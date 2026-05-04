@@ -696,3 +696,236 @@ through normal deployment resolution.
 
 It expands the deployment query contract and adds another front-door integration test surface to
 maintain.
+
+## PR-10: Vercel protected/shared control-plane execution
+
+### 1. Intent
+
+Close the remaining Vercel production-readiness gap by routing protected/shared Vercel deploy,
+preview, preview cleanup, retry, and rollback operations through the reviewed deployment
+control-plane service instead of rejecting or running them through laptop-local mutation paths.
+
+### 2. Scope of changes
+
+- Add a Vercel control-plane request and response contract that carries the admitted artifact
+  reference, source run ID, operation kind, preview cleanup inputs, smoke overrides, and admission
+  evidence through the existing service submission boundary.
+- Extend provider front-door dispatch so protected/shared Vercel mutations require and use the
+  reviewed control-plane service path, while `local_only` Vercel fixtures can still run locally.
+- Ensure protected/shared Vercel deploys, previews, retries, rollbacks, and cleanup operations never
+  accept laptop-local artifact paths or unreviewed local records roots.
+- Preserve the existing Vercel artifact admission, secret runtime, smoke, record, and fake API
+  behavior behind the service execution boundary.
+- Add replay handling for Vercel retry and rollback that reuses recorded exact artifacts or recorded
+  provider deployments where identity can be proven.
+
+### 3. External prerequisites
+
+- No live Vercel account is required for the first control-plane contract tests.
+- Live use still requires the Vercel token, team/project access, and DNS/domain ownership described
+  in PR-3.
+
+### 4. Tests to be added
+
+- Protected/shared service submission tests proving Vercel deploy, preview, preview cleanup, retry,
+  and rollback route through the control-plane service.
+- Negative front-door tests proving protected/shared Vercel mutations reject laptop-local artifact
+  paths, records roots, and direct local publish flags.
+- Replay tests proving Vercel retry and rollback reuse recorded exact artifacts and do not rebuild
+  from the current branch.
+- Fake Vercel API tests for ambiguous publish and cleanup outcomes through the service boundary.
+- Contract tests proving `local_only` Vercel fixture publishing remains available for tests and
+  development without weakening protected/shared behavior.
+
+### 5. Docs to be added or updated
+
+- Update deployment usage docs with protected/shared Vercel control-plane examples for deploy,
+  preview, cleanup, retry, and rollback.
+- Update Vercel troubleshooting docs with service submission, admission, replay, and provider API
+  failure modes.
+- Update deployment provider capability docs if Vercel runtime parity or service-only flags change.
+
+### 6. Acceptance criteria
+
+- Protected/shared Vercel mutations run only through the reviewed control-plane service path.
+- Vercel retry and rollback are recorded, test-covered, and replay exact admitted artifacts or
+  proven provider deployment identities.
+- Local fixture behavior remains explicit and cannot be selected accidentally for protected/shared
+  targets.
+
+### 7. Risks
+
+- Vercel provider records and control-plane records can drift if the service boundary does not carry
+  every replay-relevant field.
+- Preview cleanup and rollback can have provider-specific ambiguity that is harder to model than a
+  normal deploy.
+
+### 8. Mitigations
+
+- Treat the control-plane request schema as the versioned replay boundary and include fixture tests
+  for every operation kind.
+- Fail closed on ambiguous Vercel API outcomes and preserve diagnostic provider IDs in redacted
+  records.
+
+### 9. Consequences of not implementing this PR
+
+Vercel deployments can be declared and locally exercised, but protected/shared production mutation
+remains unavailable or outside the reviewed deployment service path.
+
+### 10. Downsides for implementing this PR
+
+It adds another provider-specific control-plane adapter and increases the replay matrix for Vercel
+operations.
+
+## PR-11: OpenTofu reviewed apply and provision credential runtime
+
+### 1. Intent
+
+Finish OpenTofu support by applying only the reviewed plan or a fail-closed resolved-input snapshot
+and by resolving provider credentials through the deployment secret runtime at the `provision`
+step.
+
+### 2. Scope of changes
+
+- Add an OpenTofu apply adapter for `opentofu-stack` provisioners that consumes the recorded plan
+  artifact, stack config fingerprint, state backend identity, and admission-bound plan fingerprint.
+- Resolve OpenTofu provider and backend credentials only through deployment `secret_requirements`
+  at the `provision` step.
+- Reject provision-only and app-attached provisioner runs when the plan artifact, plan fingerprint,
+  stack config fingerprint, stack identity, or state backend identity does not match admission
+  evidence.
+- Preserve destructive-plan rejection for routine flows and add an explicit reviewed exception path
+  before any destructive workflow can apply.
+- Record apply outcome, provider command metadata, state backend identity, plan fingerprint, stack
+  config fingerprint, and redacted diagnostics in deployment records.
+
+### 3. External prerequisites
+
+- OpenTofu and provider plugin versions must be pinned through the repo's Nix dependency model.
+- Real external use requires provider accounts, backend storage/locking, and Vault roles for the
+  declared `provision` contracts.
+- Initial state backend bootstrap may remain an explicit operator prerequisite.
+
+### 4. Tests to be added
+
+- Fake OpenTofu apply tests proving only the admitted plan fingerprint can be applied.
+- Negative tests for missing plan artifacts, mismatched plan fingerprints, mismatched stack config
+  fingerprints, state backend drift, and missing `provision` credentials.
+- Secretspec tests proving provider credentials are scoped to `provision` and never written to
+  records.
+- Destructive-plan tests proving routine flows reject delete/replace/unknown actions unless a
+  reviewed destructive workflow or exception is present.
+- Provision-only and app-attached provisioner tests proving records include apply outcome and replay
+  evidence.
+
+### 5. Docs to be added or updated
+
+- Update deployment usage docs with OpenTofu plan, admission, apply, and provision-only flows.
+- Update secrets docs with OpenTofu provider and backend credential contract IDs.
+- Add or update the OpenTofu stack layout guide with reviewed apply, state backend, and destructive
+  workflow rules.
+
+### 6. Acceptance criteria
+
+- OpenTofu provision-only and app-attached provisioner runs apply only admission-bound plans or
+  fail-closed resolved-input snapshots.
+- OpenTofu provider credentials are available only through the secret runtime at `provision`.
+- Destructive OpenTofu changes cannot run through routine protected/shared flows.
+
+### 7. Risks
+
+- OpenTofu plan JSON and apply behavior can vary across provider versions.
+- State backend locking failures can leave confusing partial outcomes.
+
+### 8. Mitigations
+
+- Pin OpenTofu/provider versions and test against stable fixture plan JSON.
+- Treat unknown or partial apply outcomes as failed runs with redacted diagnostics and recorded
+  follow-up context.
+
+### 9. Consequences of not implementing this PR
+
+OpenTofu deployments can record reviewed plan metadata, but infrastructure mutation still depends on
+ad hoc operator commands outside the admitted, replayable deployment model.
+
+### 10. Downsides for implementing this PR
+
+It introduces a real infrastructure mutation surface and requires careful redaction and failure
+recording around provider diagnostics.
+
+## PR-12: Kubernetes publisher secret-runtime credentials
+
+### 1. Intent
+
+Close the container-runtime provider credential gap by ensuring Kubernetes service publish,
+retry, rollback, and promotion consume declared credentials through the deployment secret runtime
+instead of relying on ambient Helm or cluster environment state.
+
+### 2. Scope of changes
+
+- Add Kubernetes/container-runtime credential resolution through deployment `secret_requirements`
+  at the `publish` step for normal deploy, retry, rollback, and promotion.
+- Pass only scoped, redacted credential material or generated kubeconfig references into the Helm
+  publisher process.
+- Reject Kubernetes service deployments with provider profiles or protected/shared posture when the
+  required publish credentials are undeclared, wrong-step, wrong-scope, or only present as ambient
+  provider environment variables.
+- Preserve scrubbed publisher environment behavior while adding an explicit reviewed credential
+  input path.
+- Record credential contract references and redacted publisher credential provenance without
+  writing secret values to deployment records.
+
+### 3. External prerequisites
+
+- A chosen Kubernetes credential contract shape, such as a generated kubeconfig secret, service
+  account token, or control-plane-issued short-lived credential reference.
+- Vault roles and target scopes for each protected/shared Kubernetes provider target.
+
+### 4. Tests to be added
+
+- Secretspec tests proving Kubernetes publish credentials resolve only at `publish` and are redacted
+  from records.
+- Fake Helm tests proving the publisher receives only reviewed credential inputs and no ambient
+  provider environment secrets.
+- Negative validation tests for missing, duplicate, wrong-step, wrong-scope, and ambient-only
+  Kubernetes/container-runtime credentials.
+- Retry, rollback, and promotion tests proving exact-artifact replay still resolves credentials
+  through the target deployment's current reviewed secret requirements.
+
+### 5. Docs to be added or updated
+
+- Update deployment secrets docs with Kubernetes/container-runtime credential contract examples.
+- Update deployment usage docs with service publish credential setup and failure modes.
+- Update provider capability docs to state that Kubernetes protected/shared publish requires
+  secret-runtime credentials.
+
+### 6. Acceptance criteria
+
+- Protected/shared Kubernetes service publish paths cannot mutate provider state without reviewed
+  `publish` credentials from the secret runtime.
+- Kubernetes retry, rollback, and promotion preserve exact artifact replay while resolving current
+  target-scoped provider credentials safely.
+- Tests prove secret values are not persisted in records or passed through ambient provider
+  environment variables.
+
+### 7. Risks
+
+- Credential shape decisions can become provider-specific and leak Kubernetes implementation details
+  into generic deployment contracts.
+- Short-lived credentials can expire during long smoke or retry flows.
+
+### 8. Mitigations
+
+- Keep the generic requirement contract at the deployment layer and isolate Kubernetes-specific
+  materialization in the publisher adapter.
+- Resolve credentials close to publish time and record only redacted contract provenance.
+
+### 9. Consequences of not implementing this PR
+
+Kubernetes service artifacts can be admitted and replayed, but provider mutation still depends on
+unreviewed ambient cluster access outside the repo's secret-runtime model.
+
+### 10. Downsides for implementing this PR
+
+It adds another credential materialization path and more negative tests around provider environment
+handling.
