@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-marketplace.json",
+  "name": "repo-plugins",
+  "owner": {
+    "name": "kiltyj"
+  },
+  "plugins": [
+    {
+      "name": "repo-skills",
+      "description": "Repo-local planning and PR workflow skills for this clone.",
+      "source": "./plugins/repo-skills",
+      "category": "productivity"
+    }
+  ]
+}

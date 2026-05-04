@@ -9,4 +9,4 @@ Use this plugin skill as the direct entrypoint for the repo plan augmentation wo
 
 1. Read [WORKFLOW.md](WORKFLOW.md) and use it as the source of truth for the rest of the task.
 2. Read only the references and scripts that `WORKFLOW.md` asks for.
-3. Keep persistent state in the repo-local files under this skill directory, not in `~/.codex/skills`.
+3. Keep persistent state in the repo-local files under this skill directory, not in user-global plugin or skill caches.

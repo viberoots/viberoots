@@ -1,0 +1,8 @@
+{
+  "name": "repo-skills",
+  "version": "0.2.2",
+  "description": "Repo-local planning and PR workflow skills for this clone.",
+  "license": "UNLICENSED",
+  "keywords": ["repo", "skills", "workflow"],
+  "skills": "./skills/"
+}
