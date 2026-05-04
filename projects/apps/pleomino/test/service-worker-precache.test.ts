@@ -13,7 +13,7 @@ describe("service worker precache integration", () => {
     expect(viteConfig).toContain("materialize-static-pwa-precache.ts");
     expect(viteConfig).toContain('"--cache-version-prefix"');
     expect(viteConfig).toContain('"pleomino"');
-    expect(viteConfig).toContain("process.execPath");
+    expect(viteConfig).toContain('"zx-wrapper"');
     expect(viteConfig).not.toContain("service-worker-precache.mjs");
   });
 
