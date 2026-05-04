@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { createSolverRequestFromGameState, solveBoardWithWasm } from "../src/game/solver/solver.ts";
-import { selectSeededRankedCandidate } from "../src/game/solver/seeded-selection.ts";
-import { STATIC_INTERESTING_SOLUTIONS } from "../src/game/solver/static-interesting-solutions.ts";
-import { createInitialGameState } from "../src/game/state.ts";
-import type { SolverRankedCandidate } from "../src/game/solver/solver-types.ts";
-import { makeRankedCandidate, makeSeededRequest } from "./game-solver-seeded-selection-helpers.ts";
+import { createSolverRequestFromGameState, solveBoardWithWasm } from "../src/game/solver/solver";
+import { selectSeededRankedCandidate } from "../src/game/solver/seeded-selection";
+import { STATIC_INTERESTING_SOLUTIONS } from "../src/game/solver/static-interesting-solutions";
+import { createInitialGameState } from "../src/game/state";
+import type { SolverRankedCandidate } from "../src/game/solver/solver-types";
+import { makeRankedCandidate, makeSeededRequest } from "./game-solver-seeded-selection-helpers";
 
 describe("solver seeded selection", () => {
   it("uses diversity ordering inside the seeded selection window", () => {

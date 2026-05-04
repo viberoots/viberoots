@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { transformCells, translateCells } from "../src/game/geometry.ts";
-import { cellKey, isPlacementValid } from "../src/game/placement.ts";
-import { pleominoGameReducer } from "../src/game/reducer.ts";
-import { createInitialGameState } from "../src/game/state.ts";
+import { transformCells, translateCells } from "../src/game/geometry";
+import { cellKey, isPlacementValid } from "../src/game/placement";
+import { pleominoGameReducer } from "../src/game/reducer";
+import { createInitialGameState } from "../src/game/state";
 
 function occupiedKeys(state: ReturnType<typeof createInitialGameState>): Set<string> {
   const byId = new Map(state.pieceCatalog.map((piece) => [piece.pieceId, piece]));

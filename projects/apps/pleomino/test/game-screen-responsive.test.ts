@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { computeResponsiveMetrics } from "../src/ui/game-screen-responsive.ts";
+import { computeResponsiveMetrics } from "../src/ui/game-screen-responsive";
 
 describe("game screen responsive sizing", () => {
   it("caps desktop cell size so board plus toolbar fit within viewport height", () => {

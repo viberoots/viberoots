@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { BOARD_SIZE } from "../src/game/board.ts";
-import { cellKey, inBounds, isPlacementValid, noOverlap } from "../src/game/placement.ts";
+import { BOARD_SIZE } from "../src/game/board";
+import { cellKey, inBounds, isPlacementValid, noOverlap } from "../src/game/placement";
 
 describe("placement validity", () => {
   it("accepts placements fully inside board bounds", () => {

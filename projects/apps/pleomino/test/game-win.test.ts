@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { computeWinState } from "../src/game/win.ts";
-import type { GameState } from "../src/game/types.ts";
+import { computeWinState } from "../src/game/win";
+import type { GameState } from "../src/game/types";
 
 function createState(placements: GameState["board"]["placedPieces"]): GameState {
   return {

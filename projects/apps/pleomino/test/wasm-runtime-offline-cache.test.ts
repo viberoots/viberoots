@@ -1,9 +1,6 @@
 /** @vitest-environment jsdom */
 import { afterEach, describe, expect, it, vi } from "vitest";
-import {
-  prewarmSolverWasmAsset,
-  resetSolverWasmForTests,
-} from "../src/game/solver/wasm-runtime.ts";
+import { prewarmSolverWasmAsset, resetSolverWasmForTests } from "../src/game/solver/wasm-runtime";
 
 describe("solver wasm runtime offline cache fallback", () => {
   afterEach(() => {

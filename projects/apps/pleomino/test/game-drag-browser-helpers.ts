@@ -1,6 +1,6 @@
 /** @vitest-environment jsdom */
-import { createInitialGameState } from "../src/game/state.ts";
-import { loadPersistedGameStateFromHash } from "../src/game/persistence.ts";
+import { createInitialGameState } from "../src/game/state";
+import { loadPersistedGameStateFromHash } from "../src/game/persistence";
 
 export type Pointer = { x: number; y: number };
 

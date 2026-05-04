@@ -4,8 +4,8 @@ import {
   normalizeCells,
   transformCells,
   translateCells,
-} from "../src/game/geometry.ts";
-import type { Cell } from "../src/game/types.ts";
+} from "../src/game/geometry";
+import type { Cell } from "../src/game/types";
 
 const lPiece: Cell[] = [
   { x: 0, y: 0 },

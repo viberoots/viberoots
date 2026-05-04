@@ -5,14 +5,14 @@ import { afterEach, describe, expect, it } from "vitest";
 import {
   loadPersistedGameStateFromHash,
   savePersistedGameStateToHash,
-} from "../src/game/persistence.ts";
-import type { SolverResult } from "../src/game/solver/solver-types.ts";
-import { createInitialGameState } from "../src/game/state.ts";
-import { GameScreen } from "../src/ui/game-screen.tsx";
+} from "../src/game/persistence";
+import type { SolverResult } from "../src/game/solver/solver-types";
+import { createInitialGameState } from "../src/game/state";
+import { GameScreen } from "../src/ui/game-screen";
 import {
   installWorkerBackedRuntime,
   restoreWorkerForTests,
-} from "./game-solve-worker-browser-helpers.ts";
+} from "./game-solve-worker-browser-helpers";
 
 function flushUi(): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, 0));

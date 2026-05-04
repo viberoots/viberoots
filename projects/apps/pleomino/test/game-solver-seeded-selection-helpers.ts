@@ -1,4 +1,4 @@
-import type { SolverRankedCandidate, SolverRequest } from "../src/game/solver/solver-types.ts";
+import type { SolverRankedCandidate, SolverRequest } from "../src/game/solver/solver-types";
 
 export const UNIT_PIECES = [
   { pieceId: "a", color: "#101010", baseCells: [{ x: 0, y: 0 }] },

@@ -2,8 +2,8 @@
 import React from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { GameScreen } from "../src/ui/game-screen.tsx";
-import { centeredOffset, flushUi, parsePx } from "./game-drag-browser-helpers.ts";
+import { GameScreen } from "../src/ui/game-screen";
+import { centeredOffset, flushUi, parsePx } from "./game-drag-browser-helpers";
 
 describe("game drag browser small viewport visibility", () => {
   let container: HTMLDivElement | null = null;

@@ -1,11 +1,11 @@
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { BOARD_CELL_SIZE } from "../src/game/board.ts";
-import { pleominoGameReducer } from "../src/game/reducer.ts";
-import { selectGameViewModel } from "../src/game/selectors.ts";
-import { createInitialGameState } from "../src/game/state.ts";
-import { BoardGrid } from "../src/ui/board-grid.tsx";
+import { BOARD_CELL_SIZE } from "../src/game/board";
+import { pleominoGameReducer } from "../src/game/reducer";
+import { selectGameViewModel } from "../src/game/selectors";
+import { createInitialGameState } from "../src/game/state";
+import { BoardGrid } from "../src/ui/board-grid";
 
 describe("board preview", () => {
   it("renders preview cells during drag/preview state", () => {

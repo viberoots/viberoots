@@ -4,10 +4,10 @@ import { flushSync } from "react-dom";
 import {
   loadPersistedGameStateFromHash,
   savePersistedGameStateToHash,
-} from "../src/game/persistence.ts";
-import type { SolverResult } from "../src/game/solver/solver-types.ts";
-import { createInitialGameState } from "../src/game/state.ts";
-import { GameScreen } from "../src/ui/game-screen.tsx";
+} from "../src/game/persistence";
+import type { SolverResult } from "../src/game/solver/solver-types";
+import { createInitialGameState } from "../src/game/state";
+import { GameScreen } from "../src/ui/game-screen";
 
 export function flushUi(): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, 0));

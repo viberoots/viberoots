@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { buildSolverPreparedInput } from "../src/game/solver/candidate-generation.ts";
-import type { SolverRequest } from "../src/game/solver/solver-types.ts";
+import { buildSolverPreparedInput } from "../src/game/solver/candidate-generation";
+import type { SolverRequest } from "../src/game/solver/solver-types";
 
 const DOMINO_PIECE = {
   pieceId: "domino",

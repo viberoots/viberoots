@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { solveBoardWithWasm } from "../src/game/solver/solver.ts";
-import type { SolverRequest } from "../src/game/solver/solver-types.ts";
+import { solveBoardWithWasm } from "../src/game/solver/solver";
+import type { SolverRequest } from "../src/game/solver/solver-types";
 
 const SQUARE = {
   pieceId: "square",

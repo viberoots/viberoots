@@ -1,12 +1,12 @@
 /** @vitest-environment jsdom */
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { solveBoardWithWasm } from "../src/game/solver/solver.ts";
+import { solveBoardWithWasm } from "../src/game/solver/solver";
 import {
   resetSolverRuntimeForTests,
   setSolverWorkerFactoryForTests,
   solveBoardWithRuntime,
-} from "../src/game/solver/solver-runtime.ts";
-import type { SolverRequest, SolverResult } from "../src/game/solver/solver-types.ts";
+} from "../src/game/solver/solver-runtime";
+import type { SolverRequest, SolverResult } from "../src/game/solver/solver-types";
 
 vi.mock("../src/game/solver/solver.ts", () => {
   return {

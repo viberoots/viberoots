@@ -3,13 +3,13 @@ import React from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import solveLatencyBaseline from "./fixtures/solve-interaction-latency-baseline.json";
-import { flushUi } from "./game-drag-browser-helpers.ts";
-import * as solverRuntime from "../src/game/solver/solver-runtime.ts";
-import { createInitialGameState } from "../src/game/state.ts";
-import { GameScreen } from "../src/ui/game-screen.tsx";
+import { flushUi } from "./game-drag-browser-helpers";
+import * as solverRuntime from "../src/game/solver/solver-runtime";
+import { createInitialGameState } from "../src/game/state";
+import { GameScreen } from "../src/ui/game-screen";
 
 vi.mock("../src/game/solver/solver-runtime.ts", async () => {
-  const actual = await vi.importActual<typeof import("../src/game/solver/solver-runtime.ts")>(
+  const actual = await vi.importActual<typeof import("../src/game/solver/solver-runtime")>(
     "../src/game/solver/solver-runtime.ts",
   );
   return {

@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { PLEOMINO_PIECE_CATALOG } from "../src/game/piece-catalog.ts";
-import { validatePieceCatalog } from "../src/game/piece-catalog-validation.ts";
+import { PLEOMINO_PIECE_CATALOG } from "../src/game/piece-catalog";
+import { validatePieceCatalog } from "../src/game/piece-catalog-validation";
 import {
   INITIAL_PIECE_CATALOG,
   INITIAL_PIECE_CATALOG_METADATA,
   createInitialGameState,
-} from "../src/game/state.ts";
-import type { PieceDefinition } from "../src/game/types.ts";
+} from "../src/game/state";
+import type { PieceDefinition } from "../src/game/types";
 
 describe("piece catalog", () => {
   it("validates the shipped catalog entries", () => {

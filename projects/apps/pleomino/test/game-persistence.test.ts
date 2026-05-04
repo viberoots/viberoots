@@ -5,8 +5,8 @@ import {
   restorePersistedGameState,
   savePersistedGameStateToHash,
   PLEOMINO_URL_STATE_HASH_KEY,
-} from "../src/game/persistence.ts";
-import { createInitialGameState } from "../src/game/state.ts";
+} from "../src/game/persistence";
+import { createInitialGameState } from "../src/game/state";
 
 describe("game persistence", () => {
   it("restores valid persisted state", () => {

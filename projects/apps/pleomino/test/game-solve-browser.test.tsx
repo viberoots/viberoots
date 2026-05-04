@@ -1,6 +1,6 @@
 /** @vitest-environment jsdom */
 import { afterEach, describe, expect, it, vi } from "vitest";
-import * as solverRuntime from "../src/game/solver/solver-runtime.ts";
+import * as solverRuntime from "../src/game/solver/solver-runtime";
 import {
   currentSolveState,
   flushUi,
@@ -9,10 +9,10 @@ import {
   seedSinglePurplePlacement,
   unsolvedResult,
   waitFor,
-} from "./game-solve-browser-helpers.tsx";
+} from "./game-solve-browser-helpers";
 
 vi.mock("../src/game/solver/solver-runtime.ts", async () => {
-  const actual = await vi.importActual<typeof import("../src/game/solver/solver-runtime.ts")>(
+  const actual = await vi.importActual<typeof import("../src/game/solver/solver-runtime")>(
     "../src/game/solver/solver-runtime.ts",
   );
   return {
