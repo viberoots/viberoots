@@ -1,20 +1,6 @@
 {
   "permissions": {
-    "allow": [
-      "Bash(buck2 build:*)",
-      "Bash(buck2 test:*)",
-      "Bash(node build-tools/tools/tests/scaffolding/node-cli.scaffold-and-build.shim-and-bundle.test.ts)",
-      "Bash(buck2 targets:*)",
-      "Bash(cat:*)",
-      "Bash(nix flake show:*)",
-      "Bash(node:*)",
-      "Bash(../../build-tools/tools/dev/install-deps.ts)",
-      "Bash(find:*)",
-      "Bash(build-tools/tools/bin/verify:*)",
-      "Bash(tee:*)",
-      "Read(//private/tmp/**)",
-      "Bash(./build-tools/tools/dev/install-deps.ts)"
-    ],
+    "allow": [],
     "deny": [],
     "ask": []
   }

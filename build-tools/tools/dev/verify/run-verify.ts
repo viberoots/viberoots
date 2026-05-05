@@ -25,6 +25,7 @@ import { prewarmVerifyOnce } from "./prewarm";
 import { cleanupVerifyLegacyPnpmState } from "./pnpm-state";
 import { resolveRequestedVerifyScope } from "./requested-scope";
 import { summarizeVerifyScopeDecision } from "./selection-output";
+import { installVerifySignalHandlers } from "./signal-shutdown";
 import { createRegisteredStateCleaner } from "./registered-state-cleanup";
 import {
   appendVerifyLogLine,
@@ -206,12 +207,7 @@ export async function runVerify(): Promise<void> {
     }
     return shutdownPromise;
   };
-  const signalHandler = (sig: NodeJS.Signals) => void requestShutdown(sig);
-  for (const sig of ["SIGINT", "SIGTERM", "SIGHUP"] as const) {
-    try {
-      process.once(sig, () => signalHandler(sig));
-    } catch {}
-  }
+  installVerifySignalHandlers(requestShutdown);
   const zxNodeModulesOut = await timedPhase(
     "compute-zx-test-node-modules",
     async () => await computeZxTestNodeModulesOut(root, zxInitPath),

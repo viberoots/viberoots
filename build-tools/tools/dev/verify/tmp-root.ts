@@ -3,20 +3,66 @@ import os from "node:os";
 import path from "node:path";
 import process from "node:process";
 
-export async function ensureRepoLocalTmpRoot(root: string): Promise<void> {
-  const liveRoot = process.env.LIVE_ROOT || root;
-  let tmpdir = path.join(liveRoot, "buck-out", "tmp", "tmpdir");
-  if (process.platform === "linux") {
+type TmpRootOptions = {
+  env?: NodeJS.ProcessEnv;
+  platform?: NodeJS.Platform;
+};
+
+async function writeMacosMetadataNeverIndexMarker(dir: string): Promise<void> {
+  await fsp.mkdir(dir, { recursive: true }).catch(() => {});
+  await fsp.writeFile(path.join(dir, ".metadata_never_index"), "", "utf8").catch(() => {});
+}
+
+export async function ensureRepoLocalTmpRoot(
+  root: string,
+  opts: TmpRootOptions = {},
+): Promise<void> {
+  const env = opts.env ?? process.env;
+  const platform = opts.platform ?? process.platform;
+  const liveRoot = env.LIVE_ROOT || root;
+  const legacyRepoTmpdir = path.join(liveRoot, "buck-out", "tmp", "tmpdir");
+  let tmpdir = legacyRepoTmpdir;
+  const repoLocalTmpdir = platform !== "linux" && platform !== "darwin";
+  if (platform === "linux") {
     let user = "";
     try {
       user = os.userInfo().username || "";
     } catch {}
     const suffix = user ? `-${user}` : "";
     tmpdir = path.join("/tmp", `bucknix-verify${suffix}`, "tmpdir");
-    delete process.env.TEST_TMP_IN_REPO;
+    delete env.TEST_TMP_IN_REPO;
+  } else if (platform === "darwin") {
+    let user = "";
+    try {
+      user = os.userInfo().username || "";
+    } catch {}
+    const suffix = user ? `-${user}` : "";
+    tmpdir = path.join("/tmp", `bucknix-verify${suffix}.noindex`, "tmpdir");
+    delete env.TEST_TMP_IN_REPO;
   } else {
-    process.env.TEST_TMP_IN_REPO = "1";
+    env.TEST_TMP_IN_REPO = "1";
   }
-  process.env.TMPDIR = tmpdir;
+  env.TMPDIR = tmpdir;
+  if (env.VERIFY_ALLOW_CONCURRENT !== "1") {
+    await Promise.all([
+      repoLocalTmpdir || platform === "darwin"
+        ? fsp.rm(tmpdir, { recursive: true, force: true }).catch(() => {})
+        : Promise.resolve(),
+      platform === "darwin"
+        ? fsp.rm(legacyRepoTmpdir, { recursive: true, force: true }).catch(() => {})
+        : Promise.resolve(),
+      platform === "darwin"
+        ? fsp.rm(`${legacyRepoTmpdir}.noindex`, { recursive: true, force: true }).catch(() => {})
+        : Promise.resolve(),
+    ]);
+  }
   await fsp.mkdir(tmpdir, { recursive: true }).catch(() => {});
+  if (platform === "darwin") {
+    await Promise.all([
+      writeMacosMetadataNeverIndexMarker(path.join(liveRoot, "buck-out")),
+      writeMacosMetadataNeverIndexMarker(path.join(liveRoot, "buck-out", "tmp")),
+      writeMacosMetadataNeverIndexMarker(path.dirname(tmpdir)),
+      writeMacosMetadataNeverIndexMarker(tmpdir),
+    ]);
+  }
 }

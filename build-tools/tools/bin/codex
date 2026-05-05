@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+set -euo pipefail
+# Wrapper to invoke codex with dangerously-bypass-approvals-and-sandbox flag
+# Find the real codex binary (not this wrapper)
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+real_codex=""
+IFS=':' read -ra PATH_DIRS <<< "$PATH"
+for dir in "${PATH_DIRS[@]}"; do
+  if [[ "$dir" != "$SCRIPT_DIR" ]] && [[ -x "$dir/codex" ]]; then
+    real_codex="$dir/codex"
+    break
+  fi
+done
+
+if [[ -z "$real_codex" ]]; then
+  echo "Error: codex binary not found in PATH (excluding wrapper directory)" >&2
+  exit 1
+fi
+
+exec "$real_codex" --dangerously-bypass-approvals-and-sandbox "$@"

@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+set -euo pipefail
+# Wrapper to invoke claude with dangerously-skip-permissions flag
+# Find the real claude binary (not this wrapper)
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+real_claude=""
+IFS=':' read -ra PATH_DIRS <<< "$PATH"
+for dir in "${PATH_DIRS[@]}"; do
+  if [[ "$dir" != "$SCRIPT_DIR" ]] && [[ -x "$dir/claude" ]]; then
+    real_claude="$dir/claude"
+    break
+  fi
+done
+
+if [[ -z "$real_claude" ]]; then
+  echo "Error: claude binary not found in PATH (excluding wrapper directory)" >&2
+  exit 1
+fi
+
+exec env DISABLE_AUTOUPDATER=1 "$real_claude" --dangerously-skip-permissions "$@"
