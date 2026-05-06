@@ -1185,9 +1185,20 @@ Protected/shared submit-response contract:
 - the status/read model should expose machine-readable approval states such as `pending`, `granted`, and `no_longer_valid` without relying on free-form text parsing
 - duplicate submit handling should therefore distinguish at least:
   - accepted as a new run
-  - accepted as an idempotent replay of an existing run submission
+  - accepted as a duplicate of an existing run submission
   - rejected because the idempotency key was reused for a different payload
   - rejected because the request is unauthorized, invalid, or no longer admissible
+- Vercel, Kubernetes, and S3 static protected/shared provider submissions use
+  the same submit-layer idempotency engine as shared-host submissions. Their
+  idempotency key is derived from the normalized provider payload fingerprint,
+  not from a synthetic submission id.
+- The normalized provider payload fingerprint binds operation kind, deployment
+  id and label, provider target identity, lock scope, admitted artifact identity
+  or component artifact identities, source-run or replay selector fields,
+  expected source revision, preview-cleanup source fields, and smoke connection
+  overrides. It deliberately excludes transport-only fields such as
+  `submissionId` and `submittedAt` so client retries collapse onto the already
+  admitted submission with dedupe mode `duplicate`.
 - the stable rejection taxonomy should cover common operator-actionable classes such as:
   - invalid request shape or mutually incompatible flags
   - invalid or incompatible source-run selector

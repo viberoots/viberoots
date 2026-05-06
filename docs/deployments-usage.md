@@ -223,6 +223,14 @@ change you are making.
 If a run returns `pending_approval`, do not submit it again. Approve the
 existing run using the same `deploy_run_id`.
 
+For protected/shared service-backed Vercel, Kubernetes, and S3 static
+submissions, retrying the same normalized provider payload reuses the existing
+admitted submission with dedupe mode `duplicate` instead of queueing a second
+one. The payload fingerprint binds the operation kind, provider target identity,
+admitted artifact or component artifact references, source-run/replay selector,
+expected source revision, preview-cleanup source inputs, and smoke overrides.
+Changing any of those fields creates a distinct submission.
+
 For service-backed workflows, the `deploy` CLI also covers the common operator
 inspection commands so you do not need to hand-build HTTP requests:
 

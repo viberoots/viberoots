@@ -147,7 +147,7 @@ REVIEWED_DEPLOYMENT_TEST_OWNERSHIP = {
     "build-tools/tools/tests/deployments/s3-static.publisher.config-drift.test.ts": True,
     "build-tools/tools/tests/deployments/s3-static.validation.test.ts": True,
     "build-tools/tools/tests/deployments/provider-frozen-kubernetes-worker-execution.test.ts": True, "build-tools/tools/tests/deployments/provider-frozen-replay-admission.test.ts": True, "build-tools/tools/tests/deployments/provider-frozen-snapshot.test.ts": True, "build-tools/tools/tests/deployments/provider-frozen-vercel-replay.test.ts": True,
-    "build-tools/tools/tests/deployments/provider-frozen-worker.test.ts": True, "build-tools/tools/tests/deployments/provider-frozen-worker-execution.test.ts": True,
+    "build-tools/tools/tests/deployments/provider-frozen-worker.test.ts": True, "build-tools/tools/tests/deployments/provider-frozen-worker-execution.test.ts": True, "build-tools/tools/tests/deployments/provider-submit-idempotency.test.ts": True,
     "build-tools/tools/tests/deployments/vercel.contract.test.ts": True, "build-tools/tools/tests/deployments/vercel.fixture.ts": False,
     "build-tools/tools/tests/deployments/vercel.control-plane.helpers.ts": False, "build-tools/tools/tests/deployments/vercel.control-plane.test.ts": True,
     "build-tools/tools/tests/deployments/vercel.front-door.test.ts": True, "build-tools/tools/tests/deployments/vercel.live-publisher.test.ts": True,

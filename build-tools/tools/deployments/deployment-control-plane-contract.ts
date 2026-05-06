@@ -101,7 +101,7 @@ export type DeploymentControlPlaneServiceInstance = {
 };
 
 export type DeploymentControlPlaneRequestDedupe = {
-  mode: "created" | "reused";
+  mode: "created" | "reused" | "duplicate";
   requestFingerprint: string;
   idempotencyKey?: string;
 };

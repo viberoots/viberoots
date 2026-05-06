@@ -1043,6 +1043,9 @@ Contract rules:
 
 - the exact transport or HTTP status mapping is implementation-specific, but this payload shape and rejection-code meaning should remain stable across CLI, UI, and CI-triggering clients
 - a repeated request resolved through idempotent deduplication should return the same `deploy_run_id` and indicate that no new run was created
+- for provider submit-layer payload-fingerprint matches, the dedupe outcome is
+  `duplicate`; `reused` remains reserved for older submit/run-action paths that
+  already expose that term
 - when a request is valid and authorized to request deployment but still needs human approval, the canonical response is an accepted run with `lifecycle_state = pending_approval`, not a submit-time rejection
 - rejection codes should be machine-readable, closed by policy review, and documented enough that clients can automate behavior without depending on prose strings
 

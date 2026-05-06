@@ -20,7 +20,11 @@ export async function abortPausedProgressiveRun(opts: {
   actionId: string;
   submittedAt: string;
   requestedBy: unknown;
-  dedupe: { mode: "created" | "reused"; requestFingerprint: string; idempotencyKey?: string };
+  dedupe: {
+    mode: "created" | "reused" | "duplicate";
+    requestFingerprint: string;
+    idempotencyKey?: string;
+  };
 }) {
   const snapshot = await readControlPlaneJson<any>(opts.submission.executionSnapshotPath);
   const rollout = opts.submission.progressiveRollout

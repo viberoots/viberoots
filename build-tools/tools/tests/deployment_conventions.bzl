@@ -156,6 +156,7 @@ _TEMP_REPO_DEPLOYMENT_TESTS = {
     "build-tools/tools/tests/deployments/provider-frozen-vercel-replay.test.ts": True,
     "build-tools/tools/tests/deployments/provider-frozen-worker.test.ts": True,
     "build-tools/tools/tests/deployments/provider-frozen-worker-execution.test.ts": True,
+    "build-tools/tools/tests/deployments/provider-submit-idempotency.test.ts": True,
     "build-tools/tools/tests/deployments/s3-static.control-plane.reviewed-source.test.ts": True,
     "build-tools/tools/tests/deployments/s3-static.control-plane.service.test.ts": True,
     "build-tools/tools/tests/deployments/s3-static.deploy.e2e.test.ts": True,

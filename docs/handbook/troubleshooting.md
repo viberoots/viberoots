@@ -229,6 +229,24 @@ unexpected outcome.
     `frozenExecutionSchemaVersion`, `admittedContext.policyEvaluation`, and the
     admitted artifact or source-run replay selector used by the worker.
 
+### Submit idempotency reuse
+
+- Symptom: a repeated Vercel, Kubernetes, or S3 static protected/shared submit
+  returns the first `submissionId` with dedupe mode `duplicate` instead of the
+  newly generated one.
+- Reason: the shared submit layer dedupes provider submissions by normalized
+  payload fingerprint. `submissionId` and `submittedAt` are transport fields;
+  the fingerprint is based on operation kind, target identity, admitted
+  artifacts, source-run or replay selectors, preview-cleanup inputs, expected
+  source revision, and smoke overrides.
+- Fix:
+  - Treat this as expected when retrying the same intent after a lost response.
+  - If a genuinely new run is needed, change the replay-relevant input, such as
+    the source run, admitted artifact, operation kind, or smoke override.
+  - If a record contains `requestFingerprint` starting with `direct:`, it was
+    written by a stale provider-control-plane fixture or binary and should be
+    regenerated through the reviewed service path.
+
 ### Missing replay snapshot for retry or rollback
 
 - Symptom: retry (`--publish-only`) or rollback

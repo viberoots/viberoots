@@ -38,7 +38,11 @@ type SubmissionRecord = {
   latestAction?: {
     actionId: string;
     action: DeploymentControlPlaneRunAction;
-    dedupe: { mode: "created" | "reused"; requestFingerprint: string; idempotencyKey?: string };
+    dedupe: {
+      mode: "created" | "reused" | "duplicate";
+      requestFingerprint: string;
+      idempotencyKey?: string;
+    };
   };
 };
 

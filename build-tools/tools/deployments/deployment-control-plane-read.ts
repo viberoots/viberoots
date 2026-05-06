@@ -31,7 +31,7 @@ type SubmissionRecord = {
     | "cancelled";
   terminationReason: "cancelled" | "superseded" | "no_longer_admitted" | "lock_timeout" | null;
   dedupe: {
-    mode: "created" | "reused";
+    mode: "created" | "reused" | "duplicate";
     requestFingerprint: string;
     idempotencyKey?: string;
   };
@@ -72,7 +72,7 @@ type SubmissionRecord = {
     action: "cancel" | "resume" | "abort" | "approve";
     submittedAt: string;
     dedupe: {
-      mode: "created" | "reused";
+      mode: "created" | "reused" | "duplicate";
       requestFingerprint: string;
       idempotencyKey?: string;
     };

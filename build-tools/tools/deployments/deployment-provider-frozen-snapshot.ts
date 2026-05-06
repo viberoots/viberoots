@@ -9,6 +9,7 @@ import { evaluateDeploymentAdmission } from "./deployment-admission-evaluator";
 import type { AdmittedContextLike } from "./deployment-admission-facts";
 import {
   enqueueBackendSubmission,
+  readBackendSubmissionBySubmissionId,
   writeBackendSnapshotDoc,
   writeBackendSubmissionDoc,
   type NixosSharedHostControlPlaneBackendTarget,
@@ -22,6 +23,7 @@ import {
   assertFrozenReplayAdmissionMatchesSnapshot,
   assertReplayAdmissionMatchesRecord,
 } from "./deployment-replay-admission";
+import { resolveProviderSubmitIdempotency } from "./deployment-provider-submit-idempotency";
 
 export const DEPLOYMENT_PROVIDER_FROZEN_SNAPSHOT_SCHEMA =
   "deployment-provider-frozen-execution-snapshot@1";
@@ -162,6 +164,23 @@ export async function queueFrozenProviderSubmission(opts: {
     admission: FrozenProviderAdmission;
   };
 }) {
+  const dedupe = await resolveProviderSubmitIdempotency({
+    backend: opts.backend,
+    snapshot: opts.snapshot,
+  });
+  if (dedupe.mode === "duplicate") {
+    const existing = await readBackendSubmissionBySubmissionId(opts.backend, dedupe.targetId);
+    if (!existing) throw new Error(`idempotent provider submission missing: ${dedupe.targetId}`);
+    return submitResponseFromSubmission({
+      ...(existing as any),
+      dedupe: {
+        ...((existing as any).dedupe || {}),
+        mode: "duplicate",
+        requestFingerprint: dedupe.requestFingerprint,
+        idempotencyKey: dedupe.idempotencyKey,
+      },
+    });
+  }
   const refs = {
     executionSnapshotPath: executionSnapshotPathFor(opts.recordsRoot, opts.snapshot.submissionId),
     submissionPath: submissionPathFor(opts.recordsRoot, opts.snapshot.submissionId),
@@ -179,7 +198,11 @@ export async function queueFrozenProviderSubmission(opts: {
     executionSnapshotPath: refs.executionSnapshotPath,
     lifecycleState: "queued",
     terminationReason: null,
-    dedupe: { mode: "created", requestFingerprint: `direct:${opts.snapshot.submissionId}` },
+    dedupe: {
+      mode: dedupe.mode,
+      requestFingerprint: dedupe.requestFingerprint,
+      idempotencyKey: dedupe.idempotencyKey,
+    },
     admission: opts.snapshot.admission,
   };
   await writeBackendSubmissionDoc(opts.backend, submission as any, refs);
