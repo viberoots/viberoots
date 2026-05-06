@@ -4,7 +4,7 @@ import path from "node:path";
 import type { LanguageHandler } from "./types";
 import { repoRoot } from "./lib/apply";
 import { runGlue } from "./glue";
-import { readImporterArg, readPatchDirArg } from "../lib/cli";
+import { readFlagStrFromTokens, readImporterArg, readPatchDirArg } from "../lib/cli";
 import { resolvePythonDist } from "./python-dist-resolve";
 import { requirePositional } from "./lib/args";
 import { resolveImporterLocalPatchDir } from "./lib/importer-local-patch-dir";
@@ -20,12 +20,24 @@ function keyFor(dist: string, ver: string): string {
   return `${String(dist || "").toLowerCase()}@${String(ver || "").toLowerCase()}`;
 }
 
+function importerArg(args: string[]): string {
+  return readFlagStrFromTokens("importer", "", args).trim() || readImporterArg("");
+}
+
+function patchDirArg(args: string[]): string {
+  return (
+    readFlagStrFromTokens("patch-dir", "", args).trim() ||
+    readFlagStrFromTokens("patchDir", "", args).trim() ||
+    readPatchDirArg("")
+  );
+}
+
 async function doStart(args: string[]) {
   const dist = requirePositional(args, 0, {
     name: "<distribution> name",
     example: "requests",
   });
-  const importerFlag = readImporterArg("");
+  const importerFlag = importerArg(args);
   const resolved = await resolvePythonDist(dist, importerFlag || undefined);
   const key = keyFor(resolved.importPath, resolved.version);
   await startWorkspaceWorkflow({
@@ -45,12 +57,12 @@ async function doApply(args: string[]) {
     name: "<distribution> name",
     example: "requests",
   });
-  const importerFlag = readImporterArg("");
+  const importerFlag = importerArg(args);
   const resolved = await resolvePythonDist(dist, importerFlag || undefined);
   const key = keyFor(resolved.importPath, resolved.version);
 
   const root = repoRoot();
-  const overridePatchDir = readPatchDirArg("");
+  const overridePatchDir = patchDirArg(args);
   const patchDir = resolveImporterLocalPatchDir({
     repoRootAbs: root,
     importerDirAbs: resolved.importerDir,
@@ -89,7 +101,7 @@ async function doReset(args: string[]) {
     name: "<distribution> name",
     example: "requests",
   });
-  const importerFlag = readImporterArg("");
+  const importerFlag = importerArg(args);
   const resolved = await resolvePythonDist(dist, importerFlag || undefined);
   const key = keyFor(resolved.importPath, resolved.version);
   await resetWorkspaceWorkflow({
@@ -104,11 +116,11 @@ async function doRemove(args: string[]) {
     name: "<distribution> name",
     example: "requests",
   });
-  const importerFlag = readImporterArg("");
+  const importerFlag = importerArg(args);
   const resolved = await resolvePythonDist(dist, importerFlag || undefined);
 
   const root = repoRoot();
-  const overridePatchDir = readPatchDirArg("");
+  const overridePatchDir = patchDirArg(args);
   const patchDir = resolveImporterLocalPatchDir({
     repoRootAbs: root,
     importerDirAbs: resolved.importerDir,

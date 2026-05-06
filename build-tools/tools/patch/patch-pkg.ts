@@ -14,7 +14,7 @@ try {
   } catch {}
 }
 import path from "node:path";
-import { getFlagBool, getFlagStr, getPositionals } from "../lib/cli";
+import { getArgvTokens, removeKnownFlags } from "../lib/cli";
 import { patchInvalidationStrategyForLang, patchPkgUsageNotes } from "../lib/lang-contracts";
 
 type SubcommandName = "start" | "apply" | "reset" | "session" | "remove" | "sync-required" | "help";
@@ -55,31 +55,52 @@ function usage(msg?: string) {
   process.exit(2);
 }
 
-const [_subRaw, _lang, ...positional] = getPositionals();
+function positionalTokens(argv: string[]): string[] {
+  const out: string[] = [];
+  for (let i = 0; i < argv.length; i++) {
+    const a = argv[i] || "";
+    if (a === "--") {
+      out.push(...argv.slice(i + 1));
+      break;
+    }
+    if (a.startsWith("--")) {
+      if (!a.includes("=") && argv[i + 1] && !argv[i + 1]!.startsWith("--")) i++;
+      continue;
+    }
+    out.push(a);
+  }
+  return out;
+}
+
+const rawTokens = getArgvTokens();
+const parsed = removeKnownFlags(rawTokens, {
+  presence: ["--force", "--write-placeholders"],
+  takesValue: ["--importer", "--target", "--patch-dir", "--patchDir", "--lang"],
+});
+const [_subRaw, _lang, ...positional] = positionalTokens(parsed.argv);
 const sub = ((_subRaw as string) || "help").toLowerCase() as SubcommandName;
-const langFlag = getFlagStr("lang", "");
-const lang = (_lang as string) || langFlag;
+const lang = (_lang as string) || parsed.seen["--lang"] || "";
 const rest: string[] = [...(positional as string[])];
 // Pass-through select flags needed by language handlers (opt-in list to reduce surprises)
-const importer = getFlagStr("importer", "");
+const importer = parsed.seen["--importer"] || "";
 if (importer.trim() !== "") {
   rest.push("--importer", importer);
 }
-const target = getFlagStr("target", "");
+const target = parsed.seen["--target"] || "";
 if (target.trim() !== "") {
   rest.push("--target", target);
 }
 // Support both dashed and camelCase variants commonly present via zx/minimist
-const patchDirDashed = getFlagStr("patch-dir", "");
-const patchDirCamel = getFlagStr("patchDir", "");
+const patchDirDashed = parsed.seen["--patch-dir"] || "";
+const patchDirCamel = parsed.seen["--patchDir"] || "";
 const patchDirVal = patchDirDashed || patchDirCamel;
 if (patchDirVal.trim() !== "") {
   rest.push("--patch-dir", patchDirVal);
 }
-if (getFlagBool("force")) {
+if (Object.prototype.hasOwnProperty.call(parsed.seen, "--force")) {
   rest.push("--force");
 }
-if (getFlagBool("write-placeholders")) {
+if (Object.prototype.hasOwnProperty.call(parsed.seen, "--write-placeholders")) {
   rest.push("--write-placeholders");
 }
 

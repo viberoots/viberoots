@@ -1,6 +1,7 @@
 import path from "node:path";
 import { stripAnsiAndCrs } from "./types";
 import type { VerifyStatus } from "./types";
+import { countRecentCompletions, RECENT_COMPLETION_WINDOW_SECONDS } from "./completion-rate";
 import {
   findLastFullSuiteWindowStart,
   formatElapsed,
@@ -17,6 +18,13 @@ import {
   passExitForBegin,
 } from "./passes";
 import { parseFinalSummary } from "./summary";
+
+function formatProjectedEndTime(epochSec: number): string {
+  return new Date(epochSec * 1000).toLocaleTimeString([], {
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
 
 function aggregateVerifyPassStatus(
   lines: string[],
@@ -126,17 +134,74 @@ export function computeVerifyStatusFromLogText(opts: {
     base.passTotal && base.passTotal > 1 ? base.done : exitMarker.done ? true : base.done;
   const stoppedAtSec = stoppedMarker.endSec ?? opts.stoppedAtSec;
   const stopped = !done && (stoppedMarker.stopped || stoppedAtSec !== undefined);
-  const elapsed = (() => {
-    if (base.elapsed) return base.elapsed;
+  const elapsedSeconds = (() => {
     if (beginSec === undefined) return undefined;
     if (done) {
       if (exitMarker.endSec === undefined) return undefined;
-      return formatElapsed(exitMarker.endSec - beginSec);
+      return exitMarker.endSec - beginSec;
     }
-    if (stopped && stoppedAtSec !== undefined) {
-      return formatElapsed(stoppedAtSec - beginSec);
+    if (stopped && stoppedAtSec !== undefined) return stoppedAtSec - beginSec;
+    return Date.now() / 1000 - beginSec;
+  })();
+  const elapsed = (() => {
+    if (base.elapsed) return base.elapsed;
+    if (elapsedSeconds === undefined) return undefined;
+    return formatElapsed(elapsedSeconds);
+  })();
+  const completedTests = base.pass + base.fail + base.fatal + base.skip;
+  const completionRateAvgPerMinute =
+    elapsedSeconds !== undefined && elapsedSeconds > 0
+      ? completedTests / (elapsedSeconds / 60)
+      : undefined;
+  const recentEndSec =
+    done && exitMarker.endSec !== undefined
+      ? exitMarker.endSec
+      : stopped && stoppedAtSec !== undefined
+        ? stoppedAtSec
+        : beginSec !== undefined
+          ? Date.now() / 1000
+          : undefined;
+  const recentCompletions =
+    recentEndSec === undefined ? undefined : countRecentCompletions(window, recentEndSec);
+  const completionRateRecentPerMinute =
+    recentCompletions === undefined
+      ? undefined
+      : recentCompletions / (RECENT_COMPLETION_WINDOW_SECONDS / 60);
+  const nowSec =
+    done && exitMarker.endSec !== undefined
+      ? exitMarker.endSec
+      : stopped && stoppedAtSec !== undefined
+        ? stoppedAtSec
+        : Date.now() / 1000;
+  const projection = (() => {
+    const begins = parsePassBegins(window);
+    const exits = parsePassExits(window);
+    const lastPass = begins
+      .filter(
+        (begin) =>
+          begin.index === begin.total &&
+          begin.startSec !== undefined &&
+          passExitForBegin(begin, exits) === undefined,
+      )
+      .at(-1);
+    if (!lastPass || done || stopped) return {};
+    if (nowSec - (lastPass.startSec || 0) < RECENT_COMPLETION_WINDOW_SECONDS) return {};
+    if (base.remaining === undefined || base.remaining <= 0) return {};
+    if (
+      completionRateRecentPerMinute === undefined ||
+      !Number.isFinite(completionRateRecentPerMinute) ||
+      completionRateRecentPerMinute <= 0
+    ) {
+      return {};
     }
-    return formatElapsed(Date.now() / 1000 - beginSec);
+    const remainingSeconds = (base.remaining / completionRateRecentPerMinute) * 60;
+    const projectedTotalSeconds =
+      beginSec === undefined ? undefined : nowSec + remainingSeconds - beginSec;
+    return {
+      projectedDuration:
+        projectedTotalSeconds === undefined ? undefined : formatElapsed(projectedTotalSeconds),
+      projectedEndTime: formatProjectedEndTime(nowSec + remainingSeconds),
+    };
   })();
   // If the buck2 test exited non-zero but we didn't see an explicit build failure count,
   // treat it as a build failure for status coloring.
@@ -154,6 +219,10 @@ export function computeVerifyStatusFromLogText(opts: {
     stopReason: stopped ? (stoppedMarker.reason ?? opts.stopReason) : undefined,
     buildFailure,
     elapsed,
+    completionRateAvgPerMinute,
+    completionRateRecentPerMinute,
+    projectedDuration: projection.projectedDuration,
+    projectedEndTime: projection.projectedEndTime,
     gcDetected,
   };
 }

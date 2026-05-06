@@ -15,6 +15,7 @@ result
 .local/deploy-vault/
 .local/deployments/
 .claude/worktrees/
+.codex/worktrees/
 deployment-host/identity-provider/*.json
 plugins/repo-skills/skills/**/references/*.local.md
 

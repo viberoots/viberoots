@@ -1,4 +1,5 @@
 #!/usr/bin/env zx-wrapper
+import fs from "node:fs";
 import path from "node:path";
 import { normalizeTargetLabel } from "../lib/labels";
 import { repoRoot } from "../lib/repo";
@@ -25,9 +26,18 @@ export function deriveAppIdFromTargetLabel(appTargetLabel: string): string {
   return appId;
 }
 
+function canonicalPath(p: string): string {
+  const resolved = path.resolve(p);
+  try {
+    return fs.realpathSync.native(resolved);
+  } catch {
+    return resolved;
+  }
+}
+
 export function deriveAppTargetLabelFromCwd(appCwd: string, root: string): string {
-  const rootAbs = path.resolve(root);
-  const cwdAbs = path.resolve(appCwd);
+  const rootAbs = canonicalPath(root);
+  const cwdAbs = canonicalPath(appCwd);
   const rel = toPosixPath(path.relative(rootAbs, cwdAbs));
   if (rel === "." || rel.startsWith("../")) {
     throw new Error(
@@ -42,7 +52,7 @@ export function resolveModuleContractsPaths(args: {
   appTargetLabel?: string;
   root?: string;
 }): ModuleContractsPaths {
-  const root = path.resolve(args.root || repoRoot());
+  const root = canonicalPath(args.root || repoRoot());
   const appTargetLabel = normalizeTargetLabel(
     args.appTargetLabel || deriveAppTargetLabelFromCwd(args.appCwd, root),
   );

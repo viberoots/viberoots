@@ -6,6 +6,7 @@ import process from "node:process";
 type TmpRootOptions = {
   env?: NodeJS.ProcessEnv;
   platform?: NodeJS.Platform;
+  systemTmpRoot?: string;
 };
 
 async function writeMacosMetadataNeverIndexMarker(dir: string): Promise<void> {
@@ -20,6 +21,7 @@ export async function ensureRepoLocalTmpRoot(
   const env = opts.env ?? process.env;
   const platform = opts.platform ?? process.platform;
   const liveRoot = env.LIVE_ROOT || root;
+  const systemTmpRoot = opts.systemTmpRoot ?? "/tmp";
   const legacyRepoTmpdir = path.join(liveRoot, "buck-out", "tmp", "tmpdir");
   let tmpdir = legacyRepoTmpdir;
   const repoLocalTmpdir = platform !== "linux" && platform !== "darwin";
@@ -29,7 +31,7 @@ export async function ensureRepoLocalTmpRoot(
       user = os.userInfo().username || "";
     } catch {}
     const suffix = user ? `-${user}` : "";
-    tmpdir = path.join("/tmp", `bucknix-verify${suffix}`, "tmpdir");
+    tmpdir = path.join(systemTmpRoot, `bucknix-verify${suffix}`, "tmpdir");
     delete env.TEST_TMP_IN_REPO;
   } else if (platform === "darwin") {
     let user = "";
@@ -37,7 +39,7 @@ export async function ensureRepoLocalTmpRoot(
       user = os.userInfo().username || "";
     } catch {}
     const suffix = user ? `-${user}` : "";
-    tmpdir = path.join("/tmp", `bucknix-verify${suffix}.noindex`, "tmpdir");
+    tmpdir = path.join(systemTmpRoot, `bucknix-verify${suffix}.noindex`, "tmpdir");
     delete env.TEST_TMP_IN_REPO;
   } else {
     env.TEST_TMP_IN_REPO = "1";

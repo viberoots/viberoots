@@ -31,7 +31,7 @@
     ]
   },
   "devDependencies": {
-    "@anthropic-ai/claude-code": "2.0.17",
+    "@anthropic-ai/claude-code": "2.1.128",
     "@modelcontextprotocol/sdk": "^1.17.4",
     "@openai/codex": "0.128.0",
     "@sinclair/typebox": "^0.32.35",

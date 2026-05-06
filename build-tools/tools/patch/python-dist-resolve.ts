@@ -1,5 +1,6 @@
 #!/usr/bin/env zx-wrapper
 import path from "node:path";
+import fs from "node:fs";
 import type { ResolveResult } from "./types";
 import { parseUvLockKeys } from "../lib/uv-lock";
 import { findNearestLockfileForPackage } from "../lib/importers";
@@ -23,11 +24,21 @@ function normName(s: string): string {
 
 async function findNearestUvLockAbs(importerFlag?: string): Promise<string> {
   const root = repoRoot();
-  const baseAbs = importerFlag
-    ? path.isAbsolute(importerFlag)
-      ? importerFlag
-      : path.join(root, importerFlag)
-    : process.cwd();
+  const canonical = (p: string): string => {
+    const abs = path.resolve(p);
+    try {
+      return fs.realpathSync.native(abs);
+    } catch {
+      return abs;
+    }
+  };
+  const baseAbs = canonical(
+    importerFlag
+      ? path.isAbsolute(importerFlag)
+        ? importerFlag
+        : path.join(root, importerFlag)
+      : process.cwd(),
+  );
 
   const pkgDir = toPosixPath(path.relative(root, baseAbs));
   const lockRel = await findNearestLockfileForPackage({ pkgDir, lockfileBasename: "uv.lock" });

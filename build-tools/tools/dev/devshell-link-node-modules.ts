@@ -52,6 +52,15 @@ async function readSymlinkTarget(linkPath: string): Promise<string> {
   }
 }
 
+async function canonicalPath(p: string): Promise<string> {
+  const abs = path.resolve(p);
+  try {
+    return await fsp.realpath(abs);
+  } catch {
+    return abs;
+  }
+}
+
 async function ensureSymlink(target: string, linkPath: string): Promise<boolean> {
   const exists = await pathExists(linkPath);
   if (exists) {
@@ -78,15 +87,18 @@ async function main() {
   const envRoot = String(process.env.WORKSPACE_ROOT || "").trim();
   const envRootAbs = envRoot ? path.resolve(envRoot) : "";
   const cwdAbs = path.resolve(cwd);
+  const envRootCanonical = envRootAbs ? await canonicalPath(envRootAbs) : "";
+  const cwdCanonical = await canonicalPath(cwdAbs);
   const repoRoot =
-    envRootAbs && (cwdAbs === envRootAbs || cwdAbs.startsWith(envRootAbs + path.sep))
+    envRootCanonical &&
+    (cwdCanonical === envRootCanonical || cwdCanonical.startsWith(envRootCanonical + path.sep))
       ? envRootAbs
       : await findRepoRoot(cwd);
-  if (path.resolve(cwd) !== path.resolve(repoRoot)) return;
+  const repoRootCanonical = await canonicalPath(repoRoot);
+  if (cwdCanonical !== repoRootCanonical) return;
 
-  const tmpRoot = path.resolve(os.tmpdir());
-  const isTmp =
-    path.resolve(repoRoot) === tmpRoot || path.resolve(repoRoot).startsWith(tmpRoot + path.sep);
+  const tmpRoot = await canonicalPath(os.tmpdir());
+  const isTmp = repoRootCanonical === tmpRoot || repoRootCanonical.startsWith(tmpRoot + path.sep);
   const allowTmp = String(process.env.BNX_DEVSHELL_ALLOW_TMP || "").trim() === "1";
   if (isTmp && !allowTmp) return;
 

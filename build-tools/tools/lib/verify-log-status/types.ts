@@ -14,6 +14,10 @@ export type VerifyStatus = {
   stopped?: boolean;
   stopReason?: string;
   elapsed?: string;
+  completionRateAvgPerMinute?: number;
+  completionRateRecentPerMinute?: number;
+  projectedDuration?: string;
+  projectedEndTime?: string;
   gcDetected: boolean;
   source: VerifyStatusSource;
   passName?: string;

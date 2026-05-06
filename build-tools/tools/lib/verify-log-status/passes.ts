@@ -6,6 +6,7 @@ export type PassBegin = {
   name: string;
   index: number;
   total: number;
+  startSec?: number;
   targetCount?: number;
   targetLabels?: ReadonlySet<string>;
 };
@@ -40,15 +41,22 @@ function parseTargetLabelsFromPassBeginLine(line: string): ReadonlySet<string> |
   return targets.length > 0 ? new Set(targets) : undefined;
 }
 
+function parseNumberField(line: string, name: string): number | undefined {
+  const re = new RegExp(`(?:^|\\s)${name}=(\\d+)\\b`);
+  const m = re.exec(line);
+  if (!m) return undefined;
+  const value = Number(m[1]);
+  return Number.isFinite(value) ? value : undefined;
+}
+
 export function parsePassBegins(lines: string[]): PassBegin[] {
-  const re =
-    /^\[verify\]\s+target pass begin name=(\S+)\s+index=(\d+)\/(\d+)\b(?:\s+target_count=(\d+))?/;
+  const re = /^\[verify\]\s+target pass begin name=(\S+)\s+index=(\d+)\/(\d+)\b/;
   const out: PassBegin[] = [];
   for (let idx = 0; idx < lines.length; idx++) {
     const { normalized } = parseLineFromBuckLogForMatching(lines[idx]);
     const m = re.exec(normalized);
     if (!m) continue;
-    const explicitTargetCount = m[4] ? Number(m[4]) : undefined;
+    const explicitTargetCount = parseNumberField(normalized, "target_count");
     const inferredTargetCount =
       explicitTargetCount !== undefined
         ? explicitTargetCount
@@ -58,6 +66,7 @@ export function parsePassBegins(lines: string[]): PassBegin[] {
       name: m[1] || "",
       index: Number(m[2]),
       total: Number(m[3]),
+      startSec: parseNumberField(normalized, "start_s"),
       targetCount:
         inferredTargetCount !== undefined && Number.isFinite(inferredTargetCount)
           ? inferredTargetCount

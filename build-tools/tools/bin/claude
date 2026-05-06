@@ -1,20 +1,319 @@
 #!/usr/bin/env bash
 set -euo pipefail
-# Wrapper to invoke claude with dangerously-skip-permissions flag
-# Find the real claude binary (not this wrapper)
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-real_claude=""
-IFS=':' read -ra PATH_DIRS <<< "$PATH"
-for dir in "${PATH_DIRS[@]}"; do
-  if [[ "$dir" != "$SCRIPT_DIR" ]] && [[ -x "$dir/claude" ]]; then
-    real_claude="$dir/claude"
-    break
-  fi
-done
 
+SCRIPT_PATH="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)/$(basename -- "${BASH_SOURCE[0]}")"
+SCRIPT_DIR="$(dirname -- "${SCRIPT_PATH}")"
+
+find_tool_excluding_wrapper_dir() {
+  local tool="$1"
+  local dir
+  local old_ifs="$IFS"
+  IFS=':'
+  for dir in ${PATH:-}; do
+    [[ -n "$dir" ]] || continue
+    if [[ "$(cd -- "$dir" 2>/dev/null && pwd -P || printf '%s' "$dir")" == "$SCRIPT_DIR" ]]; then
+      continue
+    fi
+    if [[ -x "$dir/$tool" ]]; then
+      printf '%s\n' "$(cd -- "$(dirname -- "$dir/$tool")" && pwd -P)/$(basename -- "$dir/$tool")"
+      IFS="$old_ifs"
+      return 0
+    fi
+  done
+  IFS="$old_ifs"
+  return 1
+}
+
+detect_claude_platform_key() {
+  local system
+  local machine
+  local cpu=""
+  local libc_suffix=""
+
+  if [[ -n "${BNX_CLAUDE_PLATFORM_KEY_FOR_TEST:-}" ]]; then
+    printf '%s\n' "$BNX_CLAUDE_PLATFORM_KEY_FOR_TEST"
+    return 0
+  fi
+
+  system="$(uname -s 2>/dev/null || true)"
+  machine="$(uname -m 2>/dev/null || true)"
+  case "$machine" in
+    x86_64|amd64)
+      cpu="x64"
+      ;;
+    arm64|aarch64)
+      cpu="arm64"
+      ;;
+    arm|armv7l|armv6l)
+      cpu="arm"
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+
+  case "$system" in
+    Darwin)
+      if [[ "$cpu" == "x64" && "$(sysctl -n sysctl.proc_translated 2>/dev/null || true)" == "1" ]]; then
+        cpu="arm64"
+      fi
+      printf 'darwin-%s\n' "$cpu"
+      ;;
+    Linux)
+      if command -v node >/dev/null 2>&1; then
+        if node -e 'const r=process.report?.getReport?.(); process.exit(r && r.header && r.header.glibcVersionRuntime === undefined ? 0 : 1)' >/dev/null 2>&1; then
+          libc_suffix="-musl"
+        fi
+      fi
+      printf 'linux-%s%s\n' "$cpu" "$libc_suffix"
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
+resolve_native_claude_from_node_modules_bin() {
+  local candidate="$1"
+  local bin_dir
+  local node_modules_dir
+  local platform_key
+  local native
+
+  case "$candidate" in
+    */node_modules/.bin/claude)
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+
+  bin_dir="$(cd -- "$(dirname -- "$candidate")" 2>/dev/null && pwd -P || return 1)"
+  node_modules_dir="$(cd -- "${bin_dir}/.." 2>/dev/null && pwd -P || return 1)"
+  platform_key="$(detect_claude_platform_key || true)"
+  [[ -n "$platform_key" ]] || return 1
+
+  for native in \
+    "${node_modules_dir}/.pnpm/@anthropic-ai+claude-code-${platform_key}"@*/node_modules/@anthropic-ai/claude-code-"${platform_key}"/claude \
+    "${node_modules_dir}/.pnpm/node_modules/@anthropic-ai/claude-code-${platform_key}/claude" \
+    "${node_modules_dir}/@anthropic-ai/claude-code-${platform_key}/claude"; do
+    [[ -x "$native" ]] || continue
+    printf '%s\n' "$native"
+    return 0
+  done
+
+  return 1
+}
+
+real_claude="$(find_tool_excluding_wrapper_dir claude || true)"
 if [[ -z "$real_claude" ]]; then
   echo "Error: claude binary not found in PATH (excluding wrapper directory)" >&2
   exit 1
 fi
+native_claude="$(resolve_native_claude_from_node_modules_bin "$real_claude" || true)"
+if [[ -n "$native_claude" ]]; then
+  real_claude="$native_claude"
+fi
 
-exec env DISABLE_AUTOUPDATER=1 "$real_claude" --dangerously-skip-permissions "$@"
+real_git="$(find_tool_excluding_wrapper_dir git || true)"
+
+git_root() {
+  [[ -n "$real_git" ]] || return 1
+  "$real_git" rev-parse --show-toplevel 2>/dev/null
+}
+
+WORKTREE_REQUESTED=0
+WORKTREE_NAME=""
+CLAUDE_ARGS=()
+
+parse_claude_worktree_args() {
+  local token
+  while [[ "$#" -gt 0 ]]; do
+    token="$1"
+    shift
+
+    case "$token" in
+      --worktree=*)
+        WORKTREE_REQUESTED=1
+        WORKTREE_NAME="${token#--worktree=}"
+        ;;
+      --worktree|-w)
+        WORKTREE_REQUESTED=1
+        if [[ "$#" -gt 0 && "${1:-}" != -* ]]; then
+          WORKTREE_NAME="$1"
+          shift
+        fi
+        ;;
+      -w?*)
+        WORKTREE_REQUESTED=1
+        WORKTREE_NAME="${token#-w}"
+        ;;
+      *)
+        CLAUDE_ARGS+=("$token")
+        ;;
+    esac
+  done
+}
+
+default_worktree_name() {
+  printf 'claude-%s-%s\n' "$(date +%Y%m%d%H%M%S)" "$$"
+}
+
+validate_worktree_name() {
+  local name="$1"
+  if [[ -z "$name" || "$name" == /* || "$name" == *"/"* || "$name" == "." || "$name" == ".." || "$name" == *".."* ]]; then
+    echo "Error: invalid Claude worktree name: ${name}" >&2
+    return 2
+  fi
+}
+
+git_worktree_base() {
+  if [[ -n "$real_git" ]] && "$real_git" rev-parse --verify --quiet origin/HEAD >/dev/null 2>&1; then
+    printf '%s\n' "origin/HEAD"
+    return 0
+  fi
+  printf '%s\n' "HEAD"
+}
+
+create_claude_worktree() {
+  local root="$1"
+  local name="$2"
+  local target="${root}/.claude/worktrees/${name}"
+  local branch="worktree-${name}"
+  local base
+  local git_wrapper="${BNX_CLAUDE_GIT_WRAPPER_FOR_TEST:-${SCRIPT_DIR}/git}"
+
+  if [[ ! -x "$git_wrapper" ]]; then
+    echo "Error: git CoW wrapper not found: ${git_wrapper}" >&2
+    return 127
+  fi
+
+  mkdir -p -- "$(dirname -- "$target")"
+  base="$(git_worktree_base)"
+  (
+    cd -- "$root"
+    "$git_wrapper" worktree add -b "$branch" "$target" "$base" >&2
+  )
+  printf '%s\n' "$target"
+}
+
+should_safehouse_claude() {
+  local mode="${BNX_CLAUDE_SAFEHOUSE:-auto}"
+  local root="$1"
+
+  if [[ "${BNX_CLAUDE_SAFEHOUSE_ACTIVE:-}" == "1" ]]; then
+    if [[ -n "${BNX_CLAUDE_SAFEHOUSE_ROOT:-}" && "$(real_path "$root")" != "$(real_path "$BNX_CLAUDE_SAFEHOUSE_ROOT")" ]]; then
+      echo "Error: cannot launch Claude worktree agent from inside another Safehouse sandbox: $root" >&2
+      echo "Hint: macOS sandbox-exec cannot apply a nested sandbox; launch the parent without BNX_CLAUDE_SAFEHOUSE=always." >&2
+      exit 126
+    fi
+    return 1
+  fi
+  [[ "$mode" == "0" || "$mode" == "false" || "$mode" == "off" ]] && return 1
+  [[ "$mode" == "1" || "$mode" == "true" || "$mode" == "always" ]] && return 0
+  if [[ "$mode" == "auto" ]] && is_worker_worktree "$root"; then
+    return 0
+  fi
+  return 1
+}
+
+is_worker_worktree() {
+  local root="$1"
+  case "$root" in
+    */.claude/worktrees/*|*/.codex/worktrees/*)
+      return 0
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
+sandbox_string_escape() {
+  local value="$1"
+  value="${value//\\/\\\\}"
+  value="${value//\"/\\\"}"
+  printf '%s\n' "$value"
+}
+
+real_path() {
+  local path="$1"
+  cd -- "$path" 2>/dev/null && pwd -P
+}
+
+write_home_deny_profile() {
+  local profile="$1"
+  local home_real=""
+  if [[ -n "${HOME:-}" ]]; then
+    home_real="$(cd -- "$HOME" 2>/dev/null && pwd -P || true)"
+  fi
+  [[ -n "$home_real" ]] || return 0
+  local escaped_home
+  escaped_home="$(sandbox_string_escape "$home_real")"
+  {
+    printf '(deny file-read-data (literal "%s"))\n' "$escaped_home"
+    printf '(deny file-write* (literal "%s"))\n' "$escaped_home"
+  } >"$profile"
+}
+
+run_claude_in_safehouse() {
+  local root="$1"
+  shift
+  local profile
+  local root_real
+  local status
+  root_real="$(real_path "$root")"
+  profile="$(mktemp "${TMPDIR:-/tmp}/bnx-claude-safehouse.XXXXXX.sb")"
+  write_home_deny_profile "$profile"
+  set +e
+  env \
+    BNX_CLAUDE_SAFEHOUSE_ACTIVE=1 \
+    BNX_CLAUDE_SAFEHOUSE_ROOT="$root_real" \
+    DISABLE_AUTOUPDATER=1 \
+    "$safehouse" \
+    --workdir="$root_real" \
+    --add-dirs-ro=/nix/store \
+    --append-profile="$profile" \
+    --env \
+    "$real_claude" \
+    "$@"
+  status=$?
+  set -e
+  rm -f -- "$profile"
+  exit "$status"
+}
+
+root="$(git_root || pwd -P)"
+parse_claude_worktree_args "$@"
+
+if [[ "$WORKTREE_REQUESTED" == "1" ]]; then
+  if [[ -z "$real_git" ]]; then
+    echo "Error: git binary not found; cannot create Claude worktree" >&2
+    exit 127
+  fi
+  if [[ -z "$WORKTREE_NAME" ]]; then
+    WORKTREE_NAME="$(default_worktree_name)"
+  fi
+  validate_worktree_name "$WORKTREE_NAME"
+  root="$(create_claude_worktree "$root" "$WORKTREE_NAME")"
+  # Re-enter from the worktree so first launch and later --resume use the same Safehouse path.
+  cd -- "$root"
+  exec "$SCRIPT_PATH" "${CLAUDE_ARGS[@]}"
+fi
+
+if should_safehouse_claude "$root"; then
+  safehouse="$(find_tool_excluding_wrapper_dir safehouse || true)"
+  if [[ -z "$safehouse" ]]; then
+    echo "Error: safehouse not found; refusing to launch unsandboxed Claude: $root" >&2
+    echo "Hint: run through the Nix dev shell so agent-safehouse is on PATH, or set BNX_CLAUDE_SAFEHOUSE=0 to bypass." >&2
+    exit 127
+  fi
+
+  if is_worker_worktree "$root"; then
+    run_claude_in_safehouse "$root" --dangerously-skip-permissions "$@"
+  fi
+
+  run_claude_in_safehouse "$root" "$@"
+fi
+
+exec env DISABLE_AUTOUPDATER=1 "$real_claude" "$@"

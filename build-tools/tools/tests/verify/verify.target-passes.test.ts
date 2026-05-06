@@ -91,7 +91,7 @@ test("verify target passes can preserve per-target isolated pass mode for debugg
   ]);
 });
 
-test("verify target pass execution keeps isolated serial but overlaps bounded and shared work", () => {
+test("verify target pass execution serializes isolated, resource-limited, and shared work", () => {
   const passes = planVerifyTargetPasses([
     { target: "//:startup_sensitive", labels: [VERIFY_ISOLATED_LABEL] },
     { target: "//:resource_heavy", labels: [VERIFY_RESOURCE_LIMITED_LABEL] },
@@ -100,7 +100,7 @@ test("verify target pass execution keeps isolated serial but overlaps bounded an
 
   assert.deepEqual(
     groupVerifyPassesForExecution(passes).map((group) => group.map((pass) => pass.name)),
-    [["isolated"], ["resource-limited", "shared"]],
+    [["isolated"], ["resource-limited"], ["shared"]],
   );
 });
 

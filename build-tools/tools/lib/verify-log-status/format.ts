@@ -15,6 +15,8 @@ export function formatVerifyStatusJsonLine(st: VerifyStatus): string {
     stopped: st.stopped ?? false,
     stop_reason: st.stopReason ?? null,
     elapsed: st.elapsed ?? null,
+    projected_duration: st.projectedDuration ?? null,
+    projected_end_time: st.projectedEndTime ?? null,
     gc_detected: st.gcDetected,
     log: st.logPath,
     source: st.source,
@@ -25,6 +27,32 @@ export function formatVerifyStatusJsonLine(st: VerifyStatus): string {
   return JSON.stringify(out);
 }
 
+function formatRate(rate: number | undefined): string {
+  if (rate === undefined || !Number.isFinite(rate)) return "?";
+  return `${rate.toFixed(rate < 10 ? 1 : 0)} tests/min`;
+}
+
+function parseDurationSeconds(value: string | undefined): number | undefined {
+  const text = String(value || "").trim();
+  if (!text || text === "?") return undefined;
+  const compact = /^(\d+)m(\d+)s$/.exec(text);
+  if (compact) return Number(compact[1]) * 60 + Number(compact[2]);
+  const parts = text.split(":").map((part) => Number(part));
+  if (parts.length === 2 && parts.every(Number.isFinite)) return parts[0] * 60 + parts[1];
+  if (parts.length === 3 && parts.every(Number.isFinite)) {
+    return parts[0] * 3600 + parts[1] * 60 + parts[2];
+  }
+  return undefined;
+}
+
+function formatProgressBar(ratio: number | undefined): string {
+  const width = 32;
+  if (ratio === undefined || !Number.isFinite(ratio)) return "?";
+  const clamped = Math.max(0, Math.min(1, ratio));
+  const filled = Math.round(clamped * width);
+  return `[${"█".repeat(filled)}${"░".repeat(width - filled)}]`;
+}
+
 export function formatVerifyStatusText(
   st: VerifyStatus,
   opts: {
@@ -32,8 +60,24 @@ export function formatVerifyStatusText(
   },
 ): string {
   const elapsed = st.elapsed ? st.elapsed : "?";
+  const projectedDuration = st.projectedDuration ? st.projectedDuration : "?";
+  const projectedEndTime = st.projectedEndTime ? st.projectedEndTime : "?";
   const remaining = st.remaining !== undefined ? String(st.remaining) : "?";
   const isTty = opts.isTty;
+  const completed = st.pass + st.fail + st.fatal + st.skip;
+  const total = st.remaining === undefined ? undefined : completed + st.remaining;
+  const testsProgress = total === undefined || total <= 0 ? undefined : `${completed}/${total}`;
+  const testsRatio = total === undefined || total <= 0 ? undefined : completed / Math.max(1, total);
+  const elapsedSeconds = parseDurationSeconds(st.elapsed);
+  const projectedSeconds = parseDurationSeconds(st.projectedDuration);
+  const timeRatio =
+    elapsedSeconds === undefined || projectedSeconds === undefined || projectedSeconds <= 0
+      ? undefined
+      : elapsedSeconds / projectedSeconds;
+  const timeProgress =
+    timeRatio === undefined || !Number.isFinite(timeRatio)
+      ? "?"
+      : `${formatProgressBar(timeRatio)} ${elapsed} / ${projectedDuration}`;
 
   const anyFailures = st.fail > 0 || st.fatal > 0 || st.buildFailure > 0;
   // Color policy:
@@ -68,6 +112,16 @@ export function formatVerifyStatusText(
 
   const lines: string[] = [];
   lines.push(`${label("Time elapsed:")}    ${val(elapsed)}`);
+  lines.push(
+    `${label("Projected:")}       ${val(`${projectedDuration} duration, ${projectedEndTime} end`)}`,
+  );
+  lines.push(
+    `${label("Tests:")}           ${val(`${formatProgressBar(testsRatio)} ${testsProgress || "?"}`)}`,
+  );
+  lines.push(`${label("Time:")}            ${val(timeProgress)}`);
+  lines.push(
+    `${label("Completion rate:")} ${val(`${formatRate(st.completionRateAvgPerMinute)} total avg, ${formatRate(st.completionRateRecentPerMinute)} recent avg`)}`,
+  );
   if (st.passName && st.passIndex && st.passTotal) {
     lines.push(
       `${label("Pass group:")}      ${val(`${st.passName} (${st.passIndex}/${st.passTotal})`)}`,

@@ -65,7 +65,8 @@ test("verify macOS temp roots opt generated output trees out of metadata indexin
   const env: NodeJS.ProcessEnv = {};
   const user = os.userInfo().username || "";
   const suffix = user ? `-${user}` : "";
-  const expectedTmpdir = path.join("/tmp", `bucknix-verify${suffix}.noindex`, "tmpdir");
+  const systemTmpRoot = path.join(root, "system-tmp");
+  const expectedTmpdir = path.join(systemTmpRoot, `bucknix-verify${suffix}.noindex`, "tmpdir");
 
   try {
     const staleSystemFile = path.join(expectedTmpdir, "stale-temp-repo", "file.txt");
@@ -92,7 +93,7 @@ test("verify macOS temp roots opt generated output trees out of metadata indexin
     await fsp.mkdir(path.dirname(legacyStaleFile), { recursive: true });
     await fsp.writeFile(legacyStaleFile, "legacy", "utf8");
 
-    await ensureRepoLocalTmpRoot(root, { env, platform: "darwin" });
+    await ensureRepoLocalTmpRoot(root, { env, platform: "darwin", systemTmpRoot });
 
     assert.equal(env.TEST_TMP_IN_REPO, undefined);
     assert.equal(env.TMPDIR, expectedTmpdir);

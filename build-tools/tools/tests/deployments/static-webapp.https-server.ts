@@ -1,5 +1,6 @@
 #!/usr/bin/env zx-wrapper
 import { execFile } from "node:child_process";
+import crypto from "node:crypto";
 import * as fsp from "node:fs/promises";
 import https from "node:https";
 import path from "node:path";
@@ -65,10 +66,16 @@ async function writeTlsMaterial(
   tmpRoot: string,
   hostname: string,
 ): Promise<{ cert: Buffer; key: Buffer }> {
-  const certDir = path.join(tmpRoot, ".tls");
+  const safeHostname = hostname.replace(/[^A-Za-z0-9_.-]/g, "_");
+  const certDir = path.join(
+    tmpRoot,
+    ".tls",
+    `${safeHostname}-${process.pid}-${Date.now()}-${crypto.randomBytes(4).toString("hex")}`,
+  );
   const keyPath = path.join(certDir, "server.key");
   const certPath = path.join(certDir, "server.crt");
   await fsp.mkdir(certDir, { recursive: true });
+  await fsp.access(certDir);
   const openssl = await pinnedOpenSslPath();
   await execFileAsync(openssl, [
     "req",

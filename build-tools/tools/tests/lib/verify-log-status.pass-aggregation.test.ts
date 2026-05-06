@@ -43,11 +43,12 @@ test("verify-log-status: final multi-pass status uses aggregate pass exit counts
     "[verify] begin iso=v-123 start_s=100",
     "[verify] expanded targets: concrete=3 pass_count=2 isolated_passes=1 isolated_targets=1 shared_targets=2",
     "[verify] target pass begin name=isolated index=1/2 target_count=1 targets=//:a",
-    "Tests finished: Pass 1. Fail 0. Fatal 0. Skip 0. Build failure 0",
+    "[1970-01-01T00:01:45.000Z] ✓ Pass: root//:a (1.0s)",
     "[verify] buck2 test exit iso=v-123 pass=isolated status=0 end_s=110 duration_s=10 pass_count=1 fail_count=0 completions=1 threads=1",
     "[verify] target pass end name=isolated index=1/2 status=0",
     "[verify] target pass begin name=shared index=2/2 target_count=2 targets=//:b //:c",
-    "Tests finished: Pass 2. Fail 0. Fatal 0. Skip 0. Build failure 0",
+    "[1970-01-01T00:02:05.000Z] ✓ Pass: root//:b (2.0s)",
+    "[1970-01-01T00:02:10.000Z] ✓ Pass: root//:c (3.0s)",
     "[verify] buck2 test exit iso=v-123 pass=shared status=0 end_s=130 duration_s=20 pass_count=2 fail_count=0 completions=2 threads=8",
     "[verify] target pass end name=shared index=2/2 status=0",
   ].join("\n");
@@ -65,6 +66,8 @@ test("verify-log-status: final multi-pass status uses aggregate pass exit counts
   assert.equal(st.passName, "shared");
   assert.equal(st.passIndex, 2);
   assert.equal(st.passTotal, 2);
+  assert.equal(st.completionRateAvgPerMinute, 6);
+  assert.equal(st.completionRateRecentPerMinute, 1);
 });
 
 test("verify-log-status: uses expanded target count before later passes begin", () => {

@@ -7,10 +7,28 @@ import { setTimeout as sleep } from "node:timers/promises";
 import { copyTree } from "../../lib/copy-tree";
 import { pidAlive } from "./seed-utils";
 
-const WRITABLE_MARKER = ".seed-store-writable";
+const REQUIRED_STAGE_FILES = [
+  "flake.nix",
+  ".buckconfig",
+  "eslint.config.js",
+  path.join("build-tools", "deployments", "defs.bzl"),
+  path.join("build-tools", "tools", "buck", "export-graph.ts"),
+  path.join("build-tools", "tools", "dev", "zx-init.mjs"),
+  path.join("build-tools", "tools", "node", "gen-wasm-inline-module.ts"),
+];
+
+export function seedStageRootDirForTest(): string {
+  if (process.platform === "win32") return path.join(os.tmpdir(), "bucknix-test-seed");
+  let user = "";
+  try {
+    user = os.userInfo().username || "";
+  } catch {}
+  const suffix = user ? `-${user}` : "";
+  return path.join("/tmp", `bucknix-test-seed${suffix}`);
+}
 
 function seedStageRootDir(): string {
-  return path.join(os.tmpdir(), "bucknix-test-seed");
+  return seedStageRootDirForTest();
 }
 
 function seedStageKey(seedKey: string): string {
@@ -50,6 +68,58 @@ async function ensureWritableTree(root: string): Promise<void> {
       }
     }
   }
+}
+
+async function makeReadOnlyTree(root: string): Promise<void> {
+  const stack: string[] = [root];
+  while (stack.length) {
+    const dir = stack.pop() as string;
+    let entries: import("node:fs").Dirent[] = [];
+    try {
+      entries = await fsp.readdir(dir, { withFileTypes: true });
+    } catch {
+      continue;
+    }
+    for (const entry of entries) {
+      const abs = path.join(dir, entry.name);
+      if (entry.isSymbolicLink()) continue;
+      if (entry.isDirectory()) {
+        stack.push(abs);
+        continue;
+      }
+      if (entry.isFile()) {
+        const st = await fsp.stat(abs).catch(() => null);
+        if (st) await fsp.chmod(abs, st.mode & ~0o222).catch(() => {});
+      }
+    }
+    const st = await fsp.stat(dir).catch(() => null);
+    if (st) await fsp.chmod(dir, st.mode & ~0o222).catch(() => {});
+  }
+}
+
+async function missingRequiredStageFiles(root: string): Promise<string[]> {
+  const missing: string[] = [];
+  for (const rel of REQUIRED_STAGE_FILES) {
+    const ok = await fsp
+      .access(path.join(root, rel))
+      .then(() => true)
+      .catch(() => false);
+    if (!ok) missing.push(rel);
+  }
+  return missing;
+}
+
+async function stageReady(stageDir: string, seedKey: string): Promise<boolean> {
+  const keyFile = path.join(stageDir, "seed.key");
+  const readyFile = path.join(stageDir, ".seed-store-ready");
+  const existingKey = await fsp.readFile(keyFile, "utf8").catch(() => "");
+  if (existingKey.trim() !== seedKey) return false;
+  const hasReady = await fsp
+    .access(readyFile)
+    .then(() => true)
+    .catch(() => false);
+  if (!hasReady) return false;
+  return (await missingRequiredStageFiles(stageDir)).length === 0;
 }
 
 async function statDev(pathToStat: string): Promise<number | null> {
@@ -128,51 +198,27 @@ export async function stageSeedStore(
   const stageDir = seedStageDir(seedKey);
   const keyFile = path.join(stageDir, "seed.key");
   const readyFile = path.join(stageDir, ".seed-store-ready");
-  const existingKey = await fsp.readFile(keyFile, "utf8").catch(() => "");
-  if (existingKey.trim() === seedKey) {
-    const ok = await fsp
-      .access(readyFile)
-      .then(() => true)
-      .catch(() => false);
-    if (ok) {
-      const hasMarker = await fsp
-        .access(path.join(stageDir, WRITABLE_MARKER))
-        .then(() => true)
-        .catch(() => false);
-      if (!hasMarker) {
-        await ensureWritableTree(stageDir);
-        await fsp.writeFile(path.join(stageDir, WRITABLE_MARKER), "1\n", "utf8").catch(() => {});
-      }
-      return stageDir;
-    }
+  if (await stageReady(stageDir, seedKey)) {
+    await ensureWritableTree(stageDir);
+    await fsp.rm(path.join(stageDir, ".seed-store-writable"), { force: true }).catch(() => {});
+    await makeReadOnlyTree(stageDir);
+    return stageDir;
   }
   const release = await acquireSeedStageLock(seedKey, seedTtlMs);
   try {
-    const keyInside = await fsp.readFile(keyFile, "utf8").catch(() => "");
-    if (keyInside.trim() === seedKey) {
-      const ok = await fsp
-        .access(readyFile)
-        .then(() => true)
-        .catch(() => false);
-      if (ok) {
-        const hasMarker = await fsp
-          .access(path.join(stageDir, WRITABLE_MARKER))
-          .then(() => true)
-          .catch(() => false);
-        if (!hasMarker) {
-          await ensureWritableTree(stageDir);
-          await fsp.writeFile(path.join(stageDir, WRITABLE_MARKER), "1\n", "utf8").catch(() => {});
-        }
-        return stageDir;
-      }
+    if (await stageReady(stageDir, seedKey)) {
+      await ensureWritableTree(stageDir);
+      await fsp.rm(path.join(stageDir, ".seed-store-writable"), { force: true }).catch(() => {});
+      await makeReadOnlyTree(stageDir);
+      return stageDir;
     }
+    await ensureWritableTree(stageDir).catch(() => {});
     await fsp.rm(stageDir, { recursive: true, force: true }).catch(() => {});
     await fsp.mkdir(path.dirname(stageDir), { recursive: true }).catch(() => {});
     await copyTree(seedPath, stageDir, { cloneMode: "none", force: true });
-    await ensureWritableTree(stageDir);
-    await fsp.writeFile(path.join(stageDir, WRITABLE_MARKER), "1\n", "utf8").catch(() => {});
     await fsp.writeFile(keyFile, seedKey + "\n", "utf8");
     await fsp.writeFile(readyFile, "ok\n", "utf8");
+    await makeReadOnlyTree(stageDir);
     return stageDir;
   } finally {
     await release();

@@ -68,9 +68,10 @@ export async function runVerifyBuckPasses(opts: {
   const startPass = async (pass: (typeof passes)[number], passIso = opts.iso) => {
     const index = passIndexes.get(pass) ?? 0;
     const passAnalysisDir = path.join(opts.analysisDir, `pass-${index + 1}`);
+    const startS = Math.floor(Date.now() / 1000);
     await appendVerifyPassLog(
       opts.logFile,
-      `[verify] target pass begin name=${pass.name} index=${index + 1}/${passes.length} iso=${passIso} target_count=${pass.targets.length} targets=${pass.targets.join(" ")}`,
+      `[verify] target pass begin name=${pass.name} index=${index + 1}/${passes.length} iso=${passIso} start_s=${startS} target_count=${pass.targets.length} targets=${pass.targets.join(" ")}`,
     );
     const spawned = spawnVerifyBuck2Tests({
       root: opts.root,

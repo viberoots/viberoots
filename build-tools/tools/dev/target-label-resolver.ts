@@ -21,12 +21,6 @@ function toPosixPath(s: string): string {
   return String(s || "").replace(/\\/g, "/");
 }
 
-function swapDarwinVarPrefix(p: string): string {
-  if (p.startsWith("/private/var/")) return `/var/${p.slice("/private/var/".length)}`;
-  if (p.startsWith("/var/")) return `/private/var/${p.slice("/var/".length)}`;
-  return p;
-}
-
 async function normalizeTargetInput(
   workspaceRoot: string,
   target: string,
@@ -36,27 +30,36 @@ async function normalizeTargetInput(
   if (!raw) return raw;
   if (isBuckLabelLike(raw)) return normalizeTargetLabel(raw);
 
-  const canonical = async (p: string): Promise<string> => {
+  const canonicalExistingPath = async (p: string): Promise<string> => {
     try {
       return await fsp.realpath(p);
     } catch {
       return p;
     }
   };
-  const workspaceCanonical = await canonical(path.resolve(workspaceRoot));
+  const canonicalPath = async (p: string): Promise<string> => {
+    const abs = path.resolve(p);
+    let cur = abs;
+    const missing: string[] = [];
+    for (;;) {
+      try {
+        const real = await fsp.realpath(cur);
+        return path.join(real, ...missing.reverse());
+      } catch {
+        const parent = path.dirname(cur);
+        if (parent === cur) return abs;
+        missing.push(path.basename(cur));
+        cur = parent;
+      }
+    }
+  };
+  const workspaceCanonical = await canonicalExistingPath(path.resolve(workspaceRoot));
   const baseDirRaw = String(opts?.baseDir || workspaceRoot).trim() || workspaceRoot;
-  const baseDirCanonical = await canonical(path.resolve(baseDirRaw));
+  const baseDirCanonical = await canonicalPath(baseDirRaw);
   const absPath = path.isAbsolute(raw) ? path.resolve(raw) : path.resolve(baseDirCanonical, raw);
-  const absCanonical = await canonical(absPath);
+  const absCanonical = await canonicalPath(absPath);
   const relToWorkspace = path.relative(workspaceCanonical, absCanonical);
-  const relWithDarwinSwap = path.relative(workspaceCanonical, swapDarwinVarPrefix(absCanonical));
-  const relEffective =
-    relToWorkspace.startsWith("..") || path.isAbsolute(relToWorkspace)
-      ? relWithDarwinSwap
-      : relToWorkspace;
-  const outsideWorkspace =
-    (relToWorkspace.startsWith("..") || path.isAbsolute(relToWorkspace)) &&
-    (relWithDarwinSwap.startsWith("..") || path.isAbsolute(relWithDarwinSwap));
+  const outsideWorkspace = relToWorkspace.startsWith("..") || path.isAbsolute(relToWorkspace);
   if (outsideWorkspace) {
     if (path.isAbsolute(raw)) {
       throw new Error(`path is outside workspace root: ${raw}`);
@@ -64,7 +67,7 @@ async function normalizeTargetInput(
     return normalizeTargetLabel(raw);
   }
 
-  let pkgRel = toPosixPath(relEffective).replace(/\/+$/, "");
+  let pkgRel = toPosixPath(relToWorkspace).replace(/\/+$/, "");
   if (!pkgRel || pkgRel === ".") return normalizeTargetLabel(raw);
   try {
     const st = await fsp.stat(absPath);

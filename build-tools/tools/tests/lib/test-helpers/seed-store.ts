@@ -1,6 +1,10 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import { copyTree, probeCopyFileCloneSupportFrom } from "../../../lib/copy-tree";
+import {
+  assertRequiredSeedFiles,
+  copySeedStoreToTempRepo,
+  probeSeedCowCopyFrom,
+} from "./seed-copy";
 import "./worker-init";
 
 type TimeAsync = <T>(label: string, fn: () => Promise<T>) => Promise<T>;
@@ -12,12 +16,11 @@ type SeedDeps = {
 
 type RepoInitMode = "rsync" | "seed-store";
 
-const requiredFiles = ["flake.nix", path.join("build-tools", "tools", "buck", "export-graph.ts")];
 const CLONE_PROBE_LABEL = "seedStore clone probe (copyFileCloneSupport)";
 const WRITABLE_MARKER = ".seed-store-writable";
 
-let seedStoreCloneMode: "try" | "none" | null = null;
-let seedStoreCloneModePromise: Promise<"try" | "none"> | null = null;
+let seedStoreCowCopySupported: true | null = null;
+let seedStoreCowCopySupportedPromise: Promise<true> | null = null;
 let untrackedOverlayOncePerWorker: Promise<string[]> | null = null;
 let trackedOverlayOncePerWorker: Promise<string[]> | null = null;
 let overlayFilesOncePerWorker: Promise<string[]> | null = null;
@@ -31,20 +34,6 @@ function wantsFilteredRsync(): boolean {
     String(process.env.TEST_RSYNC_ROOTS || "").trim() !== "" ||
     String(process.env.TEST_PARTIAL_CLONE_GO_ONLY || "").trim() === "1"
   );
-}
-
-async function assertRequiredFiles(dir: string, label: string): Promise<void> {
-  const missing: string[] = [];
-  for (const rel of requiredFiles) {
-    try {
-      await fsp.access(path.join(dir, rel));
-    } catch {
-      missing.push(rel);
-    }
-  }
-  if (missing.length) {
-    throw new Error(`runInTemp: ${label} missing ${missing.join(", ")}`);
-  }
 }
 
 async function requireSeedPath(seedPath: string, seedKey: string): Promise<void> {
@@ -153,27 +142,31 @@ async function overlayUntrackedFilesIntoTempRepo(tmpDir: string): Promise<void> 
   }
 }
 
-async function seedStoreCloneModeOncePerWorker(args: {
+async function seedStoreCowCopySupportedOncePerWorker(args: {
   timeAsync: TimeAsync;
   seedPath: string;
   tmpDir: string;
-}): Promise<"try" | "none"> {
-  if (seedStoreCloneMode) return seedStoreCloneMode;
-  if (!seedStoreCloneModePromise) {
-    seedStoreCloneModePromise = (async () => {
+}): Promise<true> {
+  if (seedStoreCowCopySupported) return seedStoreCowCopySupported;
+  if (!seedStoreCowCopySupportedPromise) {
+    seedStoreCowCopySupportedPromise = (async () => {
       const srcFile = path.join(args.seedPath, "flake.nix");
       const supported = await args.timeAsync(CLONE_PROBE_LABEL, async () => {
-        return await probeCopyFileCloneSupportFrom({
+        return await probeSeedCowCopyFrom({
           srcFile,
           dstDir: args.tmpDir,
-          cloneMode: "try",
         });
       });
-      seedStoreCloneMode = supported ? "try" : "none";
-      return seedStoreCloneMode;
+      if (!supported) {
+        throw new Error(
+          `runInTemp: seed store CoW clone unsupported for ${args.seedPath}; rerun v on a CoW-capable filesystem`,
+        );
+      }
+      seedStoreCowCopySupported = true;
+      return seedStoreCowCopySupported;
     })();
   }
-  return await seedStoreCloneModePromise;
+  return await seedStoreCowCopySupportedPromise;
 }
 
 export async function initTempRepoFromSeedStore(args: {
@@ -195,16 +188,14 @@ export async function initTempRepoFromSeedStore(args: {
     return "rsync";
   }
   await requireSeedPath(seedPath, seedKey);
-  await assertRequiredFiles(seedPath, "seed store");
-  const cloneMode = await seedStoreCloneModeOncePerWorker({
+  await assertRequiredSeedFiles(seedPath, "seed store");
+  await seedStoreCowCopySupportedOncePerWorker({
     timeAsync: deps.timeAsync,
     seedPath,
     tmpDir,
   });
   await deps.timeAsync(`seedStoreCopy(${path.basename(tmpDir)})`, async () => {
-    // Seed copies run in many parallel test processes; keep per-copy file operation
-    // fanout modest to avoid APFS metadata contention and long tail stalls.
-    await copyTree(seedPath, tmpDir, { cloneMode, force: true, maxInFlight: 6 });
+    await copySeedStoreToTempRepo({ seedPath, tmpDir });
   });
   await deps.timeAsync(`seedOverlayUntracked(${path.basename(tmpDir)})`, async () => {
     await overlayUntrackedFilesIntoTempRepo(tmpDir);
@@ -214,6 +205,6 @@ export async function initTempRepoFromSeedStore(args: {
       await $`bash --noprofile --norc -c ${`chmod -R u+w ${tmpDir} >/dev/null 2>&1 || true`}`;
     } catch {}
   }
-  await assertRequiredFiles(tmpDir, "seed copy");
+  await assertRequiredSeedFiles(tmpDir, "seed copy");
   return "seed-store";
 }

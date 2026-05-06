@@ -1,0 +1,383 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_PATH="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)/$(basename -- "${BASH_SOURCE[0]}")"
+
+is_same_file() {
+  local a="$1"
+  local b="$2"
+  [[ -e "$a" && -e "$b" ]] || return 1
+  [[ "$(cd -- "$(dirname -- "$a")" && pwd -P)/$(basename -- "$a")" == "$(cd -- "$(dirname -- "$b")" && pwd -P)/$(basename -- "$b")" ]]
+}
+
+resolve_symlink_path() {
+  local p="$1"
+  local dir
+  local link
+  local limit=0
+  while [[ -L "$p" && "$limit" -lt 40 ]]; do
+    dir="$(cd -- "$(dirname -- "$p")" && pwd -P)"
+    link="$(readlink "$p")"
+    if [[ "$link" == /* ]]; then
+      p="$link"
+    else
+      p="${dir}/${link}"
+    fi
+    limit=$((limit + 1))
+  done
+  printf '%s\n' "$p"
+}
+
+is_nix_store_git() {
+  local candidate="$1"
+  local resolved
+  resolved="$(resolve_symlink_path "$candidate")"
+  [[ "$candidate" == /nix/store/*/bin/git || "$resolved" == /nix/store/*/bin/git ]]
+}
+
+resolve_real_git() {
+  if [[ -n "${BNX_REAL_GIT:-}" ]]; then
+    if [[ ! -x "${BNX_REAL_GIT}" ]]; then
+      echo "git wrapper: BNX_REAL_GIT is not executable: ${BNX_REAL_GIT}" >&2
+      return 127
+    fi
+    if is_same_file "${BNX_REAL_GIT}" "${SCRIPT_PATH}"; then
+      echo "git wrapper: BNX_REAL_GIT points back to this wrapper: ${BNX_REAL_GIT}" >&2
+      return 127
+    fi
+    printf '%s\n' "${BNX_REAL_GIT}"
+    return 0
+  fi
+
+  local old_ifs="$IFS"
+  local dir
+  IFS=':'
+  for dir in ${PATH:-}; do
+    [[ -n "$dir" ]] || continue
+    local candidate="${dir}/git"
+    [[ -x "$candidate" ]] || continue
+    is_same_file "$candidate" "$SCRIPT_PATH" && continue
+    if is_nix_store_git "$candidate"; then
+      printf '%s\n' "$candidate"
+      IFS="$old_ifs"
+      return 0
+    fi
+  done
+  IFS="$old_ifs"
+
+  echo "git wrapper: could not find flake-provided git on PATH; run inside the Nix dev shell or set BNX_REAL_GIT" >&2
+  return 127
+}
+
+is_worktree_add() {
+  [[ "${1:-}" == "worktree" && "${2:-}" == "add" ]]
+}
+
+PARSED_TARGET=""
+parse_worktree_add_target() {
+  PARSED_TARGET=""
+  while [[ "$#" -gt 0 ]]; do
+    local token="$1"
+    shift
+
+    case "$token" in
+      --)
+        [[ "$#" -gt 0 ]] || return 2
+        PARSED_TARGET="$1"
+        return 0
+        ;;
+      -b|-B|--reason)
+        [[ "$#" -gt 0 ]] || return 2
+        shift
+        continue
+        ;;
+      -b?*|-B?*|--reason=*)
+        continue
+        ;;
+      -f|--force|-d|--detach|--lock|--no-checkout|--guess-remote|--no-guess-remote|--track|--no-track|-q|--quiet|--relative-paths|--no-relative-paths)
+        continue
+        ;;
+      --checkout|--orphan)
+        return 2
+        ;;
+      -*)
+        return 2
+        ;;
+      *)
+        PARSED_TARGET="$token"
+        return 0
+        ;;
+    esac
+  done
+  return 2
+}
+
+cow_copy_tree() {
+  local src="$1"
+  local dst="$2"
+  local excluded_target="${3:-}"
+
+  if [[ -n "${BNX_GIT_COW_COPY_PROG_FOR_TEST:-}" ]]; then
+    "${BNX_GIT_COW_COPY_PROG_FOR_TEST}" "$src" "$dst"
+    return $?
+  fi
+
+  local ostype="${BNX_GIT_COW_OSTYPE:-${OSTYPE:-}}"
+  if [[ "$ostype" == darwin* ]]; then
+    python3 - "$src" "$dst" "$excluded_target" <<'PY'
+import ctypes
+import os
+import shutil
+import stat
+import sys
+
+src_root = sys.argv[1]
+dst_root = sys.argv[2]
+rel_excluded_roots = [os.path.join(".claude", "worktrees"), os.path.join(".codex", "worktrees")]
+excluded_roots = [
+    os.path.abspath(root)
+    for root in [os.path.dirname(dst_root), *sys.argv[3:]]
+    if root
+]
+libc = ctypes.CDLL(None, use_errno=True)
+clonefile = libc.clonefile
+clonefile.argtypes = [ctypes.c_char_p, ctypes.c_char_p, ctypes.c_int]
+clonefile.restype = ctypes.c_int
+
+def is_excluded(path):
+    candidate = os.path.abspath(path)
+    if any(candidate == root or candidate.startswith(root + os.sep) for root in excluded_roots):
+        return True
+    rel = os.path.relpath(candidate, os.path.abspath(src_root))
+    return any(rel == root or rel.startswith(root + os.sep) for root in rel_excluded_roots)
+
+if os.path.exists(dst_root):
+    shutil.rmtree(dst_root)
+os.makedirs(dst_root, exist_ok=True)
+
+for cur, dirs, files in os.walk(src_root, topdown=True, followlinks=False):
+    if is_excluded(cur):
+        dirs[:] = []
+        continue
+
+    rel = os.path.relpath(cur, src_root)
+    dst_cur = dst_root if rel == "." else os.path.join(dst_root, rel)
+    os.makedirs(dst_cur, exist_ok=True)
+    try:
+        st = os.lstat(cur)
+        os.chmod(dst_cur, stat.S_IMODE(st.st_mode) | 0o700)
+    except OSError:
+        pass
+
+    kept_dirs = []
+    for name in dirs:
+        src = os.path.join(cur, name)
+        if is_excluded(src):
+            continue
+        dst = os.path.join(dst_cur, name)
+        st = os.lstat(src)
+        if stat.S_ISLNK(st.st_mode):
+            os.symlink(os.readlink(src), dst)
+        elif stat.S_ISDIR(st.st_mode):
+            kept_dirs.append(name)
+        else:
+            raise RuntimeError(f"unsupported directory entry type: {src}")
+    dirs[:] = kept_dirs
+
+    for name in files:
+        src = os.path.join(cur, name)
+        if is_excluded(src):
+            continue
+        dst = os.path.join(dst_cur, name)
+        st = os.lstat(src)
+        if stat.S_ISLNK(st.st_mode):
+            os.symlink(os.readlink(src), dst)
+            continue
+        if not stat.S_ISREG(st.st_mode):
+            raise RuntimeError(f"unsupported file type: {src}")
+        rc = clonefile(src.encode(), dst.encode(), 0)
+        if rc != 0:
+            err = ctypes.get_errno()
+            raise OSError(err, os.strerror(err), src)
+        os.chmod(dst, stat.S_IMODE(st.st_mode) | 0o600)
+PY
+  else
+    python3 - "$src" "$dst" "$excluded_target" <<'PY'
+import fcntl
+import os
+import shutil
+import stat
+import sys
+
+FICLONE = 0x40049409
+src_root = sys.argv[1]
+dst_root = sys.argv[2]
+rel_excluded_roots = [os.path.join(".claude", "worktrees"), os.path.join(".codex", "worktrees")]
+excluded_roots = [
+    os.path.abspath(root)
+    for root in [os.path.dirname(dst_root), *sys.argv[3:]]
+    if root
+]
+
+def is_excluded(path):
+    candidate = os.path.abspath(path)
+    if any(candidate == root or candidate.startswith(root + os.sep) for root in excluded_roots):
+        return True
+    rel = os.path.relpath(candidate, os.path.abspath(src_root))
+    return any(rel == root or rel.startswith(root + os.sep) for root in rel_excluded_roots)
+
+def reflink(src, dst, mode):
+    src_fd = os.open(src, os.O_RDONLY)
+    try:
+        dst_fd = os.open(dst, os.O_WRONLY | os.O_CREAT | os.O_EXCL, mode | 0o600)
+        try:
+            fcntl.ioctl(dst_fd, FICLONE, src_fd)
+        except OSError:
+            os.close(dst_fd)
+            try:
+                os.unlink(dst)
+            except FileNotFoundError:
+                pass
+            raise
+        else:
+            os.close(dst_fd)
+    finally:
+        os.close(src_fd)
+
+if os.path.exists(dst_root):
+    shutil.rmtree(dst_root)
+os.makedirs(dst_root, exist_ok=True)
+
+for cur, dirs, files in os.walk(src_root, topdown=True, followlinks=False):
+    if is_excluded(cur):
+        dirs[:] = []
+        continue
+
+    rel = os.path.relpath(cur, src_root)
+    dst_cur = dst_root if rel == "." else os.path.join(dst_root, rel)
+    os.makedirs(dst_cur, exist_ok=True)
+    try:
+        st = os.lstat(cur)
+        os.chmod(dst_cur, stat.S_IMODE(st.st_mode) | 0o700)
+    except OSError:
+        pass
+
+    kept_dirs = []
+    for name in dirs:
+        src = os.path.join(cur, name)
+        if is_excluded(src):
+            continue
+        dst = os.path.join(dst_cur, name)
+        st = os.lstat(src)
+        if stat.S_ISLNK(st.st_mode):
+            os.symlink(os.readlink(src), dst)
+        elif stat.S_ISDIR(st.st_mode):
+            kept_dirs.append(name)
+        else:
+            raise RuntimeError(f"unsupported directory entry type: {src}")
+    dirs[:] = kept_dirs
+
+    for name in files:
+        src = os.path.join(cur, name)
+        if is_excluded(src):
+            continue
+        dst = os.path.join(dst_cur, name)
+        st = os.lstat(src)
+        if stat.S_ISLNK(st.st_mode):
+            os.symlink(os.readlink(src), dst)
+            continue
+        if not stat.S_ISREG(st.st_mode):
+            raise RuntimeError(f"unsupported file type: {src}")
+        reflink(src, dst, stat.S_IMODE(st.st_mode))
+        os.chmod(dst, stat.S_IMODE(st.st_mode) | 0o600)
+PY
+  fi
+}
+
+move_staged_contents() {
+  local staged_repo="$1"
+  local target="$2"
+  find "$staged_repo" -mindepth 1 -maxdepth 1 -exec mv {} "$target"/ \;
+}
+
+cleanup_partial_worktree() {
+  local real_git="$1"
+  local target="$2"
+  local stage="$3"
+  [[ -n "$stage" ]] && rm -rf -- "$stage"
+  [[ -n "$target" ]] && "$real_git" worktree remove --force "$target" >/dev/null 2>&1 || true
+}
+
+run_cow_worktree_add() {
+  local real_git="$1"
+  shift
+  local args=("$@")
+  local target="$PARSED_TARGET"
+  local source_root
+  local target_parent
+  local target_abs
+  local stage=""
+  local staged_repo=""
+
+  source_root="$(pwd -P)"
+
+  if "$real_git" worktree add --no-checkout "${args[@]}"; then
+    :
+  else
+    return $?
+  fi
+
+  target_parent="$(cd -- "$(dirname -- "$target")" && pwd -P)"
+  target_abs="${target_parent}/$(basename -- "$target")"
+  stage="$(mktemp -d "${target_parent}/.git-cow-stage.XXXXXX")"
+  staged_repo="${stage}/repo"
+
+  if cow_copy_tree "$source_root" "$staged_repo" "$target_abs"; then
+    :
+  else
+    local status=$?
+    cleanup_partial_worktree "$real_git" "$target_abs" "$stage"
+    return "$status"
+  fi
+
+  rm -rf -- "${staged_repo}/.git"
+
+  if move_staged_contents "$staged_repo" "$target_abs"; then
+    :
+  else
+    local status=$?
+    cleanup_partial_worktree "$real_git" "$target_abs" "$stage"
+    return "$status"
+  fi
+
+  rm -rf -- "$stage"
+
+  if "$real_git" -C "$target_abs" reset --mixed -q HEAD >/dev/null; then
+    :
+  else
+    local status=$?
+    cleanup_partial_worktree "$real_git" "$target_abs" ""
+    return "$status"
+  fi
+
+  echo "Success: CoW worktree ready: ${target_abs}"
+}
+
+main() {
+  local real_git
+  real_git="$(resolve_real_git)"
+
+  if is_worktree_add "$@"; then
+    shift 2
+    if parse_worktree_add_target "$@"; then
+      echo "Using CoW worktree copy for: ${PARSED_TARGET}"
+      run_cow_worktree_add "$real_git" "$@"
+      return $?
+    fi
+    exec "$real_git" worktree add "$@"
+  fi
+
+  exec "$real_git" "$@"
+}
+
+main "$@"

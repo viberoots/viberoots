@@ -1,5 +1,4 @@
 #!/usr/bin/env zx-wrapper
-import { pathToFileURL } from "node:url";
 import {
   deriveNixosSharedHostProviderTarget,
   NIXOS_SHARED_HOST_PROVIDER,
@@ -23,6 +22,7 @@ import type {
 } from "../../deployments/deployment-admission-supply-chain";
 import { nixosSharedHostLaneGovernanceFixture } from "./deployment-lane-governance.fixture";
 export { installNixosSharedHostTargets } from "./deployment-targets.install.helpers";
+export { ensureNixosSharedHostStageBranch } from "./nixos-shared-host.stage-branch.fixture";
 
 export function nixosSharedHostSsrRuntimeContractFixture(
   overrides: Partial<NixosSharedHostSsrRuntimeContract> = {},
@@ -132,38 +132,6 @@ export function nixosSharedHostAdmissionPolicyNodeFixture(
     supply_chain_gates: policy.supplyChainGates || [],
     ...overrides,
   };
-}
-
-export async function ensureNixosSharedHostStageBranch(
-  cwd: string,
-  $: any,
-  deployment: Pick<NixosSharedHostDeployment, "lanePolicy" | "environmentStage">,
-) {
-  const branch = deployment.lanePolicy.stageBranches[deployment.environmentStage];
-  await $({ cwd, stdio: "pipe" })`git branch -f ${branch} HEAD`;
-  const remoteRoot = `${cwd}/.tmp-reviewed-origin.git`;
-  const hasOrigin =
-    (await $({ cwd, stdio: "pipe" })`git remote get-url origin`.nothrow()).exitCode === 0;
-  if (
-    !(
-      await $({ cwd, stdio: "pipe" })`git -C ${remoteRoot} rev-parse --is-bare-repository`.nothrow()
-    ).stdout
-  ) {
-    await $({ cwd, stdio: "pipe" })`git init --bare ${remoteRoot}`.nothrow();
-  }
-  if (hasOrigin) {
-    await $({ cwd, stdio: "pipe" })`git remote set-url origin ${remoteRoot}`;
-  } else {
-    await $({ cwd, stdio: "pipe" })`git remote add origin ${remoteRoot}`;
-  }
-  await $({ cwd, stdio: "pipe" })`git push --force origin HEAD:${branch}`;
-  const { repository = "", scmBackend = "" } = deployment.lanePolicy.governance || {};
-  if (scmBackend.toLowerCase() === "github" && repository) {
-    await $({
-      cwd,
-      stdio: "pipe",
-    })`git config ${`url.${pathToFileURL(remoteRoot).href}.insteadOf`} ${`git@github.com:${repository}.git`}`;
-  }
 }
 
 export function nixosSharedHostDeploymentFixture(

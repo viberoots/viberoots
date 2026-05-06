@@ -1,6 +1,21 @@
 { pkgs, buck2Input }:
 let
   zx-wrapper = import ./lib/zx-wrapper.nix { inherit pkgs; };
+  agent-safehouse = pkgs.stdenvNoCC.mkDerivation {
+    pname = "agent-safehouse";
+    version = "0.9.0";
+    src = pkgs.fetchurl {
+      url = "https://github.com/eugene1g/agent-safehouse/releases/download/v0.9.0/safehouse.sh";
+      sha256 = "15w65bms7y6qwxqrgnj8xikyfyf61h2wy4yb8aa0iy9yw4ggghk1";
+    };
+    dontUnpack = true;
+    dontPatchShebangs = true;
+    installPhase = ''
+      mkdir -p "$out/bin"
+      sed '1s|.*|#!/bin/bash|' "$src" > "$out/bin/safehouse"
+      chmod 755 "$out/bin/safehouse"
+    '';
+  };
 in {
   default = pkgs.mkShell {
     shellHook = ''
@@ -39,7 +54,61 @@ in {
       fi
 
       if [ -d "$PWD/build-tools/tools/bin" ]; then
-        export PATH="$PWD/build-tools/tools/bin:$PWD/node_modules/.bin:$PATH"
+        mkdir -p "$PWD/.direnv/bin" 2>/dev/null || true
+        if [ "$(uname -s 2>/dev/null || true)" = "Darwin" ]; then
+          if [ ! -x "$PWD/.direnv/bin/apfs-clone-checker" ] && command -v clang >/dev/null 2>&1; then
+            cat > "$PWD/.direnv/bin/apfs-clone-checker.c" <<'EOF'
+#include <sys/attr.h>
+#include <stdio.h>
+#include <stdint.h>
+#include <string.h>
+#include <unistd.h>
+
+typedef struct __attribute__((packed)) {
+  uint32_t length;
+  attribute_set_t returned;
+  uint64_t cloneid;
+} clone_attrs_t;
+
+static int clone_id(const char *path, uint64_t *out) {
+  struct attrlist attrs;
+  memset(&attrs, 0, sizeof(attrs));
+  attrs.bitmapcount = ATTR_BIT_MAP_COUNT;
+  attrs.commonattr = ATTR_CMN_RETURNED_ATTRS;
+  attrs.forkattr = ATTR_CMNEXT_CLONEID;
+
+  clone_attrs_t buf;
+  memset(&buf, 0, sizeof(buf));
+  if (getattrlist(path, &attrs, &buf, sizeof(buf), FSOPT_ATTR_CMN_EXTENDED) != 0) {
+    perror(path);
+    return 2;
+  }
+  if ((buf.returned.forkattr & ATTR_CMNEXT_CLONEID) == 0) {
+    fprintf(stderr, "%s: ATTR_CMNEXT_CLONEID unavailable\n", path);
+    return 3;
+  }
+  *out = buf.cloneid;
+  return 0;
+}
+
+int main(int argc, char **argv) {
+  if (argc != 3) {
+    fprintf(stderr, "usage: %s SOURCE CLONE\n", argv[0]);
+    return 2;
+  }
+  uint64_t a = 0, b = 0;
+  int rc = clone_id(argv[1], &a);
+  if (rc != 0) return rc;
+  rc = clone_id(argv[2], &b);
+  if (rc != 0) return rc;
+  puts((a != 0 && a == b) ? "1" : "0");
+  return 0;
+}
+EOF
+            clang -Wall -Wextra -O2 -o "$PWD/.direnv/bin/apfs-clone-checker" "$PWD/.direnv/bin/apfs-clone-checker.c" >/dev/null 2>&1 || rm -f "$PWD/.direnv/bin/apfs-clone-checker"
+          fi
+        fi
+        export PATH="$PWD/build-tools/tools/bin:$PWD/.direnv/bin:$PWD/node_modules/.bin:$PATH"
       fi
       # Ensure wrapper scripts on PATH are used even if stale aliases linger
       # from an older shellHook revision.
@@ -170,7 +239,7 @@ EOF
     buildInputs = [
       pkgs.git pkgs.buck2 pkgs.go pkgs.pnpm pkgs.nodejs_22 zx-wrapper pkgs.jq pkgs.rsync pkgs.copier pkgs.yq
       pkgs.secretspec pkgs.jc pkgs.coreutils pkgs.gomod2nix
-    ] ++ (if pkgs.stdenv.isLinux then [ pkgs.fuse-overlayfs pkgs.xdg-utils ] else []);
+    ] ++ (if pkgs.stdenv.isDarwin then [ agent-safehouse ] else [])
+      ++ (if pkgs.stdenv.isLinux then [ pkgs.fuse-overlayfs pkgs.xdg-utils ] else []);
   };
 }
-

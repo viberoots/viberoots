@@ -1,6 +1,6 @@
 ---
 name: test
-description: Run this repository's validation flow in a delegated tester subagent, optionally with a verify test selector. Use when the user invokes `$test` or asks the agent to validate current repo changes with `i && b && v`, or `i && b && v` followed by a specific `v` selector, while conserving main-thread tokens by capturing verbose output to logs and inspecting only failures or summaries. Report elapsed timing for each validation run.
+description: Run this repository's validation flow in a delegated tester subagent, optionally with a verify test selector. Use when the user invokes `$test` or asks the agent to validate current repo changes with `i && b && v`, or `i && b && v` followed by a specific `v` selector, while capturing verbose output to logs and reporting concise progress, failures, and summaries. Report elapsed timing for each validation run.
 ---
 
 # Test

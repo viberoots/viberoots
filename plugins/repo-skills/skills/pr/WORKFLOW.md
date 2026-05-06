@@ -137,7 +137,7 @@ Perform a self-review against:
 
 Run repository commands inside the repo dev shell. Prefer `direnv exec . bash -lc '...'` unless the current shell is already equivalently loaded.
 
-During validation, wait quietly. Do not send periodic status updates, progress pings, or "still running" messages while the `test` skill is running. Conserve tokens and report only when validation completes, fails, needs action, or produces evidence needed for handoff.
+During validation, use the `test` skill's logging and progress behavior. Keep full build and test output in saved logs, but provide concise chat updates during long runs. The tester should not run validation as one blocking foreground command; it should start the logged validation process in the background and poll it. Progress updates should include useful state such as elapsed time, log path, current phase, or a short high-signal summary; avoid empty pings and do not paste verbose logs.
 
 When invoked by `$prs` in pre-full-suite review mode, stop after self-review, gates, and focused validation pass. Report ready-for-review evidence and do not run full-suite validation until `$prs` reports that the separate scope-review subagent passed and explicitly authorizes full-suite validation.
 

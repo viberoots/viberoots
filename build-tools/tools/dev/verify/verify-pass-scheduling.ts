@@ -1,7 +1,7 @@
 import process from "node:process";
 
 function isSerialVerifyPass(name: string): boolean {
-  return name.startsWith("isolated");
+  return name.startsWith("isolated") || name === "resource-limited";
 }
 
 const DEFAULT_RESOURCE_LIMITED_START_DELAY_SECS = 900;
