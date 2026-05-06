@@ -12,12 +12,14 @@ import {
 
 const wrapper = path.join(repoRoot, "build-tools", "tools", "bin", "codex");
 const makeFakeTools = (tmp: string, gitRoot: string) => makeFakeAgentTools(tmp, gitRoot, "codex");
-test("codex --worktree creates through the CoW git wrapper and launches the worker in safehouse", async () => {
+test("codex --worktree attaches to an existing named worktree", async () => {
   await fsp.mkdir(scratchRoot, { recursive: true });
   const tmp = await fsp.mkdtemp(path.join(scratchRoot, "codex-wrapper-"));
   try {
     const gitRoot = path.join(tmp, "repo");
-    await fsp.mkdir(gitRoot, { recursive: true });
+    const worktreeRoot = path.join(gitRoot, ".codex", "worktrees", "existing-worker");
+    await fsp.mkdir(worktreeRoot, { recursive: true });
+    await fsp.writeFile(path.join(worktreeRoot, ".git"), "gitdir: fake\n", "utf8");
     const fake = await makeFakeTools(tmp, gitRoot);
     const res = await $({
       cwd: gitRoot,
@@ -27,14 +29,12 @@ test("codex --worktree creates through the CoW git wrapper and launches the work
         PATH: `${path.dirname(wrapper)}:${fake.bin}:/usr/bin:/bin`,
         BNX_CODEX_GIT_WRAPPER_FOR_TEST: path.join(fake.bin, "git"),
       },
-    })`${wrapper} --worktree native-worker exec task`;
+    })`${wrapper} --worktree existing-worker exec task`;
 
     assert.equal(res.exitCode, 0, String(res.stderr || res.stdout));
-    const worktreeRoot = path.join(gitRoot, ".codex", "worktrees", "native-worker");
     const worktreeRealRoot = await fsp.realpath(worktreeRoot);
     const log = await fsp.readFile(fake.log, "utf8");
-    assert.match(log, /git worktree add -b worktree-native-worker /);
-    assert.match(log, new RegExp(escapeRegExp(worktreeRoot)));
+    assert.doesNotMatch(log, /git worktree add/);
     assert.match(
       log,
       new RegExp(
@@ -48,7 +48,7 @@ test("codex --worktree creates through the CoW git wrapper and launches the work
   }
 });
 
-test("codex -w is an alias for the wrapper worktree path", async () => {
+test("codex --worktree recreates a missing worktree from an existing branch", async () => {
   await fsp.mkdir(scratchRoot, { recursive: true });
   const tmp = await fsp.mkdtemp(path.join(scratchRoot, "codex-wrapper-"));
   try {
@@ -63,13 +63,14 @@ test("codex -w is an alias for the wrapper worktree path", async () => {
         PATH: `${path.dirname(wrapper)}:${fake.bin}:/usr/bin:/bin`,
         BNX_CODEX_GIT_WRAPPER_FOR_TEST: path.join(fake.bin, "git"),
       },
-    })`${wrapper} -w shortcut-worker exec task`;
+    })`${wrapper} --worktree branch-only exec task`;
 
     assert.equal(res.exitCode, 0, String(res.stderr || res.stdout));
-    const worktreeRoot = path.join(gitRoot, ".codex", "worktrees", "shortcut-worker");
+    const worktreeRoot = path.join(gitRoot, ".codex", "worktrees", "branch-only");
     const worktreeRealRoot = await fsp.realpath(worktreeRoot);
     const log = await fsp.readFile(fake.log, "utf8");
-    assert.match(log, /git worktree add -b worktree-shortcut-worker /);
+    assert.match(log, /git worktree add .*branch-only worktree-branch-only/);
+    assert.doesNotMatch(log, /git worktree add -b worktree-branch-only/);
     assert.match(
       log,
       new RegExp(
@@ -77,77 +78,60 @@ test("codex -w is an alias for the wrapper worktree path", async () => {
       ),
     );
     assert.match(log, /codex --dangerously-bypass-approvals-and-sandbox exec task/);
-    assert.doesNotMatch(log, /codex .*-w/);
   } finally {
     await fsp.rm(tmp, { recursive: true, force: true });
   }
 });
 
-test("codex wrapper runs worktree agents through safehouse with unsafe flags", async () => {
+test("codex --list-worktrees prints valid named worktrees without launching", async () => {
   await fsp.mkdir(scratchRoot, { recursive: true });
   const tmp = await fsp.mkdtemp(path.join(scratchRoot, "codex-wrapper-"));
   try {
-    const worktreeRoot = path.join(tmp, ".codex", "worktrees", "worker-a");
-    await fsp.mkdir(worktreeRoot, { recursive: true });
-    const fake = await makeFakeTools(tmp, worktreeRoot);
+    const gitRoot = path.join(tmp, "repo");
+    const alpha = path.join(gitRoot, ".codex", "worktrees", "alpha");
+    const stale = path.join(gitRoot, ".codex", "worktrees", "stale");
+    await fsp.mkdir(alpha, { recursive: true });
+    await fsp.mkdir(stale, { recursive: true });
+    await fsp.writeFile(path.join(alpha, ".git"), "gitdir: fake\n", "utf8");
+    const fake = await makeFakeTools(tmp, gitRoot);
     const res = await $({
-      cwd: worktreeRoot,
+      cwd: gitRoot,
       stdio: "pipe",
-      env: { ...process.env, PATH: `${path.dirname(wrapper)}:${fake.bin}:/usr/bin:/bin` },
-    })`${wrapper} exec task`;
+      env: {
+        ...process.env,
+        PATH: `${path.dirname(wrapper)}:${fake.bin}:/usr/bin:/bin`,
+      },
+    })`${wrapper} --list-worktrees`;
 
     assert.equal(res.exitCode, 0, String(res.stderr || res.stdout));
-    const worktreeRealRoot = await fsp.realpath(worktreeRoot);
-    const log = await fsp.readFile(fake.log, "utf8");
-    assert.match(
-      log,
-      new RegExp(
-        `safehouse --workdir=${escapeRegExp(worktreeRealRoot)} --add-dirs-ro=/nix/store --append-profile=.* --env `,
-      ),
-    );
-    assert.match(log, /codex --dangerously-bypass-approvals-and-sandbox exec task/);
-    assert.match(log, /BNX_CODEX_SAFEHOUSE_ACTIVE=1/);
+    assert.equal(String(res.stdout), `alpha\t${alpha}\n`);
+    await assert.rejects(fsp.stat(fake.log), /ENOENT/);
   } finally {
     await fsp.rm(tmp, { recursive: true, force: true });
   }
 });
 
-test("codex wrapper launches the main repo with full-access sandbox by default", async () => {
+test("codex --list-worktrees ignores launch arguments", async () => {
   await fsp.mkdir(scratchRoot, { recursive: true });
   const tmp = await fsp.mkdtemp(path.join(scratchRoot, "codex-wrapper-"));
   try {
-    const fake = await makeFakeTools(tmp, repoRoot);
+    const gitRoot = path.join(tmp, "repo");
+    await fsp.mkdir(gitRoot, { recursive: true });
+    const fake = await makeFakeTools(tmp, gitRoot);
     const res = await $({
-      cwd: repoRoot,
+      cwd: gitRoot,
       stdio: "pipe",
-      env: { ...process.env, PATH: `${path.dirname(wrapper)}:${fake.bin}:/usr/bin:/bin` },
-    })`${wrapper} exec parent`;
+      reject: false,
+      nothrow: true,
+      env: {
+        ...process.env,
+        PATH: `${path.dirname(wrapper)}:${fake.bin}:/usr/bin:/bin`,
+      },
+    })`${wrapper} --list-worktrees exec task`;
 
-    assert.equal(res.exitCode, 0, String(res.stderr || res.stdout));
-    const log = await fsp.readFile(fake.log, "utf8");
-    assert.doesNotMatch(log, /safehouse /);
-    assert.match(log, /codex --sandbox danger-full-access exec parent/);
-    assert.doesNotMatch(log, /dangerously-bypass-approvals-and-sandbox/);
-  } finally {
-    await fsp.rm(tmp, { recursive: true, force: true });
-  }
-});
-
-test("codex wrapper preserves an explicit sandbox argument", async () => {
-  await fsp.mkdir(scratchRoot, { recursive: true });
-  const tmp = await fsp.mkdtemp(path.join(scratchRoot, "codex-wrapper-"));
-  try {
-    const fake = await makeFakeTools(tmp, repoRoot);
-    const res = await $({
-      cwd: repoRoot,
-      stdio: "pipe",
-      env: { ...process.env, PATH: `${path.dirname(wrapper)}:${fake.bin}:/usr/bin:/bin` },
-    })`${wrapper} --sandbox workspace-write exec parent`;
-
-    assert.equal(res.exitCode, 0, String(res.stderr || res.stdout));
-    const log = await fsp.readFile(fake.log, "utf8");
-    assert.match(log, /codex --sandbox workspace-write exec parent/);
-    assert.doesNotMatch(log, /danger-full-access/);
+    assert.equal(res.exitCode, 0);
+    assert.equal(String(res.stdout), "");
+    await assert.rejects(fsp.stat(fake.log), /ENOENT/);
   } finally {
     await fsp.rm(tmp, { recursive: true, force: true });
   }

@@ -3,42 +3,14 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
-
-const repoRoot = process.cwd();
-const wrapper = path.join(repoRoot, "build-tools", "tools", "bin", "git");
-const scratchRoot = path.join(repoRoot, "buck-out", "tmp");
-
-async function writeExecutable(file: string, text: string): Promise<void> {
-  await fsp.writeFile(file, text, "utf8");
-  await fsp.chmod(file, 0o755);
-}
-
-async function realGit(): Promise<string> {
-  const filteredPath = String(process.env.PATH || "")
-    .split(path.delimiter)
-    .filter((entry) => path.resolve(entry || ".") !== path.dirname(wrapper))
-    .join(path.delimiter);
-  const out = await $({
-    stdio: "pipe",
-    env: { ...process.env, PATH: filteredPath },
-  })`bash --noprofile --norc -c 'type -a -p git'`;
-  const candidates = String(out.stdout || "")
-    .split("\n")
-    .map((line) => line.trim())
-    .filter(Boolean);
-  return candidates.find((candidate) => candidate.startsWith("/nix/store/")) || candidates[0] || "";
-}
-
-async function initRepo(root: string, gitPath: string): Promise<void> {
-  await $({ cwd: root, stdio: "pipe" })`${gitPath} init -q`;
-  await $({ cwd: root, stdio: "pipe" })`${gitPath} config user.email test@example.com`;
-  await $({ cwd: root, stdio: "pipe" })`${gitPath} config user.name Test`;
-  await fsp.writeFile(path.join(root, "tracked.txt"), "tracked\n", "utf8");
-  await fsp.mkdir(path.join(root, "dir"));
-  await fsp.writeFile(path.join(root, "dir", ".hidden"), "hidden\n", "utf8");
-  await $({ cwd: root, stdio: "pipe" })`${gitPath} add tracked.txt dir/.hidden`;
-  await $({ cwd: root, stdio: "pipe" })`${gitPath} commit -qm initial`;
-}
+import {
+  initRepo,
+  realGit,
+  repoRoot,
+  scratchRoot,
+  wrapper,
+  writeExecutable,
+} from "./git-wrapper-test-helpers.ts";
 
 test("git wrapper delegates unsupported commands to the configured real git", async () => {
   await fsp.mkdir(scratchRoot, { recursive: true });
@@ -141,6 +113,76 @@ cp -R "$1" "$2"
     const status = await $({ cwd: target, stdio: "pipe" })`${gitPath} status --porcelain`;
     assert.doesNotMatch(String(status.stdout), /(^|\n).. tracked\.txt(\n|$)/);
     assert.match(String(status.stdout), /\?\? untracked\.txt/);
+  } finally {
+    await fsp.rm(tmp, { recursive: true, force: true });
+  }
+});
+
+test("git wrapper manifests tracked and non-ignored untracked files only", async () => {
+  await fsp.mkdir(scratchRoot, { recursive: true });
+  const tmp = await fsp.mkdtemp(path.join(scratchRoot, "git-wrapper-"));
+  const gitPath = await realGit();
+  try {
+    const source = path.join(tmp, "source");
+    const target = path.join(tmp, "target");
+    const copyProg = path.join(tmp, "copy-manifest");
+    const manifestLog = path.join(tmp, "manifest.log");
+    await fsp.mkdir(source);
+    await initRepo(source, gitPath);
+    await fsp.writeFile(path.join(source, ".gitignore"), "buck-out/\nignored-output/\n", "utf8");
+    await $({ cwd: source, stdio: "pipe" })`${gitPath} add .gitignore`;
+    await $({ cwd: source, stdio: "pipe" })`${gitPath} commit -qm ignore-output`;
+    await fsp.writeFile(path.join(source, "untracked.txt"), "untracked\n", "utf8");
+    await fsp.mkdir(path.join(source, "buck-out"), { recursive: true });
+    await fsp.writeFile(path.join(source, "buck-out", "cache.txt"), "cache\n", "utf8");
+    await fsp.mkdir(path.join(source, "ignored-output"), { recursive: true });
+    await fsp.writeFile(path.join(source, "ignored-output", "cache.txt"), "cache\n", "utf8");
+    await fsp.mkdir(path.join(source, ".codex", "worktrees", "old-agent"), {
+      recursive: true,
+    });
+    await fsp.writeFile(
+      path.join(source, ".codex", "worktrees", "old-agent", "sentinel.txt"),
+      "old worktree\n",
+      "utf8",
+    );
+    await writeExecutable(
+      copyProg,
+      `#!/usr/bin/env bash
+python3 - "$3" "$BNX_MANIFEST_LOG" <<'PY'
+import pathlib
+import sys
+
+manifest = pathlib.Path(sys.argv[1])
+log = pathlib.Path(sys.argv[2])
+items = [raw.decode("utf-8", "surrogateescape") for raw in manifest.read_bytes().split(b"\\0") if raw]
+log.write_text("\\n".join(items) + "\\n", encoding="utf-8")
+PY
+exit 23
+`,
+    );
+
+    const res = await $({
+      cwd: source,
+      stdio: "pipe",
+      reject: false,
+      nothrow: true,
+      env: {
+        ...process.env,
+        BNX_REAL_GIT: gitPath,
+        BNX_GIT_COW_COPY_PROG_FOR_TEST: copyProg,
+        BNX_MANIFEST_LOG: manifestLog,
+      },
+    })`${wrapper} worktree add ${target} HEAD`;
+
+    assert.equal(res.exitCode, 23);
+    const entries = (await fsp.readFile(manifestLog, "utf8")).trim().split("\n").sort();
+    assert(entries.includes(".gitignore"));
+    assert(entries.includes("tracked.txt"));
+    assert(entries.includes("dir/.hidden"));
+    assert(entries.includes("untracked.txt"));
+    assert(!entries.includes("buck-out/cache.txt"));
+    assert(!entries.includes("ignored-output/cache.txt"));
+    assert(!entries.includes(".codex/worktrees/old-agent/sentinel.txt"));
   } finally {
     await fsp.rm(tmp, { recursive: true, force: true });
   }

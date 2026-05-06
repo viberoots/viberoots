@@ -28,8 +28,9 @@ async function initRepo(root: string, gitPath: string): Promise<void> {
   await $({ cwd: root, stdio: "pipe" })`${gitPath} init -q`;
   await $({ cwd: root, stdio: "pipe" })`${gitPath} config user.email test@example.com`;
   await $({ cwd: root, stdio: "pipe" })`${gitPath} config user.name Test`;
+  await fsp.writeFile(path.join(root, ".gitignore"), "buck-out/\n", "utf8");
   await fsp.writeFile(path.join(root, "tracked.txt"), "tracked\n", "utf8");
-  await $({ cwd: root, stdio: "pipe" })`${gitPath} add tracked.txt`;
+  await $({ cwd: root, stdio: "pipe" })`${gitPath} add .gitignore tracked.txt`;
   await $({ cwd: root, stdio: "pipe" })`${gitPath} commit -qm initial`;
 }
 
@@ -117,6 +118,8 @@ test("git wrapper Darwin path creates an actual APFS CoW clone", async () => {
       "old worktree\n",
       "utf8",
     );
+    await fsp.mkdir(path.join(source, "buck-out"), { recursive: true });
+    await fsp.writeFile(path.join(source, "buck-out", "cache.txt"), "cache\n", "utf8");
     await $({ stdio: "pipe" })`dd if=/dev/urandom of=${marker} bs=1048576 count=16`;
 
     const res = await $({
@@ -152,6 +155,11 @@ test("git wrapper Darwin path creates an actual APFS CoW clone", async () => {
       /ENOENT/,
       "expected generated agent worktree roots not to be recursively copied",
     );
+    await assert.rejects(
+      fsp.stat(path.join(target, "buck-out", "cache.txt")),
+      /ENOENT/,
+      "expected ignored cache output not to be copied",
+    );
   } finally {
     await $({ stdio: "pipe", reject: false, nothrow: true })`chmod -R u+w ${tmp}`;
     await fsp.rm(tmp, { recursive: true, force: true });
@@ -178,6 +186,8 @@ test("git wrapper Linux path creates direct reflink CoW copies", async () => {
       "old worktree\n",
       "utf8",
     );
+    await fsp.mkdir(path.join(source, "buck-out"), { recursive: true });
+    await fsp.writeFile(path.join(source, "buck-out", "cache.txt"), "cache\n", "utf8");
     await $({ stdio: "pipe" })`dd if=/dev/urandom of=${marker} bs=1048576 count=16`;
 
     const res = await $({
@@ -197,6 +207,11 @@ test("git wrapper Linux path creates direct reflink CoW copies", async () => {
       fsp.stat(path.join(target, ".codex", "worktrees", "old-agent", "sentinel.txt")),
       /ENOENT/,
       "expected generated agent worktree roots not to be recursively copied",
+    );
+    await assert.rejects(
+      fsp.stat(path.join(target, "buck-out", "cache.txt")),
+      /ENOENT/,
+      "expected ignored cache output not to be copied",
     );
   } finally {
     await fsp.rm(tmp, { recursive: true, force: true });

@@ -1,0 +1,124 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+usage() {
+  cat >&2 <<'EOF'
+Usage: cd-worktree [--print] [--claude|--codex] <name>
+
+Open a shell in a named Claude/Codex worktree.
+Use --print to emit the resolved path instead:
+  cd "$(cd-worktree --print <name>)"
+EOF
+}
+
+find_git_root() {
+  if git rev-parse --show-toplevel >/dev/null 2>&1; then
+    git rev-parse --show-toplevel
+    return 0
+  fi
+  pwd -P
+}
+
+is_valid_name() {
+  local name="$1"
+  [[ -n "$name" && "$name" != /* && "$name" != *"/"* && "$name" != "." && "$name" != ".." && "$name" != *".."* ]]
+}
+
+is_git_worktree() {
+  local dir="$1"
+  [[ -e "$dir/.git" ]] && git -C "$dir" rev-parse --is-inside-work-tree >/dev/null 2>&1
+}
+
+PRINT_ONLY=0
+KIND=""
+NAME=""
+
+while [[ "$#" -gt 0 ]]; do
+  case "$1" in
+    --print|-p)
+      PRINT_ONLY=1
+      shift
+      ;;
+    --claude)
+      if [[ -n "$KIND" && "$KIND" != "claude" ]]; then
+        echo "Error: --claude and --codex cannot be combined" >&2
+        usage
+        exit 2
+      fi
+      KIND="claude"
+      shift
+      ;;
+    --codex)
+      if [[ -n "$KIND" && "$KIND" != "codex" ]]; then
+        echo "Error: --claude and --codex cannot be combined" >&2
+        usage
+        exit 2
+      fi
+      KIND="codex"
+      shift
+      ;;
+    --help|-h)
+      usage
+      exit 0
+      ;;
+    -*)
+      echo "Error: unknown option: $1" >&2
+      usage
+      exit 2
+      ;;
+    *)
+      if [[ -n "$NAME" ]]; then
+        echo "Error: cd-worktree accepts exactly one worktree name" >&2
+        usage
+        exit 2
+      fi
+      NAME="$1"
+      shift
+      ;;
+  esac
+done
+
+if ! is_valid_name "$NAME"; then
+  echo "Error: invalid worktree name: ${NAME}" >&2
+  usage
+  exit 2
+fi
+
+ROOT="$(find_git_root)"
+matches=()
+bases=()
+if [[ -z "$KIND" || "$KIND" == "claude" ]]; then
+  bases+=("${ROOT}/.claude/worktrees")
+fi
+if [[ -z "$KIND" || "$KIND" == "codex" ]]; then
+  bases+=("${ROOT}/.codex/worktrees")
+fi
+for base in "${bases[@]}"; do
+  candidate="${base}/${NAME}"
+  if is_git_worktree "$candidate"; then
+    matches+=("$(cd -- "$candidate" && pwd -P)")
+  fi
+done
+
+case "${#matches[@]}" in
+  0)
+    echo "Error: worktree not found: ${NAME}" >&2
+    exit 1
+    ;;
+  1)
+    target="${matches[0]}"
+    ;;
+  *)
+    echo "Error: multiple worktrees named ${NAME}; use one of:" >&2
+    printf '  %s\n' "${matches[@]}" >&2
+    exit 2
+    ;;
+esac
+
+if [[ "$PRINT_ONLY" == "1" ]]; then
+  printf '%s\n' "$target"
+  exit 0
+fi
+
+cd -- "$target"
+exec "${SHELL:-/bin/bash}" -l

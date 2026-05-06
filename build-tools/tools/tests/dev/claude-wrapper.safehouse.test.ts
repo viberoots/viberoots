@@ -3,94 +3,16 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
+import {
+  escapeRegExp,
+  makeFakeAgentTools,
+  repoRoot,
+  scratchRoot,
+  writeExecutable,
+} from "./agent-wrapper-test-helpers.ts";
 
-const repoRoot = process.cwd();
 const wrapper = path.join(repoRoot, "build-tools", "tools", "bin", "claude");
-const scratchRoot = path.join(repoRoot, "buck-out", "tmp");
-
-async function writeExecutable(file: string, text: string): Promise<void> {
-  await fsp.writeFile(file, text, "utf8");
-  await fsp.chmod(file, 0o755);
-}
-
-function escapeRegExp(value: string): string {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
-
-async function makeFakeTools(tmp: string, gitRoot: string): Promise<{ bin: string; log: string }> {
-  const bin = path.join(tmp, "bin");
-  const log = path.join(tmp, "calls.log");
-  await fsp.mkdir(bin, { recursive: true });
-  await writeExecutable(
-    path.join(bin, "git"),
-    `#!/usr/bin/env bash
-if [ "$1" = "rev-parse" ] && [ "$2" = "--show-toplevel" ]; then
-  case "$(pwd -P)" in
-    */.claude/worktrees/*|*/.codex/worktrees/*)
-      pwd -P
-      exit 0
-      ;;
-  esac
-  printf '%s\\n' "${gitRoot}"
-  exit 0
-fi
-if [ "$1" = "rev-parse" ] && [ "$2" = "--verify" ]; then
-  exit 1
-fi
-if [ "$1" = "worktree" ] && [ "$2" = "add" ]; then
-  printf 'git %s\\n' "$*" >> "${log}"
-  target=""
-  skip_next=0
-  for arg in "$@"; do
-    if [ "$skip_next" = 1 ]; then
-      skip_next=0
-      continue
-    fi
-    case "$arg" in
-      worktree|add|HEAD|origin/HEAD) ;;
-      -b|-B|--reason)
-        skip_next=1
-        ;;
-      -*)
-        ;;
-      *)
-        target="$arg"
-        ;;
-    esac
-    if [ -n "$target" ]; then
-      break
-    fi
-  done
-  mkdir -p "$target"
-  printf 'gitdir: fake\\n' > "$target/.git"
-  exit 0
-fi
-printf 'git %s\\n' "$*" >> "${log}"
-`,
-  );
-  await writeExecutable(
-    path.join(bin, "claude"),
-    `#!/usr/bin/env bash
-printf 'claude %s\\n' "$*" >> "${log}"
-printf 'BNX_CLAUDE_SAFEHOUSE_ACTIVE=%s\\n' "\${BNX_CLAUDE_SAFEHOUSE_ACTIVE:-}" >> "${log}"
-`,
-  );
-  await writeExecutable(
-    path.join(bin, "safehouse"),
-    `#!/usr/bin/env bash
-printf 'safehouse %s\\n' "$*" >> "${log}"
-while [ "$#" -gt 0 ]; do
-  case "$1" in
-    --workdir=*|--add-dirs-ro=*|--append-profile=*|--env) shift ;;
-    --workdir|--add-dirs-ro|--append-profile) shift 2 ;;
-    *) exec "$@" ;;
-  esac
-done
-`,
-  );
-  return { bin, log };
-}
-
+const makeFakeTools = (tmp: string, gitRoot: string) => makeFakeAgentTools(tmp, gitRoot, "claude");
 test("claude worktree flags create through CoW git and launch in safehouse", async () => {
   for (const { flag, name } of [
     { flag: "--worktree", name: "native-worker" },
@@ -130,6 +52,67 @@ test("claude worktree flags create through CoW git and launch in safehouse", asy
     } finally {
       await fsp.rm(tmp, { recursive: true, force: true });
     }
+  }
+});
+
+test("claude wrapper prefers native node_modules Claude over PATH wrappers", async () => {
+  await fsp.mkdir(scratchRoot, { recursive: true });
+  const tmp = await fsp.mkdtemp(path.join(scratchRoot, "claude-wrapper-"));
+  try {
+    const gitRoot = path.join(tmp, "repo");
+    const nodeModulesBin = path.join(gitRoot, "node_modules", ".bin");
+    const pnpmNativeDir = path.join(
+      gitRoot,
+      "node_modules",
+      ".pnpm",
+      "@anthropic-ai+claude-code-darwin-arm64@1.0.0",
+      "node_modules",
+      "@anthropic-ai",
+      "claude-code-darwin-arm64",
+    );
+    await fsp.mkdir(gitRoot, { recursive: true });
+    await fsp.mkdir(nodeModulesBin, { recursive: true });
+    await fsp.mkdir(pnpmNativeDir, { recursive: true });
+    const fake = await makeFakeTools(tmp, gitRoot);
+    const nativeClaude = path.join(pnpmNativeDir, "claude");
+    await writeExecutable(
+      path.join(nodeModulesBin, "claude"),
+      `#!/usr/bin/env bash
+echo unexpected-node-modules-shim
+`,
+    );
+    await writeExecutable(
+      nativeClaude,
+      `#!/usr/bin/env bash
+printf 'native-claude %s\\n' "$*" >> "${fake.log}"
+`,
+    );
+
+    const res = await $({
+      cwd: gitRoot,
+      stdio: "pipe",
+      env: {
+        ...process.env,
+        PATH: `${path.dirname(wrapper)}:${fake.bin}:/usr/bin:/bin`,
+        BNX_CLAUDE_GIT_WRAPPER_FOR_TEST: path.join(fake.bin, "git"),
+        BNX_CLAUDE_PLATFORM_KEY_FOR_TEST: "darwin-arm64",
+      },
+    })`${wrapper} --worktree native-resolution --help`;
+
+    assert.equal(res.exitCode, 0, String(res.stderr || res.stdout));
+    const worktreeRoot = path.join(gitRoot, ".claude", "worktrees", "native-resolution");
+    const worktreeRealRoot = await fsp.realpath(worktreeRoot);
+    const log = await fsp.readFile(fake.log, "utf8");
+    assert.match(
+      log,
+      new RegExp(
+        `safehouse --workdir=${escapeRegExp(worktreeRealRoot)} --add-dirs-ro=/nix/store --append-profile=.* --env ${escapeRegExp(nativeClaude)} `,
+      ),
+    );
+    assert.match(log, /native-claude --dangerously-skip-permissions --help/);
+    assert.doesNotMatch(log, /^claude /m);
+  } finally {
+    await fsp.rm(tmp, { recursive: true, force: true });
   }
 });
 
@@ -200,9 +183,11 @@ test("claude wrapper leaves main repo orchestration unsandboxed by default", asy
   await fsp.mkdir(scratchRoot, { recursive: true });
   const tmp = await fsp.mkdtemp(path.join(scratchRoot, "claude-wrapper-"));
   try {
-    const fake = await makeFakeTools(tmp, repoRoot);
+    const gitRoot = path.join(tmp, "repo");
+    await fsp.mkdir(gitRoot, { recursive: true });
+    const fake = await makeFakeTools(tmp, gitRoot);
     const res = await $({
-      cwd: repoRoot,
+      cwd: gitRoot,
       stdio: "pipe",
       env: {
         ...process.env,
@@ -219,6 +204,7 @@ test("claude wrapper leaves main repo orchestration unsandboxed by default", asy
     await fsp.rm(tmp, { recursive: true, force: true });
   }
 });
+
 test("claude wrapper refuses unsandboxed worktree agents when safehouse is missing", async () => {
   await fsp.mkdir(scratchRoot, { recursive: true });
   const tmp = await fsp.mkdtemp(path.join(scratchRoot, "claude-wrapper-"));

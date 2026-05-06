@@ -52,7 +52,7 @@ printf 'native %s\\n' "${platform}"
       );
 
       const res = await $({
-        cwd: repoRoot,
+        cwd: tmp,
         stdio: "pipe",
         env: {
           ...process.env,

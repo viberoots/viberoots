@@ -115,16 +115,16 @@ parse_worktree_add_target() {
 cow_copy_tree() {
   local src="$1"
   local dst="$2"
-  local excluded_target="${3:-}"
+  local manifest="$3"
 
   if [[ -n "${BNX_GIT_COW_COPY_PROG_FOR_TEST:-}" ]]; then
-    "${BNX_GIT_COW_COPY_PROG_FOR_TEST}" "$src" "$dst"
+    "${BNX_GIT_COW_COPY_PROG_FOR_TEST}" "$src" "$dst" "$manifest"
     return $?
   fi
 
   local ostype="${BNX_GIT_COW_OSTYPE:-${OSTYPE:-}}"
   if [[ "$ostype" == darwin* ]]; then
-    python3 - "$src" "$dst" "$excluded_target" <<'PY'
+    python3 - "$src" "$dst" "$manifest" <<'PY'
 import ctypes
 import os
 import shutil
@@ -133,76 +133,60 @@ import sys
 
 src_root = sys.argv[1]
 dst_root = sys.argv[2]
+manifest = sys.argv[3]
 rel_excluded_roots = [os.path.join(".claude", "worktrees"), os.path.join(".codex", "worktrees")]
-excluded_roots = [
-    os.path.abspath(root)
-    for root in [os.path.dirname(dst_root), *sys.argv[3:]]
-    if root
-]
 libc = ctypes.CDLL(None, use_errno=True)
 clonefile = libc.clonefile
 clonefile.argtypes = [ctypes.c_char_p, ctypes.c_char_p, ctypes.c_int]
 clonefile.restype = ctypes.c_int
 
-def is_excluded(path):
-    candidate = os.path.abspath(path)
-    if any(candidate == root or candidate.startswith(root + os.sep) for root in excluded_roots):
-        return True
-    rel = os.path.relpath(candidate, os.path.abspath(src_root))
+def is_unsafe_relpath(rel):
+    return rel == "" or os.path.isabs(rel) or rel == ".." or rel.startswith(".." + os.sep)
+
+def is_rel_excluded(rel):
     return any(rel == root or rel.startswith(root + os.sep) for root in rel_excluded_roots)
+
+def clone_entry(rel):
+    if is_unsafe_relpath(rel) or is_rel_excluded(rel):
+        return
+    src = os.path.join(src_root, rel)
+    dst = os.path.join(dst_root, rel)
+    try:
+        st = os.lstat(src)
+    except FileNotFoundError:
+        return
+
+    parent = os.path.dirname(dst)
+    if parent:
+        os.makedirs(parent, exist_ok=True)
+
+    if stat.S_ISLNK(st.st_mode):
+        os.symlink(os.readlink(src), dst)
+        return
+    if stat.S_ISDIR(st.st_mode):
+        os.makedirs(dst, exist_ok=True)
+        os.chmod(dst, stat.S_IMODE(st.st_mode) | 0o700)
+        return
+    if not stat.S_ISREG(st.st_mode):
+        raise RuntimeError(f"unsupported file type: {src}")
+
+    rc = clonefile(src.encode(), dst.encode(), 0)
+    if rc != 0:
+        err = ctypes.get_errno()
+        raise OSError(err, os.strerror(err), src)
+    os.chmod(dst, stat.S_IMODE(st.st_mode) | 0o600)
 
 if os.path.exists(dst_root):
     shutil.rmtree(dst_root)
 os.makedirs(dst_root, exist_ok=True)
 
-for cur, dirs, files in os.walk(src_root, topdown=True, followlinks=False):
-    if is_excluded(cur):
-        dirs[:] = []
-        continue
-
-    rel = os.path.relpath(cur, src_root)
-    dst_cur = dst_root if rel == "." else os.path.join(dst_root, rel)
-    os.makedirs(dst_cur, exist_ok=True)
-    try:
-        st = os.lstat(cur)
-        os.chmod(dst_cur, stat.S_IMODE(st.st_mode) | 0o700)
-    except OSError:
-        pass
-
-    kept_dirs = []
-    for name in dirs:
-        src = os.path.join(cur, name)
-        if is_excluded(src):
-            continue
-        dst = os.path.join(dst_cur, name)
-        st = os.lstat(src)
-        if stat.S_ISLNK(st.st_mode):
-            os.symlink(os.readlink(src), dst)
-        elif stat.S_ISDIR(st.st_mode):
-            kept_dirs.append(name)
-        else:
-            raise RuntimeError(f"unsupported directory entry type: {src}")
-    dirs[:] = kept_dirs
-
-    for name in files:
-        src = os.path.join(cur, name)
-        if is_excluded(src):
-            continue
-        dst = os.path.join(dst_cur, name)
-        st = os.lstat(src)
-        if stat.S_ISLNK(st.st_mode):
-            os.symlink(os.readlink(src), dst)
-            continue
-        if not stat.S_ISREG(st.st_mode):
-            raise RuntimeError(f"unsupported file type: {src}")
-        rc = clonefile(src.encode(), dst.encode(), 0)
-        if rc != 0:
-            err = ctypes.get_errno()
-            raise OSError(err, os.strerror(err), src)
-        os.chmod(dst, stat.S_IMODE(st.st_mode) | 0o600)
+with open(manifest, "rb") as f:
+    for raw in f.read().split(b"\0"):
+        if raw:
+            clone_entry(raw.decode("utf-8", "surrogateescape"))
 PY
   else
-    python3 - "$src" "$dst" "$excluded_target" <<'PY'
+    python3 - "$src" "$dst" "$manifest" <<'PY'
 import fcntl
 import os
 import shutil
@@ -212,18 +196,13 @@ import sys
 FICLONE = 0x40049409
 src_root = sys.argv[1]
 dst_root = sys.argv[2]
+manifest = sys.argv[3]
 rel_excluded_roots = [os.path.join(".claude", "worktrees"), os.path.join(".codex", "worktrees")]
-excluded_roots = [
-    os.path.abspath(root)
-    for root in [os.path.dirname(dst_root), *sys.argv[3:]]
-    if root
-]
 
-def is_excluded(path):
-    candidate = os.path.abspath(path)
-    if any(candidate == root or candidate.startswith(root + os.sep) for root in excluded_roots):
-        return True
-    rel = os.path.relpath(candidate, os.path.abspath(src_root))
+def is_unsafe_relpath(rel):
+    return rel == "" or os.path.isabs(rel) or rel == ".." or rel.startswith(".." + os.sep)
+
+def is_rel_excluded(rel):
     return any(rel == root or rel.startswith(root + os.sep) for root in rel_excluded_roots)
 
 def reflink(src, dst, mode):
@@ -244,52 +223,41 @@ def reflink(src, dst, mode):
     finally:
         os.close(src_fd)
 
+def clone_entry(rel):
+    if is_unsafe_relpath(rel) or is_rel_excluded(rel):
+        return
+    src = os.path.join(src_root, rel)
+    dst = os.path.join(dst_root, rel)
+    try:
+        st = os.lstat(src)
+    except FileNotFoundError:
+        return
+
+    parent = os.path.dirname(dst)
+    if parent:
+        os.makedirs(parent, exist_ok=True)
+
+    if stat.S_ISLNK(st.st_mode):
+        os.symlink(os.readlink(src), dst)
+        return
+    if stat.S_ISDIR(st.st_mode):
+        os.makedirs(dst, exist_ok=True)
+        os.chmod(dst, stat.S_IMODE(st.st_mode) | 0o700)
+        return
+    if not stat.S_ISREG(st.st_mode):
+        raise RuntimeError(f"unsupported file type: {src}")
+
+    reflink(src, dst, stat.S_IMODE(st.st_mode))
+    os.chmod(dst, stat.S_IMODE(st.st_mode) | 0o600)
+
 if os.path.exists(dst_root):
     shutil.rmtree(dst_root)
 os.makedirs(dst_root, exist_ok=True)
 
-for cur, dirs, files in os.walk(src_root, topdown=True, followlinks=False):
-    if is_excluded(cur):
-        dirs[:] = []
-        continue
-
-    rel = os.path.relpath(cur, src_root)
-    dst_cur = dst_root if rel == "." else os.path.join(dst_root, rel)
-    os.makedirs(dst_cur, exist_ok=True)
-    try:
-        st = os.lstat(cur)
-        os.chmod(dst_cur, stat.S_IMODE(st.st_mode) | 0o700)
-    except OSError:
-        pass
-
-    kept_dirs = []
-    for name in dirs:
-        src = os.path.join(cur, name)
-        if is_excluded(src):
-            continue
-        dst = os.path.join(dst_cur, name)
-        st = os.lstat(src)
-        if stat.S_ISLNK(st.st_mode):
-            os.symlink(os.readlink(src), dst)
-        elif stat.S_ISDIR(st.st_mode):
-            kept_dirs.append(name)
-        else:
-            raise RuntimeError(f"unsupported directory entry type: {src}")
-    dirs[:] = kept_dirs
-
-    for name in files:
-        src = os.path.join(cur, name)
-        if is_excluded(src):
-            continue
-        dst = os.path.join(dst_cur, name)
-        st = os.lstat(src)
-        if stat.S_ISLNK(st.st_mode):
-            os.symlink(os.readlink(src), dst)
-            continue
-        if not stat.S_ISREG(st.st_mode):
-            raise RuntimeError(f"unsupported file type: {src}")
-        reflink(src, dst, stat.S_IMODE(st.st_mode))
-        os.chmod(dst, stat.S_IMODE(st.st_mode) | 0o600)
+with open(manifest, "rb") as f:
+    for raw in f.read().split(b"\0"):
+        if raw:
+            clone_entry(raw.decode("utf-8", "surrogateescape"))
 PY
   fi
 }
@@ -298,6 +266,23 @@ move_staged_contents() {
   local staged_repo="$1"
   local target="$2"
   find "$staged_repo" -mindepth 1 -maxdepth 1 -exec mv {} "$target"/ \;
+}
+
+write_cow_copy_manifest() {
+  local real_git="$1"
+  local source_root="$2"
+  local manifest="$3"
+  local rel
+
+  "$real_git" -C "$source_root" ls-files -z --cached --others --exclude-standard |
+    while IFS= read -r -d '' rel; do
+      case "$rel" in
+        .claude/worktrees|.claude/worktrees/*|.codex/worktrees|.codex/worktrees/*)
+          continue
+          ;;
+      esac
+      printf '%s\0' "$rel"
+    done > "$manifest"
 }
 
 cleanup_partial_worktree() {
@@ -318,6 +303,7 @@ run_cow_worktree_add() {
   local target_abs
   local stage=""
   local staged_repo=""
+  local manifest=""
 
   source_root="$(pwd -P)"
 
@@ -331,8 +317,17 @@ run_cow_worktree_add() {
   target_abs="${target_parent}/$(basename -- "$target")"
   stage="$(mktemp -d "${target_parent}/.git-cow-stage.XXXXXX")"
   staged_repo="${stage}/repo"
+  manifest="${stage}/paths.zlist"
 
-  if cow_copy_tree "$source_root" "$staged_repo" "$target_abs"; then
+  if write_cow_copy_manifest "$real_git" "$source_root" "$manifest"; then
+    :
+  else
+    local status=$?
+    cleanup_partial_worktree "$real_git" "$target_abs" "$stage"
+    return "$status"
+  fi
+
+  if cow_copy_tree "$source_root" "$staged_repo" "$manifest"; then
     :
   else
     local status=$?
