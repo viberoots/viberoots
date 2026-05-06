@@ -6,6 +6,16 @@ import type { VercelDeployment } from "./contract-types";
 import { parseJsoncObject } from "./cloudflare-pages-config";
 import { fingerprintValue } from "./nixos-shared-host-deployment-fingerprint";
 
+export type VercelPublisherConfig = {
+  sourcePath: string;
+  renderedConfigPath: string;
+  fingerprint: string;
+  clientMode?: "live" | "fake";
+  apiBaseUrl?: string;
+  pollAttempts?: number;
+  pollIntervalMs?: number;
+};
+
 export function resolveVercelPublisherConfigPath(
   workspaceRoot: string,
   deployment: VercelDeployment,
@@ -21,7 +31,7 @@ export async function prepareVercelPublisherConfig(opts: {
   workspaceRoot: string;
   deployment: VercelDeployment;
   outputPath: string;
-}): Promise<{ sourcePath: string; renderedConfigPath: string; fingerprint: string }> {
+}): Promise<VercelPublisherConfig> {
   const sourcePath = resolveVercelPublisherConfigPath(opts.workspaceRoot, opts.deployment);
   const parsed = parseJsoncObject(await fsp.readFile(sourcePath, "utf8"), sourcePath);
   for (const [field, expected] of [
@@ -51,5 +61,18 @@ export async function prepareVercelPublisherConfig(opts: {
   const outputPath = path.resolve(opts.outputPath);
   await fsp.mkdir(path.dirname(outputPath), { recursive: true });
   await fsp.writeFile(outputPath, JSON.stringify(rendered, null, 2) + "\n", "utf8");
-  return { sourcePath, renderedConfigPath: outputPath, fingerprint: fingerprintValue(rendered) };
+  const api = typeof parsed.api === "object" && parsed.api ? (parsed.api as any) : {};
+  const rawMode = String(api.mode || parsed.client || "").trim();
+  const clientMode = rawMode === "live" || rawMode === "fake" ? rawMode : undefined;
+  return {
+    sourcePath,
+    renderedConfigPath: outputPath,
+    fingerprint: fingerprintValue(rendered),
+    ...(clientMode ? { clientMode } : {}),
+    ...(typeof api.baseUrl === "string" && api.baseUrl.trim()
+      ? { apiBaseUrl: api.baseUrl.trim() }
+      : {}),
+    ...(Number.isInteger(api.pollAttempts) ? { pollAttempts: api.pollAttempts } : {}),
+    ...(Number.isInteger(api.pollIntervalMs) ? { pollIntervalMs: api.pollIntervalMs } : {}),
+  };
 }

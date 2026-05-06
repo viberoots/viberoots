@@ -42,8 +42,12 @@ export const VERCEL_PROVIDER_CAPABILITY: DeploymentProviderCapability = {
   },
   smokeReleaseHealth: {
     defaultSmokeModel: [
-      bullet("built-in HTTP smoke is deferred to the live Vercel publisher PR"),
-      bullet("the local publisher records the reviewed canonical URL without probing it"),
+      bullet(
+        "live protected/shared publishes poll the Vercel deployment until a determinate provider outcome is available, then run the built-in HTTP smoke against the returned public URL",
+      ),
+      bullet(
+        "the local fake publisher remains a deterministic `local_only` fixture and records the reviewed canonical URL without contacting Vercel",
+      ),
     ],
   },
   builtInPublisherContract: {
@@ -74,7 +78,12 @@ export const VERCEL_PROVIDER_CAPABILITY: DeploymentProviderCapability = {
     bullet("retry or rollback fails closed when the retained exact artifact is unavailable"),
   ],
   partialPublishObservability: [
-    bullet("the local fixture records provider release id, public URL, and artifact identity"),
+    bullet(
+      "live records persist provider release id, public URL, alias assignment state, artifact identity, source run id when present, and redacted diagnostics for failed, pending, or ambiguous provider outcomes",
+    ),
+    bullet(
+      "the local fixture records deterministic provider release id, public URL, and artifact identity without external network access",
+    ),
   ],
   provisionerSupport: [
     bullet("not supported in the initial Vercel provider slice"),

@@ -266,16 +266,20 @@ replaySnapshotPath` or rejects the source-run as unsuitable for replay.
 ### Ambiguous publish or cleanup outcomes
 
 - Symptom: a Vercel deploy, retry, rollback, or preview cleanup run fails with
-  `ambiguous publish outcome` or `ambiguous cleanup outcome` and records a
-  failure result instead of a success.
-- Reason: the Vercel provider API returned an empty deployment id or did not
-  confirm cleanup. The control-plane service fails closed and never records a
-  false success.
+  `ambiguous publish outcome`, `ambiguous cleanup outcome`, or records
+  `finalOutcome = "pending"` / `"ambiguous"` instead of success.
+- Reason: the Vercel provider API returned an empty deployment id or URL, kept
+  the deployment in a non-terminal state after the polling budget, or did not
+  confirm preview cleanup. The control-plane service fails closed and never
+  records a false success.
 - Fix:
-  - Inspect the persisted record for the run id and provider release id; the
-    record is redacted of secret-runtime values.
+  - Inspect the persisted record for the run id, provider release id, public
+    URL, and redacted error summary. Secret-runtime values are not written to
+    the record.
   - Re-run the operation when the provider returns a determinate outcome. Do
     not bypass the failure by editing the recorded outcome.
+  - If the record contains a provider release id for a pending or ambiguous
+    run, reconcile that deployment in Vercel before retrying a live target.
 
 ### Rejected laptop-local artifact paths
 

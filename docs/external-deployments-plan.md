@@ -1315,3 +1315,219 @@ do not satisfy the design's submit-layer idempotency contract.
 
 It introduces another shared contract dependency on the submit-layer idempotency engine and requires
 re-recording provider control-plane fixtures whose `dedupe` shape changes.
+
+## PR-16: Live Vercel prebuilt API publisher and failure records
+
+### 1. Intent
+
+Close the remaining Vercel publishing gap by adding a real Vercel API client for admitted prebuilt
+artifacts while keeping the existing fake client as an explicit local/test fixture.
+
+### 2. Scope of changes
+
+- Add a live Vercel API client that can upload admitted Build Output API artifacts, create
+  deployments, assign aliases/domains where configured, and poll provider outcomes.
+- Select the live client only for protected/shared or explicitly configured live provider profiles;
+  keep fake/local Vercel publishing opt-in and visibly non-production.
+- Resolve Vercel API credentials exclusively through deployment `secret_requirements` and the
+  reviewed secret runtime.
+- Treat ambiguous, partial, or eventually consistent Vercel API outcomes as failed or pending
+  provider records with redacted diagnostics and provider IDs when available.
+- Preserve the existing local fake publisher contract for deterministic PR checks.
+
+### 3. External prerequisites
+
+- Vercel team/project access and API token stored through the repo's Vault/secretspec backend.
+- Network egress from the deployment worker to Vercel APIs.
+- DNS/domain ownership for any configured production or staging aliases.
+
+### 4. Tests to be added
+
+- Fake HTTP Vercel API tests for upload, create deployment, alias/domain assignment, polling,
+  success, provider failure, and ambiguous outcome handling.
+- Secretspec tests proving Vercel tokens are resolved only through deployment secret runtime and are
+  not written to records or diagnostics.
+- Selection tests proving live provider profiles use the live client and local/test profiles keep
+  using the fake client.
+- Record tests proving live provider IDs, URLs, aliases, artifact identity, source run ID, and
+  redacted diagnostics are persisted.
+
+### 5. Docs to be added or updated
+
+- Update deployment usage docs with live Vercel setup, secret contract IDs, and failure modes.
+- Update deployment troubleshooting docs with Vercel upload, alias/domain, polling, and ambiguous
+  API outcome diagnostics.
+- Update this plan if live Vercel API limitations force a different production assignment model.
+
+### 6. Acceptance criteria
+
+- Protected/shared Vercel deploys can use a real Vercel API client without consuming ambient local
+  Vercel state.
+- Required Vercel credentials are resolved only through reviewed deployment secrets.
+- Provider records distinguish successful, failed, pending, and ambiguous live Vercel outcomes with
+  redacted diagnostics.
+
+### 7. Risks
+
+- Vercel API behavior can be eventually consistent or return partial success after transport
+  failures.
+- Live API coverage can become flaky if tests depend on external network or account state.
+
+### 8. Mitigations
+
+- Keep PR tests on fake HTTP servers and make live account checks an explicit operator or admission
+  gate outside normal PR validation.
+- Record every provider ID and URL returned before an ambiguous failure so operators can reconcile
+  externally created resources.
+
+### 9. Consequences of not implementing this PR
+
+Vercel deployments remain fake-only despite the plan's live protected/shared publishing contract.
+
+### 10. Downsides for implementing this PR
+
+It adds live provider API coupling and operational failure handling to the Vercel publisher surface.
+
+## PR-17: Vercel service-backed CLI handoff for protected/shared mutations
+
+### 1. Intent
+
+Finish the Vercel protected/shared CLI parity work so deploy, preview, retry, rollback, and preview
+cleanup always hand off to the reviewed control-plane service and never prepare laptop-local
+artifacts or vault runtime state.
+
+### 2. Scope of changes
+
+- Add Vercel to the deploy CLI service-backed provider selection for protected/shared lanes and
+  provider profiles.
+- Reject protected/shared Vercel `--artifact-dir` and other laptop-local artifact inputs before
+  submit, including deploy and preview flows.
+- Route protected/shared Vercel deploy, preview, preview cleanup, retry, and rollback through the
+  PR-14 frozen snapshot and PR-15 submit-idempotency control-plane queue path.
+- Ensure the CLI client subprocess never calls `prepareDeploymentVaultRuntime` for protected/shared
+  Vercel mutations.
+- Preserve local/test Vercel flows for non-protected profiles where explicit local behavior remains
+  supported.
+
+### 3. External prerequisites
+
+- Depends on PR-14's frozen provider snapshots and PR-15's shared submit idempotency.
+- No new secret runtime contracts beyond those already required for Vercel publish and preview
+  cleanup.
+
+### 4. Tests to be added
+
+- Deploy CLI subprocess tests proving protected/shared Vercel deploy, preview, preview cleanup,
+  retry, and rollback use the service-backed path.
+- Regression tests proving protected/shared Vercel CLI execution never calls
+  `prepareDeploymentVaultRuntime` and rejects `--artifact-dir`.
+- Front-door negative tests proving laptop-local artifact inputs are rejected before a queued
+  provider submission is written.
+- Local/test profile tests proving explicitly local Vercel behavior still works where supported.
+
+### 5. Docs to be added or updated
+
+- Update deployment usage docs to state that protected/shared Vercel operations are service-backed
+  and reject laptop-local artifacts.
+- Update troubleshooting docs with the protected/shared Vercel handoff and local-artifact rejection
+  messages.
+
+### 6. Acceptance criteria
+
+- Protected/shared Vercel CLI mutations cannot prepare local vault runtime state or submit
+  laptop-local artifact directories.
+- All protected/shared Vercel mutation kinds use the reviewed control-plane service path.
+- Operator-facing errors clearly explain how to submit admitted artifacts or source-run selectors.
+
+### 7. Risks
+
+- Tightening protected/shared Vercel CLI behavior can break existing local operator workflows that
+  were accidentally relying on laptop-local state.
+
+### 8. Mitigations
+
+- Keep local/test profile behavior explicit and document the protected/shared distinction.
+- Add targeted error messages that point operators to admitted artifacts, preview source runs, and
+  rollback/retry source selectors.
+
+### 9. Consequences of not implementing this PR
+
+Protected/shared Vercel CLI execution can still bypass the reviewed service handoff and contradict
+the deployment docs.
+
+### 10. Downsides for implementing this PR
+
+It tightens Vercel CLI compatibility and may require operators to adjust preview and emergency
+replay habits.
+
+## PR-18: Production OpenTofu apply adapter for Kubernetes control-plane workers
+
+### 1. Intent
+
+Wire OpenTofu provision-only and app-attached Kubernetes control-plane runs to a production apply
+adapter so admitted plans are actually applied or fail closed instead of silently succeeding when no
+test hook adapter is present.
+
+### 2. Scope of changes
+
+- Add the production OpenTofu apply adapter used by Kubernetes control-plane workers for
+  provision-only and app-attached provisioner runs.
+- Require admitted plan fingerprints, backend/workspace identity, provider credential references,
+  and reviewed config fingerprints before apply begins.
+- Fail closed when the production adapter cannot be constructed, credentials are missing, the plan
+  fingerprint does not match, or apply exits without a recorded provider outcome.
+- Persist OpenTofu apply outcomes, state identity, redacted diagnostics, and exact plan/config
+  fingerprints in deployment records.
+- Keep fake/test apply adapters injectable for deterministic PR checks.
+
+### 3. External prerequisites
+
+- OpenTofu binary/toolchain pinned through the repo's Nix model.
+- Backend and provider credentials stored through reviewed deployment secret requirements.
+- Reviewed backend/workspace configuration for each foundation or app-attached provisioner.
+
+### 4. Tests to be added
+
+- Kubernetes control-plane worker tests proving provision-only and app-attached runs construct and
+  invoke the production OpenTofu adapter when no test hook adapter is supplied.
+- Negative tests proving missing credentials, missing plan fingerprints, mismatched plan
+  fingerprints, missing backend identity, and adapter construction failures fail closed.
+- Record tests proving successful and failed applies persist plan fingerprints, backend/workspace
+  identity, redacted diagnostics, and apply outcome.
+- Existing fake adapter tests must remain deterministic and separate from production adapter
+  construction tests.
+
+### 5. Docs to be added or updated
+
+- Update deployment usage docs with OpenTofu production apply behavior, required secrets, backend
+  identity, and provision-only failure modes.
+- Update troubleshooting docs with OpenTofu plan/apply mismatch and credential diagnostics.
+
+### 6. Acceptance criteria
+
+- Protected/shared Kubernetes provision-only and app-attached OpenTofu runs cannot record success
+  without an apply outcome.
+- Production workers fail closed when admitted plan evidence or credentials are incomplete.
+- Deployment records preserve enough redacted OpenTofu apply evidence for audit and replay review.
+
+### 7. Risks
+
+- Production OpenTofu apply behavior can mutate external infrastructure and has more operational
+  failure modes than fake adapter tests.
+
+### 8. Mitigations
+
+- Keep normal PR tests on fake or hermetic adapters while making production adapter construction and
+  fail-closed behavior testable without live infrastructure.
+- Require explicit reviewed credentials, backend identity, and admitted plan fingerprints before any
+  apply mutation starts.
+
+### 9. Consequences of not implementing this PR
+
+OpenTofu provision-only and app-attached control-plane runs can record success without applying the
+admitted plan in the shipped worker path.
+
+### 10. Downsides for implementing this PR
+
+It introduces production infrastructure mutation wiring and requires careful diagnostics around
+credential, backend, and plan mismatches.

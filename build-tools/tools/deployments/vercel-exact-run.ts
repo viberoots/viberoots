@@ -3,7 +3,7 @@ import type { VercelDeployment } from "./contract";
 import { createVaultDeploymentSecretRuntime } from "./deployment-secret-runtime-helpers";
 import { resolveDeploymentSmokeExecutionMode } from "./deployment-smoke-policy";
 import type { VercelApiClient } from "./vercel-api";
-import { createFakeVercelApiClient } from "./vercel-api";
+import { createFakeVercelApiClient, createLiveVercelApiClient } from "./vercel-api";
 import {
   createVercelDeployRecord,
   createVercelDeployRunId,
@@ -11,11 +11,29 @@ import {
   type VercelDeployRecord,
   type VercelOperationKind,
 } from "./vercel-records";
+import { vercelFailureErrorFields } from "./vercel-record-diagnostics";
 import { writeVercelReplaySnapshot, type VercelReplaySnapshot } from "./vercel-replay";
 import { smokeVercelConsole, type VercelSmokeConnectOverride } from "./vercel-smoke";
 import type { VercelAdmittedContext } from "./vercel-admission";
 
 type ExactArtifactRunOperation = "retry" | "rollback" | "promotion";
+
+function configuredAlias(deployment: VercelDeployment): string[] {
+  if (deployment.providerTarget.environment === "preview") return [];
+  try {
+    return [new URL(deployment.providerTarget.canonicalUrl).hostname].filter(Boolean);
+  } catch {
+    return [];
+  }
+}
+
+function failureOutcome(error: unknown): VercelDeployRecord["finalOutcome"] {
+  const message = error instanceof Error ? error.message : String(error);
+  const outcome = (error as any)?.outcome;
+  if (outcome === "pending") return "pending";
+  if (outcome === "ambiguous") return "ambiguous";
+  return /smoke/.test(message) ? "smoke_failed_after_publish" : "publish_failed";
+}
 
 export async function submitVercelExactArtifactRun(opts: {
   deployment: VercelDeployment;
@@ -30,6 +48,7 @@ export async function submitVercelExactArtifactRun(opts: {
   smokeConnectOverride?: VercelSmokeConnectOverride;
 }): Promise<{ record: VercelDeployRecord; recordPath: string }> {
   const runId = createVercelDeployRunId(`vercel-${opts.operationKind}`);
+  let secrets: string[] = [];
   try {
     const secretRuntime = createVaultDeploymentSecretRuntime({
       admittedContext: opts.admittedContext || {
@@ -44,7 +63,13 @@ export async function submitVercelExactArtifactRun(opts: {
     if (!String(publishSecrets.vercel_api_token || "").trim()) {
       throw new Error("vercel exact-artifact run requires a secret-runtime API token");
     }
-    const apiClient = opts.apiClient || createFakeVercelApiClient();
+    const apiToken = String(publishSecrets.vercel_api_token);
+    secrets = [apiToken];
+    const apiClient =
+      opts.apiClient ||
+      (opts.deployment.protectionClass === "local_only"
+        ? createFakeVercelApiClient()
+        : createLiveVercelApiClient({ apiToken }));
     const target = opts.deployment.providerTarget;
     const published = await apiClient.publishPrebuilt({
       team: target.team,
@@ -53,6 +78,7 @@ export async function submitVercelExactArtifactRun(opts: {
       artifactIdentity: opts.replaySnapshot.artifact.identity,
       outputDir: String(opts.replaySnapshot.artifact.outputDir || ""),
       sourceRunId: opts.parentRunId,
+      aliases: configuredAlias(opts.deployment),
     });
     if (!published.deploymentId.trim()) {
       throw new Error("vercel exact-artifact run rejected ambiguous publish outcome");
@@ -104,12 +130,16 @@ export async function submitVercelExactArtifactRun(opts: {
       deployRunId: runId,
       operationKind: opts.operationKind as VercelOperationKind,
       runClassification: opts.operationKind as VercelOperationKind,
-      finalOutcome: /smoke/.test(message) ? "smoke_failed_after_publish" : "publish_failed",
+      finalOutcome: failureOutcome(error),
       artifact: opts.replaySnapshot.artifact,
       parentRunId: opts.parentRunId,
       releaseLineageId: opts.releaseLineageId,
       artifactLineageId: opts.artifactLineageId,
-      error: message,
+      ...((error as any)?.providerReleaseId
+        ? { providerReleaseId: String((error as any).providerReleaseId) }
+        : {}),
+      ...((error as any)?.publicUrl ? { publicUrl: String((error as any).publicUrl) } : {}),
+      ...vercelFailureErrorFields(error, { secrets }),
     });
     const recordPath = await writeVercelDeployRecord(opts.recordsRoot, record);
     throw Object.assign(error instanceof Error ? error : new Error(message), {

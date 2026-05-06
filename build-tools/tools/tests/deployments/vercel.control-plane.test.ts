@@ -14,6 +14,7 @@ import {
 } from "../../deployments/deployment-provider-control-plane-submit";
 import { submitVercelDeploy, submitVercelPreviewCleanup } from "../../deployments/vercel-deploy";
 import { submitVercelExactArtifactRun } from "../../deployments/vercel-exact-run";
+import { createFakeVercelApiClient } from "../../deployments/vercel-api";
 import { resolveVercelReplaySource } from "../../deployments/vercel-replay";
 import { vercelDeploymentFixture } from "./vercel.fixture";
 import {
@@ -58,6 +59,7 @@ test("Vercel direct deploy does not create replay without recorded admission", a
         deployment,
         recordsRoot,
         artifactDir: await writeVercelArtifact(path.join(tmp, "artifact")),
+        apiClient: createFakeVercelApiClient(),
         smokeConnectOverride,
       });
       assert.equal(deployResult.record.finalOutcome, "succeeded");
@@ -176,5 +178,51 @@ test("Vercel exact-artifact run fails closed on ambiguous publish outcomes", asy
         }),
       /ambiguous publish outcome/,
     );
+  });
+});
+
+test("Vercel exact-artifact failure records redact provider diagnostics", async () => {
+  await withVercelFixtureSecrets(PUBLISH_AND_SMOKE_TOKEN, async (tmp) => {
+    const deployment = deploymentWithVercelSecret();
+    const recordsRoot = path.join(tmp, "records");
+    const failingClient = {
+      async publishPrebuilt() {
+        throw new Error("provider rejected token-fixture during retry");
+      },
+    };
+    let thrown: unknown;
+    try {
+      await submitVercelExactArtifactRun({
+        deployment,
+        recordsRoot,
+        operationKind: "retry",
+        replaySnapshot: {
+          schemaVersion: "vercel-replay-snapshot@1",
+          deployRunId: "deploy-prior",
+          createdAt: new Date().toISOString(),
+          deploymentId: deployment.deploymentId,
+          deploymentLabel: deployment.label,
+          providerTargetIdentity: deployment.providerTarget.providerTargetIdentity,
+          deployment,
+          artifact: { identity: "vercel-next:abc123" },
+          providerReleaseId: "dpl_prior",
+          publicUrl: "https://prior.example/",
+          aliasAssigned: true,
+          providerConfigFingerprint: "sha256:abc",
+        },
+        parentRunId: "deploy-prior",
+        releaseLineageId: "deploy-prior",
+        artifactLineageId: "vercel-next:abc123",
+        apiClient: failingClient,
+      });
+    } catch (error) {
+      thrown = error;
+    }
+    const failure = thrown as { record?: { finalOutcome?: string }; recordPath?: string };
+    assert.equal(failure.record?.finalOutcome, "publish_failed");
+    assert.ok(failure.recordPath, "expected recordPath on thrown error");
+    const persisted = await fsp.readFile(failure.recordPath!, "utf8");
+    assert.equal(persisted.includes("token-fixture"), false);
+    assert.match(persisted, /redacted/);
   });
 });

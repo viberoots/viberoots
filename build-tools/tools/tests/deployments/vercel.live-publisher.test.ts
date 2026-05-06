@@ -7,6 +7,8 @@ import path from "node:path";
 import { test } from "node:test";
 import { submitVercelDeploy, submitVercelPreviewCleanup } from "../../deployments/vercel-deploy";
 import { DEPLOYMENT_SECRET_FIXTURE_PATH_ENV } from "../../deployments/deployment-secret-fixture";
+import { admitVercelPrebuiltArtifact } from "../../deployments/vercel-artifacts";
+import { publishVercelPrebuilt } from "../../deployments/vercel-publisher";
 import { vercelDeploymentFixture } from "./vercel.fixture";
 
 async function writeArtifact(root: string) {
@@ -34,6 +36,66 @@ async function withServer(fn: (port: number) => Promise<void>) {
   }
 }
 
+async function withApiServer(fn: (baseUrl: string, urls: string[]) => Promise<void>) {
+  const urls: string[] = [];
+  const server = http.createServer((req, res) => {
+    urls.push(`${req.method || ""} ${req.url || ""}`);
+    if (req.method === "POST" && req.url?.startsWith("/v2/files")) {
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end("{}");
+      return;
+    }
+    if (req.method === "POST" && req.url?.startsWith("/v13/deployments")) {
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(JSON.stringify({ id: "dpl_live", readyState: "READY", url: "live.vercel.app" }));
+      return;
+    }
+    if (req.method === "POST" && req.url?.includes("/aliases")) {
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end("{}");
+      return;
+    }
+    res.writeHead(404).end();
+  });
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  try {
+    await fn(`http://127.0.0.1:${(server.address() as any).port}`, urls);
+  } finally {
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+  }
+}
+
+test("protected/shared Vercel publisher selects the live API client from provider config", async () => {
+  const tmp = await fsp.mkdtemp(path.join(os.tmpdir(), "vercel-live-select-"));
+  try {
+    await fsp.mkdir(path.join(tmp, "projects", "deployments", "console-staging"), {
+      recursive: true,
+    });
+    const artifact = await admitVercelPrebuiltArtifact(await writeArtifact(path.join(tmp, "a")));
+    await withApiServer(async (baseUrl, urls) => {
+      await fsp.writeFile(
+        path.join(tmp, "projects", "deployments", "console-staging", "vercel-prebuilt.jsonc"),
+        JSON.stringify({ mode: "prebuilt", api: { baseUrl, pollIntervalMs: 0 } }) + "\n",
+      );
+      const result = await publishVercelPrebuilt({
+        workspaceRoot: tmp,
+        recordsRoot: path.join(tmp, "records"),
+        runId: "run-live-select",
+        deployment: vercelDeploymentFixture(),
+        artifact,
+        apiToken: "fixture-token",
+      });
+      assert.equal(result.providerReleaseId, "dpl_live");
+      assert.equal(result.aliasAssigned, true);
+      assert.ok(urls.some((url) => url.startsWith("POST /v2/files")));
+      assert.ok(urls.some((url) => url.startsWith("POST /v13/deployments")));
+      assert.ok(urls.some((url) => url.includes("/aliases")));
+    });
+  } finally {
+    await fsp.rm(tmp, { recursive: true, force: true });
+  }
+});
+
 test("Vercel deploy uses secret-runtime token, fake API, smoke, and exact artifact records", async () => {
   const tmp = await fsp.mkdtemp(path.join(os.tmpdir(), "vercel-live-"));
   const previousFixture = process.env[DEPLOYMENT_SECRET_FIXTURE_PATH_ENV];
@@ -54,6 +116,7 @@ test("Vercel deploy uses secret-runtime token, fake API, smoke, and exact artifa
     );
     process.env[DEPLOYMENT_SECRET_FIXTURE_PATH_ENV] = fixturePath;
     const deployment = vercelDeploymentFixture({
+      protectionClass: "local_only",
       secretRequirements: [
         {
           name: "vercel_api_token",
@@ -112,6 +175,7 @@ test("Vercel preview cleanup is audited and uses preview_cleanup secret step", a
     process.env[DEPLOYMENT_SECRET_FIXTURE_PATH_ENV] = fixturePath;
     const result = await submitVercelPreviewCleanup({
       deployment: vercelDeploymentFixture({
+        protectionClass: "local_only",
         secretRequirements: [
           {
             name: "vercel_api_token",

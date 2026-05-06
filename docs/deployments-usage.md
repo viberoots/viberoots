@@ -499,9 +499,23 @@ kubernetes_service_deployment(
 - publishes admitted `.vercel/output` artifacts with `vercel-prebuilt`
 - resolves the Vercel API token through `secret_requirements`; do not pass
   provider tokens through ambient environment variables
+- protected/shared profiles use the live Vercel REST API publisher by default;
+  `local_only` fixtures keep using the deterministic fake publisher
 - preview, preview cleanup, retry, and rollback are source-run scoped audited
   operations; protected/shared mutations must route through the reviewed
   control-plane service path
+
+Minimum live Vercel setup:
+
+- declare a publish-step secret requirement named `vercel_api_token`, with a
+  contract such as `secret://deployments/<deployment-id>/vercel_api_token`
+- bind the secret contract to the deployment target lock scope
+  `vercel:<team>/<project>#<environment>`
+- keep `vercel-prebuilt.jsonc` checked into the deployment package with
+  `mode = "prebuilt"`; `mode = "git-autobuild"` and ambient `.vercel` state are
+  rejected
+- configure any production or staging alias/domain as the deployment
+  `canonical_url`, and verify DNS/domain ownership in Vercel before the run
 
 Protected/shared Vercel control-plane examples:
 

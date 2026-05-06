@@ -19,9 +19,18 @@ import {
 import { smokeVercelConsole, type VercelSmokeConnectOverride } from "./vercel-smoke";
 import type { VercelApiClient } from "./vercel-api";
 import { cleanupVercelPreview } from "./vercel-publisher";
+import { vercelFailureErrorFields } from "./vercel-record-diagnostics";
 import { writeVercelReplaySnapshot } from "./vercel-replay";
 
 type VercelDeployResult = { record: VercelDeployRecord; recordPath: string };
+
+function failureOutcome(error: unknown): VercelDeployRecord["finalOutcome"] {
+  const message = error instanceof Error ? error.message : String(error);
+  const outcome = (error as any)?.outcome;
+  if (outcome === "pending") return "pending";
+  if (outcome === "ambiguous") return "ambiguous";
+  return /smoke/.test(message) ? "smoke_failed_after_publish" : "publish_failed";
+}
 
 async function writeFailure(opts: {
   recordsRoot: string;
@@ -29,18 +38,25 @@ async function writeFailure(opts: {
   runId: string;
   operationKind: VercelOperationKind;
   artifact?: AdmittedVercelPrebuiltArtifact;
+  sourceRunId?: string;
   error: unknown;
+  secrets?: readonly string[];
 }): Promise<never> {
   const message = opts.error instanceof Error ? opts.error.message : String(opts.error);
   const record = createVercelDeployRecord(opts.deployment, {
     deployRunId: opts.runId,
     operationKind: opts.operationKind,
     runClassification: opts.operationKind,
-    finalOutcome: /smoke/.test(message) ? "smoke_failed_after_publish" : "publish_failed",
+    finalOutcome: failureOutcome(opts.error),
     ...(opts.artifact
       ? { artifact: { identity: opts.artifact.identity, outputDir: opts.artifact.outputDir } }
       : {}),
-    error: message,
+    ...(opts.sourceRunId ? { sourceRunId: opts.sourceRunId, parentRunId: opts.sourceRunId } : {}),
+    ...((opts.error as any)?.providerReleaseId
+      ? { providerReleaseId: String((opts.error as any).providerReleaseId) }
+      : {}),
+    ...((opts.error as any)?.publicUrl ? { publicUrl: String((opts.error as any).publicUrl) } : {}),
+    ...vercelFailureErrorFields(opts.error, { secrets: opts.secrets || [] }),
   });
   const recordPath = await writeVercelDeployRecord(opts.recordsRoot, record);
   throw Object.assign(opts.error instanceof Error ? opts.error : new Error(message), {
@@ -64,6 +80,7 @@ export async function submitVercelDeploy(opts: {
   const runId = createVercelDeployRunId();
   const operationKind = opts.operationKind || "deploy";
   let artifact: AdmittedVercelPrebuiltArtifact | undefined;
+  let secrets: string[] = [];
   try {
     artifact = opts.artifact || (await admitVercelPrebuiltArtifact(opts.artifactDir));
     const secretRuntime = createVaultDeploymentSecretRuntime({
@@ -76,6 +93,7 @@ export async function submitVercelDeploy(opts: {
       fallbackTargetScope: opts.deployment.providerTarget.providerTargetIdentity,
     });
     const publishSecrets = await secretRuntime.enterStep("publish");
+    secrets = [String(publishSecrets.vercel_api_token || "")];
     const published = await publishVercelPrebuilt({
       workspaceRoot: opts.workspaceRoot,
       recordsRoot: opts.recordsRoot,
@@ -138,7 +156,9 @@ export async function submitVercelDeploy(opts: {
       runId,
       operationKind,
       ...(artifact ? { artifact } : {}),
+      ...(opts.sourceRunId ? { sourceRunId: opts.sourceRunId } : {}),
       error,
+      secrets,
     });
   }
 }
@@ -151,11 +171,13 @@ export async function submitVercelPreviewCleanup(opts: {
   deployment: VercelDeployment;
   recordsRoot: string;
   sourceRunId: string;
+  providerDeploymentId?: string;
   apiClient?: VercelApiClient;
   admittedContext?: VercelAdmittedContext;
 }): Promise<VercelDeployResult> {
   if (!opts.sourceRunId.trim()) throw new Error("vercel preview cleanup requires sourceRunId");
   const runId = createVercelDeployRunId("vercel-preview-cleanup");
+  let secrets: string[] = [];
   try {
     const secretRuntime = createVaultDeploymentSecretRuntime({
       admittedContext: opts.admittedContext || {
@@ -167,10 +189,12 @@ export async function submitVercelPreviewCleanup(opts: {
       fallbackTargetScope: opts.deployment.providerTarget.providerTargetIdentity,
     });
     const cleanupSecrets = await secretRuntime.enterStep("preview_cleanup");
+    secrets = [String(cleanupSecrets.vercel_api_token || "")];
     const cleanup = await cleanupVercelPreview({
       deployment: opts.deployment,
       sourceRunId: opts.sourceRunId,
       apiToken: cleanupSecrets.vercel_api_token || "",
+      ...(opts.providerDeploymentId ? { providerDeploymentId: opts.providerDeploymentId } : {}),
       ...(opts.apiClient ? { apiClient: opts.apiClient } : {}),
     });
     if (!cleanup.cleaned || !cleanup.deploymentId.trim()) {
@@ -192,7 +216,9 @@ export async function submitVercelPreviewCleanup(opts: {
       deployment: opts.deployment,
       runId,
       operationKind: "preview_cleanup",
+      sourceRunId: opts.sourceRunId,
       error,
+      secrets,
     });
   }
 }

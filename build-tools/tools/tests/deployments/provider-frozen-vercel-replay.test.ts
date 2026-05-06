@@ -4,6 +4,7 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
 import { buildVercelControlPlaneSnapshot } from "../../deployments/vercel-control-plane-snapshot";
+import { createFakeVercelApiClient, type VercelApiClient } from "../../deployments/vercel-api";
 import {
   executeVercelControlPlaneSubmission,
   VERCEL_CONTROL_PLANE_SUBMIT_REQUEST_SCHEMA,
@@ -32,6 +33,7 @@ async function executeSnapshot(opts: {
   recordsRoot: string;
   provider: string;
   snapshot: Record<string, any>;
+  apiClient?: VercelApiClient;
 }) {
   const submissionPath = path.join(opts.recordsRoot, `${opts.provider}-submission.json`);
   const snapshotPath = path.join(opts.recordsRoot, `${opts.provider}-snapshot.json`);
@@ -63,6 +65,7 @@ async function executeSnapshot(opts: {
     executionSnapshotPath: snapshotPath,
     executionSnapshotRef: snapshotPath,
     workerId: `${opts.provider}-worker`,
+    ...(opts.apiClient ? { apiClient: opts.apiClient } : {}),
   });
   return JSON.parse(await fsp.readFile(submissionPath, "utf8"));
 }
@@ -84,6 +87,7 @@ test("vercel worker retry rollback and preview cleanup replay frozen snapshots",
   await runInTemp("provider-frozen-vercel-replay", async (tmp, $) => {
     const recordsRoot = path.join(tmp, "records");
     const deployment = vercelReplayDeployment();
+    const apiClient = createFakeVercelApiClient();
     await writeVercelPublisherConfig(tmp);
     await ensureNixosSharedHostStageBranch(tmp, $, deployment);
     await withVercelFixtureSecrets(
@@ -117,6 +121,7 @@ test("vercel worker retry rollback and preview cleanup replay frozen snapshots",
             recordsRoot,
             provider: "vercel-source",
             snapshot: deploy,
+            apiClient,
           });
           assert.equal(source.finalOutcome, "succeeded");
           for (const operationKind of ["retry", "rollback", "preview_cleanup"] as const) {
@@ -139,6 +144,7 @@ test("vercel worker retry rollback and preview cleanup replay frozen snapshots",
               recordsRoot,
               provider: `vercel-${operationKind}`,
               snapshot,
+              apiClient,
             });
             assert.equal(result.finalOutcome, "succeeded");
           }

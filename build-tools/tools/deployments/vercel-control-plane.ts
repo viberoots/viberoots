@@ -11,6 +11,7 @@ import {
 import { writeControlPlaneJson } from "./nixos-shared-host-control-plane-store";
 import { submitVercelDeploy, submitVercelPreviewCleanup } from "./vercel-deploy";
 import { submitVercelExactArtifactRun } from "./vercel-exact-run";
+import type { VercelApiClient } from "./vercel-api";
 import {
   queueFrozenProviderSubmission,
   requireFrozenProviderSubmissionAdmission,
@@ -67,6 +68,7 @@ export async function executeVercelControlPlaneSubmission(opts: {
   executionSnapshotPath: string;
   executionSnapshotRef: string;
   workerId: string;
+  apiClient?: VercelApiClient;
 }) {
   const persistSubmissionStatus = async (nextSubmission: Record<string, unknown>) => {
     await writeControlPlaneJson(opts.submissionPath, nextSubmission);
@@ -83,7 +85,11 @@ export async function executeVercelControlPlaneSubmission(opts: {
   const runningSubmission = { ...submission, lifecycleState: "running", workerId: opts.workerId };
   try {
     await persistSubmissionStatus(runningSubmission);
-    const result = await runVercelOperation({ workerId: opts.workerId, snapshot });
+    const result = await runVercelOperation({
+      workerId: opts.workerId,
+      snapshot,
+      ...(opts.apiClient ? { apiClient: opts.apiClient } : {}),
+    });
     result.record.controlPlane = {
       submissionId: snapshot.submissionId,
       workerId: opts.workerId,
@@ -116,7 +122,11 @@ export async function executeVercelControlPlaneSubmission(opts: {
   }
 }
 
-async function runVercelOperation(opts: { workerId: string; snapshot: Snapshot }) {
+async function runVercelOperation(opts: {
+  workerId: string;
+  snapshot: Snapshot;
+  apiClient?: VercelApiClient;
+}) {
   const { snapshot } = opts;
   if (snapshot.operationKind === "deploy" || snapshot.operationKind === "preview") {
     return await submitVercelDeploy({
@@ -128,6 +138,7 @@ async function runVercelOperation(opts: { workerId: string; snapshot: Snapshot }
       ...(snapshot.admittedContext ? { admittedContext: snapshot.admittedContext as any } : {}),
       operationKind: snapshot.operationKind,
       ...(snapshot.sourceRunId ? { sourceRunId: snapshot.sourceRunId } : {}),
+      ...(opts.apiClient ? { apiClient: opts.apiClient } : {}),
       ...(snapshot.smokeConnectOverride
         ? { smokeConnectOverride: snapshot.smokeConnectOverride as any }
         : {}),
@@ -139,6 +150,10 @@ async function runVercelOperation(opts: { workerId: string; snapshot: Snapshot }
       deployment: snapshot.deployment,
       recordsRoot: snapshot.recordsRoot,
       sourceRunId: snapshot.parentRunId || source.record.deployRunId,
+      ...(source.record.providerReleaseId
+        ? { providerDeploymentId: source.record.providerReleaseId }
+        : {}),
+      ...(opts.apiClient ? { apiClient: opts.apiClient } : {}),
       ...(snapshot.admittedContext ? { admittedContext: snapshot.admittedContext as any } : {}),
     });
   }
@@ -152,6 +167,7 @@ async function runVercelOperation(opts: { workerId: string; snapshot: Snapshot }
     releaseLineageId: snapshot.releaseLineageId as string,
     artifactLineageId: snapshot.artifactLineageId as string,
     ...(snapshot.admittedContext ? { admittedContext: snapshot.admittedContext as any } : {}),
+    ...(opts.apiClient ? { apiClient: opts.apiClient } : {}),
     ...(snapshot.smokeConnectOverride
       ? { smokeConnectOverride: snapshot.smokeConnectOverride as any }
       : {}),

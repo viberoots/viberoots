@@ -21,7 +21,12 @@ export type VercelDeployRecord = {
   deployRunId: string;
   operationKind: VercelOperationKind;
   runClassification: VercelOperationKind;
-  finalOutcome: "succeeded" | "publish_failed" | "smoke_failed_after_publish";
+  finalOutcome:
+    | "succeeded"
+    | "publish_failed"
+    | "smoke_failed_after_publish"
+    | "pending"
+    | "ambiguous";
   deploymentId: string;
   deploymentLabel: string;
   provider: "vercel";
@@ -39,6 +44,7 @@ export type VercelDeployRecord = {
   replaySnapshotPath?: string;
   admittedContext?: unknown;
   error?: string;
+  errorFingerprint?: string;
   controlPlane?: {
     submissionId?: string;
     workerId?: string;

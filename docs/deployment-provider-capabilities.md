@@ -843,8 +843,8 @@ Normative-source note:
 ### Smoke / Release Health
 
 - default smoke model:
-  - built-in HTTP smoke is deferred to the live Vercel publisher PR
-  - the local publisher records the reviewed canonical URL without probing it
+  - live protected/shared publishes poll the Vercel deployment until a determinate provider outcome is available, then run the built-in HTTP smoke against the returned public URL
+  - the local fake publisher remains a deterministic `local_only` fixture and records the reviewed canonical URL without contacting Vercel
 
 ### Built-In Publisher Contract
 
@@ -873,7 +873,8 @@ Normative-source note:
 
 ### Partial Publish Observability
 
-- the local fixture records provider release id, public URL, and artifact identity
+- live records persist provider release id, public URL, alias assignment state, artifact identity, source run id when present, and redacted diagnostics for failed, pending, or ambiguous provider outcomes
+- the local fixture records deterministic provider release id, public URL, and artifact identity without external network access
 
 ### Provisioner Support
 
