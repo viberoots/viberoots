@@ -396,6 +396,9 @@ step instead of editing Keycloak by hand.
 
 - good fit for static sites
 - supports infrastructure-aware static publishing, including provision-only flows
+- protected/shared worker execution uses a frozen admitted snapshot with the
+  shared admission-engine result and admitted static artifact reference; queued
+  snapshots do not carry laptop-local artifact directories
 - use this guide plus [Deployment Provider Capabilities](/Users/kiltyj/Code/bucknix-fresh/docs/deployment-provider-capabilities.md)
   for the exact supported behavior
 
@@ -429,6 +432,9 @@ step instead of editing Keycloak by hand.
   closed before Helm runs, ambient cluster credentials are scrubbed from the
   publisher process, and only the resolved credential env names plus contract
   refs are written to deploy records (never the credential values)
+- protected/shared worker execution starts from a frozen admitted snapshot that
+  carries component artifact identities, secret-contract references, and the
+  shared admission evaluation result instead of raw client artifact paths
 - use this guide plus [Deployment Provider Capabilities](/Users/kiltyj/Code/bucknix-fresh/docs/deployment-provider-capabilities.md)
 
 Scaffold-first examples:
@@ -533,7 +539,10 @@ deploy --deployment //projects/deployments/console-staging:deploy \
 Protected/shared Vercel mutations reject laptop-local artifact paths,
 laptop-local records roots, and direct local-publish flags. Retry and rollback
 replay the recorded exact prebuilt artifact and never rebuild from current
-branch state. See [Vercel Troubleshooting](/Users/kiltyj/Code/bucknix-fresh/docs/handbook/troubleshooting.md#vercel-control-plane-deployments)
+branch state. The control-plane service persists the admitted prebuilt artifact
+reference, source-run selector, secret-contract references, and shared
+admission evaluation in one frozen execution snapshot before worker mutation.
+See [Vercel Troubleshooting](/Users/kiltyj/Code/bucknix-fresh/docs/handbook/troubleshooting.md#vercel-control-plane-deployments)
 for service submission, admission, replay, and provider API failure modes.
 
 `app-store-connect`

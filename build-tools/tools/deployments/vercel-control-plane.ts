@@ -3,22 +3,24 @@ import fs from "node:fs/promises";
 import type { VercelDeployment } from "./contract";
 import { terminalSubmissionFromAdmissionFailure } from "./deployment-provider-control-plane-admission-failure";
 import {
-  enqueueBackendSubmission,
   writeBackendDeployRecordDoc,
-  writeBackendSnapshotDoc,
   writeBackendSubmissionDoc,
   acquireBackendControlPlaneLock,
   type NixosSharedHostControlPlaneBackendTarget,
 } from "./nixos-shared-host-control-plane-backend";
-import {
-  executionSnapshotPathFor,
-  submissionPathFor,
-  writeControlPlaneJson,
-} from "./nixos-shared-host-control-plane-store";
-import { submitResponseFromSubmission } from "./deployment-control-plane-status";
+import { writeControlPlaneJson } from "./nixos-shared-host-control-plane-store";
 import { submitVercelDeploy, submitVercelPreviewCleanup } from "./vercel-deploy";
 import { submitVercelExactArtifactRun } from "./vercel-exact-run";
-import { resolveVercelReplaySource } from "./vercel-replay";
+import {
+  queueFrozenProviderSubmission,
+  requireFrozenProviderSubmissionAdmission,
+  requireFrozenProviderReplaySource,
+  requireFrozenProviderSnapshot,
+} from "./deployment-provider-frozen-snapshot";
+import {
+  buildVercelControlPlaneSnapshot,
+  type VercelControlPlaneSnapshot as Snapshot,
+} from "./vercel-control-plane-snapshot";
 
 export const VERCEL_CONTROL_PLANE_SUBMIT_REQUEST_SCHEMA = "vercel-control-plane-submit-request@1";
 
@@ -42,78 +44,18 @@ export type VercelControlPlaneSubmitRequest = {
   smokeConnectOverride?: unknown;
 };
 
-type Snapshot = {
-  schemaVersion: "vercel-control-plane-snapshot@1";
-  submissionId: string;
-  submittedAt: string;
-  operationKind: VercelControlPlaneOperationKind;
-  deploymentId: string;
-  deploymentLabel: string;
-  providerTargetIdentity: string;
-  lockScope: string;
-  deployment: VercelDeployment;
-  workspaceRoot: string;
-  recordsRoot: string;
-  artifactDir?: string;
-  expectedSourceRevision?: string;
-  sourceRunId?: string;
-  admissionEvidence?: unknown;
-  smokeConnectOverride?: unknown;
-};
-
 export async function queueVercelControlPlaneSubmission(opts: {
   workspaceRoot: string;
   recordsRoot: string;
   backend: NixosSharedHostControlPlaneBackendTarget;
   request: VercelControlPlaneSubmitRequest;
 }) {
-  const snapshot: Snapshot = {
-    schemaVersion: "vercel-control-plane-snapshot@1",
-    submissionId: opts.request.submissionId,
-    submittedAt: opts.request.submittedAt,
-    operationKind: opts.request.operationKind,
-    deploymentId: opts.request.deployment.deploymentId,
-    deploymentLabel: opts.request.deployment.label,
-    providerTargetIdentity: opts.request.deployment.providerTarget.providerTargetIdentity,
-    lockScope: opts.request.deployment.providerTarget.providerTargetIdentity,
-    deployment: opts.request.deployment,
-    workspaceRoot: opts.workspaceRoot,
+  const snapshot = await buildVercelControlPlaneSnapshot(opts);
+  return await queueFrozenProviderSubmission({
     recordsRoot: opts.recordsRoot,
-    ...(opts.request.artifactDir ? { artifactDir: opts.request.artifactDir } : {}),
-    ...(opts.request.expectedSourceRevision
-      ? { expectedSourceRevision: opts.request.expectedSourceRevision }
-      : {}),
-    ...(opts.request.sourceRunId ? { sourceRunId: opts.request.sourceRunId } : {}),
-    ...(opts.request.admissionEvidence
-      ? { admissionEvidence: opts.request.admissionEvidence }
-      : {}),
-    ...(opts.request.smokeConnectOverride
-      ? { smokeConnectOverride: opts.request.smokeConnectOverride }
-      : {}),
-  };
-  const refs = {
-    executionSnapshotPath: executionSnapshotPathFor(opts.recordsRoot, opts.request.submissionId),
-    submissionPath: submissionPathFor(opts.recordsRoot, opts.request.submissionId),
-  };
-  await writeBackendSnapshotDoc(opts.backend, snapshot as any, refs.executionSnapshotPath);
-  const submission = {
-    schemaVersion: "deployment-provider-control-plane-submission@1",
-    submissionId: opts.request.submissionId,
-    submittedAt: opts.request.submittedAt,
-    operationKind: opts.request.operationKind,
-    deploymentId: opts.request.deployment.deploymentId,
-    deploymentLabel: opts.request.deployment.label,
-    providerTargetIdentity: snapshot.providerTargetIdentity,
-    lockScope: snapshot.lockScope,
-    executionSnapshotPath: refs.executionSnapshotPath,
-    lifecycleState: "queued",
-    terminationReason: null,
-    dedupe: { mode: "created", requestFingerprint: `direct:${opts.request.submissionId}` },
-    admission: { decision: "admitted", reason: opts.request.deployment.protectionClass },
-  };
-  await writeBackendSubmissionDoc(opts.backend, submission as any, refs);
-  await enqueueBackendSubmission(opts.backend, opts.request.submissionId, opts.request.submittedAt);
-  return submitResponseFromSubmission(submission as any);
+    backend: opts.backend,
+    snapshot,
+  });
 }
 
 export async function executeVercelControlPlaneSubmission(opts: {
@@ -135,6 +77,8 @@ export async function executeVercelControlPlaneSubmission(opts: {
   };
   const submission = JSON.parse(await fs.readFile(opts.submissionPath, "utf8"));
   const snapshot = JSON.parse(await fs.readFile(opts.executionSnapshotPath, "utf8")) as Snapshot;
+  requireFrozenProviderSnapshot(snapshot, "vercel");
+  requireFrozenProviderSubmissionAdmission({ provider: "vercel", submission, snapshot });
   const lock = await acquireBackendControlPlaneLock(opts.backend, snapshot.lockScope);
   const runningSubmission = { ...submission, lifecycleState: "running", workerId: opts.workerId };
   try {
@@ -179,7 +123,9 @@ async function runVercelOperation(opts: { workerId: string; snapshot: Snapshot }
       workspaceRoot: snapshot.workspaceRoot,
       deployment: snapshot.deployment,
       recordsRoot: snapshot.recordsRoot,
-      artifactDir: String(snapshot.artifactDir || ""),
+      artifactDir: "",
+      ...(snapshot.artifact ? { artifact: snapshot.artifact } : {}),
+      ...(snapshot.admittedContext ? { admittedContext: snapshot.admittedContext as any } : {}),
       operationKind: snapshot.operationKind,
       ...(snapshot.sourceRunId ? { sourceRunId: snapshot.sourceRunId } : {}),
       ...(snapshot.smokeConnectOverride
@@ -188,24 +134,24 @@ async function runVercelOperation(opts: { workerId: string; snapshot: Snapshot }
     });
   }
   if (snapshot.operationKind === "preview_cleanup") {
+    const source = requireFrozenProviderReplaySource(snapshot, "vercel");
     return await submitVercelPreviewCleanup({
       deployment: snapshot.deployment,
       recordsRoot: snapshot.recordsRoot,
-      sourceRunId: String(snapshot.sourceRunId || ""),
+      sourceRunId: snapshot.parentRunId || source.record.deployRunId,
+      ...(snapshot.admittedContext ? { admittedContext: snapshot.admittedContext as any } : {}),
     });
   }
-  const source = await resolveVercelReplaySource({
-    recordsRoot: snapshot.recordsRoot,
-    deployRunId: String(snapshot.sourceRunId || ""),
-  });
+  const source = requireFrozenProviderReplaySource(snapshot, "vercel");
   return await submitVercelExactArtifactRun({
     deployment: snapshot.deployment,
     recordsRoot: snapshot.recordsRoot,
     operationKind: snapshot.operationKind,
     replaySnapshot: source.replaySnapshot,
-    parentRunId: source.record.deployRunId,
-    releaseLineageId: source.record.releaseLineageId || source.record.deployRunId,
-    artifactLineageId: source.record.artifactLineageId || source.replaySnapshot.artifact.identity,
+    parentRunId: snapshot.parentRunId as string,
+    releaseLineageId: snapshot.releaseLineageId as string,
+    artifactLineageId: snapshot.artifactLineageId as string,
+    ...(snapshot.admittedContext ? { admittedContext: snapshot.admittedContext as any } : {}),
     ...(snapshot.smokeConnectOverride
       ? { smokeConnectOverride: snapshot.smokeConnectOverride as any }
       : {}),

@@ -1209,6 +1209,13 @@ Control-plane worker responsibilities for protected/shared mutation:
    - for immutable-reuse flows, source admission validates the selected prior admitted run and its replay eligibility
 2. resolve target-environment run admission and freeze one immutable execution snapshot for that mutating run before any waiting or mutation begins
    - the snapshot should preserve the deployment metadata, immutable provider-config content or immutable provider-config references, resolved policy contents, selected artifact inputs when applicable, runner implementation identities for the built-in publisher, provisioner, smoke runner, and any built-in `release_actions` runner that materially influence execution, and any other non-secret execution inputs needed to replay the admitted decision faithfully
+   - Vercel, Kubernetes, and S3 static provider submissions use the shared
+     admission evaluator at queue time and persist that policy evaluation in
+     the frozen worker snapshot alongside admitted artifact references or
+     admitted source-run replay selectors
+   - protected/shared provider snapshots must not persist laptop-local
+     `artifactDir` paths as execution inputs; workers load admitted artifact
+     references from the frozen snapshot
    - when first-run source admission used a reviewed-ref snapshot, the frozen target-environment snapshot should preserve that submission-scoped snapshot reference so later revalidation continues to check the same reviewed source rather than silently following a newer branch head
    - for secret or runtime-config dependencies, the snapshot should preserve non-secret contract references, versions, selectors, or fingerprints rather than secret values
    - replay-sensitive secret or runtime-config references must resolve exactly to the admitted reference set for the run kind being executed; implementations must not silently substitute "latest", auto-rotated, or ambient defaults during retry or rollback

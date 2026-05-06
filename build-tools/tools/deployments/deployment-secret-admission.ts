@@ -23,13 +23,11 @@ export async function resolveSourceRunAdmittedSecretReferences(opts: {
   targetScope: string;
   secretContext?: DeploymentSecretContext;
 }): Promise<DeploymentSecretAdmittedReference[]> {
-  const sourceReferences = Array.isArray(opts.sourceAdmittedContext?.admittedSecretReferences)
-    ? opts.sourceAdmittedContext.admittedSecretReferences
-    : [];
-  if (sourceReferences.length > 0) return sourceReferences;
-  return await resolveInitialAdmittedSecretReferences({
-    requirements: opts.sourceAdmittedContext?.secretRequirements || opts.requirements,
-    targetScope: opts.targetScope,
-    secretContext: opts.secretContext,
-  });
+  if (!opts.sourceAdmittedContext) {
+    throw new Error("replay requires recorded admitted secret context");
+  }
+  if (!Array.isArray(opts.sourceAdmittedContext.admittedSecretReferences)) {
+    throw new Error("replay requires recorded admitted secret references");
+  }
+  return opts.sourceAdmittedContext.admittedSecretReferences;
 }

@@ -7,6 +7,7 @@ import {
   admitVercelPrebuiltArtifact,
   type AdmittedVercelPrebuiltArtifact,
 } from "./vercel-artifacts";
+import type { VercelAdmittedContext } from "./vercel-admission";
 import { publishVercelPrebuilt } from "./vercel-publisher";
 import {
   createVercelDeployRecord,
@@ -53,6 +54,8 @@ export async function submitVercelDeploy(opts: {
   deployment: VercelDeployment;
   recordsRoot: string;
   artifactDir: string;
+  artifact?: AdmittedVercelPrebuiltArtifact;
+  admittedContext?: VercelAdmittedContext;
   operationKind?: VercelOperationKind;
   sourceRunId?: string;
   smokeConnectOverride?: VercelSmokeConnectOverride;
@@ -62,9 +65,9 @@ export async function submitVercelDeploy(opts: {
   const operationKind = opts.operationKind || "deploy";
   let artifact: AdmittedVercelPrebuiltArtifact | undefined;
   try {
-    artifact = await admitVercelPrebuiltArtifact(opts.artifactDir);
+    artifact = opts.artifact || (await admitVercelPrebuiltArtifact(opts.artifactDir));
     const secretRuntime = createVaultDeploymentSecretRuntime({
-      admittedContext: {
+      admittedContext: opts.admittedContext || {
         secretRequirements: opts.deployment.secretRequirements,
         targetEnvironment: {
           lockScope: opts.deployment.providerTarget.providerTargetIdentity,
@@ -96,7 +99,7 @@ export async function submitVercelDeploy(opts: {
       });
     }
     const replaySnapshotPath =
-      operationKind === "deploy"
+      operationKind === "deploy" && opts.admittedContext
         ? await writeVercelReplaySnapshot({
             recordsRoot: opts.recordsRoot,
             deployRunId: runId,
@@ -106,6 +109,7 @@ export async function submitVercelDeploy(opts: {
             publicUrl: published.publicUrl,
             aliasAssigned: published.aliasAssigned,
             providerConfigFingerprint: published.providerConfigFingerprint,
+            admittedContext: opts.admittedContext as any,
           })
         : undefined;
     const record = createVercelDeployRecord(opts.deployment, {
@@ -124,6 +128,7 @@ export async function submitVercelDeploy(opts: {
       aliasAssigned: published.aliasAssigned,
       smokeOutcome,
       providerConfigFingerprint: published.providerConfigFingerprint,
+      ...(opts.admittedContext ? { admittedContext: opts.admittedContext as any } : {}),
     });
     return { record, recordPath: await writeVercelDeployRecord(opts.recordsRoot, record) };
   } catch (error) {
@@ -147,12 +152,13 @@ export async function submitVercelPreviewCleanup(opts: {
   recordsRoot: string;
   sourceRunId: string;
   apiClient?: VercelApiClient;
+  admittedContext?: VercelAdmittedContext;
 }): Promise<VercelDeployResult> {
   if (!opts.sourceRunId.trim()) throw new Error("vercel preview cleanup requires sourceRunId");
   const runId = createVercelDeployRunId("vercel-preview-cleanup");
   try {
     const secretRuntime = createVaultDeploymentSecretRuntime({
-      admittedContext: {
+      admittedContext: opts.admittedContext || {
         secretRequirements: opts.deployment.secretRequirements,
         targetEnvironment: {
           lockScope: opts.deployment.providerTarget.providerTargetIdentity,
@@ -177,6 +183,7 @@ export async function submitVercelPreviewCleanup(opts: {
       finalOutcome: "succeeded",
       sourceRunId: opts.sourceRunId,
       providerReleaseId: cleanup.deploymentId,
+      ...(opts.admittedContext ? { admittedContext: opts.admittedContext as any } : {}),
     });
     return { record, recordPath: await writeVercelDeployRecord(opts.recordsRoot, record) };
   } catch (error) {

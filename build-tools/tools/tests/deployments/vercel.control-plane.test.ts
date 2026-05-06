@@ -47,7 +47,7 @@ test("Vercel control-plane submit request is recognized by the deployment provid
   assert.equal(downcast.deployment.provider, "vercel");
 });
 
-test("Vercel deploy writes a replay snapshot whose retry reuses the recorded artifact identity", async () => {
+test("Vercel direct deploy does not create replay without recorded admission", async () => {
   await withVercelFixtureSecrets(PUBLISH_AND_SMOKE_TOKEN, async (tmp) => {
     await withVercelSmokeServer(async (smokeConnectOverride) => {
       const deployment = deploymentWithVercelSecret();
@@ -61,69 +61,7 @@ test("Vercel deploy writes a replay snapshot whose retry reuses the recorded art
         smokeConnectOverride,
       });
       assert.equal(deployResult.record.finalOutcome, "succeeded");
-      assert.ok(deployResult.record.replaySnapshotPath);
-      assert.equal(deployResult.record.releaseLineageId, deployResult.record.deployRunId);
-      const source = await resolveVercelReplaySource({
-        recordsRoot,
-        deployRunId: deployResult.record.deployRunId,
-      });
-      assert.equal(source.replaySnapshot.artifact.identity, deployResult.record.artifact?.identity);
-      const retry = await submitVercelExactArtifactRun({
-        deployment,
-        recordsRoot,
-        operationKind: "retry",
-        replaySnapshot: source.replaySnapshot,
-        parentRunId: source.record.deployRunId,
-        releaseLineageId: source.record.releaseLineageId || source.record.deployRunId,
-        artifactLineageId:
-          source.record.artifactLineageId || source.replaySnapshot.artifact.identity,
-        smokeConnectOverride,
-      });
-      assert.equal(retry.record.finalOutcome, "succeeded");
-      assert.equal(retry.record.operationKind, "retry");
-      assert.equal(retry.record.runClassification, "retry");
-      assert.equal(retry.record.parentRunId, deployResult.record.deployRunId);
-      assert.equal(retry.record.releaseLineageId, deployResult.record.deployRunId);
-      assert.equal(retry.record.artifactLineageId, deployResult.record.artifact?.identity);
-      assert.equal(retry.record.artifact?.identity, source.replaySnapshot.artifact.identity);
-    });
-  });
-});
-
-test("Vercel rollback through replay reuses the recorded provider deployment identity", async () => {
-  await withVercelFixtureSecrets(PUBLISH_AND_SMOKE_TOKEN, async (tmp) => {
-    await withVercelSmokeServer(async (smokeConnectOverride) => {
-      const deployment = deploymentWithVercelSecret();
-      const recordsRoot = path.join(tmp, "records");
-      await writeVercelPublisherConfig(tmp);
-      const first = await submitVercelDeploy({
-        workspaceRoot: tmp,
-        deployment,
-        recordsRoot,
-        artifactDir: await writeVercelArtifact(path.join(tmp, "artifact-a")),
-        smokeConnectOverride,
-      });
-      const source = await resolveVercelReplaySource({
-        recordsRoot,
-        deployRunId: first.record.deployRunId,
-      });
-      const rollback = await submitVercelExactArtifactRun({
-        deployment,
-        recordsRoot,
-        operationKind: "rollback",
-        replaySnapshot: source.replaySnapshot,
-        parentRunId: source.record.deployRunId,
-        releaseLineageId: source.record.releaseLineageId || source.record.deployRunId,
-        artifactLineageId:
-          source.record.artifactLineageId || source.replaySnapshot.artifact.identity,
-        smokeConnectOverride,
-      });
-      assert.equal(rollback.record.finalOutcome, "succeeded");
-      assert.equal(rollback.record.runClassification, "rollback");
-      assert.equal(rollback.record.artifact?.identity, source.replaySnapshot.artifact.identity);
-      assert.equal(rollback.record.artifactLineageId, first.record.artifact?.identity);
-      assert.equal(rollback.record.parentRunId, first.record.deployRunId);
-      assert.equal(rollback.record.releaseLineageId, first.record.deployRunId);
+      assert.equal(deployResult.record.replaySnapshotPath, undefined);
     });
   });
 });

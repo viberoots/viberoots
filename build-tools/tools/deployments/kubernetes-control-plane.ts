@@ -4,23 +4,25 @@ import type { KubernetesDeployment } from "./contract";
 import { terminalSubmissionFromAdmissionFailure } from "./deployment-provider-control-plane-admission-failure";
 import { assertCrossDeploymentExactPromotionEligible } from "./deployment-provider-promotion";
 import {
-  enqueueBackendSubmission,
   writeBackendDeployRecordDoc,
-  writeBackendSnapshotDoc,
   writeBackendSubmissionDoc,
   acquireBackendControlPlaneLock,
   type NixosSharedHostControlPlaneBackendTarget,
 } from "./nixos-shared-host-control-plane-backend";
-import {
-  executionSnapshotPathFor,
-  submissionPathFor,
-  writeControlPlaneJson,
-} from "./nixos-shared-host-control-plane-store";
-import { submitResponseFromSubmission } from "./deployment-control-plane-status";
+import { writeControlPlaneJson } from "./nixos-shared-host-control-plane-store";
 import { submitKubernetesDeploy } from "./kubernetes-deploy";
 import { submitKubernetesExactArtifactRun } from "./kubernetes-exact-run";
 import { submitKubernetesProvisionOnly } from "./kubernetes-provision-only";
-import { resolveKubernetesReplaySource } from "./kubernetes-replay";
+import {
+  queueFrozenProviderSubmission,
+  requireFrozenProviderSubmissionAdmission,
+  requireFrozenProviderReplaySource,
+  requireFrozenProviderSnapshot,
+} from "./deployment-provider-frozen-snapshot";
+import {
+  buildKubernetesControlPlaneSnapshot,
+  type KubernetesControlPlaneSnapshot as Snapshot,
+} from "./kubernetes-control-plane-snapshot";
 
 export const KUBERNETES_CONTROL_PLANE_SUBMIT_REQUEST_SCHEMA =
   "kubernetes-control-plane-submit-request@1";
@@ -39,82 +41,18 @@ export type KubernetesControlPlaneSubmitRequest = {
   smokeConnectOverride?: unknown;
 };
 
-type Snapshot = {
-  schemaVersion: "kubernetes-control-plane-snapshot@1";
-  submissionId: string;
-  submittedAt: string;
-  operationKind: KubernetesControlPlaneSubmitRequest["operationKind"];
-  deploymentId: string;
-  deploymentLabel: string;
-  providerTargetIdentity: string;
-  lockScope: string;
-  deployment: KubernetesDeployment;
-  workspaceRoot: string;
-  recordsRoot: string;
-  artifactDir?: string;
-  artifactDirsByComponentId?: Record<string, string>;
-  expectedSourceRevision?: string;
-  sourceRunId?: string;
-  admissionEvidence?: unknown;
-  smokeConnectOverride?: unknown;
-};
-
 export async function queueKubernetesControlPlaneSubmission(opts: {
   workspaceRoot: string;
   recordsRoot: string;
   backend: NixosSharedHostControlPlaneBackendTarget;
   request: KubernetesControlPlaneSubmitRequest;
 }) {
-  const snapshot: Snapshot = {
-    schemaVersion: "kubernetes-control-plane-snapshot@1",
-    submissionId: opts.request.submissionId,
-    submittedAt: opts.request.submittedAt,
-    operationKind: opts.request.operationKind,
-    deploymentId: opts.request.deployment.deploymentId,
-    deploymentLabel: opts.request.deployment.label,
-    providerTargetIdentity: opts.request.deployment.providerTarget.providerTargetIdentity,
-    lockScope: opts.request.deployment.providerTarget.providerTargetIdentity,
-    deployment: opts.request.deployment,
-    workspaceRoot: opts.workspaceRoot,
+  const snapshot = await buildKubernetesControlPlaneSnapshot(opts);
+  return await queueFrozenProviderSubmission({
     recordsRoot: opts.recordsRoot,
-    ...(opts.request.artifactDir ? { artifactDir: opts.request.artifactDir } : {}),
-    ...(opts.request.artifactDirsByComponentId
-      ? { artifactDirsByComponentId: opts.request.artifactDirsByComponentId }
-      : {}),
-    ...(opts.request.expectedSourceRevision
-      ? { expectedSourceRevision: opts.request.expectedSourceRevision }
-      : {}),
-    ...(opts.request.sourceRunId ? { sourceRunId: opts.request.sourceRunId } : {}),
-    ...(opts.request.admissionEvidence
-      ? { admissionEvidence: opts.request.admissionEvidence }
-      : {}),
-    ...(opts.request.smokeConnectOverride
-      ? { smokeConnectOverride: opts.request.smokeConnectOverride }
-      : {}),
-  };
-  const refs = {
-    executionSnapshotPath: executionSnapshotPathFor(opts.recordsRoot, opts.request.submissionId),
-    submissionPath: submissionPathFor(opts.recordsRoot, opts.request.submissionId),
-  };
-  await writeBackendSnapshotDoc(opts.backend, snapshot as any, refs.executionSnapshotPath);
-  const submission = {
-    schemaVersion: "deployment-provider-control-plane-submission@1",
-    submissionId: opts.request.submissionId,
-    submittedAt: opts.request.submittedAt,
-    operationKind: opts.request.operationKind,
-    deploymentId: opts.request.deployment.deploymentId,
-    deploymentLabel: opts.request.deployment.label,
-    providerTargetIdentity: snapshot.providerTargetIdentity,
-    lockScope: snapshot.lockScope,
-    executionSnapshotPath: refs.executionSnapshotPath,
-    lifecycleState: "queued",
-    terminationReason: null,
-    dedupe: { mode: "created", requestFingerprint: `direct:${opts.request.submissionId}` },
-    admission: { decision: "admitted", reason: opts.request.deployment.protectionClass },
-  };
-  await writeBackendSubmissionDoc(opts.backend, submission as any, refs);
-  await enqueueBackendSubmission(opts.backend, opts.request.submissionId, opts.request.submittedAt);
-  return submitResponseFromSubmission(submission as any);
+    backend: opts.backend,
+    snapshot,
+  });
 }
 
 export async function executeKubernetesControlPlaneSubmission(opts: {
@@ -136,6 +74,8 @@ export async function executeKubernetesControlPlaneSubmission(opts: {
   };
   const submission = JSON.parse(await fs.readFile(opts.submissionPath, "utf8"));
   const snapshot = JSON.parse(await fs.readFile(opts.executionSnapshotPath, "utf8")) as Snapshot;
+  requireFrozenProviderSnapshot(snapshot, "kubernetes");
+  requireFrozenProviderSubmissionAdmission({ provider: "kubernetes", submission, snapshot });
   const lock = await acquireBackendControlPlaneLock(opts.backend, snapshot.lockScope);
   const runningSubmission = { ...submission, lifecycleState: "running", workerId: opts.workerId };
   try {
@@ -147,15 +87,16 @@ export async function executeKubernetesControlPlaneSubmission(opts: {
             deployment: snapshot.deployment,
             recordsRoot: snapshot.recordsRoot,
             submissionId: snapshot.submissionId,
+            ...(snapshot.componentArtifacts
+              ? { componentArtifacts: snapshot.componentArtifacts as any }
+              : {}),
+            ...(snapshot.admittedContext
+              ? { admittedContext: snapshot.admittedContext as any }
+              : {}),
             ...(snapshot.expectedSourceRevision
               ? { expectedSourceRevision: snapshot.expectedSourceRevision }
               : {}),
-            ...(snapshot.artifactDirsByComponentId
-              ? { artifactDirsByComponentId: snapshot.artifactDirsByComponentId }
-              : { artifactDir: String(snapshot.artifactDir || "") }),
-            ...(snapshot.admissionEvidence
-              ? { admissionEvidence: snapshot.admissionEvidence as any }
-              : {}),
+            artifactDir: "",
             ...(snapshot.smokeConnectOverride
               ? { smokeConnectOverride: snapshot.smokeConnectOverride as any }
               : {}),
@@ -166,18 +107,15 @@ export async function executeKubernetesControlPlaneSubmission(opts: {
               deployment: snapshot.deployment,
               recordsRoot: snapshot.recordsRoot,
               submissionId: snapshot.submissionId,
+              ...(snapshot.admittedContext
+                ? { admittedContext: snapshot.admittedContext as any }
+                : {}),
               ...(snapshot.expectedSourceRevision
                 ? { expectedSourceRevision: snapshot.expectedSourceRevision }
                 : {}),
-              ...(snapshot.admissionEvidence
-                ? { admissionEvidence: snapshot.admissionEvidence as any }
-                : {}),
             })
           : await (async () => {
-              const source = await resolveKubernetesReplaySource({
-                recordsRoot: snapshot.recordsRoot,
-                deployRunId: String(snapshot.sourceRunId || ""),
-              });
+              const source = requireFrozenProviderReplaySource(snapshot, "kubernetes");
               const operationKind =
                 snapshot.operationKind === "promotion" &&
                 source.replaySnapshot.deployment.deploymentId === snapshot.deployment.deploymentId
@@ -197,16 +135,15 @@ export async function executeKubernetesControlPlaneSubmission(opts: {
                 operationKind,
                 componentArtifacts: source.replaySnapshot.componentArtifacts,
                 sourceRecord: source.record,
-                parentRunId: source.record.deployRunId,
-                releaseLineageId: source.record.releaseLineageId || source.record.deployRunId,
-                artifactLineageId:
-                  source.record.artifactLineageId || source.replaySnapshot.artifactIdentity,
+                parentRunId: snapshot.parentRunId as string,
+                releaseLineageId: snapshot.releaseLineageId as string,
+                artifactLineageId: snapshot.artifactLineageId as string,
                 submissionId: snapshot.submissionId,
+                ...(snapshot.admittedContext
+                  ? { admittedContext: snapshot.admittedContext as any }
+                  : {}),
                 ...(snapshot.expectedSourceRevision
                   ? { expectedSourceRevision: snapshot.expectedSourceRevision }
-                  : {}),
-                ...(snapshot.admissionEvidence
-                  ? { admissionEvidence: snapshot.admissionEvidence as any }
                   : {}),
                 ...(snapshot.smokeConnectOverride
                   ? { smokeConnectOverride: snapshot.smokeConnectOverride as any }

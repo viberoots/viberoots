@@ -123,6 +123,10 @@ export async function resolveSourceRunS3StaticAdmittedContext(opts: {
   expectedSourceRevision?: string;
 }): Promise<S3StaticAdmittedContext> {
   const admitted = await resolveInitialS3StaticAdmittedContext(opts);
+  const source = opts.sourceRecord.admittedContext?.source;
+  if (!source?.sourceRef || !source?.sourceRevision) {
+    throw new Error("s3-static replay requires recorded admitted source snapshot");
+  }
   return {
     ...admitted,
     admittedSecretReferences: await resolveSourceRunAdmittedSecretReferences({
@@ -132,9 +136,8 @@ export async function resolveSourceRunS3StaticAdmittedContext(opts: {
     }),
     source: {
       mode: "stage_branch_head",
-      sourceRef: opts.sourceRecord.admittedContext?.source?.sourceRef || admitted.source.sourceRef,
-      sourceRevision:
-        opts.sourceRecord.admittedContext?.source?.sourceRevision || admitted.source.sourceRevision,
+      sourceRef: source.sourceRef,
+      sourceRevision: source.sourceRevision,
       artifactIdentity: opts.artifactIdentity,
       artifactTrustMode: opts.deployment.admissionPolicy.artifactAttestationMode,
       sourceRunId: opts.sourceRecord.deployRunId,

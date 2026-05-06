@@ -3,6 +3,7 @@ import path from "node:path";
 import {
   resolvePromotionKubernetesAdmittedContext,
   resolveSourceRunKubernetesAdmittedContext,
+  type KubernetesAdmittedContext,
 } from "./kubernetes-admission";
 import { prepareKubernetesPublisherConfig } from "./kubernetes-config";
 import type { KubernetesDeployment } from "./contract";
@@ -31,41 +32,23 @@ export async function submitKubernetesExactArtifactRun(opts: {
   submissionId?: string;
   expectedSourceRevision?: string;
   admissionEvidence?: DeploymentAdmissionEvidence;
+  admittedContext?: KubernetesAdmittedContext;
   publishCredentials?: KubernetesPublishCredentialsHooks;
   smokeConnectOverride?: { protocol: "http:" | "https:"; hostname: string; port: number };
 }) {
-  const admittedContext =
-    opts.operationKind === "promotion"
-      ? await resolvePromotionKubernetesAdmittedContext({
-          workspaceRoot: opts.workspaceRoot,
-          deployment: opts.deployment,
-          artifactIdentity: opts.artifactLineageId,
-          sourceRecord: opts.sourceRecord,
-          ...(opts.submissionId ? { submissionId: opts.submissionId } : {}),
-          ...(opts.expectedSourceRevision
-            ? { expectedSourceRevision: opts.expectedSourceRevision }
-            : {}),
-        })
-      : await resolveSourceRunKubernetesAdmittedContext({
-          workspaceRoot: opts.workspaceRoot,
-          deployment: opts.deployment,
-          artifactIdentity: opts.artifactLineageId,
-          sourceRecord: opts.sourceRecord,
-          ...(opts.submissionId ? { submissionId: opts.submissionId } : {}),
-          ...(opts.expectedSourceRevision
-            ? { expectedSourceRevision: opts.expectedSourceRevision }
-            : {}),
-        });
-  admittedContext.policyEvaluation = await evaluateDeploymentAdmission({
-    workspaceRoot: opts.workspaceRoot,
-    recordsRoot: opts.recordsRoot,
-    deployment: opts.deployment,
-    operationKind: opts.operationKind,
-    admittedContext,
-    sourceRecord: opts.sourceRecord as any,
-    artifactLineageId: opts.artifactLineageId,
-    evidence: opts.admissionEvidence,
-  });
+  const admittedContext = opts.admittedContext || (await resolveAdmittedContext(opts));
+  admittedContext.policyEvaluation =
+    admittedContext.policyEvaluation ||
+    (await evaluateDeploymentAdmission({
+      workspaceRoot: opts.workspaceRoot,
+      recordsRoot: opts.recordsRoot,
+      deployment: opts.deployment,
+      operationKind: opts.operationKind,
+      admittedContext,
+      sourceRecord: opts.sourceRecord as any,
+      artifactLineageId: opts.artifactLineageId,
+      evidence: opts.admissionEvidence,
+    }));
   const deployRunId = `deploy-${Date.now()}-${Math.random().toString(16).slice(2, 10)}`;
   let publisherCredentials: Awaited<
     ReturnType<typeof resolveKubernetesPublishCredentialsForDeployment>
@@ -164,4 +147,20 @@ export async function submitKubernetesExactArtifactRun(opts: {
       recordPath,
     });
   }
+}
+
+async function resolveAdmittedContext(
+  opts: Parameters<typeof submitKubernetesExactArtifactRun>[0],
+) {
+  const common = {
+    workspaceRoot: opts.workspaceRoot,
+    deployment: opts.deployment,
+    artifactIdentity: opts.artifactLineageId,
+    sourceRecord: opts.sourceRecord,
+    ...(opts.submissionId ? { submissionId: opts.submissionId } : {}),
+    ...(opts.expectedSourceRevision ? { expectedSourceRevision: opts.expectedSourceRevision } : {}),
+  };
+  return opts.operationKind === "promotion"
+    ? await resolvePromotionKubernetesAdmittedContext(common)
+    : await resolveSourceRunKubernetesAdmittedContext(common);
 }

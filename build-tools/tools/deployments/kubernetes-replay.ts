@@ -4,6 +4,10 @@ import path from "node:path";
 import { readVersionedJson } from "./deployment-schema-compat";
 import { assertProtectedSharedReplayUsable } from "./deployment-control-plane-retention";
 import {
+  assertReplayAdmissionMatchesRecord,
+  requireReplayAdmittedContext,
+} from "./deployment-replay-admission";
+import {
   kubernetesRunnerIdentities,
   runnerIdentityCompatibilityErrors,
   type DeploymentRunnerIdentities,
@@ -79,6 +83,15 @@ export async function resolveKubernetesReplaySource(opts: {
     currentSchemaVersion: KUBERNETES_REPLAY_SNAPSHOT_SCHEMA,
     validateCurrent: (raw): raw is KubernetesReplaySnapshot =>
       typeof raw.deployRunId === "string" && typeof raw.deploymentLabel === "string",
+  });
+  requireReplayAdmittedContext({
+    provider: "kubernetes",
+    admittedContext: replaySnapshot.admittedContext,
+  });
+  assertReplayAdmissionMatchesRecord({
+    provider: "kubernetes",
+    record,
+    replaySnapshot,
   });
   const expected = kubernetesRunnerIdentities(replaySnapshot.deployment);
   const compatibilityErrors = [

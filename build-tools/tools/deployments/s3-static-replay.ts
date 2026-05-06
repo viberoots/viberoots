@@ -4,6 +4,10 @@ import path from "node:path";
 import { readVersionedJson } from "./deployment-schema-compat";
 import { assertProtectedSharedReplayUsable } from "./deployment-control-plane-retention";
 import {
+  assertReplayAdmissionMatchesRecord,
+  requireReplayAdmittedContext,
+} from "./deployment-replay-admission";
+import {
   runnerIdentityCompatibilityErrors,
   s3StaticRunnerIdentities,
   type DeploymentRunnerIdentities,
@@ -78,6 +82,15 @@ export async function resolveS3StaticReplaySource(opts: {
     currentSchemaVersion: S3_STATIC_REPLAY_SNAPSHOT_SCHEMA,
     validateCurrent: (raw): raw is S3StaticReplaySnapshot =>
       typeof raw.deployRunId === "string" && typeof raw.deploymentLabel === "string",
+  });
+  requireReplayAdmittedContext({
+    provider: "s3-static",
+    admittedContext: replaySnapshot.admittedContext,
+  });
+  assertReplayAdmissionMatchesRecord({
+    provider: "s3-static",
+    record,
+    replaySnapshot,
   });
   const expected = s3StaticRunnerIdentities(replaySnapshot.deployment);
   const compatibilityErrors = [

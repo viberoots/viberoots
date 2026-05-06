@@ -210,6 +210,25 @@ unexpected outcome.
     operation enters, and confirm the contract's `targetScopes` match the
     `vercel:<team>/<project>#<environment>` lock-key shape.
 
+### Frozen-snapshot admission drift
+
+- Symptom: a Vercel, Kubernetes, or S3 static worker rejects a queued
+  protected/shared submission as no longer admitted, or the persisted snapshot
+  does not contain an `admittedContext.policyEvaluation`.
+- Likely causes:
+  - The queued submission did not pass through the shared provider admission
+    preparation path.
+  - Replay used a source-run selector whose recorded artifact identity no
+    longer matches the frozen admission payload.
+  - A test or fixture wrote a provider-local synthetic `admission` field instead
+    of preserving the shared admission-engine result.
+- Fix:
+  - Re-submit through the public protected/shared front door so the service
+    freezes the shared admission result and admitted artifact reference.
+  - For fixtures, update the recorded execution snapshot to include
+    `frozenExecutionSchemaVersion`, `admittedContext.policyEvaluation`, and the
+    admitted artifact or source-run replay selector used by the worker.
+
 ### Missing replay snapshot for retry or rollback
 
 - Symptom: retry (`--publish-only`) or rollback

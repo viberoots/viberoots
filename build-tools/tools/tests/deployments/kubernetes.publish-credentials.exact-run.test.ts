@@ -123,17 +123,24 @@ async function exerciseExactArtifactRun(operationKind: ExactRunOperationKind): P
     process.env.BNX_KUBERNETES_FAKE_PUBLISH_ROOT = fake.publishRoot;
     process.env.BNX_KUBERNETES_FAKE_HELM_LOG = fake.logPath;
     try {
+      const sourceRevision = `rev-publish-creds-${operationKind}-1`;
       const sourceRecord = {
         deployRunId: `deploy-source-${operationKind}`,
         deploymentId: deployment.deploymentId,
-        admittedContext: undefined,
+        admittedContext: {
+          source: {
+            sourceRef: "env/pleomino/prod",
+            sourceRevision,
+          },
+          admittedSecretReferences: [],
+        },
       };
       const fakeRuntime = fakeKubernetesPublishSecretRuntime();
       const componentArtifacts = [{ componentId, identity: artifactIdentity, storedArtifactPath }];
       const admissionEvidence = deploymentAdmissionEvidenceFixture({
         deployment,
         operationKind,
-        sourceRevision: `rev-publish-creds-${operationKind}-1`,
+        sourceRevision,
         artifactIdentity,
         artifactLineageId: artifactIdentity,
       });

@@ -10,6 +10,7 @@ import { requireAdmittedStaticWebappArtifactPath } from "./static-webapp-artifac
 import type { S3StaticDeployment } from "./contract";
 import type { DeploymentAdmissionEvidence } from "./deployment-admission-evidence";
 import { evaluateDeploymentAdmission } from "./deployment-admission-evaluator";
+import type { S3StaticAdmittedContext } from "./s3-static-admission";
 import type { DeploymentExecutionPolicyFacts } from "./deployment-execution-policy";
 import { deploymentMetadataFingerprintFor } from "./nixos-shared-host-deployment-fingerprint";
 import { resolveDeploymentSmokeExecutionMode } from "./deployment-smoke-policy";
@@ -38,40 +39,22 @@ export async function submitS3StaticExactArtifactRun(opts: {
   submissionId?: string;
   expectedSourceRevision?: string;
   admissionEvidence?: DeploymentAdmissionEvidence;
+  admittedContext?: S3StaticAdmittedContext;
   smokeConnectOverride?: { protocol: "http:" | "https:"; hostname: string; port: number };
 }) {
-  const admittedContext =
-    opts.operationKind === "promotion"
-      ? await resolvePromotionS3StaticAdmittedContext({
-          workspaceRoot: opts.workspaceRoot,
-          deployment: opts.deployment,
-          artifactIdentity: opts.artifact.identity,
-          sourceRecord: opts.sourceRecord,
-          ...(opts.submissionId ? { submissionId: opts.submissionId } : {}),
-          ...(opts.expectedSourceRevision
-            ? { expectedSourceRevision: opts.expectedSourceRevision }
-            : {}),
-        })
-      : await resolveSourceRunS3StaticAdmittedContext({
-          workspaceRoot: opts.workspaceRoot,
-          deployment: opts.deployment,
-          artifactIdentity: opts.artifact.identity,
-          sourceRecord: opts.sourceRecord,
-          ...(opts.submissionId ? { submissionId: opts.submissionId } : {}),
-          ...(opts.expectedSourceRevision
-            ? { expectedSourceRevision: opts.expectedSourceRevision }
-            : {}),
-        });
-  admittedContext.policyEvaluation = await evaluateDeploymentAdmission({
-    workspaceRoot: opts.workspaceRoot,
-    recordsRoot: opts.recordsRoot,
-    deployment: opts.deployment,
-    operationKind: opts.operationKind,
-    admittedContext,
-    sourceRecord: opts.sourceRecord as any,
-    artifactLineageId: opts.artifactLineageId,
-    evidence: opts.admissionEvidence,
-  });
+  const admittedContext = opts.admittedContext || (await resolveAdmittedContext(opts));
+  admittedContext.policyEvaluation =
+    admittedContext.policyEvaluation ||
+    (await evaluateDeploymentAdmission({
+      workspaceRoot: opts.workspaceRoot,
+      recordsRoot: opts.recordsRoot,
+      deployment: opts.deployment,
+      operationKind: opts.operationKind,
+      admittedContext,
+      sourceRecord: opts.sourceRecord as any,
+      artifactLineageId: opts.artifactLineageId,
+      evidence: opts.admissionEvidence,
+    }));
   const deployRunId = `deploy-${Date.now()}-${Math.random().toString(16).slice(2, 10)}`;
   const artifactPath = await requireAdmittedStaticWebappArtifactPath(opts.artifact);
   const preparedConfig = await prepareS3StaticPublisherConfig({
@@ -165,4 +148,18 @@ export async function submitS3StaticExactArtifactRun(opts: {
       recordPath,
     });
   }
+}
+
+async function resolveAdmittedContext(opts: Parameters<typeof submitS3StaticExactArtifactRun>[0]) {
+  const common = {
+    workspaceRoot: opts.workspaceRoot,
+    deployment: opts.deployment,
+    artifactIdentity: opts.artifact.identity,
+    sourceRecord: opts.sourceRecord,
+    ...(opts.submissionId ? { submissionId: opts.submissionId } : {}),
+    ...(opts.expectedSourceRevision ? { expectedSourceRevision: opts.expectedSourceRevision } : {}),
+  };
+  return opts.operationKind === "promotion"
+    ? await resolvePromotionS3StaticAdmittedContext(common)
+    : await resolveSourceRunS3StaticAdmittedContext(common);
 }

@@ -36,7 +36,8 @@ function reviewedSourceMismatchMessage(opts: {
     `protected/shared reviewed source mismatch for ${opts.targetRef}`,
     `clientExpectedSourceRevision=${opts.expectedSourceRevision}`,
     `serviceReviewedSourceRevision=${opts.targetRevision}`,
-    "Make sure the deployment branch is up to date and pushed before retrying.",
+    "The service fetched the reviewed deployment branch before admission.",
+    "Make sure that branch is up to date and pushed before retrying.",
     `Rerun with --admit-for-commit ${opts.targetRevision} if ${opts.targetRevision} is intentionally the reviewed commit to deploy.`,
   ].join("\n");
 }

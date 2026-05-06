@@ -6,6 +6,7 @@ import { OPENTOFU_STACK_PROVISIONER } from "./opentofu-stack";
 const REVIEWED_STACK_PROVISIONERS = ["terraform-stack", "cdktf-stack", OPENTOFU_STACK_PROVISIONER];
 import { destructiveReleaseActions, releaseActionRefs } from "./deployment-release-actions";
 import { providerDeclaresReleaseActionType } from "./deployment-provider-capabilities";
+import { requireVercelBuiltInExecutionBoundary } from "./deployment-admission-vercel-boundary";
 import type {
   DeploymentAdmissionApprovalFact,
   DeploymentAdmissionEvidence,
@@ -155,6 +156,10 @@ export function requireBuiltInExecutionBoundary(deployment: DeploymentTarget) {
         `protected/shared admission rejects kubernetes deployment-local release_actions: ${releaseActionRefs(deployment.releaseActions).join(", ")}`,
       );
     }
+    return;
+  }
+  if (deployment.provider === "vercel") {
+    requireVercelBuiltInExecutionBoundary(deployment);
     return;
   }
   if (

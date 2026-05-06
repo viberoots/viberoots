@@ -13,6 +13,7 @@ import {
 } from "./vercel-records";
 import { writeVercelReplaySnapshot, type VercelReplaySnapshot } from "./vercel-replay";
 import { smokeVercelConsole, type VercelSmokeConnectOverride } from "./vercel-smoke";
+import type { VercelAdmittedContext } from "./vercel-admission";
 
 type ExactArtifactRunOperation = "retry" | "rollback" | "promotion";
 
@@ -25,12 +26,13 @@ export async function submitVercelExactArtifactRun(opts: {
   releaseLineageId: string;
   artifactLineageId: string;
   apiClient?: VercelApiClient;
+  admittedContext?: VercelAdmittedContext;
   smokeConnectOverride?: VercelSmokeConnectOverride;
 }): Promise<{ record: VercelDeployRecord; recordPath: string }> {
   const runId = createVercelDeployRunId(`vercel-${opts.operationKind}`);
   try {
     const secretRuntime = createVaultDeploymentSecretRuntime({
-      admittedContext: {
+      admittedContext: opts.admittedContext || {
         secretRequirements: opts.deployment.secretRequirements,
         targetEnvironment: {
           lockScope: opts.deployment.providerTarget.providerTargetIdentity,
@@ -76,6 +78,7 @@ export async function submitVercelExactArtifactRun(opts: {
       publicUrl: published.url || opts.replaySnapshot.publicUrl,
       aliasAssigned: published.aliasAssigned,
       providerConfigFingerprint: opts.replaySnapshot.providerConfigFingerprint,
+      admittedContext: opts.admittedContext as any,
     });
     const record = createVercelDeployRecord(opts.deployment, {
       deployRunId: runId,
@@ -92,6 +95,7 @@ export async function submitVercelExactArtifactRun(opts: {
       smokeOutcome,
       providerConfigFingerprint: opts.replaySnapshot.providerConfigFingerprint,
       replaySnapshotPath,
+      ...(opts.admittedContext ? { admittedContext: opts.admittedContext as any } : {}),
     });
     return { record, recordPath: await writeVercelDeployRecord(opts.recordsRoot, record) };
   } catch (error) {

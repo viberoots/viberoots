@@ -1,19 +1,17 @@
 #!/usr/bin/env zx-wrapper
 import path from "node:path";
 import type { DeploymentAdmissionEvidence } from "./deployment-admission-evidence";
-import { evaluateDeploymentAdmission } from "./deployment-admission-evaluator";
 import type { KubernetesDeployment } from "./contract";
 import { withFailedStep } from "./deployment-failed-step";
 import { resolveDeploymentSmokeExecutionMode } from "./deployment-smoke-policy";
 // prettier-ignore
 import { classifySmokeRetry, noPublishAutoRetry, runWithAutomaticRetry } from "./deployment-retry-policy";
 import { executionPolicyWithRetry, retryAuditFrom } from "./deployment-retry-records";
-// prettier-ignore
-import { deploymentMetadataFingerprintFor, fingerprintValue } from "./nixos-shared-host-deployment-fingerprint";
-import { admitKubernetesComponentArtifacts } from "./kubernetes-artifacts";
-// prettier-ignore
-import { artifactByComponentId, orderedComponentIds, requiredArtifactPaths } from "./kubernetes-deploy-helpers";
-import { resolveInitialKubernetesAdmittedContext } from "./kubernetes-admission";
+import { deploymentMetadataFingerprintFor } from "./nixos-shared-host-deployment-fingerprint";
+import type { AdmittedKubernetesComponentArtifact } from "./kubernetes-artifacts";
+import { orderedComponentIds } from "./kubernetes-deploy-helpers";
+import type { KubernetesAdmittedContext } from "./kubernetes-admission";
+import { resolveKubernetesDeployAdmission } from "./kubernetes-deploy-admission";
 import { prepareKubernetesPublisherConfig } from "./kubernetes-config";
 import { publishKubernetesComponent } from "./kubernetes-publisher";
 // prettier-ignore
@@ -33,6 +31,8 @@ export async function submitKubernetesDeploy(opts: {
   recordsRoot: string;
   artifactDir?: string;
   artifactDirsByComponentId?: Record<string, string>;
+  componentArtifacts?: AdmittedKubernetesComponentArtifact[];
+  admittedContext?: KubernetesAdmittedContext;
   submissionId?: string;
   expectedSourceRevision?: string;
   admissionEvidence?: DeploymentAdmissionEvidence;
@@ -46,47 +46,17 @@ export async function submitKubernetesDeploy(opts: {
   };
 }): Promise<{ record: KubernetesDeployRecord; recordPath: string }> {
   const deployRunId = createKubernetesDeployRunId();
-  const admittedArtifacts = await admitKubernetesComponentArtifacts({
-    recordsRoot: opts.recordsRoot,
-    artifactPathsByComponentId: requiredArtifactPaths(
-      opts.deployment,
-      opts.artifactDir,
-      opts.artifactDirsByComponentId,
-    ),
-  });
-  const artifactsByComponent = artifactByComponentId(admittedArtifacts);
-  const compositeArtifactIdentity = fingerprintValue({
-    providerTargetIdentity: opts.deployment.providerTarget.providerTargetIdentity,
-    componentArtifacts: admittedArtifacts.map((artifact) => ({
-      componentId: artifact.componentId,
-      identity: artifact.identity,
-    })),
-  });
-  const admittedContext = await resolveInitialKubernetesAdmittedContext({
-    workspaceRoot: opts.workspaceRoot,
-    deployment: opts.deployment,
-    artifactIdentity: compositeArtifactIdentity,
-    ...(opts.submissionId ? { submissionId: opts.submissionId } : {}),
-    ...(opts.expectedSourceRevision ? { expectedSourceRevision: opts.expectedSourceRevision } : {}),
-  });
   const provisionerPlan = await writeKubernetesProvisionerPlan({
     workspaceRoot: opts.workspaceRoot,
     recordsRoot: opts.recordsRoot,
     deployRunId,
     deployment: opts.deployment,
   });
-  admittedContext.policyEvaluation = await evaluateDeploymentAdmission({
-    workspaceRoot: opts.workspaceRoot,
-    recordsRoot: opts.recordsRoot,
-    deployment: opts.deployment,
-    operationKind: "deploy",
-    admittedContext,
-    artifactLineageId: compositeArtifactIdentity,
-    evidence: {
-      ...(opts.admissionEvidence || {}),
+  const { admittedArtifacts, artifactsByComponent, compositeArtifactIdentity, admittedContext } =
+    await resolveKubernetesDeployAdmission({
+      ...opts,
       ...(provisionerPlan ? { provisionerPlanFingerprint: provisionerPlan.fingerprint } : {}),
-    },
-  });
+    });
   const provisionerApplyOutcome = await maybeRunOpenTofuReviewedApply({
     deployment: opts.deployment,
     admittedContext,

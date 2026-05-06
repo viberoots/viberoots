@@ -3,6 +3,11 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import type { VercelDeployment } from "./contract";
 import { readVersionedJson } from "./deployment-schema-compat";
+import {
+  assertReplayAdmissionMatchesRecord,
+  requireReplayAdmittedContext,
+} from "./deployment-replay-admission";
+import type { VercelAdmittedContext } from "./vercel-admission";
 import { readVercelDeployRecord } from "./vercel-records";
 
 export const VERCEL_REPLAY_SNAPSHOT_SCHEMA = "vercel-replay-snapshot@1";
@@ -20,6 +25,7 @@ export type VercelReplaySnapshot = {
   publicUrl: string;
   aliasAssigned: boolean;
   providerConfigFingerprint: string;
+  admittedContext: VercelAdmittedContext;
 };
 
 export function vercelReplaySnapshotPathFor(recordsRoot: string, deployRunId: string): string {
@@ -35,8 +41,13 @@ export async function writeVercelReplaySnapshot(opts: {
   publicUrl: string;
   aliasAssigned: boolean;
   providerConfigFingerprint: string;
+  admittedContext: VercelAdmittedContext;
 }): Promise<string> {
   const replaySnapshotPath = vercelReplaySnapshotPathFor(opts.recordsRoot, opts.deployRunId);
+  const admittedContext = requireReplayAdmittedContext({
+    provider: "vercel",
+    admittedContext: opts.admittedContext,
+  });
   const snapshot: VercelReplaySnapshot = {
     schemaVersion: VERCEL_REPLAY_SNAPSHOT_SCHEMA,
     deployRunId: opts.deployRunId,
@@ -50,6 +61,7 @@ export async function writeVercelReplaySnapshot(opts: {
     publicUrl: opts.publicUrl,
     aliasAssigned: opts.aliasAssigned,
     providerConfigFingerprint: opts.providerConfigFingerprint,
+    admittedContext,
   };
   await fsp.mkdir(path.dirname(replaySnapshotPath), { recursive: true });
   await fsp.writeFile(replaySnapshotPath, JSON.stringify(snapshot, null, 2) + "\n", "utf8");
@@ -81,6 +93,15 @@ export async function resolveVercelReplaySource(opts: {
     currentSchemaVersion: VERCEL_REPLAY_SNAPSHOT_SCHEMA,
     validateCurrent: (raw): raw is VercelReplaySnapshot =>
       typeof raw.deployRunId === "string" && typeof raw.providerReleaseId === "string",
+  });
+  requireReplayAdmittedContext({
+    provider: "vercel",
+    admittedContext: replaySnapshot.admittedContext,
+  });
+  assertReplayAdmissionMatchesRecord({
+    provider: "vercel",
+    record,
+    replaySnapshot,
   });
   return { record, recordPath, replaySnapshot };
 }

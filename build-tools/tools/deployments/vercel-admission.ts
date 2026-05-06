@@ -1,5 +1,5 @@
 #!/usr/bin/env zx-wrapper
-import type { KubernetesDeployment } from "./contract";
+import type { VercelDeployment } from "./contract";
 import type { DeploymentAdmissionPolicyEvaluation } from "./deployment-admission-evidence";
 import type { DeploymentRequirement } from "./deployment-requirements";
 import {
@@ -12,7 +12,7 @@ import {
   type DeploymentReviewedTargetEnvironmentAdmission,
 } from "./deployment-reviewed-target-environment";
 
-export type KubernetesAdmittedContext = {
+export type VercelAdmittedContext = {
   lanePolicyRef: string;
   lanePolicyFingerprint: string;
   admissionPolicyRef: string;
@@ -33,6 +33,7 @@ export type KubernetesAdmittedContext = {
     sourceRevision: string;
     artifactIdentity: string;
     artifactTrustMode: "recorded_exact_artifact";
+    sourceRunId?: string;
   };
   targetEnvironment: {
     mode: "stage_branch_snapshot";
@@ -43,13 +44,13 @@ export type KubernetesAdmittedContext = {
   } & Pick<DeploymentReviewedTargetEnvironmentAdmission, "reviewedSourceSnapshot">;
 };
 
-export async function resolveInitialKubernetesAdmittedContext(opts: {
+export async function resolveInitialVercelAdmittedContext(opts: {
   workspaceRoot: string;
-  deployment: KubernetesDeployment;
+  deployment: VercelDeployment;
   artifactIdentity: string;
-  submissionId?: string;
+  sourceRunId?: string;
   expectedSourceRevision?: string;
-}): Promise<KubernetesAdmittedContext> {
+}): Promise<VercelAdmittedContext> {
   const target = await resolveDeploymentReviewedTargetEnvironment(opts);
   return {
     lanePolicyRef: opts.deployment.lanePolicyRef,
@@ -74,59 +75,30 @@ export async function resolveInitialKubernetesAdmittedContext(opts: {
       sourceRevision: target.targetRevision,
       artifactIdentity: opts.artifactIdentity,
       artifactTrustMode: opts.deployment.admissionPolicy.artifactAttestationMode,
+      ...(opts.sourceRunId ? { sourceRunId: opts.sourceRunId } : {}),
     },
     targetEnvironment: target,
   };
 }
 
-export async function resolvePromotionKubernetesAdmittedContext(opts: {
+export async function resolveSourceRunVercelAdmittedContext(opts: {
   workspaceRoot: string;
-  deployment: KubernetesDeployment;
+  deployment: VercelDeployment;
   artifactIdentity: string;
-  sourceRecord: { deployRunId: string; deploymentId: string };
-  submissionId?: string;
+  sourceRecord: { deployRunId: string; admittedContext?: any };
   expectedSourceRevision?: string;
-}): Promise<KubernetesAdmittedContext> {
-  const admitted = await resolveInitialKubernetesAdmittedContext(opts);
-  return {
-    ...admitted,
-    source: {
-      mode: "stage_branch_head",
-      sourceRef: admitted.targetEnvironment.targetRef,
-      sourceRevision: admitted.targetEnvironment.targetRevision,
-      artifactIdentity: opts.artifactIdentity,
-      artifactTrustMode: opts.deployment.admissionPolicy.artifactAttestationMode,
-      sourceRunId: opts.sourceRecord.deployRunId,
-      sourceDeploymentId: opts.sourceRecord.deploymentId,
-    } as KubernetesAdmittedContext["source"] & {
-      sourceRunId: string;
-      sourceDeploymentId: string;
-    },
-  };
-}
-
-export async function resolveSourceRunKubernetesAdmittedContext(opts: {
-  workspaceRoot: string;
-  deployment: KubernetesDeployment;
-  artifactIdentity: string;
-  sourceRecord: {
-    deployRunId: string;
-    deploymentId: string;
-    admittedContext?: {
-      source?: {
-        sourceRef?: string;
-        sourceRevision?: string;
-      };
-    };
-  };
-  submissionId?: string;
-  expectedSourceRevision?: string;
-}): Promise<KubernetesAdmittedContext> {
-  const admitted = await resolveInitialKubernetesAdmittedContext(opts);
+}): Promise<VercelAdmittedContext> {
   const source = opts.sourceRecord.admittedContext?.source;
   if (!source?.sourceRef || !source?.sourceRevision) {
-    throw new Error("kubernetes replay requires recorded admitted source snapshot");
+    throw new Error("vercel replay requires recorded admitted source snapshot");
   }
+  const admitted = await resolveInitialVercelAdmittedContext({
+    workspaceRoot: opts.workspaceRoot,
+    deployment: opts.deployment,
+    artifactIdentity: opts.artifactIdentity,
+    sourceRunId: opts.sourceRecord.deployRunId,
+    ...(opts.expectedSourceRevision ? { expectedSourceRevision: opts.expectedSourceRevision } : {}),
+  });
   return {
     ...admitted,
     admittedSecretReferences: await resolveSourceRunAdmittedSecretReferences({
@@ -135,16 +107,9 @@ export async function resolveSourceRunKubernetesAdmittedContext(opts: {
       targetScope: admitted.targetEnvironment.lockScope,
     }),
     source: {
-      mode: "stage_branch_head",
+      ...admitted.source,
       sourceRef: source.sourceRef,
       sourceRevision: source.sourceRevision,
-      artifactIdentity: opts.artifactIdentity,
-      artifactTrustMode: opts.deployment.admissionPolicy.artifactAttestationMode,
-      sourceRunId: opts.sourceRecord.deployRunId,
-      sourceDeploymentId: opts.sourceRecord.deploymentId,
-    } as KubernetesAdmittedContext["source"] & {
-      sourceRunId: string;
-      sourceDeploymentId: string;
     },
   };
 }

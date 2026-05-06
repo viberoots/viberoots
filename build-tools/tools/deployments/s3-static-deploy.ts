@@ -26,13 +26,17 @@ import { resolveInitialS3StaticAdmittedContext } from "./s3-static-admission";
 import { createVaultDeploymentSecretRuntime } from "./deployment-secret-runtime-helpers";
 import {
   admitStaticWebappArtifact,
+  type AdmittedStaticWebappArtifact,
   requireAdmittedStaticWebappArtifactPath,
 } from "./static-webapp-artifacts";
+import type { S3StaticAdmittedContext } from "./s3-static-admission";
 
 export async function submitS3StaticDeploy(opts: {
   workspaceRoot: string;
   deployment: S3StaticDeployment;
   artifactDir: string;
+  artifact?: AdmittedStaticWebappArtifact;
+  admittedContext?: S3StaticAdmittedContext;
   recordsRoot: string;
   submissionId?: string;
   expectedSourceRevision?: string;
@@ -45,34 +49,42 @@ export async function submitS3StaticDeploy(opts: {
   };
 }): Promise<{ record: S3StaticDeployRecord; recordPath: string }> {
   const deployRunId = createS3StaticDeployRunId();
-  const artifact = await admitStaticWebappArtifact({
-    recordsRoot: opts.recordsRoot,
-    artifactDir: path.resolve(opts.artifactDir),
-  });
-  const admittedContext = await resolveInitialS3StaticAdmittedContext({
-    workspaceRoot: opts.workspaceRoot,
-    deployment: opts.deployment,
-    artifactIdentity: artifact.identity,
-    ...(opts.submissionId ? { submissionId: opts.submissionId } : {}),
-    ...(opts.expectedSourceRevision ? { expectedSourceRevision: opts.expectedSourceRevision } : {}),
-  });
+  const artifact =
+    opts.artifact ||
+    (await admitStaticWebappArtifact({
+      recordsRoot: opts.recordsRoot,
+      artifactDir: path.resolve(opts.artifactDir),
+    }));
+  const admittedContext =
+    opts.admittedContext ||
+    (await resolveInitialS3StaticAdmittedContext({
+      workspaceRoot: opts.workspaceRoot,
+      deployment: opts.deployment,
+      artifactIdentity: artifact.identity,
+      ...(opts.submissionId ? { submissionId: opts.submissionId } : {}),
+      ...(opts.expectedSourceRevision
+        ? { expectedSourceRevision: opts.expectedSourceRevision }
+        : {}),
+    }));
   const provisionerPlan = await writeS3StaticProvisionerPlan({
     recordsRoot: opts.recordsRoot,
     deployRunId,
     deployment: opts.deployment,
   });
-  admittedContext.policyEvaluation = await evaluateDeploymentAdmission({
-    workspaceRoot: opts.workspaceRoot,
-    recordsRoot: opts.recordsRoot,
-    deployment: opts.deployment,
-    operationKind: "deploy",
-    admittedContext,
-    artifactLineageId: artifact.identity,
-    evidence: {
-      ...(opts.admissionEvidence || {}),
-      ...(provisionerPlan ? { provisionerPlanFingerprint: provisionerPlan.fingerprint } : {}),
-    },
-  });
+  admittedContext.policyEvaluation =
+    admittedContext.policyEvaluation ||
+    (await evaluateDeploymentAdmission({
+      workspaceRoot: opts.workspaceRoot,
+      recordsRoot: opts.recordsRoot,
+      deployment: opts.deployment,
+      operationKind: "deploy",
+      admittedContext,
+      artifactLineageId: artifact.identity,
+      evidence: {
+        ...(opts.admissionEvidence || {}),
+        ...(provisionerPlan ? { provisionerPlanFingerprint: provisionerPlan.fingerprint } : {}),
+      },
+    }));
   const deploymentMetadataFingerprint = deploymentMetadataFingerprintFor(opts.deployment);
   const secretRuntime = createVaultDeploymentSecretRuntime({
     admittedContext,

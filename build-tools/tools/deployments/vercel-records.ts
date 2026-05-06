@@ -37,6 +37,7 @@ export type VercelDeployRecord = {
   smokeOutcome?: DeploymentSmokeOutcome;
   providerConfigFingerprint?: string;
   replaySnapshotPath?: string;
+  admittedContext?: unknown;
   error?: string;
   controlPlane?: {
     submissionId?: string;

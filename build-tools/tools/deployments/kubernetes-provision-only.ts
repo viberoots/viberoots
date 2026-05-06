@@ -1,5 +1,6 @@
 #!/usr/bin/env zx-wrapper
 import { resolveInitialKubernetesAdmittedContext } from "./kubernetes-admission";
+import type { KubernetesAdmittedContext } from "./kubernetes-admission";
 import type { KubernetesDeployment } from "./contract";
 import type { DeploymentAdmissionEvidence } from "./deployment-admission-evidence";
 import { evaluateDeploymentAdmission } from "./deployment-admission-evaluator";
@@ -18,33 +19,40 @@ export async function submitKubernetesProvisionOnly(opts: {
   submissionId?: string;
   expectedSourceRevision?: string;
   admissionEvidence?: DeploymentAdmissionEvidence;
+  admittedContext?: KubernetesAdmittedContext;
   openTofuApply?: OpenTofuApplyHooks;
 }) {
   const deployRunId = `deploy-${Date.now()}-${Math.random().toString(16).slice(2, 10)}`;
-  const admittedContext = await resolveInitialKubernetesAdmittedContext({
-    workspaceRoot: opts.workspaceRoot,
-    deployment: opts.deployment,
-    artifactIdentity: `provision-only:${opts.deployment.providerTarget.providerTargetIdentity}`,
-    ...(opts.submissionId ? { submissionId: opts.submissionId } : {}),
-    ...(opts.expectedSourceRevision ? { expectedSourceRevision: opts.expectedSourceRevision } : {}),
-  });
+  const admittedContext =
+    opts.admittedContext ||
+    (await resolveInitialKubernetesAdmittedContext({
+      workspaceRoot: opts.workspaceRoot,
+      deployment: opts.deployment,
+      artifactIdentity: `provision-only:${opts.deployment.providerTarget.providerTargetIdentity}`,
+      ...(opts.submissionId ? { submissionId: opts.submissionId } : {}),
+      ...(opts.expectedSourceRevision
+        ? { expectedSourceRevision: opts.expectedSourceRevision }
+        : {}),
+    }));
   const provisionerPlan = await writeKubernetesProvisionerPlan({
     workspaceRoot: opts.workspaceRoot,
     recordsRoot: opts.recordsRoot,
     deployRunId,
     deployment: opts.deployment,
   });
-  admittedContext.policyEvaluation = await evaluateDeploymentAdmission({
-    workspaceRoot: opts.workspaceRoot,
-    recordsRoot: opts.recordsRoot,
-    deployment: opts.deployment,
-    operationKind: "provision_only",
-    admittedContext,
-    evidence: {
-      ...(opts.admissionEvidence || {}),
-      ...(provisionerPlan ? { provisionerPlanFingerprint: provisionerPlan.fingerprint } : {}),
-    },
-  });
+  admittedContext.policyEvaluation =
+    admittedContext.policyEvaluation ||
+    (await evaluateDeploymentAdmission({
+      workspaceRoot: opts.workspaceRoot,
+      recordsRoot: opts.recordsRoot,
+      deployment: opts.deployment,
+      operationKind: "provision_only",
+      admittedContext,
+      evidence: {
+        ...(opts.admissionEvidence || {}),
+        ...(provisionerPlan ? { provisionerPlanFingerprint: provisionerPlan.fingerprint } : {}),
+      },
+    }));
   const provisionerApplyOutcome = await maybeRunOpenTofuReviewedApply({
     deployment: opts.deployment,
     admittedContext,

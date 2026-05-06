@@ -30,7 +30,7 @@ function isProtectedShared(deployment: DeploymentTarget): boolean {
 }
 
 function isServiceBackedProvider(deployment: DeploymentTarget): boolean {
-  return ["cloudflare-pages", "kubernetes", "nixos-shared-host", "s3-static"].includes(
+  return ["cloudflare-pages", "kubernetes", "nixos-shared-host", "s3-static", "vercel"].includes(
     deployment.provider,
   );
 }
