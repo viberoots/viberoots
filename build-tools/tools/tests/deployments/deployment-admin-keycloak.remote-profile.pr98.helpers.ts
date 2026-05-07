@@ -5,10 +5,26 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { resolveDeploymentFromTarget } from "../../deployments/deployment-query";
 import { shouldUseServiceOwnedInteractiveAuth } from "../../deployments/deployment-service-auth-client";
+import { stableBuckIsolation } from "../../lib/buck-command-env";
 import { waitFor } from "./nixos-shared-host.control-plane.helpers";
 import { REVIEWED_PLEOMINO_DEPLOYMENT_LABEL } from "./nixos-shared-host.deploy.remote-exec.helpers";
 
 export const CONTROL_PLANE_TOKEN = "test-control-plane-token";
+let buckQueryNonce = 0;
+
+export function freshKeycloakBuckIsolation(tmp: string): string {
+  return stableBuckIsolation(
+    path.join(tmp, `.keycloak-profile-query-${++buckQueryNonce}`),
+    "zxtest-keycloak-profile",
+  );
+}
+
+function freshBuckQueryEnv(tmp: string): NodeJS.ProcessEnv {
+  return {
+    ...process.env,
+    BUCK_NESTED_ISO: freshKeycloakBuckIsolation(tmp),
+  };
+}
 
 export function configRootFor(tmp: string) {
   return path.join(tmp, "remote-config-root");
@@ -90,6 +106,7 @@ export async function enableInteractivePkceVaultRuntime(tmp: string, issuer: str
         const deployment = await resolveDeploymentFromTarget(
           tmp,
           REVIEWED_PLEOMINO_DEPLOYMENT_LABEL,
+          { env: freshBuckQueryEnv(tmp) },
         );
         return deployment.vaultRuntime?.oidcIssuer === issuer &&
           shouldUseServiceOwnedInteractiveAuth({ deployment })

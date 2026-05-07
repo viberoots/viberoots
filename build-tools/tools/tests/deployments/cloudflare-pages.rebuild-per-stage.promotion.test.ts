@@ -10,6 +10,7 @@ import { startCloudflarePagesPublicServer } from "./cloudflare-pages.public-serv
 import {
   createSourceRun,
   fakeCloudflareEnv,
+  freshRebuildCloudflareEnv,
   rebuildStagingDeployment,
   writeCloudflareArtifact,
   writeWranglerConfig,
@@ -39,6 +40,7 @@ test("cloudflare-pages rebuild-per-stage promotion rejects publish-only exact-ar
         await $({
           cwd: tmp,
           stdio: "pipe",
+          env: freshRebuildCloudflareEnv(tmp, fake),
         })`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment ${staging.label} --admission-evidence-json ${stagingEvidenceJson} --publish-only --source-run-id ${summary.deployRunId} --records-root ${recordsRoot}`,
       /requires target-stage rebuild/,
     );
@@ -81,7 +83,7 @@ test("cloudflare-pages rebuild-per-stage promotion admits a new stage artifact b
     try {
       const run = await $({
         cwd: tmp,
-        env: fakeCloudflareEnv(fake),
+        env: freshRebuildCloudflareEnv(tmp, fake),
       })`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment ${staging.label} --admission-evidence-json ${stagingEvidenceJson} --artifact-dir ${stagingArtifactDir} --source-run-id ${sourceSummary.deployRunId} --records-root ${recordsRoot} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(server.port)} --smoke-connect-protocol https:`;
       const summary = JSON.parse(String(run.stdout));
       const record = JSON.parse(await fsp.readFile(summary.recordPath, "utf8"));

@@ -124,10 +124,16 @@ export async function runProviderDeployFrontDoor(opts: {
     return;
   }
   if (isOpenTofuDeployment(deployment)) {
-    if (!flags.provisionOnly) {
-      throw new Error("opentofu deployments are provision-only; pass --provision-only");
-    }
-    throw new Error("opentofu provision-only deploy execution is not implemented in this PR");
+    const { runOpenTofuFoundationFrontDoor } = await import("./opentofu-foundation-front-door");
+    await runOpenTofuFoundationFrontDoor({
+      workspaceRoot: opts.workspaceRoot,
+      deployment,
+      provisionOnly: flags.provisionOnly,
+      sourceRunId: flags.sourceRunId,
+      artifactDirFlag: flags.artifactDirFlag,
+      ...(opts.admissionEvidence ? { admissionEvidence: opts.admissionEvidence as any } : {}),
+    });
+    return;
   }
   if (!isNixosSharedHostDeployment(deployment)) {
     throw new Error(`unsupported deployment provider: ${deployment.provider}`);

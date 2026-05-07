@@ -132,6 +132,15 @@ Secrets use `secret://deployments/...` contract IDs and are resolved only by the
 secret runtime for the declared lifecycle step; public runtime config uses
 `config://deployments/...` contract IDs.
 
+Foundation migration records add `foundationMigrationOutcome` for
+`platform-foundation-*` provision-only runs. The field records the migration
+bundle identity, ordered migration list, dependency graph fingerprint, target
+Supabase identity, reviewed source revision, apply status, credential env names,
+redacted diagnostics, and post-apply check results. It must not contain Supabase
+service-role values. Downstream web and worker deployment prerequisites treat a
+successful outcome for the same reviewed source revision as the deploy-blocking
+schema evidence.
+
 For the reviewed `mini` shared deploy host shape, existing Vault-backed deployments should use:
 
 ```python

@@ -19,6 +19,7 @@ import {
   sourceAdmissionChecks,
   type DeploymentRunRecordLike,
 } from "./deployment-admission-records";
+import { assertFoundationMigrationPrerequisite } from "./deployment-foundation-prerequisites";
 
 export type AdmittedContextLike = {
   source: {
@@ -146,6 +147,7 @@ export async function prerequisiteFacts(opts: {
   workspaceRoot: string;
   recordsRoot: string;
   deployment: DeploymentTarget;
+  admittedContext: AdmittedContextLike;
   backendDatabaseUrl?: string;
   prerequisiteProvidersByDeploymentId?: Record<string, string>;
   evidence?: DeploymentAdmissionEvidence;
@@ -175,6 +177,19 @@ export async function prerequisiteFacts(opts: {
         "no_longer_admitted",
         `prerequisite deployment has no successful admitted run: ${prerequisite.deploymentId}`,
       );
+    }
+    if (prerequisite.deploymentId.startsWith("platform-foundation-")) {
+      assertFoundationMigrationPrerequisite({
+        prerequisiteId: prerequisite.deploymentId,
+        record: hit.record,
+        requiredRevision: sourceRevisionFor(opts.admittedContext, undefined),
+      });
+      facts.push({
+        deploymentId: prerequisite.deploymentId,
+        mode: prerequisite.mode,
+        sourceDeployRunId: hit.sourceDeployRunId,
+      });
+      continue;
     }
     const retainedUrls = {
       ...(hit.record.publicUrl ? { publicUrl: hit.record.publicUrl } : {}),

@@ -3,6 +3,7 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import type { NixosSharedHostDeployment } from "../../deployments/contract";
 import { resolveDeploymentFromTarget } from "../../deployments/deployment-query";
+import { stableBuckIsolation } from "../../lib/buck-command-env";
 import {
   ensureNixosSharedHostStageBranch,
   nixosSharedHostDeploymentFixture,
@@ -20,6 +21,21 @@ import { waitFor } from "./nixos-shared-host.control-plane.helpers";
 export { installClientProfile } from "./nixos-shared-host.remote-exec.install.helpers";
 
 export const REVIEWED_PLEOMINO_DEPLOYMENT_LABEL = "//projects/deployments/pleomino-dev:deploy";
+let buckQueryNonce = 0;
+
+export function freshRemoteExecBuckIsolation(tmp: string): string {
+  return stableBuckIsolation(
+    path.join(tmp, `.remote-exec-query-${++buckQueryNonce}`),
+    "zxtest-remote-exec",
+  );
+}
+
+function freshBuckQueryEnv(tmp: string): NodeJS.ProcessEnv {
+  return {
+    ...process.env,
+    BUCK_NESTED_ISO: freshRemoteExecBuckIsolation(tmp),
+  };
+}
 
 export type RemoteExecFixture = {
   deployment: NixosSharedHostDeployment;
@@ -119,6 +135,7 @@ export async function requirePleominoDevCheck(tmp: string): Promise<void> {
         const deployment = await resolveDeploymentFromTarget(
           tmp,
           REVIEWED_PLEOMINO_DEPLOYMENT_LABEL,
+          { env: freshBuckQueryEnv(tmp) },
         );
         return deployment.admissionPolicy.requiredChecks.includes("deploy/pleomino-dev")
           ? deployment
@@ -149,6 +166,7 @@ export async function prepareRemoteExecFixture(opts: {
   const deployment = (await resolveDeploymentFromTarget(
     opts.tmp,
     REVIEWED_PLEOMINO_DEPLOYMENT_LABEL,
+    { env: freshBuckQueryEnv(opts.tmp) },
   )) as NixosSharedHostDeployment;
   await ensureNixosSharedHostStageBranch(opts.tmp, opts.$, deployment);
   await prepareReviewedRemoteHostPaths({

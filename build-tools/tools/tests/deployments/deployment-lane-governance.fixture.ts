@@ -18,6 +18,7 @@ import {
 } from "../../deployments/deployment-lane-governance";
 import { resolveDeploymentFromTarget } from "../../deployments/deployment-query";
 import type { DeploymentAdmissionEvidence } from "../../deployments/deployment-admission-evidence";
+import { stableBuckIsolation } from "../../lib/buck-command-env";
 import type { GraphNode } from "../../lib/graph";
 import {
   installCloudflarePagesTargets,
@@ -25,6 +26,18 @@ import {
   installNixosSharedHostTargets,
   installS3StaticTargets,
 } from "./deployment-targets.install.helpers";
+
+let buckQueryNonce = 0;
+
+function freshBuckQueryEnv(tmp: string): NodeJS.ProcessEnv {
+  return {
+    ...process.env,
+    BUCK_NESTED_ISO: stableBuckIsolation(
+      path.join(tmp, `.lane-governance-query-${++buckQueryNonce}`),
+      "zxtest-lane-governance",
+    ),
+  };
+}
 
 export function nixosSharedHostLaneGovernanceFixture(
   overrides: Partial<DeploymentLaneGovernance> = {},
@@ -138,7 +151,9 @@ export async function writeReviewedLaneAdmissionEvidenceJson(opts: {
   const snapshotPath = path.join(opts.tmp, `scm-policy-${fileSuffix}.json`);
   const evidencePath = path.join(opts.tmp, `admission-evidence-${fileSuffix}.json`);
   await ensureReviewedDeploymentTargetsInstalled(opts.tmp, opts.deployment);
-  const resolvedDeployment = await resolveDeploymentFromTarget(opts.tmp, deploymentLabel);
+  const resolvedDeployment = await resolveDeploymentFromTarget(opts.tmp, deploymentLabel, {
+    env: freshBuckQueryEnv(opts.tmp),
+  });
   const sourceRef = opts.deployment.lanePolicy.stageBranches[opts.deployment.environmentStage];
   const sourceRevision = opts.includeRequiredChecks
     ? String(
@@ -167,6 +182,7 @@ export async function writeReviewedLaneAdmissionEvidenceJson(opts: {
   const verified = await opts.$({
     cwd: opts.tmp,
     stdio: "pipe",
+    env: freshBuckQueryEnv(opts.tmp),
   })`zx-wrapper build-tools/tools/deployments/deployment-lane-governance-verify.ts ${selectorArgs} --scm-policy-json ${snapshotPath}`;
   await fsp.writeFile(
     evidencePath,
@@ -208,7 +224,9 @@ async function ensureReviewedDeploymentTargetsInstalled(
   deployment: { label: string; provider?: string },
 ): Promise<void> {
   try {
-    await resolveDeploymentFromTarget(workspaceRoot, deployment.label);
+    await resolveDeploymentFromTarget(workspaceRoot, deployment.label, {
+      env: freshBuckQueryEnv(workspaceRoot),
+    });
     return;
   } catch {}
   switch (deployment.provider) {

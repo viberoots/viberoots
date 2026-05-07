@@ -326,3 +326,23 @@ replaySnapshotPath` or rejects the source-run as unsuitable for replay.
 - Plan or config drift appears as an OpenTofu apply mismatch in redacted
   diagnostics. Regenerate and re-admit the reviewed provisioner plan instead
   of applying from local workspace state.
+
+## Foundation Schema Migrations
+
+- Symptom: a `platform-foundation-*` provision-only run records
+  `foundationMigrationOutcome.status = "failed"`.
+- Check the record's `bundleIdentity`, ordered migration list,
+  `dependencyGraphFingerprint`, target Supabase identity, and redacted
+  diagnostics. The worker applies the admitted PR-19 migration bundle; do not
+  substitute ad hoc SQL files.
+- Supabase service-role credentials must come from deployment
+  `secret_requirements` at the `provision` step. Records may show the env name
+  or contract ref, but the resolved service-role value must never be present.
+- Post-apply failures for `rls_tenant_isolation`, `composite_tenant_fk`,
+  `migration_ordering`, or `required_extension_settings` are deploy-blocking.
+  Fix the schema, tenant context setup, migration ordering, or extension/settings
+  posture and rerun the foundation deployment.
+- If a web or worker deployment rejects a `platform-foundation-*` prerequisite as
+  absent, stale, failed, or bound to another source revision, rerun the
+  foundation migration for the same reviewed source revision or use a reviewed
+  compatible migration revision.

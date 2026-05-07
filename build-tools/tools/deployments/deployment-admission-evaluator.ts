@@ -111,6 +111,7 @@ export async function evaluateDeploymentAdmission(opts: {
       workspaceRoot: opts.workspaceRoot,
       recordsRoot: opts.recordsRoot,
       deployment: opts.deployment,
+      admittedContext: opts.admittedContext,
       backendDatabaseUrl: opts.backendDatabaseUrl,
       prerequisiteProvidersByDeploymentId: opts.prerequisiteProvidersByDeploymentId,
       evidence: opts.evidence,

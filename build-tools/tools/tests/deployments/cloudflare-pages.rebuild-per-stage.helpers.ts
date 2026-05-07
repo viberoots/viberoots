@@ -2,6 +2,7 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import type { CloudflarePagesDeployment } from "../../deployments/contract";
+import { stableBuckIsolation } from "../../lib/buck-command-env";
 import { installCloudflarePagesTargets } from "./cloudflare-pages.fixture";
 import { installFakeCloudflarePagesWrangler } from "./cloudflare-pages.fake-wrangler";
 import { startCloudflarePagesPublicServer } from "./cloudflare-pages.public-server";
@@ -14,6 +15,8 @@ import {
 } from "./nixos-shared-host.fixture";
 import { cloudflarePagesDeploymentFixture } from "./cloudflare-pages.fixture";
 import { nixosSharedHostLaneGovernanceFixture } from "./deployment-lane-governance.fixture";
+
+let buckQueryNonce = 0;
 
 export async function writeCloudflareArtifact(root: string, html: string): Promise<void> {
   await fsp.mkdir(root, { recursive: true });
@@ -76,6 +79,19 @@ export function fakeCloudflareEnv(
   };
 }
 
+export function freshRebuildCloudflareEnv(
+  tmp: string,
+  fake: Awaited<ReturnType<typeof installFakeCloudflarePagesWrangler>>,
+): NodeJS.ProcessEnv {
+  return {
+    ...fakeCloudflareEnv(fake),
+    BUCK_NESTED_ISO: stableBuckIsolation(
+      path.join(tmp, `.cloudflare-rebuild-query-${++buckQueryNonce}`),
+      "zxtest-cloudflare-rebuild",
+    ),
+  };
+}
+
 export async function createSourceRun(
   tmp: string,
   $: any,
@@ -110,7 +126,7 @@ export async function createSourceRun(
   try {
     const run = await $({
       cwd: tmp,
-      env: fakeCloudflareEnv(fake),
+      env: freshRebuildCloudflareEnv(tmp, fake),
     })`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment ${deployment.label} --admission-evidence-json ${admissionEvidenceJson} --artifact-dir ${artifactDir} --records-root ${recordsRoot} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(server.port)} --smoke-connect-protocol https:`;
     const summary = JSON.parse(String(run.stdout));
     const record = JSON.parse(await fsp.readFile(summary.recordPath, "utf8"));

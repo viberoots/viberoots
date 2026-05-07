@@ -5,6 +5,7 @@ import path from "node:path";
 import { test } from "node:test";
 import { resolveDeploymentFromTarget } from "../../deployments/deployment-query";
 import { listDeploymentsForCli } from "../../deployments/deploy-front-door";
+import { stableBuckIsolation } from "../../lib/buck-command-env";
 import {
   cloudflarePagesDeploymentFixture,
   installCloudflarePagesTargets,
@@ -25,6 +26,18 @@ import {
 } from "./nixos-shared-host.control-plane.helpers";
 import { ensureNixosSharedHostStageBranch } from "./nixos-shared-host.fixture";
 import { runInTemp } from "../lib/test-helpers";
+
+let buckQueryNonce = 0;
+
+function freshBuckEnv(tmp: string, prefix: string): NodeJS.ProcessEnv {
+  return {
+    ...process.env,
+    BUCK_NESTED_ISO: stableBuckIsolation(
+      path.join(tmp, `.${prefix}-${++buckQueryNonce}`),
+      `zxtest-${prefix}`,
+    ),
+  };
+}
 
 async function writeDeploymentJson(filePath: string, deployment: unknown) {
   await fsp.writeFile(filePath, JSON.stringify(deployment, null, 2) + "\n", "utf8");
@@ -72,6 +85,7 @@ test("deploy --validate-only preserves cloudflare-pages front-door contracts", a
       const result = await $({
         cwd: tmp,
         stdio: "pipe",
+        env: freshBuckEnv(tmp, "deploy-validate"),
       })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment //sandbox/deployments/demo-staging:deploy --validate-only`;
       const payload = JSON.parse(String(result.stdout));
       assert.equal(payload.schemaVersion, "deploy-validate@1");
@@ -94,6 +108,7 @@ test("deploy --validate-only preserves cloudflare-pages front-door contracts", a
           await $({
             cwd: tmp,
             stdio: "pipe",
+            env: freshBuckEnv(tmp, "deploy-validate"),
           })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment //sandbox/deployments/demo-staging:deploy --validate-only`,
         /invalid wrangler config/,
       );
@@ -108,6 +123,7 @@ test("deploy --validate-only preserves cloudflare-pages front-door contracts", a
           await $({
             cwd: tmp,
             stdio: "pipe",
+            env: freshBuckEnv(tmp, "deploy-validate"),
           })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment //sandbox/deployments/demo-staging:deploy --validate-only`,
         /is not a supported static-webapp/,
       );
@@ -196,6 +212,7 @@ test("internal deploy entrypoint preserves provider reuse guardrails", async (t)
           await $({
             cwd: tmp,
             stdio: "pipe",
+            env: freshBuckEnv(tmp, "provider-reuse"),
           })`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment ${deployment.label} --provision-only`,
         /does not support --provision-only/,
       );
@@ -209,6 +226,7 @@ test("internal deploy entrypoint preserves provider reuse guardrails", async (t)
           await $({
             cwd: tmp,
             stdio: "pipe",
+            env: freshBuckEnv(tmp, "provider-reuse"),
           })`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment ${deployment.label} --publish-only`,
         /s3-static --publish-only requires --source-run-id/,
       );
@@ -222,6 +240,7 @@ test("internal deploy entrypoint preserves provider reuse guardrails", async (t)
           await $({
             cwd: tmp,
             stdio: "pipe",
+            env: freshBuckEnv(tmp, "provider-reuse"),
           })`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment ${deployment.label} --publish-only`,
         /kubernetes --publish-only requires --source-run-id/,
       );

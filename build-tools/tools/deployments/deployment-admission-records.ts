@@ -19,6 +19,12 @@ export type DeploymentRunRecordLike = {
   artifact?: { identity?: string };
   publicUrl?: string;
   healthUrl?: string;
+  foundationMigrationOutcome?: {
+    status?: string;
+    sourceRevision?: string;
+    bundleIdentity?: string;
+    targetSupabaseIdentity?: string;
+  };
   admittedContext?: {
     source?: { sourceRevision?: string };
     policyEvaluation?: DeploymentAdmissionPolicyEvaluation;
@@ -33,6 +39,7 @@ export function defaultDeploymentRecordRoots(workspaceRoot: string, recordsRoot:
       path.join(workspaceRoot, ".local", "deployments", "cloudflare-pages", "records"),
       path.join(workspaceRoot, ".local", "deployments", "s3-static", "records"),
       path.join(workspaceRoot, ".local", "deployments", "kubernetes", "records"),
+      path.join(workspaceRoot, ".local", "deployments", "opentofu", "records"),
       path.join(workspaceRoot, ".local", "deployments", "app-store-connect", "records"),
       path.join(workspaceRoot, ".local", "deployments", "google-play", "records"),
     ]),

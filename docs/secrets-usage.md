@@ -155,6 +155,11 @@ Keep each requirement step-specific. Provider publish tokens belong to
 credentials belong to `preview_cleanup`, and smoke-only credentials belong to
 `smoke`.
 
+Foundation schema migration apply uses the Supabase service-role credential only
+at the `provision` step for `platform-foundation-*` deployments. Deploy records
+may retain the credential env name and contract reference, but never the resolved
+service-role value.
+
 ## End-To-End Example
 
 This example shows the full path for one secret on a Cloudflare Pages

@@ -494,6 +494,15 @@ The reviewed migration bundle target combines
 `//projects/libs/platform-db:migrations` before
 `//projects/libs/data-room-db:migrations` and is attached to every
 `platform-foundation-*` deployment as `migration_bundle`.
+Foundation provision-only runs apply that admitted bundle through the same
+reviewed OpenTofu source revision and then run deploy-blocking post-apply checks
+for tenant RLS isolation, composite tenant-aware FK behavior, migration ordering,
+and required Supabase extension/settings posture. The deploy record stores the
+bundle identity, ordered migration targets, dependency-graph fingerprint, target
+Supabase identity, source revision, redacted diagnostics, and post-apply check
+results. Web and worker deployments that depend on `platform-foundation-*` reject
+promotion when that migration evidence is absent, failed, or recorded for a
+different reviewed source revision.
 
 Web service example:
 

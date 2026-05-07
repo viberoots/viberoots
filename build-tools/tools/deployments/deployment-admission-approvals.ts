@@ -163,21 +163,25 @@ export function requireBuiltInExecutionBoundary(deployment: DeploymentTarget) {
     return;
   }
   if (
-    deployment.publisher.type !== "nixos-shared-host-static-webapp" &&
-    deployment.publisher.type !== "nixos-shared-host-ssr-webapp"
+    deployment.provider === "opentofu"
+      ? deployment.publisher.type !== "provision-only"
+      : deployment.publisher.type !== "nixos-shared-host-static-webapp" &&
+        deployment.publisher.type !== "nixos-shared-host-ssr-webapp"
   ) {
     throw new DeploymentAdmissionError(
       "no_longer_admitted",
-      `protected/shared admission rejects non-built-in nixos-shared-host publisher ${deployment.publisher.type}`,
+      `protected/shared admission rejects non-built-in ${deployment.provider} publisher ${deployment.publisher.type}`,
     );
   }
   if (
     deployment.provisioner?.type &&
-    deployment.provisioner.type !== "nixos-shared-host-manifest"
+    (deployment.provider === "opentofu"
+      ? deployment.provisioner.type !== OPENTOFU_STACK_PROVISIONER
+      : deployment.provisioner.type !== "nixos-shared-host-manifest")
   ) {
     throw new DeploymentAdmissionError(
       "no_longer_admitted",
-      `protected/shared admission rejects non-built-in nixos-shared-host provisioner ${deployment.provisioner.type}`,
+      `protected/shared admission rejects non-built-in ${deployment.provider} provisioner ${deployment.provisioner.type}`,
     );
   }
   for (const action of deployment.releaseActions) {
@@ -199,7 +203,7 @@ export function requireBuiltInExecutionBoundary(deployment: DeploymentTarget) {
 
 export function requiredApprovalFacts(opts: {
   deployment: DeploymentTarget;
-  operationKind: "deploy" | "promotion" | "retry" | "rollback" | "preview";
+  operationKind: "deploy" | "promotion" | "retry" | "rollback" | "preview" | "provision_only";
   sourceRecord?: DeploymentRunRecordLike;
   evidence?: DeploymentAdmissionEvidence;
   requestedBy: string;

@@ -85,6 +85,7 @@ _TEMP_REPO_DEPLOYMENT_TESTS = {
     "build-tools/tools/tests/deployments/kubernetes.opentofu-apply.integration.test.ts": True,
     "build-tools/tools/tests/deployments/kubernetes.opentofu-apply.test.ts": True,
     "build-tools/tools/tests/deployments/kubernetes.opentofu-stack.test.ts": True,
+    "build-tools/tools/tests/deployments/opentofu-foundation-migration.test.ts": True,
     "build-tools/tools/tests/deployments/kubernetes.publisher.config-drift.test.ts": True,
     "build-tools/tools/tests/deployments/kubernetes.publisher.credentials.test.ts": True,
     "build-tools/tools/tests/deployments/kubernetes.publish-credentials.exact-run.test.ts": True,
