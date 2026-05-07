@@ -1919,3 +1919,118 @@ released in an order or source-revision combination that violates the Phase 0 ar
 
 It adds orchestration and policy surface across deployment families and requires operators to reason
 about compatibility windows for non-atomic releases.
+
+## PR-23: Reusable GitHub App requirement profile and Starlark helper
+
+### 1. Intent
+
+Add a generic, reusable GitHub App external requirement profile and Starlark helper so future
+GitHub-enabled app and worker deployments can declare the required secrets and runtime config
+consistently without adding GitHub-specific deployment publishing or readiness-admission logic.
+
+### 2. Scope of changes
+
+- Add a reviewed `github_app` external requirement profile for GitHub App credentials and runtime
+  config.
+- Add a Starlark helper such as `github_app_requirements(...)` that emits the concrete
+  `secret_requirements`, `runtime_config_requirements`, and profile marker expected by deployment
+  validation.
+- Keep readiness gates separate from the requirement profile. The profile answers which credentials
+  and config a deployment consumes; readiness gates continue to answer which live validations must
+  pass before release.
+- Make the helper generic for any GitHub App, not specific to data-room source ingestion.
+- Include both secret and runtime config declarations:
+  - GitHub App ID or equivalent public app identifier as runtime config.
+  - GitHub App private key as a secret requirement.
+  - GitHub webhook secret only when webhooks are enabled.
+  - Callback, webhook, installation, or selected-owner/repository config only when the caller opts
+    into those fields.
+- Use deployment-owned contract IDs by default:
+  - `secret://deployments/<deployment-id>/github/app_private_key`
+  - `secret://deployments/<deployment-id>/github/webhook_secret`
+  - `runtime://deployments/<deployment-id>/github/app_id`
+- Allow an explicit reviewed prefix override for intentionally shared GitHub Apps, while keeping the
+  deployment-owned namespace as the default.
+- Support separate web and worker declarations so each deployment declares only the GitHub material it
+  actually consumes.
+- Fail closed when `external_requirement_profiles = ["github_app"]` is present but the matching
+  secret/runtime config declarations are absent, wrong-step, duplicate, or outside the expected
+  contract scope.
+- Do not add GitHub-specific publisher, provider, or source-ingestion implementation in this PR.
+
+### 3. External prerequisites
+
+- No live GitHub App or secret values are required for this PR.
+- A naming decision for the helper parameters and default contract suffixes.
+- Agreement that webhook support is opt-in and that deployment-owned contract IDs are the default
+  namespace.
+
+### 4. Tests to be added
+
+- External requirement profile validation tests proving `github_app` requires the GitHub App private
+  key and app ID with the expected names, steps, and contract scopes.
+- Starlark/macro extraction tests proving `github_app_requirements(...)` emits the profile marker plus
+  matching secret and runtime config declarations.
+- Optional-webhook tests proving webhook secret declarations are required only when `webhooks = True`
+  or equivalent is selected.
+- Negative tests proving missing private key, missing app ID, wrong lifecycle step, wrong contract
+  prefix, duplicate declarations, and ambient `GITHUB_*` environment secret bypasses fail closed.
+- Prefix override tests proving shared GitHub App namespaces are allowed only when explicitly
+  declared and still preserve redaction and secret-runtime resolution.
+- Fixture tests proving web and worker deployments can declare different GitHub App requirement
+  subsets without forcing one deployment to own secrets consumed by the other.
+
+### 5. Docs to be added or updated
+
+- Update deployment schema docs with the `github_app` external requirement profile and helper shape.
+- Update deployment usage docs with examples for:
+  - deployment-owned GitHub App credentials,
+  - optional webhook support,
+  - separate web callback/webhook and worker repository-read deployments,
+  - reviewed shared-prefix override when a shared GitHub App is intentional.
+- Update secrets docs with the default GitHub App contract IDs and the rule that secret values are
+  resolved only through the deployment secret runtime.
+- Update readiness-gate docs only to clarify that GitHub readiness gates remain separate from the
+  `github_app` requirement profile.
+
+### 6. Acceptance criteria
+
+- Deployment authors can add GitHub App requirements through one helper instead of hand-writing every
+  secret and runtime config declaration.
+- Validation errors name the missing GitHub-specific requirement, such as `github_app_private_key` or
+  `github_webhook_secret`, rather than failing as an opaque generic secret error.
+- The default contract namespace is deployment-owned, with explicit override support for reviewed
+  shared GitHub Apps.
+- Web and worker deployments can each declare only the GitHub App material they consume.
+- GitHub readiness gates remain implemented through the generic readiness-gate system and are not
+  coupled to the credential/config profile.
+
+### 7. Risks
+
+- The helper can overfit to Phase 0 data-room ingestion instead of remaining a generic GitHub App
+  requirement helper.
+- Making webhook support too implicit can require secrets for deployments that do not receive
+  webhooks.
+- Shared-prefix overrides can weaken deployment ownership if they become the default path by
+  convention.
+
+### 8. Mitigations
+
+- Keep source-ingestion-specific semantics out of the helper; express those through app code and
+  readiness gates.
+- Make webhook declarations opt-in and test both webhook and non-webhook shapes.
+- Default to deployment-owned contract IDs and require callers to spell out any shared prefix.
+- Document that a shared GitHub App prefix is a reviewed exception for intentionally shared
+  credentials, not the normal template path.
+
+### 9. Consequences of not implementing this PR
+
+Future GitHub-enabled deployment templates would have to hand-author generic secret and runtime
+config declarations, making missing GitHub App private keys, webhook secrets, and app IDs easier to
+miss or name inconsistently across apps.
+
+### 10. Downsides for implementing this PR
+
+It adds a deployment-system profile for an external source integration that is not itself a
+deployment provider, increasing the profile registry surface area before the first GitHub-enabled app
+template is generated.
