@@ -18,9 +18,11 @@ import {
 import { activateDeploymentSecretContext } from "./deployment-secret-context";
 import { assertNoProtectedSharedClientCredentialInputs } from "./deployment-service-client-contract";
 import {
+  type DeploymentTarget,
   isCloudflarePagesDeployment,
   isKubernetesDeployment,
   isNixosSharedHostDeployment,
+  isVercelDeployment,
 } from "./contract";
 import { runProviderDeployFrontDoor } from "./deploy-cli-provider-dispatch";
 
@@ -110,12 +112,10 @@ export async function runDeployCli(opts: {
       "--retire-target/--migrate-target cannot be combined with deploy, publish-only, remove, or preview flags",
     );
   }
-  const serviceBackedWorkerRuntime =
-    opts.publicFrontDoor &&
-    deployment.protectionClass !== "local_only" &&
-    (isNixosSharedHostDeployment(deployment) ||
-      isCloudflarePagesDeployment(deployment) ||
-      isKubernetesDeployment(deployment));
+  const serviceBackedWorkerRuntime = usesServiceBackedWorkerRuntime(
+    deployment,
+    opts.publicFrontDoor,
+  );
   const vaultRuntime = serviceBackedWorkerRuntime
     ? { minted: false }
     : await prepareDeploymentVaultRuntime({
@@ -138,4 +138,18 @@ export async function runDeployCli(opts: {
     restoreSecretContext();
     await cleanupDeploymentVaultRuntime(vaultRuntime);
   }
+}
+
+export function usesServiceBackedWorkerRuntime(
+  deployment: DeploymentTarget,
+  publicFrontDoor: boolean,
+) {
+  return (
+    publicFrontDoor &&
+    deployment.protectionClass !== "local_only" &&
+    (isNixosSharedHostDeployment(deployment) ||
+      isCloudflarePagesDeployment(deployment) ||
+      isKubernetesDeployment(deployment) ||
+      isVercelDeployment(deployment))
+  );
 }

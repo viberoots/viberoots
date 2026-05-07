@@ -520,8 +520,9 @@ Minimum live Vercel setup:
 Protected/shared Vercel control-plane examples:
 
 ```bash
-# Deploy through the control-plane service
+# Deploy an already admitted prebuilt artifact through the control-plane service
 deploy --deployment //projects/deployments/console-staging:deploy \
+  --source-run-id <deploy-run-id> \
   --control-plane-url "$BNX_DEPLOY_CONTROL_PLANE_URL"
 ```
 
@@ -559,11 +560,12 @@ deploy --deployment //projects/deployments/console-staging:deploy \
 ```
 
 Protected/shared Vercel mutations reject laptop-local artifact paths,
-laptop-local records roots, and direct local-publish flags. Retry and rollback
-replay the recorded exact prebuilt artifact and never rebuild from current
-branch state. The control-plane service persists the admitted prebuilt artifact
-reference, source-run selector, secret-contract references, and shared
-admission evaluation in one frozen execution snapshot before worker mutation.
+laptop-local records roots, and direct local-publish flags. Deploy, preview,
+retry, rollback, and preview cleanup use source-run selectors for admitted
+prebuilt artifacts and never rebuild from current branch state. The
+control-plane service persists the admitted prebuilt artifact reference,
+source-run selector, secret-contract references, and shared admission
+evaluation in one frozen execution snapshot before worker mutation.
 See [Vercel Troubleshooting](/Users/kiltyj/Code/bucknix-fresh/docs/handbook/troubleshooting.md#vercel-control-plane-deployments)
 for service submission, admission, replay, and provider API failure modes.
 

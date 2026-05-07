@@ -4,7 +4,48 @@ import http from "node:http";
 import os from "node:os";
 import path from "node:path";
 import { DEPLOYMENT_SECRET_FIXTURE_PATH_ENV } from "../../deployments/deployment-secret-fixture";
+import { localHarnessControlPlaneDatabaseUrl } from "../../deployments/nixos-shared-host-control-plane-backend";
+import { handleControlPlaneSubmit } from "../../deployments/nixos-shared-host-control-plane-service-api";
 import { vercelDeploymentFixture } from "./vercel.fixture";
+
+async function readBody(req: http.IncomingMessage): Promise<string> {
+  const chunks: Buffer[] = [];
+  for await (const chunk of req) chunks.push(Buffer.from(chunk));
+  return Buffer.concat(chunks).toString("utf8");
+}
+
+export async function startVercelQueueOnlyService(tmp: string, recordsRoot: string) {
+  const paths = {
+    statePath: path.join(tmp, "platform-state.json"),
+    hostRoot: path.join(tmp, "host"),
+    recordsRoot,
+  };
+  const backend = { recordsRoot, databaseUrl: localHarnessControlPlaneDatabaseUrl(recordsRoot) };
+  const server = http.createServer(async (req, res) => {
+    try {
+      if (req.method !== "POST" || req.url !== "/api/v1/submissions") {
+        res.writeHead(404).end(JSON.stringify({ error: "not found" }));
+        return;
+      }
+      const queued = await handleControlPlaneSubmit(JSON.parse(await readBody(req)), {
+        workspaceRoot: tmp,
+        paths,
+        backend,
+        localFixture: true,
+      });
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(JSON.stringify({ ...queued, lifecycleState: "finished" }));
+    } catch (error) {
+      res.writeHead(500, { "content-type": "application/json" });
+      res.end(JSON.stringify({ error: error instanceof Error ? error.message : String(error) }));
+    }
+  });
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  return {
+    url: `http://127.0.0.1:${(server.address() as any).port}`,
+    close: async () => await new Promise<void>((resolve) => server.close(() => resolve())),
+  };
+}
 
 export async function withVercelSmokeServer<T>(
   fn: (override: { protocol: "http:"; hostname: string; port: number }) => Promise<T>,

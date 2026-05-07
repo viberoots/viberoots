@@ -184,12 +184,15 @@ unexpected outcome.
 - Likely causes:
   - The invocation passes a laptop-local artifact directory or records root
     that the public front door does not accept for protected/shared targets.
+  - A deploy or preview omits the `--source-run-id` selector for the admitted
+    Vercel prebuilt artifact lineage.
   - The invocation passes a direct local-publish flag that is reserved for
     `local_only` Vercel fixtures.
   - `--control-plane-url` (or the reviewed `--profile` workflow) is missing.
 - Fix:
   - Re-run with `--control-plane-url "$BNX_DEPLOY_CONTROL_PLANE_URL"` (or the
-    reviewed profile) and remove laptop-local artifact or records overrides.
+    reviewed profile), pass the admitted `--source-run-id`, and remove
+    laptop-local artifact or records overrides.
   - For tests or development, use a `local_only` Vercel fixture deployment
     target instead of a protected/shared label.
 
@@ -283,7 +286,7 @@ replaySnapshotPath` or rejects the source-run as unsuitable for replay.
 
 ### Rejected laptop-local artifact paths
 
-- Symptom: a protected/shared Vercel deploy or retry rejects an artifact path
+- Symptom: a protected/shared Vercel deploy, preview, retry, or rollback rejects an artifact path
   that points inside the laptop or worktree before the control-plane service
   runs.
 - Reason: protected/shared Vercel mutations only accept admitted, identity-bound

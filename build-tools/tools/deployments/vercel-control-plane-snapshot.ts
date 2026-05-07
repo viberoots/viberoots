@@ -47,9 +47,10 @@ export async function buildVercelControlPlaneSnapshot(opts: {
   const replay = needsReplay(opts.request) ? await resolveReplay(opts) : {};
   const artifact =
     opts.request.operationKind === "deploy" || opts.request.operationKind === "preview"
-      ? await admitVercelPrebuiltArtifact(String(opts.request.artifactDir || ""), {
+      ? (replay as { artifact?: AdmittedVercelPrebuiltArtifact }).artifact ||
+        (await admitVercelPrebuiltArtifact(requireVercelArtifactDir(opts.request), {
           recordsRoot: opts.recordsRoot,
-        })
+        }))
       : (replay as { artifact?: AdmittedVercelPrebuiltArtifact }).artifact;
   const admittedContext = await admittedContextFor({ ...opts, replay, artifact });
   return {
@@ -73,7 +74,10 @@ export async function buildVercelControlPlaneSnapshot(opts: {
 }
 
 function needsReplay(request: VercelControlPlaneSubmitRequest) {
-  return ["retry", "rollback", "preview_cleanup"].includes(request.operationKind);
+  return (
+    ["retry", "rollback", "preview_cleanup"].includes(request.operationKind) ||
+    Boolean(request.sourceRunId && ["deploy", "preview"].includes(request.operationKind))
+  );
 }
 
 function baseSnapshot(opts: {
@@ -148,4 +152,12 @@ async function admittedContextFor(opts: {
       ? { expectedSourceRevision: opts.request.expectedSourceRevision }
       : {}),
   });
+}
+
+function requireVercelArtifactDir(request: VercelControlPlaneSubmitRequest): string {
+  const artifactDir = String(request.artifactDir || "").trim();
+  if (artifactDir) return artifactDir;
+  throw new Error(
+    "protected/shared vercel deploy requires an admitted artifact input or --source-run-id; --artifact-dir is rejected by the public CLI",
+  );
 }

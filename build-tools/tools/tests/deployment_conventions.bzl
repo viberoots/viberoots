@@ -162,6 +162,7 @@ _TEMP_REPO_DEPLOYMENT_TESTS = {
     "build-tools/tools/tests/deployments/s3-static.deploy.e2e.test.ts": True,
     "build-tools/tools/tests/deployments/s3-static.publisher.config-drift.test.ts": True,
     "build-tools/tools/tests/deployments/static-webapp-artifact-admission.test.ts": True,
+    "build-tools/tools/tests/deployments/vercel.cli-service-handoff.test.ts": True,
 }
 
 _RESOURCE_LIMITED_DEPLOYMENT_TEST_EXEMPTIONS = {

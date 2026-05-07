@@ -124,7 +124,12 @@ test("vercel worker retry rollback and preview cleanup replay frozen snapshots",
             apiClient,
           });
           assert.equal(source.finalOutcome, "succeeded");
-          for (const operationKind of ["retry", "rollback", "preview_cleanup"] as const) {
+          for (const operationKind of [
+            "preview",
+            "retry",
+            "rollback",
+            "preview_cleanup",
+          ] as const) {
             const snapshot = await buildVercelControlPlaneSnapshot({
               workspaceRoot: tmp,
               recordsRoot,

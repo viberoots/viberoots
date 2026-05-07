@@ -52,6 +52,26 @@ export async function resolveInitialVercelAdmittedContext(opts: {
   expectedSourceRevision?: string;
 }): Promise<VercelAdmittedContext> {
   const target = await resolveDeploymentReviewedTargetEnvironment(opts);
+  const admittedSecretReferences = await resolveInitialAdmittedSecretReferences({
+    requirements: opts.deployment.secretRequirements,
+    targetScope: target.lockScope,
+  });
+  return vercelAdmittedContext({
+    deployment: opts.deployment,
+    target,
+    artifactIdentity: opts.artifactIdentity,
+    admittedSecretReferences,
+    ...(opts.sourceRunId ? { sourceRunId: opts.sourceRunId } : {}),
+  });
+}
+
+function vercelAdmittedContext(opts: {
+  deployment: VercelDeployment;
+  target: DeploymentReviewedTargetEnvironmentAdmission;
+  artifactIdentity: string;
+  admittedSecretReferences: DeploymentSecretAdmittedReference[];
+  sourceRunId?: string;
+}): VercelAdmittedContext {
   return {
     lanePolicyRef: opts.deployment.lanePolicyRef,
     lanePolicyFingerprint: opts.deployment.lanePolicy.fingerprint,
@@ -59,10 +79,7 @@ export async function resolveInitialVercelAdmittedContext(opts: {
     admissionPolicyFingerprint: opts.deployment.admissionPolicy.fingerprint,
     environmentStage: opts.deployment.environmentStage,
     secretRequirements: opts.deployment.secretRequirements,
-    admittedSecretReferences: await resolveInitialAdmittedSecretReferences({
-      requirements: opts.deployment.secretRequirements,
-      targetScope: target.lockScope,
-    }),
+    admittedSecretReferences: opts.admittedSecretReferences,
     runtimeConfigRequirements: opts.deployment.runtimeConfigRequirements,
     referenceResolutionPolicy: {
       secrets: "exact_admitted_references",
@@ -71,13 +88,13 @@ export async function resolveInitialVercelAdmittedContext(opts: {
     targetExceptionRefs: opts.deployment.targetExceptions.map((entry) => entry.ref).sort(),
     source: {
       mode: "stage_branch_head",
-      sourceRef: target.targetRef,
-      sourceRevision: target.targetRevision,
+      sourceRef: opts.target.targetRef,
+      sourceRevision: opts.target.targetRevision,
       artifactIdentity: opts.artifactIdentity,
       artifactTrustMode: opts.deployment.admissionPolicy.artifactAttestationMode,
       ...(opts.sourceRunId ? { sourceRunId: opts.sourceRunId } : {}),
     },
-    targetEnvironment: target,
+    targetEnvironment: opts.target,
   };
 }
 
@@ -92,20 +109,25 @@ export async function resolveSourceRunVercelAdmittedContext(opts: {
   if (!source?.sourceRef || !source?.sourceRevision) {
     throw new Error("vercel replay requires recorded admitted source snapshot");
   }
-  const admitted = await resolveInitialVercelAdmittedContext({
+  const target = await resolveDeploymentReviewedTargetEnvironment({
     workspaceRoot: opts.workspaceRoot,
     deployment: opts.deployment,
-    artifactIdentity: opts.artifactIdentity,
-    sourceRunId: opts.sourceRecord.deployRunId,
     ...(opts.expectedSourceRevision ? { expectedSourceRevision: opts.expectedSourceRevision } : {}),
+  });
+  const admittedSecretReferences = await resolveSourceRunAdmittedSecretReferences({
+    sourceAdmittedContext: opts.sourceRecord.admittedContext,
+    requirements: opts.deployment.secretRequirements,
+    targetScope: target.lockScope,
+  });
+  const admitted = vercelAdmittedContext({
+    deployment: opts.deployment,
+    target,
+    artifactIdentity: opts.artifactIdentity,
+    admittedSecretReferences,
+    sourceRunId: opts.sourceRecord.deployRunId,
   });
   return {
     ...admitted,
-    admittedSecretReferences: await resolveSourceRunAdmittedSecretReferences({
-      sourceAdmittedContext: opts.sourceRecord.admittedContext,
-      requirements: opts.deployment.secretRequirements,
-      targetScope: admitted.targetEnvironment.lockScope,
-    }),
     source: {
       ...admitted.source,
       sourceRef: source.sourceRef,

@@ -1,6 +1,5 @@
 #!/usr/bin/env zx-wrapper
 import { createNixosSharedHostSubmissionId } from "./nixos-shared-host-control-plane-snapshot";
-import { resolveArtifactDirForCli } from "./deployment-cli-resolve";
 import type { VercelDeployment } from "./contract";
 import { resolveServiceClientFromCliProfileOrFlags } from "./deployment-service-client-profile";
 import {
@@ -21,6 +20,7 @@ export async function runProtectedVercelDeployFrontDoor(opts: {
   previewCleanup: boolean;
   rollback: boolean;
   sourceRunId: string;
+  artifactDirFlag: string;
   controlPlaneUrl: string;
   controlPlaneToken?: string;
   admissionEvidence?: unknown;
@@ -28,6 +28,7 @@ export async function runProtectedVercelDeployFrontDoor(opts: {
   hasFlag: (flag: string) => boolean;
 }) {
   rejectServiceOnlyLocalFlags(opts.hasFlag, "vercel");
+  rejectLocalArtifactInputs(opts);
   const operationKind: ProtectedVercelOperation = opts.previewCleanup
     ? "preview_cleanup"
     : opts.rollback
@@ -45,6 +46,14 @@ export async function runProtectedVercelDeployFrontDoor(opts: {
   if (operationKind === "preview_cleanup" && !opts.sourceRunId) {
     throw new Error("vercel --preview-cleanup requires --source-run-id");
   }
+  if (operationKind === "deploy" && !opts.sourceRunId) {
+    throw new Error(
+      "protected/shared vercel deploy requires --source-run-id selecting an admitted prebuilt artifact; --artifact-dir is not accepted",
+    );
+  }
+  if (operationKind === "preview" && !opts.sourceRunId) {
+    throw new Error("protected/shared vercel preview requires --source-run-id");
+  }
   const admissionEvidence = serviceSubmissionAdmissionEvidence(opts.admissionEvidence as any);
   const expectedSourceRevision = await resolveExpectedDeploymentSourceRevision({
     workspaceRoot: opts.workspaceRoot,
@@ -58,7 +67,6 @@ export async function runProtectedVercelDeployFrontDoor(opts: {
     defaultProfileName: opts.deployment.lanePolicy.defaultClientProfile,
     context: `vercel ${opts.deployment.protectionClass} mutation`,
   });
-  const requiresArtifact = operationKind === "deploy" || operationKind === "preview";
   return await finalizeProtectedFrontDoorSubmission({
     controlPlaneUrl: serviceClient.controlPlaneUrl,
     controlPlaneToken: serviceClient.controlPlaneToken,
@@ -68,13 +76,26 @@ export async function runProtectedVercelDeployFrontDoor(opts: {
       submittedAt: new Date().toISOString(),
       deployment: opts.deployment,
       operationKind,
-      ...(requiresArtifact
-        ? { artifactDir: await resolveArtifactDirForCli(opts.workspaceRoot, opts.deployment) }
-        : {}),
       ...(expectedSourceRevision ? { expectedSourceRevision } : {}),
       ...(opts.sourceRunId ? { sourceRunId: opts.sourceRunId } : {}),
       ...(admissionEvidence ? { admissionEvidence } : {}),
       ...(opts.smokeConnectOverride ? { smokeConnectOverride: opts.smokeConnectOverride } : {}),
     },
   });
+}
+
+function rejectLocalArtifactInputs(opts: {
+  artifactDirFlag: string;
+  hasFlag: (flag: string) => boolean;
+}) {
+  if (
+    !opts.artifactDirFlag &&
+    !opts.hasFlag("artifact-dir") &&
+    !opts.hasFlag("component-artifacts")
+  ) {
+    return;
+  }
+  throw new Error(
+    "protected/shared vercel deploy does not support --artifact-dir; submit an admitted artifact through the deployment service or use --source-run-id for preview, retry, rollback, and preview cleanup",
+  );
 }

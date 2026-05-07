@@ -48,6 +48,7 @@ export async function runVercelDeployFrontDoor(opts: {
         previewCleanup: opts.previewCleanup,
         rollback: opts.rollback,
         sourceRunId: opts.sourceRunId,
+        artifactDirFlag: opts.artifactDirFlag,
         controlPlaneUrl,
         controlPlaneToken: getFlagStr("control-plane-token", "").trim() || undefined,
         admissionEvidence: opts.admissionEvidence,
