@@ -1,5 +1,5 @@
 load("//build-tools/deployments:defs.bzl", "vercel_next_webapp_deployment")
-load("//projects/deployments/platform-shared:phase0_contracts.bzl", "phase0_runtime", "phase0_secret", "phase0_smoke", "phase0_stack_target", "phase0_vault_runtime")
+load("//projects/deployments/platform-shared:phase0_contracts.bzl", "phase0_runtime", "phase0_readiness_secrets", "phase0_secret", "phase0_smoke", "phase0_stack_target", "phase0_vault_runtime")
 
 vercel_next_webapp_deployment(
     name = "deploy",
@@ -17,7 +17,7 @@ vercel_next_webapp_deployment(
     secret_requirements = [
         phase0_secret("vercel-api-token", "data-room-console-dev", "publish"),
         phase0_secret("opentofu-provider-credentials", "data-room-console-dev", "provision"),
-    ],
+    ] + phase0_readiness_secrets(),
     runtime_config_requirements = [
         phase0_runtime("console-public-url", "data-room-console-dev"),
         phase0_runtime("data-room-web-base-url", "data-room-console-dev"),

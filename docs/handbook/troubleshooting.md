@@ -202,13 +202,23 @@ unexpected outcome.
   or secret-runtime error before any provider API call.
 - Likely causes:
   - Admission evidence is missing required checks for the admitted scope.
+  - Phase 0 readiness evidence has the wrong `accessMode`, `gateVersion`,
+    environment stage, provider target identity, source revision, or source run
+    id for the deployment being admitted.
+  - Gate 5 evidence is missing the exact `source`, `client`, or
+    `policyCombination` required by the policy for Drive, Notion, Slack, GitHub,
+    or external-source `fetch_full_document` denial.
+  - A live readiness gate declares credentials without
+    `credential_source = "secret_runtime"` and a reviewed `secret_runtime_step`.
   - The Vercel API token is not declared in `secret_requirements` for the step
     that needs it (`publish`, `smoke`, or `preview_cleanup`), or the contract
     is bound to a target scope that does not match the deployment's provider
     target identity.
 - Fix:
   - Run `deploy --deployment <label> --validate-only` and inspect
-    `admissionRequirements.required_checks` to confirm submit-time evidence.
+    `admissionRequirements.required_checks` and `readiness_gates` to confirm
+    submit-time evidence. Direct-upload pilot access uses Gates 1-4; connector
+    demo access also requires the full Connect and GitHub Gate 5 set.
   - Declare a `vercel/api-token` `secret_requirement` for each step the
     operation enters, and confirm the contract's `targetScopes` match the
     `vercel:<team>/<project>#<environment>` lock-key shape.

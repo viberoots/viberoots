@@ -61,10 +61,17 @@ test("front-door admission enforces resolved readiness gates", async () => {
             type: "ragie_acl_semantics",
             status: "passed",
             checkedAt: "2026-05-03T12:00:00.000Z",
+            gateVersion: "v1",
             deploymentId: deployment.deploymentId,
+            environmentStage: deployment.environmentStage,
             providerTargetIdentity: providerTargetIdentityFor(deployment),
             sourceRevision: admittedContext.source.sourceRevision,
             evidenceRef: "evidence://ragie/redacted",
+            redactedSummary: "ragie acl semantics passed",
+            diagnostics: {
+              summary: "redacted ragie acl review",
+              reviewContextRef: "evidence://ragie/review",
+            },
           },
         ],
         checks: [

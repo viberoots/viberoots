@@ -1,5 +1,5 @@
 load("//build-tools/deployments:defs.bzl", "opentofu_foundation_deployment")
-load("//projects/deployments/platform-shared:phase0_contracts.bzl", "phase0_secret", "phase0_stack_target", "phase0_vault_runtime")
+load("//projects/deployments/platform-shared:phase0_contracts.bzl", "phase0_readiness_secrets", "phase0_secret", "phase0_stack_target", "phase0_vault_runtime")
 
 opentofu_foundation_deployment(
     name = "deploy",
@@ -13,5 +13,5 @@ opentofu_foundation_deployment(
     secret_requirements = [
         phase0_secret("opentofu-provider-credentials", "platform-foundation-dev", "provision"),
         phase0_secret("supabase-service-role", "platform-foundation-dev", "provision"),
-    ],
+    ] + phase0_readiness_secrets(),
 )

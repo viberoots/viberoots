@@ -14,6 +14,7 @@ import {
   type DeploymentSupplyChainGateFact,
 } from "./deployment-admission-supply-chain";
 import type {
+  DeploymentAdmissionAccessMode,
   DeploymentReadinessGateEvidence,
   DeploymentReadinessGateFact,
 } from "./deployment-readiness-gates";
@@ -51,6 +52,7 @@ export type DeploymentHealthEvidence = {
 };
 
 export type DeploymentAdmissionEvidence = {
+  accessMode?: DeploymentAdmissionAccessMode;
   requestedBy?: DeploymentPrincipal;
   submittedBy?: DeploymentPrincipal;
   checks?: DeploymentCheckEvidence[];

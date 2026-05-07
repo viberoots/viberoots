@@ -84,6 +84,7 @@ export async function evaluateDeploymentAdmission(opts: {
     deployment: opts.deployment,
     operationKind: opts.operationKind,
     binding,
+    accessMode: opts.evidence?.accessMode,
     evidence: opts.evidence?.readinessGates,
   });
   return {

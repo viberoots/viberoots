@@ -576,14 +576,33 @@ Optional fields:
 - authorization scope requirements or policy reference when the deployment uses scoped submit/approve/operate permissions
 
 `readiness_gates` are for deploy-blocking checks that cannot always run in a
-local PR, such as Ragie ACL semantics, live tenant leak checks, WorkOS MCP auth,
-storage grant lifecycle, and Connect metadata/OAuth checks. Evidence must be
-redacted and bound to deployment id, provider target identity, source revision
-or source run id, and an external evidence reference. Raw provider responses,
-tokens, or diagnostic payloads are not admission evidence. The repo-level
-deployment front door resolves these gates from Buck deployment targets and
-enforces them through admission; target authors must not rely on helper-only
-validation paths.
+local PR. Phase 0 gates include Ragie ACL semantics, tenant leak checks, WorkOS
+MCP auth for reviewed clients, `fetch_full_document` grant lifecycle checks,
+Connect metadata/OAuth/source-update/scoped-source/branding/ACL checks, GitHub
+install/permission/token/refresh/retrieval checks, and external-source
+`fetch_full_document` denial checks.
+
+Each gate policy names `type`, `required_for`, `gate_version`, and optional
+`required_access`. Per-source or per-client gates use optional `source`,
+`client`, and `policy_combination` dimensions, so Drive, Notion, Slack, GitHub,
+Claude, ChatGPT, Cursor, and external-source denial policy combinations remain
+independently reviewable. `required_access` can distinguish
+`direct_upload_pilot`, `connector_demo`, and `connector_internal` admission.
+Live gate credentials must be declared as `credential_contract_id` with
+`credential_source = "secret_runtime"` and a reviewed `secret_runtime_step`;
+ambient environment credentials are not accepted.
+
+Evidence must be redacted and bound to deployment id, provider target identity,
+environment stage, gate version, run timestamp, source revision or source run
+id, and an external evidence reference. If evidence includes `expiresAt`,
+admission fails closed after that timestamp. Typed `diagnostics` may include a
+redacted `summary` and `reviewContextRef`; raw provider responses, tokens, or
+diagnostic payloads are not admission evidence. The repo-level deployment front
+door resolves these gates from Buck deployment targets and enforces them
+through admission; target authors must not rely on helper-only validation paths.
+This PR uses the existing PR-19 `readiness_gates` extraction shape and only
+adds fields inside that declared dictionary contract, avoiding new cquery or
+scaffold attributes.
 
 Minimum `artifact_attestation_requirements` contract:
 

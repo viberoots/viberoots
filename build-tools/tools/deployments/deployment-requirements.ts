@@ -3,6 +3,7 @@ import type { GraphNode } from "../lib/graph";
 
 export type DeploymentRequirementStep =
   | "provision"
+  | "readiness"
   | "publish"
   | "preview_cleanup"
   | "smoke"
@@ -12,6 +13,7 @@ export type DeploymentRequirementStep =
 
 export const DEPLOYMENT_REQUIREMENT_STEPS: DeploymentRequirementStep[] = [
   "provision",
+  "readiness",
   "publish",
   "preview_cleanup",
   "smoke",

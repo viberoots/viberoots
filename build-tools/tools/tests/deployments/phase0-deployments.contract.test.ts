@@ -57,16 +57,18 @@ test("Phase 0 deployment targets extract with concrete providers and app artifac
 
   const deploymentsById = byId(deployments);
   for (const deployment of deployments) {
-    const stage = deployment.environmentStage;
-    assert.equal(
-      deployment.admissionPolicy.readinessGates?.[0]?.name,
-      `phase0-${stage}-placeholder`,
-    );
-    assert.equal(deployment.admissionPolicy.readinessGates?.[0]?.type, "tenant_leak_check");
+    assert.equal(deployment.admissionPolicy.readinessGates?.[0]?.name, "phase0/ragie-acl");
+    assert.equal(deployment.admissionPolicy.readinessGates?.[0]?.type, "ragie_acl_semantics");
+    assert.equal(deployment.admissionPolicy.readinessGates?.[0]?.gateVersion, "phase0-2026-05");
     assert.deepEqual(deployment.admissionPolicy.readinessGates?.[0]?.requiredFor, [
       "deploy",
       "provision_only",
     ]);
+    assert.ok(
+      deployment.admissionPolicy.readinessGates?.some(
+        (gate) => gate.type === "external_source_fetch_full_document_denial",
+      ),
+    );
   }
   assert.equal(deploymentsById.get("data-room-console-prod")?.provider, "vercel");
   assert.equal(
@@ -215,7 +217,7 @@ test("protected Phase 0 front-door validation rejects placeholder identities", a
   );
   await assert.rejects(
     validateDeploymentForCli(process.cwd(), deployment),
-    /placeholder deployment value is unresolved: admissionPolicy\.readinessGates/,
+    /placeholder deployment value is unresolved:/,
   );
 });
 

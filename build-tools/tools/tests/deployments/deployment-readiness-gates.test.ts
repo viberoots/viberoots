@@ -14,7 +14,20 @@ const READINESS_GATE_TYPES: DeploymentReadinessGateType[] = [
   "tenant_leak_check",
   "workos_mcp_auth",
   "storage_grant_lifecycle",
-  "connect_metadata_oauth",
+  "fetch_full_document_grant_lifecycle",
+  "connect_metadata_shape",
+  "connect_oauth_flow",
+  "connect_source_update",
+  "scoped_source_enforcement",
+  "connect_branding_observation",
+  "connect_limitation_decision",
+  "connect_acl_review",
+  "github_selected_repository_install",
+  "github_permissions",
+  "github_token_hygiene",
+  "github_refresh_semantics",
+  "github_retrieval_bakeoff",
+  "external_source_fetch_full_document_denial",
 ];
 
 function gateName(type: DeploymentReadinessGateType) {
@@ -30,6 +43,7 @@ function readinessDeployment(type: DeploymentReadinessGateType = "ragie_acl_sema
           name: gateName(type),
           type,
           requiredFor: ["deploy"],
+          gateVersion: "phase0-2026-05",
         },
       ],
     },
@@ -47,7 +61,9 @@ function readinessEvidence(
     type,
     status: "passed" as const,
     checkedAt: "2026-05-03T12:00:00.000Z",
+    gateVersion: "phase0-2026-05",
     deploymentId: deployment.deploymentId,
+    environmentStage: deployment.environmentStage,
     providerTargetIdentity: deployment.providerTarget.deploymentTargetIdentity,
     sourceRevision: admittedContext.source.sourceRevision,
     ...(admittedContext.source.sourceRunId
@@ -55,6 +71,10 @@ function readinessEvidence(
       : {}),
     evidenceRef: `evidence://${type}/redacted`,
     redactedSummary: "live readiness gate passed",
+    diagnostics: {
+      summary: "pass count=12 fail count=0",
+      reviewContextRef: `evidence://${type}/review`,
+    },
     ...overrides,
   };
 }
@@ -95,9 +115,11 @@ for (const type of READINESS_GATE_TYPES) {
 
 for (const [field, value] of [
   ["deploymentId", "other-deployment"],
+  ["environmentStage", "other-stage"],
   ["providerTargetIdentity", "nixos-shared-host:other:demoapp"],
   ["sourceRevision", "other-revision"],
   ["sourceRunId", "other-run"],
+  ["gateVersion", "phase0-old"],
 ] as const) {
   test(`readiness evidence rejects mismatched ${field}`, async () => {
     const deployment = readinessDeployment();
@@ -123,58 +145,90 @@ for (const [field, value] of [
   });
 }
 
-test("normalization drops readiness evidence with raw provider payloads", () => {
-  const normalized = normalizeAdmissionEvidence({
-    readinessGates: [
-      {
-        name: "workos/mcp",
-        type: "workos_mcp_auth",
-        status: "passed",
-        checkedAt: "2026-05-03T12:00:00.000Z",
-        deploymentId: "console-staging",
-        providerTargetIdentity: "vercel:web/console#staging",
-        evidenceRef: "evidence://workos/mcp",
-        providerResponse: { token: "must-not-serialize" },
-      },
-    ],
-  });
-  assert.equal(normalized?.readinessGates, undefined);
+test("readiness evidence rejects expired gate evidence", async () => {
+  const deployment = readinessDeployment();
+  const admittedContext = admittedContextFixture(deployment);
+  await assert.rejects(
+    evaluateDeploymentAdmission({
+      ...admissionEvalBase("nixos-shared-host", {
+        deployment,
+        operationKind: "deploy",
+        admittedContext,
+        evidence: {
+          ...reviewedLaneAdmissionEvidenceFixture({ deployment }),
+          readinessGates: [
+            readinessEvidence(deployment, admittedContext, "ragie_acl_semantics", {
+              expiresAt: "2000-01-01T00:00:00.000Z",
+            }),
+          ],
+        },
+      }),
+    }),
+    /requires readiness gate live\/ragie_acl_semantics/,
+  );
 });
 
-test("normalization drops readiness evidence with forbidden MCP source fields", () => {
-  const normalized = normalizeAdmissionEvidence({
-    readinessGates: [
-      {
-        name: "workos/mcp",
-        type: "workos_mcp_auth",
-        status: "passed",
-        checkedAt: "2026-05-03T12:00:00.000Z",
-        deploymentId: "console-staging",
-        providerTargetIdentity: "vercel:web/console#staging",
-        evidenceRef: "evidence://workos/mcp",
-        metadata: { rawForensics: ["must-not-serialize"] },
-      },
-    ],
+for (const missingField of ["redactedSummary", "diagnostics"] as const) {
+  test(`typed readiness evidence rejects missing ${missingField}`, async () => {
+    const deployment = readinessDeployment();
+    const admittedContext = admittedContextFixture(deployment);
+    const incompleteEvidence = {
+      ...readinessEvidence(deployment, admittedContext, "ragie_acl_semantics"),
+    } as Partial<ReturnType<typeof readinessEvidence>>;
+    delete incompleteEvidence[missingField];
+    await assert.rejects(
+      evaluateDeploymentAdmission({
+        ...admissionEvalBase("nixos-shared-host", {
+          deployment,
+          operationKind: "deploy",
+          admittedContext,
+          evidence: {
+            ...reviewedLaneAdmissionEvidenceFixture({ deployment }),
+            readinessGates: [incompleteEvidence as ReturnType<typeof readinessEvidence>],
+          },
+        }),
+      }),
+      /requires readiness gate live\/ragie_acl_semantics/,
+    );
   });
-  assert.equal(normalized?.readinessGates, undefined);
-});
+}
 
-test("admission policy extraction rejects unsupported readiness gate metadata", () => {
-  const result = extractDeploymentAdmissionPolicies([
-    {
-      name: "//projects/deployments/shared:prod_release",
-      rule_type: "deployment_admission_policy",
-      allowed_refs: ["env/prod"],
-      readiness_gates: [
+test("readiness evidence binds source client and policy dimensions", async () => {
+  const deployment = nixosSharedHostDeploymentFixture({
+    admissionPolicy: {
+      ...nixosSharedHostDeploymentFixture().admissionPolicy,
+      readinessGates: [
         {
-          name: "bad/live-gate",
-          type: "unknown_gate",
-          required_for: "deploy,unknown_operation",
+          name: "phase0/drive-oauth-chatgpt",
+          type: "connect_oauth_flow",
+          requiredFor: ["deploy"],
+          gateVersion: "phase0-2026-05",
+          source: "drive",
+          client: "chatgpt",
         },
       ],
     },
-  ]);
-  assert.equal(result.policies.size, 0);
-  assert.ok(result.errors.some((entry) => entry.includes('unsupported type "unknown_gate"')));
-  assert.ok(result.errors.some((entry) => entry.includes('required_for "unknown_operation"')));
+  });
+  const admittedContext = admittedContextFixture(deployment);
+  await assert.rejects(
+    evaluateDeploymentAdmission({
+      ...admissionEvalBase("nixos-shared-host", {
+        deployment,
+        operationKind: "deploy",
+        admittedContext,
+        evidence: {
+          ...reviewedLaneAdmissionEvidenceFixture({ deployment }),
+          readinessGates: [
+            {
+              ...readinessEvidence(deployment, admittedContext, "connect_oauth_flow"),
+              name: "phase0/drive-oauth-chatgpt",
+              source: "notion",
+              client: "chatgpt",
+            },
+          ],
+        },
+      }),
+    }),
+    /requires readiness gate phase0\/drive-oauth-chatgpt/,
+  );
 });

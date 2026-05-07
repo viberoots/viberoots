@@ -77,6 +77,15 @@ target automatically. The same repo-level front door also enforces declared
 readiness gates and rejects app targets that import other app targets before a
 provider-specific mutation runs.
 
+Phase 0 readiness evidence is access-mode aware. Use
+`accessMode: "direct_upload_pilot"` when admission should require only Gates 1-4,
+and `accessMode: "connector_demo"` when Connect and GitHub external-source
+evidence must also pass. Connector evidence is source-specific for Drive,
+Notion, Slack, and GitHub, and WorkOS MCP evidence is client-specific for the
+reviewed clients. Connector evidence is only an evidence reference, redacted
+summary, and redacted diagnostics; live service credentials are resolved by the
+reviewed secret-runtime steps, not stored in CI variables or deployment records.
+
 Use `--artifact-dir <dir>` only when you want to override that default and name a
 specific build output folder as the client-side artifact source.
 

@@ -1,5 +1,5 @@
 load("//build-tools/deployments:defs.bzl", "container_runtime_service_deployment")
-load("//projects/deployments/platform-shared:phase0_contracts.bzl", "phase0_runtime", "phase0_secret", "phase0_smoke", "phase0_stack_target", "phase0_vault_runtime")
+load("//projects/deployments/platform-shared:phase0_contracts.bzl", "phase0_runtime", "phase0_readiness_secrets", "phase0_secret", "phase0_smoke", "phase0_stack_target", "phase0_vault_runtime")
 
 container_runtime_service_deployment(
     name = "deploy",
@@ -19,7 +19,7 @@ container_runtime_service_deployment(
     secret_requirements = [
         phase0_secret("container-runtime-token", "data-room-web-dev", "publish"),
         phase0_secret("opentofu-provider-credentials", "data-room-web-dev", "provision"),
-    ],
+    ] + phase0_readiness_secrets(),
     runtime_config_requirements = [
         phase0_runtime("web-public-url", "data-room-web-dev"),
         phase0_runtime("supabase-url", "data-room-web-dev"),

@@ -5,6 +5,7 @@ load(
     "deployment_lane_policy",
     "migration_bundle",
 )
+load("//projects/deployments/platform-shared:phase0_contracts.bzl", "phase0_readiness_gates")
 
 deployment_lane_governance(
     name = "lane_governance",
@@ -38,12 +39,7 @@ deployment_admission_policy(
     name = "dev_release",
     allowed_refs = ["env/platform/dev"],
     required_checks = ["deploy/admission"],
-    readiness_gates = [{
-        "name": "phase0-dev-placeholder",
-        "type": "tenant_leak_check",
-        "required_for": "deploy,provision_only",
-        "evidence": "manual",
-    }],
+    readiness_gates = phase0_readiness_gates("direct_upload_pilot,connector_internal"),
     artifact_attestation_mode = "recorded_exact_artifact",
     visibility = ["PUBLIC"],
 )
@@ -53,12 +49,7 @@ deployment_admission_policy(
     allowed_refs = ["env/platform/staging"],
     required_checks = ["deploy/admission"],
     required_approvals = ["release-owner"],
-    readiness_gates = [{
-        "name": "phase0-staging-placeholder",
-        "type": "tenant_leak_check",
-        "required_for": "deploy,provision_only",
-        "evidence": "manual",
-    }],
+    readiness_gates = phase0_readiness_gates("direct_upload_pilot,connector_demo"),
     artifact_attestation_mode = "recorded_exact_artifact",
     visibility = ["PUBLIC"],
 )
@@ -68,12 +59,7 @@ deployment_admission_policy(
     allowed_refs = ["env/platform/prod"],
     required_checks = ["deploy/admission"],
     required_approvals = ["release-owner", "security-owner"],
-    readiness_gates = [{
-        "name": "phase0-prod-placeholder",
-        "type": "tenant_leak_check",
-        "required_for": "deploy,provision_only",
-        "evidence": "manual",
-    }],
+    readiness_gates = phase0_readiness_gates("direct_upload_pilot,connector_demo"),
     artifact_attestation_mode = "recorded_exact_artifact",
     visibility = ["PUBLIC"],
 )

@@ -12,6 +12,8 @@ import {
 } from "./deployment-admission-supply-chain";
 import { normalizeReadinessGateEvidence } from "./deployment-readiness-gates";
 
+const ACCESS_MODES = ["direct_upload_pilot", "connector_demo", "connector_internal"];
+
 function normalizePrincipal(value: unknown): DeploymentPrincipal | undefined {
   if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
   const principalId =
@@ -39,6 +41,9 @@ export function normalizeAdmissionEvidence(
 ): DeploymentAdmissionEvidence | undefined {
   if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
   const raw = value as Record<string, unknown>;
+  const accessMode = ACCESS_MODES.includes(readText(raw, "accessMode"))
+    ? readText(raw, "accessMode")
+    : "";
   const checks = normalizeList(raw.checks, (entry) => {
     if (!entry || typeof entry !== "object" || Array.isArray(entry)) return undefined;
     const rawEntry = entry as Record<string, unknown>;
@@ -76,6 +81,7 @@ export function normalizeAdmissionEvidence(
   const supplyChainGates = normalizeSupplyChainGateEvidence(raw.supplyChainGates);
   const readinessGates = normalizeReadinessGateEvidence(raw.readinessGates);
   return {
+    ...(accessMode ? { accessMode: accessMode as DeploymentAdmissionEvidence["accessMode"] } : {}),
     ...(requestedBy ? { requestedBy } : {}),
     ...(submittedBy ? { submittedBy } : {}),
     ...(checks.length > 0 ? { checks } : {}),

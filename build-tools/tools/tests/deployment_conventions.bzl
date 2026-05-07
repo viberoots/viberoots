@@ -41,6 +41,7 @@ _TEMP_REPO_DEPLOYMENT_TESTS = {
     "build-tools/tools/tests/deployments/deploy.front-door.hosted-status-ux.test.ts": True,
     "build-tools/tools/tests/deployments/deploy.front-door.provider-target-identity.contract.test.ts": True,
     "build-tools/tools/tests/deployments/phase0-deployments.contract.test.ts": True,
+    "build-tools/tools/tests/deployments/phase0-deployments.readiness-secrets.test.ts": True,
     "build-tools/tools/tests/deployments/phase0-deployments.smoke.test.ts": True,
     "build-tools/tools/tests/deployments/deployment-admin-keycloak.remote-profile.pr98.errors.test.ts": True,
     "build-tools/tools/tests/deployments/deployment-admin-keycloak.remote-profile.pr98.happy-path.test.ts": True,
