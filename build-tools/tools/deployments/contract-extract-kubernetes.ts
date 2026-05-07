@@ -65,6 +65,7 @@ export function extractKubernetesDeploymentsFromContext(
     );
     const releaseActionRefs = readLabelList(node, "release_actions");
     const targetExceptionRefs = readLabelList(node, "target_exceptions");
+    const migrationBundleRef = readLabel(node, "migration_bundle");
     const smoke = readSmokePolicy(node);
     const vaultRuntime = readVaultRuntimeConfig(node);
     const rolloutPolicy = readRolloutPolicy(node);
@@ -219,6 +220,7 @@ export function extractKubernetesDeploymentsFromContext(
       runtimeConfigRequirements,
       releaseActions,
       targetExceptions,
+      ...(migrationBundleRef ? { migrationBundleRef } : {}),
       ...(smoke ? { smoke } : {}),
       ...(rolloutPolicy ? { rolloutPolicy } : {}),
       ...(vaultRuntime ? { vaultRuntime } : {}),

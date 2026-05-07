@@ -1,0 +1,28 @@
+load("//build-tools/deployments:defs.bzl", "vercel_next_webapp_deployment")
+load("//projects/deployments/platform-shared:phase0_contracts.bzl", "phase0_runtime", "phase0_secret", "phase0_smoke", "phase0_stack_target", "phase0_vault_runtime")
+
+vercel_next_webapp_deployment(
+    name = "deploy",
+    component = "//projects/apps/data-room-console:vercel_artifact",
+    team = "phase0-platform",
+    project = "data-room-console-dev",
+    environment = "dev",
+    canonical_url = "https://console.dev.data-room.example.invalid",
+    provisioner = "opentofu-stack",
+    provisioner_config = "opentofu/stack.json",
+    lane_policy = "//projects/deployments/platform-shared:lane",
+    environment_stage = "dev",
+    admission_policy = "//projects/deployments/platform-shared:dev_release",
+    vault_runtime = phase0_vault_runtime("deploy-data-room-console-dev-read"),
+    secret_requirements = [
+        phase0_secret("vercel-api-token", "data-room-console-dev", "publish"),
+        phase0_secret("opentofu-provider-credentials", "data-room-console-dev", "provision"),
+    ],
+    runtime_config_requirements = [
+        phase0_runtime("console-public-url", "data-room-console-dev"),
+        phase0_runtime("data-room-web-base-url", "data-room-console-dev"),
+        phase0_runtime("workos-client-id", "data-room-console-dev"),
+    ],
+    smoke = phase0_smoke("https://console.dev.data-room.example.invalid", "/"),
+    provider_target = phase0_stack_target("data-room-console", "dev"),
+)

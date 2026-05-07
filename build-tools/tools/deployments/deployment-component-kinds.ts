@@ -6,13 +6,15 @@ export const SSR_WEBAPP_COMPONENT_KIND = "ssr-webapp";
 export const MOBILE_APP_COMPONENT_KIND = "mobile-app";
 export const SERVICE_COMPONENT_KIND = "service";
 export const THIRD_PARTY_SERVICE_COMPONENT_KIND = "third-party-service";
+export const PROVISION_ONLY_COMPONENT_KIND = "provision-only";
 
 export type DeploymentComponentKind =
   | typeof STATIC_WEBAPP_COMPONENT_KIND
   | typeof SSR_WEBAPP_COMPONENT_KIND
   | typeof MOBILE_APP_COMPONENT_KIND
   | typeof SERVICE_COMPONENT_KIND
-  | typeof THIRD_PARTY_SERVICE_COMPONENT_KIND;
+  | typeof THIRD_PARTY_SERVICE_COMPONENT_KIND
+  | typeof PROVISION_ONLY_COMPONENT_KIND;
 
 export type DeploymentDefaultSmokeClass =
   | "http_5m"
@@ -32,6 +34,7 @@ const COMPONENT_KIND_INFO: Record<
     defaultSmokeClass: "service_health_10m",
     requiresRuntimeContract: false,
   },
+  "provision-only": { defaultSmokeClass: "service_health_10m", requiresRuntimeContract: false },
 };
 
 export const DEPLOYMENT_COMPONENT_KINDS = Object.keys(
@@ -62,6 +65,9 @@ export function isSupportedComponentNode(
   }
   if (kind === SSR_WEBAPP_COMPONENT_KIND) {
     return labels.has("kind:app") && labels.has("webapp:ssr");
+  }
+  if (kind === PROVISION_ONLY_COMPONENT_KIND) {
+    return labels.has("kind:migration-bundle") || labels.has("deployment-component:provision-only");
   }
   return !!node;
 }

@@ -14,6 +14,7 @@ test("canonical deployment component kind registry includes the reviewed non-sta
     "mobile-app",
     "service",
     "third-party-service",
+    "provision-only",
   ]);
 });
 
@@ -23,6 +24,7 @@ test("default smoke classes follow the reviewed component-kind contract", () => 
   assert.equal(defaultSmokeClassForComponentKind("mobile-app"), "release_health");
   assert.equal(defaultSmokeClassForComponentKind("service"), "service_health_10m");
   assert.equal(defaultSmokeClassForComponentKind("third-party-service"), "service_health_10m");
+  assert.equal(defaultSmokeClassForComponentKind("provision-only"), "service_health_10m");
 });
 
 test("ssr-webapp is the reviewed kind that requires a runtime contract reference", () => {
@@ -31,4 +33,5 @@ test("ssr-webapp is the reviewed kind that requires a runtime contract reference
   assert.equal(componentKindRequiresRuntimeContract("mobile-app"), false);
   assert.equal(componentKindRequiresRuntimeContract("service"), false);
   assert.equal(componentKindRequiresRuntimeContract("third-party-service"), false);
+  assert.equal(componentKindRequiresRuntimeContract("provision-only"), false);
 });

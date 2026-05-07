@@ -5,29 +5,22 @@ import type {
   DeploymentDefaultSmokeClass,
 } from "./deployment-component-kinds";
 import type { DeploymentTarget } from "./contract-types";
+import type {
+  DeploymentSmokeException,
+  DeploymentSmokePolicy,
+} from "./deployment-smoke-policy-types";
 import {
   DEPLOYMENT_SMOKE_CLASSES,
   resolveDeploymentSmokeBudget,
   type DeploymentSmokeBudget,
 } from "./deployment-smoke-budget";
 
-export type DeploymentSmokeException = {
-  owner: string;
-  reason: string;
-  scope: string;
-  reviewBy?: string;
-  expiresAt?: string;
-  downgradeMode?: string;
-};
-
-export type DeploymentSmokePolicy = {
-  exception?: DeploymentSmokeException;
-  runnerClass?: DeploymentDefaultSmokeClass;
-  timeoutBudgetMs?: number;
-};
-
-export type DeploymentSmokeExecutionMode = "blocking" | "nonblocking" | "omitted";
-export type DeploymentSmokeOutcome = "passed" | "failed_nonblocking" | "omitted_by_exception";
+export type {
+  DeploymentSmokeException,
+  DeploymentSmokeExecutionMode,
+  DeploymentSmokeOutcome,
+  DeploymentSmokePolicy,
+} from "./deployment-smoke-policy-types";
 
 const PROTECTED_SMOKE_CLASSES = new Set(["shared_nonprod", "production_facing"]);
 
@@ -96,15 +89,32 @@ function isProtectedSmokeClass(protectionClass: string): boolean {
 export function readDeploymentSmokePolicy(node: GraphNode): DeploymentSmokePolicy | undefined {
   const smoke = readStringRecord(node, "smoke");
   const smokeException = parseSmokeException(readStringRecord(node, "smoke_exception"));
+  const runner = smoke.runner || "";
+  const url = smoke.url || "";
+  const path = smoke.path || "";
+  const expectedStatus = smoke.expected_status || "";
   const runnerClass = String(
     node.smoke_runner_class || smoke.runner_class || "",
   ).trim() as DeploymentDefaultSmokeClass;
   const timeoutBudgetMs = parseSmokeTimeoutBudget(
     node.smoke_timeout_budget_ms || smoke.timeout_budget_ms,
   );
-  if (!smokeException && !runnerClass && timeoutBudgetMs === undefined) return undefined;
+  if (
+    !smokeException &&
+    !runner &&
+    !url &&
+    !path &&
+    !expectedStatus &&
+    !runnerClass &&
+    timeoutBudgetMs === undefined
+  )
+    return undefined;
   return {
     ...(smokeException ? { exception: smokeException } : {}),
+    ...(runner ? { runner } : {}),
+    ...(url ? { url } : {}),
+    ...(path ? { path } : {}),
+    ...(expectedStatus ? { expectedStatus } : {}),
     ...(runnerClass ? { runnerClass } : {}),
     ...(timeoutBudgetMs !== undefined ? { timeoutBudgetMs } : {}),
   };

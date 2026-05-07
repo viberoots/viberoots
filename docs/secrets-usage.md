@@ -135,6 +135,21 @@ Use stable reviewed contract IDs for external dependencies:
   `secret_requirements` and may not rely on ambient Helm or cluster
   environment state.
 
+Phase 0 concrete deployment packages use these reviewed contract namespaces:
+
+- Vercel console publish tokens:
+  `secret://deployments/phase0/data-room-console-<stage>/vercel-api-token`
+- container runtime publish tokens:
+  `secret://deployments/phase0/data-room-{web,worker}-<stage>/container-runtime-token`
+- OpenTofu provider credentials:
+  `secret://deployments/phase0/<deployment-id>/opentofu-provider-credentials`
+- Supabase foundation credentials:
+  `secret://deployments/phase0/platform-foundation-<stage>/supabase-service-role`
+
+Their non-secret runtime config contracts use the matching
+`runtime://deployments/phase0/<deployment-id>/<name>` namespace for public URLs,
+Supabase URLs, WorkOS client IDs, queue names, and console-to-web base URLs.
+
 Keep each requirement step-specific. Provider publish tokens belong to
 `publish`, provisioning credentials belong to `provision`, preview cleanup
 credentials belong to `preview_cleanup`, and smoke-only credentials belong to

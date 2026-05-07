@@ -61,13 +61,17 @@ export function readReadinessGatePolicies(node: Record<string, unknown>) {
     .map((entry) => {
       if (!entry || typeof entry !== "object" || Array.isArray(entry)) return undefined;
       const rawEntry = entry as Record<string, unknown>;
-      const name = typeof rawEntry.name === "string" ? rawEntry.name.trim() : "";
+      const name =
+        typeof rawEntry.name === "string"
+          ? rawEntry.name.trim()
+          : typeof rawEntry.id === "string"
+            ? rawEntry.id.trim()
+            : "";
       const type = typeof rawEntry.type === "string" ? rawEntry.type.trim() : "";
       const requiredFor = String(rawEntry.required_for || "deploy")
         .split(",")
         .map((part) => part.trim())
         .filter(Boolean) as DeploymentAdmissionOperationKind[];
-      if (!name) return undefined;
       return { name, type: type as DeploymentReadinessGateType, requiredFor };
     })
     .filter((entry): entry is DeploymentReadinessGatePolicy => !!entry);
@@ -78,6 +82,10 @@ export function validateReadinessGatePolicies(ref: string, gates: DeploymentRead
   const seen = new Set<string>();
   for (const gate of gates) {
     const key = gate.name;
+    if (!gate.name) {
+      errors.push(`${ref}: readiness_gates entry must set name`);
+      continue;
+    }
     if (seen.has(key)) errors.push(`${ref}: duplicate readiness_gates entry "${gate.name}"`);
     seen.add(key);
     if (!isGateType(gate.type)) {

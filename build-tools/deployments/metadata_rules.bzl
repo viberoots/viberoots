@@ -40,6 +40,7 @@ def _deployment_document(ctx):
         "external_requirement_profiles": ctx.attrs.external_requirement_profiles,
         "release_actions": _label_list(ctx.attrs.release_actions),
         "target_exceptions": _label_list(ctx.attrs.target_exceptions),
+        "migration_bundle": _optional_label(ctx.attrs.migration_bundle),
     }
 
 def _deployment_target_impl(ctx):
@@ -79,6 +80,7 @@ deployment_target = rule(
         "external_requirement_profiles": attrs.list(attrs.string(), default = []),
         "release_actions": attrs.list(attrs.dep(), default = []),
         "target_exceptions": attrs.list(attrs.dep(), default = []),
+        "migration_bundle": attrs.option(attrs.dep(), default = None),
         "labels": attrs.list(attrs.string(), default = []),
     },
 )

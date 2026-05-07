@@ -1,0 +1,19 @@
+load("//build-tools/deployments:defs.bzl", "opentofu_foundation_deployment")
+load("//projects/deployments/platform-shared:phase0_contracts.bzl", "phase0_secret", "phase0_stack_target", "phase0_vault_runtime")
+
+opentofu_foundation_deployment(
+    name = "deploy",
+    component = "//projects/deployments/platform-shared:migration_bundle",
+    provisioner_config = "opentofu/stack.json",
+    lane_policy = "//projects/deployments/platform-shared:lane",
+    environment_stage = "prod",
+    admission_policy = "//projects/deployments/platform-shared:prod_release",
+    provider_target = phase0_stack_target("platform-foundation", "prod"),
+    vault_runtime = phase0_vault_runtime("deploy-platform-foundation-prod-read"),
+    protection_class = "production_facing",
+    secret_requirements = [
+        phase0_secret("opentofu-provider-credentials", "platform-foundation-prod", "provision"),
+        phase0_secret("supabase-service-role", "platform-foundation-prod", "provision"),
+    ],
+    prerequisites = [{"deployment_id": "platform-foundation-staging", "mode": "ordering_only"}],
+)

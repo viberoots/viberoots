@@ -25,6 +25,7 @@ def kubernetes_service_deployment(
         runtime_config_requirements = [],
         external_requirement_profiles = [],
         vault_runtime = {},
+        migration_bundle = None,
         labels = [],
         visibility = ["PUBLIC"]):
     if protection_class != "local_only":
@@ -67,6 +68,7 @@ def kubernetes_service_deployment(
         runtime_config_requirements = runtime_config_requirements,
         external_requirement_profiles = external_requirement_profiles,
         vault_runtime = vault_runtime,
+        migration_bundle = migration_bundle,
         labels = labels + [
             "kind:deployment",
             "deployment:kubernetes",

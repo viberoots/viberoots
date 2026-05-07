@@ -22,6 +22,9 @@ import { pushVercelComponentKindErrors } from "./vercel-capability-validation";
 import { prepareVercelPublisherConfig } from "./vercel-config";
 import { appTargetBoundaryErrors } from "./deployment-boundary-checks";
 import { ambientProviderEnvBypassErrors } from "./external-deployment-requirements";
+import { protectedDeploymentPlaceholderErrors } from "./deployment-placeholder-validation";
+import { readOpenTofuResolvedPlan } from "./opentofu-stack";
+import { packagePathFromLabel } from "../lib/labels";
 
 function componentsForValidation(deployment: DeploymentTarget): DeploymentComponent[] {
   return deployment.components.length > 0
@@ -129,6 +132,13 @@ function pushComponentValidationErrors(opts: {
           errors: opts.errors,
         });
         break;
+      case "opentofu":
+        if (!isSupportedComponentNode(component.kind, componentNode)) {
+          opts.errors.push(
+            `${opts.deployment.label}: component target ${component.target} is not a supported ${component.kind}`,
+          );
+        }
+        break;
       default:
         opts.errors.push(`${opts.deployment.label}: unsupported deployment provider`);
     }
@@ -180,6 +190,13 @@ async function validateProviderConfigSemantics(
       case "vercel":
         await prepareVercelPublisherConfig({ workspaceRoot, deployment, outputPath });
         return;
+      case "opentofu":
+        await readOpenTofuResolvedPlan({
+          workspaceRoot,
+          packagePath: packagePathFromLabel(deployment.label),
+          provisioner: deployment.provisioner,
+        });
+        return;
     }
   } finally {
     await fsp.rm(tmpRoot, { recursive: true, force: true });
@@ -204,6 +221,7 @@ export async function validateRepoFrontDoorDeployment(
       profiles: deployment.externalRequirementProfiles || [],
     }),
   );
+  errors.push(...protectedDeploymentPlaceholderErrors(deployment));
   pushComponentValidationErrors({ deployment, nodeMap, errors });
   if (errors.length > 0) {
     throw new Error(Array.from(new Set(errors)).join("\n"));

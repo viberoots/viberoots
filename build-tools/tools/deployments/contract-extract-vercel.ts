@@ -32,6 +32,7 @@ import { readDeploymentRequirements } from "./deployment-requirements";
 import { pushSmokePolicyErrors } from "./deployment-smoke-policy";
 import { readVaultRuntimeConfig } from "./deployment-vault-runtime-metadata";
 import { pushVercelComponentKindErrors } from "./vercel-capability-validation";
+import { readVercelProvisionerMetadata } from "./vercel-provisioner-extract";
 
 const TARGET_TOKEN_RE = /^[a-z0-9](?:[a-z0-9-]{0,126}[a-z0-9])?$/;
 const SHARED_NONPROD = "shared_nonprod";
@@ -56,6 +57,7 @@ export function extractVercelDeploymentsFromContext(
     const publisher = readString(node, "publisher");
     const publisherConfig = readString(node, "publisher_config");
     const provisioner = readString(node, "provisioner");
+    const provisionerConfig = readString(node, "provisioner_config");
     const rolloutPolicy = readRolloutPolicy(node);
     const secretRequirements = readDeploymentRequirements(node, "secret_requirements");
     const runtimeConfigRequirements = readDeploymentRequirements(
@@ -65,6 +67,7 @@ export function extractVercelDeploymentsFromContext(
     const externalRequirementProfiles = readExternalRequirementProfiles(node);
     const releaseActionRefs = readLabelList(node, "release_actions");
     const targetExceptionRefs = readLabelList(node, "target_exceptions");
+    const migrationBundleRef = readLabel(node, "migration_bundle");
     const preview = readPreviewPolicy(node, "preview");
     const smoke = readSmokePolicy(node);
     const vaultRuntime = readVaultRuntimeConfig(node);
@@ -112,10 +115,13 @@ export function extractVercelDeploymentsFromContext(
     }
     if (!publisherConfig)
       deploymentErrors.push(deploymentError(label, "missing required publisher_config"));
-    if (provisioner)
-      deploymentErrors.push(
-        deploymentError(label, "deployment-owned provisioner is not supported for vercel"),
-      );
+    const openTofuProvisioner = readVercelProvisionerMetadata({
+      label,
+      provisioner,
+      provisionerConfig,
+      providerTarget,
+      errors: deploymentErrors,
+    });
     if (releaseActionRefs.length > 0) {
       deploymentErrors.push(
         deploymentError(label, "vercel does not support protected/shared release_actions"),
@@ -199,6 +205,7 @@ export function extractVercelDeploymentsFromContext(
       externalRequirementProfiles,
       releaseActions,
       targetExceptions,
+      ...(migrationBundleRef ? { migrationBundleRef } : {}),
       ...(smoke ? { smoke } : {}),
       ...(preview ? { preview } : {}),
       ...(vaultRuntime ? { vaultRuntime } : {}),
@@ -211,6 +218,9 @@ export function extractVercelDeploymentsFromContext(
         },
       ],
       publisher: { type: publisher, config: publisherConfig },
+      ...(provisioner
+        ? { provisioner: openTofuProvisioner || { type: provisioner, config: provisionerConfig } }
+        : {}),
       providerTarget: deriveVercelProviderTarget({
         team,
         project,

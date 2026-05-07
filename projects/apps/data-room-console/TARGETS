@@ -1,0 +1,16 @@
+load("@prelude//:rules.bzl", "genrule")
+
+genrule(
+    name = "vercel_artifact",
+    out = "vercel-prebuilt",
+    cmd = "mkdir -p $OUT/.vercel/output && echo data-room-console > $OUT/.vercel/output/config.json && echo '{\"identity\":\"phase0-console\"}' > $OUT/artifact-identity.json",
+    labels = [
+        "kind:app",
+        "webapp:ssr",
+        "framework:next",
+        "deployable:app",
+        "deployment-component:ssr-webapp",
+        "vercel:prebuilt",
+    ],
+    visibility = ["//projects/deployments/..."],
+)

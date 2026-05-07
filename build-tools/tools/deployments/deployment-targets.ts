@@ -6,6 +6,7 @@ import type {
   GooglePlayDeployment,
   KubernetesDeployment,
   NixosSharedHostDeployment,
+  OpenTofuDeployment,
   S3StaticDeployment,
   VercelDeployment,
 } from "./contract-types";
@@ -15,6 +16,7 @@ import {
   GOOGLE_PLAY_PROVIDER,
   KUBERNETES_PROVIDER,
   NIXOS_SHARED_HOST_PROVIDER,
+  OPENTOFU_PROVIDER,
   S3_STATIC_PROVIDER,
   VERCEL_PROVIDER,
 } from "./contract-types";
@@ -41,6 +43,12 @@ export function isKubernetesDeployment(
   deployment: DeploymentTarget,
 ): deployment is KubernetesDeployment {
   return deployment.provider === KUBERNETES_PROVIDER;
+}
+
+export function isOpenTofuDeployment(
+  deployment: DeploymentTarget,
+): deployment is OpenTofuDeployment {
+  return deployment.provider === OPENTOFU_PROVIDER;
 }
 
 export function isAppStoreConnectDeployment(

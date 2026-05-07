@@ -20,6 +20,7 @@ import {
   GOOGLE_PLAY_PROVIDER,
   KUBERNETES_PROVIDER,
   NIXOS_SHARED_HOST_PROVIDER,
+  OPENTOFU_PROVIDER,
   S3_STATIC_PROVIDER,
   type AppStoreConnectProviderTarget,
   type CloudflarePagesProviderTarget,
@@ -28,6 +29,7 @@ import {
   type NixosSharedHostProviderTarget,
   type S3StaticProviderTarget,
 } from "./deployment-provider-targets";
+import type { OpenTofuProviderTarget } from "./opentofu-provider-target";
 import type { VercelDeployment } from "./vercel-contract-types";
 
 export const STATIC_WEBAPP_COMPONENT = "static-webapp";
@@ -40,6 +42,7 @@ export {
   GOOGLE_PLAY_PROVIDER,
   KUBERNETES_PROVIDER,
   NIXOS_SHARED_HOST_PROVIDER,
+  OPENTOFU_PROVIDER,
   S3_STATIC_PROVIDER,
   deriveAppStoreConnectProviderTarget,
   deriveCloudflarePagesProviderTarget,
@@ -107,6 +110,7 @@ export type DeploymentBase = {
   externalRequirementProfiles?: ExternalDeploymentRequirementProfile[];
   releaseActions: DeploymentReleaseAction[];
   targetExceptions: DeploymentTargetException[];
+  migrationBundleRef?: string;
   smoke?: DeploymentSmokePolicy;
   rolloutPolicy?: DeploymentRolloutPolicy;
   bootstrap?: DeploymentBootstrapPolicy;
@@ -192,6 +196,15 @@ export type KubernetesDeployment = DeploymentBase & {
   providerTarget: KubernetesProviderTarget;
 };
 
+export type OpenTofuDeployment = DeploymentBase & {
+  provider: typeof OPENTOFU_PROVIDER;
+  publisher: {
+    type: "provision-only";
+  };
+  provisioner: OpenTofuProvisionerMetadata;
+  providerTarget: OpenTofuProviderTarget;
+};
+
 export type AppStoreConnectDeployment = DeploymentBase & {
   provider: typeof APP_STORE_CONNECT_PROVIDER;
   publisher: {
@@ -215,6 +228,7 @@ export type DeploymentTarget =
   | CloudflarePagesDeployment
   | S3StaticDeployment
   | KubernetesDeployment
+  | OpenTofuDeployment
   | AppStoreConnectDeployment
   | GooglePlayDeployment
   | VercelDeployment;

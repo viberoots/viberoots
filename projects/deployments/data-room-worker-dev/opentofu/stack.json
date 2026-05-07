@@ -1,0 +1,7 @@
+{
+  "plan_json": "plan.json",
+  "apply_plan": "plan.tfplan",
+  "provider_lock": "providers.lock.hcl",
+  "stack_identity": "phase0/data-room-worker/dev",
+  "state_backend_identity": "s3://replace-me-phase0-state/dev/data-room-worker"
+}

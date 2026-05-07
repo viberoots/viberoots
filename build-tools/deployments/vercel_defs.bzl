@@ -11,6 +11,8 @@ def vercel_next_webapp_deployment(
         smoke_exception = None,
         publisher = "vercel-prebuilt",
         publisher_config = "vercel-prebuilt.jsonc",
+        provisioner = "",
+        provisioner_config = "",
         protection_class = "shared_nonprod",
         lane_policy = None,
         environment_stage = "",
@@ -20,12 +22,20 @@ def vercel_next_webapp_deployment(
         runtime_config_requirements = [],
         external_requirement_profiles = [],
         vault_runtime = {},
+        provider_target = {},
         release_actions = [],
         target_exceptions = [],
         labels = [],
         visibility = ["PUBLIC"]):
     if protection_class != "local_only":
         require_shared_policy(lane_policy, environment_stage, admission_policy)
+    base_provider_target = {
+        "team": team,
+        "project": project,
+        "environment": environment,
+        "canonical_url": canonical_url,
+    }
+    base_provider_target.update(provider_target)
     deployment_target(
         name = name,
         provider = "vercel",
@@ -33,6 +43,8 @@ def vercel_next_webapp_deployment(
         component_kind = "ssr-webapp",
         publisher = publisher,
         publisher_config = publisher_config,
+        provisioner = provisioner,
+        provisioner_config = provisioner_config,
         protection_class = protection_class,
         lane_policy = lane_policy,
         environment_stage = environment_stage,
@@ -42,12 +54,7 @@ def vercel_next_webapp_deployment(
             "kind": "ssr-webapp",
             "target": component,
         }],
-        provider_target = {
-            "team": team,
-            "project": project,
-            "environment": environment,
-            "canonical_url": canonical_url,
-        },
+        provider_target = base_provider_target,
         smoke = smoke or {},
         smoke_exception = smoke_exception or {},
         prerequisites = prerequisites,

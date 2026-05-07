@@ -34,6 +34,8 @@ export const DEPLOYMENT_CQUERY_ATTRS = [
   "external_requirement_profiles",
   "release_actions",
   "target_exceptions",
+  "migration_bundle",
+  "migration_sets",
   "type",
   "phase",
   "run_condition",

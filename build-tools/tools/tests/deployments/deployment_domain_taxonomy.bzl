@@ -78,7 +78,7 @@ REVIEWED_DEPLOYMENT_TEST_OWNERSHIP = {
     "build-tools/tools/tests/deployments/deploy.front-door.contract.test.ts": True, "build-tools/tools/tests/deployments/deploy.front-door-readiness.test.ts": True,
     "build-tools/tools/tests/deployments/deploy.front-door.control-plane-operator.contract.test.ts": True,
     "build-tools/tools/tests/deployments/deploy.front-door.hosted-status-ux.test.ts": True,
-    "build-tools/tools/tests/deployments/deploy.front-door.provider-target-identity.contract.test.ts": True,
+    "build-tools/tools/tests/deployments/deploy.front-door.provider-target-identity.contract.test.ts": True, "build-tools/tools/tests/deployments/phase0-deployments.contract.test.ts": True, "build-tools/tools/tests/deployments/phase0-deployments.smoke.test.ts": True,
     "build-tools/tools/tests/deployments/deployment-from-changes.batch.test.ts": True,
     "build-tools/tools/tests/deployments/deployment-from-changes.selection.test.ts": True,
     "build-tools/tools/tests/deployments/deployment-promotion-compatibility.test.ts": True,

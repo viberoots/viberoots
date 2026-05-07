@@ -25,6 +25,7 @@ Minimum fields:
 | `external_requirement_profiles` | no                                               | Names reviewed external provider or product requirement families whose typed secret/runtime-config declarations must be present and correctly scoped.               |
 | `provisioner`                   | no                                               | Present only when provisioning is deployment-owned.                                                                                                                 |
 | `release_actions`               | no                                               | Present only when release-time actions are needed.                                                                                                                  |
+| `migration_bundle`              | no                                               | Optional Buck-visible migration bundle artifact reference for foundation deployments that own reviewed schema migration inputs.                                     |
 | `smoke`                         | yes for protected/shared                         | Optional for `local_only`.                                                                                                                                          |
 | `preview`                       | no                                               | Explicit opt-in only.                                                                                                                                               |
 | `prerequisites`                 | no                                               | Explicit direct-edge deployment prerequisites.                                                                                                                      |
@@ -254,8 +255,10 @@ Minimum plan/diff contract when provisioner-managed infra mutation is reviewable
 - how destructive or replacement actions are surfaced distinctly from create or in-place update
 - if no meaningful plan or diff can be produced, the reviewed higher-bar approval posture required for that path
 
-`opentofu-stack` is a reviewed built-in provisioner type for Kubernetes-owned
-foundation and app-attached infrastructure. Its package-local stack files must
+`opentofu-stack` is a reviewed built-in provisioner type for provision-only
+foundation targets and app-attached infrastructure. Foundation deployments use
+provider `opentofu` with publisher `provision-only`; app deployments attach the
+same provisioner to their publishing provider. Package-local stack files must
 live under `projects/deployments/<deployment-id>/opentofu/`; deployment metadata
 must declare `provider_target.stack_identity` and
 `provider_target.state_backend_identity`; stack config must declare reviewed
@@ -263,6 +266,13 @@ must declare `provider_target.stack_identity` and
 OpenTofu plan fingerprint and stack-config fingerprint are bound into admission
 evidence. Routine `deploy` and `--provision-only` flows fail closed on delete,
 replace, or unknown plan actions.
+
+Phase 0 foundation deployments use the reviewed migration bundle
+`//projects/deployments/platform-shared:migration_bundle`. That bundle records
+the Buck dependency order of `//projects/libs/platform-db:migrations` followed
+by `//projects/libs/data-room-db:migrations`, plus an ordered migration-set
+identity list and graph fingerprint; deployment extraction exposes the attached
+bundle through `migration_bundle` so later migration admission can bind evidence.
 
 ### `runtime_config_requirements`
 

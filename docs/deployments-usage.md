@@ -418,10 +418,10 @@ step instead of editing Keycloak by hand.
   ingress plus a health path, while worker services must not declare public ingress
 - checked-in `helm/values.yaml` can carry chart, smoke URL, service kind, ingress mode, and health
   path; deploy injects admitted service artifacts into the rendered provider config
-- supports `opentofu-stack` provision-only foundation runs when stack files live
-  under the deployment package `opentofu/` directory, with `plan_json` pointing
-  at reviewed JSON evidence and `apply_plan` pointing at the saved plan from
-  `tofu plan -out=...`; the reviewed JSON plan must be non-destructive
+- app deployments can attach an `opentofu-stack` provisioner when stack files
+  live under the deployment package `opentofu/` directory, with `plan_json`
+  pointing at reviewed JSON evidence and `apply_plan` pointing at the saved plan
+  from `tofu plan -out=...`; the reviewed JSON plan must be non-destructive
 - the OpenTofu reviewed apply path consumes the recorded provisioner plan
   artifact, reviewed JSON fingerprint, saved apply-plan path, stack config
   fingerprint, stack identity, and state backend identity; mismatches against
@@ -457,12 +457,34 @@ Scaffold-first examples:
 scaf new deployment shared console --repository=example/platform --yes
 scaf new deployment vercel-next console-dev --component=//projects/apps/console:vercel_artifact --team=acme --project=console --shared_package=console-shared --yes
 scaf new deployment service api-dev --component=//projects/apps/api:service_artifact --cluster=dev-cluster --shared_package=console-shared --yes
-scaf new deployment opentofu-foundation platform-dev --component=//projects/apps/platform:service_artifact --cluster=dev-cluster --shared_package=console-shared --yes
+scaf new deployment opentofu-foundation platform-dev --component=//projects/deployments/platform-shared:migration_bundle --shared_package=platform-shared --yes
 scaf new deployment opentofu-provisioner api-dev --path=projects/deployments/api-dev --yes
 ```
 
 The generated packages include placeholder secret/runtime config contract IDs and provider config
 files. Replace those placeholders with reviewed provider/account/domain values before admission.
+
+Concrete Phase 0 packages:
+
+- `//projects/deployments/platform-shared:lane` owns the dev/staging/prod lane,
+  governance policy, admission policies, and `:migration_bundle`
+- `//projects/deployments/platform-foundation-{dev,staging,prod}:deploy` owns
+  provision-only OpenTofu foundation work through provider `opentofu`, publisher
+  `provision-only`, and component `//projects/deployments/platform-shared:migration_bundle`
+- `//projects/deployments/data-room-console-{dev,staging,prod}:deploy` publishes
+  `//projects/apps/data-room-console:vercel_artifact` through Vercel and carries
+  an app-attached `opentofu-stack` provisioner for project, domain, and env setup
+- `//projects/deployments/data-room-web-{dev,staging,prod}:deploy` publishes
+  `//projects/apps/data-room-web:service_artifact` through the container runtime
+- `//projects/deployments/data-room-worker-{dev,staging,prod}:deploy` publishes
+  `//projects/apps/data-room-worker:service_artifact` through the container runtime
+
+The Phase 0 OpenTofu stack layout is package-local:
+`projects/deployments/<deployment-id>/opentofu/{main.tf,plan.json,plan.tfplan,stack.json}`.
+The reviewed migration bundle target combines
+`//projects/libs/platform-db:migrations` before
+`//projects/libs/data-room-db:migrations` and is attached to every
+`platform-foundation-*` deployment as `migration_bundle`.
 
 Web service example:
 
@@ -507,6 +529,8 @@ kubernetes_service_deployment(
   provider tokens through ambient environment variables
 - protected/shared profiles use the live Vercel REST API publisher by default;
   `local_only` fixtures keep using the deterministic fake publisher
+- app-attached `opentofu-stack` provisioners are allowed when stack files remain
+  under the owning deployment package's `opentofu/` directory
 - preview, preview cleanup, retry, and rollback are source-run scoped audited
   operations; protected/shared mutations must route through the reviewed
   control-plane service path

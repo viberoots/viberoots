@@ -26,6 +26,7 @@ function relatedLabelsForNodes(
           normalizeTargetLabel(String((node as any).governance_policy || "")),
           normalizeTargetLabel(String((node as any).defaults || "")),
           normalizeTargetLabel(String((node as any).admission_policy || "")),
+          normalizeTargetLabel(String((node as any).migration_bundle || "")),
           ...queryLabelList(node as Record<string, unknown>, "release_actions"),
           ...queryLabelList(node as Record<string, unknown>, "target_exceptions"),
         ].filter((label) => label && !blocked.has(label)),
@@ -87,6 +88,7 @@ export async function resolveDeploymentFromTarget(
     normalizeTargetLabel(String((deploymentNode as any).lane_policy || "")),
     normalizeTargetLabel(String((deploymentNode as any).governance_policy || "")),
     normalizeTargetLabel(String((deploymentNode as any).admission_policy || "")),
+    normalizeTargetLabel(String((deploymentNode as any).migration_bundle || "")),
     ...queryLabelList(deploymentNode as Record<string, unknown>, "release_actions"),
     ...queryLabelList(deploymentNode as Record<string, unknown>, "target_exceptions"),
   ].filter((label) => label && label !== deploymentTarget);

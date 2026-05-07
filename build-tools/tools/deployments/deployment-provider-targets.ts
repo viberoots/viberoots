@@ -3,6 +3,7 @@ export const NIXOS_SHARED_HOST_PROVIDER = "nixos-shared-host";
 export const CLOUDFLARE_PAGES_PROVIDER = "cloudflare-pages";
 export const S3_STATIC_PROVIDER = "s3-static";
 export const KUBERNETES_PROVIDER = "kubernetes";
+export const OPENTOFU_PROVIDER = "opentofu";
 export const APP_STORE_CONNECT_PROVIDER = "app-store-connect";
 export const GOOGLE_PLAY_PROVIDER = "google-play";
 

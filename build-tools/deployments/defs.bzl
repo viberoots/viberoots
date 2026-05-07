@@ -8,6 +8,8 @@ load(
     _deployment_target = "deployment_target",
     _deployment_target_exception = "deployment_target_exception",
 )
+load("//build-tools/deployments:migration_bundle_rules.bzl", _migration_bundle = "migration_bundle")
+load("//build-tools/deployments:opentofu_defs.bzl", _opentofu_foundation_deployment = "opentofu_foundation_deployment")
 load(
     "//build-tools/deployments:nixos_shared_host_defs.bzl",
     _nixos_shared_host_multi_static_webapp_deployment = "nixos_shared_host_multi_static_webapp_deployment",
@@ -26,6 +28,7 @@ deployment_lane_policy = _deployment_lane_policy
 deployment_release_action = _deployment_release_action
 deployment_target = _deployment_target
 deployment_target_exception = _deployment_target_exception
+migration_bundle = _migration_bundle
 
 def nixos_shared_host_static_webapp_deployment(**kwargs):
     _nixos_shared_host_static_webapp_deployment(
@@ -132,6 +135,13 @@ def vercel_next_webapp_deployment(**kwargs):
 
 def kubernetes_service_deployment(**kwargs):
     _kubernetes_service_deployment(
+        deployment_target = deployment_target,
+        require_shared_policy = _require_shared_policy,
+        **kwargs
+    )
+
+def opentofu_foundation_deployment(**kwargs):
+    _opentofu_foundation_deployment(
         deployment_target = deployment_target,
         require_shared_policy = _require_shared_policy,
         **kwargs

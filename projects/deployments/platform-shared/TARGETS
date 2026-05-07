@@ -1,0 +1,89 @@
+load(
+    "//build-tools/deployments:defs.bzl",
+    "deployment_admission_policy",
+    "deployment_lane_governance",
+    "deployment_lane_policy",
+    "migration_bundle",
+)
+
+deployment_lane_governance(
+    name = "lane_governance",
+    scm_backend = "github",
+    repository = "replace-me/platform",
+    branch_protections = [
+        {"stage": "dev", "branch": "env/platform/dev", "required_checks": "deploy/admission", "fast_forward_only": "true", "normal_advance_principals": "repository-role:admin", "emergency_direct_push_principals": "repository-role:admin"},
+        {"stage": "staging", "branch": "env/platform/staging", "required_checks": "deploy/admission", "fast_forward_only": "true", "normal_advance_principals": "repository-role:admin", "emergency_direct_push_principals": "repository-role:admin"},
+        {"stage": "prod", "branch": "env/platform/prod", "required_checks": "deploy/admission", "fast_forward_only": "true", "normal_advance_principals": "release-owner", "emergency_direct_push_principals": "break-glass"},
+    ],
+    visibility = ["PUBLIC"],
+)
+
+deployment_lane_policy(
+    name = "lane",
+    defaults = "//projects/deployments:defaults",
+    stages = ["dev", "staging", "prod"],
+    stage_branches = {
+        "dev": "env/platform/dev",
+        "staging": "env/platform/staging",
+        "prod": "env/platform/prod",
+    },
+    allowed_promotion_edges = ["dev->staging", "staging->prod"],
+    artifact_reuse_mode = "same_artifact",
+    governance_policy = ":lane_governance",
+    default_client_profile = "phase0",
+    visibility = ["PUBLIC"],
+)
+
+deployment_admission_policy(
+    name = "dev_release",
+    allowed_refs = ["env/platform/dev"],
+    required_checks = ["deploy/admission"],
+    readiness_gates = [{
+        "name": "phase0-dev-placeholder",
+        "type": "tenant_leak_check",
+        "required_for": "deploy,provision_only",
+        "evidence": "manual",
+    }],
+    artifact_attestation_mode = "recorded_exact_artifact",
+    visibility = ["PUBLIC"],
+)
+
+deployment_admission_policy(
+    name = "staging_release",
+    allowed_refs = ["env/platform/staging"],
+    required_checks = ["deploy/admission"],
+    required_approvals = ["release-owner"],
+    readiness_gates = [{
+        "name": "phase0-staging-placeholder",
+        "type": "tenant_leak_check",
+        "required_for": "deploy,provision_only",
+        "evidence": "manual",
+    }],
+    artifact_attestation_mode = "recorded_exact_artifact",
+    visibility = ["PUBLIC"],
+)
+
+deployment_admission_policy(
+    name = "prod_release",
+    allowed_refs = ["env/platform/prod"],
+    required_checks = ["deploy/admission"],
+    required_approvals = ["release-owner", "security-owner"],
+    readiness_gates = [{
+        "name": "phase0-prod-placeholder",
+        "type": "tenant_leak_check",
+        "required_for": "deploy,provision_only",
+        "evidence": "manual",
+    }],
+    artifact_attestation_mode = "recorded_exact_artifact",
+    visibility = ["PUBLIC"],
+)
+
+migration_bundle(
+    name = "migration_bundle",
+    migration_sets = [
+        "//projects/libs/platform-db:migrations",
+        "//projects/libs/data-room-db:migrations",
+    ],
+    labels = ["kind:migration-bundle", "deployment:migration-bundle", "deployment-component:provision-only"],
+    visibility = ["PUBLIC"],
+)

@@ -6,6 +6,7 @@ import {
   isGooglePlayDeployment,
   isKubernetesDeployment,
   isNixosSharedHostDeployment,
+  isOpenTofuDeployment,
   isS3StaticDeployment,
 } from "./contract";
 import type { DeployCliReadonlyFlags } from "./deploy-cli-readonly";
@@ -121,6 +122,12 @@ export async function runProviderDeployFrontDoor(opts: {
       opts.smokeConnectOverride,
     );
     return;
+  }
+  if (isOpenTofuDeployment(deployment)) {
+    if (!flags.provisionOnly) {
+      throw new Error("opentofu deployments are provision-only; pass --provision-only");
+    }
+    throw new Error("opentofu provision-only deploy execution is not implemented in this PR");
   }
   if (!isNixosSharedHostDeployment(deployment)) {
     throw new Error(`unsupported deployment provider: ${deployment.provider}`);

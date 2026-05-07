@@ -1,0 +1,31 @@
+load("//build-tools/deployments:defs.bzl", "container_runtime_service_deployment")
+load("//projects/deployments/platform-shared:phase0_contracts.bzl", "phase0_runtime", "phase0_secret", "phase0_smoke", "phase0_stack_target", "phase0_vault_runtime")
+
+container_runtime_service_deployment(
+    name = "deploy",
+    component = "//projects/apps/data-room-web:service_artifact",
+    cluster = "phase0-staging",
+    namespace = "data-room",
+    release = "data-room-web-staging",
+    service_kind = "web",
+    health_path = "/healthz",
+    provisioner = "opentofu-stack",
+    provisioner_config = "opentofu/stack.json",
+    lane_policy = "//projects/deployments/platform-shared:lane",
+    environment_stage = "staging",
+    admission_policy = "//projects/deployments/platform-shared:staging_release",
+    provider_target = phase0_stack_target("data-room-web", "staging"),
+    vault_runtime = phase0_vault_runtime("deploy-data-room-web-staging-read"),
+    protection_class = "shared_nonprod",
+    secret_requirements = [
+        phase0_secret("container-runtime-token", "data-room-web-staging", "publish"),
+        phase0_secret("opentofu-provider-credentials", "data-room-web-staging", "provision"),
+    ],
+    runtime_config_requirements = [
+        phase0_runtime("web-public-url", "data-room-web-staging"),
+        phase0_runtime("supabase-url", "data-room-web-staging"),
+        phase0_runtime("workos-client-id", "data-room-web-staging"),
+    ],
+    prerequisites = [{"deployment_id": "platform-foundation-staging", "mode": "health_gated"}],
+    smoke = phase0_smoke("https://web.staging.data-room.example.invalid"),
+)

@@ -1,0 +1,14 @@
+load("@prelude//:rules.bzl", "genrule")
+
+genrule(
+    name = "service_artifact",
+    out = "node-service",
+    cmd = "mkdir -p $OUT && echo '{\"service\":\"data-room-worker\"}' > $OUT/runtime-contract.json && echo '{\"identity\":\"phase0-worker\"}' > $OUT/artifact-identity.json",
+    labels = [
+        "kind:app",
+        "deployable:app",
+        "deployment-component:service",
+        "artifact:node-service",
+    ],
+    visibility = ["//projects/deployments/..."],
+)

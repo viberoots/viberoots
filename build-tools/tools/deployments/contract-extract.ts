@@ -11,6 +11,7 @@ import { extractAppStoreConnectDeploymentsFromContext } from "./contract-extract
 import { extractGooglePlayDeploymentsFromContext } from "./contract-extract-google-play";
 import { extractKubernetesDeploymentsFromContext } from "./contract-extract-kubernetes";
 import { extractNixosSharedHostDeploymentsFromContext } from "./contract-extract-nixos-shared-host";
+import { extractOpenTofuDeploymentsFromContext } from "./contract-extract-opentofu";
 import { extractS3StaticDeploymentsFromContext } from "./contract-extract-s3-static";
 import { extractVercelDeploymentsFromContext } from "./contract-extract-vercel";
 import {
@@ -130,6 +131,7 @@ export function extractDeployments(nodes: GraphNode[]): {
     ...extractGooglePlayDeploymentsFromContext(context),
     ...extractS3StaticDeploymentsFromContext(context),
     ...extractKubernetesDeploymentsFromContext(context),
+    ...extractOpenTofuDeploymentsFromContext(context),
     ...extractVercelDeploymentsFromContext(context),
   ].sort((a, b) => a.label.localeCompare(b.label));
   context.errors.push(...validateExternalRequirementMetadata(nodes, deployments));
