@@ -65,7 +65,32 @@ test("kubernetes provision-only records OpenTofu apply success outcome and redac
     ]);
     assert.equal(calls.length, 1);
     assert.equal(calls[0].planArtifactPath, record.provisionerPlan?.artifactPath);
+    assert.match(calls[0].applyPlanPath, /plan\.tfplan$/);
     const persisted = await fsp.readFile(recordPath, "utf8");
+    const persistedRecord = JSON.parse(persisted);
+    assert.equal(
+      persistedRecord.provisionerApplyOutcome.planFingerprint,
+      record.provisionerPlan?.planFingerprint,
+    );
+    assert.equal(
+      persistedRecord.provisionerApplyOutcome.stackConfigFingerprint,
+      record.provisionerPlan?.stackConfigFingerprint,
+    );
+    assert.equal(persistedRecord.provisionerApplyOutcome.stackIdentity, "foundation/integration");
+    assert.equal(
+      persistedRecord.provisionerApplyOutcome.stateBackendIdentity,
+      "s3://state-integration/foundation",
+    );
+    assert.equal(persistedRecord.provisionerApplyOutcome.status, "succeeded");
+    assert.equal(
+      persistedRecord.provisionerApplyOutcome.diagnostics.classification,
+      "display_safe",
+    );
+    assert.equal(persistedRecord.provisionerApplyOutcome.diagnostics.redacted, false);
+    assert.equal(
+      persistedRecord.provisionerApplyOutcome.diagnostics.summary,
+      "apply complete resources 1 added",
+    );
     assert.ok(
       !persisted.includes(INTEGRATION_SECRET_VALUE),
       "persisted record must not contain the resolved secret value",
@@ -118,6 +143,25 @@ test("kubernetes provision-only records OpenTofu apply failure outcome with reda
     assert.equal(record.provisionerApplyOutcome?.diagnostics?.redacted, true);
     assert.ok(!(record.provisionerApplyOutcome?.diagnostics?.summary || "").includes("ABC123XYZ"));
     const persisted = await fsp.readFile(recordPath, "utf8");
+    const persistedRecord = JSON.parse(persisted);
+    assert.equal(
+      persistedRecord.provisionerApplyOutcome.planFingerprint,
+      record.provisionerPlan?.planFingerprint,
+    );
+    assert.equal(
+      persistedRecord.provisionerApplyOutcome.stackConfigFingerprint,
+      record.provisionerPlan?.stackConfigFingerprint,
+    );
+    assert.equal(persistedRecord.provisionerApplyOutcome.stackIdentity, "foundation/integration");
+    assert.equal(
+      persistedRecord.provisionerApplyOutcome.stateBackendIdentity,
+      "s3://state-integration/foundation",
+    );
+    assert.equal(persistedRecord.provisionerApplyOutcome.status, "failed");
+    assert.equal(
+      persistedRecord.provisionerApplyOutcome.diagnostics.classification,
+      "redact_before_display",
+    );
     assert.ok(!persisted.includes("ABC123XYZ"));
     assert.ok(!persisted.includes(INTEGRATION_SECRET_VALUE));
   });

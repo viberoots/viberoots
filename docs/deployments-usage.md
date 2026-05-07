@@ -419,12 +419,18 @@ step instead of editing Keycloak by hand.
 - checked-in `helm/values.yaml` can carry chart, smoke URL, service kind, ingress mode, and health
   path; deploy injects admitted service artifacts into the rendered provider config
 - supports `opentofu-stack` provision-only foundation runs when stack files live
-  under the deployment package `opentofu/` directory and the plan is
-  non-destructive
-- the OpenTofu reviewed apply path consumes the recorded plan artifact, plan
-  fingerprint, stack config fingerprint, stack identity, and state backend
-  identity; mismatches against admission evidence fail closed and never invoke
-  `tofu apply`
+  under the deployment package `opentofu/` directory, with `plan_json` pointing
+  at reviewed JSON evidence and `apply_plan` pointing at the saved plan from
+  `tofu plan -out=...`; the reviewed JSON plan must be non-destructive
+- the OpenTofu reviewed apply path consumes the recorded provisioner plan
+  artifact, reviewed JSON fingerprint, saved apply-plan path, stack config
+  fingerprint, stack identity, and state backend identity; mismatches against
+  admission evidence fail closed and never invoke `tofu apply`
+- Kubernetes control-plane workers construct the production OpenTofu adapter
+  when no test hook adapter is injected. The adapter runs the pinned `tofu`
+  from the Nix dev shell by default, or `BNX_OPENTOFU_BIN` /
+  `BNX_DEPLOY_OPENTOFU_BIN` when a reviewed worker profile pins an explicit
+  binary path.
 - OpenTofu provider and backend credentials are resolved exclusively through
   deployment `secret_requirements` at the `provision` step, never from ambient
   process environment, and credential values are never written to deployment

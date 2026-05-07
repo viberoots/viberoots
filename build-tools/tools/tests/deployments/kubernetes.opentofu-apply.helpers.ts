@@ -31,6 +31,8 @@ export async function writePlanArtifact(opts: {
   actions?: string[];
   planFingerprint?: string;
   stackConfigFingerprint?: string;
+  stackIdentity?: string;
+  stateBackendIdentity?: string;
 }): Promise<void> {
   const actions = opts.actions || ["create"];
   await fsp.mkdir(path.dirname(opts.artifactPath), { recursive: true });
@@ -42,10 +44,11 @@ export async function writePlanArtifact(opts: {
         provisionerType: OPENTOFU_STACK_PROVISIONER,
         opentofu: {
           configPath: "opentofu/stack.json",
-          planPath: "opentofu/plan.json",
+          planJsonPath: "opentofu/plan.json",
+          applyPlanPath: "opentofu/plan.tfplan",
           stackDirectory: "opentofu",
-          stackIdentity: STACK_IDENTITY,
-          stateBackendIdentity: STATE_BACKEND_IDENTITY,
+          stackIdentity: opts.stackIdentity ?? STACK_IDENTITY,
+          stateBackendIdentity: opts.stateBackendIdentity ?? STATE_BACKEND_IDENTITY,
           stackConfigFingerprint: opts.stackConfigFingerprint || STACK_CONFIG_FINGERPRINT,
           planFingerprint: opts.planFingerprint || PLAN_FINGERPRINT,
           summary: {
@@ -66,6 +69,7 @@ export async function writePlanArtifact(opts: {
 
 export type RecordingAdapterCall = {
   planArtifactPath: string;
+  applyPlanPath: string;
   stackDirectory: string;
   stateBackendIdentity: string;
   credentialEnvNames: string[];
@@ -81,7 +85,7 @@ export function recordingAdapter(
       return {
         command: {
           binary: "tofu",
-          args: ["apply", "-input=false", args.planArtifactPath],
+          args: ["apply", "-input=false", args.applyPlanPath],
           workingDirectory: args.stackDirectory,
         },
         exitCode: opts.exitCode ?? 0,

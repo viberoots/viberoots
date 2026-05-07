@@ -43,6 +43,17 @@ function asStringList(value: unknown): string[] {
     : [];
 }
 
+async function firstNonWhitespaceByte(filePath: string): Promise<string> {
+  const handle = await fsp.open(filePath, "r");
+  try {
+    const buffer = Buffer.alloc(256);
+    const { bytesRead } = await handle.read(buffer, 0, buffer.length, 0);
+    return buffer.subarray(0, bytesRead).toString("utf8").trimStart().slice(0, 1);
+  } finally {
+    await handle.close();
+  }
+}
+
 export function classifyOpenTofuPlan(plan: unknown): OpenTofuPlanSummary {
   const changes = Array.isArray((plan as { resource_changes?: unknown })?.resource_changes)
     ? ((plan as { resource_changes: unknown[] }).resource_changes as Record<string, unknown>[])
@@ -78,20 +89,39 @@ export async function readOpenTofuResolvedPlan(opts: {
   const config = JSON.parse(await fsp.readFile(configPath, "utf8")) as Record<string, unknown>;
   const planJson = String(config.plan_json || config.planJson || "").trim();
   if (!planJson) throw new Error(`opentofu stack config must declare plan_json: ${configPath}`);
-  const planPath = path.resolve(path.dirname(configPath), planJson);
-  if (staysUnder(planPath, path.join(opts.workspaceRoot, opts.packagePath, "opentofu"))) {
-    const plan = JSON.parse(await fsp.readFile(planPath, "utf8"));
+  const applyPlan = String(config.apply_plan || config.applyPlan || "").trim();
+  if (!applyPlan) throw new Error(`opentofu stack config must declare apply_plan: ${configPath}`);
+  const planJsonPath = path.resolve(path.dirname(configPath), planJson);
+  const applyPlanPath = path.resolve(path.dirname(configPath), applyPlan);
+  const stackRoot = path.join(opts.workspaceRoot, opts.packagePath, "opentofu");
+  if (!staysUnder(planJsonPath, stackRoot)) {
+    throw new Error(
+      `opentofu plan_json must stay under the deployment opentofu directory: ${planJson}`,
+    );
+  }
+  if (!staysUnder(applyPlanPath, stackRoot)) {
+    throw new Error(
+      `opentofu apply_plan must stay under the deployment opentofu directory: ${applyPlan}`,
+    );
+  }
+  if (applyPlanPath === planJsonPath) {
+    throw new Error("opentofu apply_plan must be a saved plan artifact separate from plan_json");
+  }
+  const firstApplyPlanByte = await firstNonWhitespaceByte(applyPlanPath);
+  if (firstApplyPlanByte === "{" || firstApplyPlanByte === "[") {
+    throw new Error("opentofu apply_plan must be a saved plan artifact, not reviewed plan JSON");
+  }
+  {
+    const plan = JSON.parse(await fsp.readFile(planJsonPath, "utf8"));
     return {
       configPath,
-      planPath,
+      planJsonPath,
+      applyPlanPath,
       stackConfigFingerprint: fingerprint(config),
       planFingerprint: fingerprint(plan),
       summary: classifyOpenTofuPlan(plan),
     };
   }
-  throw new Error(
-    `opentofu plan_json must stay under the deployment opentofu directory: ${planJson}`,
-  );
 }
 
 export function opentofuPromotionCompatibilityErrors(

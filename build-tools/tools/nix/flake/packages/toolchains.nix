@@ -19,4 +19,5 @@ in
     pkgs.llvmPackages.lld
   ];
   python = toolchain "toolchain-python" pkgs.python3;
+  opentofu = toolchain "toolchain-opentofu" pkgs.opentofu;
 }

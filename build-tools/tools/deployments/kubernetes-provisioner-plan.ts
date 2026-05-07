@@ -51,7 +51,8 @@ export async function writeKubernetesProvisionerPlan(opts: {
       ? {
           opentofu: {
             configPath: resolvedOpenTofuPlan.configPath,
-            planPath: resolvedOpenTofuPlan.planPath,
+            planJsonPath: resolvedOpenTofuPlan.planJsonPath,
+            applyPlanPath: resolvedOpenTofuPlan.applyPlanPath,
             stackDirectory: opts.deployment.provisioner.stackDirectory,
             stackIdentity: opts.deployment.provisioner.stackIdentity,
             stateBackendIdentity: opts.deployment.provisioner.stateBackendIdentity,

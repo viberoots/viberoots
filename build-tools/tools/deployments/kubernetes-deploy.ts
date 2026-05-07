@@ -74,6 +74,9 @@ export async function submitKubernetesDeploy(opts: {
     ReturnType<typeof resolveKubernetesPublishCredentialsForDeployment>
   > = { env: {}, envNames: [], contractRefs: [] };
   try {
+    if (provisionerApplyOutcome?.status === "failed") {
+      throw withFailedStep("publish", new Error("opentofu apply failed before kubernetes publish"));
+    }
     preparedConfig = await prepareKubernetesPublisherConfig({
       workspaceRoot: opts.workspaceRoot,
       deployment: opts.deployment,

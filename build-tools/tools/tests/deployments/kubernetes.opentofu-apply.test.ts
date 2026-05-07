@@ -50,6 +50,7 @@ test("runOpenTofuReviewedApply records succeeded outcome with credentials and co
   assert.deepEqual(secrets.calls, ["provision"]);
   assert.equal(calls.length, 1);
   assert.equal(calls[0].planArtifactPath, provisionerPlan.artifactPath);
+  assert.equal(calls[0].applyPlanPath, "opentofu/plan.tfplan");
   assert.equal(outcome.diagnostics?.classification, "display_safe");
   const serialized = JSON.stringify(outcome);
   assert.ok(
@@ -194,4 +195,27 @@ test("runOpenTofuReviewedApply records failed outcome with redacted diagnostics"
   assert.equal(outcome.diagnostics?.classification, "redact_before_display");
   assert.equal(outcome.diagnostics?.redacted, true);
   assert.ok(!outcome.diagnostics?.summary.includes("ABC123XYZ"));
+});
+
+test("runOpenTofuReviewedApply fails closed when adapter records no provider outcome", async (t) => {
+  const tmp = await tempDir(t);
+  const provisionerPlan = await setupArtifact(tmp, "missing-provider-outcome");
+  const secrets = fakeSecretRuntime({ opentofu_provider_credentials: "vault" });
+  const outcome = await runOpenTofuReviewedApply({
+    provisioner: provisionerMetadata(),
+    provisionerPlan,
+    admittedProvisionerPlanFingerprint: provisionerPlan.fingerprint,
+    secretRuntime: secrets.runtime,
+    adapter: {
+      async apply() {
+        return undefined as never;
+      },
+    },
+  });
+  assert.equal(outcome.status, "failed");
+  assert.equal(outcome.exitCode, 1);
+  assert.equal(outcome.command.binary, "tofu");
+  assert.equal(outcome.command.argCount, 0);
+  assert.equal(outcome.diagnostics?.classification, "display_safe");
+  assert.match(outcome.diagnostics?.summary || "", /recorded provider outcome/);
 });

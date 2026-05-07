@@ -779,7 +779,7 @@ Normative-source note:
   - deployment metadata stays authoritative for target identity while the provisioner config stays provider-local
   - the initial reviewed deploy flow records a provisioner plan artifact alongside publish records when a built-in Kubernetes provisioner is declared
 - `--provision-only` is reviewed for protected/shared deployments through the control-plane service when the deployment declares one reviewed built-in provisioner
-- `opentofu-stack` provisioners must keep stack-owned files under the deployment package `opentofu/` directory and bind stack identity plus state backend identity into admission evidence
+- `opentofu-stack` provisioners must keep stack-owned files under the deployment package `opentofu/` directory, declare separate reviewed JSON (`plan_json`) and saved apply plan (`apply_plan`) artifacts, and bind stack identity plus state backend identity into admission evidence
 - that provision-only path still binds one admitted source revision and one frozen execution snapshot before provider mutation
 
 ### Built-In `release_actions` Support

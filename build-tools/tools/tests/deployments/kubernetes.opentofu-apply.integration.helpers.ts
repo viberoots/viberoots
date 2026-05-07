@@ -38,7 +38,7 @@ export async function writeOpenTofuStackFixture(opts: {
   await fsp.mkdir(baseDir, { recursive: true });
   await fsp.writeFile(
     path.join(baseDir, "stack.json"),
-    JSON.stringify({ plan_json: "plan.json" }, null, 2) + "\n",
+    JSON.stringify({ plan_json: "plan.json", apply_plan: "plan.tfplan" }, null, 2) + "\n",
     "utf8",
   );
   const actions = opts.actions || ["create"];
@@ -53,10 +53,12 @@ export async function writeOpenTofuStackFixture(opts: {
     ) + "\n",
     "utf8",
   );
+  await fsp.writeFile(path.join(baseDir, "plan.tfplan"), "saved opentofu plan fixture\n", "utf8");
 }
 
 export type IntegrationApplyCall = {
   planArtifactPath: string;
+  applyPlanPath: string;
   credentialEnvNames: string[];
 };
 
@@ -70,12 +72,13 @@ export function recordingApplyAdapter(opts: {
     async apply(args): Promise<OpenTofuApplyAdapterResult> {
       calls.push({
         planArtifactPath: args.planArtifactPath,
+        applyPlanPath: args.applyPlanPath,
         credentialEnvNames: args.credentialEnvNames,
       });
       return {
         command: {
           binary: "tofu",
-          args: ["apply", "-input=false", args.planArtifactPath],
+          args: ["apply", "-input=false", args.applyPlanPath],
           workingDirectory: args.stackDirectory,
         },
         exitCode: opts.exitCode ?? 0,
@@ -93,4 +96,61 @@ export function fakeProvisionSecretRuntime(values: Record<string, string>) {
       return values;
     },
   });
+}
+
+export async function installFakeOpenTofu(tmp: string): Promise<{
+  binPath: string;
+  logPath: string;
+}> {
+  const binDir = path.join(tmp, "fake-opentofu-bin");
+  const logPath = path.join(tmp, "fake-opentofu.log");
+  const binPath = path.join(binDir, "tofu");
+  await fsp.mkdir(binDir, { recursive: true });
+  await fsp.writeFile(
+    binPath,
+    [
+      "#!/usr/bin/env bash",
+      "set -euo pipefail",
+      'printf \'%s\\n\' "$PWD|$*|${opentofu_provider_credentials:-missing}" >> "$BNX_FAKE_OPENTOFU_LOG"',
+      "printf '%s\\n' 'fake opentofu apply complete'",
+      "",
+    ].join("\n"),
+    "utf8",
+  );
+  await fsp.chmod(binPath, 0o755);
+  return { binPath, logPath };
+}
+
+export async function writeOpenTofuSecretFixture(
+  tmp: string,
+  extraContracts: Record<string, unknown> = {},
+): Promise<string> {
+  const fixturePath = path.join(tmp, "opentofu-secrets.json");
+  await fsp.writeFile(
+    fixturePath,
+    JSON.stringify({
+      schemaVersion: "deployment-secret-fixture@1",
+      contracts: {
+        "secret://deployments/opentofu/provider": {
+          value: INTEGRATION_SECRET_VALUE,
+          allowedSteps: ["provision"],
+          targetScopes: ["*"],
+        },
+        ...extraContracts,
+      },
+    }),
+    "utf8",
+  );
+  return fixturePath;
+}
+
+export function reviewedOpenTofuSecretRequirements() {
+  return [
+    {
+      name: "opentofu_provider_credentials",
+      step: "provision" as const,
+      contractId: "secret://deployments/opentofu/provider",
+      required: true,
+    },
+  ];
 }

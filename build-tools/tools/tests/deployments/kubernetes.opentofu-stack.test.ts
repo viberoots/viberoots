@@ -10,6 +10,7 @@ import {
   type KubernetesDeployment,
 } from "../../deployments/contract";
 import { runInTemp } from "../lib/test-helpers";
+import { DEPLOYMENT_SECRET_FIXTURE_PATH_ENV } from "../../deployments/deployment-secret-fixture";
 import {
   nixosSharedHostLaneGovernanceNodeFixture,
   writeReviewedLaneAdmissionEvidenceJson,
@@ -20,11 +21,20 @@ import {
   kubernetesDeploymentFixture,
   kubernetesLanePolicyNodeFixture,
 } from "./kubernetes.fixture";
-import { startControlPlaneHarness } from "./nixos-shared-host.control-plane.helpers";
+import {
+  startControlPlaneHarness,
+  withEnvOverrides,
+} from "./nixos-shared-host.control-plane.helpers";
 import { ensureNixosSharedHostStageBranch } from "./nixos-shared-host.fixture";
+import {
+  installFakeOpenTofu,
+  reviewedOpenTofuSecretRequirements,
+  writeOpenTofuSecretFixture,
+} from "./kubernetes.opentofu-apply.integration.helpers";
 
 function openTofuDeployment(): KubernetesDeployment {
   return kubernetesDeploymentFixture({
+    secretRequirements: reviewedOpenTofuSecretRequirements(),
     provisioner: {
       type: OPENTOFU_STACK_PROVISIONER,
       config: "opentofu/stack.json",
@@ -48,6 +58,7 @@ async function writeOpenTofuStack(
     JSON.stringify(
       {
         plan_json: "plan.json",
+        apply_plan: "plan.tfplan",
         provider_lock: "providers.lock.hcl",
       },
       null,
@@ -71,6 +82,7 @@ async function writeOpenTofuStack(
     ) + "\n",
     "utf8",
   );
+  await fsp.writeFile(path.join(stackRoot, "plan.tfplan"), "saved opentofu plan fixture\n", "utf8");
 }
 
 test("classifyOpenTofuPlan accepts no-op/create/update and rejects destructive actions", () => {
@@ -181,24 +193,37 @@ test("protected kubernetes provision-only records opentofu plan fingerprints", a
       deploymentLabel: deployment.label,
       deployment,
     });
+    const fakeOpenTofu = await installFakeOpenTofu(tmp);
+    const secretFixturePath = await writeOpenTofuSecretFixture(tmp);
     const harness = await startControlPlaneHarness({
       workspaceRoot: tmp,
       hostRoot: path.join(tmp, "host"),
       recordsRoot: path.join(tmp, "records"),
     });
     try {
-      const result = await $({
-        cwd: tmp,
-        stdio: "pipe",
-      })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment ${deployment.label} --provision-only --admission-evidence-json ${evidence} --control-plane-url ${harness.controlPlane.url}`;
-      const summary = JSON.parse(String(result.stdout));
-      assert.equal(summary.finalOutcome, "succeeded");
-      assert.equal(summary.provisionerType, OPENTOFU_STACK_PROVISIONER);
-      assert.equal(summary.provisionerPlan.mutationClass, "non_destructive");
-      assert.match(summary.provisionerPlan.planFingerprint, /^sha256:/);
-      assert.match(
-        summary.admittedContext.policyEvaluation.binding.provisionerPlanFingerprint,
-        /^sha256:/,
+      await withEnvOverrides(
+        {
+          BNX_OPENTOFU_BIN: fakeOpenTofu.binPath,
+          BNX_FAKE_OPENTOFU_LOG: fakeOpenTofu.logPath,
+          [DEPLOYMENT_SECRET_FIXTURE_PATH_ENV]: secretFixturePath,
+        },
+        async () => {
+          const result = await $({
+            cwd: tmp,
+            stdio: "pipe",
+          })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment ${deployment.label} --provision-only --admission-evidence-json ${evidence} --control-plane-url ${harness.controlPlane.url}`;
+          const summary = JSON.parse(String(result.stdout));
+          assert.equal(summary.finalOutcome, "succeeded");
+          assert.equal(summary.provisionerType, OPENTOFU_STACK_PROVISIONER);
+          assert.equal(summary.provisionerPlan.mutationClass, "non_destructive");
+          assert.equal(summary.provisionerApplyOutcome.status, "succeeded");
+          assert.equal(summary.provisionerApplyOutcome.command.binary, fakeOpenTofu.binPath);
+          assert.match(summary.provisionerPlan.planFingerprint, /^sha256:/);
+          assert.match(
+            summary.admittedContext.policyEvaluation.binding.provisionerPlanFingerprint,
+            /^sha256:/,
+          );
+        },
       );
     } finally {
       await harness.close();

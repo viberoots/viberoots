@@ -77,6 +77,7 @@ _TEMP_REPO_DEPLOYMENT_TESTS = {
     "build-tools/tools/tests/deployments/kubernetes.deploy.smoke-failure.test.ts": True,
     "build-tools/tools/tests/deployments/kubernetes.macro-extraction.cquery.test.ts": True,
     "build-tools/tools/tests/deployments/kubernetes.opentofu-apply.deploy.test.ts": True,
+    "build-tools/tools/tests/deployments/kubernetes.opentofu-apply-plan-contract.test.ts": True,
     "build-tools/tools/tests/deployments/kubernetes.opentofu-apply.guard.test.ts": True,
     "build-tools/tools/tests/deployments/kubernetes.opentofu-apply.integration.test.ts": True,
     "build-tools/tools/tests/deployments/kubernetes.opentofu-apply.test.ts": True,

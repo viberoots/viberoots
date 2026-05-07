@@ -212,12 +212,11 @@ kubernetes_service_deployment(
   required_version = ">= 1.8.0"
 }
 `,
-    "opentofu/plan.json": `{
-  "resource_changes": []
-}
-`,
+    "opentofu/plan.json": `{ "resource_changes": [] }\n`,
+    "opentofu/plan.tfplan": `replace with saved plan from: tofu plan -out=plan.tfplan\n`,
     "opentofu/stack.json": `{
   "plan_json": "plan.json",
+  "apply_plan": "plan.tfplan",
   "provider_lock": "providers.lock.hcl",
   "stack_identity": "foundation/demo-foundation",
   "state_backend_identity": "s3://replace-me/demo-foundation"
@@ -234,12 +233,11 @@ provisioner.
   required_version = ">= 1.8.0"
 }
 `,
-    "opentofu/plan.json": `{
-  "resource_changes": []
-}
-`,
+    "opentofu/plan.json": `{ "resource_changes": [] }\n`,
+    "opentofu/plan.tfplan": `replace with saved plan from: tofu plan -out=plan.tfplan\n`,
     "opentofu/stack.json": `{
   "plan_json": "plan.json",
+  "apply_plan": "plan.tfplan",
   "provider_lock": "providers.lock.hcl",
   "stack_identity": "app/demo-attached",
   "state_backend_identity": "s3://replace-me/demo-attached"

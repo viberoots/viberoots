@@ -1531,3 +1531,391 @@ admitted plan in the shipped worker path.
 
 It introduces production infrastructure mutation wiring and requires careful diagnostics around
 credential, backend, and plan mismatches.
+
+## PR-19: Concrete Phase 0 deployment packages and build-graph wiring
+
+### 1. Intent
+
+Use the deployment scaffolds and provider contracts from earlier PRs to create the actual Phase 0
+deployment packages required by the architecture, rather than leaving the app represented only by
+generic templates and provider capabilities. This PR intentionally absorbs the remaining
+build-graph-facing Phase 0 deployment work so later PRs can stay mostly in deployment-domain
+runtime, admission, or policy code and avoid repeatedly forcing full build-system validation.
+
+### 2. Scope of changes
+
+- Create deployment packages under `projects/deployments/` for:
+  - `platform-shared`
+  - `platform-foundation-dev`, `platform-foundation-staging`, and `platform-foundation-prod`
+  - `data-room-console-dev`, `data-room-console-staging`, and `data-room-console-prod`
+  - `data-room-web-dev`, `data-room-web-staging`, and `data-room-web-prod`
+  - `data-room-worker-dev`, `data-room-worker-staging`, and `data-room-worker-prod`
+- Wire console deployments to the Vercel prebuilt artifact target and `opentofu-stack` provisioner
+  for project, domain, and environment-setting configuration.
+- Wire web and worker deployments to admitted service artifacts or image digests and app-attached
+  `opentofu-stack` provisioners for service infrastructure.
+- Wire foundation deployments as provision-only OpenTofu targets for shared DNS, Supabase resources,
+  object buckets, secret path scaffolding, and OpenTofu state configuration.
+- Add the migration-bundle artifact target that combines `platform-db/migrations/` and
+  `data-room-db/migrations/` in Buck-declared dependency order, and attach that artifact to
+  `platform-foundation-*` deployment metadata.
+- Add reviewed placeholder provider identities, lane policy references, protection classes,
+  `secret_requirements`, `runtime_config_requirements`, smoke checks, and readiness gate references
+  that fail validation until real environment values are supplied.
+- Add the cquery/extraction attributes needed for concrete deployment targets, migration bundle
+  identity, readiness gate references, and release prerequisites in one build-system-facing change.
+- Keep all project-specific infrastructure below the owning deployment package; do not introduce a
+  separate top-level `infra/` tree.
+
+### 3. External prerequisites
+
+- Agreement on initial dev, staging, and prod provider target names for Vercel, the chosen container
+  runtime, Supabase, DNS, and OpenTofu state.
+- Stable secret contract IDs for all deployment families.
+- Placeholder values are acceptable for this PR if they fail validation until intentionally replaced.
+
+### 4. Tests to be added
+
+- Scaffold/golden tests proving the concrete Phase 0 deployment packages match the reviewed template
+  shape after environment-specific answers are supplied.
+- Cquery extraction tests proving every concrete package extracts as a deployment target with the
+  expected provider family, component target, protection class, lane policy, provisioner, secret
+  requirements, runtime config requirements, smoke checks, and readiness gates.
+- Migration-bundle extraction tests proving cross-package migration dependencies determine bundle
+  order and missing dependencies fail closed.
+- Front-door validation tests proving unresolved placeholders fail closed with actionable diagnostics.
+- Graph tests proving all concrete deployment component targets point at `projects/apps/*` artifacts
+  and no app deployment imports another app target.
+- Build-system selector tests proving this PR owns the broad cquery/scaffold/build-graph validation
+  pass for the Phase 0 deployment packages, so PR-20 through PR-22 can avoid touching target
+  extraction unless implementation discovers a real missing attribute.
+
+### 5. Docs to be added or updated
+
+- Update deployment usage docs with the concrete Phase 0 deployment labels and the expected dev,
+  staging, and prod flow.
+- Update schema/migration docs with the protected/shared migration bundle target and how it is bound
+  to foundation deployment metadata.
+- Update the OpenTofu stack layout guide with where console, service, and foundation stack files live
+  for these concrete deployments.
+- Update secrets docs with the exact Phase 0 deployment contract IDs and which deployment family uses
+  each one.
+
+### 6. Acceptance criteria
+
+- The Phase 0 architecture's required deployment directories exist as first-class deployment packages.
+- Console, web, worker, foundation, and shared governance targets can be resolved through the normal
+  repo deployment front door.
+- The migration bundle is a Buck-visible artifact attached to foundation deployment metadata.
+- Placeholder or incomplete environment values cannot accidentally pass protected/shared validation.
+- No project-specific infrastructure is introduced outside `projects/deployments/`.
+
+### 7. Risks
+
+- Concrete package generation can lock in provider naming before external accounts are finalized.
+- Placeholder values can be mistaken for production-ready configuration if validation is too lenient.
+- Consolidating build-graph work into this PR makes the PR larger and more likely to require the full
+  build-system validation suite.
+
+### 8. Mitigations
+
+- Use clearly invalid placeholder identities that produce deterministic validation errors until
+  replaced.
+- Keep environment-specific provider IDs reviewed metadata and update this plan if account naming or
+  runtime selection changes.
+- Keep the build-system-facing changes mechanical and limited to deployment target extraction,
+  scaffold output, graph visibility, and migration bundle metadata.
+
+### 9. Consequences of not implementing this PR
+
+The deployment machinery can exist without the Phase 0 app actually being represented as deployable
+console, web, worker, shared, and foundation targets.
+
+### 10. Downsides for implementing this PR
+
+It adds a substantial amount of deployment metadata before all external accounts may exist, and it is
+expected to trigger the broad build-system validation suite. The payoff is that the later closeout
+PRs can stay off the full build-system critical path unless they uncover a missing extraction
+contract.
+
+## PR-20: Complete Phase 0 readiness-gate admission coverage
+
+### 1. Intent
+
+Close the gap between generic readiness-gate support and the full Phase 0 pilot gates, especially
+the external-source and GitHub gates that decide whether design partners may see connector flows.
+
+### 2. Scope of changes
+
+- Add typed readiness-gate evidence for every Phase 0 gate required by the engineering companion:
+  - Gate 1 Ragie ACL array semantics or boolean fallback evidence
+  - Gate 2 live tenant-leak suite evidence
+  - Gate 3 WorkOS MCP Auth client evidence for Claude, ChatGPT, and Cursor or approved equivalent
+  - Gate 4 `fetch_full_document` grant lifecycle evidence
+  - Gate 5 Connect and GitHub external-source evidence
+- Extend Gate 5 evidence to cover:
+  - Connect metadata shape and overlay survival
+  - Connect OAuth flows for Drive, Notion, and Slack when enabled
+  - Connect source-update Window A validation or enforced `paused_after_import` fallback
+  - scoped-source enforcement for Drive, Notion, Slack, and GitHub
+  - Connect branding observation and external-demo eligibility
+  - Slack single-channel and Notion workspace-token limitation decisions
+  - Connect most-restrictive default ACL and `review_pending` landing behavior
+  - GitHub selected-repository install, permissions, token non-persistence, hygiene, refresh semantics,
+    and retrieval bakeoff
+  - `fetch_full_document` denial for Connect-sourced and GitHub-sourced documents under every policy
+    combination
+- Bind all readiness evidence to deployment, provider target identity, source revision, environment,
+  gate version, run timestamp, and redacted diagnostics.
+- Allow admission policy to distinguish direct-upload pilot access, connector demo access, and
+  internal-only connector validation.
+- Ensure evidence can be required for protected/shared deployments without storing external-service
+  secrets in CI variables or deployment records.
+- Consume the readiness-gate declarations extracted by PR-19; do not add new cquery or scaffold
+  attributes in this PR unless PR-19's contract is proven insufficient.
+
+### 3. External prerequisites
+
+- Non-production WorkOS, Ragie, Supabase, storage, GitHub App, and connector-source accounts for live
+  validation.
+- A policy decision for which gates block dev, staging, prod, direct-upload pilot access, and
+  connector demo access.
+- Vault roles for all live gate secret contracts.
+
+### 4. Tests to be added
+
+- Admission evaluator tests for each Phase 0 readiness gate and sub-gate, including missing,
+  expired, wrong-target, wrong-source-revision, and wrong-environment evidence.
+- Fixture evidence tests proving diagnostics are redacted while preserving enough context for review.
+- Negative tests proving connector-demo admission fails when Gate 5 lacks source-update validation,
+  scoped-source evidence, branding evidence, GitHub hygiene evidence, or external-source
+  `fetch_full_document` denial evidence.
+- Policy tests proving direct-upload pilot admission can pass with Gates 1-4 while connector-demo
+  admission still blocks until Gate 5 passes.
+- Secretspec tests proving live gate credentials resolve only through reviewed secret runtime steps.
+- Regression tests proving readiness admission consumes PR-19 deployment metadata without requiring
+  another build-system extraction change.
+
+### 5. Docs to be added or updated
+
+- Update deployment schema/admission docs with the Phase 0 gate evidence types and their binding
+  fields.
+- Update deployment usage docs with direct-upload versus connector-demo admission examples.
+- Update operator troubleshooting docs with readiness-gate failure messages and rerun guidance.
+- Update this plan if any gate is intentionally moved from protected/shared admission to a separate
+  release-health workflow.
+
+### 6. Acceptance criteria
+
+- Protected/shared deployments can require all Phase 0 pilot readiness gates by policy.
+- Connector-demo admission cannot pass without the full Gate 5 Connect and GitHub evidence set.
+- Direct-upload pilot admission remains separately expressible with Gates 1-4 only.
+- Gate evidence is redacted, target-bound, source-bound, and environment-bound.
+- The PR remains deployment-admission/policy scoped and does not require a second full build-system
+  validation pass after PR-19.
+
+### 7. Risks
+
+- Live gate evidence can become stale, flaky, or too expensive to rerun frequently.
+- Encoding every Gate 5 sub-gate can make admission policy hard to understand.
+
+### 8. Mitigations
+
+- Version gate evidence and give each evidence type explicit freshness and target-binding rules.
+- Keep operator diagnostics short but link to runbooks that explain how to rerun each live gate.
+- Separate fast PR checks from protected/shared admission checks.
+- If gate metadata cannot be represented by the PR-19 extraction shape, update PR-19 before starting
+  this PR rather than spreading build-system work across both.
+
+### 9. Consequences of not implementing this PR
+
+The deployment system can admit external deployments before the architecture's hard pilot and
+connector-demo readiness gates have actually passed.
+
+### 10. Downsides for implementing this PR
+
+It adds live-environment policy complexity and requires operators to manage several external test
+accounts before connector-demo readiness can be proven.
+
+## PR-21: Foundation migration apply runtime and post-apply RLS checks
+
+### 1. Intent
+
+Make schema migration rollout a protected/shared deployment concern by attaching the cross-package
+migration bundle from PR-19, Supabase apply step, and post-apply isolation checks to
+`platform-foundation-*` deployments without adding new build-system target shapes.
+
+### 2. Scope of changes
+
+- Consume the migration-bundle artifact and foundation deployment metadata created in PR-19.
+- Add the runtime adapter that applies the admitted migration bundle as a reviewed provision or
+  release action before web and worker readers are promoted.
+- Resolve Supabase service credentials only through deployment `secret_requirements` at the migration
+  or provision step.
+- Record migration bundle identity, migration list, dependency graph fingerprint, target Supabase
+  identity, apply outcome, and redacted diagnostics.
+- Run post-apply checks for RLS tenant isolation, composite tenant-aware FK behavior, migration
+  ordering invariants, and required extension/settings posture.
+- Add release prerequisites so web and worker deployments cannot promote readers that require schema
+  changes until the foundation migration run has succeeded for the same reviewed source revision or a
+  compatible migration revision.
+
+### 3. External prerequisites
+
+- Dev, staging, and prod Supabase project identities or equivalent Postgres targets.
+- Vault-backed Supabase service-role credentials scoped to migration/provision execution.
+- A reviewed policy for destructive or irreversible migration exceptions.
+
+### 4. Tests to be added
+
+- Fake Supabase/Postgres apply tests proving bundle identity, target identity, and apply outcome are
+  recorded.
+- Runtime contract tests proving PR-21 consumes the existing PR-19 migration-bundle metadata rather
+  than introducing new target extraction attributes.
+- Post-apply check tests for RLS, composite FK violations, tenant context setup, and failure
+  diagnostics.
+- Admission/prerequisite tests proving web and worker deployments block when required foundation
+  migration evidence is absent, stale, failed, or bound to the wrong source revision.
+- Secretspec tests proving Supabase migration credentials are scoped to the migration/provision step
+  and are not recorded.
+
+### 5. Docs to be added or updated
+
+- Update deployment usage docs with the foundation migration flow and its relationship to web and
+  worker promotion.
+- Update schema/migration docs with protected/shared migration apply, post-apply checks, and
+  destructive migration exception handling.
+- Update troubleshooting docs with migration-order, RLS, Supabase credential, and post-apply check
+  failure modes.
+
+### 6. Acceptance criteria
+
+- Protected/shared schema changes are applied through `platform-foundation-*` deployment records, not
+  ad hoc operator commands.
+- Web and worker deployments can require successful migration evidence before promotion.
+- Post-apply RLS and composite-FK checks run as deploy-blocking checks for protected/shared
+  environments.
+- Migration credentials are resolved only through the deployment secret runtime.
+- No new build-system extraction or scaffold surface is added after PR-19.
+
+### 7. Risks
+
+- Migration application can become a long-running or partially successful operation with hard recovery
+  semantics.
+- Binding app promotion to migration evidence can block otherwise safe deploys when compatibility
+  windows are not modeled carefully.
+- A runtime implementation may discover that PR-19's extraction shape omitted data needed for safe
+  migration apply.
+
+### 8. Mitigations
+
+- Require migration compatibility metadata and reviewed destructive exceptions for risky changes.
+- Record enough migration and target identity information to support in-doubt-run recovery.
+- Keep app-reader prerequisites compatible with backward-compatible migration sequences and feature
+  flags.
+- If a missing extraction field is found, update PR-19's build-graph contract before implementing
+  this PR rather than spreading cquery changes into PR-21.
+
+### 9. Consequences of not implementing this PR
+
+The architecture's schema, RLS, and composite-FK guarantees can be implemented in code but still
+rolled out through unreviewed or unordered database changes outside deployment admission.
+
+### 10. Downsides for implementing this PR
+
+It adds a database mutation surface to foundation deployments and increases the amount of evidence
+that must be preserved for every protected/shared release.
+
+## PR-22: Coordinated Phase 0 release promotion and prerequisite enforcement
+
+### 1. Intent
+
+Enforce the Phase 0 coordinated release model across the separate console, web, worker, and
+foundation deployments without pretending cross-provider releases are atomic.
+
+### 2. Scope of changes
+
+- Add a shared Phase 0 release group or prerequisite model connecting:
+  - `platform-foundation-*`
+  - `data-room-worker-*`
+  - `data-room-web-*`
+  - `data-room-console-*`
+- Enforce promotion of the same reviewed source revision through dev, staging, and prod unless an
+  explicit reviewed compatibility exception is present.
+- Preserve separate artifact identities for console, web, and worker while binding them to the same
+  release source revision and lane policy.
+- Encode default capability-add ordering as foundation/schema, worker, web, console.
+- Encode capability-removal ordering as console, web, worker, then foundation cleanup when needed.
+- Add deployment prerequisites for runtime config compatibility, console-to-web base URL, web API
+  readiness, worker job compatibility, migration evidence, and smoke or release-health checks.
+- Support feature-flag or compatibility-window metadata for risky non-atomic changes.
+- Keep each deployment single-provider; the release group coordinates separate deployments rather
+  than creating one cross-provider deployment object.
+- Consume the concrete deployment package and prerequisite metadata extracted by PR-19; avoid adding
+  new target shapes or cquery attributes in this PR.
+
+### 3. External prerequisites
+
+- A policy decision on how strictly dev lanes must match staging/prod source-revision promotion.
+- Provider target identities for all concrete Phase 0 deployment packages.
+- Operator agreement on compatibility exception review requirements.
+
+### 4. Tests to be added
+
+- Promotion tests proving console, web, and worker deployments can advance through dev, staging, and
+  prod only with the required shared reviewed source revision or reviewed compatibility exception.
+- Prerequisite tests proving console promotion blocks when web readiness, console-to-web runtime
+  config, migration evidence, or required smoke checks are missing.
+- Ordering tests proving add-capability and remove-capability flows enforce the documented sequence.
+- Record tests proving release group runs preserve separate artifact identities and provider records
+  while linking them to one release source revision.
+- Negative tests proving the release group does not collapse the system into a multi-provider
+  deployment target.
+- Regression tests proving coordinated release enforcement consumes PR-19 metadata without requiring
+  additional build-system extraction changes.
+
+### 5. Docs to be added or updated
+
+- Update deployment usage docs with Phase 0 release group commands, ordering, compatibility windows,
+  and rollback/retry expectations.
+- Update deployment schema/admission docs with release prerequisites and source-revision coherence
+  fields.
+- Update operator troubleshooting docs with common cross-deployment prerequisite failures.
+
+### 6. Acceptance criteria
+
+- Phase 0 deployments remain separate provider-specific targets but can be promoted as a coordinated
+  release with explicit prerequisites.
+- Worker, web, and console promotion order follows the architecture for adding and removing
+  capabilities.
+- Deployment records preserve separate artifact identity and provider target identity for each
+  component while binding the release to a reviewed source revision.
+- Risky non-atomic changes require feature-flag, compatibility-window, or reviewed exception
+  metadata.
+- The PR stays in deployment orchestration/admission code and does not trigger another broad
+  build-system validation pass after PR-19.
+
+### 7. Risks
+
+- Release grouping can drift into a hidden multi-provider deployment abstraction.
+- Strict source-revision matching can make emergency fixes awkward if one component needs a targeted
+  patch.
+
+### 8. Mitigations
+
+- Keep the release group as orchestration over normal deployment targets and records, not a new
+  provider type.
+- Add reviewed compatibility exceptions with explicit expiration and diagnostics for targeted
+  hotfixes.
+- If implementation needs extra extracted metadata, fold that requirement back into PR-19 before
+  starting this PR.
+
+### 9. Consequences of not implementing this PR
+
+Console, web, worker, and foundation deployments can each be correct in isolation while still being
+released in an order or source-revision combination that violates the Phase 0 architecture.
+
+### 10. Downsides for implementing this PR
+
+It adds orchestration and policy surface across deployment families and requires operators to reason
+about compatibility windows for non-atomic releases.

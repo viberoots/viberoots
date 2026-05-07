@@ -258,10 +258,11 @@ Minimum plan/diff contract when provisioner-managed infra mutation is reviewable
 foundation and app-attached infrastructure. Its package-local stack files must
 live under `projects/deployments/<deployment-id>/opentofu/`; deployment metadata
 must declare `provider_target.stack_identity` and
-`provider_target.state_backend_identity`; the resolved OpenTofu plan fingerprint
-and stack-config fingerprint are bound into admission evidence. Routine
-`deploy` and `--provision-only` flows fail closed on delete, replace, or unknown
-plan actions.
+`provider_target.state_backend_identity`; stack config must declare reviewed
+`plan_json` evidence plus a separate saved `apply_plan` artifact; the resolved
+OpenTofu plan fingerprint and stack-config fingerprint are bound into admission
+evidence. Routine `deploy` and `--provision-only` flows fail closed on delete,
+replace, or unknown plan actions.
 
 ### `runtime_config_requirements`
 

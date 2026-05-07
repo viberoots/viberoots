@@ -4,6 +4,7 @@ import type { KubernetesAdmittedContext } from "./kubernetes-admission";
 import type { KubernetesProvisionerPlanRef } from "./kubernetes-provisioner-plan";
 import { createVaultDeploymentSecretRuntime } from "./deployment-secret-runtime-helpers";
 import {
+  createProductionOpenTofuApplyAdapter,
   isOpenTofuProvisioner,
   runOpenTofuReviewedApply,
   type OpenTofuApplyAdapter,
@@ -13,6 +14,7 @@ import {
 
 export type OpenTofuApplyHooks = {
   adapter?: OpenTofuApplyAdapter;
+  adapterFactory?: () => OpenTofuApplyAdapter;
   evidence?: OpenTofuApplyEvidence;
   secretRuntimeFactory?: (opts: {
     deployment: KubernetesDeployment;
@@ -28,10 +30,13 @@ export async function maybeRunOpenTofuReviewedApply(opts: {
 }): Promise<OpenTofuApplyOutcome | undefined> {
   const provisioner = opts.deployment.provisioner;
   if (!isOpenTofuProvisioner(provisioner)) return undefined;
-  if (!opts.hooks?.adapter) return undefined;
-  if (!opts.provisionerPlan) return undefined;
+  const adapter =
+    opts.hooks?.adapter || opts.hooks?.adapterFactory?.() || createProductionOpenTofuApplyAdapter();
+  if (!opts.provisionerPlan) {
+    throw new Error("opentofu apply requires an admitted provisioner plan");
+  }
   const factory =
-    opts.hooks.secretRuntimeFactory ||
+    opts.hooks?.secretRuntimeFactory ||
     ((args) =>
       createVaultDeploymentSecretRuntime({
         admittedContext: args.admittedContext,
@@ -47,7 +52,7 @@ export async function maybeRunOpenTofuReviewedApply(opts: {
     admittedProvisionerPlanFingerprint:
       opts.admittedContext.policyEvaluation?.binding.provisionerPlanFingerprint,
     secretRuntime,
-    adapter: opts.hooks.adapter,
-    ...(opts.hooks.evidence ? { evidence: opts.hooks.evidence } : {}),
+    adapter,
+    ...(opts.hooks?.evidence ? { evidence: opts.hooks.evidence } : {}),
   });
 }

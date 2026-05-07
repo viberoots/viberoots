@@ -296,3 +296,23 @@ replaySnapshotPath` or rejects the source-run as unsuitable for replay.
     artifact identity is recomputed from the staged bytes.
   - For tests or local development, switch to a `local_only` Vercel fixture
     deployment label.
+
+## OpenTofu Kubernetes Applies
+
+- Symptom: a protected/shared Kubernetes provision-only or app-attached run
+  rejects before `tofu apply`.
+- Check the deploy record `provisionerPlan` and `provisionerApplyOutcome`
+  fields. The worker requires an admitted provisioner plan fingerprint, plan
+  fingerprint, stack config fingerprint, stack identity, and state backend
+  identity before it resolves credentials or starts the adapter.
+- Check the OpenTofu stack config: `plan_json` is reviewed JSON evidence, while
+  `apply_plan` must be the separate saved plan artifact produced by
+  `tofu plan -out=...`. Pointing `apply_plan` at JSON fails closed.
+- Ensure the deployment declares required `secret_requirements` for
+  `opentofu_provider_credentials` at the `provision` step. Missing or
+  unauthorized credentials fail closed before the adapter runs.
+- The production adapter uses `tofu` from the pinned Nix toolchain unless the
+  worker profile sets `BNX_OPENTOFU_BIN` or `BNX_DEPLOY_OPENTOFU_BIN`.
+- Plan or config drift appears as an OpenTofu apply mismatch in redacted
+  diagnostics. Regenerate and re-admit the reviewed provisioner plan instead
+  of applying from local workspace state.
