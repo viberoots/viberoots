@@ -29,13 +29,17 @@ test("deployment-impact: reviewed deployment-owned build-system paths stay deplo
 
 test("deployment-impact: deployment taxonomy-only edits stay deployment-only", () => {
   const result = resolveDeploymentImpactSelection(
-    ["build-tools/tools/tests/deployments/deployment_domain_taxonomy.bzl"],
+    [
+      "build-tools/tools/tests/deployments/deployment_domain_taxonomy.bzl",
+      "build-tools/tools/tests/deployments/deployment_resource_limited_taxonomy.bzl",
+    ],
     { deploymentTargetLabels },
   );
 
   assert.equal(result.mode, "deployment-only");
   assert.deepEqual(result.diagnostics.deploymentOwnedPaths, [
     "build-tools/tools/tests/deployments/deployment_domain_taxonomy.bzl",
+    "build-tools/tools/tests/deployments/deployment_resource_limited_taxonomy.bzl",
   ]);
   assert.deepEqual(result.diagnostics.fullBuildSystemTriggerPaths, []);
   assert.equal(result.diagnostics.reason, "deployment-owned-build-system-path-changed");

@@ -346,3 +346,18 @@ replaySnapshotPath` or rejects the source-run as unsuitable for replay.
   absent, stale, failed, or bound to another source revision, rerun the
   foundation migration for the same reviewed source revision or use a reviewed
   compatible migration revision.
+
+## Phase 0 Coordinated Release Prerequisites
+
+- Symptom: a Phase 0 console, web, worker, or foundation deployment rejects with
+  a missing prerequisite, source-revision mismatch, or stale health evidence.
+- Check the declared direct prerequisites first. Add order is
+  foundation/schema, worker, web, console; removal order is console, web,
+  worker, then foundation cleanup. Staging and prod also require the same
+  component to have advanced successfully through the previous lane stage.
+- Console failures usually mean the matching web deployment lacks fresh health
+  evidence, the `data-room-web-base-url` runtime config is not admitted, or the
+  foundation migration evidence is stale for the reviewed source revision.
+- For non-atomic hotfixes, attach an expiring reviewed compatibility-window
+  exception to the divergent run record. Do not edit source revisions or
+  artifact identities in existing records.

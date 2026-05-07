@@ -254,6 +254,25 @@ Expected behavior:
 - every run keeps its own `deploy_run_id`, lifecycle, and final outcome even when the CLI also attaches one shared `deploy_batch_id`
 - the selector may over-select for safety but must not under-select
 
+## 10.1 Phase 0 Coordinated Release
+
+Situation:
+
+- the operator promotes the Phase 0 foundation, worker, web, and console
+  packages through one lane stage
+- providers differ, so the release cannot be atomic
+
+Expected behavior:
+
+- the release remains a batch of ordinary single-provider deployment runs
+- add-capability order is foundation/schema, worker, web, console
+- removal order is console, web, worker, then foundation cleanup
+- each run records its own artifact identity and provider target identity
+- all Phase 0 records in the batch share one reviewed source revision unless
+  the divergent run has an expiring reviewed compatibility-window exception
+- console waits for web readiness, console-to-web runtime config, migration
+  evidence, and smoke or release-health evidence before mutating
+
 ## 11. Protected/Shared Provision-Only With Immutable Inputs
 
 Situation:

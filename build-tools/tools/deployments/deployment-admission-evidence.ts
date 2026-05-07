@@ -51,6 +51,12 @@ export type DeploymentHealthEvidence = {
   evidenceRef?: string;
 };
 
+export type DeploymentCompatibilityExceptionEvidence = {
+  reviewedBy: string;
+  reason: string;
+  expiresAt: string;
+};
+
 export type DeploymentAdmissionEvidence = {
   accessMode?: DeploymentAdmissionAccessMode;
   requestedBy?: DeploymentPrincipal;
@@ -65,6 +71,7 @@ export type DeploymentAdmissionEvidence = {
   sboms?: DeploymentSbomEvidence[];
   supplyChainGates?: DeploymentSupplyChainGateEvidence[];
   readinessGates?: DeploymentReadinessGateEvidence[];
+  phase0CompatibilityException?: DeploymentCompatibilityExceptionEvidence;
 };
 
 export type DeploymentAdmissionBinding = {

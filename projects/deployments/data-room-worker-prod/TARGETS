@@ -24,6 +24,9 @@ container_runtime_service_deployment(
         phase0_runtime("supabase-url", "data-room-worker-prod"),
         phase0_runtime("job-queue-name", "data-room-worker-prod"),
     ],
-    prerequisites = [{"deployment_id": "platform-foundation-prod", "mode": "health_gated"}],
+    prerequisites = [
+        {"deployment_id": "platform-foundation-prod", "mode": "health_gated"},
+        {"deployment_id": "data-room-worker-staging", "mode": "ordering_only"},
+    ],
     smoke = phase0_smoke("service://data-room-worker-prod", runner_class = "service_health_10m"),
 )

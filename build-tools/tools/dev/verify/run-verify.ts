@@ -9,6 +9,7 @@ import { parseVerifyArgs } from "./args";
 import { cleanupOrphanBuckDaemons } from "./buck-orphan-cleanup";
 import { runMergedCoverageReport, setupCoverage } from "./coverage";
 import { runExplainSelection } from "./explain-selection";
+import { runFinalOrphanBuckCleanup } from "./final-orphan-cleanup";
 import {
   enforceVerifyDiskGate,
   runVerifyHousekeeping,
@@ -237,5 +238,6 @@ export async function runVerify(): Promise<void> {
     seedCleanup = null;
   }
   await timedPhase("kill-verify-buck-isolation", async () => await killBuckIsolation(root, iso));
+  await runFinalOrphanBuckCleanup({ logFile: lock.logFile, timedPhase });
   process.exit(requestedExitCode ?? status);
 }

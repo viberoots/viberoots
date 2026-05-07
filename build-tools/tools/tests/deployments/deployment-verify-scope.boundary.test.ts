@@ -16,6 +16,7 @@ test("deployment verify scope marks reviewed deployment-owned paths explicitly",
     "build-tools/deployments/defs.bzl",
     "build-tools/tools/deployments/deploy.ts",
     "build-tools/tools/tests/deployments/deployment_domain_taxonomy.bzl",
+    "build-tools/tools/tests/deployments/deployment_resource_limited_taxonomy.bzl",
     "build-tools/tools/tests/deployments/nixos-shared-host.contract.test.ts",
     ...REVIEWED_DEPLOYMENT_OWNED_SUPPORT_PATHS,
   ];

@@ -210,6 +210,7 @@ export async function writeFoundationRecord(opts: {
   sourceRevision?: string;
 }) {
   await fsp.mkdir(path.join(opts.recordsRoot, "runs"), { recursive: true });
+  const deployment = foundationDeploymentFixture();
   const outcome: Record<string, string> = {
     status: opts.status || "succeeded",
   };
@@ -220,6 +221,9 @@ export async function writeFoundationRecord(opts: {
       deployRunId: "foundation-run",
       deploymentId: "platform-foundation-dev",
       finalOutcome: "succeeded",
+      lanePolicyRef: deployment.lanePolicyRef,
+      artifact: { identity: "migration-bundle:test" },
+      providerTargetIdentity: deployment.providerTarget.providerTargetIdentity,
       foundationMigrationOutcome: outcome,
     }),
   );

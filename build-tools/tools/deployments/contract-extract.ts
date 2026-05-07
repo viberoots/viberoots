@@ -18,6 +18,10 @@ import {
   readExternalRequirementProfiles,
   validateExternalDeploymentRequirementProfiles,
 } from "./deployment-extract-metadata";
+import {
+  validatePhase0ReleaseContracts,
+  validatePhase0ReleasePrerequisites,
+} from "./deployment-phase0-release";
 
 const DEPLOYMENT_PREREQUISITE_MODES = new Set<DeploymentPrerequisiteMode>([
   "ordering_only",
@@ -136,6 +140,8 @@ export function extractDeployments(nodes: GraphNode[]): {
   ].sort((a, b) => a.label.localeCompare(b.label));
   context.errors.push(...validateExternalRequirementMetadata(nodes, deployments));
   context.errors.push(...validateDeploymentPrerequisites(deployments));
+  context.errors.push(...validatePhase0ReleasePrerequisites(deployments));
+  context.errors.push(...validatePhase0ReleaseContracts(deployments));
   return {
     deployments,
     errors: uniqueErrors(context.errors),

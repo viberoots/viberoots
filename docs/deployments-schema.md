@@ -421,6 +421,14 @@ Validation rule:
 - prerequisites must stay within the same lane; cross-lane prerequisites are rejected
 - prerequisites must form an acyclic graph before orchestration
 - selectors may widen only by declared direct prerequisite edges; transitive execution order comes from topological sorting, not extra inferred metadata
+- Phase 0 deployment ids (`platform-foundation-*`, `data-room-worker-*`,
+  `data-room-web-*`, `data-room-console-*`) have additional release-policy
+  validation: component prerequisites encode add order as foundation/schema,
+  worker, web, console with `health_gated` edges, staging/prod deployments
+  order after the previous stage for the same component, and release records
+  preserve separate artifact and provider-target identities while binding the
+  group to one source revision unless an expiring reviewed compatibility
+  exception is present
 
 ## 2. Lane Policy Object
 

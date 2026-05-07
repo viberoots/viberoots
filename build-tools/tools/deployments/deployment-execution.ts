@@ -198,7 +198,34 @@ export async function runNormalDeployment(opts: {
     ...(opts.deployBatchId ? { deployBatchId: opts.deployBatchId } : {}),
   });
 }
-
+export async function runExplicitRemovalDeployment(opts: {
+  workspaceRoot: string;
+  deployment: DeploymentTarget;
+  sharedRecordsRoot?: string;
+  hostRoot?: string;
+  statePath?: string;
+  hostConfigPath?: string;
+  admissionEvidence?: DeploymentAdmissionEvidence;
+}): Promise<DeploymentExecutionResult> {
+  if (!isNixosSharedHostDeployment(opts.deployment)) {
+    throw new Error(
+      `from-changes removal is not supported for provider "${opts.deployment.provider}" on ${opts.deployment.label}`,
+    );
+  }
+  const hostRoot = path.resolve(opts.hostRoot || defaultNixosHostRoot(opts.workspaceRoot));
+  return await submitNixosSharedHostControlPlaneRun({
+    workspaceRoot: opts.workspaceRoot,
+    operationKind: "explicit_removal",
+    deployment: opts.deployment,
+    paths: {
+      statePath: path.resolve(opts.statePath || path.join(hostRoot, "platform-state.json")),
+      hostRoot,
+      recordsRoot: path.resolve(opts.sharedRecordsRoot || path.join(hostRoot, "records")),
+      ...(opts.hostConfigPath ? { hostConfigPath: path.resolve(opts.hostConfigPath) } : {}),
+    },
+    ...(opts.admissionEvidence ? { admissionEvidence: opts.admissionEvidence } : {}),
+  });
+}
 export function summarizeDeploymentResult(result: DeploymentExecutionResult) {
   return {
     runId: result.record.deployRunId,

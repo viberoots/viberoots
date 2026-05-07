@@ -13,6 +13,7 @@ test("orphan buck cleanup: matches ephemeral verify/debug/test isolations only",
     "v-12345-1772235882",
     "verify-nested-12345-deadbeefcafe",
     "verify-nested-deadbeefcafe",
+    "zxtest-shared-deadbeef12",
     "debug-cpp-set-final-1772235882",
     "targeted-scaff-1772219350",
     "parity_19426_1772253747273__build_tools_tools_tests_cpp_sanitize_case1",
@@ -40,4 +41,11 @@ test("orphan buck cleanup: live verify owner isolations are protected", () => {
   assert.equal(liveOwnerPidFromEphemeralIsolation(currentNested), process.pid);
   assert.equal(liveOwnerPidFromEphemeralIsolation("v-999999999-1772235882"), null);
   assert.equal(liveOwnerPidFromEphemeralIsolation("verify-nested-deadbeefcafe"), null);
+});
+
+test("orphan buck cleanup: live-owner parsing stays scoped to the encoded verify pid", () => {
+  const currentNested = `verify-nested-${process.pid}-deadbeefcafe`;
+  const otherNested = `verify-nested-${process.pid + 1}-deadbeefcafe`;
+  assert.equal(liveOwnerPidFromEphemeralIsolation(currentNested), process.pid);
+  assert.equal(ownerPidFromEphemeralIsolation(otherNested), process.pid + 1);
 });

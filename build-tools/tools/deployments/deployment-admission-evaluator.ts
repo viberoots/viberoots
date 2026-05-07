@@ -30,6 +30,8 @@ import {
   evaluateSupplyChainGatePolicies,
 } from "./deployment-admission-supply-chain-evaluator";
 import { evaluateReadinessGatePolicies } from "./deployment-readiness-gates";
+import { DeploymentAdmissionError } from "./deployment-control-plane-errors";
+import { validatePhase0CurrentAdmission } from "./deployment-phase0-admission";
 
 export async function evaluateDeploymentAdmission(opts: {
   workspaceRoot: string;
@@ -45,17 +47,28 @@ export async function evaluateDeploymentAdmission(opts: {
   governanceResolver?: DeploymentLaneGovernanceResolver;
 }): Promise<DeploymentAdmissionPolicyEvaluation> {
   requireBuiltInExecutionBoundary(opts.deployment);
+  const admittedContext = opts.admittedContext;
+  if (opts.evidence?.phase0CompatibilityException) {
+    admittedContext.phase0CompatibilityException = opts.evidence.phase0CompatibilityException;
+  }
+  const phase0CurrentErrors = validatePhase0CurrentAdmission({
+    deployment: opts.deployment,
+    admittedContext,
+  });
+  if (phase0CurrentErrors.length > 0) {
+    throw new DeploymentAdmissionError("no_longer_admitted", phase0CurrentErrors.join("\n"));
+  }
   const requestedBy = opts.evidence?.requestedBy || defaultRequestedBy();
   const binding = createDeploymentAdmissionBinding({
     deployment: opts.deployment,
-    sourceRevision: sourceRevisionFor(opts.admittedContext, opts.sourceRecord),
+    sourceRevision: sourceRevisionFor(admittedContext, opts.sourceRecord),
     sourceRunId:
-      opts.admittedContext.source.sourceRunId ||
+      admittedContext.source.sourceRunId ||
       (typeof opts.sourceRecord?.deployRunId === "string"
         ? opts.sourceRecord.deployRunId
         : undefined),
     artifactIdentity:
-      opts.admittedContext.source.artifactIdentity || opts.sourceRecord?.artifact?.identity,
+      admittedContext.source.artifactIdentity || opts.sourceRecord?.artifact?.identity,
     artifactLineageId:
       opts.artifactLineageId ||
       opts.sourceRecord?.artifactLineageId ||
@@ -66,7 +79,7 @@ export async function evaluateDeploymentAdmission(opts: {
   const attestation = evaluateAttestationPolicy({
     policy: opts.deployment.admissionPolicy,
     binding,
-    admittedContext: opts.admittedContext,
+    admittedContext,
     evidence: opts.evidence?.attestations,
   });
   const sbom = evaluateSbomPolicy({
@@ -111,7 +124,7 @@ export async function evaluateDeploymentAdmission(opts: {
       workspaceRoot: opts.workspaceRoot,
       recordsRoot: opts.recordsRoot,
       deployment: opts.deployment,
-      admittedContext: opts.admittedContext,
+      admittedContext,
       backendDatabaseUrl: opts.backendDatabaseUrl,
       prerequisiteProvidersByDeploymentId: opts.prerequisiteProvidersByDeploymentId,
       evidence: opts.evidence,

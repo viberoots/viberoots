@@ -26,6 +26,9 @@ container_runtime_service_deployment(
         phase0_runtime("supabase-url", "data-room-web-staging"),
         phase0_runtime("workos-client-id", "data-room-web-staging"),
     ],
-    prerequisites = [{"deployment_id": "platform-foundation-staging", "mode": "health_gated"}],
+    prerequisites = [
+        {"deployment_id": "data-room-worker-staging", "mode": "health_gated"},
+        {"deployment_id": "data-room-web-dev", "mode": "ordering_only"},
+    ],
     smoke = phase0_smoke("https://web.staging.data-room.example.invalid"),
 )

@@ -504,6 +504,66 @@ results. Web and worker deployments that depend on `platform-foundation-*` rejec
 promotion when that migration evidence is absent, failed, or recorded for a
 different reviewed source revision.
 
+Phase 0 coordinated release promotion is an orchestration policy over these
+normal deployment targets, not a new multi-provider target. The default
+capability-add order is `platform-foundation-*`, `data-room-worker-*`,
+`data-room-web-*`, then `data-room-console-*`; capability removal runs the
+reverse order. Staging and prod packages also keep an `ordering_only`
+prerequisite on the same component in the previous lane stage, so the reviewed
+source revision advances through dev, staging, and prod unless a reviewed
+compatibility-window exception is attached to the release record. Console
+promotion health-gates the matching web deployment so `data-room-web-base-url`,
+web API readiness, smoke evidence, and migration evidence are present before
+the console mutates.
+
+Phase 0 grouped release from changed packages:
+
+```bash
+deploy --from-changes --group \
+  --changed projects/deployments/platform-foundation-prod/TARGETS \
+  --changed projects/deployments/data-room-worker-prod/TARGETS \
+  --changed projects/deployments/data-room-web-prod/TARGETS \
+  --changed projects/deployments/data-room-console-prod/TARGETS
+```
+
+The grouped command still emits ordinary per-deployment runs. Use the resulting
+records as the source-run inputs for explicit stage promotion:
+
+```bash
+deploy --deployment //projects/deployments/platform-foundation-staging:deploy \
+  --source-run-id <platform-foundation-dev-run-id>
+deploy --deployment //projects/deployments/data-room-worker-staging:deploy \
+  --source-run-id <data-room-worker-dev-run-id>
+deploy --deployment //projects/deployments/data-room-web-staging:deploy \
+  --source-run-id <data-room-web-dev-run-id>
+deploy --deployment //projects/deployments/data-room-console-staging:deploy \
+  --source-run-id <data-room-console-dev-run-id>
+```
+
+Retry preserves the same operation, source revision, prerequisite evidence, and
+artifact identity from the selected run:
+
+```bash
+deploy --deployment //projects/deployments/data-room-console-prod:deploy \
+  --source-run-id <failed-console-prod-run-id>
+```
+
+Rollback is also explicit and source-run scoped. Run removal-sensitive rollback
+in reverse capability order: console, web, worker, then foundation cleanup when
+needed.
+
+```bash
+deploy --deployment //projects/deployments/data-room-console-prod:deploy \
+  --rollback \
+  --source-run-id <previous-good-console-prod-run-id>
+deploy --deployment //projects/deployments/data-room-web-prod:deploy \
+  --rollback \
+  --source-run-id <previous-good-web-prod-run-id>
+deploy --deployment //projects/deployments/data-room-worker-prod:deploy \
+  --rollback \
+  --source-run-id <previous-good-worker-prod-run-id>
+```
+
 Web service example:
 
 ```starlark

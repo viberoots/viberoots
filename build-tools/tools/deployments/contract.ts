@@ -78,3 +78,4 @@ export * from "./deployment-targets";
 export * from "./deployment-provider-targets";
 export * from "./deployment-readiness-gates";
 export * from "./external-deployment-requirements";
+export * from "./deployment-phase0-release";

@@ -23,6 +23,7 @@ vercel_next_webapp_deployment(
         phase0_runtime("data-room-web-base-url", "data-room-console-dev"),
         phase0_runtime("workos-client-id", "data-room-console-dev"),
     ],
+    prerequisites = [{"deployment_id": "data-room-web-dev", "mode": "health_gated"}],
     smoke = phase0_smoke("https://console.dev.data-room.example.invalid", "/"),
     provider_target = phase0_stack_target("data-room-console", "dev"),
 )

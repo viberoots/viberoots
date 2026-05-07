@@ -29,7 +29,6 @@ function parseForkservers(lines: string[]): ForkserverProc[] {
   }
   return forks;
 }
-
 type BuckDaemonProc = { pid: number; ppid: number; etime: string; cmd: string; iso: string };
 
 function parseBuckDaemons(lines: string[]): BuckDaemonProc[] {
@@ -51,6 +50,7 @@ export function isLikelyEphemeralIsolation(iso: string): boolean {
   if (!s) return false;
   if (/^v-\d+-\d+$/.test(s)) return true;
   if (/^verify-nested-(?:\d+-)?[a-f0-9]{12}$/.test(s)) return true;
+  if (/^zxtest-shared-[a-f0-9]{10}$/.test(s)) return true;
   if (/^debug-[A-Za-z0-9._-]+-\d{9,}$/.test(s)) return true;
   if (/^targeted-[A-Za-z0-9._-]+-\d{9,}$/.test(s)) return true;
   if (/^(parity_|sanitize_|importer_strings_)/.test(s)) return true;
@@ -60,8 +60,12 @@ export function isLikelyEphemeralIsolation(iso: string): boolean {
 export async function cleanupOrphanBuckDaemons(opts: {
   log?: (line: string) => Promise<void>;
   maxKills?: number;
+  ignoreLiveOwnerPid?: number;
+  includeOwnerlessEphemeral?: boolean;
 }): Promise<{ scanned: number; candidates: number; killed: number }> {
   const maxKills = Math.max(0, opts.maxKills ?? 50);
+  const includeOwnerlessEphemeral = opts.includeOwnerlessEphemeral ?? true;
+  const ignoreLiveOwnerPid = opts.ignoreLiveOwnerPid ?? -1;
   const staleGraceRaw = Number.parseInt(
     String(process.env.BNX_BUCK_ORPHAN_STALE_GRACE_SECS || "120"),
     10,
@@ -76,8 +80,7 @@ export async function cleanupOrphanBuckDaemons(opts: {
     if (!mapped) continue;
     const { repoRoot, iso } = mapped;
     if (!isTempRepoRoot(repoRoot)) continue;
-    const orphan = f.ppid <= 1 || !isPidAlive(f.ppid);
-    if (!orphan) continue;
+    if (f.ppid > 1 && isPidAlive(f.ppid)) continue;
     candidates++;
     if (killed >= maxKills) continue;
 
@@ -103,11 +106,10 @@ export async function cleanupOrphanBuckDaemons(opts: {
 
   const daemons = parseBuckDaemons(lines);
   for (const d of daemons) {
-    const orphan = d.ppid <= 1 || !isPidAlive(d.ppid);
-    if (!orphan) continue;
+    if (d.ppid > 1 && isPidAlive(d.ppid)) continue;
     if (!isLikelyEphemeralIsolation(d.iso)) continue;
     const liveOwnerPid = liveOwnerPidFromEphemeralIsolation(d.iso);
-    if (liveOwnerPid) {
+    if (liveOwnerPid && liveOwnerPid !== ignoreLiveOwnerPid) {
       if (opts.log) {
         await opts.log(
           `[verify] buck2 orphan cleanup: skipped live-owner daemon pid=${d.pid} ppid=${d.ppid} etime=${d.etime} iso=${d.iso} owner_pid=${liveOwnerPid}`,
@@ -115,6 +117,7 @@ export async function cleanupOrphanBuckDaemons(opts: {
       }
       continue;
     }
+    if (!liveOwnerPid && !includeOwnerlessEphemeral) continue;
     if (etimeToSeconds(d.etime) < staleGraceSec) continue;
     candidates++;
     if (killed >= maxKills) continue;
@@ -155,8 +158,6 @@ export async function cleanupRegisteredTempRepos(opts: {
     .map((l) => l.trim())
     .filter(Boolean)
     .map((p) => path.resolve(p))
-    // Registered roots come from this verify run's own state file; keep broad here so
-    // temp dirs rooted under platform-specific $TMPDIR locations are still cleaned.
     .filter((p) => p.length > 1);
   const uniqueRoots = Array.from(new Set(roots));
   if (uniqueRoots.length === 0) return { roots: 0, killed: 0 };
@@ -173,7 +174,6 @@ export async function cleanupRegisteredTempRepos(opts: {
       await buck2Kill(root, iso, 5000);
     }
   }
-
   for (let pass = 0; pass < 3 && killed < maxKills; pass++) {
     let matchedThisPass = 0;
     for (const f of forks) {
@@ -183,9 +183,10 @@ export async function cleanupRegisteredTempRepos(opts: {
       const { repoRoot, iso } = mapped;
       const absRepo = path.resolve(repoRoot);
       if (!uniqueRoots.includes(absRepo)) continue;
-      if (!(await pathExists(absRepo))) continue;
       matchedThisPass++;
-      await buck2Kill(absRepo, iso, 5000);
+      if (await pathExists(absRepo)) {
+        await buck2Kill(absRepo, iso, 5000);
+      }
       if (isPidAlive(f.pid)) {
         try {
           process.kill(f.pid, "SIGKILL");

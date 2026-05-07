@@ -1,6 +1,10 @@
 #!/usr/bin/env zx-wrapper
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import {
+  assertFromChangesConflicts,
+  resolveFromChangesOperationKind,
+} from "../../deployments/deployment-from-changes-cli";
 import { runDeploymentBatchFromChanges } from "../../deployments/deployment-from-changes-run";
 import type { DeploymentFromChangesPlan } from "../../deployments/deployment-from-changes-selection";
 import { cloudflarePagesDeploymentFixture } from "./cloudflare-pages.fixture";
@@ -127,4 +131,18 @@ test("grouped from-changes failures stay attributable to one run and block healt
   assert.equal(result.results[1]?.result?.record.deployRunId, "deploy-pleomino-staging");
   assert.equal(result.results[2]?.status, "blocked");
   assert.deepEqual(result.results[2]?.blockedBy, ["pleomino-staging"]);
+});
+
+test("from-changes CLI remove mode is explicit and allows the grouped removal path", () => {
+  const flags = new Set(["from-changes", "remove", "group"]);
+  const hasFlag = (name: string) => flags.has(name);
+
+  assert.equal(resolveFromChangesOperationKind(hasFlag), "remove");
+  assert.doesNotThrow(() => assertFromChangesConflicts(hasFlag, "remove"));
+
+  flags.add("rollback");
+  assert.throws(
+    () => assertFromChangesConflicts(hasFlag, "remove"),
+    /--from-changes cannot be combined with --rollback/,
+  );
 });

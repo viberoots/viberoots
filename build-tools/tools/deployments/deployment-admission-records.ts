@@ -14,9 +14,18 @@ import type {
 export type DeploymentRunRecordLike = {
   deployRunId: string;
   deploymentId: string;
+  lanePolicyRef?: string;
+  deployment?: { lanePolicyRef?: string };
   finalOutcome?: string;
   artifactLineageId?: string;
   artifact?: { identity?: string };
+  providerTargetIdentity?: string;
+  effectiveRunTarget?: { providerTargetIdentity?: string };
+  phase0CompatibilityException?: {
+    reviewedBy?: string;
+    reason?: string;
+    expiresAt?: string;
+  };
   publicUrl?: string;
   healthUrl?: string;
   foundationMigrationOutcome?: {
@@ -26,7 +35,14 @@ export type DeploymentRunRecordLike = {
     targetSupabaseIdentity?: string;
   };
   admittedContext?: {
+    lanePolicyRef?: string;
+    phase0CompatibilityException?: {
+      reviewedBy?: string;
+      reason?: string;
+      expiresAt?: string;
+    };
     source?: { sourceRevision?: string };
+    targetEnvironment?: { providerTargetIdentity?: string };
     policyEvaluation?: DeploymentAdmissionPolicyEvaluation;
   };
 };
@@ -40,6 +56,7 @@ export function defaultDeploymentRecordRoots(workspaceRoot: string, recordsRoot:
       path.join(workspaceRoot, ".local", "deployments", "s3-static", "records"),
       path.join(workspaceRoot, ".local", "deployments", "kubernetes", "records"),
       path.join(workspaceRoot, ".local", "deployments", "opentofu", "records"),
+      path.join(workspaceRoot, ".local", "deployments", "vercel", "records"),
       path.join(workspaceRoot, ".local", "deployments", "app-store-connect", "records"),
       path.join(workspaceRoot, ".local", "deployments", "google-play", "records"),
     ]),

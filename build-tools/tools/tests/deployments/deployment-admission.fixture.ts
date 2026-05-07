@@ -37,6 +37,11 @@ type EvidenceOpts = {
     applyAt: "build_admission" | "publish_admission" | "both";
     status?: "passed" | "failed";
   }>;
+  phase0CompatibilityException?: {
+    reviewedBy: string;
+    reason: string;
+    expiresAt: string;
+  };
 };
 
 export function admissionBindingFixture(opts: EvidenceOpts) {
@@ -154,6 +159,9 @@ export function deploymentAdmissionEvidenceFixture(
             recordRef: `gate://${gate.name}/${gate.applyAt}`,
           })),
         }
+      : {}),
+    ...(opts.phase0CompatibilityException
+      ? { phase0CompatibilityException: opts.phase0CompatibilityException }
       : {}),
   };
 }

@@ -20,6 +20,7 @@ async function copyCurrentBuckClassificationFiles(tmp: string): Promise<void> {
     "build-tools/tools/tests/defs.bzl",
     "build-tools/tools/tests/deployment_conventions.bzl",
     "build-tools/tools/tests/deployments/deployment_domain_taxonomy.bzl",
+    "build-tools/tools/tests/deployments/deployment_resource_limited_taxonomy.bzl",
   ];
   for (const relPath of relPaths) {
     const src = path.join(repoRoot, relPath);
@@ -105,4 +106,24 @@ test("deployment-domain taxonomy drift fails closed for unclassified deployment 
     assert.match(String(result.stderr || ""), /deployment_domain_taxonomy\.bzl/);
     assert.match(String(result.stderr || ""), /unclassified\.deployment-domain\.test\.ts/);
   });
+});
+
+test("resource-limited deployment taxonomy stays data-only", async () => {
+  const relPath = "build-tools/tools/tests/deployments/deployment_resource_limited_taxonomy.bzl";
+  const text = await fsp.readFile(path.join(process.cwd(), relPath), "utf8");
+  const executablePatterns = [
+    /\bload\s*\(/,
+    /^\s*def\s+/m,
+    /^\s*if\s+/m,
+    /^\s*for\s+/m,
+    /\bfor\b.*\bin\b/,
+  ];
+  const codeOnly = text
+    .split("\n")
+    .map((line) => line.replace(/#.*/, ""))
+    .join("\n");
+
+  for (const pattern of executablePatterns) {
+    assert.doesNotMatch(codeOnly, pattern, `${relPath} must remain metadata-only`);
+  }
 });

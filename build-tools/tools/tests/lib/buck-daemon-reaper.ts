@@ -324,6 +324,25 @@ async function reapBuckDaemonsForTempRepo(tmpRepoRoot: string): Promise<void> {
   } catch {}
 }
 
+async function reapRegisteredRoots(tmpRepoRoot: string, stateFile: string): Promise<void> {
+  const tmpRoots: string[] = [];
+  if (tmpRepoRoot) tmpRoots.push(tmpRepoRoot);
+  if (stateFile) {
+    try {
+      const txt = await (await import("node:fs/promises")).readFile(stateFile, "utf8");
+      tmpRoots.push(...parseVerifyOwnedState(txt).roots);
+    } catch {}
+  }
+  await cleanupRegisteredVerifyProcesses({ stateFile, maxKills: 200 }).catch(() => {});
+  const seen = new Set<string>();
+  for (const r of tmpRoots) {
+    const abs = path.resolve(r);
+    if (seen.has(abs)) continue;
+    seen.add(abs);
+    await reapBuckDaemonsForTempRepo(abs);
+  }
+}
+
 async function main() {
   const argv = (global as any).argv as Args;
   const parentPidRaw = argv?.parent || parseArg("parent", "");
@@ -357,22 +376,7 @@ async function main() {
       // we've recorded. This avoids leaking forkservers when the parent dies before we can
       // read its lstart signature.
       if (!isPidAlive(parentPid)) {
-        const tmpRoots: string[] = [];
-        if (tmpRepoRoot) tmpRoots.push(tmpRepoRoot);
-        if (stateFile) {
-          try {
-            const txt = await (await import("node:fs/promises")).readFile(stateFile, "utf8");
-            tmpRoots.push(...parseVerifyOwnedState(txt).roots);
-          } catch {}
-        }
-        await cleanupRegisteredVerifyProcesses({ stateFile, maxKills: 200 }).catch(() => {});
-        const seen = new Set<string>();
-        for (const r of tmpRoots) {
-          const abs = path.resolve(r);
-          if (seen.has(abs)) continue;
-          seen.add(abs);
-          await reapBuckDaemonsForTempRepo(abs);
-        }
+        await reapRegisteredRoots(tmpRepoRoot, stateFile);
       }
       // Primary path: do not wait and do not reap if the observed pid is not the expected parent.
       return;
@@ -381,7 +385,10 @@ async function main() {
     let lastSigCheckMs = Date.now();
     while (isPidAlive(parentPid)) {
       if (Date.now() - t0 > maxWaitMs) return;
-      if (tmpRepoRoot && !(await tempRepoStillExists(tmpRepoRoot))) return;
+      if (tmpRepoRoot && !(await tempRepoStillExists(tmpRepoRoot))) {
+        await reapRegisteredRoots(tmpRepoRoot, stateFile);
+        return;
+      }
       if (Date.now() - lastSigCheckMs > 5 * 60 * 1000) {
         const curSig = await processStartSignature(parentPid, psTimeoutMs).catch(() => "");
         if (curSig && curSig !== parentSigExpected) break; // pid reused
@@ -391,22 +398,7 @@ async function main() {
     }
 
     // Parent exited: reap only buck2d daemons whose cwd lives under registered temp repos.
-    const tmpRoots: string[] = [];
-    if (tmpRepoRoot) tmpRoots.push(tmpRepoRoot);
-    if (stateFile) {
-      try {
-        const txt = await (await import("node:fs/promises")).readFile(stateFile, "utf8");
-        tmpRoots.push(...parseVerifyOwnedState(txt).roots);
-      } catch {}
-    }
-    await cleanupRegisteredVerifyProcesses({ stateFile, maxKills: 200 }).catch(() => {});
-    const seen = new Set<string>();
-    for (const r of tmpRoots) {
-      const abs = path.resolve(r);
-      if (seen.has(abs)) continue;
-      seen.add(abs);
-      await reapBuckDaemonsForTempRepo(abs);
-    }
+    await reapRegisteredRoots(tmpRepoRoot, stateFile);
   } finally {
     try {
       clearTimeout(hardExit);

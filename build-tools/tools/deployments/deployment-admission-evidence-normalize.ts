@@ -80,6 +80,9 @@ export function normalizeAdmissionEvidence(
   const sboms = normalizeSbomEvidence(raw.sboms);
   const supplyChainGates = normalizeSupplyChainGateEvidence(raw.supplyChainGates);
   const readinessGates = normalizeReadinessGateEvidence(raw.readinessGates);
+  const phase0CompatibilityException = normalizePhase0CompatibilityException(
+    raw.phase0CompatibilityException,
+  );
   return {
     ...(accessMode ? { accessMode: accessMode as DeploymentAdmissionEvidence["accessMode"] } : {}),
     ...(requestedBy ? { requestedBy } : {}),
@@ -94,6 +97,7 @@ export function normalizeAdmissionEvidence(
     ...(sboms.length > 0 ? { sboms } : {}),
     ...(supplyChainGates.length > 0 ? { supplyChainGates } : {}),
     ...(readinessGates.length > 0 ? { readinessGates } : {}),
+    ...(phase0CompatibilityException ? { phase0CompatibilityException } : {}),
   };
 }
 
@@ -141,4 +145,13 @@ function normalizeHealthEvidence(entry: unknown) {
   return evidenceRef
     ? { deploymentId, status, checkedAt, evidenceRef }
     : { deploymentId, status, checkedAt };
+}
+
+function normalizePhase0CompatibilityException(entry: unknown) {
+  if (!entry || typeof entry !== "object" || Array.isArray(entry)) return undefined;
+  const rawEntry = entry as Record<string, unknown>;
+  const reviewedBy = readText(rawEntry, "reviewedBy");
+  const reason = readText(rawEntry, "reason");
+  const expiresAt = readText(rawEntry, "expiresAt");
+  return reviewedBy || reason || expiresAt ? { reviewedBy, reason, expiresAt } : undefined;
 }

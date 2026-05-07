@@ -2,7 +2,11 @@
 import path from "node:path";
 import { collectChangedPaths } from "../lib/build-system-test-scope";
 import { getFlagBool, getFlagList, getFlagStr, hasFlag } from "../lib/cli";
-import { runNormalDeployment, summarizeDeploymentResult } from "./deployment-execution";
+import {
+  runExplicitRemovalDeployment,
+  runNormalDeployment,
+  summarizeDeploymentResult,
+} from "./deployment-execution";
 import { runDeploymentBatchFromChanges } from "./deployment-from-changes-run";
 import { resolveDeploymentsFromChanges } from "./deployment-from-changes-selection";
 import { resolveAllDeployments } from "./deployment-query";
@@ -14,7 +18,16 @@ function optionalResolvedFlag(name: string): string | undefined {
   return path.resolve(value);
 }
 
-function assertFromChangesConflicts() {
+export type FromChangesOperationKind = "deploy" | "remove";
+
+export function resolveFromChangesOperationKind(flagPresent: (name: string) => boolean) {
+  return flagPresent("remove") ? "remove" : "deploy";
+}
+
+export function assertFromChangesConflicts(
+  flagPresent: (name: string) => boolean = hasFlag,
+  operationKind: FromChangesOperationKind = resolveFromChangesOperationKind(flagPresent),
+) {
   const conflicts = [
     "deployment",
     "deployment-json",
@@ -22,7 +35,6 @@ function assertFromChangesConflicts() {
     "publish-only",
     "preview",
     "preview-cleanup",
-    "remove",
     "rollback",
     "source-run-id",
     "profile",
@@ -40,8 +52,9 @@ function assertFromChangesConflicts() {
     "apply-host-dry-run",
     "remote-config-root",
     "remote-managed-root",
+    ...(operationKind === "remove" ? [] : ["remove"]),
   ]
-    .filter((flag) => hasFlag(flag))
+    .filter((flag) => flagPresent(flag))
     .map((flag) => `--${flag}`);
   if (conflicts.length > 0) {
     throw new Error(`--from-changes cannot be combined with ${conflicts.join(", ")}`);
@@ -62,7 +75,8 @@ function collectSmokeConnectOverride() {
 }
 
 export async function runFromChangesCli(workspaceRoot: string) {
-  assertFromChangesConflicts();
+  const operationKind = resolveFromChangesOperationKind(hasFlag);
+  assertFromChangesConflicts(hasFlag, operationKind);
   const changedPaths = (() => {
     const provided = getFlagList("changed");
     return provided.length > 0 ? provided : undefined;
@@ -80,17 +94,27 @@ export async function runFromChangesCli(workspaceRoot: string) {
     plan,
     deployBatchId: groupId,
     group: getFlagBool("group") || !!groupId,
+    operationKind,
     runDeployment: async (deployment, extra) =>
-      await runNormalDeployment({
-        workspaceRoot,
-        deployment,
-        sharedRecordsRoot: optionalResolvedFlag("records-root"),
-        hostRoot: optionalResolvedFlag("host-root"),
-        statePath: optionalResolvedFlag("state"),
-        hostConfigPath: optionalResolvedFlag("host-config-out"),
-        ...(smokeConnectOverride ? { smokeConnectOverride } : {}),
-        ...(extra.deployBatchId ? { deployBatchId: extra.deployBatchId } : {}),
-      }),
+      operationKind === "remove"
+        ? await runExplicitRemovalDeployment({
+            workspaceRoot,
+            deployment,
+            sharedRecordsRoot: optionalResolvedFlag("records-root"),
+            hostRoot: optionalResolvedFlag("host-root"),
+            statePath: optionalResolvedFlag("state"),
+            hostConfigPath: optionalResolvedFlag("host-config-out"),
+          })
+        : await runNormalDeployment({
+            workspaceRoot,
+            deployment,
+            sharedRecordsRoot: optionalResolvedFlag("records-root"),
+            hostRoot: optionalResolvedFlag("host-root"),
+            statePath: optionalResolvedFlag("state"),
+            hostConfigPath: optionalResolvedFlag("host-config-out"),
+            ...(smokeConnectOverride ? { smokeConnectOverride } : {}),
+            ...(extra.deployBatchId ? { deployBatchId: extra.deployBatchId } : {}),
+          }),
   });
   console.log(
     JSON.stringify(

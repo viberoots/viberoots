@@ -10,16 +10,23 @@ import type {
   DeploymentAdmissionCheckFact,
   DeploymentAdmissionEvidence,
   DeploymentCheckEvidence,
+  DeploymentCompatibilityExceptionEvidence,
   DeploymentPolicyBinding,
   DeploymentPrerequisiteFact,
 } from "./deployment-admission-evidence";
-import { resolveAllDeployments } from "./deployment-query";
 import {
   latestSuccessfulDeploymentRecord,
   sourceAdmissionChecks,
   type DeploymentRunRecordLike,
 } from "./deployment-admission-records";
 import { assertFoundationMigrationPrerequisite } from "./deployment-foundation-prerequisites";
+import { validatePhase0PrerequisiteRecord } from "./deployment-phase0-admission";
+import { assertPhase0ConsoleMigrationChain } from "./deployment-phase0-prerequisite-chain";
+import { parsePhase0ReleaseMember } from "./deployment-phase0-release";
+import {
+  deploymentsForWorkspace,
+  prerequisiteProvidersForWorkspace,
+} from "./deployment-prerequisite-workspace";
 
 export type AdmittedContextLike = {
   source: {
@@ -30,6 +37,7 @@ export type AdmittedContextLike = {
   targetEnvironment: {
     providerTargetIdentity: string;
   };
+  phase0CompatibilityException?: DeploymentCompatibilityExceptionEvidence;
 };
 
 export function sourceRevisionFor(
@@ -127,22 +135,6 @@ function mismatchDetail(opts: {
   return `protected/shared admission requires check ${opts.name} for subject(s) ${opts.requiredSubjects.join(", ")}`;
 }
 
-const prerequisiteProviderMaps = new Map<string, Promise<Map<string, string>>>();
-
-async function prerequisiteProvidersForWorkspace(workspaceRoot: string) {
-  let hit = prerequisiteProviderMaps.get(workspaceRoot);
-  if (!hit) {
-    hit = resolveAllDeployments(workspaceRoot)
-      .then(
-        (deployments) =>
-          new Map(deployments.map((deployment) => [deployment.deploymentId, deployment.provider])),
-      )
-      .catch(() => new Map<string, string>());
-    prerequisiteProviderMaps.set(workspaceRoot, hit);
-  }
-  return await hit;
-}
-
 export async function prerequisiteFacts(opts: {
   workspaceRoot: string;
   recordsRoot: string;
@@ -156,12 +148,18 @@ export async function prerequisiteFacts(opts: {
   const prerequisites = opts.deployment.prerequisites;
   if (prerequisites.length === 0) return facts;
   const explicitProviders = opts.prerequisiteProvidersByDeploymentId || {};
+  const deploymentMember = parsePhase0ReleaseMember(opts.deployment.deploymentId);
+  const needsPhase0Chain = deploymentMember?.component === "console";
   const needsWorkspaceDiscovery = prerequisites.some(
     (prerequisite) => !explicitProviders[prerequisite.deploymentId],
   );
   const providerMap = needsWorkspaceDiscovery
     ? await prerequisiteProvidersForWorkspace(opts.workspaceRoot)
     : new Map<string, string>();
+  const deploymentMap =
+    needsWorkspaceDiscovery || needsPhase0Chain
+      ? await deploymentsForWorkspace(opts.workspaceRoot)
+      : new Map<string, DeploymentTarget>();
   for (const prerequisite of prerequisites) {
     const prerequisiteProvider =
       explicitProviders[prerequisite.deploymentId] || providerMap.get(prerequisite.deploymentId);
@@ -184,6 +182,17 @@ export async function prerequisiteFacts(opts: {
         record: hit.record,
         requiredRevision: sourceRevisionFor(opts.admittedContext, undefined),
       });
+    }
+    const phase0RecordErrors = validatePhase0PrerequisiteRecord({
+      deployment: opts.deployment,
+      prerequisiteId: prerequisite.deploymentId,
+      record: hit.record,
+      admittedContext: opts.admittedContext,
+    });
+    if (phase0RecordErrors.length > 0) {
+      throw new DeploymentAdmissionError("no_longer_admitted", phase0RecordErrors.join("\n"));
+    }
+    if (prerequisite.deploymentId.startsWith("platform-foundation-")) {
       facts.push({
         deploymentId: prerequisite.deploymentId,
         mode: prerequisite.mode,
@@ -211,6 +220,15 @@ export async function prerequisiteFacts(opts: {
           `health_gated prerequisite lacks fresh health evidence: ${prerequisite.deploymentId}`,
         );
       }
+      await assertPhase0ConsoleMigrationChain({
+        ...opts,
+        prerequisiteId: prerequisite.deploymentId,
+        requiredRevision: sourceRevisionFor(opts.admittedContext, undefined),
+        prerequisiteRecord: hit.record,
+        deploymentMap,
+        providerMap,
+        explicitProviders,
+      });
       facts.push({
         deploymentId: prerequisite.deploymentId,
         mode: prerequisite.mode,

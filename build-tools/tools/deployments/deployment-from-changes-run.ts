@@ -5,6 +5,7 @@ import type {
   DeploymentChangeReason,
   DeploymentFromChangesPlan,
 } from "./deployment-from-changes-selection";
+import { orderPhase0DeploymentsForRemoval } from "./deployment-phase0-release";
 
 export type DeploymentBatchRunResult = {
   deploymentId: string;
@@ -34,6 +35,7 @@ export type DeploymentFromChangesBatchResult = {
   changedPaths: string[];
   directDeploymentIds: string[];
   deploymentOrder: string[];
+  operationKind: "deploy" | "remove";
   deployBatchId?: string;
   results: DeploymentBatchRunResult[];
 };
@@ -64,17 +66,24 @@ export async function runDeploymentBatchFromChanges(opts: {
   plan: DeploymentFromChangesPlan;
   deployBatchId?: string;
   group: boolean;
+  operationKind?: "deploy" | "remove";
   runDeployment: (
     deployment: DeploymentTarget,
     extra: { deployBatchId?: string },
   ) => Promise<DeploymentBatchRunResult["result"]>;
 }): Promise<DeploymentFromChangesBatchResult> {
   const deployBatchId = opts.deployBatchId || (opts.group ? createDeployBatchId() : undefined);
+  const operationKind = opts.operationKind || "deploy";
+  const selectedDeployments =
+    operationKind === "remove"
+      ? orderPhase0DeploymentsForRemoval(opts.plan.selectedDeployments)
+      : opts.plan.selectedDeployments;
   const statusesByDeploymentId = new Map<string, DeploymentBatchRunResult["status"]>();
   const results: DeploymentBatchRunResult[] = [];
 
-  for (const deployment of opts.plan.selectedDeployments) {
-    const blockedBy = unsatisfiedHealthGates(deployment, statusesByDeploymentId);
+  for (const deployment of selectedDeployments) {
+    const blockedBy =
+      operationKind === "remove" ? [] : unsatisfiedHealthGates(deployment, statusesByDeploymentId);
     if (blockedBy.length > 0) {
       const blocked: DeploymentBatchRunResult = {
         deploymentId: deployment.deploymentId,
@@ -119,7 +128,8 @@ export async function runDeploymentBatchFromChanges(opts: {
     mode: "from-changes",
     changedPaths: opts.plan.changedPaths,
     directDeploymentIds: opts.plan.directDeploymentIds,
-    deploymentOrder: opts.plan.selectedDeployments.map((deployment) => deployment.deploymentId),
+    deploymentOrder: selectedDeployments.map((deployment) => deployment.deploymentId),
+    operationKind,
     ...(deployBatchId ? { deployBatchId } : {}),
     results,
   };
