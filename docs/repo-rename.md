@@ -1,0 +1,470 @@
+# Repository Rename Plan
+
+This plan migrates the repository from the temporary `bucknix`, `bnx`, and deployment-facing
+`common` names to `viberoots`.
+
+Reviewed context:
+
+- `bucknix` appears in repository/package metadata, the ESLint plugin name, artifact metadata,
+  temp/cache path prefixes, test fixtures, generated logs, and docs.
+- `bnx` appears as the short prefix for environment variables, temp files, debug tags, globals, and
+  Kubernetes labels.
+- `common` is overloaded. Some occurrences are ordinary shared-code terminology, such as
+  `defs_common.bzl`, `templates-common.nix`, local variables named `common`, and prose like
+  "common failures". Those should not be blindly renamed. The deployment-facing uses that mean the
+  temporary repository/service identity should move to `viberoots`, including `/srv/common`,
+  `kiltyj/common`, and `git@github.com:kiltyj/common.git`.
+- Repository identity also appears as `bucknix-fresh`, `kiltyj/bucknix-fresh`, absolute local paths
+  containing `/bucknix-fresh/`, and possible Git remote URLs derived from those strings.
+- Active code and tests also contain completed-plan and completed-phase references such as
+  `pr14_latency`, `deployment-auth-session.pr90.docs.test.ts`, `PR-7 zero-wasm default`, and
+  `Phase-5 PR-10 policy`. These PR and phase numbers should not remain in code-facing identifiers
+  once the related plans have been implemented.
+- Active code also contains pre-launch compatibility and migration-era labels such as `legacy*`,
+  internal `v1`/`v2` helper or contract names, and first-version schema names. Because this repo has
+  not launched and has no external users, these labels should either become canonical behavior names
+  or be removed when they only exist to preserve an abandoned migration path.
+
+Canonical replacements:
+
+- `bucknix` -> `viberoots`
+- `Bucknix` -> `Viberoots`
+- `BUCKNIX` -> `VIBEROOTS`
+- `bnx` -> `vbr`
+- `Bnx` -> `Vbr`
+- `BNX` -> `VBR`
+- repo identity `bucknix-fresh` -> `viberoots`
+- repository slug `kiltyj/bucknix-fresh` -> `kiltyj/viberoots`
+- repository remote URL `git@github.com:kiltyj/bucknix-fresh.git` ->
+  `git@github.com:kiltyj/viberoots.git`
+- deployment repo path `/srv/common` -> `/srv/viberoots`
+- deployment repository `kiltyj/common` -> `kiltyj/viberoots`
+- deployment remote URL `git@github.com:kiltyj/common.git` -> `git@github.com:kiltyj/viberoots.git`
+
+Non-goals:
+
+- no docs-only PRs
+- no tests-only PRs
+- no compatibility aliases for old names or old public env vars
+- no blind replacement of ordinary `common` helper names, prose, or shared utility filenames
+- no renaming of unrelated product names such as `pleomino`
+- no generated build output churn unless the source that produces it is also updated in the same PR
+- no broad rewrite of historical plan documents solely to remove `PR-N` section headings
+- no broad replacement of real protocol, package, tool, or third-party version strings such as
+  `/api/v1`, Vault `/v1` or `kv-v2`, Go/npm module versions, Buck `buck-out/v2`, or Git porcelain
+  `v1`
+
+Each PR below must update this plan if implementation changes invalidate the remaining sequence,
+scope, or assumptions.
+
+## PR-1: Public package, plugin, artifact, and temp-name rename
+
+### 1. Intent
+
+Move repository-facing `bucknix` names to `viberoots` where they do not require changing the `BNX`
+runtime contract yet.
+
+### 2. Scope of changes
+
+- Rename package and flake-facing identity from `bucknix-fresh` to `viberoots`.
+- Rename repository slug and remote identity strings such as `kiltyj/bucknix-fresh` and
+  `git@github.com:kiltyj/bucknix-fresh.git` to the `viberoots` equivalents.
+- Rename the local ESLint plugin directory, import binding, plugin key, and rule names from
+  `bucknix` to `viberoots`.
+- Rename active uppercase `BUCKNIX` variables and sentinels such as `_BUCKNIX_DEVSHELL_ACTIVE` and
+  `_BUCKNIX_DEVSHELL_ROOT` to `_VIBEROOTS_*`.
+- Rename artifact marker files and metadata such as `bucknix.json` to `viberoots.json`.
+- Rename temp/cache/lock prefixes such as `bucknix-patch-*`, `bucknix-verify*`,
+  `bucknix-test-*`, `bucknix-locks`, `bucknix-pnpm*`, and `bucknix-reaper-*` to
+  `viberoots-*`.
+- Update source tests, fixtures, and docs that assert these names.
+- Audit file and directory names containing `bucknix` and rename them when they are checked-in
+  source paths rather than historical generated output.
+
+### 3. External prerequisites
+
+- Developers should be ready to recreate local temp/cache state under the new prefixes.
+- Any local scripts referring to the repository directory as `bucknix-fresh` must be updated outside
+  this repo.
+
+### 4. Tests to be added
+
+- Update ESLint plugin tests or enforcement tests so only the `viberoots/...` plugin key is accepted.
+- Update artifact contract tests to assert `viberoots.json` and reject stale `bucknix.json` output.
+- Update temp path, lock path, seed path, patch path, and reaper tests to assert `viberoots-*`
+  prefixes.
+- Add or update a no-stale-name enforcement test for checked-in source files that fails on
+  `bucknix`, `Bucknix`, `BUCKNIX`, `bucknix-fresh`, `kiltyj/bucknix-fresh`, and old remote URLs
+  outside explicitly allowed historical docs.
+
+### 5. Docs to be added or updated
+
+- Update build-system docs that mention temp workspaces, lock directories, verifier roots, or
+  artifact metadata.
+- Update testing docs that mention `bucknix-*` temp paths.
+- Update app and deployment docs that contain absolute local paths under `bucknix-fresh` or
+  repository slugs containing `bucknix-fresh`.
+
+### 6. Acceptance criteria
+
+- Checked-in source no longer uses `bucknix`, `Bucknix`, `BUCKNIX`, or `bucknix-fresh` for active
+  package, plugin, artifact, temp, or cache naming.
+- Active source and operator docs no longer use `kiltyj/bucknix-fresh`, old `bucknix-fresh` remote
+  URLs, or absolute local paths containing `/bucknix-fresh/`.
+- The ESLint config loads the renamed plugin and existing lint rules still run.
+- Tests that previously asserted `bucknix-*` active behavior now assert `viberoots-*`.
+
+### 7. Risks
+
+- Temp path changes can leave stale local locks, caches, or reaper state behind.
+- Plugin rename can silently disable lint rules if config and rule IDs are not updated together.
+- Some docs contain historical log paths where changing them may reduce diagnostic value.
+
+### 8. Mitigations
+
+- Add explicit stale-name enforcement for active source surfaces.
+- Keep historical build-log documents out of mechanical source assertions unless they describe active
+  commands.
+- Run targeted plugin, artifact, temp-path, and verifier tests before the full suite.
+
+### 9. Consequences of not implementing this PR
+
+The repository would continue exposing the old name in package metadata, lint rule IDs, artifact
+files, and developer-visible temp paths.
+
+### 10. Downsides for implementing this PR
+
+It invalidates local caches and any private scripts that refer to old temp or plugin names.
+
+## PR-2: Short-prefix runtime contract rename from BNX/bnx to VBR/vbr
+
+### 1. Intent
+
+Replace the `bnx` abbreviation and `BNX` environment-variable namespace with the `vbr`/`VBR`
+namespace across active build, verify, deployment, and developer tooling.
+
+### 2. Scope of changes
+
+- Rename all active `BNX_*` environment variables to `VBR_*`.
+- Rename shell temp files and command fragments such as `bnx-nix-outpaths.txt`,
+  `bnx-workspace-root.phys`, `bnx-flk-root.*`, and `bnx-flake-*` to `vbr-*`.
+- Rename debug tags such as `[BNX-BUNDLE-DEBUG]` to `[VBR-BUNDLE-DEBUG]`.
+- Rename internal globals and sentinels such as `__bnxVerifyProcessRegistered` and
+  `__bnx_impure_env_probe__` to `__vbr...`.
+- Rename labels and metadata prefixes such as `bnx.componentId` and `bnx.artifactPath` to
+  `vbr.componentId` and `vbr.artifactPath`.
+- Update all call sites, tests, docs, fixtures, and generated examples in the same PR.
+- Decide during implementation whether any generated artifacts need source regeneration or can be
+  ignored as build output.
+
+### 3. External prerequisites
+
+- CI, developer shells, deployment workers, Vault/bootstrap runbooks, and any local `.env` files must
+  be prepared to use `VBR_*` variables.
+- Operators should treat this as a breaking env-var rename.
+
+### 4. Tests to be added
+
+- Update verifier, seed-store, requested-scope, deployment-scope, materialization, safehouse,
+  deployment, and node/Nix tests to use `VBR_*`.
+- Add negative tests proving stale `BNX_*` variables are not accepted for active runtime paths after
+  migration.
+- Update command-assembly tests to assert `vbr-*` temp files and `VBR_*` exported variables.
+- Update Kubernetes publisher tests to assert `vbr.*` labels.
+
+### 5. Docs to be added or updated
+
+- Update `TESTING.md`, build-system docs, deployment docs, secrets docs, Vault bootstrap docs, and
+  NixOS shared-host docs for the `VBR_*` runtime contract.
+- Add a concise migration note listing the old `BNX_*` variables and their `VBR_*` replacements.
+
+### 6. Acceptance criteria
+
+- Active source, tests, and operator docs use `VBR_*`, `vbr-*`, and `vbr.*` instead of
+  `BNX_*`, `bnx-*`, and `bnx.*`.
+- Stale `BNX_*` usage is blocked by enforcement or explicit negative tests.
+- The normal `i && b && v` validation flow runs using the new environment namespace.
+
+### 7. Risks
+
+- This PR touches many shell-command strings, so partial rename failures can appear only at runtime.
+- External CI and operator environments may break immediately if not updated with the code.
+- Some uppercase `BNX` hits can appear inside third-party lockfile integrity strings and must not be
+  changed.
+
+### 8. Mitigations
+
+- Use structured searches and targeted tests for every env-var family.
+- Exclude third-party lockfiles and content-addressed integrity strings from mechanical replacement.
+- Document the breaking env-var migration in the same PR that changes the code.
+
+### 9. Consequences of not implementing this PR
+
+The public runtime namespace would continue to carry the old abbreviation even after the repository
+and package name have moved.
+
+### 10. Downsides for implementing this PR
+
+It is a broad breaking change for scripts, CI, deployment workers, and operator muscle memory.
+
+## PR-3: Deployment repository identity rename from common to viberoots
+
+### 1. Intent
+
+Replace deployment-facing uses of the temporary `common` repository identity with `viberoots`
+without disturbing ordinary shared-helper uses of the word "common".
+
+### 2. Scope of changes
+
+- Replace reviewed repository metadata from `kiltyj/common` to `kiltyj/viberoots`.
+- Replace reviewed remote URLs from `git@github.com:kiltyj/common.git` to
+  `git@github.com:kiltyj/viberoots.git`.
+- Replace remote host repository paths from `/srv/common` to `/srv/viberoots`.
+- Update NixOS shared-host defaults, prompts, command assembly, docs, and fixtures.
+- Update deployment auth, governance, control-plane, remote execution, and Vault tests that assert
+  repository identity claims.
+- Leave ordinary `common` helper names unchanged, including `defs_common.bzl`,
+  `templates-common.nix`, `node-modules/common.nix`, local variables named `common`, and prose that
+  uses "common" in its normal English meaning.
+
+### 3. External prerequisites
+
+- Shared hosts must have the repository checked out or mounted at `/srv/viberoots`.
+- GitHub repository identity and deployment identity claims must be updated to
+  `kiltyj/viberoots`.
+- Any existing remote service config that points at `/srv/common` must be migrated with the code
+  rollout.
+
+### 4. Tests to be added
+
+- Update NixOS shared-host install, prompt, remote-plan, remote-exec, Jenkins, and operator-docs
+  tests to assert `/srv/viberoots`.
+- Update deployment control-plane, auth diagnostics, admin Vault, and remote execution tests to
+  assert `kiltyj/viberoots` and the new remote URL.
+- Add a targeted stale-identity test that fails on active deployment fixtures containing
+  `/srv/common`, `kiltyj/common`, or `git@github.com:kiltyj/common.git`.
+
+### 5. Docs to be added or updated
+
+- Update NixOS shared-host setup, usage, technician checklist, Vault bootstrap, deployments usage,
+  scenarios, secrets, and deployment contract docs that describe reviewed repo identity or remote
+  host paths.
+- Update operator examples to use `/srv/viberoots` and `kiltyj/viberoots`.
+- Update this plan if implementation discovers another concrete deployment identity string that must
+  be renamed with this PR.
+
+### 6. Acceptance criteria
+
+- Active deployment code and tests no longer use `/srv/common`, `kiltyj/common`, or the old Git
+  remote URL.
+- Shared-host docs and prompts consistently instruct operators to use `/srv/viberoots`.
+- Ordinary helper names containing `common` remain stable where they describe shared code rather than
+  repository identity.
+
+### 7. Risks
+
+- A blind `common` replacement would rename many shared helper surfaces incorrectly.
+- Remote hosts and identity-provider claims may be updated out of order with the repo change.
+- Historical docs can contain examples that look active but are actually design history.
+
+### 8. Mitigations
+
+- Restrict replacement to concrete identity strings and reviewed remote path defaults.
+- Add stale-identity tests scoped to deployment fixtures and active operator docs.
+- Keep design-history changes limited to active instructions or examples that are still referenced.
+
+### 9. Consequences of not implementing this PR
+
+Deployment flows would continue to refer to the temporary repository name even after the codebase is
+renamed.
+
+### 10. Downsides for implementing this PR
+
+It requires synchronized host-path, repository-claim, and operator-runbook updates.
+
+## PR-4: Final stale-name enforcement, migration-label cleanup, and generated surface cleanup
+
+### 1. Intent
+
+Close rename gaps after the active code migrations by enforcing the new naming contract, removing
+completed-plan PR-number and phase-number references from active code surfaces, removing pre-launch
+`legacy` and internal version labels where they are only migration scaffolding, and cleaning up any
+generated or scaffold surfaces that still emit old names.
+
+### 2. Scope of changes
+
+- Add or tighten repository-wide stale-name checks for active source, tests, templates, scaffolds,
+  docs, and checked-in generated examples.
+- Regenerate or update scaffold outputs that still emit `bucknix`, `bnx`, `BNX`, or deployment
+  identity `common`.
+- Rename active targets, test files, test names, fixtures, helper files, convention allowlists, and
+  inventories that encode completed plan or phase numbers, such as `pr14_latency`, `phase0`,
+  `deployment-control-plane.pr92.docs.test.ts`, `deployment-service-pr88.docs.test.ts`, and
+  `webapp.phase4-regression-contract.pr1.test.ts`, to durable behavior-based names.
+- Remove or rename active compatibility surfaces labeled `legacy` when there is no current external
+  compatibility requirement. Examples to review include legacy command aliases, legacy manifest
+  fallback readers, legacy deployment metadata fallbacks, legacy template ids, and legacy
+  single-module watcher paths.
+- Rename internal `v1`/`v2` names when they mean "old helper", "new helper", "first contract", or
+  "preferred version" rather than a real external protocol/schema/tool version. Preferred helper
+  surfaces should be versionless canonical names; older surfaces should be removed or explicitly
+  quarantined behind behavior names if still needed for tests.
+- Keep real external version identifiers unchanged, including HTTP API paths, Vault API and KV
+  versions, package/module versions, Buck output-layout versions, Git porcelain versions, and
+  intentionally versioned long-lived schemas whose version number is part of the contract.
+- During PR-4 implementation, use a temporary reviewed rename inventory for active code-facing
+  identifiers that need coordinated replacement across files. Each entry should include the stale
+  token, path, target, or command surface; the chosen behavior-based replacement; the owning PR; and
+  whether mechanical replacement is safe.
+- Use the temporary rename inventory to keep code, tests, Buck targets, docs, convention allowlists,
+  and command inventories aligned when a stale identifier appears in multiple places.
+- Do not use the temporary rename inventory as a blind global replacement source. Context-sensitive
+  terms such as `common`, `legacy`, `v1`/`v2`, `PR-N`, and `phase<N>` still require reviewed
+  classification and explicit allowlist entries when retained.
+- Resolve every temporary rename inventory entry before PR-4 is complete. Each entry must end as
+  renamed, removed, or retained in the enforcement allowlist with a narrow reason.
+- Delete the temporary rename inventory before PR-4 merges. Long-term state belongs in enforcement
+  rules, tests, and explicit allowlists, not an old-name-to-new-name migration database.
+- Add a fast repo-name, completed-plan/phase-number, and migration-label lint command that can run on
+  a scoped path list for pre-commit and on the full active-source set for verify/CI.
+- Wire the lint command into `.husky/pre-commit` through the existing `lint-staged` flow so staged
+  active-source files cannot introduce old names, completed plan/phase-numbered identifiers, or
+  unapproved migration labels.
+- Wire the same lint command into the verify/test suite, preferably through the existing verify lint
+  preflight plus explicit Buck/Node tests, so bypassing hooks still fails in normal validation.
+- Update any active docs or command inventories that reference the renamed targets or files.
+- Keep `PR-N` headings in plan documents where they are the document's planning structure, but avoid
+  copying those numbers, or completed phase numbers such as `phase0` / `Phase-0`, into code
+  identifiers, test descriptions, target names, fixtures, or operational commands.
+- Review `docs/design-history`, `docs/build-history`, and checked-in app `dist` files and either
+  update active instructions or explicitly exclude inert historical/generated content from
+  stale-name checks.
+- Update repo-skill, handbook, methodology exception, and plugin docs if they surface old names.
+- Add a short contributor convention documenting the canonical name and abbreviation:
+  `viberoots` / `Viberoots` / `VIBEROOTS` and `vbr` / `Vbr` / `VBR`.
+
+### 3. External prerequisites
+
+- PR-1 through PR-3 should be merged first so enforcement can be strict without blocking active
+  migration work.
+- Generated artifacts should be reproducible from current source before refreshing them.
+- The lint command should be cheap enough to run in pre-commit on staged files without noticeably
+  slowing normal commits.
+
+### 4. Tests to be added
+
+- Add a repository-wide stale-name enforcement test with explicit allowlists for third-party
+  lockfile integrity strings and inert historical records.
+- Add an active-code plan-number enforcement test or extend the stale-name enforcement test to
+  reject behaviorally meaningless `pr<N>` / `PR-<N>` and `phase<N>` / `Phase-<N>` identifiers in
+  source paths, Buck target names, test names, fixture names, and active command examples.
+- Add active-code migration-label enforcement for unapproved `legacy` names and internal
+  `v1`/`v2` labels, with allowlists only for reviewed external versions and intentionally versioned
+  long-lived schema boundaries.
+- Add tests or fixtures for the temporary rename inventory proving duplicate stale identifiers
+  resolve to one reviewed replacement and context-sensitive entries cannot be applied as blind
+  replacements while the inventory exists.
+- Add closeout validation proving the temporary rename inventory has been deleted and any retained
+  entries have moved to explicit enforcement allowlists with narrow reasons.
+- Add pre-commit wiring tests proving `.husky/pre-commit` / `lint-staged` invokes the new lint command
+  for relevant staged file types.
+- Add verify-preflight tests proving the normal `v` path runs the new lint command and reports
+  actionable diagnostics for old names, completed plan/phase-numbered identifiers, and unapproved
+  migration labels.
+- Add scaffold rendering tests proving new projects emit `viberoots` and `VBR_*` where applicable.
+- Add docs-link or docs-contract tests for active operator docs that previously contained old
+  absolute paths or completed plan/phase-numbered target/file references.
+
+### 5. Docs to be added or updated
+
+- Update contributor and tooling docs with the canonical naming rules and the stale-name allowlist
+  policy.
+- Document that completed-plan PR numbers and completed phase numbers must not be used in active code
+  identifiers, test names, target names, fixture names, or operational command examples; use behavior
+  names instead.
+- Document that active `legacy` compatibility paths are not kept solely for hypothetical pre-launch
+  users. Remove them where possible; otherwise rename them to the behavior they preserve and record a
+  narrow reason.
+- Document when internal version labels are allowed. Version labels are acceptable for external
+  protocols, third-party APIs, package/module versions, tool-owned layouts, and reviewed long-lived
+  schemas; they are not acceptable for "current preferred helper" or one-off migration surfaces.
+- Document the temporary rename inventory format and review policy, including how to record the stale
+  identifier, chosen replacement, owning PR, mechanical-replacement safety, and final resolution.
+- Document that the temporary rename inventory is deleted before PR-4 merges and that long-term
+  exceptions live only in enforcement allowlists with narrow reasons.
+- Document that the same enforcement runs in pre-commit and verify/CI, and include the command to run
+  it manually when cleaning up violations.
+- Update scaffold docs and examples if generated templates expose the repo name or abbreviation.
+- Update this plan with any intentionally retained historical old-name references and the reason each
+  one is excluded from active-source enforcement.
+- Update this plan with any intentionally retained PR-number or phase-number references and the
+  reason each one is excluded from active-code enforcement.
+- Update this plan with any intentionally retained active `legacy`, internal `v1`, or internal `v2`
+  references and the reason each one is excluded from migration-label enforcement.
+
+### 6. Acceptance criteria
+
+- A clean search of active source surfaces has no unapproved `bucknix`, `Bucknix`, `BUCKNIX`,
+  `bucknix-fresh`, `kiltyj/bucknix-fresh`, `bnx`, `Bnx`, `BNX`, `/srv/common`, `kiltyj/common`,
+  or old remote URL hits.
+- Active code, tests, Buck targets, fixtures, and command examples no longer use completed-plan
+  identifiers such as `pr<N>`, `PR-<N>`, or `phase<N>` when a behavior-based name would be clearer.
+- Active code, tests, Buck targets, fixtures, and command examples no longer use `legacy` labels for
+  pre-launch compatibility paths unless there is an explicit reviewed reason.
+- Internal helper, test, fixture, and contract names no longer use `v1`/`v2` to mean old/new,
+  first/preferred, or migration-era versioning when a canonical behavior name would be clearer.
+- Coordinated active identifier renames are recorded in the temporary rename inventory before or
+  alongside the code changes that consume them.
+- The temporary rename inventory is deleted before PR-4 merges, with all retained exceptions moved to
+  explicit enforcement allowlists.
+- Any remaining old-name hits are in an explicit allowlist with a narrow reason.
+- Any remaining PR-number or phase-number hits are either in historical plan documents or in an
+  explicit allowlist with a narrow reason.
+- Any remaining active `legacy`, internal `v1`, or internal `v2` hits are either real external
+  version identifiers or in an explicit allowlist with a narrow reason.
+- Pre-commit rejects staged active-source files that introduce old names or completed plan/phase
+  numbered identifiers or unapproved migration labels.
+- The verify/test suite rejects old names, completed plan/phase numbered identifiers, and unapproved
+  migration labels even when hooks are skipped.
+- New scaffolded projects and active generated examples use the new naming contract.
+
+### 7. Risks
+
+- Repository-wide enforcement can create noisy failures if it scans third-party or historical
+  artifacts without an allowlist.
+- Regenerating checked-in outputs can create large diffs that obscure the actual rename.
+- Over-tight checks can block legitimate words like `common` in shared-helper contexts.
+- Over-tight plan-number checks can accidentally reject valid external issue IDs, protocol versions,
+  changelog entries, phase names that describe active runtime concepts, or historical planning
+  sections.
+- Over-tight migration-label checks can reject legitimate external versions, package versions,
+  Vault/Buck/Git-owned version strings, or intentionally versioned long-lived schemas.
+- Pre-commit enforcement can frustrate small commits if it scans too broadly or emits vague
+  diagnostics.
+
+### 8. Mitigations
+
+- Scope enforcement to identity strings rather than the bare English word `common`.
+- Scope PR-number and phase-number enforcement to active code identifiers, test descriptions, target
+  names, fixture names, and operational command examples rather than historical plan structure.
+- Scope migration-label enforcement to active repo-owned identifiers and prose. Do not match
+  third-party package versions, protocol paths, Vault/Buck/Git version strings, or reviewed schema
+  versions whose number is part of the contract.
+- Keep the temporary rename inventory reviewed and behavior-oriented while it exists; it should
+  coordinate exact chosen names, not replace the classification step for contextual tokens.
+- Make the pre-commit path-list mode scan only staged relevant files, while verify/CI performs the
+  full active-source scan.
+- Emit replacement-oriented diagnostics that name the matched token, file, and expected category of
+  behavior-based replacement.
+- Keep allowlists path-specific and reviewed in code.
+- Regenerate only artifacts that are intentionally checked in and consumed by tests or docs.
+
+### 9. Consequences of not implementing this PR
+
+Old names, completed-plan PR-number or phase-number identifiers, and pre-launch migration labels
+would gradually reappear through scaffolds, docs, generated examples, tests, or partial manual edits.
+
+### 10. Downsides for implementing this PR
+
+It adds ongoing maintenance for stale-name, plan-number, and migration-label allowlists and may
+require updating tests whenever new historical docs are added.
