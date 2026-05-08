@@ -35,9 +35,22 @@ export const ACTIVE_DOC_COMMAND_CONTRACT: DocCommandContractEntry[] = [
     requiredFragments: [
       "scaf new ts webapp-ssr-vite demo-vite-ssr --yes",
       "scaf new deployment cloudflare-pages console-staging",
+      "scaf new deployment cloudflare-containers console-ssr-staging",
+      "scaf new deployment cloudflare-containers api-private",
+      "scaf new deployment cloudflare-containers worker-none",
       "build-tools/tools/dev/build-wasm-producer.ts",
       "Hash-only or browser-storage-only client state is a poor fit for SSR-first ownership",
       "pnpm run preview -- --host 127.0.0.1 --port 4173",
+    ],
+  },
+  {
+    path: "docs/deployments-usage.md",
+    requiredFragments: [
+      "scaf new deployment cloudflare-pages <deployment-id>",
+      "scaf new deployment cloudflare-containers <deployment-id>",
+      "scaf new deployment cloudflare-containers console-ssr-staging",
+      "scaf new deployment cloudflare-containers api-private",
+      "scaf new deployment cloudflare-containers worker-none",
     ],
   },
 ];

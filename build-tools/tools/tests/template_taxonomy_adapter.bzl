@@ -4,6 +4,7 @@
 CANONICAL_TEMPLATE_IDS = [
     "cpp/cli",
     "cpp/lib",
+    "deployment/cloudflare-containers",
     "deployment/cloudflare-pages",
     "deployment/opentofu-foundation",
     "deployment/opentofu-provisioner",

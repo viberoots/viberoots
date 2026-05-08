@@ -3,6 +3,7 @@ import type { GraphNode } from "../lib/graph";
 import { createDeploymentExtractionContext, uniqueErrors } from "./contract-extract-shared";
 import { extractAppStoreConnectDeploymentsFromContext } from "./contract-extract-app-store-connect";
 import { extractCloudflarePagesDeploymentsFromContext } from "./contract-extract-cloudflare-pages";
+import { extractCloudflareContainersDeploymentsFromContext } from "./contract-extract-cloudflare-containers";
 import { extractGooglePlayDeploymentsFromContext } from "./contract-extract-google-play";
 import { extractKubernetesDeploymentsFromContext } from "./contract-extract-kubernetes";
 import { extractNixosSharedHostDeploymentsFromContext } from "./contract-extract-nixos-shared-host";
@@ -21,6 +22,14 @@ export function extractCloudflarePagesDeployments(nodes: GraphNode[]) {
   const context = createDeploymentExtractionContext(nodes);
   return {
     deployments: extractCloudflarePagesDeploymentsFromContext(context),
+    errors: uniqueErrors(context.errors),
+  };
+}
+
+export function extractCloudflareContainersDeployments(nodes: GraphNode[]) {
+  const context = createDeploymentExtractionContext(nodes);
+  return {
+    deployments: extractCloudflareContainersDeploymentsFromContext(context),
     errors: uniqueErrors(context.errors),
   };
 }
@@ -68,6 +77,7 @@ export function extractVercelDeployments(nodes: GraphNode[]) {
 export * from "./contract-types";
 export * from "./contract-extract";
 export * from "./contract-extract-cloudflare-pages";
+export * from "./contract-extract-cloudflare-containers";
 export * from "./contract-extract-app-store-connect";
 export * from "./contract-extract-google-play";
 export * from "./contract-extract-kubernetes";

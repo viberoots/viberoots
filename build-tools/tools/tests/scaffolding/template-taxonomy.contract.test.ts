@@ -25,6 +25,7 @@ const EXPECTED_TS_TEMPLATE_IDS = [
 ];
 
 const EXPECTED_DEPLOYMENT_TEMPLATE_IDS = [
+  "deployment/cloudflare-containers",
   "deployment/cloudflare-pages",
   "deployment/opentofu-foundation",
   "deployment/opentofu-provisioner",

@@ -582,6 +582,109 @@ Normative-source note:
 - `pleomino-staging` uses `cloudflare-pages` with protection class `shared_nonprod`
 - `pleomino-prod` uses `cloudflare-pages` with protection class `production_facing`
 
+## Capability Entry: `cloudflare-containers`
+
+### Identity
+
+- `provider`: `cloudflare-containers`
+- canonical target identity fields:
+  - `account_id`
+  - `worker`
+- canonical lock-key shape:
+  - `cloudflare-containers:<account_id>/<worker>`
+
+### Component Support
+
+- supported component kinds:
+  - `ssr-webapp`
+  - `service`
+  - `third-party-service`
+- multi-component support:
+  - not supported for protected/shared use
+  - deployments must contain exactly one containerized component
+- additional unsupported shapes:
+  - ambient local Docker builds in protected/shared mutation
+  - provider-side Git auto-builds as the authoritative artifact source
+
+### Rollout Support
+
+- default rollout mode:
+  - `all_at_once`
+- rollout-policy omission posture:
+  - omission is reviewed only for the single-component local/fake publisher slice
+  - advanced rollout policy requires a later reviewed live publisher contract
+- supported rollout modes:
+  - `all_at_once`
+- unsupported rollout modes:
+  - `all_or_nothing`
+  - `ordered_best_effort`
+  - `parallel_best_effort`
+  - `canary`
+  - `blue_green`
+  - `phased`
+  - `store_staged`
+
+### Preview Support
+
+- preview support:
+  - not reviewed for the initial Containers provider slice
+- preview isolation model:
+  - no preview target derivation is currently reviewed
+- preview cleanup default:
+  - not supported
+- preview lock-scope default:
+  - normal deployment lock only
+- required guarantees:
+  - separate reviewed PR before preview mutation is allowed
+
+### Smoke / Release Health
+
+- default smoke model:
+  - public ingress may use HTTP smoke against the configured custom domain
+  - private and no-ingress deployments rely on explicit smoke metadata or exceptions
+- preview override:
+  - not supported in the initial reviewed slice
+
+### Built-In Publisher Contract
+
+- built-in publisher type:
+  - `cloudflare-containers-local`
+- exact publish input:
+  - one admitted immutable service artifact directory or OCI image digest file
+- checked-in provider config:
+  - `wrangler.jsonc` remains provider-native Worker and Containers configuration
+  - deployment metadata remains authoritative for account, worker, ingress, and domain
+- account selection:
+  - protected/shared execution must use declared `cloudflare_account_id` metadata
+
+### Retry / Idempotency
+
+- local fake publisher retries are deterministic by artifact and config fingerprint
+- live retry and rollback require a later reviewed Cloudflare API integration
+
+### Target Transition Support
+
+- not reviewed for the initial Containers provider slice
+
+### Partial Publish Observability
+
+- records preserve admitted artifact identity, Worker config fingerprint, target identity, and smoke URL when present
+
+### Provisioner Support
+
+- not supported in the reviewed initial capability entry
+
+### Built-In `release_actions` Support
+
+- protected/shared built-in `release_actions`:
+  - not supported in the reviewed `cloudflare-containers` capability entry
+  - allowed built-in action types: none
+
+### Protected/Shared Eligibility
+
+- metadata extraction and validation are reviewed
+- protected/shared live mutation fails closed until a reviewed live publisher exists
+
 ## Capability Entry: `s3-static`
 
 ### Identity

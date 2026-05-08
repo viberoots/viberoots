@@ -1,6 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import type {
   AppStoreConnectDeployment,
+  CloudflareContainersDeployment,
   CloudflarePagesDeployment,
   DeploymentTarget,
   GooglePlayDeployment,
@@ -20,6 +21,7 @@ import {
   S3_STATIC_PROVIDER,
   VERCEL_PROVIDER,
 } from "./contract-types";
+import { CLOUDFLARE_CONTAINERS_PROVIDER } from "./cloudflare-containers-provider-target";
 
 export function isNixosSharedHostDeployment(
   deployment: DeploymentTarget,
@@ -31,6 +33,12 @@ export function isCloudflarePagesDeployment(
   deployment: DeploymentTarget,
 ): deployment is CloudflarePagesDeployment {
   return deployment.provider === CLOUDFLARE_PAGES_PROVIDER;
+}
+
+export function isCloudflareContainersDeployment(
+  deployment: DeploymentTarget,
+): deployment is CloudflareContainersDeployment {
+  return deployment.provider === CLOUDFLARE_CONTAINERS_PROVIDER;
 }
 
 export function isS3StaticDeployment(

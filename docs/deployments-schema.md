@@ -75,6 +75,25 @@ Initial reviewed `vercel` shape:
 - the initial provider slice supports repo-built prebuilt SSR artifacts only; provider-side Git
   auto-builds are not a reviewed deployment shape
 
+Initial reviewed `cloudflare-containers` shape:
+
+- canonical identity fields:
+  - `account_id`
+  - `worker`
+- canonical identity string:
+  - `cloudflare-containers:<account_id>/<worker>`
+- required runtime placement fields:
+  - `ingress_mode`: `public`, `private`, or `none`
+  - `container_port`: integer TCP port exposed by the admitted container artifact
+- public custom-domain fields:
+  - `domain`
+  - `cloudflare_zone_id`
+- protected/shared public ingress requires `domain` and `cloudflare_zone_id`
+  unless an explicit reviewed exception opts into a non-production `workers.dev`
+  endpoint
+- the initial provider slice supports admitted service/image artifacts through
+  the local/fake publisher only; protected/shared live mutation fails closed
+
 ### `vault_runtime`
 
 Optional keys:

@@ -49,6 +49,22 @@
 - Notes:
   - Downstream tools MUST use the Composite Graph API (`build-tools/tools/lib/graph-view.ts` or `build-tools/tools/buck/graph-view.ts`) rather than reading `graph.json` directly.
 
+## Cloudflare Containers Deployments
+
+- Missing domain on protected/shared public ingress:
+  add `domain` and `cloudflare_zone_id` to the deployment metadata, or set a
+  reviewed non-production `workers_dev_exception`.
+- Local Dockerfile rejected as an artifact:
+  publish inputs must be an admitted service artifact directory or an immutable
+  image digest file such as `sha256:<64 hex>`, not an ambient local Docker build.
+- Live protected/shared mutation rejected:
+  the first reviewed slice is `cloudflare-containers-local`; live Cloudflare API
+  mutation needs a later reviewed publisher that uses the secret runtime,
+  control-plane, retry, rollback, smoke, and record contracts.
+- Smoke URL missing:
+  public custom-domain deployments derive smoke URL from `domain`; private and
+  no-ingress services need explicit smoke metadata or a reviewed smoke exception.
+
 ## Overrides in CI
 
 - Ensure `NIX_GO_DEV_OVERRIDE_JSON` and `NIX_CPP_DEV_OVERRIDE_JSON` are unset. Locally, use `build-tools/tools/dev/clear-overrides.ts`.

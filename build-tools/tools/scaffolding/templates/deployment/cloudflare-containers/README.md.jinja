@@ -1,0 +1,8 @@
+# {{ name }} Cloudflare Containers Deployment
+
+This package publishes an admitted containerized artifact through a Worker-fronted Cloudflare
+Containers target.
+
+Keep `wrangler.jsonc` and `src/worker.ts` limited to provider-native settings. Deployment identity,
+artifact admission, lane policy, ingress posture, and secret/runtime requirements remain
+authoritative in `TARGETS`.

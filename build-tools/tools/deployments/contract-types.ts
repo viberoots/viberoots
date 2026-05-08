@@ -31,6 +31,7 @@ import {
 } from "./deployment-provider-targets";
 import type { OpenTofuProviderTarget } from "./opentofu-provider-target";
 import type { VercelDeployment } from "./vercel-contract-types";
+import type { CloudflareContainersDeployment } from "./cloudflare-containers-contract-types";
 
 export const STATIC_WEBAPP_COMPONENT = "static-webapp";
 export const SSR_WEBAPP_COMPONENT = "ssr-webapp";
@@ -226,6 +227,7 @@ export type GooglePlayDeployment = DeploymentBase & {
 export type DeploymentTarget =
   | NixosSharedHostDeployment
   | CloudflarePagesDeployment
+  | CloudflareContainersDeployment
   | S3StaticDeployment
   | KubernetesDeployment
   | OpenTofuDeployment
@@ -234,8 +236,8 @@ export type DeploymentTarget =
   | VercelDeployment;
 
 export type { VercelDeployment } from "./vercel-contract-types";
+export type { CloudflareContainersDeployment } from "./cloudflare-containers-contract-types";
 export * from "./deployment-contract-helpers";
-
 export function hasNixosSharedHostSsrRuntimeContract(
   component: NixosSharedHostDeploymentComponent,
 ): component is NixosSharedHostDeploymentComponent & {

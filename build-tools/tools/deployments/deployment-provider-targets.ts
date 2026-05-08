@@ -1,6 +1,7 @@
 #!/usr/bin/env zx-wrapper
 export const NIXOS_SHARED_HOST_PROVIDER = "nixos-shared-host";
 export const CLOUDFLARE_PAGES_PROVIDER = "cloudflare-pages";
+export { CLOUDFLARE_CONTAINERS_PROVIDER } from "./cloudflare-containers-provider-target";
 export const S3_STATIC_PROVIDER = "s3-static";
 export const KUBERNETES_PROVIDER = "kubernetes";
 export const OPENTOFU_PROVIDER = "opentofu";

@@ -31,6 +31,7 @@ test("reviewed provider registry is complete and deterministic", () => {
     "app-store-connect",
     "google-play",
     "cloudflare-pages",
+    "cloudflare-containers",
     "s3-static",
     "kubernetes",
     "vercel",
@@ -70,6 +71,7 @@ test("legacy lookup helpers preserve the reviewed runtime contract", () => {
   assert.equal(providerCapabilityFor("google-play")?.defaultRolloutMode, "all_at_once");
   assert.equal(providerCapabilityFor("nixos-shared-host")?.defaultRolloutMode, "all_at_once");
   assert.equal(providerCapabilityFor("cloudflare-pages")?.defaultRolloutMode, "all_at_once");
+  assert.equal(providerCapabilityFor("cloudflare-containers")?.defaultRolloutMode, "all_at_once");
   assert.equal(providerCapabilityFor("s3-static")?.defaultRolloutMode, "all_at_once");
   assert.equal(providerCapabilityFor("kubernetes")?.defaultRolloutMode, "all_at_once");
   assert.equal(providerCapabilityFor("vercel")?.defaultRolloutMode, "all_at_once");
@@ -90,6 +92,10 @@ test("legacy lookup helpers preserve the reviewed runtime contract", () => {
     rolloutPolicyOmissionInPolicy({ provider: "cloudflare-pages", componentCount: 1 }),
     true,
   );
+  assert.equal(
+    rolloutPolicyOmissionInPolicy({ provider: "cloudflare-containers", componentCount: 1 }),
+    true,
+  );
   assert.equal(rolloutPolicyOmissionInPolicy({ provider: "s3-static", componentCount: 1 }), true);
   assert.equal(rolloutPolicyOmissionInPolicy({ provider: "kubernetes", componentCount: 1 }), true);
   assert.equal(rolloutPolicyOmissionInPolicy({ provider: "vercel", componentCount: 1 }), true);
@@ -104,6 +110,7 @@ test("legacy lookup helpers preserve the reviewed runtime contract", () => {
     false,
   );
   assert.equal(providerDeclaresReleaseActionType("cloudflare-pages", "cache_warmup"), false);
+  assert.equal(providerDeclaresReleaseActionType("cloudflare-containers", "cache_warmup"), false);
   assert.equal(providerDeclaresReleaseActionType("s3-static", "cache_warmup"), false);
   assert.equal(providerDeclaresReleaseActionType("kubernetes", "cache_warmup"), false);
   assert.equal(providerDeclaresReleaseActionType("vercel", "cache_warmup"), false);
@@ -117,6 +124,13 @@ test("legacy lookup helpers preserve the reviewed runtime contract", () => {
   const vercel = providerCapabilityFor("vercel");
   assert.deepEqual(vercel?.supportedComponentKinds, ["ssr-webapp"]);
   assert.deepEqual(vercel?.multiComponentKinds, []);
+  const cloudflareContainers = providerCapabilityFor("cloudflare-containers");
+  assert.deepEqual(cloudflareContainers?.supportedComponentKinds, [
+    "ssr-webapp",
+    "service",
+    "third-party-service",
+  ]);
+  assert.deepEqual(cloudflareContainers?.multiComponentKinds, []);
   const capability = providerCapabilityFor("app-store-connect");
   assert.deepEqual(capability?.supportedComponentKinds, ["mobile-app"]);
   assert.deepEqual(capability?.multiComponentKinds, []);

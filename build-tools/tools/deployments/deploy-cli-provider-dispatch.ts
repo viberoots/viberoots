@@ -2,6 +2,7 @@
 import type { DeploymentTarget } from "./contract";
 import {
   isAppStoreConnectDeployment,
+  isCloudflareContainersDeployment,
   isCloudflarePagesDeployment,
   isGooglePlayDeployment,
   isKubernetesDeployment,
@@ -61,6 +62,18 @@ export async function runProviderDeployFrontDoor(opts: {
         ? { smokeConnectOverride: opts.smokeConnectOverride as any }
         : {}),
       provisionOnly: flags.provisionOnly,
+    });
+    return;
+  }
+  if (isCloudflareContainersDeployment(deployment)) {
+    const { runCloudflareContainersDeployFrontDoor } = await import(
+      "./cloudflare-containers-front-door"
+    );
+    await runCloudflareContainersDeployFrontDoor({
+      workspaceRoot: opts.workspaceRoot,
+      deployment,
+      requireServiceForProtectedShared: opts.publicFrontDoor,
+      artifactDirFlag: flags.artifactDirFlag,
     });
     return;
   }

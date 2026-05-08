@@ -255,6 +255,15 @@ Common example values and when to use them:
   Use `name = "vercel_api_token"` for Vercel provider API tokens. Declare it on
   the `publish` step, and add a separate `preview_cleanup` requirement when
   preview cleanup is enabled.
+- `contract_id = "secret://deployments/api-staging/cloudflare_api_token"`
+  Use `name = "cloudflare_api_token"` for Cloudflare Containers Worker publish
+  credentials. Declare it on `provision`, `publish`, and `preview_cleanup` when
+  the deployment uses the shared `cloudflare_provider` profile.
+- `contract_id = "secret://deployments/api-staging/cloudflare_registry_token"`
+  Use `name = "cloudflare_registry_token"` for Cloudflare Containers image
+  publish or registry credentials. Declare it on the `publish` step so the
+  publisher can push or reference the admitted image through the reviewed
+  credential runtime.
 - `contract_id = "secret://deployments/demoapp/database_url"`
   Use this kind of shape for app-specific credentials that belong to one
   deployment family.
@@ -411,6 +420,10 @@ Common backend shapes:
   `cloudflare-pages:<account>/<project>`
   Example:
   `cloudflare-pages:web-platform-staging/pleomino-staging-pages`
+- Cloudflare Containers:
+  `cloudflare-containers:<account_id>/<worker>`
+  Example:
+  `cloudflare-containers:0123456789abcdef0123456789abcdef/api-staging`
 - `nixos-shared-host`:
   `nixos-shared-host:<target-group>:<app>`
   Example:

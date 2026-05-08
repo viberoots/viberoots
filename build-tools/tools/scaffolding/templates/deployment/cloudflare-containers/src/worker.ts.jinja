@@ -1,0 +1,17 @@
+import { Container, getContainer } from "@cloudflare/containers";
+
+export class ContainerEntrypoint extends Container {
+  defaultPort = {{ container_port }};
+  sleepAfter = "{{ sleep_after }}";
+}
+
+export default {
+  async fetch(request: Request, env: { CONTAINER: DurableObjectNamespace }) {
+{% if ingress_mode == "none" %}
+    return new Response("no public ingress", { status: 404 });
+{% else %}
+    const container = getContainer(env.CONTAINER);
+    return container.fetch(request);
+{% endif %}
+  },
+};

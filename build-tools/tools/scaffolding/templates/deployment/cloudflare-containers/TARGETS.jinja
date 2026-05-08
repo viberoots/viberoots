@@ -1,0 +1,49 @@
+load("//build-tools/deployments:defs.bzl", "cloudflare_containers_deployment")
+
+cloudflare_containers_deployment(
+    name = "deploy",
+    component = "{{ component }}",
+    component_kind = "{{ component_kind }}",
+    cloudflare_account_id = "{{ cloudflare_account_id }}",
+    worker = "{{ worker }}",
+    ingress_mode = "{{ ingress_mode }}",
+{% if domain %}    domain = "{{ domain }}",
+{% endif %}{% if cloudflare_zone_id %}    cloudflare_zone_id = "{{ cloudflare_zone_id }}",
+{% endif %}    container_port = {{ container_port }},
+    health_path = "{{ health_path }}",
+    workers_dev_exception = {{ "True" if workers_dev_exception == "true" else "False" }},
+    sleep_after = "{{ sleep_after }}",
+    max_instances = "{{ max_instances }}",
+    lane_policy = "//projects/deployments/{{ shared_package }}:lane",
+    environment_stage = "{{ stage }}",
+    admission_policy = "//projects/deployments/{{ shared_package }}:{{ stage }}_release",
+    protection_class = "{{ protection_class }}",
+    secret_requirements = [
+        {
+            "name": "cloudflare_api_token",
+            "step": "provision",
+            "contract_id": "secret://deployments/{{ name }}/cloudflare_api_token",
+            "required": "true",
+        },
+        {
+            "name": "cloudflare_api_token",
+            "step": "publish",
+            "contract_id": "secret://deployments/{{ name }}/cloudflare_api_token",
+            "required": "true",
+        },
+        {
+            "name": "cloudflare_api_token",
+            "step": "preview_cleanup",
+            "contract_id": "secret://deployments/{{ name }}/cloudflare_api_token",
+            "required": "true",
+        },
+        {
+            "name": "cloudflare_registry_token",
+            "step": "publish",
+            "contract_id": "secret://deployments/{{ name }}/cloudflare_registry_token",
+            "required": "true",
+        },
+    ],
+    runtime_config_requirements = [],
+    external_requirement_profiles = ["cloudflare_provider"],
+)

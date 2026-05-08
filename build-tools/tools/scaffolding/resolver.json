@@ -8,6 +8,7 @@
     "lib": "projects/libs/{name}"
   },
   "deployment": {
+    "cloudflare-containers": "projects/deployments/{name}",
     "cloudflare-pages": "projects/deployments/{name}",
     "opentofu-foundation": "projects/deployments/{name}",
     "opentofu-provisioner": "projects/deployments/{name}",

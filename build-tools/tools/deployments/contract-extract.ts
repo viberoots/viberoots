@@ -7,6 +7,7 @@ import {
   uniqueErrors,
 } from "./contract-extract-shared";
 import { extractCloudflarePagesDeploymentsFromContext } from "./contract-extract-cloudflare-pages";
+import { extractCloudflareContainersDeploymentsFromContext } from "./contract-extract-cloudflare-containers";
 import { extractAppStoreConnectDeploymentsFromContext } from "./contract-extract-app-store-connect";
 import { extractGooglePlayDeploymentsFromContext } from "./contract-extract-google-play";
 import { extractKubernetesDeploymentsFromContext } from "./contract-extract-kubernetes";
@@ -131,6 +132,7 @@ export function extractDeployments(nodes: GraphNode[]): {
   const deployments = [
     ...extractNixosSharedHostDeploymentsFromContext(context),
     ...extractCloudflarePagesDeploymentsFromContext(context),
+    ...extractCloudflareContainersDeploymentsFromContext(context),
     ...extractAppStoreConnectDeploymentsFromContext(context),
     ...extractGooglePlayDeploymentsFromContext(context),
     ...extractS3StaticDeploymentsFromContext(context),

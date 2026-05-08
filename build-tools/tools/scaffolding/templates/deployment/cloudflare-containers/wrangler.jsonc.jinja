@@ -1,0 +1,38 @@
+{
+  "$schema": "../../../node_modules/wrangler/config-schema.json",
+  "name": "{{ worker }}",
+  "main": "src/worker.ts",
+  "compatibility_date": "{{ compatibility_date }}",
+{% if ingress_mode == "public" and domain %}
+  "routes": [
+    {
+      "pattern": "{{ domain }}",
+      "custom_domain": true,
+      "zone_id": "{{ cloudflare_zone_id }}",
+    },
+  ],
+{% endif %}
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "CONTAINER",
+        "class_name": "ContainerEntrypoint",
+      },
+    ],
+  },
+  "migrations": [
+    {
+      "tag": "{{ worker }}-containers-v1",
+      "new_classes": ["ContainerEntrypoint"],
+    },
+  ],
+  "containers": [
+    {
+      "class_name": "ContainerEntrypoint",
+      "image": "./Dockerfile",
+      "max_instances": {{ max_instances }},
+      "instance_type": "dev",
+      "sleep_after": "{{ sleep_after }}",
+    },
+  ],
+}

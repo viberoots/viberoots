@@ -1,0 +1,33 @@
+version: 1
+
+_envops:
+  block_start_string: "{%"
+  block_end_string: "%}"
+  variable_start_string: "{{"
+  variable_end_string: "}}"
+  comment_start_string: "{#"
+  comment_end_string: "#}"
+  keep_trailing_newline: true
+
+_exclude:
+  - meta.json
+
+name: ""
+language: "deployment"
+template: "cloudflare-containers"
+component: ""
+component_kind: "service"
+cloudflare_account_id: ""
+worker: "{{ name }}"
+ingress_mode: "public"
+domain: ""
+cloudflare_zone_id: ""
+container_port: "8080"
+health_path: "/healthz"
+workers_dev_exception: "false"
+sleep_after: "10m"
+max_instances: "1"
+stage: "dev"
+shared_package: "{{ name }}-shared"
+protection_class: "shared_nonprod"
+compatibility_date: "2026-03-18"
