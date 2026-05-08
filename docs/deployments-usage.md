@@ -86,6 +86,34 @@ reviewed clients. Connector evidence is only an evidence reference, redacted
 summary, and redacted diagnostics; live service credentials are resolved by the
 reviewed secret-runtime steps, not stored in CI variables or deployment records.
 
+Deployments that run server-side GitHub App code should use the shared
+`github_app_requirements(...)` helper instead of hand-writing the platform app
+credential declarations. Web deployments can opt into webhook material while
+workers can declare only the app private key and app id:
+
+```starlark
+nixos_shared_host_ssr_webapp_deployment(
+    name = "deploy",
+    component = "//projects/apps/data-room-web:app",
+    **github_app_requirements(
+        "data-room-web-staging",
+        webhooks = True,
+        webhook_config = True,
+    )
+)
+
+kubernetes_service_deployment(
+    name = "deploy",
+    component = "//projects/apps/data-room-worker:image",
+    **github_app_requirements("data-room-worker-staging")
+)
+```
+
+For an intentionally shared platform app, pass a reviewed
+`contract_prefix = "deployments/shared-github-apps/<name>"`. Repository
+selection, installation IDs, refresh state, and imported snapshot state stay in
+the application database rather than deployment metadata.
+
 Use `--artifact-dir <dir>` only when you want to override that default and name a
 specific build output folder as the client-side artifact source.
 

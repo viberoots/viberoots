@@ -1,5 +1,9 @@
 #!/usr/bin/env zx-wrapper
 import type { DeploymentRequirement } from "./deployment-requirements";
+import {
+  GITHUB_APP_REQUIREMENTS,
+  validateGithubAppProfileRequirements,
+} from "./github-app-requirement-profile";
 
 export type ExternalDeploymentRequirementProfile =
   | "workos_authkit"
@@ -11,9 +15,10 @@ export type ExternalDeploymentRequirementProfile =
   | "vercel_provider"
   | "container_runtime_provider"
   | "dns_provider"
-  | "opentofu_provider";
+  | "opentofu_provider"
+  | "github_app";
 
-type ExpectedRequirement = {
+export type ExpectedRequirement = {
   field: "secret_requirements" | "runtime_config_requirements";
   name: string;
   step: DeploymentRequirement["step"];
@@ -63,6 +68,7 @@ const PROFILES: Record<ExternalDeploymentRequirementProfile, ExpectedRequirement
   opentofu_provider: [
     secret("opentofu_provider_credentials", "provision", "secret://deployments/opentofu/provider"),
   ],
+  github_app: GITHUB_APP_REQUIREMENTS,
 };
 
 export function externalRequirementProfiles() {
@@ -102,19 +108,10 @@ export function validateExternalRequirementProfiles(opts: {
   );
   for (const profile of opts.profiles) {
     for (const expected of PROFILES[profile]) {
-      const sameName = byField[expected.field].filter((entry) => entry.name === expected.name);
-      const matches = sameName.filter((entry) => entry.step === expected.step);
-      const match = matches[0];
-      if (!match) {
-        if (sameName[0]) {
-          pushRequirementMismatch(errors, opts.label, profile, expected, sameName[0]);
-          continue;
-        }
-        errors.push(`${opts.label}: ${profile} missing ${expected.field} ${expected.name}`);
-        continue;
-      }
-      if (matches.length > 1) continue;
-      pushRequirementMismatch(errors, opts.label, profile, expected, match);
+      validateExpectedRequirement({ errors, label: opts.label, profile, expected, byField });
+    }
+    if (profile === "github_app") {
+      validateGithubAppProfileRequirements({ errors, label: opts.label, byField });
     }
   }
   return errors;
@@ -129,7 +126,13 @@ export function ambientProviderEnvBypassErrors(opts: {
   const secretNames = new Set(opts.secretRequirements.map((entry) => envName(entry.name)));
   const blockedPrefixes = new Set(
     (opts.profiles || externalRequirementProfiles()).flatMap((profile) =>
-      profile === "vercel_provider" ? ["VERCEL_"] : profile === "ragie" ? ["RAGIE_"] : [],
+      profile === "vercel_provider"
+        ? ["VERCEL_"]
+        : profile === "ragie"
+          ? ["RAGIE_"]
+          : profile === "github_app"
+            ? ["GITHUB_"]
+            : [],
     ),
   );
   return Object.keys(opts.env)
@@ -139,6 +142,32 @@ export function ambientProviderEnvBypassErrors(opts: {
         Array.from(blockedPrefixes).some((prefix) => key.startsWith(prefix)),
     )
     .map((key) => `${opts.label}: ambient provider env ${key} cannot satisfy secret_requirements`);
+}
+
+function validateExpectedRequirement(opts: {
+  errors: string[];
+  label: string;
+  profile: string;
+  expected: ExpectedRequirement;
+  byField: Record<ExpectedRequirement["field"], DeploymentRequirement[]>;
+}) {
+  const sameName = opts.byField[opts.expected.field].filter(
+    (entry) => entry.name === opts.expected.name,
+  );
+  const matches = sameName.filter((entry) => entry.step === opts.expected.step);
+  const match = matches[0];
+  if (!match) {
+    if (sameName[0]) {
+      pushRequirementMismatch(opts.errors, opts.label, opts.profile, opts.expected, sameName[0]);
+      return;
+    }
+    opts.errors.push(
+      `${opts.label}: ${opts.profile} missing ${opts.expected.field} ${opts.expected.name}`,
+    );
+    return;
+  }
+  if (matches.length > 1) return;
+  pushRequirementMismatch(opts.errors, opts.label, opts.profile, opts.expected, match);
 }
 
 function pushRequirementMismatch(

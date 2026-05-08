@@ -1920,31 +1920,36 @@ released in an order or source-revision combination that violates the Phase 0 ar
 It adds orchestration and policy surface across deployment families and requires operators to reason
 about compatibility windows for non-atomic releases.
 
-## PR-23: Reusable GitHub App requirement profile and Starlark helper
+## PR-23: Reusable GitHub App runtime credential profile and Starlark helper
 
 ### 1. Intent
 
-Add a generic, reusable GitHub App external requirement profile and Starlark helper so future
-GitHub-enabled app and worker deployments can declare the required secrets and runtime config
-consistently without adding GitHub-specific deployment publishing or readiness-admission logic.
+Add a generic, reusable GitHub App external requirement profile and Starlark helper so deployments
+that run server-side GitHub App code can declare the platform-owned app credentials and runtime
+config consistently.
+
+This PR is about the product's GitHub App identity, not customer repository linking. Users connect
+their GitHub repositories at application runtime; selected repositories, installation IDs,
+per-tenant source state, refresh state, and snapshot/import behavior remain app data and app logic,
+not deployment metadata.
 
 ### 2. Scope of changes
 
-- Add a reviewed `github_app` external requirement profile for GitHub App credentials and runtime
-  config.
+- Add a reviewed `github_app` external requirement profile for platform GitHub App credentials and
+  runtime config consumed by server-side app processes.
 - Add a Starlark helper such as `github_app_requirements(...)` that emits the concrete
   `secret_requirements`, `runtime_config_requirements`, and profile marker expected by deployment
   validation.
 - Keep readiness gates separate from the requirement profile. The profile answers which credentials
   and config a deployment consumes; readiness gates continue to answer which live validations must
   pass before release.
-- Make the helper generic for any GitHub App, not specific to data-room source ingestion.
+- Make the helper generic for any server-side GitHub App integration, not specific to data-room
+  source ingestion.
 - Include both secret and runtime config declarations:
   - GitHub App ID or equivalent public app identifier as runtime config.
   - GitHub App private key as a secret requirement.
   - GitHub webhook secret only when webhooks are enabled.
-  - Callback, webhook, installation, or selected-owner/repository config only when the caller opts
-    into those fields.
+  - Callback or webhook URL/config only when the caller opts into those fields.
 - Use deployment-owned contract IDs by default:
   - `secret://deployments/<deployment-id>/github/app_private_key`
   - `secret://deployments/<deployment-id>/github/webhook_secret`
@@ -1953,6 +1958,8 @@ consistently without adding GitHub-specific deployment publishing or readiness-a
   deployment-owned namespace as the default.
 - Support separate web and worker declarations so each deployment declares only the GitHub material it
   actually consumes.
+- Do not model customer-selected repository owner, repository name, installation ID, tenant source
+  linkage, or refresh/import state as deployment requirements. Those are runtime product state.
 - Fail closed when `external_requirement_profiles = ["github_app"]` is present but the matching
   secret/runtime config declarations are absent, wrong-step, duplicate, or outside the expected
   contract scope.
@@ -1967,8 +1974,8 @@ consistently without adding GitHub-specific deployment publishing or readiness-a
 
 ### 4. Tests to be added
 
-- External requirement profile validation tests proving `github_app` requires the GitHub App private
-  key and app ID with the expected names, steps, and contract scopes.
+- External requirement profile validation tests proving `github_app` requires the platform GitHub App
+  private key and app ID with the expected names, steps, and contract scopes.
 - Starlark/macro extraction tests proving `github_app_requirements(...)` emits the profile marker plus
   matching secret and runtime config declarations.
 - Optional-webhook tests proving webhook secret declarations are required only when `webhooks = True`
@@ -1979,19 +1986,23 @@ consistently without adding GitHub-specific deployment publishing or readiness-a
   declared and still preserve redaction and secret-runtime resolution.
 - Fixture tests proving web and worker deployments can declare different GitHub App requirement
   subsets without forcing one deployment to own secrets consumed by the other.
+- Negative tests proving repository-specific runtime product state is not accepted as part of the
+  `github_app` deployment requirement profile.
 
 ### 5. Docs to be added or updated
 
 - Update deployment schema docs with the `github_app` external requirement profile and helper shape.
 - Update deployment usage docs with examples for:
-  - deployment-owned GitHub App credentials,
+  - deployment-owned platform GitHub App credentials,
   - optional webhook support,
-  - separate web callback/webhook and worker repository-read deployments,
+  - separate web callback/webhook and worker token-minting deployments,
   - reviewed shared-prefix override when a shared GitHub App is intentional.
 - Update secrets docs with the default GitHub App contract IDs and the rule that secret values are
   resolved only through the deployment secret runtime.
 - Update readiness-gate docs only to clarify that GitHub readiness gates remain separate from the
   `github_app` requirement profile.
+- Update app-integration docs to clarify that user repository linking is runtime product state, not a
+  deployment requirement.
 
 ### 6. Acceptance criteria
 
@@ -2002,13 +2013,14 @@ consistently without adding GitHub-specific deployment publishing or readiness-a
 - The default contract namespace is deployment-owned, with explicit override support for reviewed
   shared GitHub Apps.
 - Web and worker deployments can each declare only the GitHub App material they consume.
+- Customer repository links and selected repositories are not represented in deployment metadata.
 - GitHub readiness gates remain implemented through the generic readiness-gate system and are not
   coupled to the credential/config profile.
 
 ### 7. Risks
 
-- The helper can overfit to Phase 0 data-room ingestion instead of remaining a generic GitHub App
-  requirement helper.
+- The helper can overfit to Phase 0 data-room ingestion or accidentally imply that customer
+  repository linking is configured at deployment time.
 - Making webhook support too implicit can require secrets for deployments that do not receive
   webhooks.
 - Shared-prefix overrides can weaken deployment ownership if they become the default path by
@@ -2016,8 +2028,8 @@ consistently without adding GitHub-specific deployment publishing or readiness-a
 
 ### 8. Mitigations
 
-- Keep source-ingestion-specific semantics out of the helper; express those through app code and
-  readiness gates.
+- Keep source-ingestion-specific semantics and customer repository state out of the helper; express
+  those through app code, app database state, and readiness gates.
 - Make webhook declarations opt-in and test both webhook and non-webhook shapes.
 - Default to deployment-owned contract IDs and require callers to spell out any shared prefix.
 - Document that a shared GitHub App prefix is a reviewed exception for intentionally shared
@@ -2025,12 +2037,269 @@ consistently without adding GitHub-specific deployment publishing or readiness-a
 
 ### 9. Consequences of not implementing this PR
 
-Future GitHub-enabled deployment templates would have to hand-author generic secret and runtime
-config declarations, making missing GitHub App private keys, webhook secrets, and app IDs easier to
-miss or name inconsistently across apps.
+Future deployments that run server-side GitHub App code would have to hand-author generic secret and
+runtime config declarations, making missing platform GitHub App private keys, webhook secrets, and
+app IDs easier to miss or name inconsistently across apps.
 
 ### 10. Downsides for implementing this PR
 
-It adds a deployment-system profile for an external source integration that is not itself a
-deployment provider, increasing the profile registry surface area before the first GitHub-enabled app
-template is generated.
+It adds a deployment-system profile for an application runtime credential family that is not itself a
+deployment provider, increasing the profile registry surface area before the first GitHub App-enabled
+service template is generated.
+
+## PR-24: Cloudflare Pages deployment scaffold and existing deployment migration
+
+### 1. Intent
+
+Add a first-class Cloudflare Pages deployment scaffold so deployment authors do not have to
+hand-create `wrangler.jsonc` or remember the minimum provider-native configuration required by the
+repo deployment system.
+
+Migrate the existing checked-in Cloudflare Pages deployment packages to match the scaffolded shape so
+real deployments, generated deployments, docs, and tests all agree on one convention.
+
+### 2. Scope of changes
+
+- Add a `deployment/cloudflare-pages` scaffold template under the existing scaffolding system.
+- Generate a deployment package with:
+  - `TARGETS` using `cloudflare_pages_static_webapp_deployment(...)`,
+  - a Prettier-compliant `wrangler.jsonc`,
+  - reviewed default `secret_requirements`, `runtime_config_requirements`, and
+    `external_requirement_profiles = ["cloudflare_provider"]`,
+  - lane/admission policy references consistent with the existing deployment scaffold conventions.
+- Keep `wrangler.jsonc` provider-native and minimal. It should include the Wrangler schema reference
+  and `compatibility_date`, while deployment identity such as account, project, provider target,
+  lane, smoke, preview, and admission policy stays in `TARGETS`.
+- Migrate the existing `pleomino-staging` and `pleomino-prod` Cloudflare deployment packages to the
+  scaffolded formatting and file shape without changing their provider target identities or
+  protected/shared behavior.
+- Update deployment install/scaffold tests so generated Cloudflare deployments include the
+  `wrangler.jsonc` file and do not require a manual post-scaffold step.
+- Preserve the existing deployment installer behavior that writes `TARGETS` fragments, unless the
+  implementation chooses to add an explicit Cloudflare config materialization path with tests proving
+  it is deterministic and does not overwrite reviewed custom provider-native fields.
+
+### 3. External prerequisites
+
+- No live Cloudflare account is required.
+- The reviewed default `compatibility_date` must be chosen from the existing checked-in deployments
+  or a documented repo constant.
+- Agreement that scaffolded Cloudflare config remains provider-native and does not duplicate
+  deployment metadata from `TARGETS`.
+
+### 4. Tests to be added
+
+- Scaffold render tests proving `deployment/cloudflare-pages` creates `TARGETS` and
+  `wrangler.jsonc` with Prettier-compliant output.
+- Contract tests proving generated Cloudflare deployment metadata extracts with
+  `external_requirement_profiles = ["cloudflare_provider"]` and the required provider secret
+  requirements.
+- Negative tests proving missing or malformed generated `wrangler.jsonc` fails during front-door
+  validation with a clear diagnostic.
+- Migration tests or golden assertions proving `pleomino-staging` and `pleomino-prod` match the
+  scaffolded file shape while preserving their current provider target identities.
+- Docs command-contract tests, if the new scaffold adds active command guidance.
+
+### 5. Docs to be added or updated
+
+- Update scaffolding docs with the new `scaf new deployment cloudflare-pages ...` command and the
+  files it creates.
+- Update deployment usage docs to state that Cloudflare Pages deployments should be scaffolded rather
+  than hand-authoring `wrangler.jsonc`.
+- Update Cloudflare deployment docs to clarify which values belong in `wrangler.jsonc` and which
+  values must remain in `TARGETS`.
+- Update this plan if the implementation chooses installer-side config generation instead of a pure
+  scaffold-template approach.
+
+### 6. Acceptance criteria
+
+- A new Cloudflare Pages deployment package can be generated with the repo scaffolding tool and is
+  immediately valid without the user hand-creating `wrangler.jsonc`.
+- Generated `wrangler.jsonc` is Prettier-compliant and contains only reviewed provider-native
+  Wrangler config.
+- Existing checked-in Cloudflare deployment packages match the scaffold convention without changing
+  deployment identity, secret/runtime requirements, or protected/shared behavior.
+- Cloudflare deployment validation still fails closed when the provider-native config is missing,
+  malformed, or inconsistent with deployment metadata.
+
+### 7. Risks
+
+- The scaffold can duplicate deployment identity in `wrangler.jsonc`, creating drift against
+  `TARGETS`.
+- Installer-side generation could overwrite intentionally reviewed provider-native Wrangler fields.
+- Migrating real deployment packages can accidentally change provider target identity or admission
+  posture if treated as a broad cleanup.
+
+### 8. Mitigations
+
+- Keep the generated Wrangler file minimal and let the existing deployment preparation path inject
+  the Pages project name from extracted deployment metadata.
+- If installer-side generation is added, make it create-only or merge with explicit preservation
+  tests for reviewed custom fields.
+- Add migration assertions for the existing deployments before and after scaffold alignment.
+
+### 9. Consequences of not implementing this PR
+
+Cloudflare Pages deployment authors must continue to know that a separate `wrangler.jsonc` file is
+required after scaffolding or installation, and formatting drift in those files can keep breaking
+repo-wide lint even when deployment metadata is otherwise correct.
+
+### 10. Downsides for implementing this PR
+
+It adds another deployment scaffold and golden-test surface, and it makes the Cloudflare Pages
+provider path responsible for maintaining a provider-native config template in addition to deployment
+metadata validation.
+
+## PR-25: Cloudflare Containers deployment provider and scaffold
+
+### 1. Intent
+
+Add a reviewed Cloudflare Containers deployment path and `deployment/cloudflare-containers` scaffold
+for containerized workloads that run behind a Cloudflare Worker, including public web services, SSR
+apps packaged as services, APIs, private services, and no-ingress worker-style services.
+
+This PR should reuse the Cloudflare scaffold conventions introduced by PR-24 so Pages and Containers
+ask for the same provider identity and domain concepts where they overlap, while keeping their
+provider-native Wrangler config shapes separate.
+
+### 2. Scope of changes
+
+- Add a `cloudflare-containers` provider capability and deployment macro, such as
+  `cloudflare_containers_deployment(...)`.
+- Add a `deployment/cloudflare-containers` scaffold template under the existing scaffolding system.
+- Keep the template name generic. Do not include `webapp`, `service`, or `services` in the template
+  name; the workload shape is controlled by deployment metadata and the component artifact.
+- Support component kinds for:
+  - containerized public web or SSR workloads,
+  - API/service workloads,
+  - private services,
+  - no-ingress worker-style services.
+- Use a consistent Cloudflare provider target argument model with `deployment/cloudflare-pages`:
+  - `cloudflare_account_id` for the owning account,
+  - optional account display/alias only when the repo needs it,
+  - `domain` and `cloudflare_zone_id` for public custom-domain routing,
+  - provider-specific resource names such as `project` for Pages and `worker` for Containers.
+- Require `domain` for protected/shared public-ingress Containers deployments unless an explicit
+  reviewed exception opts into a non-production `workers.dev` endpoint.
+- Generate provider-native files automatically:
+  - `wrangler.jsonc` with Worker name, compatibility date, route/custom-domain config when public,
+    container declaration, Durable Object binding, and migration declaration,
+  - a Worker entrypoint that proxies requests to the generated container binding,
+  - any small provider-native metadata needed for port, sleep policy, and max instances.
+- Derive low-level Cloudflare implementation names by default:
+  - container class,
+  - container binding,
+  - migration tag,
+  - Worker entrypoint path.
+- Keep user-facing scaffold inputs focused on deployment intent:
+  - component label,
+  - stage,
+  - Cloudflare account ID when not derivable,
+  - public domain and zone ID when public,
+  - ingress mode,
+  - container port,
+  - optional health path and capacity knobs.
+- Preserve the repo's protected/shared deployment contract: the authoritative artifact must be a
+  reviewed Buck/Nix-built container artifact or immutable image reference, not an ambient local
+  Docker build performed by Wrangler during protected/shared mutation.
+- Add live-publisher integration only if it can publish the admitted image and Worker config through
+  the existing deployment secret-runtime, control-plane, retry, rollback, smoke, and record
+  contracts. Otherwise start with a local/fake publisher and fail closed for protected/shared live
+  mutation.
+
+### 3. External prerequisites
+
+- Cloudflare Workers Paid plan access for live Containers usage.
+- Cloudflare account ID, zone ID, and domain ownership for public deployments.
+- A reviewed decision on whether protected/shared deployments push images through Cloudflare's
+  managed registry or use configured external registries.
+- A reviewed decision on how the repo pins or admits the Worker wrapper package dependencies such as
+  `@cloudflare/containers`.
+- No live Cloudflare Containers account is required for local fixture tests.
+
+### 4. Tests to be added
+
+- Scaffold render tests proving `deployment/cloudflare-containers` creates `TARGETS`,
+  `wrangler.jsonc`, and Worker entrypoint files with Prettier-compliant output.
+- Contract extraction tests proving public, private, and no-ingress Containers deployments extract
+  provider target identity, component kind, ingress mode, domain, route, port, health path, and
+  secret/runtime requirements correctly.
+- Capability validation tests proving unsupported component kinds, missing account IDs, missing
+  public domains, unsupported ingress modes, and missing container ports fail closed.
+- Wrangler config tests proving generated public deployments use custom-domain route config, while
+  private and no-ingress deployments do not expose public routes.
+- Negative tests proving user repository/app metadata is not duplicated into provider-native config
+  when it belongs in `TARGETS`.
+- Artifact-admission tests proving protected/shared Containers deployments cannot publish from an
+  ambient local Docker build or unreviewed image reference.
+- Fake publisher tests proving admitted image identity, Worker config fingerprint, provider target
+  identity, route/domain, and smoke URL are recorded.
+- Smoke tests against fixture HTTP servers or local Worker/container doubles for public and private
+  routing behavior.
+- Docs command-contract tests for any active scaffold command guidance.
+
+### 5. Docs to be added or updated
+
+- Update scaffolding docs with `scaf new deployment cloudflare-containers ...` examples for public
+  web/SSR, API/private, and no-ingress worker-style deployments.
+- Update deployment usage docs to compare Cloudflare Pages and Cloudflare Containers:
+  - Pages for static webapps,
+  - Containers for SSR or containerized services that need a Worker-fronted container runtime.
+- Update deployment schema docs with the `cloudflare-containers` provider target shape and required
+  fields.
+- Update secrets docs with Cloudflare Containers image/Worker publish credentials and registry
+  credential contract IDs.
+- Update operator troubleshooting docs with common Containers provisioning, domain, registry, smoke,
+  and rollout failure modes.
+- Update this plan if Cloudflare Containers beta limitations force a narrower first live-publisher
+  scope.
+
+### 6. Acceptance criteria
+
+- Deployment authors can generate a Cloudflare Containers deployment without knowing container class
+  names, Durable Object binding names, migration tags, or Worker wrapper file paths.
+- Pages and Containers scaffolds use consistent Cloudflare account, stage, domain, and zone argument
+  conventions.
+- Public Containers deployments require a reviewed custom domain or explicit non-production
+  exception; private/no-ingress deployments do not generate public routes.
+- SSR apps can be deployed through the Containers path as containerized services without requiring a
+  webapp-specific template name.
+- Protected/shared live mutation, when enabled, consumes only admitted artifacts and reviewed
+  secret-runtime credentials.
+- Records include admitted image identity, Worker config fingerprint, route/domain identity, provider
+  target identity, and smoke outcome.
+
+### 7. Risks
+
+- Cloudflare Containers beta semantics may change, especially around registry integration, rollout
+  behavior, custom domains, and Durable Object migration requirements.
+- The scaffold can leak low-level Cloudflare implementation details into user-facing arguments.
+- Treating SSR as special could duplicate provider paths already covered by a generic container
+  service model.
+- Allowing Wrangler to build from local Docker state can bypass the repo's immutable artifact
+  admission model.
+
+### 8. Mitigations
+
+- Keep the first implementation narrow and fixture-backed until live API and Wrangler behavior are
+  verified against current Cloudflare docs and a real non-production account.
+- Derive container class, binding, migration, and Worker entrypoint names from the deployment name
+  with existing repo sanitization helpers.
+- Model SSR as a workload running in a containerized service artifact, not as a separate Containers
+  template family.
+- Treat Wrangler local Docker builds as local-only unless the exact produced image is admitted and
+  recorded before protected/shared mutation.
+- Keep provider-native config minimal and deterministic, with `TARGETS` remaining the source of truth
+  for deployment identity, policy, requirements, and admission.
+
+### 9. Consequences of not implementing this PR
+
+Cloudflare-hosted SSR, API, and other containerized workloads would have to use Kubernetes,
+NixOS-shared-host, or ad hoc Cloudflare Worker/Containers glue instead of a reviewed deployment
+provider with scaffolded config, artifact admission, secret-runtime credentials, smoke checks, and
+records.
+
+### 10. Downsides for implementing this PR
+
+It adds a second Cloudflare provider family with Worker, Durable Object, route/domain, registry, and
+container lifecycle semantics that are more complex and less mature than Cloudflare Pages.

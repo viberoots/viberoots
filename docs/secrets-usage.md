@@ -134,6 +134,13 @@ Use stable reviewed contract IDs for external dependencies:
   Protected/shared Kubernetes service deployments must declare publish-step
   `secret_requirements` and may not rely on ambient Helm or cluster
   environment state.
+- Platform GitHub App private keys use `github_app_private_key` at step
+  `publish` with contract id
+  `secret://deployments/<deployment-id>/github/app_private_key`. Optional
+  webhook verification secrets use `github_webhook_secret` with
+  `secret://deployments/<deployment-id>/github/webhook_secret`. Both resolve
+  only through the deployment secret runtime; ambient `GITHUB_*` environment
+  variables are not accepted.
 
 Phase 0 concrete deployment packages use these reviewed contract namespaces:
 
@@ -145,6 +152,8 @@ Phase 0 concrete deployment packages use these reviewed contract namespaces:
   `secret://deployments/phase0/<deployment-id>/opentofu-provider-credentials`
 - Supabase foundation credentials:
   `secret://deployments/phase0/platform-foundation-<stage>/supabase-service-role`
+- GitHub App runtime credentials:
+  `secret://deployments/phase0/data-room-{web,worker}-<stage>/github/app_private_key`
 
 Their non-secret runtime config contracts use the matching
 `runtime://deployments/phase0/<deployment-id>/<name>` namespace for public URLs,

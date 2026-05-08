@@ -122,8 +122,8 @@ External deployments should express product and provider dependencies through
 `secret_requirements` and `runtime_config_requirements`, not `.env` files, CI
 variables, or provider-local project settings. The reviewed profile families are
 WorkOS/AuthKit, Supabase, Ragie, Source Access HMAC material, console-to-web
-base URL, Cloudflare, Vercel, container runtime, DNS, and OpenTofu provider
-credentials.
+base URL, Cloudflare, Vercel, container runtime, DNS, OpenTofu provider
+credentials, and platform GitHub App runtime credentials.
 Deployment metadata declares the applicable set with
 `external_requirement_profiles`; extractors reject unsupported profile names,
 missing requirements, duplicate requirement names, wrong lifecycle steps, wrong
@@ -131,6 +131,15 @@ contract scopes, or wrong requirement sources.
 Secrets use `secret://deployments/...` contract IDs and are resolved only by the
 secret runtime for the declared lifecycle step; public runtime config uses
 `config://deployments/...` contract IDs.
+
+The `github_app` profile declares the platform-owned GitHub App identity used
+by server-side app code. It requires `github_app_private_key` at `publish`
+through `secret_requirements` and `github_app_id` at `publish` through
+`runtime_config_requirements`. Optional webhook and callback entries may add
+`github_webhook_secret`, `github_webhook_url`, and `github_callback_url`.
+Customer repository owner/name, selected repository IDs, installation IDs, and
+refresh/import state are runtime product data and are rejected as deployment
+requirement profile entries.
 
 Foundation migration records add `foundationMigrationOutcome` for
 `platform-foundation-*` provision-only runs. The field records the migration
@@ -608,6 +617,9 @@ independently reviewable. `required_access` can distinguish
 Live gate credentials must be declared as `credential_contract_id` with
 `credential_source = "secret_runtime"` and a reviewed `secret_runtime_step`;
 ambient environment credentials are not accepted.
+GitHub App readiness gates stay in this generic readiness-gate system. The
+`github_app` external requirement profile only declares the runtime credentials
+and public config consumed by the deployment.
 
 Evidence must be redacted and bound to deployment id, provider target identity,
 environment stage, gate version, run timestamp, source revision or source run

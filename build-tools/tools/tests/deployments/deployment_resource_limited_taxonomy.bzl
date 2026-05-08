@@ -16,6 +16,7 @@ RESOURCE_LIMITED_DEPLOYMENT_TESTS = {
     "build-tools/tools/tests/deployments/cloudflare-pages.rollback.e2e.test.ts": True,
     "build-tools/tools/tests/deployments/cloudflare-pages.rollback.guardrails.test.ts": True,
     "build-tools/tools/tests/deployments/cloudflare-pages.secretspec.e2e.test.ts": True,
+    "build-tools/tools/tests/deployments/github-app-requirements.cquery.test.ts": True,
     "build-tools/tools/tests/deployments/cloudflare-pages.status-profile.test.ts": True,
     "build-tools/tools/tests/deployments/cloudflare-pages.target-transition.test.ts": True,
     "build-tools/tools/tests/deployments/cloudflare-pages.timeout.test.ts": True,

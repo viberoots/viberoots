@@ -8,6 +8,7 @@ load(
     _deployment_target = "deployment_target",
     _deployment_target_exception = "deployment_target_exception",
 )
+load("//build-tools/deployments:github_app_requirements.bzl", _github_app_requirements = "github_app_requirements")
 load("//build-tools/deployments:migration_bundle_rules.bzl", _migration_bundle = "migration_bundle")
 load("//build-tools/deployments:opentofu_defs.bzl", _opentofu_foundation_deployment = "opentofu_foundation_deployment")
 load(
@@ -28,6 +29,7 @@ deployment_lane_policy = _deployment_lane_policy
 deployment_release_action = _deployment_release_action
 deployment_target = _deployment_target
 deployment_target_exception = _deployment_target_exception
+github_app_requirements = _github_app_requirements
 migration_bundle = _migration_bundle
 
 def nixos_shared_host_static_webapp_deployment(**kwargs):
