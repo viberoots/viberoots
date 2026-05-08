@@ -8,10 +8,11 @@
     "usage": "scaf new deployment cloudflare-containers <deployment-id> --component=//projects/apps/api:service_artifact --cloudflare_account_id=<32-hex-account-id> --worker=<worker-name>",
     "notes": [
       "Generates a Cloudflare Containers deployment target, Wrangler config, and Worker entrypoint.",
-      "Use --domain and --cloudflare_zone_id for protected/shared public ingress."
+      "Defaults to private ingress so generated protected/shared deployments do not need a public domain.",
+      "Use --ingress_mode=public with --domain and --cloudflare_zone_id for protected/shared public ingress."
     ],
     "examples": [
-      "scaf new deployment cloudflare-containers api-staging --component=//projects/apps/api:service_artifact --cloudflare_account_id=0123456789abcdef0123456789abcdef --worker=api-staging --domain=api.example.com --cloudflare_zone_id=abcdef0123456789abcdef0123456789 --yes"
+      "scaf new deployment cloudflare-containers api-staging --component=//projects/apps/api:service_artifact --cloudflare_account_id=0123456789abcdef0123456789abcdef --worker=api-staging --ingress_mode=public --domain=api.example.com --cloudflare_zone_id=abcdef0123456789abcdef0123456789 --yes"
     ]
   }
 }

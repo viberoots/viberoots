@@ -50,11 +50,15 @@ scaf new ts webapp-static-pwa demo-pwa --yes
 scaf new deployment shared console --repository=example/platform --yes
 scaf new deployment vercel-next console-dev --component=//projects/apps/console:vercel_artifact --team=acme --project=console --yes
 scaf new deployment cloudflare-pages console-staging --component=//projects/apps/console:app --account=web-platform-staging --project=console-staging-pages --yes
-scaf new deployment cloudflare-containers console-ssr-staging --component=//projects/apps/console:ssr_service_artifact --component_kind=ssr-webapp --cloudflare_account_id=0123456789abcdef0123456789abcdef --worker=console-ssr-staging --domain=console.example.com --cloudflare_zone_id=0123456789abcdef0123456789abcdef --yes
+scaf new deployment cloudflare-containers console-ssr-staging --component=//projects/apps/console:ssr_service_artifact --component_kind=ssr-webapp --cloudflare_account_id=0123456789abcdef0123456789abcdef --worker=console-ssr-staging --ingress_mode=public --domain=console.example.com --cloudflare_zone_id=0123456789abcdef0123456789abcdef --yes
 scaf new deployment cloudflare-containers api-private --component=//projects/apps/api:service_artifact --cloudflare_account_id=0123456789abcdef0123456789abcdef --worker=api-private --ingress_mode=private --yes
 scaf new deployment cloudflare-containers worker-none --component=//projects/apps/worker:service_artifact --component_kind=third-party-service --cloudflare_account_id=0123456789abcdef0123456789abcdef --worker=worker-none --ingress_mode=none --yes
 scaf new deployment service api-dev --component=//projects/apps/api:service_artifact --cluster=dev-cluster --yes
 ```
+
+`deployment/cloudflare-containers` defaults to private ingress. Add
+`--ingress_mode=public --domain=<host> --cloudflare_zone_id=<zone>` for protected/shared public
+custom-domain routing.
 
 For TypeScript SSR templates, framework-specific names are explicit:
 

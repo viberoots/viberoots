@@ -449,12 +449,14 @@ step instead of editing Keycloak by hand.
   container workloads that need Cloudflare Containers instead of static Pages
 - start new packages with
   `scaf new deployment cloudflare-containers <deployment-id> --component=<service-or-ssr-target> --cloudflare_account_id=<32-hex-account-id> --worker=<worker-name>`
-- use public custom-domain examples for web/SSR workloads, `--ingress_mode=private`
-  for internal APIs, and `--ingress_mode=none` for worker-style services with no
-  public route
+- the scaffold defaults to `--ingress_mode=private`; use public custom-domain
+  examples for web/SSR workloads, and `--ingress_mode=none` for worker-style
+  services with no public route
 - protected/shared public ingress must declare `domain` and
   `cloudflare_zone_id` unless a reviewed non-production `workers.dev`
   exception is set in metadata
+- `deploy --deployment <label> --validate-only` accepts reviewed
+  `cloudflare-containers` metadata through the shared front-door validation path
 - the initial publisher is a local/fake `cloudflare-containers-local` adapter
   that records admitted image identity and Worker config fingerprint; protected
   shared live mutation fails closed until a reviewed live publisher lands
@@ -519,7 +521,7 @@ Scaffold-first examples:
 scaf new deployment shared console --repository=example/platform --yes
 scaf new deployment vercel-next console-dev --component=//projects/apps/console:vercel_artifact --team=acme --project=console --shared_package=console-shared --yes
 scaf new deployment cloudflare-pages console-staging --component=//projects/apps/console:app --account=web-platform-staging --project=console-staging-pages --shared_package=console-shared --yes
-scaf new deployment cloudflare-containers console-ssr-staging --component=//projects/apps/console:ssr_service_artifact --component_kind=ssr-webapp --cloudflare_account_id=0123456789abcdef0123456789abcdef --worker=console-ssr-staging --domain=console.example.com --cloudflare_zone_id=0123456789abcdef0123456789abcdef --shared_package=console-shared --yes
+scaf new deployment cloudflare-containers console-ssr-staging --component=//projects/apps/console:ssr_service_artifact --component_kind=ssr-webapp --cloudflare_account_id=0123456789abcdef0123456789abcdef --worker=console-ssr-staging --ingress_mode=public --domain=console.example.com --cloudflare_zone_id=0123456789abcdef0123456789abcdef --shared_package=console-shared --yes
 scaf new deployment cloudflare-containers api-private --component=//projects/apps/api:service_artifact --cloudflare_account_id=0123456789abcdef0123456789abcdef --worker=api-private --ingress_mode=private --shared_package=console-shared --yes
 scaf new deployment cloudflare-containers worker-none --component=//projects/apps/worker:service_artifact --component_kind=third-party-service --cloudflare_account_id=0123456789abcdef0123456789abcdef --worker=worker-none --ingress_mode=none --shared_package=console-shared --yes
 scaf new deployment service api-dev --component=//projects/apps/api:service_artifact --cluster=dev-cluster --shared_package=console-shared --yes

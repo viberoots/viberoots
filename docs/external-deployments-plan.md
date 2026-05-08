@@ -2303,3 +2303,113 @@ records.
 
 It adds a second Cloudflare provider family with Worker, Durable Object, route/domain, registry, and
 container lifecycle semantics that are more complex and less mature than Cloudflare Pages.
+
+## PR-26: Cloudflare Containers front-door validation and scaffold-safe defaults
+
+### 1. Intent
+
+Close the completed PR-25 acceptance gaps by wiring `cloudflare-containers` into the shared
+front-door validation path and by making the Containers scaffold emit a valid deployment shape by
+default.
+
+After this PR, `--validate-only` should accept reviewed Cloudflare Containers deployments through the
+same shared deployment validation front door as other providers, and generated Containers packages
+should not default to a protected/shared public deployment that is missing the required domain and
+zone configuration.
+
+### 2. Scope of changes
+
+- Add `cloudflare-containers` handling to
+  `build-tools/tools/deployments/deploy-front-door-validate.ts` so `--validate-only` reaches the
+  reviewed Containers validation path instead of falling through to unsupported provider handling.
+- Add the corresponding Containers branch to the provider config semantic validation switch, keeping
+  Pages and Containers config rules separate while reusing shared Cloudflare account, domain, zone,
+  ingress, and protected/shared policy helpers where appropriate.
+- Fix the `deployment/cloudflare-containers` scaffold defaults so generated packages are valid
+  without hidden follow-up edits. The implementation must choose one reviewed default:
+  - require `domain` and `cloudflare_zone_id` when generating the default protected/shared public
+    ingress shape,
+  - default the scaffold to a non-public/local/private shape that does not require a custom domain,
+  - or require an explicit reviewed `workers_dev_exception` when generating a non-production
+    `workers.dev` public endpoint.
+- Preserve fail-closed validation for public protected/shared deployments that omit both a custom
+  domain/zone and an explicit reviewed `workers.dev` exception.
+- Ensure generated provider-native `wrangler.jsonc` and `TARGETS` fragments agree with the chosen
+  default ingress mode, protection posture, domain/zone inputs, and exception metadata.
+- Keep the change limited to Containers front-door acceptance and scaffold validity; do not broaden
+  live publisher scope beyond the PR-25 implementation.
+
+### 3. External prerequisites
+
+- No live Cloudflare account is required.
+- A reviewed decision on which scaffold default is safest for generated Containers deployments:
+  public custom-domain with required domain/zone inputs, non-public/local/private by default, or
+  explicit non-production `workers.dev` exception.
+- Agreement that shared front-door validation is the authoritative acceptance path for
+  `cloudflare-containers` deployment metadata.
+
+### 4. Tests to be added
+
+- Front-door `--validate-only` tests proving `cloudflare-containers` deployments dispatch to the
+  Containers validation path and no longer fail as an unsupported deployment provider.
+- Provider semantic validation tests proving Containers config accepts valid public, private, and
+  no-ingress shapes and rejects missing account IDs, unsupported ingress modes, and invalid
+  protected/shared public routing.
+- Scaffold render tests proving the default `deployment/cloudflare-containers` output validates
+  immediately through the shared front door.
+- Negative scaffold tests proving protected/shared public defaults cannot be generated without
+  domain/zone inputs unless an explicit reviewed `workers_dev_exception` is present.
+- Golden or snapshot tests proving generated `TARGETS` and `wrangler.jsonc` stay consistent for the
+  selected default ingress and exception model.
+
+### 5. Docs to be added or updated
+
+- Update scaffolding docs with the finalized default behavior for
+  `deployment/cloudflare-containers`, including which inputs are required for public custom-domain
+  deployments and when a `workers.dev` exception is allowed.
+- Update deployment schema or provider docs to state that `cloudflare-containers` is accepted by the
+  shared front-door validation path and to document its semantic config rules.
+- Update Cloudflare Containers troubleshooting docs with the validation errors for unsupported
+  providers, missing domain/zone inputs, and missing or invalid `workers_dev_exception` metadata.
+- Update this plan if the selected scaffold default changes later Containers PR boundaries.
+
+### 6. Acceptance criteria
+
+- `--validate-only` accepts reviewed `cloudflare-containers` deployments through the shared
+  front-door validation path.
+- Containers provider semantic validation has an explicit provider branch and does not rely on
+  generic unsupported-provider fallthrough.
+- A freshly generated `deployment/cloudflare-containers` package is valid under the chosen default
+  without requiring undocumented manual edits.
+- Protected/shared public Containers deployments still fail closed unless they provide a custom
+  domain and zone or an explicit reviewed `workers.dev` exception.
+- Generated `TARGETS`, `wrangler.jsonc`, and docs describe the same ingress, domain, zone, and
+  exception contract.
+
+### 7. Risks
+
+- Choosing a public default can make the scaffold require more inputs before generation succeeds.
+- Choosing a non-public default can surprise authors who expected a public web service from the
+  Containers template.
+- Adding a front-door provider branch without shared semantic coverage can create a second partial
+  acceptance path.
+
+### 8. Mitigations
+
+- Make the scaffold command contract explicit and cover the chosen default with render and
+  front-door validation tests.
+- Keep protected/shared public routing strict even if local or private generated defaults are
+  convenient.
+- Route all Containers acceptance through the shared validation helpers and add negative tests for
+  unsupported-provider fallthrough.
+
+### 9. Consequences of not implementing this PR
+
+PR-25 Containers deployments remain partially scaffolded but unusable through the shared
+`--validate-only` front door, and the generated default package can continue to fail validation as an
+invalid protected/shared public deployment with no domain or zone.
+
+### 10. Downsides for implementing this PR
+
+It adds another provider-specific branch to shared front-door validation and forces the Containers
+scaffold to make a stricter user-facing decision about public routing defaults.

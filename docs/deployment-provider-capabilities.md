@@ -656,6 +656,9 @@ Normative-source note:
   - deployment metadata remains authoritative for account, worker, ingress, and domain
 - account selection:
   - protected/shared execution must use declared `cloudflare_account_id` metadata
+- front-door validation:
+  - `deploy --deployment <label> --validate-only` accepts reviewed metadata through the shared validation path
+  - protected/shared public ingress fails closed without a custom domain and zone or a reviewed non-production `workers.dev` exception
 
 ### Retry / Idempotency
 

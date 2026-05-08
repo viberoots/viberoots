@@ -91,6 +91,8 @@ Initial reviewed `cloudflare-containers` shape:
 - protected/shared public ingress requires `domain` and `cloudflare_zone_id`
   unless an explicit reviewed exception opts into a non-production `workers.dev`
   endpoint
+- shared front-door validation accepts reviewed `cloudflare-containers`
+  deployments and enforces component support plus ingress metadata semantics
 - the initial provider slice supports admitted service/image artifacts through
   the local/fake publisher only; protected/shared live mutation fails closed
 

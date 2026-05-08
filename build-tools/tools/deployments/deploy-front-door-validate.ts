@@ -9,6 +9,8 @@ import { queryDeploymentNodesWithAttrs } from "./deployment-query";
 import { pushAppStoreConnectComponentKindErrors } from "./app-store-connect-capability-validation";
 import { prepareAppStoreConnectPublisherConfig } from "./app-store-connect-config";
 import { pushCloudflareComponentKindErrors } from "./cloudflare-pages-capability-validation";
+import { prepareCloudflareContainersWranglerConfig } from "./cloudflare-containers-config";
+import { pushCloudflareContainersComponentErrors } from "./cloudflare-containers-validation";
 import { prepareCloudflarePagesWranglerConfig } from "./cloudflare-pages-config";
 import { pushGooglePlayComponentKindErrors } from "./google-play-capability-validation";
 import { prepareGooglePlayPublisherConfig } from "./google-play-config";
@@ -78,6 +80,15 @@ function pushComponentValidationErrors(opts: {
     switch (opts.deployment.provider) {
       case "cloudflare-pages":
         pushCloudflareComponentKindErrors({
+          label: opts.deployment.label,
+          declaredKind: component.kind,
+          componentTarget: component.target,
+          componentNode,
+          errors: opts.errors,
+        });
+        break;
+      case "cloudflare-containers":
+        pushCloudflareContainersComponentErrors({
           label: opts.deployment.label,
           declaredKind: component.kind,
           componentTarget: component.target,
@@ -162,6 +173,9 @@ async function validateProviderConfigSemantics(
     switch (deployment.provider) {
       case "cloudflare-pages":
         await prepareCloudflarePagesWranglerConfig({ workspaceRoot, deployment, outputPath });
+        return;
+      case "cloudflare-containers":
+        await prepareCloudflareContainersWranglerConfig({ workspaceRoot, deployment, outputPath });
         return;
       case "s3-static":
         await prepareS3StaticPublisherConfig({ workspaceRoot, deployment, outputPath });

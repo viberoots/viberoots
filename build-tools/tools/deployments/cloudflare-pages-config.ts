@@ -61,7 +61,7 @@ export function stripJsonComments(raw: string): string {
 
 export function parseJsoncObject(raw: string, sourcePath: string): Record<string, unknown> {
   try {
-    const parsed = JSON.parse(stripJsonComments(raw)) as unknown;
+    const parsed = JSON.parse(stripTrailingJsoncCommas(stripJsonComments(raw))) as unknown;
     if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
       throw new Error("expected a JSON object");
     }
@@ -69,6 +69,37 @@ export function parseJsoncObject(raw: string, sourcePath: string): Record<string
   } catch (error) {
     throw new Error(`${sourcePath}: invalid wrangler config (${String(error)})`);
   }
+}
+
+export function stripTrailingJsoncCommas(raw: string): string {
+  let out = "";
+  let inString = false;
+  let escaped = false;
+  for (let index = 0; index < raw.length; index += 1) {
+    const current = raw[index] || "";
+    if (inString) {
+      out += current;
+      if (escaped) {
+        escaped = false;
+      } else if (current === "\\") {
+        escaped = true;
+      } else if (current === '"') {
+        inString = false;
+      }
+      continue;
+    }
+    if (current === '"') {
+      inString = true;
+      out += current;
+      continue;
+    }
+    if (current === ",") {
+      const rest = raw.slice(index + 1);
+      if (/^\s*[}\]]/.test(rest)) continue;
+    }
+    out += current;
+  }
+  return out;
 }
 
 export function resolveCloudflarePagesPublisherConfigPath(

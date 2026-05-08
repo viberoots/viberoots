@@ -25,6 +25,7 @@ import { resolveDestination } from "../templates/destination";
 import { normalizeTemplateName } from "../templates/names";
 import { canonicalTemplateLanguage, isCanonicalTypeScriptTemplate } from "../templates/taxonomy";
 import { usage } from "../usage";
+import { validateDeploymentScaffoldAnswers } from "./deployment-validation";
 
 export async function cmdNew(args: string[], flags: ScafFlags) {
   const [language, templateRaw, name] = args;
@@ -85,6 +86,7 @@ export async function cmdNew(args: string[], flags: ScafFlags) {
       data[k] = v;
     }
   }
+  validateDeploymentScaffoldAnswers(canonicalLanguage, template, data);
   if (canonicalLanguage === "ts") {
     const noTests = (flags["no-tests"] || "").toString().toLowerCase() === "true";
     if (noTests) {

@@ -77,6 +77,16 @@ export const CLOUDFLARE_CONTAINERS_PROVIDER_CAPABILITY: DeploymentProviderCapabi
     accountSelection: [
       bullet("protected/shared execution must use declared `cloudflare_account_id` metadata"),
     ],
+    additionalFacts: [
+      bullet("front-door validation:", [
+        bullet(
+          "`deploy --deployment <label> --validate-only` accepts reviewed metadata through the shared validation path",
+        ),
+        bullet(
+          "protected/shared public ingress fails closed without a custom domain and zone or a reviewed non-production `workers.dev` exception",
+        ),
+      ]),
+    ],
   },
   retryIdempotency: [
     bullet("local fake publisher retries are deterministic by artifact and config fingerprint"),

@@ -51,9 +51,36 @@
 
 ## Cloudflare Containers Deployments
 
+- Unsupported provider during `--validate-only`:
+  `unsupported deployment provider` means the deployment metadata did not
+  resolve to a reviewed provider branch. Check for a provider typo, regenerate
+  metadata from the `cloudflare_containers_deployment(...)` macro, and rerun
+  `deploy --deployment <label> --validate-only`.
+- Unsupported Containers ingress mode:
+  `unsupported cloudflare-containers ingress_mode "<value>"` means
+  `provider_target.ingress_mode` is not one of `public`, `private`, or `none`.
+  Use `private` for the scaffold default, `public` only with reviewed routing
+  metadata, or `none` for Worker-fronted services with no public route.
 - Missing domain on protected/shared public ingress:
-  add `domain` and `cloudflare_zone_id` to the deployment metadata, or set a
-  reviewed non-production `workers_dev_exception`.
+  the `protected/shared public cloudflare-containers deployments require domain`
+  / `reviewed workers_dev_exception` error means public ingress has neither a
+  custom domain nor a reviewed non-production `workers.dev` exception. Add
+  `domain` and `cloudflare_zone_id`, switch the scaffold/deployment to private
+  or no-ingress mode, or wire a reviewed target exception.
+- Missing zone for a custom domain:
+  `cloudflare_zone_id is required with domain` means the deployment declares a
+  custom public hostname but not the owning Cloudflare zone id. Add
+  `cloudflare_zone_id` to `provider_target` and keep the generated
+  `wrangler.jsonc` route `zone_id` aligned with it.
+- Invalid `workers_dev_exception` metadata:
+  `workers_dev_exception requires an active reviewed target_exception` means the
+  deployment set `workers_dev_exception = True` without an active exception
+  whose affected deployment id, old provider target identity, and shared lock
+  scope all match `cloudflare-containers:<account_id>/<worker>`.
+  `production_facing cloudflare-containers deployments require a custom domain`
+  means `workers.dev` is not accepted for production-facing Containers
+  deployments. Use a custom domain and zone for production, or limit the
+  exception to reviewed non-production metadata.
 - Local Dockerfile rejected as an artifact:
   publish inputs must be an admitted service artifact directory or an immutable
   image digest file such as `sha256:<64 hex>`, not an ambient local Docker build.
