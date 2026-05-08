@@ -3,6 +3,9 @@
 This package publishes an admitted containerized artifact through a Worker-fronted Cloudflare
 Containers target.
 
-Keep `wrangler.jsonc` and `src/worker.ts` limited to provider-native settings. Deployment identity,
-artifact admission, lane policy, ingress posture, and secret/runtime requirements remain
-authoritative in `TARGETS`.
+Keep `wrangler.jsonc` and `{{ cloudflare_worker_entrypoint_path }}` limited to provider-native
+settings. Deployment identity, artifact admission, lane policy, ingress posture, and secret/runtime
+requirements remain authoritative in `TARGETS`.
+
+The container class, Durable Object binding, migration tag, and Worker entrypoint path are derived
+from the deployment name and are not scaffold inputs.

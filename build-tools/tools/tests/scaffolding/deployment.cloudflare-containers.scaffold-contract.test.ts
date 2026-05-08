@@ -50,9 +50,13 @@ test("deployment/cloudflare-containers scaffold renders Worker config and metada
     const deploymentRoot = path.join(tmp, "projects/deployments/api-staging");
     const targetsPath = path.join(deploymentRoot, "TARGETS");
     const wranglerPath = path.join(deploymentRoot, "wrangler.jsonc");
-    const workerPath = path.join(deploymentRoot, "src/worker.ts");
+    const workerPath = path.join(deploymentRoot, "src/api-staging-worker.ts");
     const wrangler = await fsp.readFile(wranglerPath, "utf8");
     assert.match(wrangler, /"name": "api-staging"/);
+    assert.match(wrangler, /"main": "src\/api-staging-worker.ts"/);
+    assert.match(wrangler, /"class_name": "ApiStagingContainer"/);
+    assert.match(wrangler, /"name": "API_STAGING_CONTAINER"/);
+    assert.match(wrangler, /"tag": "api-staging-containers-v1"/);
     assert.match(wrangler, /"custom_domain": true/);
     assert.match(wrangler, /"max_instances": 3/);
     assert.match(wrangler, /"sleep_after": "20m"/);
@@ -65,7 +69,10 @@ test("deployment/cloudflare-containers scaffold renders Worker config and metada
     assert.doesNotMatch(wrangler, /cloudflare_api_token|cloudflare_registry_token/);
     assert.doesNotMatch(wrangler, /external_requirement_profiles|cloudflare_provider/);
     assert.doesNotMatch(wrangler, /protection_class|shared_nonprod/);
-    assert.match(await fsp.readFile(workerPath, "utf8"), /getContainer/);
+    const worker = await fsp.readFile(workerPath, "utf8");
+    assert.match(worker, /class ApiStagingContainer/);
+    assert.match(worker, /API_STAGING_CONTAINER: DurableObjectNamespace/);
+    assert.match(worker, /getContainer/);
     const targets = await fsp.readFile(targetsPath, "utf8");
     assert.match(targets, /cloudflare_containers_deployment/);
     assert.match(targets, /sleep_after = "20m"/);

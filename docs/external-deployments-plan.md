@@ -2413,3 +2413,115 @@ invalid protected/shared public deployment with no domain or zone.
 
 It adds another provider-specific branch to shared front-door validation and forces the Containers
 scaffold to make a stricter user-facing decision about public routing defaults.
+
+## PR-27: Cloudflare scaffold derivation and migration golden closure
+
+### 1. Intent
+
+Close the remaining Cloudflare scaffold contract gaps from PR-24 through PR-26 by making generated
+Containers packages derive every low-level Cloudflare implementation name from the deployment name
+and by adding explicit migration golden coverage for the checked-in Pages deployments.
+
+After this PR, `deployment/cloudflare-containers` should not hardcode provider-native implementation
+names such as the container class, Durable Object binding, migration tag, or Worker entrypoint path,
+and the real `pleomino-staging` and `pleomino-prod` packages should be proven to match the
+scaffolded Pages file shape.
+
+### 2. Scope of changes
+
+- Update the `deployment/cloudflare-containers` scaffold so it derives all low-level Cloudflare
+  implementation names from the deployment name using the repo's existing sanitization helpers:
+  - container class name,
+  - Durable Object binding name,
+  - migration tag,
+  - Worker entrypoint path.
+- Remove hardcoded generated identifiers such as `ContainerEntrypoint`, `CONTAINER`, and
+  `src/worker.ts` from the scaffold output except where they are replaced by deterministic derived
+  values.
+- Ensure `wrangler.jsonc`, the generated Worker entrypoint, and any scaffold metadata all reference
+  the same derived names.
+- Add migration golden or assertion coverage proving the checked-in `pleomino-staging` and
+  `pleomino-prod` Cloudflare Pages deployment packages match the `deployment/cloudflare-pages`
+  scaffolded file shape while preserving their provider target identities.
+- Include `wrangler.jsonc` in the Pages migration golden/assertion so the provider-native config
+  shape is explicitly covered, not only deployment identity extracted through `cquery`.
+- Keep the change limited to scaffold determinism and migration-test coverage; do not broaden live
+  publisher behavior or introduce new Cloudflare deployment semantics.
+
+### 3. External prerequisites
+
+- No live Cloudflare account is required.
+- Agreement that the existing repo sanitization helpers are the source of truth for converting
+  deployment names into provider-native Cloudflare identifiers and paths.
+- Agreement that the real checked-in Pages packages should remain aligned with the scaffolded shape
+  unless a later reviewed PR intentionally changes that scaffold contract.
+
+### 4. Tests to be added
+
+- Containers scaffold render tests proving deployment names with hyphens, underscores, digits, and
+  mixed case produce deterministic derived container class names, binding names, migration tags, and
+  Worker entrypoint paths.
+- Golden or snapshot tests proving generated Containers `wrangler.jsonc` and Worker entrypoint files
+  reference the same derived identifiers and contain no stale hardcoded `ContainerEntrypoint`,
+  `CONTAINER`, or `src/worker.ts` assumptions.
+- Negative or regression tests proving changing the deployment name changes all derived
+  provider-native names consistently rather than leaving any hardcoded value behind.
+- Pages migration golden/assertion tests proving `pleomino-staging` and `pleomino-prod` match the
+  `deployment/cloudflare-pages` scaffolded file shape, including `TARGETS` and `wrangler.jsonc`.
+- Existing `cquery` identity tests must continue proving the migrated Pages packages preserve their
+  provider target identities, protected/shared posture, and requirement profiles.
+
+### 5. Docs to be added or updated
+
+- Update Cloudflare Containers scaffold docs to state that container class, Durable Object binding,
+  migration tag, and Worker entrypoint path are derived from the deployment name and are not
+  user-facing scaffold inputs.
+- Update Cloudflare Pages scaffold or migration docs only if the new migration golden documents an
+  observable checked-in file-shape convention not already described.
+- Update this plan if the derivation rules require a new shared naming helper or if the Pages
+  migration assertion intentionally allows reviewed per-deployment provider-native differences.
+
+### 6. Acceptance criteria
+
+- A freshly generated `deployment/cloudflare-containers` package derives the container class,
+  Durable Object binding, migration tag, and Worker entrypoint path from the deployment name using
+  the same sanitization rules.
+- Generated Containers `wrangler.jsonc`, Worker entrypoint files, and scaffold metadata agree on the
+  derived names and do not contain leftover hardcoded implementation identifiers.
+- Scaffold tests cover the derivation contract for representative deployment names and fail if any
+  low-level Cloudflare implementation name stops being derived.
+- `pleomino-staging` and `pleomino-prod` have explicit migration golden/assertion coverage proving
+  they match the `deployment/cloudflare-pages` scaffolded file shape, especially `wrangler.jsonc`,
+  while retaining existing identity coverage.
+- Documentation describes the user-facing scaffold contract without asking deployment authors to
+  provide low-level Cloudflare implementation names.
+
+### 7. Risks
+
+- The derivation rules can accidentally produce Cloudflare identifiers that are valid in one
+  provider-native context but invalid in another.
+- Golden coverage for real checked-in deployments can become noisy if the Pages scaffold later
+  permits reviewed per-deployment Wrangler differences.
+- Renaming generated Worker entrypoint paths can break tests or docs that implicitly assumed
+  `src/worker.ts`.
+
+### 8. Mitigations
+
+- Centralize derivation through existing sanitization helpers and cover path, binding, class, and
+  migration forms separately in scaffold tests.
+- Keep Pages migration assertions focused on the reviewed scaffold file shape while preserving
+  existing identity extraction checks for deployment-specific values.
+- Update docs and command-contract expectations in the same PR so generated file paths and examples
+  match the new derived names.
+
+### 9. Consequences of not implementing this PR
+
+Cloudflare Containers scaffolds continue to expose hidden hardcoded implementation names despite the
+plan requiring deployment-name derivation, and the real migrated Pages packages remain covered only
+by identity checks rather than by an explicit assertion that their checked-in `wrangler.jsonc` and
+file shape match the scaffold contract.
+
+### 10. Downsides for implementing this PR
+
+It adds more scaffold golden surface and makes Cloudflare naming derivation a maintained contract
+that future template changes must preserve or intentionally update.

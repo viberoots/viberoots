@@ -58,7 +58,8 @@ scaf new deployment service api-dev --component=//projects/apps/api:service_arti
 
 `deployment/cloudflare-containers` defaults to private ingress. Add
 `--ingress_mode=public --domain=<host> --cloudflare_zone_id=<zone>` for protected/shared public
-custom-domain routing.
+custom-domain routing. The generated container class, Durable Object binding, migration tag, and
+Worker entrypoint path are derived from the deployment id rather than provided as scaffold inputs.
 
 For TypeScript SSR templates, framework-specific names are explicit:
 

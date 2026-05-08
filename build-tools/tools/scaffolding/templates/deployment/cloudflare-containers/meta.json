@@ -9,6 +9,7 @@
     "notes": [
       "Generates a Cloudflare Containers deployment target, Wrangler config, and Worker entrypoint.",
       "Defaults to private ingress so generated protected/shared deployments do not need a public domain.",
+      "Derives the container class, Durable Object binding, migration tag, and Worker entrypoint path from the deployment id.",
       "Use --ingress_mode=public with --domain and --cloudflare_zone_id for protected/shared public ingress."
     ],
     "examples": [

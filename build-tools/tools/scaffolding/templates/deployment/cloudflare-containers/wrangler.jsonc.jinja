@@ -1,7 +1,7 @@
 {
   "$schema": "../../../node_modules/wrangler/config-schema.json",
   "name": "{{ worker }}",
-  "main": "src/worker.ts",
+  "main": "{{ cloudflare_worker_entrypoint_path }}",
   "compatibility_date": "{{ compatibility_date }}",
 {% if ingress_mode == "public" and domain %}
   "routes": [
@@ -15,20 +15,20 @@
   "durable_objects": {
     "bindings": [
       {
-        "name": "CONTAINER",
-        "class_name": "ContainerEntrypoint",
+        "name": "{{ cloudflare_container_binding_name }}",
+        "class_name": "{{ cloudflare_container_class_name }}",
       },
     ],
   },
   "migrations": [
     {
-      "tag": "{{ worker }}-containers-v1",
-      "new_classes": ["ContainerEntrypoint"],
+      "tag": "{{ cloudflare_container_migration_tag }}",
+      "new_classes": ["{{ cloudflare_container_class_name }}"],
     },
   ],
   "containers": [
     {
-      "class_name": "ContainerEntrypoint",
+      "class_name": "{{ cloudflare_container_class_name }}",
       "image": "./Dockerfile",
       "max_instances": {{ max_instances }},
       "instance_type": "dev",
