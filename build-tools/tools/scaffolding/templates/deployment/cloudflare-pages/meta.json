@@ -1,0 +1,17 @@
+{
+  "language": "deployment",
+  "template": "cloudflare-pages",
+  "description": "Cloudflare Pages static webapp deployment package",
+  "resolverDestination": "projects/deployments/{name}",
+  "requiredFlags": ["component", "account", "project"],
+  "help": {
+    "usage": "scaf new deployment cloudflare-pages <deployment-id> --component=//projects/apps/app:app --account=account --project=project",
+    "notes": [
+      "Generates a Cloudflare Pages deployment target plus minimal provider-native wrangler.jsonc.",
+      "Deployment identity and admission policy stay in TARGETS; wrangler.jsonc stays limited to Wrangler config."
+    ],
+    "examples": [
+      "scaf new deployment cloudflare-pages console-staging --component=//projects/apps/console:app --account=web-platform-staging --project=console-staging-pages --yes"
+    ]
+  }
+}

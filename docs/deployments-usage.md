@@ -432,8 +432,14 @@ step instead of editing Keycloak by hand.
 `cloudflare-pages`
 
 - good fit for static sites
+- start new packages with
+  `scaf new deployment cloudflare-pages <deployment-id> --component=<static-webapp-target> --account=<cloudflare-account> --project=<pages-project>`
+  so `TARGETS` and `wrangler.jsonc` are created together
 - supports preview, preview cleanup, retry, rollback, and promotion from the
   main `deploy` command
+- keep account, project, domains, lane policy, admission policy, preview, smoke,
+  and secret requirements in `TARGETS`; keep `wrangler.jsonc` limited to
+  provider-native Wrangler settings such as `$schema` and `compatibility_date`
 - use this guide plus [Deployment Provider Capabilities](/Users/kiltyj/Code/bucknix-fresh/docs/deployment-provider-capabilities.md)
   for the exact supported behavior
 
@@ -493,6 +499,7 @@ Scaffold-first examples:
 ```bash
 scaf new deployment shared console --repository=example/platform --yes
 scaf new deployment vercel-next console-dev --component=//projects/apps/console:vercel_artifact --team=acme --project=console --shared_package=console-shared --yes
+scaf new deployment cloudflare-pages console-staging --component=//projects/apps/console:app --account=web-platform-staging --project=console-staging-pages --shared_package=console-shared --yes
 scaf new deployment service api-dev --component=//projects/apps/api:service_artifact --cluster=dev-cluster --shared_package=console-shared --yes
 scaf new deployment opentofu-foundation platform-dev --component=//projects/deployments/platform-shared:migration_bundle --shared_package=platform-shared --yes
 scaf new deployment opentofu-provisioner api-dev --path=projects/deployments/api-dev --yes

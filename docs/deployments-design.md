@@ -2678,6 +2678,9 @@ Why this file is intentionally small:
 - `wrangler.jsonc` only carries provider-native publish settings for Wrangler itself
 - the deploy CLI still passes the resolved artifact path at runtime instead of relying on a checked-in output directory
 - if Wrangler needs a project identifier such as `name`, the preferred model is to inject or render it from deployment metadata rather than duplicate it by hand here
+- new Cloudflare Pages deployment packages should come from
+  `scaf new deployment cloudflare-pages ...` so this minimal file and the
+  matching `TARGETS` metadata stay in sync from the first commit
 
 Why you would want this:
 

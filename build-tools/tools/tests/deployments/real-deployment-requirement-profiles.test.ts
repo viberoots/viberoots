@@ -1,5 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import assert from "node:assert/strict";
+import * as fsp from "node:fs/promises";
+import path from "node:path";
 import { test } from "node:test";
 import { extractDeployments } from "../../deployments/contract";
 import {
@@ -10,6 +12,11 @@ import type { GraphNode } from "../../lib/graph";
 
 const STAGING = "//projects/deployments/pleomino-staging:deploy";
 const PROD = "//projects/deployments/pleomino-prod:deploy";
+const SCAFFOLD_WRANGLER = `{
+  "$schema": "../../../node_modules/wrangler/config-schema.json",
+  "compatibility_date": "2026-03-18",
+}
+`;
 
 test("real pleomino Cloudflare deployments declare typed external requirement profiles", async () => {
   for (const label of [STAGING, PROD]) {
@@ -41,4 +48,11 @@ test("real pleomino Cloudflare profile fails closed when a lifecycle secret is m
       entry.includes("cloudflare_provider missing secret_requirements cloudflare_api_token"),
     ),
   );
+});
+
+test("real pleomino Cloudflare wrangler configs match the scaffolded minimal shape", async () => {
+  for (const deploymentId of ["pleomino-staging", "pleomino-prod"]) {
+    const wranglerPath = path.join("projects", "deployments", deploymentId, "wrangler.jsonc");
+    assert.equal(await fsp.readFile(wranglerPath, "utf8"), SCAFFOLD_WRANGLER);
+  }
 });

@@ -1,0 +1,51 @@
+load("//build-tools/deployments:defs.bzl", "cloudflare_pages_static_webapp_deployment")
+
+cloudflare_pages_static_webapp_deployment(
+    name = "deploy",
+    component = "{{ component }}",
+    account = "{{ account }}",
+{% if account_id %}
+    account_id = "{{ account_id }}",
+{% endif %}
+{% if custom_domain %}
+    custom_domain = "{{ custom_domain }}",
+{% endif %}
+{% if custom_domain_zone_id %}
+    custom_domain_zone_id = "{{ custom_domain_zone_id }}",
+{% endif %}
+    project = "{{ project }}",
+    lane_policy = "//projects/deployments/{{ shared_package }}:lane",
+    environment_stage = "{{ stage }}",
+    admission_policy = "//projects/deployments/{{ shared_package }}:{{ stage }}_release",
+    protection_class = "{{ protection_class }}",
+    secret_requirements = [
+        {
+            "name": "cloudflare_api_token",
+            "step": "provision",
+            "contract_id": "secret://deployments/{{ name }}/cloudflare_api_token",
+            "required": "true",
+        },
+        {
+            "name": "cloudflare_api_token",
+            "step": "publish",
+            "contract_id": "secret://deployments/{{ name }}/cloudflare_api_token",
+            "required": "true",
+        },
+        {
+            "name": "cloudflare_api_token",
+            "step": "preview_cleanup",
+            "contract_id": "secret://deployments/{{ name }}/cloudflare_api_token",
+            "required": "true",
+        },
+    ],
+    runtime_config_requirements = [],
+    external_requirement_profiles = ["cloudflare_provider"],
+    preview = {
+        "target_derivation": "provider_managed_source_run",
+        "isolation_class": "isolated",
+        "identity_selector": "source_run",
+        "cleanup_ttl": "7d",
+        "smoke_target": "preview_url",
+        "lock_scope": "shared",
+    },
+)

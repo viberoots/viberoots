@@ -88,7 +88,12 @@ export async function prepareCloudflarePagesWranglerConfig(opts: {
   outputPath: string;
 }): Promise<{ sourcePath: string; renderedConfigPath: string; fingerprint: string }> {
   const sourcePath = resolveCloudflarePagesPublisherConfigPath(opts.workspaceRoot, opts.deployment);
-  const raw = await fsp.readFile(sourcePath, "utf8");
+  const raw = await fsp.readFile(sourcePath, "utf8").catch((error: NodeJS.ErrnoException) => {
+    if (error?.code === "ENOENT") {
+      throw new Error(`${sourcePath}: missing wrangler config`);
+    }
+    throw error;
+  });
   const parsed = parseJsoncObject(raw, sourcePath);
   const configuredName = typeof parsed.name === "string" ? String(parsed.name).trim() : undefined;
   if (configuredName && configuredName !== opts.deployment.providerTarget.project) {

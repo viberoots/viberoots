@@ -34,6 +34,7 @@ export const ACTIVE_DOC_COMMAND_CONTRACT: DocCommandContractEntry[] = [
     path: "build-tools/docs/scaffolding.md",
     requiredFragments: [
       "scaf new ts webapp-ssr-vite demo-vite-ssr --yes",
+      "scaf new deployment cloudflare-pages console-staging",
       "build-tools/tools/dev/build-wasm-producer.ts",
       "Hash-only or browser-storage-only client state is a poor fit for SSR-first ownership",
       "pnpm run preview -- --host 127.0.0.1 --port 4173",

@@ -49,6 +49,7 @@ scaf new ts webapp-ssr-vite demo-vite-ssr --yes
 scaf new ts webapp-static-pwa demo-pwa --yes
 scaf new deployment shared console --repository=example/platform --yes
 scaf new deployment vercel-next console-dev --component=//projects/apps/console:vercel_artifact --team=acme --project=console --yes
+scaf new deployment cloudflare-pages console-staging --component=//projects/apps/console:app --account=web-platform-staging --project=console-staging-pages --yes
 scaf new deployment service api-dev --component=//projects/apps/api:service_artifact --cluster=dev-cluster --yes
 ```
 
@@ -81,6 +82,8 @@ metadata, and template-only verify selection path.
 
 - `deployment/shared` creates lane governance, lane policy, and dev/staging/prod admission policy.
 - `deployment/vercel-next` creates a Vercel prebuilt Next.js package for a repo-built artifact.
+- `deployment/cloudflare-pages` creates a Cloudflare Pages package with `TARGETS` metadata and a
+  minimal provider-native `wrangler.jsonc`.
 - `deployment/service` creates a Kubernetes service deployment package and provider config.
 - `deployment/opentofu-foundation` creates a Kubernetes deployment with an `opentofu-stack`
   provisioner and placeholder stack layout.
@@ -88,9 +91,10 @@ metadata, and template-only verify selection path.
   existing deployment package.
 
 Deployment templates fail before rendering when required provider answers are missing. For example,
-`deployment/vercel-next` requires `--component`, `--team`, and `--project`; `deployment/service` and
-`deployment/opentofu-foundation` require `--component` and `--cluster`; `deployment/shared` requires
-`--repository`.
+`deployment/vercel-next` requires `--component`, `--team`, and `--project`;
+`deployment/cloudflare-pages` requires `--component`, `--account`, and `--project`;
+`deployment/service` and `deployment/opentofu-foundation` require `--component` and `--cluster`;
+`deployment/shared` requires `--repository`.
 
 Local-origin PWA validation guidance:
 

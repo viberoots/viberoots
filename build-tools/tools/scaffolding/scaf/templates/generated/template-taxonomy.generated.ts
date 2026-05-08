@@ -10,6 +10,7 @@ export const TEMPLATE_NAME_ALIASES: Record<string, string> = {
 export const TEMPLATE_TAXONOMY = {
   "cpp": ["cli", "lib"],
   "deployment": [
+    "cloudflare-pages",
     "opentofu-foundation",
     "opentofu-provisioner",
     "service",

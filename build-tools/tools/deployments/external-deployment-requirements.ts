@@ -48,17 +48,9 @@ const PROFILES: Record<ExternalDeploymentRequirementProfile, ExpectedRequirement
     runtime("console_to_web_base_url", "publish", "config://deployments/console/web_base_url"),
   ],
   cloudflare_provider: [
-    secret(
-      "cloudflare_api_token",
-      "provision",
-      "secret://deployments/pleomino/cloudflare_api_token",
-    ),
-    secret("cloudflare_api_token", "publish", "secret://deployments/pleomino/cloudflare_api_token"),
-    secret(
-      "cloudflare_api_token",
-      "preview_cleanup",
-      "secret://deployments/pleomino/cloudflare_api_token",
-    ),
+    secret("cloudflare_api_token", "provision", "secret://deployments/"),
+    secret("cloudflare_api_token", "publish", "secret://deployments/"),
+    secret("cloudflare_api_token", "preview_cleanup", "secret://deployments/"),
   ],
   vercel_provider: [secret("vercel_api_token", "publish", "secret://deployments/vercel/api_token")],
   container_runtime_provider: [
