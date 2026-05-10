@@ -32,7 +32,7 @@ function assertNodeWebappCmdInvariants(cmd: string) {
     "node_webapp: expected attr argument for filtered flake builder",
   );
   assert.ok(
-    cmd.includes("OUT_PATHS_FILE=") || cmd.includes("bnx-nix-outpaths.txt"),
+    cmd.includes("OUT_PATHS_FILE=") || cmd.includes("vbr-nix-outpaths.txt"),
     "node_webapp: expected deterministic outPath capture file",
   );
   assert.ok(

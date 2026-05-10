@@ -2,7 +2,7 @@
 let
   lib = pkgs.lib;
   H = import ./lib/lang-helpers.nix { inherit pkgs; };
-  filteredFlakeSnapshot = (builtins.getEnv "BNX_FILTERED_FLAKE_SNAPSHOT") != "";
+  filteredFlakeSnapshot = (builtins.getEnv "VBR_FILTERED_FLAKE_SNAPSHOT") != "";
   buckTestSrcEnv = builtins.getEnv "BUCK_TEST_SRC";
   repoRootStr =
     if filteredFlakeSnapshot then builtins.toString src

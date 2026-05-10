@@ -111,7 +111,7 @@ test("GitHub wildcard branch protection rule can verify every declared branch", 
         governance,
         fingerprint: "sha256:test-lane-policy",
       },
-      env: { BNX_DEPLOY_GITHUB_TOKEN: "ghp_test" } as NodeJS.ProcessEnv,
+      env: { VBR_DEPLOY_GITHUB_TOKEN: "ghp_test" } as NodeJS.ProcessEnv,
     });
     assert.deepEqual(calls.map((call) => call.branch).sort(), [
       "env/pleomino/dev",
@@ -183,7 +183,7 @@ test("GitHub repository ruleset can verify every declared branch", async () => {
         governance,
         fingerprint: "sha256:test-lane-policy",
       },
-      env: { BNX_DEPLOY_GITHUB_TOKEN: "ghp_test" } as NodeJS.ProcessEnv,
+      env: { VBR_DEPLOY_GITHUB_TOKEN: "ghp_test" } as NodeJS.ProcessEnv,
     });
     assert.deepEqual(calls.map((call) => call.branch).sort(), [
       "env/pleomino/dev",

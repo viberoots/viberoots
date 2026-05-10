@@ -29,9 +29,9 @@ async function writeArtifact(root: string, html: string) {
 function fakeAwsOverrides(fake: Awaited<ReturnType<typeof installFakeS3StaticAwsCli>>) {
   return {
     PATH: `${fake.binDir}:${process.env.PATH || ""}`,
-    BNX_S3_STATIC_FAKE_PUBLISH_ROOT: fake.publishRoot,
-    BNX_S3_STATIC_FAKE_AWS_LOG: fake.logPath,
-    BNX_S3_STATIC_AWS_BIN: path.join(fake.binDir, "aws"),
+    VBR_S3_STATIC_FAKE_PUBLISH_ROOT: fake.publishRoot,
+    VBR_S3_STATIC_FAKE_AWS_LOG: fake.logPath,
+    VBR_S3_STATIC_AWS_BIN: path.join(fake.binDir, "aws"),
   };
 }
 
@@ -62,7 +62,7 @@ test("public s3-static deploy requires a control-plane URL for protected/shared 
         cwd: tmp,
         stdio: "pipe",
       })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment ${deployment.label} --artifact-dir ${artifactDir} --admission-evidence-json ${evidence}`,
-      /s3-static (shared_nonprod|production_facing) mutation requires --control-plane-url or BNX_DEPLOY_CONTROL_PLANE_URL/,
+      /s3-static (shared_nonprod|production_facing) mutation requires --control-plane-url or VBR_DEPLOY_CONTROL_PLANE_URL/,
     );
   });
 });

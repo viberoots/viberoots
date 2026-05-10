@@ -38,7 +38,7 @@ test("buck cleanup: does not kill buck2 daemons belonging to other running temp 
     ],
     {
       stdio: ["ignore", "pipe", "pipe"],
-      env: { ...process.env, BNX_BUCK_REAPER_STATE_FILE: "" },
+      env: { ...process.env, VBR_BUCK_REAPER_STATE_FILE: "" },
     },
   );
 

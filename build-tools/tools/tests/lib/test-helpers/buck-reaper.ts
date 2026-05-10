@@ -37,7 +37,7 @@ async function startSignatureForPid(pid: number, $: any): Promise<string> {
 
 export async function ensureBuckReaperStarted(tmp: string, $: any): Promise<void> {
   try {
-    const shared = String(process.env.BNX_BUCK_REAPER_STATE_FILE || "").trim();
+    const shared = String(process.env.VBR_BUCK_REAPER_STATE_FILE || "").trim();
     if (shared) {
       await fsp.appendFile(shared, `${tmp}\n`, "utf8");
       return;

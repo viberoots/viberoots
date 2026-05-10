@@ -22,7 +22,7 @@ function assertServiceClientInstallParity(doc: string, label: string) {
   );
   assert.match(
     doc,
-    /--control-plane-token-env BNX_DEPLOY_CONTROL_PLANE_TOKEN/,
+    /--control-plane-token-env VBR_DEPLOY_CONTROL_PLANE_TOKEN/,
     `${label} must document the reviewed control-plane token env`,
   );
 }

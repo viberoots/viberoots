@@ -14,11 +14,11 @@ if (args[0] !== "s3" || args[1] !== "sync") {
 const artifactDir = path.resolve(args[2] || "");
 const destinationArg = String(args[3] || "");
 const bucket = destinationArg.replace(/^s3:\\/\\//, "");
-const publishRoot = process.env.BNX_S3_STATIC_FAKE_PUBLISH_ROOT || "";
-const logPath = process.env.BNX_S3_STATIC_FAKE_AWS_LOG || "";
-const configPath = process.env.BNX_S3_STATIC_RENDERED_CONFIG || "";
+const publishRoot = process.env.VBR_S3_STATIC_FAKE_PUBLISH_ROOT || "";
+const logPath = process.env.VBR_S3_STATIC_FAKE_AWS_LOG || "";
+const configPath = process.env.VBR_S3_STATIC_RENDERED_CONFIG || "";
 if (!publishRoot) {
-  console.error("missing BNX_S3_STATIC_FAKE_PUBLISH_ROOT");
+  console.error("missing VBR_S3_STATIC_FAKE_PUBLISH_ROOT");
   process.exit(3);
 }
 const config = configPath ? JSON.parse(fs.readFileSync(configPath, "utf8")) : {};
@@ -37,7 +37,7 @@ if (logPath) {
     JSON.stringify({ args, artifactDir, bucket, configPath, config }) + "\\n",
   );
 }
-if (process.env.BNX_S3_STATIC_FAKE_AMBIGUOUS_RESULT === "1") {
+if (process.env.VBR_S3_STATIC_FAKE_AMBIGUOUS_RESULT === "1") {
   console.error("ambiguous publish result after sync");
   process.exit(5);
 }

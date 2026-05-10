@@ -14,7 +14,7 @@ export async function makeFilteredFlakeRef(opts: {
   logPrefix: string;
 }): Promise<{ flakeRef: string; cleanup: () => Promise<void> }> {
   const tmpBase = process.env.TMPDIR || "/tmp";
-  const workDir = await fsp.mkdtemp(path.join(tmpBase, "bnx-flake-"));
+  const workDir = await fsp.mkdtemp(path.join(tmpBase, "vbr-flake-"));
   const snapDir = path.join(workDir, "src");
   await fsp.mkdir(snapDir, { recursive: true });
   const src = path.resolve(opts.workspaceRoot);

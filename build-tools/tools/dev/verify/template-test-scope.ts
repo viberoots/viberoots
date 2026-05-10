@@ -117,7 +117,7 @@ export async function resolveVerifyTemplateTestScope(opts: {
   deps?: Partial<VerifyTemplateScopeDeps>;
 }): Promise<VerifyTemplateScopeDecision> {
   const env = opts.env || process.env;
-  const requestedMode = parseVerifyTemplateScopeMode(env.BNX_TEMPLATE_TEST_SCOPE);
+  const requestedMode = parseVerifyTemplateScopeMode(env.VBR_TEMPLATE_TEST_SCOPE);
   const resolveBuildScope = opts.deps?.resolveBuildScope || resolveBuildSystemBuckTestScope;
   const baseScope = await resolveBuildScope({
     root: opts.root,
@@ -167,7 +167,7 @@ export async function resolveVerifyTemplateTestScope(opts: {
   if (requestedMode === "always" && selected.mode !== "template-only") {
     throw new Error(
       [
-        "template selector guardrail failed: BNX_TEMPLATE_TEST_SCOPE=always requires template-only changes",
+        "template selector guardrail failed: VBR_TEMPLATE_TEST_SCOPE=always requires template-only changes",
         "diagnostics:",
         JSON.stringify(diagnostics, null, 2),
       ].join("\n"),

@@ -11,10 +11,12 @@ import {
 import type { ForkserverProc } from "./buck-orphan-cleanup-lib";
 import {
   cleanupOrphanRegisteredBuckIsolations,
-  cleanupOrphanRegisteredTempRepos,
   cleanupRegisteredBuckIsolations,
-  cleanupRegisteredTempRepos,
 } from "./registered-buck-cleanup";
+import {
+  cleanupOrphanRegisteredTempRepos,
+  cleanupRegisteredTempRepos,
+} from "./registered-temp-repo-cleanup";
 import { cleanupOrphanVerifyProcesses, etimeToSeconds } from "./verify-owned-orphan-cleanup";
 
 export {
@@ -74,7 +76,7 @@ export async function cleanupOrphanBuckDaemons(opts: {
   const includeOwnerlessEphemeral = opts.includeOwnerlessEphemeral ?? false;
   const ignoreLiveOwnerPid = opts.ignoreLiveOwnerPid ?? -1;
   const staleGraceRaw = Number.parseInt(
-    String(process.env.BNX_BUCK_ORPHAN_STALE_GRACE_SECS || "120"),
+    String(process.env.VBR_BUCK_ORPHAN_STALE_GRACE_SECS || "120"),
     10,
   );
   const staleGraceSec = Math.max(0, Number.isFinite(staleGraceRaw) ? staleGraceRaw : 120);

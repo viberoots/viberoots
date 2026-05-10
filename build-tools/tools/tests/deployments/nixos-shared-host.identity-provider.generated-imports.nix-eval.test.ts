@@ -156,7 +156,7 @@ test("shared-host identity provider module bootstraps generated identity imports
       /printf 'db-url(?:-host|-database|-port|-properties)?=%s\\n'/,
     );
     assert.doesNotMatch(out.keycloakPreStart, /(^|[[:space:]])--db([[:space:]]|$)/);
-    assert.match(out.keycloakPreStart, /--client-secret:env=BNX_KEYCLOAK_BOOTSTRAP_ADMIN_SECRET/);
+    assert.match(out.keycloakPreStart, /--client-secret:env=VBR_KEYCLOAK_BOOTSTRAP_ADMIN_SECRET/);
     assert.match(out.keycloakPostStart, /kcadm\.sh create realms/);
     assert.match(out.keycloakPostStart, /kcadm\.sh create groups/);
     assert.match(out.keycloakPostStart, /-q max=1000/);

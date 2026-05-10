@@ -54,10 +54,10 @@ function sharedSubmitOpts(opts: ProvisionOnlyRunOpts) {
 }
 
 function requireBackendDatabaseUrl(value?: string): string {
-  const resolved = value || String(process.env.BNX_DEPLOY_CONTROL_PLANE_DATABASE_URL || "").trim();
+  const resolved = value || String(process.env.VBR_DEPLOY_CONTROL_PLANE_DATABASE_URL || "").trim();
   if (!resolved) {
     throw new Error(
-      "shared replay source lookup requires backendDatabaseUrl or BNX_DEPLOY_CONTROL_PLANE_DATABASE_URL",
+      "shared replay source lookup requires backendDatabaseUrl or VBR_DEPLOY_CONTROL_PLANE_DATABASE_URL",
     );
   }
   return resolved;

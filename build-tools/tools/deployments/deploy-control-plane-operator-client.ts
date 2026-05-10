@@ -56,7 +56,7 @@ export async function resolveServiceClientForOperator(opts: {
   return resolveServiceClientFromFlags({
     controlPlaneUrl:
       getFlagStr("control-plane-url", "").trim() ||
-      String(process.env.BNX_DEPLOY_CONTROL_PLANE_URL || "").trim(),
+      String(process.env.VBR_DEPLOY_CONTROL_PLANE_URL || "").trim(),
     controlPlaneToken: getFlagStr("control-plane-token", "").trim() || undefined,
     remote: getFlagStr("remote", "").trim(),
     context: opts.actionLabel,

@@ -31,6 +31,8 @@ Use the deeper docs when needed:
 - [NixOS Shared Host Usage](/Users/kiltyj/Code/viberoots/docs/nixos-shared-host-usage.md)
   for the reviewed `mini` host workflow and the start-here path for first-time
   `mini` setup
+- [Runtime Prefix Migration](/Users/kiltyj/Code/viberoots/docs/runtime-prefix-migration.md)
+  for updating old runtime environment variables to `VBR_*`
 
 ## Main Command
 
@@ -275,14 +277,14 @@ inspection commands so you do not need to hand-build HTTP requests:
 deploy --deployment //projects/deployments/pleomino-prod:deploy \
   --status \
   --deploy-run-id <deploy-run-id> \
-  --control-plane-url "$BNX_DEPLOY_CONTROL_PLANE_URL"
+  --control-plane-url "$VBR_DEPLOY_CONTROL_PLANE_URL"
 ```
 
 ```bash
 deploy --deployment //projects/deployments/pleomino-prod:deploy \
   --print-run-lock-scope \
   --deploy-run-id <deploy-run-id> \
-  --control-plane-url "$BNX_DEPLOY_CONTROL_PLANE_URL"
+  --control-plane-url "$VBR_DEPLOY_CONTROL_PLANE_URL"
 ```
 
 ```bash
@@ -290,7 +292,7 @@ deploy --deployment //projects/deployments/pleomino-prod:deploy \
   --approve \
   --deploy-run-id <deploy-run-id> \
   --approval-id <ticket-or-review-ref> \
-  --control-plane-url "$BNX_DEPLOY_CONTROL_PLANE_URL"
+  --control-plane-url "$VBR_DEPLOY_CONTROL_PLANE_URL"
 ```
 
 Use `--status` when you want the full run status JSON, `--print-run-lock-scope`
@@ -397,7 +399,7 @@ need client-supplied `laneGovernance` JSON; the service verifies live branch
 protection, required checks, and reviewed branch-advance identities before it
 admits the run, then stores the resulting fact with
 `verificationSource = "service_verified"`. If the hosted service is verifying a
-GitHub-backed lane, configure `BNX_DEPLOY_GITHUB_TOKEN` on the service host so
+GitHub-backed lane, configure `VBR_DEPLOY_GITHUB_TOKEN` on the service host so
 it can read the live governance state. Unsupported SCM backends still fail
 closed unless you intentionally provide reviewed compatibility evidence through
 `--admission-evidence-json`.
@@ -407,7 +409,7 @@ derives identity through its service session and the worker uses server-owned
 secret context for provider mutation. Use HTTPS service URLs and reviewed SSH
 known-host or pinning configuration for protected/shared remote profiles; local
 HTTP is only for explicit local test fixtures marked with
-`BNX_DEPLOY_LOCAL_FIXTURE_SERVICE=1`. Remote-profile uploads finalize under the
+`VBR_DEPLOY_LOCAL_FIXTURE_SERVICE=1`. Remote-profile uploads finalize under the
 configured staging root before proof submission, and the service admits only the
 canonical finalized tree into the content-addressed store.
 When a service-backed request returns `unauthorized`, read the rejection text:
@@ -492,8 +494,8 @@ step instead of editing Keycloak by hand.
   admission evidence fail closed and never invoke `tofu apply`
 - Kubernetes control-plane workers construct the production OpenTofu adapter
   when no test hook adapter is injected. The adapter runs the pinned `tofu`
-  from the Nix dev shell by default, or `BNX_OPENTOFU_BIN` /
-  `BNX_DEPLOY_OPENTOFU_BIN` when a reviewed worker profile pins an explicit
+  from the Nix dev shell by default, or `VBR_OPENTOFU_BIN` /
+  `VBR_DEPLOY_OPENTOFU_BIN` when a reviewed worker profile pins an explicit
   binary path.
 - OpenTofu provider and backend credentials are resolved exclusively through
   deployment `secret_requirements` at the `provision` step, never from ambient
@@ -690,7 +692,7 @@ Protected/shared Vercel control-plane examples:
 # Deploy an already admitted prebuilt artifact through the control-plane service
 deploy --deployment //projects/deployments/console-staging:deploy \
   --source-run-id <deploy-run-id> \
-  --control-plane-url "$BNX_DEPLOY_CONTROL_PLANE_URL"
+  --control-plane-url "$VBR_DEPLOY_CONTROL_PLANE_URL"
 ```
 
 ```bash
@@ -698,7 +700,7 @@ deploy --deployment //projects/deployments/console-staging:deploy \
 deploy --deployment //projects/deployments/console-staging:deploy \
   --preview \
   --source-run-id <deploy-run-id> \
-  --control-plane-url "$BNX_DEPLOY_CONTROL_PLANE_URL"
+  --control-plane-url "$VBR_DEPLOY_CONTROL_PLANE_URL"
 ```
 
 ```bash
@@ -706,7 +708,7 @@ deploy --deployment //projects/deployments/console-staging:deploy \
 deploy --deployment //projects/deployments/console-staging:deploy \
   --preview-cleanup \
   --source-run-id <deploy-run-id> \
-  --control-plane-url "$BNX_DEPLOY_CONTROL_PLANE_URL"
+  --control-plane-url "$VBR_DEPLOY_CONTROL_PLANE_URL"
 ```
 
 ```bash
@@ -714,7 +716,7 @@ deploy --deployment //projects/deployments/console-staging:deploy \
 deploy --deployment //projects/deployments/console-staging:deploy \
   --publish-only \
   --source-run-id <deploy-run-id> \
-  --control-plane-url "$BNX_DEPLOY_CONTROL_PLANE_URL"
+  --control-plane-url "$VBR_DEPLOY_CONTROL_PLANE_URL"
 ```
 
 ```bash
@@ -723,7 +725,7 @@ deploy --deployment //projects/deployments/console-staging:deploy \
   --publish-only \
   --rollback \
   --source-run-id <deploy-run-id> \
-  --control-plane-url "$BNX_DEPLOY_CONTROL_PLANE_URL"
+  --control-plane-url "$VBR_DEPLOY_CONTROL_PLANE_URL"
 ```
 
 Protected/shared Vercel mutations reject laptop-local artifact paths,

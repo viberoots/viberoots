@@ -98,15 +98,15 @@ export function resolveServiceClientFromFlags(opts: {
     controlPlaneUrl: requireNonEmpty(
       opts.controlPlaneUrl ||
         (remote === "mini"
-          ? String(env.BNX_DEPLOY_MINI_CONTROL_PLANE_URL || "").trim() || REMOTE_ALIASES.mini
+          ? String(env.VBR_DEPLOY_MINI_CONTROL_PLANE_URL || "").trim() || REMOTE_ALIASES.mini
           : ""),
-      `${opts.context} requires --control-plane-url or BNX_DEPLOY_CONTROL_PLANE_URL (or --remote mini)`,
+      `${opts.context} requires --control-plane-url or VBR_DEPLOY_CONTROL_PLANE_URL (or --remote mini)`,
     ),
     context: opts.context,
     env,
   });
   const controlPlaneToken = String(opts.controlPlaneToken || "").trim();
-  const envToken = String(env.BNX_DEPLOY_CONTROL_PLANE_TOKEN || "").trim();
+  const envToken = String(env.VBR_DEPLOY_CONTROL_PLANE_TOKEN || "").trim();
   return {
     controlPlaneUrl,
     ...(controlPlaneToken || envToken ? { controlPlaneToken: controlPlaneToken || envToken } : {}),
@@ -114,7 +114,7 @@ export function resolveServiceClientFromFlags(opts: {
       mode: "control-plane-service",
       controlPlaneUrl,
       ...(controlPlaneToken || envToken
-        ? { controlPlaneTokenEnv: "BNX_DEPLOY_CONTROL_PLANE_TOKEN" }
+        ? { controlPlaneTokenEnv: "VBR_DEPLOY_CONTROL_PLANE_TOKEN" }
         : {}),
     },
   };

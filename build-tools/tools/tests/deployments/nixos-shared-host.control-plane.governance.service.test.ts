@@ -57,7 +57,7 @@ test("service-backed shared-host deploy synthesizes service-owned governance evi
       localFixture: true,
       env: {
         ...process.env,
-        BNX_DEPLOY_GITHUB_GOVERNANCE_FIXTURE_JSON: JSON.stringify({
+        VBR_DEPLOY_GITHUB_GOVERNANCE_FIXTURE_JSON: JSON.stringify({
           scmBackend: "github",
           repository: deployment.lanePolicy.governance.repository,
           branchProtections: deployment.lanePolicy.governance.branchProtections,
@@ -125,7 +125,7 @@ test("service-backed shared-host deploy fails closed when automatic governance d
       localFixture: true,
       env: {
         ...process.env,
-        BNX_DEPLOY_GITHUB_GOVERNANCE_FIXTURE_JSON: JSON.stringify({
+        VBR_DEPLOY_GITHUB_GOVERNANCE_FIXTURE_JSON: JSON.stringify({
           scmBackend: "github",
           repository: deployment.lanePolicy.governance.repository,
           branchProtections: deployment.lanePolicy.governance.branchProtections.map((entry) =>

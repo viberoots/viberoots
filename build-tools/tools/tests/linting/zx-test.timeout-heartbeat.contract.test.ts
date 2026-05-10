@@ -24,7 +24,7 @@ test("linting: zx_test forwards pnpm fetch timeout and wraps node --test with co
   );
   assert.match(
     txt,
-    /BNX_STREAM_NIX_BUILD_LOGS/,
+    /VBR_STREAM_NIX_BUILD_LOGS/,
     "expected zx_test to enable streamed nix build logs for long-running test diagnostics",
   );
   assert.match(

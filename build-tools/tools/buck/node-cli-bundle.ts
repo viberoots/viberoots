@@ -28,15 +28,15 @@ function fail(msg: string): never {
 }
 
 async function main() {
-  const debug = String(process.env.BNX_NIX_CALL_DEBUG || "") === "1";
+  const debug = String(process.env.VBR_NIX_CALL_DEBUG || "") === "1";
   const dbg = (...args: any[]) => {
     if (debug) console.error(...args);
   };
 
-  dbg("[BNX-BUNDLE-DEBUG] node_version=%s argv0=%s", process.version, process.argv0);
-  dbg("[BNX-BUNDLE-DEBUG] cwd=%s", process.cwd());
+  dbg("[VBR-BUNDLE-DEBUG] node_version=%s argv0=%s", process.version, process.argv0);
+  dbg("[VBR-BUNDLE-DEBUG] cwd=%s", process.cwd());
   dbg(
-    "[BNX-BUNDLE-DEBUG] env PATH=%s NIX_PATH=%s NIX_PROFILES=%s",
+    "[VBR-BUNDLE-DEBUG] env PATH=%s NIX_PATH=%s NIX_PROFILES=%s",
     process.env.PATH || "",
     process.env.NIX_PATH || "",
     process.env.NIX_PROFILES || "",
@@ -101,7 +101,7 @@ async function main() {
     await fsp.access(path.join(flakeRoot, "flake.nix"));
   } catch {
     dbg(
-      "[BNX-BUNDLE-DEBUG] flake.nix not found at %s; listing directory for diagnostics:",
+      "[VBR-BUNDLE-DEBUG] flake.nix not found at %s; listing directory for diagnostics:",
       flakeRoot,
     );
     if (debug) {
@@ -115,9 +115,9 @@ async function main() {
     fail(`node-cli-bundle: expected flake.nix at ${path.join(flakeRoot, "flake.nix")}`);
   }
   const workspaceRoot = flakeRoot;
-  dbg("[BNX-BUNDLE-DEBUG] importer=%s name=%s out=%s", importer, name, out);
+  dbg("[VBR-BUNDLE-DEBUG] importer=%s name=%s out=%s", importer, name, out);
   dbg(
-    "[BNX-BUNDLE-DEBUG] repoRoot=%s flakeRoot=%s workspaceRoot=%s",
+    "[VBR-BUNDLE-DEBUG] repoRoot=%s flakeRoot=%s workspaceRoot=%s",
     repoRoot,
     flakeRoot,
     workspaceRoot,
@@ -132,14 +132,14 @@ async function main() {
     } catch {}
   }
   dbg(
-    "[BNX-BUNDLE-DEBUG] LOCAL_PNPM_STORE=%s NIX_USE_PREFETCHED_PNPM_STORE=%s",
+    "[VBR-BUNDLE-DEBUG] LOCAL_PNPM_STORE=%s NIX_USE_PREFETCHED_PNPM_STORE=%s",
     String(process.env.LOCAL_PNPM_STORE || ""),
     String(process.env.NIX_USE_PREFETCHED_PNPM_STORE || ""),
   );
   const mj = String(process.env.NIX_MAX_JOBS || "0").trim();
   const cr = String(process.env.NIX_CORES || "0").trim();
   const attr = `node-cli.${sanitizeName(importer)}`;
-  dbg("[BNX-BUNDLE-DEBUG] building attr: %s#%s", flakeRoot, attr);
+  dbg("[VBR-BUNDLE-DEBUG] building attr: %s#%s", flakeRoot, attr);
   const nixArgs: string[] = [
     "build",
     `path:${flakeRoot}#${attr}`,
@@ -161,9 +161,9 @@ async function main() {
   if (cr && cr !== "0") {
     nixArgs.push("--option", "cores", cr);
   }
-  dbg("[BNX-BUNDLE-DEBUG] nix build args: %s", nixArgs.join(" "));
+  dbg("[VBR-BUNDLE-DEBUG] nix build args: %s", nixArgs.join(" "));
   const heartbeat = debug
-    ? setInterval(() => console.error("[BNX-BUNDLE-DEBUG] still building via nix..."), 10000)
+    ? setInterval(() => console.error("[VBR-BUNDLE-DEBUG] still building via nix..."), 10000)
     : null;
   const buildOut = await run("nix", nixArgs, {
     cwd: flakeRoot,

@@ -66,14 +66,14 @@ in {
         runHook preUnpack
         cp -r $src source
         chmod -R u+rwX source
-        if [ "''${BNX_MKNM_DEBUG:-0}" = "1" ]; then
+        if [ "''${VBR_MKNM_DEBUG:-0}" = "1" ]; then
           echo "[nix] mkNodeModules: tree under filtered src (max depth 3)"
           (cd source && find . -maxdepth 3 -type d -print | sort)
         fi
         # Ensure we run inside the importer directory so pnpm sees package.json
         cd source/${importerDir}
         echo "[nix] mkNodeModules: entered $(pwd)"
-        if [ "''${BNX_MKNM_DEBUG:-0}" = "1" ]; then
+        if [ "''${VBR_MKNM_DEBUG:-0}" = "1" ]; then
           ls -la
         fi
         runHook postUnpack
@@ -84,21 +84,21 @@ in {
         export SOURCE_DATE_EPOCH=1
         export TZ=UTC
         debug_mknm() {
-          if [ "''${BNX_MKNM_DEBUG:-0}" = "1" ]; then
+          if [ "''${VBR_MKNM_DEBUG:-0}" = "1" ]; then
             echo "$@" >&2
           fi
         }
-        debug_mknm "[BNX-MKNM-DEBUG] env PATH=$PATH"
-        debug_mknm "[BNX-MKNM-DEBUG] node=$(command -v node || echo none) pnpm=$(command -v pnpm || echo none)"
-        debug_mknm "[BNX-MKNM-DEBUG] NODE_VERSION=$(node -v 2>/dev/null || echo none) PNPM_VERSION=$(pnpm -v 2>/dev/null || echo none)"
+        debug_mknm "[VBR-MKNM-DEBUG] env PATH=$PATH"
+        debug_mknm "[VBR-MKNM-DEBUG] node=$(command -v node || echo none) pnpm=$(command -v pnpm || echo none)"
+        debug_mknm "[VBR-MKNM-DEBUG] NODE_VERSION=$(node -v 2>/dev/null || echo none) PNPM_VERSION=$(pnpm -v 2>/dev/null || echo none)"
         if ! command -v timeout >/dev/null 2>&1; then
-          echo "[BNX-MKNM-ERROR] 'timeout' not found in PATH; coreutils must provide it in builder env" >&2
-          echo "[BNX-MKNM-ERROR] PATH=$PATH" >&2
+          echo "[VBR-MKNM-ERROR] 'timeout' not found in PATH; coreutils must provide it in builder env" >&2
+          echo "[VBR-MKNM-ERROR] PATH=$PATH" >&2
           exit 127
         fi
-        debug_mknm "[BNX-MKNM-DEBUG] TIMEOUT_BIN=timeout"
-        debug_mknm "[BNX-MKNM-DEBUG] begin mkNodeModules buildPhase (importerDir=${importerDir})"
-        debug_mknm "[BNX-MKNM-DEBUG] CWD=$(pwd)"
+        debug_mknm "[VBR-MKNM-DEBUG] TIMEOUT_BIN=timeout"
+        debug_mknm "[VBR-MKNM-DEBUG] begin mkNodeModules buildPhase (importerDir=${importerDir})"
+        debug_mknm "[VBR-MKNM-DEBUG] CWD=$(pwd)"
         export SSL_CERT_FILE=${certs}/etc/ssl/certs/ca-bundle.crt
         export NIX_SSL_CERT_FILE=${certs}/etc/ssl/certs/ca-bundle.crt
         export NODE_EXTRA_CA_CERTS=${certs}/etc/ssl/certs/ca-bundle.crt
@@ -119,7 +119,7 @@ in {
         # For locked installs, seed directly from the importer-specific fixed store so
         # the shared prefetched cache stays off the hot evaluation path.
         # For generation paths, seed from the shared prefetched store when available.
-        debug_mknm "[BNX-MKNM-DEBUG] preparing local pnpm store"
+        debug_mknm "[VBR-MKNM-DEBUG] preparing local pnpm store"
         LOCAL_STORE="$HOME/.pnpm-store"
         mkdir -p "$LOCAL_STORE"
 
@@ -158,23 +158,23 @@ in {
         printf '%s\n' ${lib.escapeShellArg pnpmSupportedArchitectures} >> pnpm-workspace.yaml
         FT="${ftVal}"
         IT="${installTimeoutVal}"
-        debug_mknm "[BNX-MKNM-DEBUG] NIX_PNPM_FETCH_TIMEOUT=$FT"
-        debug_mknm "[BNX-MKNM-DEBUG] NIX_PNPM_INSTALL_TIMEOUT=$IT"
-        debug_mknm "[BNX-MKNM-DEBUG] lockfile_present=$(test -f pnpm-lock.yaml && echo yes || echo no)"
-        if [ "''${BNX_MKNM_DEBUG:-0}" = "1" ] && [ -f pnpm-lock.yaml ]; then
-          echo "[BNX-MKNM-DEBUG] head -n5 pnpm-lock.yaml:" >&2
+        debug_mknm "[VBR-MKNM-DEBUG] NIX_PNPM_FETCH_TIMEOUT=$FT"
+        debug_mknm "[VBR-MKNM-DEBUG] NIX_PNPM_INSTALL_TIMEOUT=$IT"
+        debug_mknm "[VBR-MKNM-DEBUG] lockfile_present=$(test -f pnpm-lock.yaml && echo yes || echo no)"
+        if [ "''${VBR_MKNM_DEBUG:-0}" = "1" ] && [ -f pnpm-lock.yaml ]; then
+          echo "[VBR-MKNM-DEBUG] head -n5 pnpm-lock.yaml:" >&2
           head -n5 pnpm-lock.yaml >&2 || true
         fi
         # If explicitly requested by caller, ignore any importer-local lockfile
         if [ "${if ignoreImporterLock then "1" else "0"}" = "1" ]; then
-          debug_mknm "[BNX-MKNM-DEBUG] ignoreImporterLock=1; removing importer-local lockfile before install"
+          debug_mknm "[VBR-MKNM-DEBUG] ignoreImporterLock=1; removing importer-local lockfile before install"
           rm -f pnpm-lock.yaml >/dev/null 2>&1 || true
         fi
         # If generation is allowed, ignore lockfiles only when one is not already present in src.
         # This prevents "outdated lockfile" mismatches when a temp importer has no lock yet,
         # but still respects a real lockfile when it exists.
         if [ "${if genAllowed then "1" else "0"}" = "1" ] && [ ! -f pnpm-lock.yaml ]; then
-          debug_mknm "[BNX-MKNM-DEBUG] allow-generate=1 and no lockfile in src; proceeding without an importer lockfile"
+          debug_mknm "[VBR-MKNM-DEBUG] allow-generate=1 and no lockfile in src; proceeding without an importer lockfile"
         fi
         # Do not rely on pnpm cache from the store output; resolve strictly from lockfile + store
         # Ensure a lockfile is present: prefer using the exported lockfile from pnpm-store
@@ -187,7 +187,7 @@ in {
             cp ${if lockInput != null then "${lockInput}" else "/nonexistent"} pnpm-lock.yaml
           elif [ "${if genAllowed then "1" else "0"}" = "1" ]; then
             echo "[nix] mkNodeModules: offline install to create lockfile (allow-generate)"
-          debug_mknm "[BNX-MKNM-DEBUG] pnpm install (generate) --offline --force --no-frozen-lockfile --ignore-scripts --prod=false (IT=${installTimeoutVal}s)"
+          debug_mknm "[VBR-MKNM-DEBUG] pnpm install (generate) --offline --force --no-frozen-lockfile --ignore-scripts --prod=false (IT=${installTimeoutVal}s)"
           timeout "$IT"s env PNPM_HOME="$PNPM_HOME" pnpm install --offline --force --no-frozen-lockfile --ignore-scripts --prod=false --lockfile-dir "." --dir "."
           else
             echo "[nix] mkNodeModules: no lockfile present and generation not allowed; failing"
@@ -196,18 +196,18 @@ in {
         else
           # Install strictly from the fixed-output store for the specific importer (relative to importer root)
           # Force inclusion of devDependencies so tool binaries (e.g., vite) are available
-          debug_mknm "[BNX-MKNM-DEBUG] pnpm install (offline) --force --frozen-lockfile --ignore-scripts --prod=false (IT=${installTimeoutVal}s)"
+          debug_mknm "[VBR-MKNM-DEBUG] pnpm install (offline) --force --frozen-lockfile --ignore-scripts --prod=false (IT=${installTimeoutVal}s)"
           timeout "$IT"s env PNPM_HOME="$PNPM_HOME" pnpm install --offline --force --frozen-lockfile --ignore-scripts --prod=false --lockfile-dir "." --dir "."
         fi
         echo "[nix] mkNodeModules: install complete"
-        if [ "''${BNX_MKNM_DEBUG:-0}" = "1" ]; then
+        if [ "''${VBR_MKNM_DEBUG:-0}" = "1" ]; then
           echo "[nix] mkNodeModules: listing node_modules/.bin"
           ls -la node_modules/.bin || true
           echo "[nix] mkNodeModules: probing vitest under pnpm virtual store"
           find node_modules/.pnpm -maxdepth 2 -type d -name "vitest@*" -print || true
           find node_modules -maxdepth 4 -type f -name "vitest.mjs" -print || true
         fi
-        debug_mknm "[BNX-MKNM-DEBUG] end mkNodeModules buildPhase"
+        debug_mknm "[VBR-MKNM-DEBUG] end mkNodeModules buildPhase"
         runHook postBuild
       '';
       installPhase = ''

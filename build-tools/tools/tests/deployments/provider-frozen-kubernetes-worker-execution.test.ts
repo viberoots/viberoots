@@ -102,9 +102,9 @@ test("kubernetes worker deploy and retry execute from frozen snapshots", async (
       await withEnvOverrides(
         {
           PATH: `${fake.binDir}:${process.env.PATH || ""}`,
-          BNX_KUBERNETES_HELM_BIN: path.join(fake.binDir, "helm"),
-          BNX_KUBERNETES_FAKE_PUBLISH_ROOT: fake.publishRoot,
-          BNX_KUBERNETES_FAKE_HELM_LOG: fake.logPath,
+          VBR_KUBERNETES_HELM_BIN: path.join(fake.binDir, "helm"),
+          VBR_KUBERNETES_FAKE_PUBLISH_ROOT: fake.publishRoot,
+          VBR_KUBERNETES_FAKE_HELM_LOG: fake.logPath,
           [DEPLOYMENT_SECRET_FIXTURE_PATH_ENV]: secretFixturePath,
         },
         async () => {

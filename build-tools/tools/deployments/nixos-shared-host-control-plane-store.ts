@@ -98,19 +98,19 @@ function envInt(name: string, fallback: number): number {
 }
 
 function lockLeaseMs(): number {
-  return envInt("BNX_DEPLOY_LOCK_LEASE_MS", 30_000);
+  return envInt("VBR_DEPLOY_LOCK_LEASE_MS", 30_000);
 }
 
 function lockHeartbeatMs(): number {
-  return envInt("BNX_DEPLOY_LOCK_HEARTBEAT_MS", 5_000);
+  return envInt("VBR_DEPLOY_LOCK_HEARTBEAT_MS", 5_000);
 }
 
 function lockPollMs(): number {
-  return envInt("BNX_DEPLOY_LOCK_POLL_MS", 1_000);
+  return envInt("VBR_DEPLOY_LOCK_POLL_MS", 1_000);
 }
 
 function lockWaitTimeoutMs(): number {
-  return envInt("BNX_DEPLOY_LOCK_WAIT_TIMEOUT_MS", 30 * 60_000);
+  return envInt("VBR_DEPLOY_LOCK_WAIT_TIMEOUT_MS", 30 * 60_000);
 }
 
 function sleep(ms: number): Promise<void> {

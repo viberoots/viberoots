@@ -16,7 +16,7 @@ const DEFAULT_REMOTE_STATE_PATH = "/etc/nixos/deployment-host/platform-state.jso
 const DEFAULT_REMOTE_RUNTIME_ROOT = "/var/lib/deployment-host/runtime";
 const DEFAULT_REMOTE_RECORDS_ROOT = "/var/lib/deployment-host/records";
 const DEFAULT_CONTROL_PLANE_URL = "http://127.0.0.1:7780";
-const DEFAULT_CONTROL_PLANE_TOKEN_ENV = "BNX_DEPLOY_CONTROL_PLANE_TOKEN";
+const DEFAULT_CONTROL_PLANE_TOKEN_ENV = "VBR_DEPLOY_CONTROL_PLANE_TOKEN";
 
 export async function createSshAuthFixture(tmp: string) {
   const sshIdentityFile = path.join(tmp, "id_ed25519");

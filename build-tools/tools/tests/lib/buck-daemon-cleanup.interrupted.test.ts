@@ -39,10 +39,10 @@ test("buck cleanup: interrupted temp repo run is reaped (no orphan buck2 daemons
     ],
     {
       stdio: ["ignore", "pipe", "pipe"],
-      // IMPORTANT: verify runs set BNX_BUCK_REAPER_STATE_FILE to a shared per-run reaper.
+      // IMPORTANT: verify runs set VBR_BUCK_REAPER_STATE_FILE to a shared per-run reaper.
       // For this test we need a *per-child* reaper (so we can assert cleanup happens promptly
       // after SIGKILL), so explicitly disable the shared reaper for the child.
-      env: { ...process.env, BNX_BUCK_REAPER_STATE_FILE: "" },
+      env: { ...process.env, VBR_BUCK_REAPER_STATE_FILE: "" },
     },
   );
 

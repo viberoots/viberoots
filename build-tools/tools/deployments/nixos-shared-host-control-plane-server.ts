@@ -140,9 +140,9 @@ export async function startNixosSharedHostControlPlaneServer(opts: {
       }
       if (request.method === "POST" && url.pathname === "/api/v1/artifact-uploads/static-webapp") {
         if (!requireReviewedBearerToken(request, response, opts)) return;
-        const submissionId = String(request.headers["x-bnx-submission-id"] || "").trim();
+        const submissionId = String(request.headers["x-vbr-submission-id"] || "").trim();
         if (!submissionId) {
-          writeJson(response, 400, { error: "artifact upload requires x-bnx-submission-id" });
+          writeJson(response, 400, { error: "artifact upload requires x-vbr-submission-id" });
           return;
         }
         writeJson(

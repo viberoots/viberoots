@@ -46,7 +46,7 @@ export async function psLinesWithEnv(timeoutMs: number): Promise<string[]> {
   return await processTableLines({
     psArgs: ["eww", "-A", "-o", "pid=,ppid=,pgid=,etime=,command="],
     timeoutMs,
-    pgrepPattern: "BNX_VERIFY_LOG_FILE=|BNX_VERIFY_PROCESS_STATE_FILE=",
+    pgrepPattern: "VBR_VERIFY_LOG_FILE=|VBR_VERIFY_PROCESS_STATE_FILE=",
     pgrepToLine: (pid, cmd) => `${pid} 0 ${pid} 00:00 ${cmd}`,
   });
 }
@@ -77,9 +77,9 @@ function matchEnvValue(cmd: string, name: string): string {
 
 function summarizeCommand(cmd: string): string {
   const envMarkers = [
-    " BNX_VERIFY_LOG_FILE=",
-    " BNX_VERIFY_PROCESS_STATE_FILE=",
-    " BNX_BUCK_REAPER_STATE_FILE=",
+    " VBR_VERIFY_LOG_FILE=",
+    " VBR_VERIFY_PROCESS_STATE_FILE=",
+    " VBR_BUCK_REAPER_STATE_FILE=",
     " BUCK_TEST_TARGET=",
   ];
   const cut = envMarkers
@@ -94,10 +94,10 @@ export function parseEnvVerifyProcesses(lines: string[]): EnvVerifyProc[] {
   const out: EnvVerifyProc[] = [];
   for (const line of lines) {
     if (!line.includes("BUCK_TEST_TARGET=")) continue;
-    if (!line.includes("BNX_VERIFY_LOG_FILE=")) continue;
+    if (!line.includes("VBR_VERIFY_LOG_FILE=")) continue;
     if (
-      !line.includes("BNX_VERIFY_PROCESS_STATE_FILE=") &&
-      !line.includes("BNX_BUCK_REAPER_STATE_FILE=")
+      !line.includes("VBR_VERIFY_PROCESS_STATE_FILE=") &&
+      !line.includes("VBR_BUCK_REAPER_STATE_FILE=")
     ) {
       continue;
     }
@@ -112,10 +112,10 @@ export function parseEnvVerifyProcesses(lines: string[]): EnvVerifyProc[] {
     if (!Number.isFinite(ppid) || ppid < 0) continue;
     if (!Number.isFinite(pgid) || pgid <= 1 || pgid === process.pid) continue;
 
-    const logFile = matchEnvValue(cmd, "BNX_VERIFY_LOG_FILE");
+    const logFile = matchEnvValue(cmd, "VBR_VERIFY_LOG_FILE");
     const stateFile =
-      matchEnvValue(cmd, "BNX_VERIFY_PROCESS_STATE_FILE") ||
-      matchEnvValue(cmd, "BNX_BUCK_REAPER_STATE_FILE");
+      matchEnvValue(cmd, "VBR_VERIFY_PROCESS_STATE_FILE") ||
+      matchEnvValue(cmd, "VBR_BUCK_REAPER_STATE_FILE");
     const target = matchEnvValue(cmd, "BUCK_TEST_TARGET");
     if (!logFile || !stateFile || !target) continue;
     out.push({
@@ -150,7 +150,7 @@ export async function listCandidateStateFiles(): Promise<string[]> {
     dirs.add(path.resolve("/tmp", `viberoots-verify-${user}.noindex`, "tmpdir"));
     dirs.add(path.resolve("/private/tmp", `viberoots-verify-${user}.noindex`, "tmpdir"));
   }
-  const currentStateFile = String(process.env.BNX_VERIFY_PROCESS_STATE_FILE || "").trim();
+  const currentStateFile = String(process.env.VBR_VERIFY_PROCESS_STATE_FILE || "").trim();
   if (currentStateFile) dirs.add(path.dirname(path.resolve(currentStateFile)));
 
   const files: string[] = [];

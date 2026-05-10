@@ -26,7 +26,7 @@ in
     buildPhase = ''
       set -euo pipefail
       cd ${info.importer}
-      tmpOut="$PWD/.bnx-out/${outRel}"
+      tmpOut="$PWD/.vbr-out/${outRel}"
       mkdir -p "$(dirname "$tmpOut")"
       export OUT="$tmpOut"
       export SRCS=${srcsEscaped}
@@ -42,7 +42,7 @@ in
     installPhase = ''
       set -euo pipefail
       outRel=${outEscaped}
-      srcPath="$PWD/.bnx-out/$outRel"
+      srcPath="$PWD/.vbr-out/$outRel"
       mkdir -p "$out/$(dirname "$outRel")"
       if [ -d "$srcPath" ]; then
         cp -R "$srcPath" "$out/$outRel"

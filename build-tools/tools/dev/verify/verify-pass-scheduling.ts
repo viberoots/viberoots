@@ -24,7 +24,7 @@ export function resourceLimitedStartDelaySeconds<
   if (!resourceLimitedPass || !sharedPass) return 0;
 
   const override = parseNonNegativeInteger(
-    env.BNX_VERIFY_RESOURCE_LIMITED_START_DELAY_SECS ||
+    env.VBR_VERIFY_RESOURCE_LIMITED_START_DELAY_SECS ||
       env.VERIFY_RESOURCE_LIMITED_START_DELAY_SECS,
   );
   if (override != null) return override;

@@ -35,7 +35,7 @@ test(
   "PR-2 concurrency: manifest-driven watcher handles 5 module keys fairly in one session",
   { timeout: TEST_TIMEOUT_MS },
   async () => {
-    await runInTemp("bnx-multi-module-watch", async (tmp, _$) => {
+    await runInTemp("vbr-multi-module-watch", async (tmp, _$) => {
       const $ = _$({ cwd: tmp, stdio: "inherit" });
       await $`scaf new ts webapp-static demo-web --yes --no-tests --skip-lockfile-gen`;
       const appAbs = path.join(tmp, "projects", "apps", "demo-web");

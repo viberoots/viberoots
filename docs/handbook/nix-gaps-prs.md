@@ -110,7 +110,7 @@ PRs after PR-11 should use them consistently and avoid bypassing them.
    - Evidence: `TESTING.md` includes single-target and multi-target test commands.
 
 3. Reuse verify seed store for temp repos; do not rebuild seed per test.
-   - Preserve `BNX_TEST_SEED_STORE_PATH` flow and fail-fast behavior in verify mode.
+   - Preserve `VBR_TEST_SEED_STORE_PATH` flow and fail-fast behavior in verify mode.
    - Evidence: `build-tools/tools/tests/lib/test-helpers/run-in-temp.ts` and
      `build-tools/tools/dev/verify/seed.ts`.
 

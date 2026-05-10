@@ -3,7 +3,7 @@ import * as fsp from "node:fs/promises";
 import type { DeploymentRequirementStep } from "./deployment-requirements";
 
 export const DEPLOYMENT_SECRET_FIXTURE_SCHEMA = "deployment-secret-fixture@1";
-export const DEPLOYMENT_SECRET_FIXTURE_PATH_ENV = "BNX_DEPLOYMENT_SECRET_FIXTURE_PATH";
+export const DEPLOYMENT_SECRET_FIXTURE_PATH_ENV = "VBR_DEPLOYMENT_SECRET_FIXTURE_PATH";
 
 export type DeploymentSecretFixtureEntry = {
   value: string;

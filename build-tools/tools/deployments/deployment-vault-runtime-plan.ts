@@ -13,18 +13,18 @@ import {
 } from "./deployment-credential-source-selection";
 import type { DeploymentVaultRuntimeInputs } from "./deployment-vault-runtime-inputs";
 
-export const VAULT_OIDC_ISSUER_ENV = "BNX_VAULT_OIDC_ISSUER";
-export const VAULT_AUDIENCE_ENV = "BNX_VAULT_AUDIENCE";
-export const DEPLOYMENT_CLIENT_ID_ENV = "BNX_DEPLOYMENT_CLIENT_ID";
-export const DEPLOYMENT_CLI_PUBLIC_CLIENT_ID_ENV = "BNX_DEPLOYMENT_CLI_PUBLIC_CLIENT_ID";
-export const DEPLOYMENT_ENVIRONMENT_ENV = "BNX_DEPLOYMENT_ENVIRONMENT";
-export const DEPLOYMENT_CLIENT_SECRET_ENV_ENV = "BNX_DEPLOYMENT_CLIENT_SECRET_ENV";
-export const DEPLOYMENT_CREDENTIAL_SOURCE_ENV = "BNX_DEPLOYMENT_CREDENTIAL_SOURCE";
-export const DEPLOYMENT_EXTERNAL_OIDC_TOKEN_ENV_ENV = "BNX_DEPLOYMENT_EXTERNAL_OIDC_TOKEN_ENV";
+export const VAULT_OIDC_ISSUER_ENV = "VBR_VAULT_OIDC_ISSUER";
+export const VAULT_AUDIENCE_ENV = "VBR_VAULT_AUDIENCE";
+export const DEPLOYMENT_CLIENT_ID_ENV = "VBR_DEPLOYMENT_CLIENT_ID";
+export const DEPLOYMENT_CLI_PUBLIC_CLIENT_ID_ENV = "VBR_DEPLOYMENT_CLI_PUBLIC_CLIENT_ID";
+export const DEPLOYMENT_ENVIRONMENT_ENV = "VBR_DEPLOYMENT_ENVIRONMENT";
+export const DEPLOYMENT_CLIENT_SECRET_ENV_ENV = "VBR_DEPLOYMENT_CLIENT_SECRET_ENV";
+export const DEPLOYMENT_CREDENTIAL_SOURCE_ENV = "VBR_DEPLOYMENT_CREDENTIAL_SOURCE";
+export const DEPLOYMENT_EXTERNAL_OIDC_TOKEN_ENV_ENV = "VBR_DEPLOYMENT_EXTERNAL_OIDC_TOKEN_ENV";
 export const DEFAULT_DEPLOYMENT_CLIENT_ID = "deployment-runner";
 export const DEFAULT_DEPLOYMENT_CLI_PUBLIC_CLIENT_ID = "deployment-cli";
-export const DEFAULT_DEPLOYMENT_CLIENT_SECRET_ENV = "BNX_DEPLOYER_CLIENT_SECRET";
-export const DEFAULT_DEPLOYMENT_EXTERNAL_OIDC_TOKEN_ENV = "BNX_DEPLOYMENT_OIDC_TOKEN";
+export const DEFAULT_DEPLOYMENT_CLIENT_SECRET_ENV = "VBR_DEPLOYER_CLIENT_SECRET";
+export const DEFAULT_DEPLOYMENT_EXTERNAL_OIDC_TOKEN_ENV = "VBR_DEPLOYMENT_OIDC_TOKEN";
 export const DEFAULT_VAULT_AUDIENCE = "deployments-vault";
 
 export type DeploymentVaultRuntimePlan = {
@@ -194,7 +194,7 @@ export function resolveDeploymentVaultRuntimePlan(opts: {
   const missing = [
     ...(requiresSecrets && !fixtureActive && !addr
       ? [
-          `secret-consuming deployments require vault_runtime.addr, ${VAULT_ADDR_ENV}, or BNX_DEPLOYMENT_SECRET_FIXTURE_PATH`,
+          `secret-consuming deployments require vault_runtime.addr, ${VAULT_ADDR_ENV}, or VBR_DEPLOYMENT_SECRET_FIXTURE_PATH`,
         ]
       : []),
     ...(requiresSecrets && !fixtureActive && !issuerUrl

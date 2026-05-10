@@ -128,7 +128,7 @@ test("never mode bypasses deployment selection", async () => {
     root: process.cwd(),
     invocationCwd: process.cwd(),
     args: defaultArgs,
-    env: { BNX_DEPLOYMENT_TEST_SCOPE: "never" },
+    env: { VBR_DEPLOYMENT_TEST_SCOPE: "never" },
     deps: {
       resolveTemplateScope: async () => baseDecision(),
       collectChangedPaths: async () => {
@@ -148,14 +148,14 @@ test("always mode fails unless the change is safely deployment-only", async () =
         root: process.cwd(),
         invocationCwd: process.cwd(),
         args: defaultArgs,
-        env: { BNX_DEPLOYMENT_TEST_SCOPE: "always" },
+        env: { VBR_DEPLOYMENT_TEST_SCOPE: "always" },
         deps: {
           resolveTemplateScope: async () => baseDecision(),
           collectChangedPaths: async () => ["projects/deployments/pleomino-dev/TARGETS"],
           listDeploymentTargets: async () => ["//projects/deployments/pleomino-dev:deploy"],
         },
       }),
-    /BNX_DEPLOYMENT_TEST_SCOPE=always requires deployment-only changes/,
+    /VBR_DEPLOYMENT_TEST_SCOPE=always requires deployment-only changes/,
   );
 });
 

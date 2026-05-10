@@ -50,7 +50,7 @@ test("link-node writes marker at repo root", async () => {
     const zxInitPath = path.join(tmp, "build-tools/tools/dev/zx-init.mjs");
     const env = {
       ...process.env,
-      BNX_LINK_NODE_FAKE_NIX: "1",
+      VBR_LINK_NODE_FAKE_NIX: "1",
       PATH: `${binDir}:${process.env.PATH || ""}`,
       WORKSPACE_ROOT: tmp,
     };

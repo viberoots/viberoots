@@ -38,7 +38,7 @@ function assertWorkerCredentialSource(source: string | undefined) {
 function assertNoFixtureRuntime() {
   if (!deploymentSecretFixturePath()) return;
   throw new Error(
-    "server-mode worker Vault access must not use BNX_DEPLOYMENT_SECRET_FIXTURE_PATH",
+    "server-mode worker Vault access must not use VBR_DEPLOYMENT_SECRET_FIXTURE_PATH",
   );
 }
 

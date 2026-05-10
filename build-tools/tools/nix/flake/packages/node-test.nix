@@ -176,7 +176,7 @@ let
               export ADDON_SRC="${addonSrc}"
               export COVERAGE_ENV="${coverageEnv}"
               export PATTERNS_VALUE='${builtins.toJSON patternsValue}'
-              export BNX_NODE_PHASE_DIAGNOSTICS="${innerPhaseDiagnostics}"
+              export VBR_NODE_PHASE_DIAGNOSTICS="${innerPhaseDiagnostics}"
               ${builtins.readFile ./node-test-buildPhase.sh}
             '';
             installPhase = ''

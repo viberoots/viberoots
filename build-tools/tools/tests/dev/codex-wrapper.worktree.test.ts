@@ -28,7 +28,7 @@ test("codex --worktree attaches to an existing named worktree", async () => {
       env: {
         ...process.env,
         PATH: `${path.dirname(wrapper)}:${fake.bin}:/usr/bin:/bin`,
-        BNX_CODEX_GIT_WRAPPER_FOR_TEST: path.join(fake.bin, "git"),
+        VBR_CODEX_GIT_WRAPPER_FOR_TEST: path.join(fake.bin, "git"),
       },
     })`${wrapper} --worktree existing-worker exec task`;
 
@@ -57,7 +57,7 @@ test("codex --worktree recreates a missing worktree from an existing branch", as
       env: {
         ...process.env,
         PATH: `${path.dirname(wrapper)}:${fake.bin}:/usr/bin:/bin`,
-        BNX_CODEX_GIT_WRAPPER_FOR_TEST: path.join(fake.bin, "git"),
+        VBR_CODEX_GIT_WRAPPER_FOR_TEST: path.join(fake.bin, "git"),
       },
     })`${wrapper} --worktree branch-only exec task`;
 

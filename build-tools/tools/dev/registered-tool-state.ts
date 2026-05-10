@@ -11,16 +11,16 @@ type EnvSnapshot = {
 };
 
 function restoreEnv(snapshot: EnvSnapshot): void {
-  if (snapshot.stateFile === undefined) delete process.env.BNX_VERIFY_PROCESS_STATE_FILE;
-  else process.env.BNX_VERIFY_PROCESS_STATE_FILE = snapshot.stateFile;
-  if (snapshot.reaperStateFile === undefined) delete process.env.BNX_BUCK_REAPER_STATE_FILE;
-  else process.env.BNX_BUCK_REAPER_STATE_FILE = snapshot.reaperStateFile;
-  if (snapshot.ownerPid === undefined) delete process.env.BNX_VERIFY_OWNER_PID;
-  else process.env.BNX_VERIFY_OWNER_PID = snapshot.ownerPid;
+  if (snapshot.stateFile === undefined) delete process.env.VBR_VERIFY_PROCESS_STATE_FILE;
+  else process.env.VBR_VERIFY_PROCESS_STATE_FILE = snapshot.stateFile;
+  if (snapshot.reaperStateFile === undefined) delete process.env.VBR_BUCK_REAPER_STATE_FILE;
+  else process.env.VBR_BUCK_REAPER_STATE_FILE = snapshot.reaperStateFile;
+  if (snapshot.ownerPid === undefined) delete process.env.VBR_VERIFY_OWNER_PID;
+  else process.env.VBR_VERIFY_OWNER_PID = snapshot.ownerPid;
 }
 
 export async function withRegisteredToolState<T>(kind: string, fn: () => Promise<T>): Promise<T> {
-  if (String(process.env.BNX_VERIFY_PROCESS_STATE_FILE || "").trim()) {
+  if (String(process.env.VBR_VERIFY_PROCESS_STATE_FILE || "").trim()) {
     return await fn();
   }
 
@@ -34,13 +34,13 @@ export async function withRegisteredToolState<T>(kind: string, fn: () => Promise
   await fsp.writeFile(stateFile, "", "utf8");
 
   const snapshot: EnvSnapshot = {
-    stateFile: process.env.BNX_VERIFY_PROCESS_STATE_FILE,
-    reaperStateFile: process.env.BNX_BUCK_REAPER_STATE_FILE,
-    ownerPid: process.env.BNX_VERIFY_OWNER_PID,
+    stateFile: process.env.VBR_VERIFY_PROCESS_STATE_FILE,
+    reaperStateFile: process.env.VBR_BUCK_REAPER_STATE_FILE,
+    ownerPid: process.env.VBR_VERIFY_OWNER_PID,
   };
-  process.env.BNX_VERIFY_PROCESS_STATE_FILE = stateFile;
-  process.env.BNX_BUCK_REAPER_STATE_FILE = stateFile;
-  process.env.BNX_VERIFY_OWNER_PID = String(process.pid);
+  process.env.VBR_VERIFY_PROCESS_STATE_FILE = stateFile;
+  process.env.VBR_BUCK_REAPER_STATE_FILE = stateFile;
+  process.env.VBR_VERIFY_OWNER_PID = String(process.pid);
 
   const cleanup = createRegisteredStateCleaner({ stateFile, logFile });
   try {

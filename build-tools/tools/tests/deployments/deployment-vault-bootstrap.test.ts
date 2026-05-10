@@ -171,7 +171,7 @@ test("shell rendering includes auth, policy, role, and runtime exports", () => {
   assert.match(rendered, /vault write auth\/jwt\/config/);
   assert.match(rendered, /vault policy write deploy-pleomino-read/);
   assert.match(rendered, /vault write auth\/jwt\/role\/deploy-pleomino-read/);
-  assert.match(rendered, /export BNX_VAULT_OIDC_ISSUER=/);
+  assert.match(rendered, /export VBR_VAULT_OIDC_ISSUER=/);
   assert.equal(payload.vault.boundClaims.deployment_environment, "mini");
 });
 

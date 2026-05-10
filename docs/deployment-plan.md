@@ -820,7 +820,7 @@ shared-path impact still broadens immediately to the current full build-system b
 ### Scope & Changes
 
 - Add a first-class deployment test scope control, for example:
-  - `BNX_DEPLOYMENT_TEST_SCOPE=auto|always|never`
+  - `VBR_DEPLOYMENT_TEST_SCOPE=auto|always|never`
 - In `auto`, use the deployment-impact classifier from PR-4.5.2.
 - Add verify execution behavior:
   - `deployment-only`: run the deployment-domain Buck test targets plus a reviewed deployment safety
@@ -8594,7 +8594,7 @@ semantics explicit through admitted secret-reference snapshots rather than ambie
 ### Tests (in this PR)
 
 - Add or extend secret-runtime tests proving the reviewed production path reads secrets through the
-  direct Vault backend boundary rather than requiring `BNX_DEPLOYMENT_VAULT_FIXTURE_PATH` for the
+  direct Vault backend boundary rather than requiring `VBR_DEPLOYMENT_VAULT_FIXTURE_PATH` for the
   normal protected/shared path.
 - Add admitted-reference tests proving protected/shared admission freezes one explicit non-secret
   secret-reference set and that same-deployment `retry` / `rollback` reuse that exact set while
@@ -8799,7 +8799,7 @@ transitional caveat.
     fixture-handoff model with direct Vault-backed runtime resolution and explicit admitted secret-
     reference replay semantics for retry, rollback, and promotion.
 37. PR-67: remove the remaining fixture-path front-door misnaming by replacing
-    `BNX_DEPLOYMENT_VAULT_FIXTURE_PATH` with one neutral secret-fixture env var and by making the
+    `VBR_DEPLOYMENT_VAULT_FIXTURE_PATH` with one neutral secret-fixture env var and by making the
     reviewed operator/docs/test surface explicit that the fixture path is for local, test, and
     bootstrap-oriented workflows rather than the normal production Vault path.
 38. PR-68: finish the fixture-surface naming cleanup by renaming the remaining fixture-only schema,
@@ -8814,16 +8814,16 @@ transitional caveat.
 ### Description
 
 I will remove the remaining front-door misnaming around the local/test fixture path by replacing
-`BNX_DEPLOYMENT_VAULT_FIXTURE_PATH` with one neutral secret-fixture env var and by tightening the
+`VBR_DEPLOYMENT_VAULT_FIXTURE_PATH` with one neutral secret-fixture env var and by tightening the
 operator-facing documentation so it is impossible to confuse the fixture override with the normal
 direct-Vault runtime path. This is a direct cutover for the env var name; no compatibility alias is
 needed for this repo.
 
 ### Scope & Changes
 
-- Replace `BNX_DEPLOYMENT_VAULT_FIXTURE_PATH` everywhere in reviewed runtime code, tests, helpers,
+- Replace `VBR_DEPLOYMENT_VAULT_FIXTURE_PATH` everywhere in reviewed runtime code, tests, helpers,
   scripts, and docs with one neutral fixture env var such as
-  `BNX_DEPLOYMENT_SECRET_FIXTURE_PATH`.
+  `VBR_DEPLOYMENT_SECRET_FIXTURE_PATH`.
 - Keep the runtime precedence explicit and reviewed:
   - the fixture env var is an intentional local/test/bootstrap override
   - direct Vault runtime resolution uses `VAULT_ADDR` plus `VAULT_TOKEN`
@@ -9022,9 +9022,9 @@ before running `deploy`.
   normal production provider.
 - Define one explicit JWT provider configuration surface, for example:
   - `VAULT_ADDR` for the remote Vault API endpoint
-  - `BNX_VAULT_AUTH_METHOD=jwt`
-  - `BNX_VAULT_JWT_ROLE` for the Vault JWT role used by the deployment identity
-  - one reviewed JWT source such as `BNX_VAULT_JWT`, `BNX_VAULT_JWT_FILE`, or a CI-specific JWT
+  - `VBR_VAULT_AUTH_METHOD=jwt`
+  - `VBR_VAULT_JWT_ROLE` for the Vault JWT role used by the deployment identity
+  - one reviewed JWT source such as `VBR_VAULT_JWT`, `VBR_VAULT_JWT_FILE`, or a CI-specific JWT
     source adapter
 - Exchange the workload JWT through Vault's JWT auth endpoint and keep the returned Vault token
   in-memory for the duration of the deployment run.
@@ -9344,7 +9344,7 @@ consumed by the JWT-first Vault credential provider from PR-69.
   - expected issuer, audience, or bound claims are absent
   - the output path would overwrite a non-regular file
 - Keep this helper separate from the main `deploy` runtime path:
-  - `deploy` continues to consume `BNX_VAULT_JWT` or `BNX_VAULT_JWT_FILE`
+  - `deploy` continues to consume `VBR_VAULT_JWT` or `VBR_VAULT_JWT_FILE`
   - the helper is optional CI/operator glue for IdPs that use client credentials
   - later CI-specific workload identity adapters can be added without changing the Vault runtime
     contract
@@ -9492,7 +9492,7 @@ the reviewed production deployment credential path.
     is necessary
   - the normal production deployment credential story must remain JWT-first remote Vault auth
   - docs must point operators at `deploy --print-vault-bootstrap`, `deploy-vault-jwt`, and the
-    reviewed `BNX_VAULT_AUTH_METHOD=jwt` runtime contract for normal deployments
+    reviewed `VBR_VAULT_AUTH_METHOD=jwt` runtime contract for normal deployments
 
 ### Tests (in this PR)
 
@@ -9598,7 +9598,7 @@ I will replace the deployment runtime's ambient Vault credential handoff with an
 secret context. The deploy front door will receive or construct a typed Vault credential object,
 hand it directly to the secret resolver, exchange it for a Vault token inside that resolver, and
 clear all references when the deployment scope exits. This PR intentionally breaks the current
-`BNX_VAULT_JWT`, `BNX_VAULT_JWT_FILE`, and `BNX_VAULT_AUTH_METHOD` runtime contract in favor of a
+`VBR_VAULT_JWT`, `VBR_VAULT_JWT_FILE`, and `VBR_VAULT_AUTH_METHOD` runtime contract in favor of a
 cleaner design because there are no current users that need compatibility.
 
 ### Scope & Changes
@@ -9632,8 +9632,8 @@ cleaner design because there are no current users that need compatibility.
   - `kubernetes`
   - NixOS shared-host deploys
   - mobile-store providers if they consume deployment secrets
-- Remove normal-runtime support for `BNX_VAULT_JWT`, `BNX_VAULT_JWT_FILE`,
-  `BNX_VAULT_AUTH_METHOD`, and `VAULT_TOKEN` from deployment secret resolution.
+- Remove normal-runtime support for `VBR_VAULT_JWT`, `VBR_VAULT_JWT_FILE`,
+  `VBR_VAULT_AUTH_METHOD`, and `VAULT_TOKEN` from deployment secret resolution.
 - Add guardrails so provider code and child-process wrappers do not inherit or log Vault workload
   JWTs, Vault tokens, or deployment client secrets.
 - Keep secret fixture support explicit and typed as a separate test/local context, not as an ambient
@@ -9644,8 +9644,8 @@ cleaner design because there are no current users that need compatibility.
 - Add Vault secret resolver tests proving:
   - an explicit in-memory JWT credential logs in to Vault and reads authorized secrets
   - no JWT file is created for the normal auto-minted path
-  - `process.env` is not mutated with `BNX_VAULT_JWT`, `BNX_VAULT_JWT_FILE`,
-    `BNX_VAULT_AUTH_METHOD`, `BNX_VAULT_JWT_ROLE`, or `VAULT_TOKEN`
+  - `process.env` is not mutated with `VBR_VAULT_JWT`, `VBR_VAULT_JWT_FILE`,
+    `VBR_VAULT_AUTH_METHOD`, `VBR_VAULT_JWT_ROLE`, or `VAULT_TOKEN`
   - Vault JWTs and Vault tokens are not included in thrown errors, logs, deploy records, replay
     snapshots, or operator-visible status
 - Add deploy front-door tests proving the secret context is created from `vault_runtime` metadata
@@ -9672,8 +9672,8 @@ cleaner design because there are no current users that need compatibility.
   [Deployment Schema](/Users/kiltyj/Code/viberoots/docs/deployments-schema.md) if needed to
   clarify that `vault_runtime` contains stable public routing/identity metadata only.
 - Update [Vault Production Bootstrap Runbook](/Users/kiltyj/Code/viberoots/docs/vault-production-bootstrap.md)
-  to remove normal-runtime instructions for `BNX_VAULT_JWT`, `BNX_VAULT_JWT_FILE`,
-  `BNX_VAULT_AUTH_METHOD`, and `VAULT_TOKEN`, and to document that workload JWTs and Vault tokens
+  to remove normal-runtime instructions for `VBR_VAULT_JWT`, `VBR_VAULT_JWT_FILE`,
+  `VBR_VAULT_AUTH_METHOD`, and `VAULT_TOKEN`, and to document that workload JWTs and Vault tokens
   remain in memory during deploy execution.
 
 ### Verification Commands
@@ -10436,7 +10436,7 @@ deployment request, and polls or streams status.
   - open or print the returned login URL
   - poll session and deployment status until the submission is queued, rejected, or finished
 - Add a stable remote-client configuration contract:
-  - `--control-plane-url` / `BNX_DEPLOY_CONTROL_PLANE_URL`
+  - `--control-plane-url` / `VBR_DEPLOY_CONTROL_PLANE_URL`
   - optional `--remote mini` or profile alias that resolves to the service endpoint
   - no client-side Vault JWT, provider token, or PKCE callback material in normal server mode
 - Rework protected/shared service submission authorization:
@@ -11774,7 +11774,7 @@ contract.
 - Ensure rejected-path retention is not controlled solely by the client request or CLI flag.
 - Tighten protected/shared service-client URL validation:
   - remove implicit `allowLoopbackHttp` bypasses from manifest and flag resolution
-  - require `BNX_DEPLOY_LOCAL_FIXTURE_SERVICE=1` or an equivalent reviewed fixture profile before
+  - require `VBR_DEPLOY_LOCAL_FIXTURE_SERVICE=1` or an equivalent reviewed fixture profile before
     accepting `http://127.0.0.1`, `http://localhost`, or equivalent loopback URLs
   - keep HTTPS aliases such as `mini` unchanged
   - preserve TLS-validation fail-closed behavior for all protected/shared profiles
@@ -11790,7 +11790,7 @@ contract.
 - Add tests proving accepted submissions may clean transient staging while preserving admitted
   content-addressed artifacts for retry, rollback, and audit.
 - Add client-config tests proving manifest and flag resolution reject loopback HTTP unless
-  `BNX_DEPLOY_LOCAL_FIXTURE_SERVICE=1` or a reviewed local fixture profile marks the flow
+  `VBR_DEPLOY_LOCAL_FIXTURE_SERVICE=1` or a reviewed local fixture profile marks the flow
   non-production.
 - Update existing fixture tests so local HTTP usage is visibly marked as fixture-only instead of
   accepted by default.

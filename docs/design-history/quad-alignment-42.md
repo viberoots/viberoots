@@ -291,7 +291,7 @@ Policy constraints for this PR:
 
 - Add a verify-scoped “seed artifact” step:
   - The verify runner (`build-tools/tools/dev/verify/run-verify.ts`) prepares a single seed store path **before** starting `buck2 test` (before `spawnVerifyBuck2Tests(...)`).
-  - The seed store path is exported to tests via a single environment variable: `BNX_TEST_SEED_STORE_PATH`.
+  - The seed store path is exported to tests via a single environment variable: `VBR_TEST_SEED_STORE_PATH`.
   - The seed export must be part of the same verify environment that already exports other per-run state (so all Buck test workers inherit it).
   - This PR removes the existing temp-repo seed cache mechanism in `build-tools/tools/tests/lib/seed-temp-repo.ts` (and any `SEED_VERSION`/seed-key caching state associated with it).
 
@@ -313,7 +313,7 @@ Policy constraints for this PR:
 
 - Prevent repeated eval/build attempts:
   - The verify process is the single authority that computes/builds the seed.
-  - `runInTemp(...)` must never attempt to invoke Nix to build/ensure the seed; it only consumes `BNX_TEST_SEED_STORE_PATH` and fails fast if it is missing/invalid.
+  - `runInTemp(...)` must never attempt to invoke Nix to build/ensure the seed; it only consumes `VBR_TEST_SEED_STORE_PATH` and fails fast if it is missing/invalid.
 
 - Ensure seed survival even if GC is triggered mid-run:
   - Verify must create an explicit GC root under the repo working tree (e.g., `buck-out/tmp/verify-seed/pins/<iso>/seed -> /nix/store/...-seed`) so `nix-collect-garbage` cannot delete it during the run.
@@ -338,11 +338,11 @@ Non-goals in this PR:
 ### Tests (in this PR)
 
 - Add a focused test that asserts **verify exports a seed store path** and `runInTemp` consumes it without invoking Nix:
-  - enforce that `runInTemp` does not call `nix build` for seeding when `BNX_TEST_SEED_STORE_PATH` is set
-  - enforce that missing `BNX_TEST_SEED_STORE_PATH` is a **hard failure** in verify mode (no silent fallback)
+  - enforce that `runInTemp` does not call `nix build` for seeding when `VBR_TEST_SEED_STORE_PATH` is set
+  - enforce that missing `VBR_TEST_SEED_STORE_PATH` is a **hard failure** in verify mode (no silent fallback)
 
 - Add a test that simulates “seed missing” mid-run and asserts the failure mode is strict and actionable:
-  - when `BNX_TEST_SEED_STORE_PATH` points at a missing path, `runInTemp` fails fast with a message that includes the missing path and guidance (“rerun verify”).
+  - when `VBR_TEST_SEED_STORE_PATH` points at a missing path, `runInTemp` fails fast with a message that includes the missing path and guidance (“rerun verify”).
 
 - Add a test for the GC-root pinning contract:
   - verify creates the pin path and it points at the seed store path
@@ -352,9 +352,9 @@ Non-goals in this PR:
 ### Implementation Notes (so another engineer can implement without guessing)
 
 - Proposed exported environment variables:
-  - `BNX_TEST_SEED_STORE_PATH`: absolute `/nix/store/...-seed` path to the prepared seed artifact
-  - `BNX_TEST_SEED_KEY`: the computed seed key string (for diagnostics and lock scoping)
-  - `BNX_TEST_SEED_PIN_DIR`: absolute path to the per-run pin dir (e.g., `buck-out/tmp/verify-seed/pins/<iso>`)
+  - `VBR_TEST_SEED_STORE_PATH`: absolute `/nix/store/...-seed` path to the prepared seed artifact
+  - `VBR_TEST_SEED_KEY`: the computed seed key string (for diagnostics and lock scoping)
+  - `VBR_TEST_SEED_PIN_DIR`: absolute path to the per-run pin dir (e.g., `buck-out/tmp/verify-seed/pins/<iso>`)
 
 - Proposed verify-owned state directory layout:
   - `buck-out/tmp/verify-seed/`
@@ -368,7 +368,7 @@ Non-goals in this PR:
   - Lock key example: `verify-seed:${seedKey}` (repo-identity scoped, cross-process).
 
 - Proposed consumption in `runInTemp`:
-  - If `BNX_TEST_SEED_STORE_PATH` is set, temp repo init must copy from it (no Nix calls).
+  - If `VBR_TEST_SEED_STORE_PATH` is set, temp repo init must copy from it (no Nix calls).
   - Copy mechanism should reuse existing utilities (`copyTree(...)` / clone-aware copy) currently used in `seed-temp-repo.ts`.
   - If the path does not exist, fail fast with a message that includes:
     - missing path

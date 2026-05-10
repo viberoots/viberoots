@@ -38,8 +38,8 @@ async function main() {
   const cwd = process.cwd();
   const root = await findRepoRoot(cwd);
   const target = await resolveSelectedTargetLabel(root, targetInput, { baseDir: cwd });
-  if (!String(process.env.BNX_RUNNABLE_BUILD_TIMEOUT_SEC || "").trim()) {
-    process.env.BNX_RUNNABLE_BUILD_TIMEOUT_SEC = "25";
+  if (!String(process.env.VBR_RUNNABLE_BUILD_TIMEOUT_SEC || "").trim()) {
+    process.env.VBR_RUNNABLE_BUILD_TIMEOUT_SEC = "25";
   }
   const outPath = await buildSelectedOutPath(
     root,

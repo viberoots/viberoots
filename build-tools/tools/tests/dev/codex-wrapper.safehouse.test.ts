@@ -27,7 +27,7 @@ test("codex --worktree creates through the CoW git wrapper and launches the work
       env: {
         ...process.env,
         PATH: `${path.dirname(wrapper)}:${fake.bin}:/usr/bin:/bin`,
-        BNX_CODEX_GIT_WRAPPER_FOR_TEST: path.join(fake.bin, "git"),
+        VBR_CODEX_GIT_WRAPPER_FOR_TEST: path.join(fake.bin, "git"),
         CODEX_HOME: path.join(tmp, "home", ".codex"),
       },
     })`${wrapper} --worktree native-worker exec task`;
@@ -69,7 +69,7 @@ test("codex -w is an alias for the wrapper worktree path", async () => {
       env: {
         ...process.env,
         PATH: `${path.dirname(wrapper)}:${fake.bin}:/usr/bin:/bin`,
-        BNX_CODEX_GIT_WRAPPER_FOR_TEST: path.join(fake.bin, "git"),
+        VBR_CODEX_GIT_WRAPPER_FOR_TEST: path.join(fake.bin, "git"),
       },
     })`${wrapper} -w shortcut-worker exec task`;
 
@@ -104,7 +104,7 @@ test("codex wrapper runs worktree agents through safehouse with unsafe flags", a
     const log = await fsp.readFile(fake.log, "utf8");
     assert.match(log, new RegExp(safehouseLaunchPattern(worktreeRealRoot)));
     assert.match(log, /codex --dangerously-bypass-approvals-and-sandbox exec task/);
-    assert.match(log, /BNX_CODEX_SAFEHOUSE_ACTIVE=1/);
+    assert.match(log, /VBR_CODEX_SAFEHOUSE_ACTIVE=1/);
   } finally {
     await fsp.rm(tmp, { recursive: true, force: true });
   }

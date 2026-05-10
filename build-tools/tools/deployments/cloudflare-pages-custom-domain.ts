@@ -31,7 +31,7 @@ export type CloudflarePagesCustomDomainEnsureResult =
 
 function cloudflareApiBaseUrl(): string {
   return (
-    process.env.BNX_CLOUDFLARE_API_BASE_URL?.trim() || "https://api.cloudflare.com/client/v4"
+    process.env.VBR_CLOUDFLARE_API_BASE_URL?.trim() || "https://api.cloudflare.com/client/v4"
   ).replace(/\/+$/, "");
 }
 

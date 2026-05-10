@@ -32,7 +32,7 @@ test("claude worktree flags create through CoW git and launch in safehouse", asy
         env: {
           ...process.env,
           PATH: `${path.dirname(wrapper)}:${fake.bin}:/usr/bin:/bin`,
-          BNX_CLAUDE_GIT_WRAPPER_FOR_TEST: path.join(fake.bin, "git"),
+          VBR_CLAUDE_GIT_WRAPPER_FOR_TEST: path.join(fake.bin, "git"),
           CLAUDE_CONFIG_DIR: path.join(tmp, "home", ".claude"),
         },
       })`${wrapper} ${flag} ${name} -p hello`;
@@ -102,8 +102,8 @@ printf 'native-claude %s\\n' "$*" >> "${fake.log}"
       env: {
         ...process.env,
         PATH: `${path.dirname(wrapper)}:${fake.bin}:/usr/bin:/bin`,
-        BNX_CLAUDE_GIT_WRAPPER_FOR_TEST: path.join(fake.bin, "git"),
-        BNX_CLAUDE_PLATFORM_KEY_FOR_TEST: "darwin-arm64",
+        VBR_CLAUDE_GIT_WRAPPER_FOR_TEST: path.join(fake.bin, "git"),
+        VBR_CLAUDE_PLATFORM_KEY_FOR_TEST: "darwin-arm64",
       },
     })`${wrapper} --worktree native-resolution --help`;
 
@@ -169,7 +169,7 @@ test("claude wrapper runs worktree agents through safehouse", async () => {
     const log = await fsp.readFile(fake.log, "utf8");
     assert.match(log, new RegExp(safehouseLaunchPattern(worktreeRealRoot)));
     assert.match(log, /claude --dangerously-skip-permissions --print hello/);
-    assert.match(log, /BNX_CLAUDE_SAFEHOUSE_ACTIVE=1/);
+    assert.match(log, /VBR_CLAUDE_SAFEHOUSE_ACTIVE=1/);
   } finally {
     await fsp.rm(tmp, { recursive: true, force: true });
   }

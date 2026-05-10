@@ -16,10 +16,10 @@ function requireFlag(name: string): string {
 function requireBackendDatabaseUrl(): string {
   const value =
     getFlagStr("control-plane-database-url", "").trim() ||
-    String(process.env.BNX_DEPLOY_CONTROL_PLANE_DATABASE_URL || "").trim();
+    String(process.env.VBR_DEPLOY_CONTROL_PLANE_DATABASE_URL || "").trim();
   if (!value) {
     throw new Error(
-      "shared replay inspect requires --control-plane-database-url or BNX_DEPLOY_CONTROL_PLANE_DATABASE_URL",
+      "shared replay inspect requires --control-plane-database-url or VBR_DEPLOY_CONTROL_PLANE_DATABASE_URL",
     );
   }
   return value;

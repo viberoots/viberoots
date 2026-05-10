@@ -29,7 +29,7 @@ function parsePgrepLine(line: string): { pid: number; cmd: string } | null {
 }
 
 export function processInspectionPrefersPgrep(env: NodeJS.ProcessEnv = process.env): boolean {
-  return env.BNX_CODEX_SAFEHOUSE_ACTIVE === "1" || env.BNX_CLAUDE_SAFEHOUSE_ACTIVE === "1";
+  return env.VBR_CODEX_SAFEHOUSE_ACTIVE === "1" || env.VBR_CLAUDE_SAFEHOUSE_ACTIVE === "1";
 }
 
 async function spawnOutput(cmd: string, args: string[], timeoutMs: number): Promise<string> {

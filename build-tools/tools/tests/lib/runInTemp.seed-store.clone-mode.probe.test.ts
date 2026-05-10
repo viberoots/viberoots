@@ -6,8 +6,8 @@ test("runInTemp seed store clone probe runs once per worker", async () => {
   const prevTiming = process.env.TEST_TIMING;
   try {
     assert.ok(
-      process.env.BNX_TEST_SEED_STORE_PATH,
-      "expected verifier to provide BNX_TEST_SEED_STORE_PATH",
+      process.env.VBR_TEST_SEED_STORE_PATH,
+      "expected verifier to provide VBR_TEST_SEED_STORE_PATH",
     );
     process.env.TEST_TIMING = "summary";
     const { runInTemp, getTimingCountForLabel } = await import("./test-helpers");

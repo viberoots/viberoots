@@ -10,20 +10,21 @@ import { runInTemp } from "../lib/test-helpers";
 const HELM_RECORDER = `#!/usr/bin/env node
 import fs from "node:fs";
 import path from "node:path";
-const logPath = process.env.BNX_KUBERNETES_FAKE_HELM_LOG;
+const logPath = process.env.VBR_KUBERNETES_FAKE_HELM_LOG;
 const watchedKeys = [
   "kubernetes_publish_kubeconfig",
-  "BNX_DEPLOYER_OIDC_SECRET",
-  "BNX_DEPLOYMENT_CLIENT_TOKEN",
+  "VBR_DEPLOYER_OIDC_SECRET",
+  "VBR_DEPLOYMENT_CLIENT_TOKEN",
   "VAULT_TOKEN",
   "CLOUDFLARE_API_TOKEN",
-  "BNX_KUBERNETES_COMPONENT_ID",
+  "VBR_KUBERNETES_COMPONENT_ID",
 ];
 fs.mkdirSync(path.dirname(logPath), { recursive: true });
 fs.writeFileSync(
   logPath,
   JSON.stringify(
     {
+      argv: process.argv.slice(2),
       env: Object.fromEntries(
         Object.entries(process.env).filter(([key]) => watchedKeys.includes(key)),
       ),
@@ -57,10 +58,10 @@ test("publisher process receives reviewed credential env and no ambient provider
     await fsp.mkdir(artifactPath, { recursive: true });
     const logPath = path.join(tmp, "publisher-env.json");
     const previous = { ...process.env };
-    process.env.BNX_KUBERNETES_HELM_BIN = helmPath;
-    process.env.BNX_KUBERNETES_FAKE_HELM_LOG = logPath;
-    process.env.BNX_DEPLOYER_OIDC_SECRET = "ambient-secret";
-    process.env.BNX_DEPLOYMENT_CLIENT_TOKEN = "ambient-token";
+    process.env.VBR_KUBERNETES_HELM_BIN = helmPath;
+    process.env.VBR_KUBERNETES_FAKE_HELM_LOG = logPath;
+    process.env.VBR_DEPLOYER_OIDC_SECRET = "ambient-secret";
+    process.env.VBR_DEPLOYMENT_CLIENT_TOKEN = "ambient-token";
     process.env.VAULT_TOKEN = "ambient-vault";
     process.env.CLOUDFLARE_API_TOKEN = "ambient-cloudflare";
     process.env.PATH = `${binDir}:${process.env.PATH || ""}`;
@@ -77,16 +78,24 @@ test("publisher process receives reviewed credential env and no ambient provider
       });
       const recorded = JSON.parse(await fsp.readFile(logPath, "utf8"));
       assert.equal(recorded.env.kubernetes_publish_kubeconfig, "reviewed-only");
-      assert.equal(recorded.env.BNX_DEPLOYER_OIDC_SECRET, undefined);
-      assert.equal(recorded.env.BNX_DEPLOYMENT_CLIENT_TOKEN, undefined);
+      assert.equal(recorded.env.VBR_DEPLOYER_OIDC_SECRET, undefined);
+      assert.equal(recorded.env.VBR_DEPLOYMENT_CLIENT_TOKEN, undefined);
       assert.equal(recorded.env.VAULT_TOKEN, undefined);
       assert.equal(recorded.env.CLOUDFLARE_API_TOKEN, undefined);
-      assert.equal(recorded.env.BNX_KUBERNETES_COMPONENT_ID, "api");
+      assert.equal(recorded.env.VBR_KUBERNETES_COMPONENT_ID, "api");
+      assert.ok(
+        (recorded.argv as string[]).includes(`vbr.componentId=api`),
+        `expected helm argv to include vbr.componentId=api, got: ${JSON.stringify(recorded.argv)}`,
+      );
+      assert.ok(
+        (recorded.argv as string[]).includes(`vbr.artifactPath=${artifactPath}`),
+        `expected helm argv to include vbr.artifactPath=${artifactPath}, got: ${JSON.stringify(recorded.argv)}`,
+      );
     } finally {
-      delete process.env.BNX_KUBERNETES_HELM_BIN;
-      delete process.env.BNX_KUBERNETES_FAKE_HELM_LOG;
-      process.env.BNX_DEPLOYER_OIDC_SECRET = previous.BNX_DEPLOYER_OIDC_SECRET || "";
-      process.env.BNX_DEPLOYMENT_CLIENT_TOKEN = previous.BNX_DEPLOYMENT_CLIENT_TOKEN || "";
+      delete process.env.VBR_KUBERNETES_HELM_BIN;
+      delete process.env.VBR_KUBERNETES_FAKE_HELM_LOG;
+      process.env.VBR_DEPLOYER_OIDC_SECRET = previous.VBR_DEPLOYER_OIDC_SECRET || "";
+      process.env.VBR_DEPLOYMENT_CLIENT_TOKEN = previous.VBR_DEPLOYMENT_CLIENT_TOKEN || "";
       process.env.VAULT_TOKEN = previous.VAULT_TOKEN || "";
       process.env.CLOUDFLARE_API_TOKEN = previous.CLOUDFLARE_API_TOKEN || "";
       process.env.PATH = previous.PATH || "";

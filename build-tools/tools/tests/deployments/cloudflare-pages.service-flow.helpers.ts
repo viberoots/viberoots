@@ -18,8 +18,8 @@ export function fakeCloudflareOverrides(
 ): Record<string, string> {
   return {
     PATH: `${fake.binDir}:${process.env.PATH || ""}`,
-    BNX_CLOUDFLARE_FAKE_PUBLISH_ROOT: fake.publishRoot,
-    BNX_CLOUDFLARE_FAKE_WRANGLER_LOG: fake.logPath,
-    BNX_CLOUDFLARE_PAGES_WRANGLER_BIN: path.join(fake.binDir, "wrangler"),
+    VBR_CLOUDFLARE_FAKE_PUBLISH_ROOT: fake.publishRoot,
+    VBR_CLOUDFLARE_FAKE_WRANGLER_LOG: fake.logPath,
+    VBR_CLOUDFLARE_PAGES_WRANGLER_BIN: path.join(fake.binDir, "wrangler"),
   };
 }

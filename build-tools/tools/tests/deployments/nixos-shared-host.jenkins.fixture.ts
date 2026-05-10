@@ -13,7 +13,7 @@ export const REVIEWED_PLEOMINO_DEPLOYMENT_LABEL = "//projects/deployments/pleomi
 export function jenkinsExecEnv(env: Record<string, string>, extra: Record<string, string> = {}) {
   return {
     ...env,
-    BNX_DEPLOY_CONTROL_PLANE_TOKEN: "test-control-plane-token",
+    VBR_DEPLOY_CONTROL_PLANE_TOKEN: "test-control-plane-token",
     [LOCAL_FIXTURE_SERVICE_ENV]: "1",
     IN_NIX_SHELL: "1",
     JENKINS_URL: "https://jenkins.example.invalid/job/pleomino",

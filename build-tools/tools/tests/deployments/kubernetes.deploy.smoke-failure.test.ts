@@ -62,9 +62,9 @@ test("kubernetes deploy records service-health smoke failure after publish", asy
     });
     const originalEnv = { ...process.env };
     process.env.PATH = `${fake.binDir}:${originalEnv.PATH || ""}`;
-    process.env.BNX_KUBERNETES_HELM_BIN = path.join(fake.binDir, "helm");
-    process.env.BNX_KUBERNETES_FAKE_PUBLISH_ROOT = fake.publishRoot;
-    process.env.BNX_KUBERNETES_FAKE_HELM_LOG = fake.logPath;
+    process.env.VBR_KUBERNETES_HELM_BIN = path.join(fake.binDir, "helm");
+    process.env.VBR_KUBERNETES_FAKE_PUBLISH_ROOT = fake.publishRoot;
+    process.env.VBR_KUBERNETES_FAKE_HELM_LOG = fake.logPath;
     try {
       await assert.rejects(
         async () =>
@@ -89,9 +89,9 @@ test("kubernetes deploy records service-health smoke failure after publish", asy
       );
     } finally {
       process.env.PATH = originalEnv.PATH || "";
-      delete process.env.BNX_KUBERNETES_HELM_BIN;
-      delete process.env.BNX_KUBERNETES_FAKE_PUBLISH_ROOT;
-      delete process.env.BNX_KUBERNETES_FAKE_HELM_LOG;
+      delete process.env.VBR_KUBERNETES_HELM_BIN;
+      delete process.env.VBR_KUBERNETES_FAKE_PUBLISH_ROOT;
+      delete process.env.VBR_KUBERNETES_FAKE_HELM_LOG;
       fixtureEnv.restore();
       await server.close();
     }

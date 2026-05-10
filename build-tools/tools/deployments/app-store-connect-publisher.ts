@@ -33,7 +33,7 @@ export type AppStoreConnectPublishResult = {
 
 function fakeStoreRoot(workspaceRoot: string): string {
   return path.resolve(
-    process.env.BNX_APP_STORE_CONNECT_FAKE_STORE_ROOT?.trim() ||
+    process.env.VBR_APP_STORE_CONNECT_FAKE_STORE_ROOT?.trim() ||
       path.join(workspaceRoot, ".local", "deployments", "app-store-connect", "fake-store"),
   );
 }
@@ -68,7 +68,7 @@ export async function publishAppStoreConnectMobileApp(opts: {
   await fsp.copyFile(opts.artifactPath, path.join(releaseRoot, path.basename(opts.artifactPath)));
   const rolloutMode =
     opts.deployment.rolloutPolicy?.mode === "store_staged" ? "store_staged" : "all_at_once";
-  const releaseHealthMode = process.env.BNX_APP_STORE_CONNECT_FAKE_RELEASE_HEALTH_MODE?.trim();
+  const releaseHealthMode = process.env.VBR_APP_STORE_CONNECT_FAKE_RELEASE_HEALTH_MODE?.trim();
   const releaseHealth: AppStoreConnectReleaseHealth =
     releaseHealthMode === "failed"
       ? {

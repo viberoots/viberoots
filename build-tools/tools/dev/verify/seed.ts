@@ -31,7 +31,7 @@ export function shouldPrepareVerifySeedForRequestedTargets(
   effectiveTargets: string[],
   env: NodeJS.ProcessEnv = process.env,
 ): boolean {
-  const mode = parseVerifySeedMode(env.BNX_VERIFY_SEED_MODE);
+  const mode = parseVerifySeedMode(env.VBR_VERIFY_SEED_MODE);
   if (mode === "always") return true;
   if (mode === "never") return false;
   return !isNonBuildSystemOnlyVerifyTargets(effectiveTargets);
@@ -122,7 +122,7 @@ async function computeSeedKey(root: string): Promise<string> {
 }
 
 function seedBuildTimeoutSec(): number {
-  const raw = String(process.env.BNX_VERIFY_SEED_BUILD_TIMEOUT_SEC || "").trim();
+  const raw = String(process.env.VBR_VERIFY_SEED_BUILD_TIMEOUT_SEC || "").trim();
   const parsed = Number(raw || "300");
   if (!Number.isFinite(parsed) || parsed <= 0) return 300;
   return Math.floor(parsed);

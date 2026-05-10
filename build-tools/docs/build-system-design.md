@@ -669,7 +669,7 @@ I prepare a single Nix-store seed at the start of `v` and share it with all test
 Behavior:
 
 - The verify runner builds `.#test-seed` once and writes `buck-out/tmp/verify-seed/current` plus `current.key`.
-- `runInTemp` consumes `BNX_TEST_SEED_STORE_PATH` and fails fast in verify mode if it is missing or invalid.
+- `runInTemp` consumes `VBR_TEST_SEED_STORE_PATH` and fails fast in verify mode if it is missing or invalid.
 - The seed key includes workspace root, `HEAD`, `git status --porcelain=v1 -z`, and filter toggles (`TEST_RSYNC_ROOTS`, `TEST_PARTIAL_CLONE_GO_ONLY`, `TEST_EXCLUDE_CPP_REQS`).
 - The seed contents are a filtered working-tree snapshot built from an allowlist that mirrors the temp repo shape.
 
@@ -694,7 +694,7 @@ I keep template test selection as a deterministic tool contract before verify/CI
 
 I wire template selector decisions directly into `v` and CI verify execution.
 
-- Control env: `BNX_TEMPLATE_TEST_SCOPE=auto|always|never`
+- Control env: `VBR_TEMPLATE_TEST_SCOPE=auto|always|never`
   - `auto`: use selector decision
   - `always`: force selector path and fail if changes are not `template-only`
   - `never`: bypass selector path and keep build-system scope behavior
@@ -717,7 +717,7 @@ changes that do not touch build-system paths.
 
 - Decision order:
   - if requested targets are explicit (not `//...`), keep explicit targets (existing behavior)
-  - if `BNX_TEMPLATE_TEST_SCOPE=never`, keep existing build-system scope behavior
+  - if `VBR_TEMPLATE_TEST_SCOPE=never`, keep existing build-system scope behavior
   - if template selector mode is `template-only`, run template-targeted selection (existing behavior)
   - if build-system changes are detected, keep existing build-system scope/fallback behavior
   - otherwise (`no-template-impact` + no build-system changes), run `project-impact`
@@ -759,7 +759,7 @@ I add the first deployment-only execution path on top of the existing selector s
 weakening the fail-closed build-system rules.
 
 - Invocation contract:
-  - `BNX_DEPLOYMENT_TEST_SCOPE=auto|always|never v`
+  - `VBR_DEPLOYMENT_TEST_SCOPE=auto|always|never v`
   - the same env var applies to CI `buck-test` stage resolution
 - Decision order:
   - explicit Buck targets and explicit `project-closure` keep their existing precedence
@@ -774,7 +774,7 @@ weakening the fail-closed build-system rules.
   - `mixed-build-system`: keep the current full build-system verify path
   - `no-deployment-impact`: keep the existing non-deployment selector behavior
 - Guardrails:
-  - fail when `BNX_DEPLOYMENT_TEST_SCOPE=always` is requested for anything except safe
+  - fail when `VBR_DEPLOYMENT_TEST_SCOPE=always` is requested for anything except safe
     `deployment-only`
   - fail when the reviewed deployment-domain Buck query resolves zero targets
   - fail when the reviewed deployment safety floor is empty
@@ -801,7 +801,7 @@ I add an explicit compliance selector without changing default verify behavior.
 - Decision precedence:
   - explicit `project-closure` runs before template/project-impact selection
   - build-system broadening rules remain authoritative
-  - if build-system changes are present, or `BNX_BUILD_SYSTEM_TESTS=always`, keep the existing broader scope and attach a `fallbackReason`
+  - if build-system changes are present, or `VBR_BUILD_SYSTEM_TESTS=always`, keep the existing broader scope and attach a `fallbackReason`
 - Resolution contract:
   - seed with the caller-provided projects
   - traverse Buck graph project dependencies recursively to fixed point

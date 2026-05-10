@@ -90,9 +90,9 @@ test("kubernetes deploy CLI completes single-service publish with reviewed provi
         env: {
           ...process.env,
           PATH: `${fake.binDir}:${process.env.PATH || ""}`,
-          BNX_KUBERNETES_HELM_BIN: path.join(fake.binDir, "helm"),
-          BNX_KUBERNETES_FAKE_PUBLISH_ROOT: fake.publishRoot,
-          BNX_KUBERNETES_FAKE_HELM_LOG: fake.logPath,
+          VBR_KUBERNETES_HELM_BIN: path.join(fake.binDir, "helm"),
+          VBR_KUBERNETES_FAKE_PUBLISH_ROOT: fake.publishRoot,
+          VBR_KUBERNETES_FAKE_HELM_LOG: fake.logPath,
           [DEPLOYMENT_SECRET_FIXTURE_PATH_ENV]: secretFixturePath,
         },
       })`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment ${deployment.label} --admission-evidence-json ${admissionEvidenceJson} --artifact-dir ${artifactDir} --records-root ${recordsRoot} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(server.port)} --smoke-connect-protocol http:`;
@@ -174,9 +174,9 @@ test("kubernetes deploy preserves ordered multi-component publish state", async 
         env: {
           ...process.env,
           PATH: `${fake.binDir}:${process.env.PATH || ""}`,
-          BNX_KUBERNETES_HELM_BIN: path.join(fake.binDir, "helm"),
-          BNX_KUBERNETES_FAKE_PUBLISH_ROOT: fake.publishRoot,
-          BNX_KUBERNETES_FAKE_HELM_LOG: fake.logPath,
+          VBR_KUBERNETES_HELM_BIN: path.join(fake.binDir, "helm"),
+          VBR_KUBERNETES_FAKE_PUBLISH_ROOT: fake.publishRoot,
+          VBR_KUBERNETES_FAKE_HELM_LOG: fake.logPath,
           [DEPLOYMENT_SECRET_FIXTURE_PATH_ENV]: secretFixturePath,
         },
       })`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment ${deployment.label} --component-artifacts api=${apiArtifact},otel-sidecar=${sidecarArtifact} --admission-evidence-json ${admissionEvidenceJson} --records-root ${recordsRoot} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(server.port)} --smoke-connect-protocol http:`;

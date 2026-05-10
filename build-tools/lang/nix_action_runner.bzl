@@ -33,11 +33,11 @@ def nix_action_export_graph_cmd(
         query_roots = ",".join(roots + ["go", "cpp", "third_party"])
     return (
         "mkdir -p \"$WORKSPACE_ROOT/build-tools/tools/buck\"; "
-        + "BNX_NODE_ZX_INIT=\"$WORKSPACE_ROOT/build-tools/tools/dev/zx-init.mjs\"; "
+        + "VBR_NODE_ZX_INIT=\"$WORKSPACE_ROOT/build-tools/tools/dev/zx-init.mjs\"; "
         + "if command -v node >/dev/null 2>&1; then "
         + ("  BUCK_TEST_SRC=\"$WORKSPACE_ROOT\" BUCK_QUERY_ROOTS=\"%s\" " % query_roots)
         + "node --experimental-top-level-await --disable-warning=ExperimentalWarning "
-        + "--experimental-strip-types --import \"$BNX_NODE_ZX_INIT\" "
+        + "--experimental-strip-types --import \"$VBR_NODE_ZX_INIT\" "
         + ("\"$WORKSPACE_ROOT/build-tools/tools/buck/export-graph.ts\" --out \"%s\"; " % out_graph)
         + "else "
         + ("  BUCK_TEST_SRC=\"$WORKSPACE_ROOT\" BUCK_QUERY_ROOTS=\"%s\" " % query_roots)

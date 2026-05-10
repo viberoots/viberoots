@@ -62,11 +62,11 @@ test("shared-host deployment service module routes hosted HTTPS to a private ser
     assert.deepEqual(out.firewallPorts, [80, 443]);
     assert.match(
       out.reviewedSourceEnv,
-      /BNX_DEPLOY_REVIEWED_SOURCE_SSH_KEY_FILE=\/run\/secrets\/github-reviewed-source-key/,
+      /VBR_DEPLOY_REVIEWED_SOURCE_SSH_KEY_FILE=\/run\/secrets\/github-reviewed-source-key/,
     );
     assert.match(
       out.reviewedSourceEnv,
-      /BNX_DEPLOY_REVIEWED_SOURCE_SSH_KNOWN_HOSTS_FILE=\/etc\/deployment-host\/github-known-hosts/,
+      /VBR_DEPLOY_REVIEWED_SOURCE_SSH_KNOWN_HOSTS_FILE=\/etc\/deployment-host\/github-known-hosts/,
     );
     assert.match(out.githubKnownHosts, /github\.com ssh-ed25519 /);
   });
@@ -108,7 +108,7 @@ test("shared-host deployment service module points the worker at repo-managed Wr
     const { stdout } = await $({ cwd: tmp })`nix eval --impure --expr ${expr} --json`;
     const out = JSON.parse(String(stdout || "{}")) as Record<string, string>;
     assert.deepEqual(out, {
-      BNX_CLOUDFLARE_PAGES_WRANGLER_BIN: "/nix/store/test-bnx-cloudflare-pages-wrangler",
+      VBR_CLOUDFLARE_PAGES_WRANGLER_BIN: "/nix/store/test-vbr-cloudflare-pages-wrangler",
     });
   });
 });

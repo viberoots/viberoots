@@ -52,7 +52,7 @@ test("deploy plan reads the reviewed remote profile deterministically", async ()
       serviceClient: {
         mode: "control-plane-service",
         controlPlaneUrl: "http://127.0.0.1:7780",
-        controlPlaneTokenEnv: "BNX_DEPLOY_CONTROL_PLANE_TOKEN",
+        controlPlaneTokenEnv: "VBR_DEPLOY_CONTROL_PLANE_TOKEN",
       },
       artifactSource: {
         kind: "component-dist",

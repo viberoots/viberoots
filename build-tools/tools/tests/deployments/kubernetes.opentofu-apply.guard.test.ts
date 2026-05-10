@@ -210,16 +210,16 @@ test("production OpenTofu adapter records command outcome without leaking ambien
     [
       "#!/usr/bin/env bash",
       "set -euo pipefail",
-      'printf \'%s\\n\' "$PWD|$*|${opentofu_provider_credentials:-missing}|${BNX_DEPLOYMENT_TOKEN:-scrubbed}" > "$BNX_FAKE_OPENTOFU_LOG"',
+      'printf \'%s\\n\' "$PWD|$*|${opentofu_provider_credentials:-missing}|${VBR_DEPLOYMENT_TOKEN:-scrubbed}" > "$VBR_FAKE_OPENTOFU_LOG"',
       "",
     ].join("\n"),
     "utf8",
   );
   await fsp.chmod(binPath, 0o755);
-  const previousLog = process.env.BNX_FAKE_OPENTOFU_LOG;
-  const previousToken = process.env.BNX_DEPLOYMENT_TOKEN;
-  process.env.BNX_FAKE_OPENTOFU_LOG = logPath;
-  process.env.BNX_DEPLOYMENT_TOKEN = "ambient-secret-token";
+  const previousLog = process.env.VBR_FAKE_OPENTOFU_LOG;
+  const previousToken = process.env.VBR_DEPLOYMENT_TOKEN;
+  process.env.VBR_FAKE_OPENTOFU_LOG = logPath;
+  process.env.VBR_DEPLOYMENT_TOKEN = "ambient-secret-token";
   try {
     const adapter = createProductionOpenTofuApplyAdapter({ binary: binPath });
     const result = await adapter.apply({
@@ -237,9 +237,9 @@ test("production OpenTofu adapter records command outcome without leaking ambien
     assert.match(log, /scrubbed/);
     assert.doesNotMatch(log, /ambient-secret-token/);
   } finally {
-    if (previousLog === undefined) delete process.env.BNX_FAKE_OPENTOFU_LOG;
-    else process.env.BNX_FAKE_OPENTOFU_LOG = previousLog;
-    if (previousToken === undefined) delete process.env.BNX_DEPLOYMENT_TOKEN;
-    else process.env.BNX_DEPLOYMENT_TOKEN = previousToken;
+    if (previousLog === undefined) delete process.env.VBR_FAKE_OPENTOFU_LOG;
+    else process.env.VBR_FAKE_OPENTOFU_LOG = previousLog;
+    if (previousToken === undefined) delete process.env.VBR_DEPLOYMENT_TOKEN;
+    else process.env.VBR_DEPLOYMENT_TOKEN = previousToken;
   }
 });

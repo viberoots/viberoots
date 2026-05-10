@@ -33,7 +33,7 @@ function unifiedStoreRecoveryMessage(lockPath: string, waitTimeoutMs: number): s
     `  2) Remove stale lock: rm -f "${lockPath}"`,
     "  3) Rebuild unified store: i",
     "  4) Retry verify/build command (for example: v projects/apps/my-app)",
-    "  5) Optional: raise wait timeout with BNX_UNIFIED_STORE_LOCK_WAIT_TIMEOUT_MS=<ms>",
+    "  5) Optional: raise wait timeout with VBR_UNIFIED_STORE_LOCK_WAIT_TIMEOUT_MS=<ms>",
   ].join("\n");
 }
 
@@ -42,9 +42,9 @@ async function withFileLock(lockPath: string, fn: () => Promise<void>) {
   let fd = -1;
   const startedAt = Date.now();
   const waitTimeoutMs =
-    Number.parseInt(process.env.BNX_UNIFIED_STORE_LOCK_WAIT_TIMEOUT_MS || "300000", 10) || 300000;
+    Number.parseInt(process.env.VBR_UNIFIED_STORE_LOCK_WAIT_TIMEOUT_MS || "300000", 10) || 300000;
   const staleAgeMs =
-    Number.parseInt(process.env.BNX_UNIFIED_STORE_LOCK_STALE_AGE_MS || "300000", 10) || 300000;
+    Number.parseInt(process.env.VBR_UNIFIED_STORE_LOCK_STALE_AGE_MS || "300000", 10) || 300000;
   const sleepMs = 100;
 
   const pidAlive = (pid: number): boolean => {

@@ -15,11 +15,11 @@ const release = String(args[2] || "");
 const chart = String(args[3] || "");
 const namespace = String(args[args.indexOf("--namespace") + 1] || "");
 const cluster = String(args[args.indexOf("--kube-context") + 1] || "");
-const renderedConfigPath = String(args[args.indexOf("--values") + 1] || process.env.BNX_KUBERNETES_RENDERED_CONFIG || "");
-const componentId = String(process.env.BNX_KUBERNETES_COMPONENT_ID || "");
-const artifactPath = String(process.env.BNX_KUBERNETES_COMPONENT_ARTIFACT || "");
-const publishRoot = String(process.env.BNX_KUBERNETES_FAKE_PUBLISH_ROOT || "");
-const logPath = String(process.env.BNX_KUBERNETES_FAKE_HELM_LOG || "");
+const renderedConfigPath = String(args[args.indexOf("--values") + 1] || process.env.VBR_KUBERNETES_RENDERED_CONFIG || "");
+const componentId = String(process.env.VBR_KUBERNETES_COMPONENT_ID || "");
+const artifactPath = String(process.env.VBR_KUBERNETES_COMPONENT_ARTIFACT || "");
+const publishRoot = String(process.env.VBR_KUBERNETES_FAKE_PUBLISH_ROOT || "");
+const logPath = String(process.env.VBR_KUBERNETES_FAKE_HELM_LOG || "");
 if (!publishRoot || !renderedConfigPath || !componentId || !artifactPath) {
   console.error("missing fake helm inputs");
   process.exit(3);
@@ -50,7 +50,7 @@ if (logPath) {
     JSON.stringify({ args, componentId, artifactPath, renderedConfigPath }) + "\\n",
   );
 }
-if (process.env.BNX_KUBERNETES_FAKE_HELM_FAIL_COMPONENT === componentId) {
+if (process.env.VBR_KUBERNETES_FAKE_HELM_FAIL_COMPONENT === componentId) {
   console.error("fake helm publish failure");
   process.exit(4);
 }

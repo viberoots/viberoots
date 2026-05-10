@@ -112,7 +112,7 @@ zx-wrapper build-tools/tools/dev/inspect-deployment-impact.ts \
 
 PR-4.5.3 adds the first execution control:
 
-- `BNX_DEPLOYMENT_TEST_SCOPE=auto|always|never`
+- `VBR_DEPLOYMENT_TEST_SCOPE=auto|always|never`
 - `auto`:
   - `deployment-only` runs `domain:deployment` targets plus the reviewed deployment safety floor
   - `deployment-and-project-impact` runs that same deployment suite plus project-impact targets for

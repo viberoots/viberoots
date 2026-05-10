@@ -20,20 +20,20 @@ import {
 const repoRoot = process.cwd();
 const claudeWrapper = path.join(repoRoot, "build-tools", "tools", "bin", "claude");
 const codexWrapper = path.join(repoRoot, "build-tools", "tools", "bin", "codex");
-const enabled = process.env.BNX_AGENT_SAFEHOUSE_E2E === "1";
+const enabled = process.env.VBR_AGENT_SAFEHOUSE_E2E === "1";
 const unsupportedPlatform = enabled && process.platform !== "darwin";
 const unsupportedBuckLive =
-  enabled && process.env.BUCK_TEST_TARGET && process.env.BNX_AGENT_SAFEHOUSE_E2E_ALLOW_BUCK !== "1";
+  enabled && process.env.BUCK_TEST_TARGET && process.env.VBR_AGENT_SAFEHOUSE_E2E_ALLOW_BUCK !== "1";
 const skipReason = enabled
   ? unsupportedPlatform
     ? "live APFS clone proof is macOS-specific"
     : unsupportedBuckLive
       ? "live Claude/Codex E2E is run directly with direnv exec, not inside Buck's test action"
       : false
-  : "set BNX_AGENT_SAFEHOUSE_E2E=1 to run real Claude/Codex Safehouse E2E checks";
+  : "set VBR_AGENT_SAFEHOUSE_E2E=1 to run real Claude/Codex Safehouse E2E checks";
 
-if (enabled && process.env.BNX_AGENT_SAFEHOUSE_E2E_PATH) {
-  process.env.PATH = process.env.BNX_AGENT_SAFEHOUSE_E2E_PATH;
+if (enabled && process.env.VBR_AGENT_SAFEHOUSE_E2E_PATH) {
+  process.env.PATH = process.env.VBR_AGENT_SAFEHOUSE_E2E_PATH;
 }
 
 test(
@@ -43,11 +43,11 @@ test(
     assert.equal(process.platform, "darwin", "APFS clone proof is macOS-specific");
 
     const cloneChecker =
-      process.env.BNX_APFS_CLONE_CHECKER || (await commandPath("apfs-clone-checker"));
+      process.env.VBR_APFS_CLONE_CHECKER || (await commandPath("apfs-clone-checker"));
     assert.notEqual(
       cloneChecker,
       "",
-      "set BNX_APFS_CLONE_CHECKER or put apfs-clone-checker on PATH for pairwise APFS clone proof",
+      "set VBR_APFS_CLONE_CHECKER or put apfs-clone-checker on PATH for pairwise APFS clone proof",
     );
     await checkedTool("safehouse");
     await checkedTool("claude");

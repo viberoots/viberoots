@@ -41,7 +41,7 @@ export async function runCloudflareDeployFrontDoor(opts: {
     throw new Error("cloudflare-pages rollback requires --publish-only");
   const controlPlaneUrl =
     getFlagStr("control-plane-url", "").trim() ||
-    String(process.env.BNX_DEPLOY_CONTROL_PLANE_URL || "").trim();
+    String(process.env.VBR_DEPLOY_CONTROL_PLANE_URL || "").trim();
   if (
     opts.deployment.protectionClass !== "local_only" &&
     (opts.requireServiceForProtectedShared || !!controlPlaneUrl)
@@ -76,7 +76,7 @@ export async function runCloudflareDeployFrontDoor(opts: {
   );
   const controlPlaneDatabaseUrl =
     getFlagStr("control-plane-database-url", "").trim() ||
-    String(process.env.BNX_DEPLOY_CONTROL_PLANE_DATABASE_URL || "").trim() ||
+    String(process.env.VBR_DEPLOY_CONTROL_PLANE_DATABASE_URL || "").trim() ||
     undefined;
   const backendDatabaseUrl = controlPlaneDatabaseUrl;
   if (opts.retireTarget || opts.migrateTarget) {

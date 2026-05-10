@@ -121,7 +121,7 @@ test(
     const spawnChild = () =>
       spawn(nodeBin, ["--experimental-strip-types", "--import", zxInit, childScript], {
         stdio: ["ignore", "pipe", "pipe"],
-        env: { ...process.env, BNX_BUCK_REAPER_STATE_FILE: "" },
+        env: { ...process.env, VBR_BUCK_REAPER_STATE_FILE: "" },
       });
 
     const attachReady = (child: ReturnType<typeof spawnChild>) => {

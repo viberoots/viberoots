@@ -39,7 +39,7 @@ test("auth doctor reports source selection and missing Jenkins binding without m
   assert.equal(doctor.providerMutation, false);
   assert.equal(doctor.tokensMinted, false);
   assert.equal(doctor.credentialSource.source, "jenkins_client_secret");
-  assert.match(doctor.vaultRuntime.credentialInputMissing.join("\n"), /BNX_DEPLOYER_CLIENT_SECRET/);
+  assert.match(doctor.vaultRuntime.credentialInputMissing.join("\n"), /VBR_DEPLOYER_CLIENT_SECRET/);
 });
 
 test("auth doctor fails closed for unsupported CI without interactive auth", async () => {
@@ -74,12 +74,12 @@ test("print-login instructions are browserless and memory-only", async () => {
 test("auth doctor lets CLI/env callback profile overrides win over metadata", async () => {
   const deployment = await fixtureDeployment();
   const doctor = buildDoctor(deployment, {
-    BNX_DEPLOYMENT_PKCE_CALLBACK_MODE: "public_host",
-    BNX_DEPLOYMENT_PKCE_CALLBACK_EXTERNAL_SCHEME: "http",
-    BNX_DEPLOYMENT_PKCE_CALLBACK_HOST: "override.example.test",
-    BNX_DEPLOYMENT_PKCE_CALLBACK_EXTERNAL_PORT: "8088",
-    BNX_DEPLOYMENT_PKCE_CALLBACK_BIND_HOST: "127.0.0.1",
-    BNX_DEPLOYMENT_PKCE_CALLBACK_BIND_PORT: "18088",
+    VBR_DEPLOYMENT_PKCE_CALLBACK_MODE: "public_host",
+    VBR_DEPLOYMENT_PKCE_CALLBACK_EXTERNAL_SCHEME: "http",
+    VBR_DEPLOYMENT_PKCE_CALLBACK_HOST: "override.example.test",
+    VBR_DEPLOYMENT_PKCE_CALLBACK_EXTERNAL_PORT: "8088",
+    VBR_DEPLOYMENT_PKCE_CALLBACK_BIND_HOST: "127.0.0.1",
+    VBR_DEPLOYMENT_PKCE_CALLBACK_BIND_PORT: "18088",
   });
   assert.equal(doctor.vaultRuntime.pkceCallback.externalScheme, "http");
   assert.equal(doctor.vaultRuntime.pkceCallback.externalHost, "override.example.test");
@@ -91,7 +91,7 @@ test("Jenkins help and matrix share the reviewed credential env names", async ()
   const deployment = await fixtureDeployment();
   const plan = resolveDeploymentVaultRuntimePlan({ deployment });
   const help = renderDeploymentJenkinsHelp(plan);
-  assert.match(help, /BNX_DEPLOYER_CLIENT_SECRET/);
+  assert.match(help, /VBR_DEPLOYER_CLIENT_SECRET/);
   assert.match(help, /withCredentials/);
   assert.doesNotMatch(help, /secret-value/);
 });

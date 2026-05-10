@@ -21,7 +21,7 @@ test("Cloudflare target install preserves reviewed vault runtime metadata", asyn
         serviceAccountClientId: "deployment-runner",
         deploymentEnvironment: "mini",
         roleName: "deploy-pleomino-read",
-        clientSecretEnv: "BNX_DEPLOYER_CLIENT_SECRET",
+        clientSecretEnv: "VBR_DEPLOYER_CLIENT_SECRET",
         jenkinsClientSecretEnv: "JENKINS_DEPLOYMENT_CLIENT_SECRET",
         pkceCallback: {
           mode: "public_host",

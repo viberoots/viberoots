@@ -54,7 +54,7 @@ export async function shouldMaterializeByDefault(opts: {
 }): Promise<{ materialize: boolean; reason: string }> {
   if (!opts.requestedMaterialize) return { materialize: false, reason: "explicit-no-materialize" };
   if (opts.isCI) return { materialize: true, reason: "ci-default" };
-  if ((process.env.BNX_DEVBUILD_FORCE_MATERIALIZE || "").trim() === "1") {
+  if ((process.env.VBR_DEVBUILD_FORCE_MATERIALIZE || "").trim() === "1") {
     return { materialize: true, reason: "forced-by-env" };
   }
 

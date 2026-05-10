@@ -136,7 +136,7 @@ test("resource-limited pass start delay honors explicit overrides", () => {
 
   assert.equal(
     resourceLimitedStartDelaySeconds(passes, {
-      BNX_VERIFY_RESOURCE_LIMITED_START_DELAY_SECS: "0",
+      VBR_VERIFY_RESOURCE_LIMITED_START_DELAY_SECS: "0",
     }),
     0,
   );

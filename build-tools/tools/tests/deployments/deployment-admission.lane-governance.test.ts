@@ -123,7 +123,7 @@ test("admission can synthesize service-owned lane-governance facts", async () =>
     governanceResolver: createServiceOwnedLaneGovernanceResolver({
       localFixture: true,
       env: {
-        BNX_DEPLOY_GITHUB_GOVERNANCE_FIXTURE_JSON: JSON.stringify({
+        VBR_DEPLOY_GITHUB_GOVERNANCE_FIXTURE_JSON: JSON.stringify({
           scmBackend: "github",
           repository: deployment.lanePolicy.governance.repository,
           branchProtections: deployment.lanePolicy.governance.branchProtections,

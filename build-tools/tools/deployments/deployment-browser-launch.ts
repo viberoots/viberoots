@@ -8,7 +8,7 @@ function envFlagEnabled(value: string | undefined): boolean {
 }
 
 export function shouldSuppressBrowserLaunch(env: NodeJS.ProcessEnv = process.env): boolean {
-  return envFlagEnabled(env.TEST_NO_BROWSER) || envFlagEnabled(env.BNX_TEST_NO_BROWSER);
+  return envFlagEnabled(env.TEST_NO_BROWSER) || envFlagEnabled(env.VBR_TEST_NO_BROWSER);
 }
 
 export function browserLaunchCommand(url: string): { command: string; args: string[] } {

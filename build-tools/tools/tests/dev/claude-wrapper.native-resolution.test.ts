@@ -57,8 +57,8 @@ printf 'native %s\\n' "${platform}"
         env: {
           ...process.env,
           PATH: `${path.dirname(wrapper)}:${bin}:/usr/bin:/bin`,
-          BNX_CLAUDE_PLATFORM_KEY_FOR_TEST: platform,
-          BNX_CLAUDE_SAFEHOUSE: "0",
+          VBR_CLAUDE_PLATFORM_KEY_FOR_TEST: platform,
+          VBR_CLAUDE_SAFEHOUSE: "0",
         },
       })`${wrapper} --version`;
 

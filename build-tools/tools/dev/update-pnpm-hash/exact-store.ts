@@ -18,10 +18,10 @@ async function sha256HexFile(absPath: string): Promise<string> {
 
 async function withExactStoreLock<T>(lockPath: string, fn: () => Promise<T>): Promise<T> {
   const waitTimeoutMs =
-    Number.parseInt(process.env.BNX_EXACT_PNPM_STORE_LOCK_WAIT_TIMEOUT_MS || "900000", 10) ||
+    Number.parseInt(process.env.VBR_EXACT_PNPM_STORE_LOCK_WAIT_TIMEOUT_MS || "900000", 10) ||
     900000;
   const staleAgeMs =
-    Number.parseInt(process.env.BNX_EXACT_PNPM_STORE_LOCK_STALE_AGE_MS || "900000", 10) || 900000;
+    Number.parseInt(process.env.VBR_EXACT_PNPM_STORE_LOCK_STALE_AGE_MS || "900000", 10) || 900000;
   const startedAt = Date.now();
   const pidAlive = (pid: number): boolean => {
     if (!Number.isFinite(pid) || pid <= 0) return false;

@@ -21,7 +21,7 @@ test("nixos shared-host service client resolves the reviewed mini remote alias",
       remote: "mini",
       context: "deploy",
       env: {
-        BNX_DEPLOY_MINI_CONTROL_PLANE_URL: "http://127.0.0.1:7780",
+        VBR_DEPLOY_MINI_CONTROL_PLANE_URL: "http://127.0.0.1:7780",
         [LOCAL_FIXTURE_SERVICE_ENV]: "1",
       },
     }).controlPlaneUrl,

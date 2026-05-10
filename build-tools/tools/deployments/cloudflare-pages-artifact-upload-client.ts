@@ -56,7 +56,7 @@ export async function uploadCloudflarePagesClientArtifact(opts: {
       method: "POST",
       headers: {
         "content-type": "application/vnd.viberoots.static-webapp-artifact+json",
-        "x-bnx-submission-id": opts.submissionId,
+        "x-vbr-submission-id": opts.submissionId,
         ...authHeaders(opts.controlPlaneToken),
       },
       body: bytes,

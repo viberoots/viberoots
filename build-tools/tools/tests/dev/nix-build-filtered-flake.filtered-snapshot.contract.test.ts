@@ -8,12 +8,12 @@ test("filtered flake builds mark the snapshot so graph-generator can reuse flake
   const planner = await fsp.readFile("build-tools/tools/nix/graph-generator.nix", "utf8");
 
   assert.ok(
-    helper.includes('BNX_FILTERED_FLAKE_SNAPSHOT: "1"'),
+    helper.includes('VBR_FILTERED_FLAKE_SNAPSHOT: "1"'),
     "expected nix-build-filtered-flake to mark filtered snapshot builds",
   );
   assert.ok(
     planner.includes(
-      'filteredFlakeSnapshot = (builtins.getEnv "BNX_FILTERED_FLAKE_SNAPSHOT") != "";',
+      'filteredFlakeSnapshot = (builtins.getEnv "VBR_FILTERED_FLAKE_SNAPSHOT") != "";',
     ),
     "expected graph-generator to read the filtered snapshot marker",
   );

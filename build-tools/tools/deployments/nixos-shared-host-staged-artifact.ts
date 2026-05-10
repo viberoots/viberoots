@@ -2,7 +2,7 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 
-export const NIXOS_SHARED_HOST_UPLOAD_COMPLETE_MARKER = ".bnx-upload-complete.json";
+export const NIXOS_SHARED_HOST_UPLOAD_COMPLETE_MARKER = ".vbr-upload-complete.json";
 
 export function stagedUploadTempPath(finalPath: string): string {
   return `${finalPath}.uploading`;

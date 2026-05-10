@@ -113,15 +113,15 @@ test("buck-daemon-reaper: reaps registered verify-owned node processes after par
       stdio: "ignore",
       env: {
         ...process.env,
-        BNX_VERIFY_PROCESS_STATE_FILE: stateFile,
-        BNX_VERIFY_LOG_FILE: path.join(
+        VBR_VERIFY_PROCESS_STATE_FILE: stateFile,
+        VBR_VERIFY_LOG_FILE: path.join(
           repoRoot,
           "buck-out",
           "tmp",
           "verify-logs",
           "owned-process.log",
         ),
-        BNX_VERIFY_REGISTER_PROCESS: "1",
+        VBR_VERIFY_REGISTER_PROCESS: "1",
         BUCK_TEST_TARGET: "root//:verify_owned_process_reaper",
       },
     },

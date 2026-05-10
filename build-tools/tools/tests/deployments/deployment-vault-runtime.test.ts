@@ -46,9 +46,9 @@ test("deployment Vault runtime mints a fresh JWT from deployment-derived claims"
     });
     assert.equal(result.minted, true);
     assert.equal(env.VAULT_ADDR, undefined);
-    assert.equal(env.BNX_VAULT_AUTH_METHOD, undefined);
-    assert.equal(env.BNX_VAULT_JWT_ROLE, undefined);
-    assert.equal(env.BNX_VAULT_JWT_FILE, undefined);
+    assert.equal(env.VBR_VAULT_AUTH_METHOD, undefined);
+    assert.equal(env.VBR_VAULT_JWT_ROLE, undefined);
+    assert.equal(env.VBR_VAULT_JWT_FILE, undefined);
     assert.equal(result.secretContext?.kind, "vault");
     const credential =
       result.secretContext?.kind === "vault" ? result.secretContext.credential : undefined;
@@ -94,7 +94,7 @@ test("deployment Vault runtime allows env and flags to override metadata", async
       env,
     });
     assert.equal(result.minted, true);
-    assert.equal(env.BNX_VAULT_JWT_FILE, undefined);
+    assert.equal(env.VBR_VAULT_JWT_FILE, undefined);
     const credential =
       result.secretContext?.kind === "vault" ? result.secretContext.credential : undefined;
     const claims = decodeJwtPayload(credential?.kind === "jwt" ? credential.workloadJwt : "");
@@ -109,8 +109,8 @@ test("deployment Vault runtime ignores stale ambient Vault auth variables", asyn
   const env: NodeJS.ProcessEnv = {
     [DEFAULT_DEPLOYMENT_CLIENT_SECRET_ENV]: "super-secret",
     VAULT_ADDR: "https://stale.example.invalid:8200",
-    BNX_VAULT_AUTH_METHOD: "token",
-    BNX_VAULT_JWT: "stale.jwt",
+    VBR_VAULT_AUTH_METHOD: "token",
+    VBR_VAULT_JWT: "stale.jwt",
     VAULT_TOKEN: "stale-token",
   };
   const server = await startFakeOidcServer({
@@ -130,7 +130,7 @@ test("deployment Vault runtime ignores stale ambient Vault auth variables", asyn
       env,
     });
     assert.equal(result.minted, true);
-    assert.equal(env.BNX_VAULT_AUTH_METHOD, "token");
+    assert.equal(env.VBR_VAULT_AUTH_METHOD, "token");
     const credential =
       result.secretContext?.kind === "vault" ? result.secretContext.credential : undefined;
     assert.equal(
@@ -144,8 +144,8 @@ test("deployment Vault runtime ignores stale ambient Vault auth variables", asyn
 });
 
 test("worker Vault runtime rejects fixture and interactive client credential sources", async () => {
-  const previousFixture = process.env.BNX_DEPLOYMENT_SECRET_FIXTURE_PATH;
-  process.env.BNX_DEPLOYMENT_SECRET_FIXTURE_PATH = "/tmp/local-secret-fixture.json";
+  const previousFixture = process.env.VBR_DEPLOYMENT_SECRET_FIXTURE_PATH;
+  process.env.VBR_DEPLOYMENT_SECRET_FIXTURE_PATH = "/tmp/local-secret-fixture.json";
   try {
     await assert.rejects(
       prepareWorkerDeploymentVaultRuntime({
@@ -154,11 +154,11 @@ test("worker Vault runtime rejects fixture and interactive client credential sou
           secretRequirements: cloudflarePagesApiTokenRequirements(),
         }),
       }),
-      /server-mode worker Vault access must not use BNX_DEPLOYMENT_SECRET_FIXTURE_PATH/,
+      /server-mode worker Vault access must not use VBR_DEPLOYMENT_SECRET_FIXTURE_PATH/,
     );
   } finally {
-    if (previousFixture === undefined) delete process.env.BNX_DEPLOYMENT_SECRET_FIXTURE_PATH;
-    else process.env.BNX_DEPLOYMENT_SECRET_FIXTURE_PATH = previousFixture;
+    if (previousFixture === undefined) delete process.env.VBR_DEPLOYMENT_SECRET_FIXTURE_PATH;
+    else process.env.VBR_DEPLOYMENT_SECRET_FIXTURE_PATH = previousFixture;
   }
 
   await assert.rejects(
@@ -187,11 +187,11 @@ test("worker Vault runtime metadata keeps only non-secret credential references"
         addr: "https://vault.example.net:8200",
         oidcIssuer: "https://identity.example.test",
         preferredCredentialSource: "external_oidc_token",
-        externalOidcTokenEnv: "BNX_WORKER_OIDC_TOKEN",
+        externalOidcTokenEnv: "VBR_WORKER_OIDC_TOKEN",
       },
     }),
-    env: { BNX_WORKER_OIDC_TOKEN: token },
+    env: { VBR_WORKER_OIDC_TOKEN: token },
   });
-  assert.equal(metadata?.externalOidcTokenEnv, "BNX_WORKER_OIDC_TOKEN");
+  assert.equal(metadata?.externalOidcTokenEnv, "VBR_WORKER_OIDC_TOKEN");
   assert.ok(!JSON.stringify(metadata).includes(token));
 });

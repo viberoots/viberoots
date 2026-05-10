@@ -6,7 +6,7 @@ import { cloudflarePagesPublishedPath } from "./cloudflare-pages-preview";
 async function cleanupFakePreviewTarget(
   effectiveRunTarget: Pick<CloudflarePagesProviderTarget, "project" | "previewBranch">,
 ): Promise<boolean> {
-  const publishRoot = process.env.BNX_CLOUDFLARE_FAKE_PUBLISH_ROOT?.trim();
+  const publishRoot = process.env.VBR_CLOUDFLARE_FAKE_PUBLISH_ROOT?.trim();
   if (!publishRoot) return false;
   await fsp.rm(cloudflarePagesPublishedPath(publishRoot, effectiveRunTarget), {
     recursive: true,

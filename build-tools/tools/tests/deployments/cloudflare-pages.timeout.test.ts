@@ -86,10 +86,10 @@ test("cloudflare-pages publish timeout records the failed step and reports progr
     const originalEnv = { ...process.env };
     const progress: Array<{ step: string; timeoutMs?: number }> = [];
     process.env.PATH = `${fake.binDir}:${originalEnv.PATH || ""}`;
-    process.env.BNX_CLOUDFLARE_FAKE_PUBLISH_ROOT = fake.publishRoot;
-    process.env.BNX_CLOUDFLARE_FAKE_WRANGLER_LOG = fake.logPath;
-    process.env.BNX_CLOUDFLARE_FAKE_WRANGLER_DELAY_MS = "250";
-    process.env.BNX_CLOUDFLARE_PAGES_WRANGLER_BIN = path.join(fake.binDir, "wrangler");
+    process.env.VBR_CLOUDFLARE_FAKE_PUBLISH_ROOT = fake.publishRoot;
+    process.env.VBR_CLOUDFLARE_FAKE_WRANGLER_LOG = fake.logPath;
+    process.env.VBR_CLOUDFLARE_FAKE_WRANGLER_DELAY_MS = "250";
+    process.env.VBR_CLOUDFLARE_PAGES_WRANGLER_BIN = path.join(fake.binDir, "wrangler");
     try {
       await assert.rejects(
         async () =>
@@ -126,10 +126,10 @@ test("cloudflare-pages publish timeout records the failed step and reports progr
       assert.match(record.error, /publish|timeout|SIGTERM/i);
     } finally {
       process.env.PATH = originalEnv.PATH || "";
-      delete process.env.BNX_CLOUDFLARE_FAKE_PUBLISH_ROOT;
-      delete process.env.BNX_CLOUDFLARE_FAKE_WRANGLER_LOG;
-      delete process.env.BNX_CLOUDFLARE_FAKE_WRANGLER_DELAY_MS;
-      delete process.env.BNX_CLOUDFLARE_PAGES_WRANGLER_BIN;
+      delete process.env.VBR_CLOUDFLARE_FAKE_PUBLISH_ROOT;
+      delete process.env.VBR_CLOUDFLARE_FAKE_WRANGLER_LOG;
+      delete process.env.VBR_CLOUDFLARE_FAKE_WRANGLER_DELAY_MS;
+      delete process.env.VBR_CLOUDFLARE_PAGES_WRANGLER_BIN;
     }
   });
 });

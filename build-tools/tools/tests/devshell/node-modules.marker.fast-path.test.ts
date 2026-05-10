@@ -60,7 +60,7 @@ test("devshell marker avoids nix eval", async () => {
     const baseEnv = {
       ...process.env,
       PATH: `${binDir}:${process.env.PATH || ""}`,
-      BNX_DEVSHELL_ALLOW_TMP: "1",
+      VBR_DEVSHELL_ALLOW_TMP: "1",
       WORKSPACE_ROOT: tmp,
       NO_NODE_MODULES_LINK: "",
     };

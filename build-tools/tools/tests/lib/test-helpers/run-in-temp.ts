@@ -27,7 +27,7 @@ import { externalPnpmStateDirs } from "../../../lib/pnpm-state-paths";
 import { stableBuckIsolation } from "../../../lib/buck-command-env";
 import { resolveToolPathSync } from "../../../lib/tool-paths";
 
-const LOCAL_FIXTURE_SERVICE_ENV = "BNX_DEPLOY_LOCAL_FIXTURE_SERVICE";
+const LOCAL_FIXTURE_SERVICE_ENV = "VBR_DEPLOY_LOCAL_FIXTURE_SERVICE";
 
 let cachedDevEnvExport: Promise<string> | null = null;
 let cachedPinnedNixpkgsPath: Promise<string> | null = null;
@@ -362,7 +362,7 @@ export async function runInTemp<T>(
     exportEnv.WORKSPACE_ROOT = tmp;
     exportEnv.BUCK_TEST_SRC = tmp;
     exportEnv.REPO_ROOT = tmp;
-    exportEnv.BNX_RUN_IN_TEMP_REPO = "1";
+    exportEnv.VBR_RUN_IN_TEMP_REPO = "1";
     exportEnv.SCAF_ALLOW_LIVE_REPO = "1";
     exportEnv.TEST_NO_BROWSER = exportEnv.TEST_NO_BROWSER || "1";
     exportEnv[LOCAL_FIXTURE_SERVICE_ENV] = exportEnv[LOCAL_FIXTURE_SERVICE_ENV] || "1";
@@ -427,7 +427,7 @@ export async function runInTemp<T>(
     BUCKD_STARTUP_TIMEOUT: process.env.BUCKD_STARTUP_TIMEOUT || "300",
     BUCKD_STARTUP_INIT_TIMEOUT:
       process.env.BUCKD_STARTUP_INIT_TIMEOUT || process.env.BUCKD_STARTUP_TIMEOUT || "300",
-    BNX_RUN_IN_TEMP_REPO: "1",
+    VBR_RUN_IN_TEMP_REPO: "1",
     SCAF_ALLOW_LIVE_REPO: "1",
     REPO_ROOT: process.cwd(),
     HOME: home,
@@ -551,7 +551,7 @@ export async function runInTemp<T>(
   } catch {}
   exportEnv.WORKSPACE_ROOT = tmp;
   exportEnv.BUCK_TEST_SRC = tmp;
-  exportEnv.BNX_RUN_IN_TEMP_REPO = "1";
+  exportEnv.VBR_RUN_IN_TEMP_REPO = "1";
   exportEnv.SCAF_ALLOW_LIVE_REPO = "1";
   exportEnv.BUCK_ISOLATION_DIR = tempNestedIso;
   exportEnv.BUCK_NESTED_ISO = tempNestedIso;
@@ -716,9 +716,9 @@ export async function runInTemp<T>(
 }
 
 function registerRunInTempBuckIsolation(iso: string): void {
-  const stateFile = String(process.env.BNX_VERIFY_PROCESS_STATE_FILE || "").trim();
+  const stateFile = String(process.env.VBR_VERIFY_PROCESS_STATE_FILE || "").trim();
   if (!stateFile || !iso) return;
-  const ownerPidRaw = Number(process.env.BNX_VERIFY_OWNER_PID || process.pid);
+  const ownerPidRaw = Number(process.env.VBR_VERIFY_OWNER_PID || process.pid);
   const ownerPid = Number.isFinite(ownerPidRaw) && ownerPidRaw > 1 ? ownerPidRaw : process.pid;
   try {
     registerBuckIsolationSync({

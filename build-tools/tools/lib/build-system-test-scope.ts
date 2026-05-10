@@ -208,7 +208,7 @@ export async function resolveBuildSystemBuckTestScope(opts: {
   env?: NodeJS.ProcessEnv;
 }): Promise<ScopeDecision> {
   const env = opts.env || process.env;
-  const mode = parseBuildSystemTestMode(env.BNX_BUILD_SYSTEM_TESTS);
+  const mode = parseBuildSystemTestMode(env.VBR_BUILD_SYSTEM_TESTS);
   if (!shouldAutoScopeTargets(opts.requestedTargets)) {
     return { targets: opts.requestedTargets, mode, hasBuildSystemChanges: false };
   }

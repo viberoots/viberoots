@@ -20,8 +20,8 @@ test("verify orphan cleanup: kills orphaned verify-owned node processes only", a
     target: "root//:verify_orphan_owned_process_cleanup",
   });
 
-  const prevGrace = process.env.BNX_VERIFY_PROCESS_ORPHAN_STALE_GRACE_SECS;
-  process.env.BNX_VERIFY_PROCESS_ORPHAN_STALE_GRACE_SECS = "0";
+  const prevGrace = process.env.VBR_VERIFY_PROCESS_ORPHAN_STALE_GRACE_SECS;
+  process.env.VBR_VERIFY_PROCESS_ORPHAN_STALE_GRACE_SECS = "0";
   try {
     const result = await cleanupOrphanBuckDaemons({ maxKills: 20 });
     assert.ok(
@@ -30,8 +30,8 @@ test("verify orphan cleanup: kills orphaned verify-owned node processes only", a
     );
     await waitForPidGone(orphanPid, 10_000);
   } finally {
-    if (prevGrace === undefined) delete process.env.BNX_VERIFY_PROCESS_ORPHAN_STALE_GRACE_SECS;
-    else process.env.BNX_VERIFY_PROCESS_ORPHAN_STALE_GRACE_SECS = prevGrace;
+    if (prevGrace === undefined) delete process.env.VBR_VERIFY_PROCESS_ORPHAN_STALE_GRACE_SECS;
+    else process.env.VBR_VERIFY_PROCESS_ORPHAN_STALE_GRACE_SECS = prevGrace;
     try {
       process.kill(orphanPid, "SIGKILL");
     } catch {}
@@ -47,8 +47,8 @@ test("verify orphan cleanup: kills orphaned registered verify-env test processes
     target: "root//:verify_orphan_env_process_cleanup",
   });
 
-  const prevGrace = process.env.BNX_VERIFY_PROCESS_ORPHAN_STALE_GRACE_SECS;
-  process.env.BNX_VERIFY_PROCESS_ORPHAN_STALE_GRACE_SECS = "0";
+  const prevGrace = process.env.VBR_VERIFY_PROCESS_ORPHAN_STALE_GRACE_SECS;
+  process.env.VBR_VERIFY_PROCESS_ORPHAN_STALE_GRACE_SECS = "0";
   try {
     const result = await cleanupOrphanBuckDaemons({ maxKills: 20 });
     assert.ok(
@@ -57,8 +57,8 @@ test("verify orphan cleanup: kills orphaned registered verify-env test processes
     );
     await waitForPidGone(orphanPid, 10_000);
   } finally {
-    if (prevGrace === undefined) delete process.env.BNX_VERIFY_PROCESS_ORPHAN_STALE_GRACE_SECS;
-    else process.env.BNX_VERIFY_PROCESS_ORPHAN_STALE_GRACE_SECS = prevGrace;
+    if (prevGrace === undefined) delete process.env.VBR_VERIFY_PROCESS_ORPHAN_STALE_GRACE_SECS;
+    else process.env.VBR_VERIFY_PROCESS_ORPHAN_STALE_GRACE_SECS = prevGrace;
     try {
       process.kill(orphanPid, "SIGKILL");
     } catch {}

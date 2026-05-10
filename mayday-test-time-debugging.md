@@ -173,7 +173,7 @@ beats `38.1m` and passes all targets.
 - Added a bounded `resource-limited` pass with `threads=4`.
 - Added per-pass Buck isolation for concurrent verify passes.
 - Added broad-run staged start logic for `resource-limited`; default is now
-  `900s`, with `BNX_VERIFY_RESOURCE_LIMITED_START_DELAY_SECS` or
+  `900s`, with `VBR_VERIFY_RESOURCE_LIMITED_START_DELAY_SECS` or
   `VERIFY_RESOURCE_LIMITED_START_DELAY_SECS` as explicit overrides.
 - Split scheduling helpers into
   `build-tools/tools/dev/verify/verify-pass-scheduling.ts` so

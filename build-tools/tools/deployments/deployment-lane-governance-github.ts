@@ -7,7 +7,7 @@ import {
 import type { DeploymentLanePolicy } from "./deployment-policy";
 
 const GITHUB_GRAPHQL_URL = "https://api.github.com/graphql";
-const GITHUB_TOKEN_ENV = "BNX_DEPLOY_GITHUB_TOKEN";
+const GITHUB_TOKEN_ENV = "VBR_DEPLOY_GITHUB_TOKEN";
 
 type GithubActor =
   | { __typename: "App"; slug: string }

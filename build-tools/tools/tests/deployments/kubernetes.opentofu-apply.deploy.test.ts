@@ -91,11 +91,11 @@ test("kubernetes app-attached deploy attaches OpenTofu apply outcome with replay
     });
     const originalEnv = { ...process.env };
     process.env.PATH = `${fake.binDir}:${originalEnv.PATH || ""}`;
-    process.env.BNX_KUBERNETES_HELM_BIN = path.join(fake.binDir, "helm");
-    process.env.BNX_KUBERNETES_FAKE_PUBLISH_ROOT = fake.publishRoot;
-    process.env.BNX_KUBERNETES_FAKE_HELM_LOG = fake.logPath;
-    process.env.BNX_OPENTOFU_BIN = fakeOpenTofu.binPath;
-    process.env.BNX_FAKE_OPENTOFU_LOG = fakeOpenTofu.logPath;
+    process.env.VBR_KUBERNETES_HELM_BIN = path.join(fake.binDir, "helm");
+    process.env.VBR_KUBERNETES_FAKE_PUBLISH_ROOT = fake.publishRoot;
+    process.env.VBR_KUBERNETES_FAKE_HELM_LOG = fake.logPath;
+    process.env.VBR_OPENTOFU_BIN = fakeOpenTofu.binPath;
+    process.env.VBR_FAKE_OPENTOFU_LOG = fakeOpenTofu.logPath;
     process.env[DEPLOYMENT_SECRET_FIXTURE_PATH_ENV] = openTofuSecretFixturePath;
     try {
       const { record, recordPath } = await submitKubernetesDeploy({
@@ -134,11 +134,11 @@ test("kubernetes app-attached deploy attaches OpenTofu apply outcome with replay
     } finally {
       process.env.PATH = originalEnv.PATH || "";
       for (const name of [
-        "BNX_KUBERNETES_HELM_BIN",
-        "BNX_KUBERNETES_FAKE_PUBLISH_ROOT",
-        "BNX_KUBERNETES_FAKE_HELM_LOG",
-        "BNX_OPENTOFU_BIN",
-        "BNX_FAKE_OPENTOFU_LOG",
+        "VBR_KUBERNETES_HELM_BIN",
+        "VBR_KUBERNETES_FAKE_PUBLISH_ROOT",
+        "VBR_KUBERNETES_FAKE_HELM_LOG",
+        "VBR_OPENTOFU_BIN",
+        "VBR_FAKE_OPENTOFU_LOG",
         DEPLOYMENT_SECRET_FIXTURE_PATH_ENV,
       ]) {
         if (originalEnv[name] === undefined) delete process.env[name];

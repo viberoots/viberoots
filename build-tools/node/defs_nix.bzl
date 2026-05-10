@@ -58,9 +58,9 @@ def node_webapp(
         + nix_calling_env_export_buck_graph_json()
         + nix_calling_node_patch_requirements_preflight(_importer)
         + nix_calling_env_export_nix_pnpm_fetch_timeout(default_sec = 600)
-        + "OUT_PATHS_FILE=\"$TMP/bnx-nix-outpaths.txt\"; "
+        + "OUT_PATHS_FILE=\"$TMP/vbr-nix-outpaths.txt\"; "
         + (
-            "$TIMEOUT node --experimental-top-level-await --disable-warning=ExperimentalWarning --experimental-strip-types --import \"$BNX_NODE_ZX_INIT\" "
+            "$TIMEOUT node --experimental-top-level-await --disable-warning=ExperimentalWarning --experimental-strip-types --import \"$VBR_NODE_ZX_INIT\" "
             + "\"$WORKSPACE_ROOT/build-tools/tools/dev/nix-build-filtered-flake.ts\" --attr "
             + ("\"node-webapp.%s\" > \"$OUT_PATHS_FILE\"; " % sanitize_importer_for_nix_attr(_importer))
         )

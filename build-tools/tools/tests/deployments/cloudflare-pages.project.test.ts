@@ -51,13 +51,13 @@ async function withFakeCloudflareApi<T>(
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
   const address = server.address();
   if (!address || typeof address !== "object") throw new Error("fake Cloudflare API did not bind");
-  const originalBase = process.env.BNX_CLOUDFLARE_API_BASE_URL;
-  process.env.BNX_CLOUDFLARE_API_BASE_URL = `http://127.0.0.1:${address.port}`;
+  const originalBase = process.env.VBR_CLOUDFLARE_API_BASE_URL;
+  process.env.VBR_CLOUDFLARE_API_BASE_URL = `http://127.0.0.1:${address.port}`;
   try {
     return await run({ requests });
   } finally {
-    if (originalBase === undefined) delete process.env.BNX_CLOUDFLARE_API_BASE_URL;
-    else process.env.BNX_CLOUDFLARE_API_BASE_URL = originalBase;
+    if (originalBase === undefined) delete process.env.VBR_CLOUDFLARE_API_BASE_URL;
+    else process.env.VBR_CLOUDFLARE_API_BASE_URL = originalBase;
     await new Promise<void>((resolve, reject) =>
       server.close((error) => (error ? reject(error) : resolve())),
     );

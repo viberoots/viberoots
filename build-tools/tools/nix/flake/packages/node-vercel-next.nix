@@ -20,7 +20,7 @@ let
           set -euo pipefail
           REPO_ROOT="$PWD"
           APP_DIR="$REPO_ROOT/${importerDir}"
-          CONFIG_REL="${let v = builtins.getEnv "BNX_VERCEL_CONFIG"; in if v != "" then v else "vercel.project.json"}"
+          CONFIG_REL="${let v = builtins.getEnv "VBR_VERCEL_CONFIG"; in if v != "" then v else "vercel.project.json"}"
           CONFIG="$APP_DIR/$CONFIG_REL"
           DIST="$APP_DIR/dist"
           test -f "$CONFIG" || {

@@ -125,7 +125,7 @@ async function resolveDeploymentOverride(opts: {
   });
   if (opts.requestedDeploymentMode === "always" && impact.mode !== "deployment-only") {
     guardDeploymentSelection(
-      "BNX_DEPLOYMENT_TEST_SCOPE=always requires deployment-only changes",
+      "VBR_DEPLOYMENT_TEST_SCOPE=always requires deployment-only changes",
       impact.diagnostics,
     );
   }
@@ -214,7 +214,7 @@ export async function resolveRequestedVerifyScope(opts: {
         : null,
     env,
   });
-  const requestedDeploymentMode = parseDeploymentTestScopeMode(env.BNX_DEPLOYMENT_TEST_SCOPE);
+  const requestedDeploymentMode = parseDeploymentTestScopeMode(env.VBR_DEPLOYMENT_TEST_SCOPE);
   if (args.selector !== "default" || !isDefaultVerifyTargetSet(args.targets)) {
     return {
       args,

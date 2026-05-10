@@ -29,10 +29,10 @@ const projectName = flagValue("--project-name");
 const branch = flagValue("--branch");
 const explicitConfigPath = flagValue("--config");
 const configPath = explicitConfigPath ? path.resolve(explicitConfigPath) : defaultConfigPath();
-const publishRoot = process.env.BNX_CLOUDFLARE_FAKE_PUBLISH_ROOT || "";
-const logPath = process.env.BNX_CLOUDFLARE_FAKE_WRANGLER_LOG || "";
+const publishRoot = process.env.VBR_CLOUDFLARE_FAKE_PUBLISH_ROOT || "";
+const logPath = process.env.VBR_CLOUDFLARE_FAKE_WRANGLER_LOG || "";
 const accountId = process.env.CLOUDFLARE_ACCOUNT_ID || "";
-const delayMs = Number(process.env.BNX_CLOUDFLARE_FAKE_WRANGLER_DELAY_MS || "0");
+const delayMs = Number(process.env.VBR_CLOUDFLARE_FAKE_WRANGLER_DELAY_MS || "0");
 if (!configPath) {
   console.error("missing wrangler config");
   process.exit(5);
@@ -43,7 +43,7 @@ if (String(config.name || "") !== projectName) {
   process.exit(3);
 }
 if (!publishRoot) {
-  console.error("missing BNX_CLOUDFLARE_FAKE_PUBLISH_ROOT");
+  console.error("missing VBR_CLOUDFLARE_FAKE_PUBLISH_ROOT");
   process.exit(4);
 }
 if (Number.isFinite(delayMs) && delayMs > 0) {

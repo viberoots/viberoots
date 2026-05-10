@@ -45,8 +45,8 @@ export function isTempRepoRoot(repoRoot: string): boolean {
   const r = path.resolve(repoRoot);
   return (
     r.includes(`${path.sep}buck-out${path.sep}tmp${path.sep}tmpdir${path.sep}`) ||
-    r.startsWith("/tmp/bnx-") ||
-    r.startsWith("/private/tmp/bnx-") ||
+    r.startsWith("/tmp/vbr-") ||
+    r.startsWith("/private/tmp/vbr-") ||
     r.startsWith("/tmp/viberoots-") ||
     r.startsWith("/private/tmp/viberoots-")
   );

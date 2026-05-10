@@ -22,7 +22,7 @@ type SharedSourceFrontDoorOpts = {
 async function requireDirectSharedHostSourceBackend(backendDatabaseUrl?: string) {
   if (!backendDatabaseUrl) {
     throw new Error(
-      "shared replay source lookup requires --control-plane-database-url or BNX_DEPLOY_CONTROL_PLANE_DATABASE_URL",
+      "shared replay source lookup requires --control-plane-database-url or VBR_DEPLOY_CONTROL_PLANE_DATABASE_URL",
     );
   }
   return backendDatabaseUrl;

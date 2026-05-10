@@ -51,7 +51,7 @@ function isPatternVerifyTarget(target: string): boolean {
 type IsolatedPassMode = "batch" | "per-target";
 
 function isolatedPassMode(env: NodeJS.ProcessEnv = process.env): IsolatedPassMode {
-  return String(env.BNX_VERIFY_ISOLATED_PASS_MODE || "").trim() === "per-target"
+  return String(env.VBR_VERIFY_ISOLATED_PASS_MODE || "").trim() === "per-target"
     ? "per-target"
     : "batch";
 }

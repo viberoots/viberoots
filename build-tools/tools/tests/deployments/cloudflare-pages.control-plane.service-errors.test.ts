@@ -50,7 +50,7 @@ test("public cloudflare-pages deploy requires a control-plane URL for protected/
         cwd: tmp,
         stdio: "pipe",
       })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment ${deployment.label} --artifact-dir ${artifactDir} --admission-evidence-json ${admissionEvidenceJson}`,
-      /cloudflare-pages (shared_nonprod|production_facing) mutation requires --control-plane-url or BNX_DEPLOY_CONTROL_PLANE_URL/,
+      /cloudflare-pages (shared_nonprod|production_facing) mutation requires --control-plane-url or VBR_DEPLOY_CONTROL_PLANE_URL/,
     );
   });
 });

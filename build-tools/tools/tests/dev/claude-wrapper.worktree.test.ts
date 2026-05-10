@@ -28,7 +28,7 @@ test("claude --worktree attaches to an existing named worktree", async () => {
       env: {
         ...process.env,
         PATH: `${path.dirname(wrapper)}:${fake.bin}:/usr/bin:/bin`,
-        BNX_CLAUDE_GIT_WRAPPER_FOR_TEST: path.join(fake.bin, "git"),
+        VBR_CLAUDE_GIT_WRAPPER_FOR_TEST: path.join(fake.bin, "git"),
       },
     })`${wrapper} --worktree existing-worker -p hello`;
 
@@ -57,7 +57,7 @@ test("claude --worktree recreates a missing worktree from an existing branch", a
       env: {
         ...process.env,
         PATH: `${path.dirname(wrapper)}:${fake.bin}:/usr/bin:/bin`,
-        BNX_CLAUDE_GIT_WRAPPER_FOR_TEST: path.join(fake.bin, "git"),
+        VBR_CLAUDE_GIT_WRAPPER_FOR_TEST: path.join(fake.bin, "git"),
       },
     })`${wrapper} --worktree branch-only -p hello`;
 

@@ -139,7 +139,7 @@ export async function cleanupOrphanVerifyProcesses(opts: {
 }): Promise<{ scanned: number; candidates: number; killed: number }> {
   const maxKills = Math.max(0, opts.maxKills ?? 50);
   const staleGraceRaw = Number.parseInt(
-    String(process.env.BNX_VERIFY_PROCESS_ORPHAN_STALE_GRACE_SECS || "120"),
+    String(process.env.VBR_VERIFY_PROCESS_ORPHAN_STALE_GRACE_SECS || "120"),
     10,
   );
   const staleGraceSec = Math.max(0, Number.isFinite(staleGraceRaw) ? staleGraceRaw : 120);

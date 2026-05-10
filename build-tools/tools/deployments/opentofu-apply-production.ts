@@ -9,8 +9,8 @@ export function createProductionOpenTofuApplyAdapter(
 ): OpenTofuApplyAdapter {
   const binary =
     (opts.binary || "").trim() ||
-    (process.env.BNX_OPENTOFU_BIN || "").trim() ||
-    (process.env.BNX_DEPLOY_OPENTOFU_BIN || "").trim() ||
+    (process.env.VBR_OPENTOFU_BIN || "").trim() ||
+    (process.env.VBR_DEPLOY_OPENTOFU_BIN || "").trim() ||
     "tofu";
   return {
     async apply(args): Promise<OpenTofuApplyAdapterResult> {

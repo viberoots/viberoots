@@ -1,7 +1,11 @@
 #!/usr/bin/env zx-wrapper
+import { execFile } from "node:child_process";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
+import { promisify } from "node:util";
+
+const execFileAsync = promisify(execFile);
 
 const EXCLUDED_DIRS = new Set([
   ".git",
@@ -15,9 +19,12 @@ const EXCLUDED_DIRS = new Set([
 
 const ALLOWED_PATHS = new Set([
   ".git",
+  "build-tools/tools/tests/deployments/nixos-shared-host.control-plane-service-env.test.ts",
   "build-tools/tools/tests/linting/no-stale-viberoots-names.enforcement.test.ts",
   "docs/repo-rename.md",
+  "docs/runtime-prefix-migration.md",
   "mayday-test-time-debugging.md",
+  "pnpm-lock.yaml",
 ]);
 
 const ALLOWED_PREFIXES = ["docs/build-history/", "docs/design-history/"];
@@ -29,6 +36,9 @@ const STALE_PATTERNS: Array<{ re: RegExp; label: string }> = [
   { re: /\bbucknix-fresh\b/g, label: "bucknix-fresh" },
   { re: /\bkiltyj\/bucknix-fresh\b/g, label: "kiltyj/bucknix-fresh" },
   { re: /\bgit@github\.com:kiltyj\/bucknix-fresh\.git\b/g, label: "old repo remote" },
+  { re: /(^|[^A-Za-z0-9])bnx(?=[^A-Za-z0-9]|$)/g, label: "bnx" },
+  { re: /(^|[^A-Za-z0-9])Bnx(?=[^A-Za-z0-9]|$)/g, label: "Bnx" },
+  { re: /(^|[^A-Za-z0-9])BNX(?=[^A-Za-z0-9]|$)/g, label: "BNX" },
 ];
 
 function normalizeRel(p: string): string {
@@ -51,6 +61,18 @@ function lineNumberForOffset(text: string, offset: number): number {
 }
 
 async function listRepoFiles(repoRoot: string): Promise<string[]> {
+  try {
+    const { stdout } = await execFileAsync("git", ["ls-files", "-z"], {
+      cwd: repoRoot,
+      encoding: "utf8",
+    });
+    return String(stdout || "")
+      .split("\0")
+      .filter(Boolean)
+      .map((rel) => path.join(repoRoot, normalizeRel(rel)))
+      .sort((a, b) => a.localeCompare(b));
+  } catch {}
+
   const files: string[] = [];
   const stack = [repoRoot];
 

@@ -31,7 +31,7 @@ export async function makeFakeAgentTools(
   const bin = path.join(tmp, "bin");
   const log = path.join(tmp, "calls.log");
   const safehouseEnv =
-    toolName === "claude" ? "BNX_CLAUDE_SAFEHOUSE_ACTIVE" : "BNX_CODEX_SAFEHOUSE_ACTIVE";
+    toolName === "claude" ? "VBR_CLAUDE_SAFEHOUSE_ACTIVE" : "VBR_CODEX_SAFEHOUSE_ACTIVE";
   await fsp.mkdir(bin, { recursive: true });
   await writeExecutable(
     path.join(bin, "git"),

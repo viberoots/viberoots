@@ -82,7 +82,7 @@ export function spawnVerifyBuck2Tests(opts: {
 
   const startS = Math.floor(Date.now() / 1000);
   const buckEnv = { ...process.env };
-  delete buckEnv.BNX_VERIFY_REGISTER_PROCESS;
+  delete buckEnv.VBR_VERIFY_REGISTER_PROCESS;
 
   const proc = spawn(timeoutPath, ["-k", "10s", `${overallTimeoutSecs}s`, buck2Path, ...buckArgs], {
     cwd: opts.root,

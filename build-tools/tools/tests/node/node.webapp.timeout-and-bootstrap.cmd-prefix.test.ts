@@ -66,7 +66,7 @@ test("node_webapp cmd prefixes nix bootstrap env and timeout wrapper", async () 
       "expected node_webapp filtered builder to receive attr selection",
     );
     assert.ok(
-      out.includes("OUT_PATHS_FILE=") || out.includes("bnx-nix-outpaths.txt"),
+      out.includes("OUT_PATHS_FILE=") || out.includes("vbr-nix-outpaths.txt"),
       "expected outPath capture to use a deterministic temp file",
     );
   });

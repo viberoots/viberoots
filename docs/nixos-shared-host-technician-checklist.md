@@ -96,8 +96,8 @@ Completion criteria:
 Run on `mini` from `/srv/common`:
 
 ```bash
-export BNX_DEPLOY_CONTROL_PLANE_DATABASE_URL='postgres://deployctl:REDACTED@127.0.0.1:5432/deployctl'
-export BNX_DEPLOY_CONTROL_PLANE_TOKEN='replace-me'
+export VBR_DEPLOY_CONTROL_PLANE_DATABASE_URL='postgres://deployctl:REDACTED@127.0.0.1:5432/deployctl'
+export VBR_DEPLOY_CONTROL_PLANE_TOKEN='replace-me'
 set -a
 . /etc/deployment-host/reviewed-source-ssh.env
 set +a
@@ -143,7 +143,7 @@ direnv exec . build-tools/tools/bin/nixos-shared-host-install \
 The installed profile should be here:
 
 - `.local/deployments/nixos-shared-host/clients/mini.json`
-- `--control-plane-token-env BNX_DEPLOY_CONTROL_PLANE_TOKEN` is the default;
+- `--control-plane-token-env VBR_DEPLOY_CONTROL_PLANE_TOKEN` is the default;
   the profile stores the env var name, not the token value
 
 What success looks like:

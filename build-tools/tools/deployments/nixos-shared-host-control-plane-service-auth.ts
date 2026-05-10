@@ -24,7 +24,7 @@ export function assertReviewedServiceTokenConfigured(opts: {
 }) {
   if (opts.serviceToken || runsInLocalFixtureMode(opts)) return;
   throw new Error(
-    `${opts.context} requires --token or BNX_DEPLOY_CONTROL_PLANE_TOKEN unless ${LOCAL_FIXTURE_SERVICE_ENV}=1 marks an explicit local fixture service`,
+    `${opts.context} requires --token or VBR_DEPLOY_CONTROL_PLANE_TOKEN unless ${LOCAL_FIXTURE_SERVICE_ENV}=1 marks an explicit local fixture service`,
   );
 }
 

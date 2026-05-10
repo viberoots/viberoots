@@ -79,6 +79,6 @@ export async function installAppStoreConnectTargets(
 export function appStoreConnectFakeEnv(tmp: string): NodeJS.ProcessEnv {
   return {
     ...process.env,
-    BNX_APP_STORE_CONNECT_FAKE_STORE_ROOT: path.join(tmp, "fake-store"),
+    VBR_APP_STORE_CONNECT_FAKE_STORE_ROOT: path.join(tmp, "fake-store"),
   };
 }

@@ -84,7 +84,7 @@ test("identity-provider migration reads restricted host secrets through startup 
     assert.match(out.preStart, /printf 'db-password=%s\\n' "\$db_password"/);
     assert.match(out.preStart, /printf 'db-url(?:-host|-database|-port|-properties)?=%s\\n'/);
     assert.doesNotMatch(out.preStart, /(^|[[:space:]])--db([[:space:]]|$)/);
-    assert.match(out.preStart, /--client-secret:env=BNX_KEYCLOAK_BOOTSTRAP_ADMIN_SECRET/);
+    assert.match(out.preStart, /--client-secret:env=VBR_KEYCLOAK_BOOTSTRAP_ADMIN_SECRET/);
     assert.match(out.postStart, /\/run\/secrets\/bootstrap-first-operator-password/);
     assert.match(out.postStart, /first_operator_password="\$\(tr -d '\\n'/);
     assert.match(out.postStart, /--new-password "\$first_operator_password"/);

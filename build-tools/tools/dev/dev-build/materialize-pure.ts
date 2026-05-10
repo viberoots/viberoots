@@ -9,7 +9,7 @@ import {
 } from "../../lib/runnables";
 
 function materializeTimeoutSec(defaultSec: number): number {
-  const raw = String(process.env.BNX_MATERIALIZE_TIMEOUT_SEC || "").trim();
+  const raw = String(process.env.VBR_MATERIALIZE_TIMEOUT_SEC || "").trim();
   const parsed = Number(raw || String(defaultSec));
   if (!Number.isFinite(parsed) || parsed <= 0) return defaultSec;
   return Math.floor(parsed);

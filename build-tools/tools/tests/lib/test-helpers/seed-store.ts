@@ -26,7 +26,7 @@ let trackedOverlayOncePerWorker: Promise<string[]> | null = null;
 let overlayFilesOncePerWorker: Promise<string[]> | null = null;
 
 function isVerifyMode(): boolean {
-  return Boolean(process.env.BNX_VERIFY_LOCK_DIR || process.env.BNX_VERIFY_LOG_FILE);
+  return Boolean(process.env.VBR_VERIFY_LOCK_DIR || process.env.VBR_VERIFY_LOG_FILE);
 }
 
 function wantsFilteredRsync(): boolean {
@@ -174,15 +174,15 @@ export async function initTempRepoFromSeedStore(args: {
   deps: SeedDeps;
 }): Promise<RepoInitMode> {
   const { tmpDir, deps } = args;
-  const seedPath = String(process.env.BNX_TEST_SEED_STORE_PATH || "").trim();
-  const seedKey = String(process.env.BNX_TEST_SEED_KEY || "").trim();
+  const seedPath = String(process.env.VBR_TEST_SEED_STORE_PATH || "").trim();
+  const seedKey = String(process.env.VBR_TEST_SEED_KEY || "").trim();
   if (wantsFilteredRsync()) {
     await deps.rsyncRepoTo(tmpDir);
     return "rsync";
   }
   if (!seedPath) {
     if (isVerifyMode()) {
-      throw new Error("runInTemp: missing BNX_TEST_SEED_STORE_PATH; rerun v");
+      throw new Error("runInTemp: missing VBR_TEST_SEED_STORE_PATH; rerun v");
     }
     await deps.rsyncRepoTo(tmpDir);
     return "rsync";

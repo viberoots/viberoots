@@ -85,8 +85,8 @@ test("cloudflare preview cleanup rejects credentials not authorized for cleanup"
   await fsp.mkdir(tmpParent, { recursive: true });
   const tmp = await fsp.mkdtemp(path.join(tmpParent, "cf-cleanup-"));
   const fixturePath = await writeFixture(tmp, ["publish"]);
-  const original = process.env.BNX_DEPLOYMENT_SECRET_FIXTURE_PATH;
-  process.env.BNX_DEPLOYMENT_SECRET_FIXTURE_PATH = fixturePath;
+  const original = process.env.VBR_DEPLOYMENT_SECRET_FIXTURE_PATH;
+  process.env.VBR_DEPLOYMENT_SECRET_FIXTURE_PATH = fixturePath;
   try {
     await assert.rejects(
       async () =>
@@ -116,7 +116,7 @@ test("cloudflare preview cleanup rejects credentials not authorized for cleanup"
       /not authorized for lifecycle step preview_cleanup/,
     );
   } finally {
-    if (original === undefined) delete process.env.BNX_DEPLOYMENT_SECRET_FIXTURE_PATH;
-    else process.env.BNX_DEPLOYMENT_SECRET_FIXTURE_PATH = original;
+    if (original === undefined) delete process.env.VBR_DEPLOYMENT_SECRET_FIXTURE_PATH;
+    else process.env.VBR_DEPLOYMENT_SECRET_FIXTURE_PATH = original;
   }
 });

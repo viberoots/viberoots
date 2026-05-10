@@ -124,7 +124,7 @@ export async function spawnOrphanedVerifyProcess(opts: {
   target: string;
   registered: boolean;
 }): Promise<number> {
-  const registrationEnv = opts.registered ? ["    BNX_VERIFY_REGISTER_PROCESS: '1',"] : [];
+  const registrationEnv = opts.registered ? ["    VBR_VERIFY_REGISTER_PROCESS: '1',"] : [];
   const registerArgs = opts.registered
     ? "['--experimental-strip-types', '--import', process.argv[1], '-e', 'setInterval(() => {}, 1000)']"
     : "['-e', 'setInterval(() => {}, 1000)']";
@@ -136,9 +136,9 @@ export async function spawnOrphanedVerifyProcess(opts: {
     "  stdio: 'ignore',",
     "  env: {",
     "    ...process.env,",
-    `    BNX_VERIFY_PROCESS_STATE_FILE: process.argv[${1 + argOffset}],`,
-    `    BNX_BUCK_REAPER_STATE_FILE: process.argv[${1 + argOffset}],`,
-    `    BNX_VERIFY_LOG_FILE: process.argv[${2 + argOffset}],`,
+    `    VBR_VERIFY_PROCESS_STATE_FILE: process.argv[${1 + argOffset}],`,
+    `    VBR_BUCK_REAPER_STATE_FILE: process.argv[${1 + argOffset}],`,
+    `    VBR_VERIFY_LOG_FILE: process.argv[${2 + argOffset}],`,
     ...registrationEnv,
     `    BUCK_TEST_TARGET: '${opts.target}'`,
     "  }",
@@ -172,10 +172,10 @@ export function spawnCurrentVerifyEnvProcess(files: ProcessFiles, target: string
       stdio: "ignore",
       env: {
         ...process.env,
-        BNX_VERIFY_PROCESS_STATE_FILE: files.stateFile,
-        BNX_BUCK_REAPER_STATE_FILE: files.stateFile,
-        BNX_VERIFY_LOG_FILE: files.logFile,
-        BNX_VERIFY_REGISTER_PROCESS: "1",
+        VBR_VERIFY_PROCESS_STATE_FILE: files.stateFile,
+        VBR_BUCK_REAPER_STATE_FILE: files.stateFile,
+        VBR_VERIFY_LOG_FILE: files.logFile,
+        VBR_VERIFY_REGISTER_PROCESS: "1",
         BUCK_TEST_TARGET: target,
       },
     },

@@ -50,14 +50,14 @@ export function cloudflareBackendTimeouts(): {
   smokeMs?: number;
   previewCleanupMs: number;
 } {
-  const smokeMs = positiveEnvInt("BNX_DEPLOY_CLOUDFLARE_SMOKE_TIMEOUT_MS");
+  const smokeMs = positiveEnvInt("VBR_DEPLOY_CLOUDFLARE_SMOKE_TIMEOUT_MS");
   return {
-    vaultMs: positiveEnvInt("BNX_DEPLOY_CLOUDFLARE_VAULT_TIMEOUT_MS") || DEFAULT_VAULT_TIMEOUT_MS,
+    vaultMs: positiveEnvInt("VBR_DEPLOY_CLOUDFLARE_VAULT_TIMEOUT_MS") || DEFAULT_VAULT_TIMEOUT_MS,
     publishMs:
-      positiveEnvInt("BNX_DEPLOY_CLOUDFLARE_PUBLISH_TIMEOUT_MS") || DEFAULT_PUBLISH_TIMEOUT_MS,
+      positiveEnvInt("VBR_DEPLOY_CLOUDFLARE_PUBLISH_TIMEOUT_MS") || DEFAULT_PUBLISH_TIMEOUT_MS,
     ...(smokeMs ? { smokeMs } : {}),
     previewCleanupMs:
-      positiveEnvInt("BNX_DEPLOY_CLOUDFLARE_PREVIEW_CLEANUP_TIMEOUT_MS") ||
+      positiveEnvInt("VBR_DEPLOY_CLOUDFLARE_PREVIEW_CLEANUP_TIMEOUT_MS") ||
       DEFAULT_PREVIEW_CLEANUP_TIMEOUT_MS,
   };
 }

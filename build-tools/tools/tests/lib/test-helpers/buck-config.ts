@@ -5,7 +5,7 @@ import "./worker-init";
 let cachedPreludePath: Promise<string> | null = null;
 
 async function resolvePreludePath(tmp: string, $: any): Promise<string> {
-  const sharedPrelude = String(process.env.BNX_SHARED_PRELUDE_PATH || "").trim();
+  const sharedPrelude = String(process.env.VBR_SHARED_PRELUDE_PATH || "").trim();
   if (sharedPrelude) {
     try {
       await fsp.access(sharedPrelude);

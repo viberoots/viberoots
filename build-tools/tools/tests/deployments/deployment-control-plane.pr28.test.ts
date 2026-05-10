@@ -53,8 +53,8 @@ test(
   async () => {
     await withEnvOverrides(
       {
-        BNX_DEPLOY_LOCK_WAIT_TIMEOUT_MS: "200",
-        BNX_DEPLOY_LOCK_POLL_MS: "25",
+        VBR_DEPLOY_LOCK_WAIT_TIMEOUT_MS: "200",
+        VBR_DEPLOY_LOCK_POLL_MS: "25",
       },
       async () => {
         await runInTemp("deployment-control-plane-lock-timeout", async (tmp) => {
@@ -97,8 +97,8 @@ test(
   async () => {
     await withEnvOverrides(
       {
-        BNX_DEPLOY_LOCK_WAIT_TIMEOUT_MS: INTEGRATION_LOCK_WAIT_TIMEOUT_MS,
-        BNX_DEPLOY_LOCK_POLL_MS: "25",
+        VBR_DEPLOY_LOCK_WAIT_TIMEOUT_MS: INTEGRATION_LOCK_WAIT_TIMEOUT_MS,
+        VBR_DEPLOY_LOCK_POLL_MS: "25",
       },
       async () => {
         await runInTemp("deployment-control-plane-supersedence", async (tmp, $) => {
@@ -188,8 +188,8 @@ test(
   async () => {
     await withEnvOverrides(
       {
-        BNX_DEPLOY_LOCK_WAIT_TIMEOUT_MS: INTEGRATION_LOCK_WAIT_TIMEOUT_MS,
-        BNX_DEPLOY_LOCK_POLL_MS: "25",
+        VBR_DEPLOY_LOCK_WAIT_TIMEOUT_MS: INTEGRATION_LOCK_WAIT_TIMEOUT_MS,
+        VBR_DEPLOY_LOCK_POLL_MS: "25",
       },
       async () => {
         await runInTemp("deployment-control-plane-revalidation", async (tmp, $) => {

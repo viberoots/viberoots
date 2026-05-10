@@ -2,10 +2,10 @@
 
 export const VAULT_ADDR_ENV = "VAULT_ADDR";
 export const VAULT_TOKEN_ENV = "VAULT_TOKEN";
-export const VAULT_AUTH_METHOD_ENV = "BNX_VAULT_AUTH_METHOD";
-export const VAULT_JWT_ROLE_ENV = "BNX_VAULT_JWT_ROLE";
-export const VAULT_JWT_ENV = "BNX_VAULT_JWT";
-export const VAULT_JWT_FILE_ENV = "BNX_VAULT_JWT_FILE";
+export const VAULT_AUTH_METHOD_ENV = "VBR_VAULT_AUTH_METHOD";
+export const VAULT_JWT_ROLE_ENV = "VBR_VAULT_JWT_ROLE";
+export const VAULT_JWT_ENV = "VBR_VAULT_JWT";
+export const VAULT_JWT_FILE_ENV = "VBR_VAULT_JWT_FILE";
 
 export type VaultCredentialConfig =
   | {

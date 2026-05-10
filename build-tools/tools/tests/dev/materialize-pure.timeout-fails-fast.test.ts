@@ -21,9 +21,9 @@ test("materialize pure fails fast when nix build exceeds timeout", async () => {
     await fsp.chmod(stubNix, 0o755);
 
     const prevPath = process.env.PATH || "";
-    const prevTimeout = process.env.BNX_MATERIALIZE_TIMEOUT_SEC;
+    const prevTimeout = process.env.VBR_MATERIALIZE_TIMEOUT_SEC;
     process.env.PATH = `${stubBin}:${prevPath}`;
-    process.env.BNX_MATERIALIZE_TIMEOUT_SEC = "1";
+    process.env.VBR_MATERIALIZE_TIMEOUT_SEC = "1";
     try {
       await assert.rejects(
         async () =>
@@ -38,8 +38,8 @@ test("materialize pure fails fast when nix build exceeds timeout", async () => {
       );
     } finally {
       process.env.PATH = prevPath;
-      if (prevTimeout == null) delete process.env.BNX_MATERIALIZE_TIMEOUT_SEC;
-      else process.env.BNX_MATERIALIZE_TIMEOUT_SEC = prevTimeout;
+      if (prevTimeout == null) delete process.env.VBR_MATERIALIZE_TIMEOUT_SEC;
+      else process.env.VBR_MATERIALIZE_TIMEOUT_SEC = prevTimeout;
     }
   });
 });

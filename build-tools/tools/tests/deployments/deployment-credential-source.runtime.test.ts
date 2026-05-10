@@ -64,11 +64,11 @@ test("Jenkins-bound secrets and tokens are scrubbed from provider subprocess env
   const env = scrubDeploymentSecretEnv({
     PATH: "/bin",
     JENKINS_DEPLOYMENT_CLIENT_SECRET: "secret",
-    BNX_DEPLOYMENT_OIDC_TOKEN: "token",
-    BNX_DEPLOYMENT_EXTERNAL_OIDC_TOKEN_ENV: "JENKINS_OIDC_TOKEN",
+    VBR_DEPLOYMENT_OIDC_TOKEN: "token",
+    VBR_DEPLOYMENT_EXTERNAL_OIDC_TOKEN_ENV: "JENKINS_OIDC_TOKEN",
   });
   assert.equal(env.PATH, "/bin");
-  assert.equal(env.BNX_DEPLOYMENT_OIDC_TOKEN, undefined);
-  assert.equal(env.BNX_DEPLOYMENT_EXTERNAL_OIDC_TOKEN_ENV, undefined);
+  assert.equal(env.VBR_DEPLOYMENT_OIDC_TOKEN, undefined);
+  assert.equal(env.VBR_DEPLOYMENT_EXTERNAL_OIDC_TOKEN_ENV, undefined);
   assert.equal(env.JENKINS_DEPLOYMENT_CLIENT_SECRET, undefined);
 });

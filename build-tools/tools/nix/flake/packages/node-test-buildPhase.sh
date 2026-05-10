@@ -2,7 +2,7 @@ set -euo pipefail
 
 cd "$IMPORTER_DIR"
 export SOURCE_DATE_EPOCH=1
-PHASE_DIAG="${BNX_NODE_PHASE_DIAGNOSTICS:-}"
+PHASE_DIAG="${VBR_NODE_PHASE_DIAGNOSTICS:-}"
 phase_timer_begin() {
   if [ -n "$PHASE_DIAG" ]; then
     date +%s
@@ -125,7 +125,7 @@ else
     if [ -n "$NODE_PATH" ]; then NODE_PATH_SUFFIX=":"$NODE_PATH; fi
     export NODE_PATH="$VITEST_NODE_MODULES$NODE_PATH_SUFFIX"
 
-    VITE_CFG="$TMPDIR/bnx-vite-config.mjs"
+    VITE_CFG="$TMPDIR/vbr-vite-config.mjs"
     cat > "$VITE_CFG" <<'EOF_VITE_CFG'
 export default {
   cacheDir: ".vite",

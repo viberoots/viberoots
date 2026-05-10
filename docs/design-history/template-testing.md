@@ -164,7 +164,7 @@ tests while keeping deterministic safety checks and clear observability.
   - `mixed` -> run existing full build-system test scope.
   - `no-template-impact` -> skip template suite path.
 - Add explicit scope control env:
-  - `BNX_TEMPLATE_TEST_SCOPE=auto|always|never`
+  - `VBR_TEMPLATE_TEST_SCOPE=auto|always|never`
   - `auto` uses selector decision
   - `always` forces template selector path
   - `never` forces current full build-system path.

@@ -137,34 +137,34 @@ Deployment-service routing:
 - `--remote mini`: shorthand for the reviewed `mini` deployment service endpoint
 - `--control-plane-token <token>`: required bearer token for reviewed hosted
   protected/shared service requests; explicit local fixture flows may omit it
-  only when `BNX_DEPLOY_LOCAL_FIXTURE_SERVICE=1` marks the service as
+  only when `VBR_DEPLOY_LOCAL_FIXTURE_SERVICE=1` marks the service as
   non-production
-- `BNX_DEPLOY_CONTROL_PLANE_URL`: environment fallback for `--control-plane-url`
-- `BNX_DEPLOY_MINI_CONTROL_PLANE_URL`: optional override for `--remote mini`
-- `BNX_DEPLOY_CONTROL_PLANE_TOKEN`: environment fallback used by reviewed
+- `VBR_DEPLOY_CONTROL_PLANE_URL`: environment fallback for `--control-plane-url`
+- `VBR_DEPLOY_MINI_CONTROL_PLANE_URL`: optional override for `--remote mini`
+- `VBR_DEPLOY_CONTROL_PLANE_TOKEN`: environment fallback used by reviewed
   service clients and hosted service processes
 
 Common example values:
 
 - `--control-plane-url http://127.0.0.1:7780`
   Use only for explicit local fixture flows with
-  `BNX_DEPLOY_LOCAL_FIXTURE_SERVICE=1`.
+  `VBR_DEPLOY_LOCAL_FIXTURE_SERVICE=1`.
 - `--control-plane-url https://deploy.apps.kilty.io`
   Use the reviewed hosted `mini` deployment service endpoint from laptops and
   automation outside the host.
 - `--remote mini`
   Use the reviewed mini alias; defaults to `https://deploy.apps.kilty.io` unless
-  `BNX_DEPLOY_MINI_CONTROL_PLANE_URL` is set.
-- `BNX_DEPLOY_CONTROL_PLANE_TOKEN=replace-me`
+  `VBR_DEPLOY_MINI_CONTROL_PLANE_URL` is set.
+- `VBR_DEPLOY_CONTROL_PLANE_TOKEN=replace-me`
   Example token environment variable for local or CI use.
 
 Service-process configuration:
 
 - `--control-plane-database-url <postgres-url>`: database URL for the
   deployment service or worker
-- `BNX_DEPLOY_CONTROL_PLANE_DATABASE_URL`: environment fallback for backend
+- `VBR_DEPLOY_CONTROL_PLANE_DATABASE_URL`: environment fallback for backend
   service processes and backend-native read helpers
-- `BNX_DEPLOY_CONTROL_PLANE_TOKEN`: environment fallback for the deployment
+- `VBR_DEPLOY_CONTROL_PLANE_TOKEN`: environment fallback for the deployment
   service bearer token; the reviewed hosted service fails closed at startup
   unless this or `--token` is set, and only explicit fixture mode may run
   without it
@@ -192,14 +192,14 @@ Vault credential-source overrides:
 - `--pkce-callback-bind-host <host>`: local listener bind address.
 - `--pkce-callback-bind-port <port>`: stable local listener port.
 - `--pkce-callback-bind-path <path>`: local listener path.
-- `BNX_DEPLOYMENT_PKCE_CALLBACK_MODE`,
-  `BNX_DEPLOYMENT_PKCE_CALLBACK_EXTERNAL_SCHEME`,
-  `BNX_DEPLOYMENT_PKCE_CALLBACK_HOST`,
-  `BNX_DEPLOYMENT_PKCE_CALLBACK_EXTERNAL_PORT`,
-  `BNX_DEPLOYMENT_PKCE_CALLBACK_EXTERNAL_PATH`,
-  `BNX_DEPLOYMENT_PKCE_CALLBACK_BIND_HOST`,
-  `BNX_DEPLOYMENT_PKCE_CALLBACK_BIND_PORT`, and
-  `BNX_DEPLOYMENT_PKCE_CALLBACK_BIND_PATH`: environment fallbacks for the same
+- `VBR_DEPLOYMENT_PKCE_CALLBACK_MODE`,
+  `VBR_DEPLOYMENT_PKCE_CALLBACK_EXTERNAL_SCHEME`,
+  `VBR_DEPLOYMENT_PKCE_CALLBACK_HOST`,
+  `VBR_DEPLOYMENT_PKCE_CALLBACK_EXTERNAL_PORT`,
+  `VBR_DEPLOYMENT_PKCE_CALLBACK_EXTERNAL_PATH`,
+  `VBR_DEPLOYMENT_PKCE_CALLBACK_BIND_HOST`,
+  `VBR_DEPLOYMENT_PKCE_CALLBACK_BIND_PORT`, and
+  `VBR_DEPLOYMENT_PKCE_CALLBACK_BIND_PATH`: environment fallbacks for the same
   controls.
 - `--cli-public-client-id <client-id>`: public OIDC client for human
   PKCE/device login.
@@ -286,12 +286,12 @@ deploy \
 Use the deployment service path:
 
 ```bash
-export BNX_DEPLOY_CONTROL_PLANE_URL='https://deploy.apps.kilty.io'
-export BNX_DEPLOY_CONTROL_PLANE_TOKEN='replace-me'
+export VBR_DEPLOY_CONTROL_PLANE_URL='https://deploy.apps.kilty.io'
+export VBR_DEPLOY_CONTROL_PLANE_TOKEN='replace-me'
 
 deploy \
   --deployment //projects/deployments/pleomino-prod:deploy \
-  --control-plane-url "$BNX_DEPLOY_CONTROL_PLANE_URL"
+  --control-plane-url "$VBR_DEPLOY_CONTROL_PLANE_URL"
 ```
 
 Read the current status for one service-backed run:
@@ -301,7 +301,7 @@ deploy \
   --deployment //projects/deployments/pleomino-prod:deploy \
   --status \
   --deploy-run-id deploy-run-123 \
-  --control-plane-url "$BNX_DEPLOY_CONTROL_PLANE_URL"
+  --control-plane-url "$VBR_DEPLOY_CONTROL_PLANE_URL"
 ```
 
 Print only the exact admitted target scope string:
@@ -311,7 +311,7 @@ deploy \
   --deployment //projects/deployments/pleomino-prod:deploy \
   --print-run-lock-scope \
   --deploy-run-id deploy-run-123 \
-  --control-plane-url "$BNX_DEPLOY_CONTROL_PLANE_URL"
+  --control-plane-url "$VBR_DEPLOY_CONTROL_PLANE_URL"
 ```
 
 Approve an existing waiting run without building the JSON payload yourself:
@@ -322,7 +322,7 @@ deploy \
   --approve \
   --deploy-run-id deploy-run-123 \
   --approval-id ticket-123 \
-  --control-plane-url "$BNX_DEPLOY_CONTROL_PLANE_URL"
+  --control-plane-url "$VBR_DEPLOY_CONTROL_PLANE_URL"
 ```
 
 Operator helper flags:
@@ -362,8 +362,8 @@ deploy --from-changes
 The current service is started with:
 
 ```bash
-export BNX_DEPLOY_CONTROL_PLANE_DATABASE_URL='postgres://deployctl:REDACTED@127.0.0.1:5432/deployctl'
-export BNX_DEPLOY_CONTROL_PLANE_TOKEN='replace-me'
+export VBR_DEPLOY_CONTROL_PLANE_DATABASE_URL='postgres://deployctl:REDACTED@127.0.0.1:5432/deployctl'
+export VBR_DEPLOY_CONTROL_PLANE_TOKEN='replace-me'
 
 zx-wrapper build-tools/tools/deployments/nixos-shared-host-control-plane-service.ts \
   --host 127.0.0.1 \
@@ -553,7 +553,7 @@ already been uploaded to the service:
 ```bash
 curl \
   -H 'Content-Type: application/json' \
-  -H "Authorization: Bearer $BNX_DEPLOY_CONTROL_PLANE_TOKEN" \
+  -H "Authorization: Bearer $VBR_DEPLOY_CONTROL_PLANE_TOKEN" \
   -X POST \
   https://deploy.apps.kilty.io/api/v1/submissions \
   -d '{
@@ -622,7 +622,7 @@ Read status by `submissionId`:
 
 ```bash
 curl \
-  -H "Authorization: Bearer $BNX_DEPLOY_CONTROL_PLANE_TOKEN" \
+  -H "Authorization: Bearer $VBR_DEPLOY_CONTROL_PLANE_TOKEN" \
   'https://deploy.apps.kilty.io/api/v1/status?submissionId=submission-2026-04-16T12:00:00Z'
 ```
 
@@ -630,7 +630,7 @@ Read the finalized record by `deployRunId`:
 
 ```bash
 curl \
-  -H "Authorization: Bearer $BNX_DEPLOY_CONTROL_PLANE_TOKEN" \
+  -H "Authorization: Bearer $VBR_DEPLOY_CONTROL_PLANE_TOKEN" \
   'https://deploy.apps.kilty.io/api/v1/records?deployRunId=deploy-run-123'
 ```
 
@@ -645,7 +645,7 @@ Approve an existing `pending_approval` run instead of resubmitting it:
 ```bash
 curl \
   -H 'Content-Type: application/json' \
-  -H "Authorization: Bearer $BNX_DEPLOY_CONTROL_PLANE_TOKEN" \
+  -H "Authorization: Bearer $VBR_DEPLOY_CONTROL_PLANE_TOKEN" \
   -X POST \
   https://deploy.apps.kilty.io/api/v1/run-actions \
   -d '{
@@ -683,7 +683,7 @@ Cancel a queued run:
 ```bash
 curl \
   -H 'Content-Type: application/json' \
-  -H "Authorization: Bearer $BNX_DEPLOY_CONTROL_PLANE_TOKEN" \
+  -H "Authorization: Bearer $VBR_DEPLOY_CONTROL_PLANE_TOKEN" \
   -X POST \
   https://deploy.apps.kilty.io/api/v1/run-actions \
   -d '{
@@ -883,15 +883,15 @@ authorizes the request, while the `mini` worker reads non-secret Vault runtime m
 execution snapshot and obtains a server-local workload credential immediately
 before provider execution. The workload JWT and returned Vault token stay in
 worker memory for the deployment run; normal deploys do not write JWT files or
-set `BNX_VAULT_JWT`, `BNX_VAULT_JWT_FILE`, `BNX_VAULT_AUTH_METHOD`,
-`BNX_VAULT_JWT_ROLE`, or `VAULT_TOKEN` in `process.env`.
+set `VBR_VAULT_JWT`, `VBR_VAULT_JWT_FILE`, `VBR_VAULT_AUTH_METHOD`,
+`VBR_VAULT_JWT_ROLE`, or `VAULT_TOKEN` in `process.env`.
 
 Local development, isolated tests, and explicit bootstrap-oriented workflows
 can intentionally override the local/direct runtime path with the reviewed
 fixture file. Protected service-backed workers reject this override:
 
 ```bash
-export BNX_DEPLOYMENT_SECRET_FIXTURE_PATH="$PWD/secret-fixture.json"
+export VBR_DEPLOYMENT_SECRET_FIXTURE_PATH="$PWD/secret-fixture.json"
 ```
 
 Production operators should also read
@@ -959,7 +959,7 @@ deploy \
   --deployment //projects/deployments/pleomino-staging:deploy \
   --print-run-lock-scope \
   --deploy-run-id "$DEPLOY_RUN_ID" \
-  --control-plane-url "$BNX_DEPLOY_CONTROL_PLANE_URL"
+  --control-plane-url "$VBR_DEPLOY_CONTROL_PLANE_URL"
 ```
 
 Use that `lockScope` value as the source of truth for the exact run.

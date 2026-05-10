@@ -4,21 +4,21 @@ import path from "node:path";
 import { processTableLines } from "../lib/process-inspection";
 
 function runnableBuildTimeoutSec(): number {
-  const raw = String(process.env.BNX_RUNNABLE_BUILD_TIMEOUT_SEC || "").trim();
+  const raw = String(process.env.VBR_RUNNABLE_BUILD_TIMEOUT_SEC || "").trim();
   const parsed = Number(raw || "420");
   if (!Number.isFinite(parsed) || parsed <= 0) return 420;
   return Math.floor(parsed);
 }
 
 function runnableTimeoutDiagEnabled(): boolean {
-  const raw = String(process.env.BNX_RUNNABLE_TIMEOUT_DIAG || "")
+  const raw = String(process.env.VBR_RUNNABLE_TIMEOUT_DIAG || "")
     .trim()
     .toLowerCase();
   return raw === "1" || raw === "true" || raw === "yes";
 }
 
 function runnableTimeoutSampleSec(): number {
-  const raw = String(process.env.BNX_RUNNABLE_TIMEOUT_SAMPLE_SEC || "").trim();
+  const raw = String(process.env.VBR_RUNNABLE_TIMEOUT_SAMPLE_SEC || "").trim();
   const parsed = Number(raw || "3");
   if (!Number.isFinite(parsed) || parsed <= 0) return 3;
   return Math.max(1, Math.min(10, Math.floor(parsed)));

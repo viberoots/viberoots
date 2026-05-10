@@ -20,7 +20,7 @@ test("PR-88 docs stay aligned on hosted token enforcement and staged-reference b
 
   assert.match(
     apiDoc,
-    /--control-plane-token <token>[\s\S]*required bearer token[\s\S]*BNX_DEPLOY_LOCAL_FIXTURE_SERVICE=1/,
+    /--control-plane-token <token>[\s\S]*required bearer token[\s\S]*VBR_DEPLOY_LOCAL_FIXTURE_SERVICE=1/,
   );
   assert.match(
     apiDoc,
@@ -33,11 +33,11 @@ test("PR-88 docs stay aligned on hosted token enforcement and staged-reference b
 
   assert.match(
     usageDoc,
-    /BNX_DEPLOY_CONTROL_PLANE_TOKEN[\s\S]*hosted service[\s\S]*cleans staged artifacts|bounded janitor/i,
+    /VBR_DEPLOY_CONTROL_PLANE_TOKEN[\s\S]*hosted service[\s\S]*cleans staged artifacts|bounded janitor/i,
   );
   assert.match(
     setupDoc,
-    /startup fails closed without a bearer token[\s\S]*BNX_DEPLOY_LOCAL_FIXTURE_SERVICE=1/,
+    /startup fails closed without a bearer token[\s\S]*VBR_DEPLOY_LOCAL_FIXTURE_SERVICE=1/,
   );
   assert.match(
     contractDoc,

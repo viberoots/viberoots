@@ -132,9 +132,9 @@ export function buildVaultBootstrapDocument(opts: {
     secretTemplates: templates,
     runtimeEnvironment: {
       VAULT_ADDR: opts.deployment.vaultRuntime?.addr || "<vault-addr>",
-      BNX_VAULT_OIDC_ISSUER:
+      VBR_VAULT_OIDC_ISSUER:
         inputs.issuerUrl || opts.deployment.vaultRuntime?.oidcIssuer || "<issuer-url>",
-      [opts.deployment.vaultRuntime?.clientSecretEnv || "BNX_DEPLOYER_CLIENT_SECRET"]:
+      [opts.deployment.vaultRuntime?.clientSecretEnv || "VBR_DEPLOYER_CLIENT_SECRET"]:
         "<client-secret>",
     },
     warnings: [
@@ -184,15 +184,15 @@ export function renderVaultBootstrapDocument(
   if (format === "shell") {
     const clientSecretEnv =
       Object.keys(document.runtimeEnvironment).find(
-        (key) => key !== "VAULT_ADDR" && key !== "BNX_VAULT_OIDC_ISSUER",
-      ) || "BNX_DEPLOYER_CLIENT_SECRET";
+        (key) => key !== "VAULT_ADDR" && key !== "VBR_VAULT_OIDC_ISSUER",
+      ) || "VBR_DEPLOYER_CLIENT_SECRET";
     return [
       auth,
       `cat > ${document.vault.policyName}.hcl <<'HCL'\n${document.policyHcl}\nHCL`,
       `vault policy write ${document.vault.policyName} ${document.vault.policyName}.hcl`,
       role,
       `export VAULT_ADDR=${shellQuote(document.runtimeEnvironment.VAULT_ADDR)}`,
-      `export BNX_VAULT_OIDC_ISSUER=${shellQuote(document.runtimeEnvironment.BNX_VAULT_OIDC_ISSUER)}`,
+      `export VBR_VAULT_OIDC_ISSUER=${shellQuote(document.runtimeEnvironment.VBR_VAULT_OIDC_ISSUER)}`,
       `export ${clientSecretEnv}='<client-secret>'`,
     ].join("\n\n");
   }

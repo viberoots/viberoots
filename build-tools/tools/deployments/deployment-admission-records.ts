@@ -94,7 +94,7 @@ export async function latestSuccessfulDeploymentRecord(opts: {
 > {
   const sharedHostBackendDatabaseUrl =
     opts.backendDatabaseUrl ||
-    String(process.env.BNX_DEPLOY_CONTROL_PLANE_DATABASE_URL || "").trim();
+    String(process.env.VBR_DEPLOY_CONTROL_PLANE_DATABASE_URL || "").trim();
   if (opts.provider === "nixos-shared-host") {
     if (!sharedHostBackendDatabaseUrl) {
       throw new Error(

@@ -1,7 +1,7 @@
 #!/usr/bin/env zx-wrapper
 
-export const LOCAL_FIXTURE_SERVICE_ENV = "BNX_DEPLOY_LOCAL_FIXTURE_SERVICE";
-export const INSECURE_TLS_OVERRIDE_ENV = "BNX_DEPLOY_INSECURE_TLS";
+export const LOCAL_FIXTURE_SERVICE_ENV = "VBR_DEPLOY_LOCAL_FIXTURE_SERVICE";
+export const INSECURE_TLS_OVERRIDE_ENV = "VBR_DEPLOY_INSECURE_TLS";
 
 function envEnabled(env: NodeJS.ProcessEnv, name: string): boolean {
   const value = String(env[name] || "")

@@ -29,7 +29,7 @@ For secret-runtime integration and public helper signatures, open
 [Deployment And Secrets API](/Users/kiltyj/Code/viberoots/docs/deployment-secrets-api.md).
 
 For production Vault bring-up and the optional local/test export bridge into
-`BNX_DEPLOYMENT_SECRET_FIXTURE_PATH`, open
+`VBR_DEPLOYMENT_SECRET_FIXTURE_PATH`, open
 [Vault Production Bootstrap Runbook](/Users/kiltyj/Code/viberoots/docs/vault-production-bootstrap.md).
 
 ## Plain-Language Glossary
@@ -85,7 +85,7 @@ For local development, isolated tests, or an explicit bootstrap-oriented
 workflow, point the runtime at a reviewed fixture file:
 
 ```bash
-export BNX_DEPLOYMENT_SECRET_FIXTURE_PATH="$PWD/secret-fixture.json"
+export VBR_DEPLOYMENT_SECRET_FIXTURE_PATH="$PWD/secret-fixture.json"
 ```
 
 Then use the runtime helper described in
@@ -322,8 +322,8 @@ flags, and session detection:
 Workload JWTs and Vault tokens are not written to `.local/deploy-vault` and are
 not communicated through `process.env`.
 
-Stale ambient variables such as `BNX_VAULT_JWT`, `BNX_VAULT_JWT_FILE`,
-`BNX_VAULT_AUTH_METHOD`, and `VAULT_TOKEN` are not the normal runtime contract.
+Stale ambient variables such as `VBR_VAULT_JWT`, `VBR_VAULT_JWT_FILE`,
+`VBR_VAULT_AUTH_METHOD`, and `VAULT_TOKEN` are not the normal runtime contract.
 Protected service-backed workers also reject the local/test fixture override,
 interactive client credential sources as worker Vault credentials, and
 client-submitted secret values. The interactive client session authenticates the
@@ -342,7 +342,7 @@ That means:
 
 - you create a file describing the available secrets
 - you point the runtime at that file with
-  `BNX_DEPLOYMENT_SECRET_FIXTURE_PATH`
+  `VBR_DEPLOYMENT_SECRET_FIXTURE_PATH`
 - the runtime resolves secrets from that file when the deployment step starts
 
 Create `secret-fixture.json`:
@@ -365,7 +365,7 @@ Create `secret-fixture.json`:
 Then point the deployment runtime at that file:
 
 ```bash
-export BNX_DEPLOYMENT_SECRET_FIXTURE_PATH="$PWD/secret-fixture.json"
+export VBR_DEPLOYMENT_SECRET_FIXTURE_PATH="$PWD/secret-fixture.json"
 ```
 
 What this file does:
@@ -403,7 +403,7 @@ deploy \
   --deployment //projects/deployments/pleomino-staging:deploy \
   --print-run-lock-scope \
   --deploy-run-id "$DEPLOY_RUN_ID" \
-  --control-plane-url "$BNX_DEPLOY_CONTROL_PLANE_URL"
+  --control-plane-url "$VBR_DEPLOY_CONTROL_PLANE_URL"
 ```
 
 Use that exact `lockScope` value in `targetScopes`.
@@ -626,7 +626,7 @@ This repo now documents two distinct layers:
 - JWT-first runtime Vault reads for the reviewed production path through
   deployment `vault_runtime` metadata and deployment-derived workload JWTs
 - the local/test fixture override consumed through
-  `BNX_DEPLOYMENT_SECRET_FIXTURE_PATH`
+  `VBR_DEPLOYMENT_SECRET_FIXTURE_PATH`
 
 Records and replay snapshots now keep admitted non-secret secret references so
 retry and rollback can fetch the same Vault version exactly while still never

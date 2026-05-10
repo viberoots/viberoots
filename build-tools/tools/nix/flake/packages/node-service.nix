@@ -21,7 +21,7 @@ let
           REPO_ROOT="$PWD"
           export WORKSPACE_ROOT="$REPO_ROOT"
           cd ${importerDir}
-          CONTRACT_REL="${let v = builtins.getEnv "BNX_NODE_SERVICE_CONTRACT"; in if v != "" then v else "service.runtime.json"}"
+          CONTRACT_REL="${let v = builtins.getEnv "VBR_NODE_SERVICE_CONTRACT"; in if v != "" then v else "service.runtime.json"}"
           test -f "$CONTRACT_REL" || {
             echo "node-service: missing declared runtime contract: ${importerDir}/$CONTRACT_REL" >&2
             exit 2

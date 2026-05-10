@@ -92,7 +92,7 @@ export async function runDevBuild(): Promise<void> {
   const iso = createIsolation({
     reuseDaemon: useFreshIsolationForMissingPatchDirs ? false : undefined,
   });
-  const stateFile = String(process.env.BNX_VERIFY_PROCESS_STATE_FILE || "").trim();
+  const stateFile = String(process.env.VBR_VERIFY_PROCESS_STATE_FILE || "").trim();
   if (stateFile && iso.buckIsolation) {
     registerBuckIsolationSync({
       stateFile,

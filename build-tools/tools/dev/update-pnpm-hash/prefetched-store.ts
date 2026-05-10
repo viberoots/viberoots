@@ -87,9 +87,9 @@ async function withStoreLock<T>(storePath: string, fn: () => Promise<T>): Promis
   const lockPath = lockPathForStore(storePath);
   const startedAt = Date.now();
   const waitTimeoutMs =
-    Number.parseInt(process.env.BNX_PNPM_STORE_SYNC_LOCK_WAIT_TIMEOUT_MS || "900000", 10) || 900000;
+    Number.parseInt(process.env.VBR_PNPM_STORE_SYNC_LOCK_WAIT_TIMEOUT_MS || "900000", 10) || 900000;
   const staleAgeMs =
-    Number.parseInt(process.env.BNX_PNPM_STORE_SYNC_LOCK_STALE_AGE_MS || "900000", 10) || 900000;
+    Number.parseInt(process.env.VBR_PNPM_STORE_SYNC_LOCK_STALE_AGE_MS || "900000", 10) || 900000;
 
   const pidAlive = (pid: number): boolean => {
     if (!Number.isFinite(pid) || pid <= 0) return false;

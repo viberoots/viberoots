@@ -99,7 +99,7 @@ async function main() {
 
   const tmpRoot = await canonicalPath(os.tmpdir());
   const isTmp = repoRootCanonical === tmpRoot || repoRootCanonical.startsWith(tmpRoot + path.sep);
-  const allowTmp = String(process.env.BNX_DEVSHELL_ALLOW_TMP || "").trim() === "1";
+  const allowTmp = String(process.env.VBR_DEVSHELL_ALLOW_TMP || "").trim() === "1";
   if (isTmp && !allowTmp) return;
 
   const lockInfo = await findNearestImporterLock(cwd);

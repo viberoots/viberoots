@@ -26,7 +26,7 @@ Run locally with `CI=true build-tools/tools/ci/run-stage.ts --stage <name>`.
 - **wheelhouse-preload**: Builds Python wheelhouse outputs (`py-wheelhouse-*`) for any importers with `uv.lock`, and if `NIX_CACHE_TO` is set (or `--to` is passed), pushes the closures to a binary cache via `nix copy`.
   - Configure cache destination in CI via environment: `NIX_CACHE_TO=https://<cache-endpoint>`.
   - Safe no-op when no Python importers exist.
-- **buck-test**: Runs project tests by default (`//projects/...`). Build-system tests are included only when build-system files changed, or when forced via `BNX_BUILD_SYSTEM_TESTS=always` (also supports `1/true`). Use `BNX_BUILD_SYSTEM_TESTS=never` (`0/false`) to force project-only test scope.
+- **buck-test**: Runs project tests by default (`//projects/...`). Build-system tests are included only when build-system files changed, or when forced via `VBR_BUILD_SYSTEM_TESTS=always` (also supports `1/true`). Use `VBR_BUILD_SYSTEM_TESTS=never` (`0/false`) to force project-only test scope.
 
 ## Why keep a Nix build stage separate from Buck
 

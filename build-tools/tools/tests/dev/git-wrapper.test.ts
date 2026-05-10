@@ -21,7 +21,7 @@ test("git wrapper delegates unsupported commands to the configured real git", as
     await writeExecutable(
       fakeGit,
       `#!/usr/bin/env bash
-printf '%s\\n' "$*" >> "$BNX_FAKE_GIT_LOG"
+printf '%s\\n' "$*" >> "$VBR_FAKE_GIT_LOG"
 `,
     );
 
@@ -30,8 +30,8 @@ printf '%s\\n' "$*" >> "$BNX_FAKE_GIT_LOG"
       stdio: "pipe",
       env: {
         ...process.env,
-        BNX_REAL_GIT: fakeGit,
-        BNX_FAKE_GIT_LOG: log,
+        VBR_REAL_GIT: fakeGit,
+        VBR_FAKE_GIT_LOG: log,
         PATH: `${path.dirname(wrapper)}:${process.env.PATH || ""}`,
       },
     })`${wrapper} status --short`;
@@ -52,7 +52,7 @@ test("git wrapper delegates unsupported worktree add forms unchanged", async () 
     await writeExecutable(
       fakeGit,
       `#!/usr/bin/env bash
-printf '%s\\n' "$*" >> "$BNX_FAKE_GIT_LOG"
+printf '%s\\n' "$*" >> "$VBR_FAKE_GIT_LOG"
 `,
     );
 
@@ -61,8 +61,8 @@ printf '%s\\n' "$*" >> "$BNX_FAKE_GIT_LOG"
       stdio: "pipe",
       env: {
         ...process.env,
-        BNX_REAL_GIT: fakeGit,
-        BNX_FAKE_GIT_LOG: log,
+        VBR_REAL_GIT: fakeGit,
+        VBR_FAKE_GIT_LOG: log,
       },
     })`${wrapper} worktree add --checkout ../wt main`;
 
@@ -96,8 +96,8 @@ cp -R "$1" "$2"
       stdio: "pipe",
       env: {
         ...process.env,
-        BNX_REAL_GIT: gitPath,
-        BNX_GIT_COW_COPY_PROG_FOR_TEST: copyProg,
+        VBR_REAL_GIT: gitPath,
+        VBR_GIT_COW_COPY_PROG_FOR_TEST: copyProg,
       },
     })`${wrapper} worktree add ${target} HEAD`;
 
@@ -148,7 +148,7 @@ test("git wrapper manifests tracked and non-ignored untracked files only", async
     await writeExecutable(
       copyProg,
       `#!/usr/bin/env bash
-python3 - "$3" "$BNX_MANIFEST_LOG" <<'PY'
+python3 - "$3" "$VBR_MANIFEST_LOG" <<'PY'
 import pathlib
 import sys
 
@@ -168,9 +168,9 @@ exit 23
       nothrow: true,
       env: {
         ...process.env,
-        BNX_REAL_GIT: gitPath,
-        BNX_GIT_COW_COPY_PROG_FOR_TEST: copyProg,
-        BNX_MANIFEST_LOG: manifestLog,
+        VBR_REAL_GIT: gitPath,
+        VBR_GIT_COW_COPY_PROG_FOR_TEST: copyProg,
+        VBR_MANIFEST_LOG: manifestLog,
       },
     })`${wrapper} worktree add ${target} HEAD`;
 
@@ -212,8 +212,8 @@ exit 23
       nothrow: true,
       env: {
         ...process.env,
-        BNX_REAL_GIT: gitPath,
-        BNX_GIT_COW_COPY_PROG_FOR_TEST: copyProg,
+        VBR_REAL_GIT: gitPath,
+        VBR_GIT_COW_COPY_PROG_FOR_TEST: copyProg,
       },
     })`${wrapper} worktree add ${target} HEAD`;
 

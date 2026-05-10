@@ -63,7 +63,7 @@ test("rollback replay fails when the recorded release-action policy forbids roll
     });
     await withEnvOverrides(
       {
-        BNX_DEPLOY_CONTROL_PLANE_DATABASE_URL: localHarnessControlPlaneDatabaseUrl(recordsRoot),
+        VBR_DEPLOY_CONTROL_PLANE_DATABASE_URL: localHarnessControlPlaneDatabaseUrl(recordsRoot),
       },
       async () => {
         const harness = await startControlPlaneHarness({

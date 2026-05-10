@@ -33,7 +33,7 @@ test("nixos-shared-host rollback fails closed for a successful retry source run"
     const recordsRoot = path.join(tmp, "records");
     const commandEnv = {
       ...process.env,
-      BNX_DEPLOY_CONTROL_PLANE_DATABASE_URL: localHarnessControlPlaneDatabaseUrl(recordsRoot),
+      VBR_DEPLOY_CONTROL_PLANE_DATABASE_URL: localHarnessControlPlaneDatabaseUrl(recordsRoot),
     };
     await writeArtifact(artifactDir, "v1");
     await ensureNixosSharedHostStageBranch(tmp, $, deployment);

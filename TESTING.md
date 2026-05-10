@@ -137,11 +137,11 @@ Many zx tests run in a temporary copy of the workspace created via rsync. To spe
 
 During `v`, verify prepares a single Nix-store seed and exports it to all tests:
 
-- `BNX_TEST_SEED_STORE_PATH` points at the seed store path.
-- `BNX_TEST_SEED_KEY` is exported for diagnostics.
-- `BNX_TEST_SEED_PIN_DIR` is a GC root pinned for the verify run.
+- `VBR_TEST_SEED_STORE_PATH` points at the seed store path.
+- `VBR_TEST_SEED_KEY` is exported for diagnostics.
+- `VBR_TEST_SEED_PIN_DIR` is a GC root pinned for the verify run.
 
-`runInTemp` requires `BNX_TEST_SEED_STORE_PATH` in verify mode and fails fast if it is missing or invalid. Outside verify, you can still set `BNX_TEST_SEED_STORE_PATH` explicitly.
+`runInTemp` requires `VBR_TEST_SEED_STORE_PATH` in verify mode and fails fast if it is missing or invalid. Outside verify, you can still set `VBR_TEST_SEED_STORE_PATH` explicitly.
 
 - By default, the temp copy excludes common heavy paths (e.g., `buck-out`, `.git`, `node_modules`, `coverage`, `.direnv`, `test-logs/`), while keeping essentials like `flake.nix`.
 - When you only need specific roots for a test, you can limit what is copied using `TEST_RSYNC_ROOTS` (comma or space separated).

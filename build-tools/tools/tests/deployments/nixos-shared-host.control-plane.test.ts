@@ -177,8 +177,8 @@ test("shared control plane rejects replay when the current lane policy no longer
 test("shared control plane times out queued runs when another holder keeps the shared lock", async () => {
   await withEnvOverrides(
     {
-      BNX_DEPLOY_LOCK_WAIT_TIMEOUT_MS: "200",
-      BNX_DEPLOY_LOCK_POLL_MS: "25",
+      VBR_DEPLOY_LOCK_WAIT_TIMEOUT_MS: "200",
+      VBR_DEPLOY_LOCK_POLL_MS: "25",
     },
     async () => {
       await runInTemp("nixos-shared-host-control-plane-lock-conflict", async (tmp) => {

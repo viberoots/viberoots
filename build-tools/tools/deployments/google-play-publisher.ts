@@ -34,7 +34,7 @@ export type GooglePlayPublishResult = {
 
 function fakeStoreRoot(workspaceRoot: string): string {
   return path.resolve(
-    process.env.BNX_GOOGLE_PLAY_FAKE_STORE_ROOT?.trim() ||
+    process.env.VBR_GOOGLE_PLAY_FAKE_STORE_ROOT?.trim() ||
       path.join(workspaceRoot, ".local", "deployments", "google-play", "fake-store"),
   );
 }
@@ -72,7 +72,7 @@ export async function publishGooglePlayMobileApp(opts: {
   await fsp.copyFile(opts.artifactPath, path.join(releaseRoot, path.basename(opts.artifactPath)));
   const rolloutMode =
     opts.deployment.rolloutPolicy?.mode === "store_staged" ? "store_staged" : "all_at_once";
-  const releaseHealthMode = process.env.BNX_GOOGLE_PLAY_FAKE_RELEASE_HEALTH_MODE?.trim();
+  const releaseHealthMode = process.env.VBR_GOOGLE_PLAY_FAKE_RELEASE_HEALTH_MODE?.trim();
   const releaseHealth: GooglePlayReleaseHealth =
     releaseHealthMode === "failed"
       ? {

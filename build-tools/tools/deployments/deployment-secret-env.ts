@@ -31,10 +31,10 @@ const SECRET_ENV_NAMES = new Set([
 function isSecretName(name: string): boolean {
   return (
     SECRET_ENV_NAMES.has(name) ||
-    /^BNX_VAULT/.test(name) ||
-    /^BNX_DEPLOYER_.*SECRET/.test(name) ||
-    /^BNX_DEPLOYMENT_CLIENT_SECRET/.test(name) ||
-    /^BNX_DEPLOYMENT_.*TOKEN/.test(name) ||
+    /^VBR_VAULT/.test(name) ||
+    /^VBR_DEPLOYER_.*SECRET/.test(name) ||
+    /^VBR_DEPLOYMENT_CLIENT_SECRET/.test(name) ||
+    /^VBR_DEPLOYMENT_.*TOKEN/.test(name) ||
     /^JENKINS_.*(SECRET|TOKEN)/.test(name) ||
     /^DEPLOYMENT_CLIENT_SECRET$/.test(name)
   );

@@ -5,7 +5,7 @@ export function registerVerifyBuckTestIsolations(opts: {
   nestedIso: string;
   repoRoot: string;
 }): void {
-  const stateFile = String(process.env.BNX_VERIFY_PROCESS_STATE_FILE || "").trim();
+  const stateFile = String(process.env.VBR_VERIFY_PROCESS_STATE_FILE || "").trim();
   if (!stateFile) return;
   try {
     registerBuckIsolationSync({

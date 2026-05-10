@@ -203,8 +203,8 @@ test("protected kubernetes provision-only records opentofu plan fingerprints", a
     try {
       await withEnvOverrides(
         {
-          BNX_OPENTOFU_BIN: fakeOpenTofu.binPath,
-          BNX_FAKE_OPENTOFU_LOG: fakeOpenTofu.logPath,
+          VBR_OPENTOFU_BIN: fakeOpenTofu.binPath,
+          VBR_FAKE_OPENTOFU_LOG: fakeOpenTofu.logPath,
           [DEPLOYMENT_SECRET_FIXTURE_PATH_ENV]: secretFixturePath,
         },
         async () => {

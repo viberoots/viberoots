@@ -51,7 +51,7 @@ test(
   "PR-8 in-session refresh enrolls and retires module keys without restart",
   { timeout: TEST_TIMEOUT_MS },
   async () => {
-    await runInTemp("bnx-phase5-refresh", async (tmp, _$) => {
+    await runInTemp("vbr-phase5-refresh", async (tmp, _$) => {
       const $ = _$({ cwd: tmp, stdio: "inherit" });
       await $`scaf new ts webapp-static demo-web --yes --no-tests --skip-lockfile-gen`;
       const appAbs = path.join(tmp, "projects", "apps", "demo-web");

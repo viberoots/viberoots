@@ -19,7 +19,7 @@ Important current-repo reality:
   variables; `VAULT_TOKEN` remains only for manual Vault bootstrap/admin CLI
   moments outside the deployment runtime
 - the exported JSON secret fixture path through
-  `BNX_DEPLOYMENT_SECRET_FIXTURE_PATH`
+  `VBR_DEPLOYMENT_SECRET_FIXTURE_PATH`
   remains available only for reviewed local, test, and bootstrap-oriented
   workflows, not as the normal production runtime mechanism
 - this runbook therefore covers both:
@@ -50,7 +50,7 @@ At the end of this runbook:
   Vault token and read those secrets without a pre-minted `VAULT_TOKEN`
 - when needed, a reviewed `deployment-secret-fixture@1` file can still be
   exported from Vault for local/test flows through
-  `BNX_DEPLOYMENT_SECRET_FIXTURE_PATH`
+  `VBR_DEPLOYMENT_SECRET_FIXTURE_PATH`
 
 ## Before You Start
 
@@ -212,7 +212,7 @@ deploy \
   --deployment //projects/deployments/pleomino-staging:deploy \
   --print-vault-secret-templates \
   --deploy-run-id "$DEPLOY_RUN_ID" \
-  --control-plane-url "$BNX_DEPLOY_CONTROL_PLANE_URL"
+  --control-plane-url "$VBR_DEPLOY_CONTROL_PLANE_URL"
 ```
 
 Use that exact `lockScope` value in `targetScopes`.
@@ -979,7 +979,7 @@ One practical Keycloak admin-console path is:
    login path.
 6. In the client credentials tab, copy the generated client secret into the
    Jenkins credential or host secret named by the deployment runner, such as
-   `BNX_DEPLOYER_CLIENT_SECRET`.
+   `VBR_DEPLOYER_CLIENT_SECRET`.
 7. In the client's dedicated client scope, add an `Audience` mapper with
    `Included Custom Audience` set to `deployments-vault`, and include it in the
    access token.
@@ -1107,12 +1107,12 @@ writes the JWT with restrictive file permissions for the smoke check, and fails
 closed if the expected issuer, audience, `azp`, or bound claims are missing:
 
 ```bash
-export BNX_DEPLOYER_CLIENT_SECRET='<client-secret-from-keycloak>'
+export VBR_DEPLOYER_CLIENT_SECRET='<client-secret-from-keycloak>'
 
 deploy-vault-jwt \
   --issuer https://identity.apps.kilty.io/realms/deployments \
   --client-id deployment-runner \
-  --client-secret-env BNX_DEPLOYER_CLIENT_SECRET \
+  --client-secret-env VBR_DEPLOYER_CLIENT_SECRET \
   --out /tmp/mini-workload.jwt \
   --audience deployments-vault \
   --expect-claim deployment_environment=mini \
@@ -1432,7 +1432,7 @@ For Jenkins client-secret automation, keep the client secret itself outside the
 repo:
 
 ```bash
-export BNX_DEPLOYER_CLIENT_SECRET='<deployment-runner-client-secret>'
+export VBR_DEPLOYER_CLIENT_SECRET='<deployment-runner-client-secret>'
 unset VAULT_TOKEN
 ```
 
@@ -1442,10 +1442,10 @@ this runbook:
 - Vault audience: `deployments-vault`
 - service-account client id: `deployment-runner`
 - human public client id: `deployment-cli`
-- client secret env var: `BNX_DEPLOYER_CLIENT_SECRET`
-- external OIDC token env var: `BNX_DEPLOYMENT_OIDC_TOKEN`
+- client secret env var: `VBR_DEPLOYER_CLIENT_SECRET`
+- external OIDC token env var: `VBR_DEPLOYMENT_OIDC_TOKEN`
 - deployment environment claim: machine hostname, override with
-  `BNX_DEPLOYMENT_ENVIRONMENT` or `--deployment-environment`
+  `VBR_DEPLOYMENT_ENVIRONMENT` or `--deployment-environment`
 - Vault role: `deploy-<deployment-family>-read` when the deployment id ends in
   the stage name, otherwise `deploy-<deployment-id>-read`
 
@@ -1459,7 +1459,7 @@ deploy \
   --deployment-client-id deployment-runner \
   --deployment-environment mini \
   --credential-source jenkins_client_secret \
-  --deployment-client-secret-env BNX_DEPLOYER_CLIENT_SECRET \
+  --deployment-client-secret-env VBR_DEPLOYER_CLIENT_SECRET \
   --vault-jwt-role deploy-pleomino-read
 ```
 
@@ -1467,8 +1467,8 @@ deploy \
 but routine deploys should let the deploy front door mint the workload JWT so
 the token is always fresh.
 
-The normal deploy runtime does not accept `BNX_VAULT_JWT` or
-`BNX_VAULT_JWT_FILE` as ambient credential handoff. Credential-source adapters
+The normal deploy runtime does not accept `VBR_VAULT_JWT` or
+`VBR_VAULT_JWT_FILE` as ambient credential handoff. Credential-source adapters
 may obtain short-lived JWT material from Jenkins or a human login flow, but
 provider execution receives only the typed in-memory secret context.
 
@@ -1579,26 +1579,26 @@ Set the optional fixture override env var only for local development, isolated
 tests, or explicit bootstrap-oriented workflows:
 
 ```bash
-export BNX_DEPLOYMENT_SECRET_FIXTURE_PATH="$PWD/.local/deploy-secrets/secret-fixture.json"
+export VBR_DEPLOYMENT_SECRET_FIXTURE_PATH="$PWD/.local/deploy-secrets/secret-fixture.json"
 ```
 
-Do not set `BNX_DEPLOYMENT_SECRET_FIXTURE_PATH` for normal production
+Do not set `VBR_DEPLOYMENT_SECRET_FIXTURE_PATH` for normal production
 deployments. When the variable is unset, the reviewed production runtime resolves
 the same contract IDs directly through the Vault API.
 
 ## Step 12: Run A Deployment Through Vault
 
-For local/direct production flows, leave `BNX_DEPLOYMENT_SECRET_FIXTURE_PATH`
+For local/direct production flows, leave `VBR_DEPLOYMENT_SECRET_FIXTURE_PATH`
 unset. Human deploys normally use PKCE/device login without a deployment client
 secret, and non-service provider execution receives only the typed in-memory
 secret context:
 
 ```bash
-unset BNX_DEPLOYMENT_SECRET_FIXTURE_PATH
+unset VBR_DEPLOYMENT_SECRET_FIXTURE_PATH
 unset VAULT_TOKEN
-unset BNX_VAULT_JWT
-unset BNX_VAULT_JWT_FILE
-unset BNX_VAULT_AUTH_METHOD
+unset VBR_VAULT_JWT
+unset VBR_VAULT_JWT_FILE
+unset VBR_VAULT_AUTH_METHOD
 
 deploy \
   --deployment //projects/deployments/pleomino-staging:deploy \
@@ -1610,11 +1610,11 @@ client authenticates to `mini`; it does not mint or forward Vault workload
 credentials:
 
 ```bash
-unset BNX_DEPLOYMENT_SECRET_FIXTURE_PATH
+unset VBR_DEPLOYMENT_SECRET_FIXTURE_PATH
 unset VAULT_TOKEN
-unset BNX_VAULT_JWT
-unset BNX_VAULT_JWT_FILE
-unset BNX_VAULT_AUTH_METHOD
+unset VBR_VAULT_JWT
+unset VBR_VAULT_JWT_FILE
+unset VBR_VAULT_AUTH_METHOD
 
 deploy \
   --deployment //projects/deployments/pleomino-staging:deploy \
@@ -1639,11 +1639,11 @@ Jenkins deploys to protected/shared `mini` should use the reviewed shared-host
 wrapper and keep Vault credential material on `mini`:
 
 ```bash
-unset BNX_DEPLOYMENT_SECRET_FIXTURE_PATH
+unset VBR_DEPLOYMENT_SECRET_FIXTURE_PATH
 unset VAULT_TOKEN
-unset BNX_VAULT_JWT
-unset BNX_VAULT_JWT_FILE
-unset BNX_VAULT_AUTH_METHOD
+unset VBR_VAULT_JWT
+unset VBR_VAULT_JWT_FILE
+unset VBR_VAULT_AUTH_METHOD
 
 nixos-shared-host-jenkins-deploy \
   --deployment //projects/deployments/pleomino-staging:deploy \
@@ -1657,17 +1657,17 @@ Jenkins deploys for local/direct or CI-owned non-service flows should expose
 only the selected Jenkins credential binding to the deploy front door:
 
 ```bash
-export BNX_DEPLOYER_CLIENT_SECRET='<deployment-runner-client-secret>'
-unset BNX_DEPLOYMENT_SECRET_FIXTURE_PATH
+export VBR_DEPLOYER_CLIENT_SECRET='<deployment-runner-client-secret>'
+unset VBR_DEPLOYMENT_SECRET_FIXTURE_PATH
 unset VAULT_TOKEN
-unset BNX_VAULT_JWT
-unset BNX_VAULT_JWT_FILE
-unset BNX_VAULT_AUTH_METHOD
+unset VBR_VAULT_JWT
+unset VBR_VAULT_JWT_FILE
+unset VBR_VAULT_AUTH_METHOD
 
 deploy \
   --deployment //projects/deployments/pleomino-staging:deploy \
   --credential-source jenkins_client_secret \
-  --deployment-client-secret-env BNX_DEPLOYER_CLIENT_SECRET
+  --deployment-client-secret-env VBR_DEPLOYER_CLIENT_SECRET
 ```
 
 For local/direct and CI-owned non-service flows, the deploy front door mints or
@@ -1688,7 +1688,7 @@ A healthy end-to-end result looks like this:
 - the durable deployment record stores
   `secret://deployments/pleomino/cloudflare_api_token`
   rather than the raw token value
-- `BNX_DEPLOYMENT_SECRET_FIXTURE_PATH` is unset for normal production runs
+- `VBR_DEPLOYMENT_SECRET_FIXTURE_PATH` is unset for normal production runs
 - any exported fixture file exists only where a reviewed local/test or bootstrap
   workflow needs it
 
@@ -1699,7 +1699,7 @@ When you rotate a secret:
 1. write a new version at the same Vault path
 2. verify a deployment run can read the new version through the Vault API
 3. if a reviewed local/test workflow uses a fixture export, regenerate that
-   fixture and replace the file referenced by `BNX_DEPLOYMENT_SECRET_FIXTURE_PATH`
+   fixture and replace the file referenced by `VBR_DEPLOYMENT_SECRET_FIXTURE_PATH`
 4. remove stale local/test fixture files
 
 Example rotation write:

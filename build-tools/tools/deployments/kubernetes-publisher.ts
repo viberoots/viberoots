@@ -23,7 +23,7 @@ export async function publishKubernetesComponent(opts: {
   artifactPath: string;
   publishCredentialEnv?: Record<string, string>;
 }): Promise<{ providerReleaseId: string }> {
-  const helmBin = process.env.BNX_KUBERNETES_HELM_BIN || "helm";
+  const helmBin = process.env.VBR_KUBERNETES_HELM_BIN || "helm";
   const command = [
     "upgrade",
     "--install",
@@ -36,9 +36,9 @@ export async function publishKubernetesComponent(opts: {
     "--values",
     opts.renderedConfigPath,
     "--set-string",
-    `bnx.componentId=${opts.componentId}`,
+    `vbr.componentId=${opts.componentId}`,
     "--set-string",
-    `bnx.artifactPath=${opts.artifactPath}`,
+    `vbr.artifactPath=${opts.artifactPath}`,
   ];
   const run = await $({
     cwd: opts.workspaceRoot,
@@ -46,9 +46,9 @@ export async function publishKubernetesComponent(opts: {
     env: {
       ...scrubDeploymentSecretEnv(),
       ...(opts.publishCredentialEnv || {}),
-      BNX_KUBERNETES_COMPONENT_ID: opts.componentId,
-      BNX_KUBERNETES_COMPONENT_ARTIFACT: opts.artifactPath,
-      BNX_KUBERNETES_RENDERED_CONFIG: opts.renderedConfigPath,
+      VBR_KUBERNETES_COMPONENT_ID: opts.componentId,
+      VBR_KUBERNETES_COMPONENT_ARTIFACT: opts.artifactPath,
+      VBR_KUBERNETES_RENDERED_CONFIG: opts.renderedConfigPath,
     },
   })`${helmBin} ${command}`.nothrow();
   const stdout = String((run as any).stdout || "");

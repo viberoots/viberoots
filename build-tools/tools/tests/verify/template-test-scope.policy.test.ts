@@ -81,7 +81,7 @@ test("never mode bypasses selector path and keeps existing build-system scope", 
   const result = await resolveVerifyTemplateTestScope({
     root: process.cwd(),
     requestedTargets: ["//..."],
-    env: { BNX_TEMPLATE_TEST_SCOPE: "never" },
+    env: { VBR_TEMPLATE_TEST_SCOPE: "never" },
     deps: {
       resolveBuildScope: async () => ({
         targets: ["//workspace/..."],
@@ -101,7 +101,7 @@ test("never mode preserves full build-system scope when build-system tests are f
   const result = await resolveVerifyTemplateTestScope({
     root: process.cwd(),
     requestedTargets: ["//..."],
-    env: { BNX_TEMPLATE_TEST_SCOPE: "never", BNX_BUILD_SYSTEM_TESTS: "always" },
+    env: { VBR_TEMPLATE_TEST_SCOPE: "never", VBR_BUILD_SYSTEM_TESTS: "always" },
     deps: {
       resolveBuildScope: async () => ({
         targets: ["//..."],
@@ -156,7 +156,7 @@ test("always mode fails with actionable diagnostics when change-set is not templ
       resolveVerifyTemplateTestScope({
         root: process.cwd(),
         requestedTargets: ["//..."],
-        env: { BNX_TEMPLATE_TEST_SCOPE: "always" },
+        env: { VBR_TEMPLATE_TEST_SCOPE: "always" },
         deps: {
           resolveBuildScope: async () => ({
             targets: ["//..."],
@@ -180,7 +180,7 @@ test("always mode fails with actionable diagnostics when change-set is not templ
           }),
         },
       }),
-    /BNX_TEMPLATE_TEST_SCOPE=always requires template-only changes/,
+    /VBR_TEMPLATE_TEST_SCOPE=always requires template-only changes/,
   );
 });
 

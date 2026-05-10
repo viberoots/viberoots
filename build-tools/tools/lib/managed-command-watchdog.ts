@@ -7,9 +7,9 @@ import { resolveToolPathSync } from "./tool-paths";
 export function watchdogEnvFor(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
   const scrubbed = { ...env };
   delete scrubbed.BUCK_TEST_TARGET;
-  delete scrubbed.BNX_VERIFY_LOG_FILE;
-  delete scrubbed.BNX_VERIFY_PROCESS_STATE_FILE;
-  delete scrubbed.BNX_BUCK_REAPER_STATE_FILE;
+  delete scrubbed.VBR_VERIFY_LOG_FILE;
+  delete scrubbed.VBR_VERIFY_PROCESS_STATE_FILE;
+  delete scrubbed.VBR_BUCK_REAPER_STATE_FILE;
   return scrubbed;
 }
 
@@ -26,7 +26,7 @@ function executablePath(value: string | undefined): string {
 
 export function resolveWatchdogShell(env: NodeJS.ProcessEnv = process.env): string {
   return (
-    executablePath(env.BNX_BASH_BIN) ||
+    executablePath(env.VBR_BASH_BIN) ||
     executablePath(env.BASH) ||
     (() => {
       try {

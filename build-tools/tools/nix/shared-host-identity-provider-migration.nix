@@ -145,7 +145,7 @@ EOF
     if [ -f ${escape bootstrapAdminMarkerFile} ]; then
       exit 0
     fi
-    export BNX_KEYCLOAK_BOOTSTRAP_ADMIN_SECRET="$(tr -d '\n' < ${escape bootstrapAdminSecretFile})"
+    export VBR_KEYCLOAK_BOOTSTRAP_ADMIN_SECRET="$(tr -d '\n' < ${escape bootstrapAdminSecretFile})"
     bootstrap_runtime_dir="$(mktemp -d)"
     trap 'rm -rf "$bootstrap_runtime_dir"' EXIT
     install -d -m 0700 "$bootstrap_runtime_dir/conf"
@@ -155,7 +155,7 @@ EOF
     if ! KC_HOME_DIR="$bootstrap_runtime_dir" KC_CONF_DIR="$bootstrap_runtime_dir/conf" \
       ${keycloakBin}/kc.sh bootstrap-admin service \
       --client-id ${escape bootstrapAdminClientId} \
-      --client-secret:env=BNX_KEYCLOAK_BOOTSTRAP_ADMIN_SECRET \
+      --client-secret:env=VBR_KEYCLOAK_BOOTSTRAP_ADMIN_SECRET \
       --no-prompt; then
       echo "bootstrap identity migration failed while creating the temporary recovery admin" >&2
       exit 1

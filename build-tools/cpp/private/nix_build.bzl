@@ -54,7 +54,7 @@ def _cpp_nix_build_impl(ctx):
     )
     run_and_copy = (
         nix_action_workspace_setup_from_args()
-        + "export BNX_SKIP_REQUIRE_UNIFIED_PNPM_STORE=1; "
+        + "export VBR_SKIP_REQUIRE_UNIFIED_PNPM_STORE=1; "
         + nix_cmd_prefix(timeout_var = "TIMEOUT", timeout_sec = 600, include_pnpm_store = False, escape_cmd_subst = True)
         + "SECONDS=0; "
         + "cd \"$FLK_ROOT\"; "
@@ -72,17 +72,17 @@ def _cpp_nix_build_impl(ctx):
         + "  exit 2; "
         + "fi; "
         + "export BUCK_GRAPH_JSON=\"$WORKSPACE_ROOT/build-tools/tools/buck/graph.json\"; "
-        + "export BNX_NODE_ZX_INIT=\"$WORKSPACE_ROOT/build-tools/tools/dev/zx-init.mjs\"; "
+        + "export VBR_NODE_ZX_INIT=\"$WORKSPACE_ROOT/build-tools/tools/dev/zx-init.mjs\"; "
         # Build via a filtered flake snapshot instead of the live repo root so broad
         # dev builds are not poisoned by dirty/untracked workspace artifacts.
         + "export PLANNER_ONLY_CPP=1; "
         + ("export BUCK_TARGET=\"%s\"; " % raw)
         + "export BUCK_TEST_SRC=\"$WORKSPACE_ROOT\"; "
-        + "OUT_PATHS_FILE=\"$TMP/bnx-nix-outpaths.txt\"; "
+        + "OUT_PATHS_FILE=\"$TMP/vbr-nix-outpaths.txt\"; "
         + "selected_build_start=$SECONDS; "
         + (
             "$TIMEOUT node --experimental-top-level-await --disable-warning=ExperimentalWarning "
-            + "--experimental-strip-types --import \"$BNX_NODE_ZX_INIT\" "
+            + "--experimental-strip-types --import \"$VBR_NODE_ZX_INIT\" "
             + "\"$WORKSPACE_ROOT/build-tools/tools/dev/nix-build-filtered-flake.ts\" --attr "
             + "\"graph-generator-selected\" > \"$OUT_PATHS_FILE\"; "
         )

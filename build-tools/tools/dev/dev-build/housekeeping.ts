@@ -44,8 +44,8 @@ async function touch(p: string): Promise<void> {
 
 export async function runHousekeeping(opts: { isCI: boolean; root: string }): Promise<void> {
   try {
-    const hkEnabled = (process.env.BNX_HOUSEKEEPING || "1").trim() !== "0";
-    const gcMode = (process.env.BNX_GC_MODE || "auto").trim(); // auto | warn | off
+    const hkEnabled = (process.env.VBR_HOUSEKEEPING || "1").trim() !== "0";
+    const gcMode = (process.env.VBR_GC_MODE || "auto").trim(); // auto | warn | off
     if (opts.isCI || !hkEnabled) return;
 
     const nodeBase = zxNodeBase(opts.root);

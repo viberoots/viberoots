@@ -25,12 +25,12 @@ test("pr94 docs keep service-owned governance verification aligned", async () =>
   );
   for (const doc of [usageDoc, sharedHostUsageDoc]) {
     assert.match(doc, /service-owned lane governance\s+verification/i);
-    assert.match(doc, /BNX_DEPLOY_GITHUB_TOKEN/);
+    assert.match(doc, /VBR_DEPLOY_GITHUB_TOKEN/);
     assert.match(doc, /unsupported SCM backends?[\s\S]*--admission-evidence-json/i);
     assert.match(doc, /client-supplied `laneGovernance` JSON|hand-build `laneGovernance` JSON/i);
     assert.match(doc, /does not\s+need|do not\s+hand-build/i);
   }
-  assert.match(setupDoc, /BNX_DEPLOY_GITHUB_TOKEN/);
+  assert.match(setupDoc, /VBR_DEPLOY_GITHUB_TOKEN/);
   assert.match(
     setupDoc,
     /verify GitHub-backed lane governance\s+automatically[\s\S]*protected\/shared admission/i,

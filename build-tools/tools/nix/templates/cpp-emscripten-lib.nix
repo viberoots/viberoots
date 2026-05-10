@@ -62,7 +62,7 @@ in {
       else [];
     verboseFlags =
       let
-        raw = builtins.getEnv "BNX_CPP_EMSCRIPTEN_VERBOSE";
+        raw = builtins.getEnv "VBR_CPP_EMSCRIPTEN_VERBOSE";
       in if raw == "1" || raw == "true" then [ "-v" ] else [];
     emFlagsCommon = [
       "-O2"

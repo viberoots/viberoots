@@ -15,7 +15,7 @@ async function readText(p: string): Promise<string> {
 }
 
 test("verify safety rails: triggers write snapshot and signal only the intended process group", async () => {
-  const analysisDir = await fsp.mkdtemp(path.join(os.tmpdir(), "bnx-safety-rails-"));
+  const analysisDir = await fsp.mkdtemp(path.join(os.tmpdir(), "vbr-safety-rails-"));
   const telemetryPath = path.join(analysisDir, "telemetry.log");
   await fsp.writeFile(telemetryPath, "", "utf8");
 
@@ -94,7 +94,7 @@ test("verify safety rails: triggers write snapshot and signal only the intended 
 });
 
 test("verify safety rails: active nix gc is logged as notice and does not stop verify", async () => {
-  const analysisDir = await fsp.mkdtemp(path.join(os.tmpdir(), "bnx-safety-rails-gc-"));
+  const analysisDir = await fsp.mkdtemp(path.join(os.tmpdir(), "vbr-safety-rails-gc-"));
   const telemetryPath = path.join(analysisDir, "telemetry.log");
   await fsp.writeFile(telemetryPath, "", "utf8");
 
@@ -134,7 +134,7 @@ test("verify safety rails: active nix gc is logged as notice and does not stop v
 });
 
 test("verify safety rails: telemetry summary captures load and process-count peaks", async () => {
-  const analysisDir = await fsp.mkdtemp(path.join(os.tmpdir(), "bnx-safety-rails-summary-"));
+  const analysisDir = await fsp.mkdtemp(path.join(os.tmpdir(), "vbr-safety-rails-summary-"));
   const telemetryPath = path.join(analysisDir, "telemetry.log");
   await fsp.writeFile(
     telemetryPath,

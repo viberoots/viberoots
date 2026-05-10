@@ -6,7 +6,7 @@ import {
 import { fetchGithubLaneGovernanceSnapshot } from "./deployment-lane-governance-github";
 import type { DeploymentLaneGovernanceResolver } from "./deployment-lane-governance-resolution";
 
-const GITHUB_FIXTURE_ENV = "BNX_DEPLOY_GITHUB_GOVERNANCE_FIXTURE_JSON";
+const GITHUB_FIXTURE_ENV = "VBR_DEPLOY_GITHUB_GOVERNANCE_FIXTURE_JSON";
 
 function fixtureSnapshotFor(repository: string, env: NodeJS.ProcessEnv | undefined) {
   const raw = String((env || process.env)[GITHUB_FIXTURE_ENV] || "").trim();

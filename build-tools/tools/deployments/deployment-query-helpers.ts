@@ -38,9 +38,9 @@ function registerVerifySharedIsolation(
   kind: string,
   env: NodeJS.ProcessEnv,
 ): void {
-  const stateFile = String(env.BNX_VERIFY_PROCESS_STATE_FILE || "").trim();
+  const stateFile = String(env.VBR_VERIFY_PROCESS_STATE_FILE || "").trim();
   if (!stateFile || !iso || !repoRoot) return;
-  const ownerPidRaw = Number(env.BNX_VERIFY_OWNER_PID || process.pid);
+  const ownerPidRaw = Number(env.VBR_VERIFY_OWNER_PID || process.pid);
   const ownerPid = Number.isFinite(ownerPidRaw) && ownerPidRaw > 1 ? ownerPidRaw : process.pid;
   try {
     for (const root of Array.from(new Set([repoRoot, process.cwd()]))) {

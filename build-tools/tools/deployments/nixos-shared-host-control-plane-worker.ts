@@ -12,10 +12,10 @@ async function main() {
   const pollMs = Number(getFlagStr("poll-ms", "100").trim() || "100");
   const backendDatabaseUrl =
     getFlagStr("control-plane-database-url", "").trim() ||
-    String(process.env.BNX_DEPLOY_CONTROL_PLANE_DATABASE_URL || "").trim();
+    String(process.env.VBR_DEPLOY_CONTROL_PLANE_DATABASE_URL || "").trim();
   if (!backendDatabaseUrl) {
     throw new Error(
-      "shared control-plane worker requires --control-plane-database-url or BNX_DEPLOY_CONTROL_PLANE_DATABASE_URL",
+      "shared control-plane worker requires --control-plane-database-url or VBR_DEPLOY_CONTROL_PLANE_DATABASE_URL",
     );
   }
   startNixosSharedHostControlPlaneWorkerLoop({

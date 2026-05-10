@@ -52,9 +52,9 @@ test("s3-static deploy CLI completes the static-webapp flow end to end", async (
         env: {
           ...process.env,
           PATH: `${fake.binDir}:${process.env.PATH || ""}`,
-          BNX_S3_STATIC_FAKE_PUBLISH_ROOT: fake.publishRoot,
-          BNX_S3_STATIC_FAKE_AWS_LOG: fake.logPath,
-          BNX_S3_STATIC_AWS_BIN: path.join(fake.binDir, "aws"),
+          VBR_S3_STATIC_FAKE_PUBLISH_ROOT: fake.publishRoot,
+          VBR_S3_STATIC_FAKE_AWS_LOG: fake.logPath,
+          VBR_S3_STATIC_AWS_BIN: path.join(fake.binDir, "aws"),
         },
       })`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment ${deployment.label} --admission-evidence-json ${admissionEvidenceJson} --artifact-dir ${artifactDir} --records-root ${recordsRoot} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(server.port)} --smoke-connect-protocol https:`;
       const summary = JSON.parse(String(result.stdout));
@@ -99,10 +99,10 @@ test("s3-static fails closed on ambiguous publish results", async () => {
       artifactLineageId: "artifact-ambiguous",
     });
     process.env.PATH = `${fake.binDir}:${process.env.PATH || ""}`;
-    process.env.BNX_S3_STATIC_FAKE_PUBLISH_ROOT = fake.publishRoot;
-    process.env.BNX_S3_STATIC_FAKE_AWS_LOG = fake.logPath;
-    process.env.BNX_S3_STATIC_AWS_BIN = path.join(fake.binDir, "aws");
-    process.env.BNX_S3_STATIC_FAKE_AMBIGUOUS_RESULT = "1";
+    process.env.VBR_S3_STATIC_FAKE_PUBLISH_ROOT = fake.publishRoot;
+    process.env.VBR_S3_STATIC_FAKE_AWS_LOG = fake.logPath;
+    process.env.VBR_S3_STATIC_AWS_BIN = path.join(fake.binDir, "aws");
+    process.env.VBR_S3_STATIC_FAKE_AMBIGUOUS_RESULT = "1";
     try {
       await assert.rejects(
         async () =>
@@ -118,10 +118,10 @@ test("s3-static fails closed on ambiguous publish results", async () => {
         /ambiguous publish result/,
       );
     } finally {
-      delete process.env.BNX_S3_STATIC_FAKE_PUBLISH_ROOT;
-      delete process.env.BNX_S3_STATIC_FAKE_AWS_LOG;
-      delete process.env.BNX_S3_STATIC_AWS_BIN;
-      delete process.env.BNX_S3_STATIC_FAKE_AMBIGUOUS_RESULT;
+      delete process.env.VBR_S3_STATIC_FAKE_PUBLISH_ROOT;
+      delete process.env.VBR_S3_STATIC_FAKE_AWS_LOG;
+      delete process.env.VBR_S3_STATIC_AWS_BIN;
+      delete process.env.VBR_S3_STATIC_FAKE_AMBIGUOUS_RESULT;
     }
   });
 });

@@ -122,9 +122,9 @@ test("cloudflare-pages rebuild-per-stage promotion admits a new stage artifact b
       );
     } finally {
       process.env.PATH = originalEnv.PATH || "";
-      delete process.env.BNX_CLOUDFLARE_FAKE_PUBLISH_ROOT;
-      delete process.env.BNX_CLOUDFLARE_FAKE_WRANGLER_LOG;
-      delete process.env.BNX_CLOUDFLARE_PAGES_WRANGLER_BIN;
+      delete process.env.VBR_CLOUDFLARE_FAKE_PUBLISH_ROOT;
+      delete process.env.VBR_CLOUDFLARE_FAKE_WRANGLER_LOG;
+      delete process.env.VBR_CLOUDFLARE_PAGES_WRANGLER_BIN;
       await server.close();
     }
   });

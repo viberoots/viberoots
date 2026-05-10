@@ -66,7 +66,7 @@ export async function runAppStoreConnectDeployFrontDoor(opts: {
   );
   const controlPlaneDatabaseUrl =
     getFlagStr("control-plane-database-url", "").trim() ||
-    String(process.env.BNX_DEPLOY_CONTROL_PLANE_DATABASE_URL || "").trim() ||
+    String(process.env.VBR_DEPLOY_CONTROL_PLANE_DATABASE_URL || "").trim() ||
     undefined;
   if (!opts.publishOnly) {
     const result = await submitAppStoreConnectDeploy({

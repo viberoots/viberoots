@@ -76,11 +76,11 @@ def node_service_artifact(
         + nix_calling_env_export_buck_graph_json()
         + nix_calling_node_patch_requirements_preflight(_importer)
         + nix_calling_env_export_nix_pnpm_fetch_timeout(default_sec = 600)
-        + ("export BNX_NODE_SERVICE_CONTRACT=%s; " % sh_quote(runtime_contract))
-        + "OUT_PATHS_FILE=\"$TMP/bnx-nix-outpaths.txt\"; "
+        + ("export VBR_NODE_SERVICE_CONTRACT=%s; " % sh_quote(runtime_contract))
+        + "OUT_PATHS_FILE=\"$TMP/vbr-nix-outpaths.txt\"; "
         + (
             "$TIMEOUT node --experimental-top-level-await --disable-warning=ExperimentalWarning "
-            + "--experimental-strip-types --import \"$BNX_NODE_ZX_INIT\" "
+            + "--experimental-strip-types --import \"$VBR_NODE_ZX_INIT\" "
             + "\"$WORKSPACE_ROOT/build-tools/tools/dev/nix-build-filtered-flake.ts\" --attr "
             + ("\"node-service.%s\" > \"$OUT_PATHS_FILE\"; " % sanitize_importer_for_nix_attr(_importer))
         )

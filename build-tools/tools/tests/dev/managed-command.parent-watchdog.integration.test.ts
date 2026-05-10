@@ -35,9 +35,9 @@ test("managed-command starts parent-lifecycle watchdog for spawned process group
   if (
     !txt.includes("watchdogEnvFor") ||
     !watchdogTxt.includes("delete scrubbed.BUCK_TEST_TARGET") ||
-    !watchdogTxt.includes("delete scrubbed.BNX_VERIFY_LOG_FILE") ||
-    !watchdogTxt.includes("delete scrubbed.BNX_VERIFY_PROCESS_STATE_FILE") ||
-    !watchdogTxt.includes("delete scrubbed.BNX_BUCK_REAPER_STATE_FILE")
+    !watchdogTxt.includes("delete scrubbed.VBR_VERIFY_LOG_FILE") ||
+    !watchdogTxt.includes("delete scrubbed.VBR_VERIFY_PROCESS_STATE_FILE") ||
+    !watchdogTxt.includes("delete scrubbed.VBR_BUCK_REAPER_STATE_FILE")
   ) {
     throw new Error("managed-command.ts watchdog must not inherit verify ownership env");
   }

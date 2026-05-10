@@ -127,8 +127,8 @@ test("git wrapper Darwin path creates an actual APFS CoW clone", async () => {
       stdio: "pipe",
       env: {
         ...process.env,
-        BNX_REAL_GIT: gitPath,
-        BNX_GIT_COW_OSTYPE: "darwin-test",
+        VBR_REAL_GIT: gitPath,
+        VBR_GIT_COW_OSTYPE: "darwin-test",
       },
     })`${wrapper} worktree add ${target} HEAD`;
 
@@ -195,8 +195,8 @@ test("git wrapper Linux path creates direct reflink CoW copies", async () => {
       stdio: "pipe",
       env: {
         ...process.env,
-        BNX_REAL_GIT: gitPath,
-        BNX_GIT_COW_OSTYPE: "linux-test",
+        VBR_REAL_GIT: gitPath,
+        VBR_GIT_COW_OSTYPE: "linux-test",
       },
     })`${wrapper} worktree add ${target} HEAD`;
 

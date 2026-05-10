@@ -85,17 +85,20 @@ When adding or materially editing scaffold command guidance:
   - Provide explicit changed paths: `node build-tools/tools/dev/select-template-tests.ts --changed build-tools/tools/scaffolding/templates/go/lib/copier.yaml`
   - Targets-only output: `node build-tools/tools/dev/select-template-tests.ts --targets-only`
 - Verify template-scope controls (PR-3):
-  - `BNX_TEMPLATE_TEST_SCOPE=auto|always|never v`
+  - `VBR_TEMPLATE_TEST_SCOPE=auto|always|never v`
   - `auto`: when changes are template-only, `v` runs only label-selected template tests + safety floor
   - `always`: force selector mode; fails fast when the change-set is not template-only
   - `never`: bypass selector mode and use existing build-system test scope behavior
+- Runtime prefix migration:
+  - update old runtime environment variables to `VBR_*`
+  - see `docs/runtime-prefix-migration.md`
 - Verify project-impact default (PR-1.5):
   - default `v` behavior for non-build-system app/lib edits is dependency-aware project selection
   - selected test scope = changed projects + full recursive downstream dependents
   - project-local methodology exception edits (for example `projects/apps/<name>/methodology-exceptions.json`) stay on this project-impact path
   - build-system edits still keep existing broad-scope/fallback behavior
 - Verify deployment-aware build-system scope (PR-4.5.3):
-  - `BNX_DEPLOYMENT_TEST_SCOPE=auto|always|never v`
+  - `VBR_DEPLOYMENT_TEST_SCOPE=auto|always|never v`
   - `auto`: safe deployment-owned build-system edits run the reviewed deployment suite plus safety floor
   - `auto`: `projects/deployments/**` changes run the union of deployment coverage and project-impact coverage
   - `auto`: shared or ambiguous build-system paths still broaden to the existing full build-system scope
@@ -215,7 +218,7 @@ These guardrails assume test tooling stays aligned with the dev shell and global
 - **Do not bootstrap unified pnpm store per temp repo when repo prewarm exists**: temp-repo Nix call sites should prefer `REPO_ROOT/buck-out/.unified-pnpm-store/path` when available and skip local `require-unified-pnpm-store` bootstrap; per-temp bootstrap multiplies Nix eval/build cost and creates suite-wide long-tail stalls.
 - **Keep temp-repo root vars self-consistent**: in `runInTemp` flows, make `WORKSPACE_ROOT`/`BUCK_TEST_SRC` authoritative for workspace resolution. Keep `REPO_ROOT` reserved for deliberate live-repo assets (for example shared caches), and avoid mixing root precedence accidentally. Mixed roots can make Nix/planner paths resolve to the live checkout (missing temp fixtures) and can also collapse per-importer install locks into one shared lock, creating suite-wide stalls/timeouts.
 - **Treat interrupted verify cleanup as part of performance correctness**: if a verify run is stopped early, it must still reap registered temp Buck daemons/dev servers and remove owned temp repos. Leaked temp-repo state can accumulate across the day and turn later like-for-like full-suite runs into sudden execution-time spikes.
-- **Keep verify-owned process registration opt-in**: do not register every zx-initialized Buck test process for orphan cleanup. Only long-lived helper processes that a test intentionally detaches should set `BNX_VERIFY_REGISTER_PROCESS=1`; otherwise cleanup can mistake ordinary active test children for owned orphans after a Buck client failure.
+- **Keep verify-owned process registration opt-in**: do not register every zx-initialized Buck test process for orphan cleanup. Only long-lived helper processes that a test intentionally detaches should set `VBR_VERIFY_REGISTER_PROCESS=1`; otherwise cleanup can mistake ordinary active test children for owned orphans after a Buck client failure.
 - **When scoping env for graph/setup, propagate required vars to child builds**: if `ensureGraph` is run under a scoped env (`BUCK_TARGET`, `BUCK_GRAPH_JSON`, workspace roots), pass the same required keys into downstream `nix build`/runner subprocesses. Otherwise stubs/wrappers can fail hard (`set -u` unbound vars) and trigger expensive retry paths.
 - **Filtered flake helper builds must stay impure when they depend on selected-target env**: wrappers like `nix-build-filtered-flake.ts` are safe places to use `--impure` because they operate on a temporary filtered snapshot. If the helper drops `BUCK_TARGET` / `PLANNER_ONLY_CPP` / wasm selection env, planner-selected builds silently fall back to `.noop` outputs and waste full build/test time before failing.
 - **Avoid per-process Buck isolation fan-out in exporter paths**: prefer the parent `BUCK_ISOLATION_DIR` for exporter `cquery` calls and only use ephemeral isolation dirs when no parent isolation exists. PID-suffixed exporter isolation forces daemon cold starts/teardowns and creates suite-wide latency.
@@ -231,7 +234,7 @@ These guardrails assume test tooling stays aligned with the dev shell and global
 - **Watch pacing checkpoints, not just final duration**: if pass/min drops sharply between 5-minute and 10-minute checkpoints, treat that as a systemic contention signal and investigate immediately.
 - **Compare like-for-like verify evidence**: use completed full-suite runs (`[verify] buck2 test exit ... status=0`) and timing summaries; partial/failed runs can under-report throughput and mislead regression analysis.
 - **Confirm `verify:isolated` targets are truly isolated under wildcard/package verify scopes**: if timing-sensitive targets rely on `verify:isolated`, check the verify log for a dedicated `target pass begin name=isolated` entry. If a broad selector such as `//...` or `//project/...` stays in a single `shared` pass, the isolated label is not being materialized and suite concurrency can create false timing regressions.
-- **Batch isolated targets unless debugging per-target behavior**: default `verify:isolated` handling should use one serial isolated pass (`threads=1`) plus the shared pass, avoiding one Buck invocation per isolated target. Use `BNX_VERIFY_ISOLATED_PASS_MODE=per-target` only for focused debugging where per-target pass logs matter more than total runtime.
+- **Batch isolated targets unless debugging per-target behavior**: default `verify:isolated` handling should use one serial isolated pass (`threads=1`) plus the shared pass, avoiding one Buck invocation per isolated target. Use `VBR_VERIFY_ISOLATED_PASS_MODE=per-target` only for focused debugging where per-target pass logs matter more than total runtime.
 - **Use bounded scheduling for deployment temp-repo tests**: deployment-owned tests that call `runInTemp` should carry `verify:resource-limited` through `deployment_conventions.bzl`. A broad shared pass cannot absorb dozens of deployment temp repos also starting local services, smoke checks, and nested Buck/Nix work; keep that class out of shared without forcing every target through the fully serial `verify:isolated` path.
 - **Give concurrent verify passes distinct Buck isolations and a staged start**: after the serial `verify:isolated` pass, `verify:resource-limited` may overlap with the normal shared pass only from a distinct top-level Buck isolation and after the broad shared startup surge has passed. Reusing the same `--isolation-dir` makes the delayed `buck2 test` wait behind the shared command instead of overlapping; starting the bounded lane too early recreates load amplification. Current full-suite evidence supports the default 900s broad-run delay.
 - **Mark temp-repo dev-server tests as `verify:isolated` when startup latency matters**: scaffolding tests that run `runInTemp`, refresh lockfiles/hashes, build `node_modules`, and wait for a live dev server should not share the main verify pass with hundreds of other actions. If a saved log shows steps like `pnpm --lockfile-only`, `node-modules-build`, or server readiness suddenly inflating only under broad verify, treat missing isolation labels as a systemic execution regression.

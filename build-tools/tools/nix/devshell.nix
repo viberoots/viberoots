@@ -164,7 +164,7 @@ EOF
       export ZDOTDIR="$PWD/.nix-zsh"
       cat > .nix-zsh/.zshrc <<'EOF'
 PROMPT='%F{green}[nix-shell]%f %m:%~$ '
-_bnx_update_path() {
+_vbr_update_path() {
   local d="$PWD"
   while [[ "$d" != "/" ]]; do
     if [[ -f "$d/flake.nix" && -d "$d/build-tools/tools/bin" ]]; then
@@ -177,9 +177,9 @@ _bnx_update_path() {
     d="$(dirname "$d")"
   done
 }
-_bnx_update_path
+_vbr_update_path
 autoload -Uz add-zsh-hook
-add-zsh-hook chpwd _bnx_update_path
+add-zsh-hook chpwd _vbr_update_path
 autoload -Uz compinit
 compinit -i
 if command -v scaf >/dev/null 2>&1; then

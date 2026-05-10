@@ -156,27 +156,27 @@ register(
   ),
 );
 
-const verifyProcessStateFile = String(process.env.BNX_VERIFY_PROCESS_STATE_FILE || "").trim();
-const verifyLogFile = String(process.env.BNX_VERIFY_LOG_FILE || "").trim();
+const verifyProcessStateFile = String(process.env.VBR_VERIFY_PROCESS_STATE_FILE || "").trim();
+const verifyLogFile = String(process.env.VBR_VERIFY_LOG_FILE || "").trim();
 const verifyTarget = String(process.env.BUCK_TEST_TARGET || "").trim();
-const verifyOwnerPidRaw = String(process.env.BNX_VERIFY_OWNER_PID || "").trim();
+const verifyOwnerPidRaw = String(process.env.VBR_VERIFY_OWNER_PID || "").trim();
 const shouldRegisterVerifyProcess =
-  String(process.env.BNX_VERIFY_REGISTER_PROCESS || "").trim() === "1";
+  String(process.env.VBR_VERIFY_REGISTER_PROCESS || "").trim() === "1";
 if (shouldRegisterVerifyProcess) {
   // Treat registration as a one-shot marker for this process. Child processes
   // inherit process.env by default, so leaving this set would make opt-in
   // contagious and recreate the suite-wide registration storm.
-  delete process.env.BNX_VERIFY_REGISTER_PROCESS;
+  delete process.env.VBR_VERIFY_REGISTER_PROCESS;
 }
 if (
   shouldRegisterVerifyProcess &&
   verifyProcessStateFile &&
   verifyLogFile &&
   verifyTarget &&
-  !globalThis.__bnxVerifyProcessRegistered
+  !globalThis.__vbrVerifyProcessRegistered
 ) {
   try {
-    globalThis.__bnxVerifyProcessRegistered = true;
+    globalThis.__vbrVerifyProcessRegistered = true;
     const ownedState = await import("./verify/owned-process-state");
     await ownedState.registerCurrentVerifyProcess({
       stateFile: verifyProcessStateFile,
@@ -189,9 +189,9 @@ if (
 const nestedBuckIso = String(
   process.env.BUCK_NESTED_ISO || process.env.BUCK_ISOLATION_DIR || "",
 ).trim();
-if (verifyProcessStateFile && nestedBuckIso && !globalThis.__bnxVerifyBuckIsolationRegistered) {
+if (verifyProcessStateFile && nestedBuckIso && !globalThis.__vbrVerifyBuckIsolationRegistered) {
   try {
-    globalThis.__bnxVerifyBuckIsolationRegistered = true;
+    globalThis.__vbrVerifyBuckIsolationRegistered = true;
     const ownerPid = Number(verifyOwnerPidRaw || process.pid);
     const ownedState = await import("./verify/owned-process-state");
     await ownedState.registerBuckIsolation({

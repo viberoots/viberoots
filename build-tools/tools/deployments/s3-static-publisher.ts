@@ -5,7 +5,7 @@ import type { S3StaticDeployment } from "./contract";
 import { scrubDeploymentSecretEnv } from "./deployment-secret-env";
 
 function awsBin(): string {
-  return process.env.BNX_S3_STATIC_AWS_BIN?.trim() || "aws";
+  return process.env.VBR_S3_STATIC_AWS_BIN?.trim() || "aws";
 }
 
 function packageDirFor(workspaceRoot: string, deployment: S3StaticDeployment): string {
@@ -38,7 +38,7 @@ export async function publishS3StaticWebapp(opts: {
     env: {
       ...scrubDeploymentSecretEnv(),
       AWS_DEFAULT_REGION: opts.deployment.providerTarget.region,
-      BNX_S3_STATIC_RENDERED_CONFIG: path.resolve(opts.renderedConfigPath),
+      VBR_S3_STATIC_RENDERED_CONFIG: path.resolve(opts.renderedConfigPath),
     },
   })`${awsBin()} s3 sync ${path.resolve(opts.artifactDir)} s3://${opts.deployment.providerTarget.bucket} --delete --exact-timestamps`.nothrow();
   const stdout = String((result as any).stdout || "");

@@ -100,7 +100,7 @@ When a Node macro assembles a shell command that invokes Nix:
 
 Debugging:
 
-- Set `BNX_NIX_CALL_DEBUG=1` to enable `set -x` tracing inside Nix-calling genrule commands and to enable verbose diagnostics in the Node CLI bundler shim.
+- Set `VBR_NIX_CALL_DEBUG=1` to enable `set -x` tracing inside Nix-calling genrule commands and to enable verbose diagnostics in the Node CLI bundler shim.
 
 ### Dependency parity (package.json vs Buck deps)
 

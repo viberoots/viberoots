@@ -29,7 +29,7 @@ def nix_bootstrap_env_core():
         + "  fi; "
         + "fi; "
         + "export WORKSPACE_ROOT=\"${WORKSPACE_ROOT:-$PWD}\"; "
-        + "WS_PHYS_FILE=\"$TMP/bnx-workspace-root.phys\"; "
+        + "WS_PHYS_FILE=\"$TMP/vbr-workspace-root.phys\"; "
         + "(cd \"$WORKSPACE_ROOT\" 2>/dev/null && pwd -P > \"$WS_PHYS_FILE\") || true; "
         + "WS_PHYS=\"\"; read -r WS_PHYS < \"$WS_PHYS_FILE\" 2>/dev/null || true; "
         + "if [ -n \"$WS_PHYS\" ]; then WORKSPACE_ROOT=\"$WS_PHYS\"; fi; "
@@ -46,7 +46,7 @@ def nix_bootstrap_env_core():
         + "    FLK_ROOT=\"$CAND\"; "
         + "  fi; "
         + "  if [ ! -f \"$FLK_ROOT/flake.nix\" ]; then "
-        + "    ROOT_GIT_FILE=\"$TMP/bnx-flk-root.git\"; "
+        + "    ROOT_GIT_FILE=\"$TMP/vbr-flk-root.git\"; "
         + "    if git -C \"${REPO_ROOT:-$WORKSPACE_ROOT}\" rev-parse --show-toplevel > \"$ROOT_GIT_FILE\" 2>/dev/null; then "
         + "      ROOT_GIT=\"\"; read -r ROOT_GIT < \"$ROOT_GIT_FILE\" 2>/dev/null || true; "
         + "    else "
@@ -55,7 +55,7 @@ def nix_bootstrap_env_core():
         + "    FLK_ROOT=\"$ROOT_GIT\"; "
         + "  fi; "
         + "fi; "
-        + "FLK_PHYS_FILE=\"$TMP/bnx-flk-root.phys\"; "
+        + "FLK_PHYS_FILE=\"$TMP/vbr-flk-root.phys\"; "
         + "(cd \"$FLK_ROOT\" 2>/dev/null && pwd -P > \"$FLK_PHYS_FILE\") || true; "
         + "FLK_PHYS=\"\"; read -r FLK_PHYS < \"$FLK_PHYS_FILE\" 2>/dev/null || true; "
         + "if [ -n \"$FLK_PHYS\" ]; then FLK_ROOT=\"$FLK_PHYS\"; fi; "
@@ -73,7 +73,7 @@ def nix_bootstrap_env_pnpm_store():
         + "    export LOCAL_PNPM_STORE; "
         + "  fi; "
         + "fi; "
-        + "if [ \"${BNX_SKIP_REQUIRE_UNIFIED_PNPM_STORE:-}\" != \"1\" ]; then "
+        + "if [ \"${VBR_SKIP_REQUIRE_UNIFIED_PNPM_STORE:-}\" != \"1\" ]; then "
         + "  if [ -z \"${LOCAL_PNPM_STORE:-}\" ] && [ ! -f \"$FLK_ROOT/buck-out/.unified-pnpm-store/path\" ]; then "
         + "    if command -v node >/dev/null 2>&1; then "
         + "      (cd \"$FLK_ROOT\" && node \"$FLK_ROOT/build-tools/tools/dev/require-unified-pnpm-store.ts\" >/dev/null 2>&1 || true); "
@@ -140,7 +140,7 @@ def nix_calling_genrule_bootstrap(
         include_pnpm_store = False,
         source_workspace_root_env = False,
         skip_require_unified_pnpm_store = False,
-        debug_env_var = "BNX_NIX_CALL_DEBUG"):
+        debug_env_var = "VBR_NIX_CALL_DEBUG"):
     """
     Standard bootstrap for genrule-style macros that invoke Nix.
 
@@ -155,7 +155,7 @@ def nix_calling_genrule_bootstrap(
         pre = pre + "if [ -f build-tools/tools/buck/workspace-root.env ]; then . build-tools/tools/buck/workspace-root.env 2>/dev/null || true; fi; "
     pre = pre + "if [ -n \"${WORKSPACE_ROOT:-}\" ]; then export REPO_ROOT=\"$WORKSPACE_ROOT\"; fi; "
     if skip_require_unified_pnpm_store:
-        pre = pre + "export BNX_SKIP_REQUIRE_UNIFIED_PNPM_STORE=1; "
+        pre = pre + "export VBR_SKIP_REQUIRE_UNIFIED_PNPM_STORE=1; "
     if isinstance(debug_env_var, str) and debug_env_var != "":
         pre = pre + ("if [ \"${%s:-}\" = \"1\" ]; then set -x; fi; " % debug_env_var)
 
@@ -174,7 +174,7 @@ def nix_calling_genrule_nix_build_out_path_prefix(
         source_workspace_root_env = False,
         skip_require_unified_pnpm_store = False,
         impure = False,
-        debug_env_var = "BNX_NIX_CALL_DEBUG"):
+        debug_env_var = "VBR_NIX_CALL_DEBUG"):
     """
     Convenience helper for the common pattern:
       <bootstrap> + outPath=$$($TIMEOUT nix build ... --no-link --print-out-paths | tail -n1)
@@ -200,7 +200,7 @@ def nix_build_out_path_cmd(flake_attr, timeout_var = "TIMEOUT", impure = False, 
             prefix = prefix + " "
     imp = "--impure " if impure else ""
     return (
-        "OUT_PATHS_FILE=\"$TMP/bnx-nix-outpaths.txt\"; "
+        "OUT_PATHS_FILE=\"$TMP/vbr-nix-outpaths.txt\"; "
         + (
             tout +
             ("%snix build %s --accept-flake-config --option min-free 0 --option max-free 0 %s--no-link --print-out-paths > \"$OUT_PATHS_FILE\"; " % (prefix, flake_attr, imp))
@@ -224,11 +224,11 @@ def nix_calling_node_patch_requirements_preflight(importer):
     if not isinstance(importer, str) or importer == "":
         fail("nix_calling_node_patch_requirements_preflight: importer is required")
     return (
-        ("BNX_NODE_PATCH_IMPORTER=\"%s\"; " % importer)
-        + "BNX_NODE_ZX_INIT=\"$WORKSPACE_ROOT/build-tools/tools/dev/zx-init.mjs\"; "
+        ("VBR_NODE_PATCH_IMPORTER=\"%s\"; " % importer)
+        + "VBR_NODE_ZX_INIT=\"$WORKSPACE_ROOT/build-tools/tools/dev/zx-init.mjs\"; "
         + "export BUCK_GRAPH_JSON=\"${BUCK_GRAPH_JSON:-$WORKSPACE_ROOT/build-tools/tools/buck/graph.json}\"; "
         + "if [ ! -f \"$BUCK_GRAPH_JSON\" ]; then "
-        + "  node --experimental-top-level-await --disable-warning=ExperimentalWarning --experimental-strip-types --import \"$BNX_NODE_ZX_INIT\" \"$WORKSPACE_ROOT/build-tools/tools/buck/export-graph.ts\" --out \"$BUCK_GRAPH_JSON\"; "
+        + "  node --experimental-top-level-await --disable-warning=ExperimentalWarning --experimental-strip-types --import \"$VBR_NODE_ZX_INIT\" \"$WORKSPACE_ROOT/build-tools/tools/buck/export-graph.ts\" --out \"$BUCK_GRAPH_JSON\"; "
         + "fi; "
-        + "node --experimental-top-level-await --disable-warning=ExperimentalWarning --experimental-strip-types --import \"$BNX_NODE_ZX_INIT\" \"$WORKSPACE_ROOT/build-tools/tools/buck/enforce-node-patch-requirements.ts\" --check --importer \"$BNX_NODE_PATCH_IMPORTER\"; "
+        + "node --experimental-top-level-await --disable-warning=ExperimentalWarning --experimental-strip-types --import \"$VBR_NODE_ZX_INIT\" \"$WORKSPACE_ROOT/build-tools/tools/buck/enforce-node-patch-requirements.ts\" --check --importer \"$VBR_NODE_PATCH_IMPORTER\"; "
     )

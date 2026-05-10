@@ -73,9 +73,9 @@ test("protected service client rejects laptop Vault and fixture credential input
       assertNoProtectedSharedClientCredentialInputs({
         deployment,
         publicFrontDoor: true,
-        env: { BNX_DEPLOYMENT_SECRET_FIXTURE_PATH: "/tmp/fixture.json" },
+        env: { VBR_DEPLOYMENT_SECRET_FIXTURE_PATH: "/tmp/fixture.json" },
       }),
-    /must not use laptop credential input BNX_DEPLOYMENT_SECRET_FIXTURE_PATH/,
+    /must not use laptop credential input VBR_DEPLOYMENT_SECRET_FIXTURE_PATH/,
   );
   assert.throws(
     () =>

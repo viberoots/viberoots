@@ -23,7 +23,7 @@ async function pathExists(p: string): Promise<boolean> {
 }
 
 async function requireImpureEnvPassthrough() {
-  const probe = "__bnx_impure_env_probe__";
+  const probe = "__vbr_impure_env_probe__";
   const res = await $({
     stdio: "pipe",
     env: {

@@ -101,9 +101,9 @@ test("s3-static worker deploy and retry execute from frozen snapshots", async ()
       await withEnvOverrides(
         {
           PATH: `${fake.binDir}:${process.env.PATH || ""}`,
-          BNX_S3_STATIC_FAKE_PUBLISH_ROOT: fake.publishRoot,
-          BNX_S3_STATIC_FAKE_AWS_LOG: fake.logPath,
-          BNX_S3_STATIC_AWS_BIN: path.join(fake.binDir, "aws"),
+          VBR_S3_STATIC_FAKE_PUBLISH_ROOT: fake.publishRoot,
+          VBR_S3_STATIC_FAKE_AWS_LOG: fake.logPath,
+          VBR_S3_STATIC_AWS_BIN: path.join(fake.binDir, "aws"),
         },
         async () => {
           const deployArtifact = await writeStaticArtifact(path.join(tmp, "s3-artifact"), "s3\n");

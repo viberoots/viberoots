@@ -102,8 +102,8 @@ export function pleominoDeploymentFixture(): NixosSharedHostDeployment {
 export function remoteExecEnv(env: Record<string, string>, extra: Record<string, string> = {}) {
   return {
     ...env,
-    BNX_DEPLOY_CONTROL_PLANE_TOKEN: "test-control-plane-token",
-    BNX_DEPLOY_LOCAL_FIXTURE_SERVICE: "1",
+    VBR_DEPLOY_CONTROL_PLANE_TOKEN: "test-control-plane-token",
+    VBR_DEPLOY_LOCAL_FIXTURE_SERVICE: "1",
     IN_NIX_SHELL: "1",
     ...extra,
   };

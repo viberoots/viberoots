@@ -23,6 +23,6 @@ export function deploymentSecretContext(
 
 export function missingDeploymentSecretContextError(): Error {
   return new Error(
-    "secret-consuming deployments require an explicit deployment secret context from vault_runtime metadata plus a reviewed credential source, or BNX_DEPLOYMENT_SECRET_FIXTURE_PATH for local/test fixtures",
+    "secret-consuming deployments require an explicit deployment secret context from vault_runtime metadata plus a reviewed credential source, or VBR_DEPLOYMENT_SECRET_FIXTURE_PATH for local/test fixtures",
   );
 }

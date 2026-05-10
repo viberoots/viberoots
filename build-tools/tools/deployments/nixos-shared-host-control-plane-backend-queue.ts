@@ -18,11 +18,11 @@ function envInt(name: string, fallback: number): number {
 }
 
 function claimLeaseMs(): number {
-  return envInt("BNX_DEPLOY_CONTROL_PLANE_CLAIM_LEASE_MS", 30_000);
+  return envInt("VBR_DEPLOY_CONTROL_PLANE_CLAIM_LEASE_MS", 30_000);
 }
 
 function claimHeartbeatMs(): number {
-  return envInt("BNX_DEPLOY_CONTROL_PLANE_CLAIM_HEARTBEAT_MS", 5_000);
+  return envInt("VBR_DEPLOY_CONTROL_PLANE_CLAIM_HEARTBEAT_MS", 5_000);
 }
 
 async function renewBackendSubmissionClaim(opts: {

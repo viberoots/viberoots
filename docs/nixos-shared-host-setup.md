@@ -512,14 +512,14 @@ What these modules do not do:
 Postgres follow-up after the first `nixos-rebuild switch`:
 
 - set a password for the local `deployctl` database role
-- export `BNX_DEPLOY_CONTROL_PLANE_DATABASE_URL` using that credential before
+- export `VBR_DEPLOY_CONTROL_PLANE_DATABASE_URL` using that credential before
   you start the service and worker
 
 One reviewed example:
 
 ```bash
 sudo -u postgres psql -c "ALTER ROLE deployctl WITH LOGIN PASSWORD 'replace-me';"
-export BNX_DEPLOY_CONTROL_PLANE_DATABASE_URL='postgres://deployctl:replace-me@127.0.0.1:5432/deployctl'
+export VBR_DEPLOY_CONTROL_PLANE_DATABASE_URL='postgres://deployctl:replace-me@127.0.0.1:5432/deployctl'
 ```
 
 Vault follow-up after the first `nixos-rebuild switch`:
@@ -558,28 +558,28 @@ What the service and worker flags mean:
   The only root from which protected/shared staged artifacts are admitted. The
   service canonicalizes finalized artifact paths under this root and rejects
   mutable, incomplete, or escaping trees before hashing and storage.
-- `--control-plane-database-url "$BNX_DEPLOY_CONTROL_PLANE_DATABASE_URL"`
+- `--control-plane-database-url "$VBR_DEPLOY_CONTROL_PLANE_DATABASE_URL"`
   The Postgres URL both processes use.
 - `--port 7780`
   The TCP port where the deployment service listens.
 - `--host 127.0.0.1`
   The private bind address. Keep the service on loopback and expose it only
   through the reviewed HTTPS nginx vhost.
-- `BNX_DEPLOY_CONTROL_PLANE_TOKEN='replace-me'`
-  Required for the reviewed hosted service. The service startup fails closed without a bearer token unless `BNX_DEPLOY_LOCAL_FIXTURE_SERVICE=1` explicitly marks a local fixture service.
-- `BNX_DEPLOY_GITHUB_TOKEN='replace-me'`
+- `VBR_DEPLOY_CONTROL_PLANE_TOKEN='replace-me'`
+  Required for the reviewed hosted service. The service startup fails closed without a bearer token unless `VBR_DEPLOY_LOCAL_FIXTURE_SERVICE=1` explicitly marks a local fixture service.
+- `VBR_DEPLOY_GITHUB_TOKEN='replace-me'`
   Required when the hosted service must verify GitHub-backed lane governance
   automatically during protected/shared admission. The service reads live
   branch-protection state with this token and fails closed if governance
   verification is required but the token is unavailable.
-- `BNX_DEPLOY_REVIEWED_SOURCE_SSH_KEY_FILE=/run/secrets/...`
+- `VBR_DEPLOY_REVIEWED_SOURCE_SSH_KEY_FILE=/run/secrets/...`
   Required for private GitHub repositories. The deployment service snapshots the
   reviewed branch by fetching `git@github.com:<owner>/<repo>.git`; point this at
   a deploy key or machine key that has read access to the governed repository.
   The SOPS secret must be readable by the `deployment-host` service user and
   remain private-key safe, for example:
   `owner = "deployment-host"; group = "deployment-host"; mode = "0400";`.
-- `BNX_DEPLOY_REVIEWED_SOURCE_SSH_KNOWN_HOSTS_FILE=/etc/deployment-host/github-known-hosts`
+- `VBR_DEPLOY_REVIEWED_SOURCE_SSH_KNOWN_HOSTS_FILE=/etc/deployment-host/github-known-hosts`
   Pins GitHub's SSH host keys for reviewed-source fetches. The deployment
   service module writes this file automatically when
   `deploymentHost.deploymentService.reviewedSourceSsh.privateKeyFile` is set and
@@ -587,19 +587,19 @@ What the service and worker flags mean:
 
 Common example values:
 
-- `BNX_DEPLOY_CONTROL_PLANE_DATABASE_URL='postgres://deployctl:REDACTED@127.0.0.1:5432/deployctl'`
+- `VBR_DEPLOY_CONTROL_PLANE_DATABASE_URL='postgres://deployctl:REDACTED@127.0.0.1:5432/deployctl'`
 - `--port 7780`
 - service URL from another machine:
   `https://deploy.apps.kilty.io`
 - service URL on `mini` itself:
-  `http://127.0.0.1:7780` only with `BNX_DEPLOY_LOCAL_FIXTURE_SERVICE=1`
+  `http://127.0.0.1:7780` only with `VBR_DEPLOY_LOCAL_FIXTURE_SERVICE=1`
   for local fixture flows. Laptop and CI profiles use HTTPS, and manifest or
   flag based loopback HTTP is rejected unless that fixture marker is present.
 
 ```bash
-export BNX_DEPLOY_CONTROL_PLANE_DATABASE_URL='postgres://deployctl:REDACTED@127.0.0.1:5432/deployctl'
-export BNX_DEPLOY_CONTROL_PLANE_TOKEN='replace-me'
-export BNX_DEPLOY_GITHUB_TOKEN='replace-me'
+export VBR_DEPLOY_CONTROL_PLANE_DATABASE_URL='postgres://deployctl:REDACTED@127.0.0.1:5432/deployctl'
+export VBR_DEPLOY_CONTROL_PLANE_TOKEN='replace-me'
+export VBR_DEPLOY_GITHUB_TOKEN='replace-me'
 set -a
 . /etc/deployment-host/reviewed-source-ssh.env
 set +a
@@ -619,11 +619,11 @@ direnv exec . zx-wrapper build-tools/tools/deployments/nixos-shared-host-control
 
 Required worker-side secret-source prep after PR-79 and later:
 
-- set `BNX_DEPLOY_CONTROL_PLANE_DATABASE_URL` for both service and worker
-- set `BNX_DEPLOY_CONTROL_PLANE_TOKEN` or pass `--token` for the reviewed
+- set `VBR_DEPLOY_CONTROL_PLANE_DATABASE_URL` for both service and worker
+- set `VBR_DEPLOY_CONTROL_PLANE_TOKEN` or pass `--token` for the reviewed
   hosted service; unconfigured hosted protected/shared routes fail closed, and
   tokenless startup is reserved for explicit fixture mode only
-- set `BNX_DEPLOY_GITHUB_TOKEN` when the hosted service must verify GitHub lane
+- set `VBR_DEPLOY_GITHUB_TOKEN` when the hosted service must verify GitHub lane
   governance automatically; unsupported SCM backends still require reviewed
   explicit governance evidence through `--admission-evidence-json`
 - set `deploymentHost.deploymentService.reviewedSourceSsh.privateKeyFile` to a
@@ -631,14 +631,14 @@ Required worker-side secret-source prep after PR-79 and later:
   both the service and worker systemd units so reviewed-source snapshots can
   fetch the private GitHub repository over SSH
 - set the server-local credential variable referenced by `vault_runtime`, for
-  example `BNX_DEPLOYER_CLIENT_SECRET` for a reviewed service-account client
-  secret, or `BNX_DEPLOYMENT_OIDC_TOKEN` for an external workload identity
+  example `VBR_DEPLOYER_CLIENT_SECRET` for a reviewed service-account client
+  secret, or `VBR_DEPLOYMENT_OIDC_TOKEN` for an external workload identity
   token
-- keep `BNX_DEPLOYMENT_SECRET_FIXTURE_PATH`, ambient Vault JWTs, ambient Vault
+- keep `VBR_DEPLOYMENT_SECRET_FIXTURE_PATH`, ambient Vault JWTs, ambient Vault
   tokens, provider tokens, PKCE verifiers, and client secrets out of both the
   protected/shared client submission and the worker process environment unless a
   reviewed server-local credential source explicitly names the variable
-- keep `NODE_TLS_REJECT_UNAUTHORIZED=0` and `BNX_DEPLOY_INSECURE_TLS=1` out of
+- keep `NODE_TLS_REJECT_UNAUTHORIZED=0` and `VBR_DEPLOY_INSECURE_TLS=1` out of
   protected/shared client environments. The client fails closed if TLS
   validation is disabled.
 - rely on the service-owned auth session for the human principal; protected/shared
@@ -701,7 +701,7 @@ Common example values for the client-install flags:
   Default value. Selects the SSH transport for remote command execution.
   Override only if a future reviewed transport mode exists.
 - `--control-plane-url https://deploy.apps.kilty.io`
-- `--control-plane-token-env BNX_DEPLOY_CONTROL_PLANE_TOKEN`
+- `--control-plane-token-env VBR_DEPLOY_CONTROL_PLANE_TOKEN`
   Default value. This stores the environment variable name in the profile; the
   token value itself stays outside the profile.
 
@@ -754,7 +754,7 @@ destination, or from a single standard `~/.ssh/id_ed25519`/`id_ecdsa`/`id_rsa`
 plus `~/.ssh/known_hosts` when the choice is unambiguous, and then persist the
 resolved paths into the reviewed profile.
 You can still override them for one run with
-`BNX_REMOTE_SSH_IDENTITY_FILE` and `BNX_REMOTE_SSH_KNOWN_HOSTS_FILE`.
+`VBR_REMOTE_SSH_IDENTITY_FILE` and `VBR_REMOTE_SSH_KNOWN_HOSTS_FILE`.
 Deploy itself does not guess from generic `~/.ssh` defaults, and install fails
 closed when multiple plausible SSH files exist.
 

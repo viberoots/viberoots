@@ -69,7 +69,7 @@ async function ensureNodeOnPath(tmp: string): Promise<string> {
 
 function resolvedToolEnv(): NodeJS.ProcessEnv {
   const env: NodeJS.ProcessEnv = {};
-  for (const key of ["BASH", "BNX_BASH_BIN", "GIT_BIN", "NIX_BIN", "PATCH_BIN"] as const) {
+  for (const key of ["BASH", "VBR_BASH_BIN", "GIT_BIN", "NIX_BIN", "PATCH_BIN"] as const) {
     const value = process.env[key];
     if (value) env[key] = value;
   }

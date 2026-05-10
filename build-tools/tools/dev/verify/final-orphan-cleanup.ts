@@ -8,8 +8,8 @@ export async function runFinalOrphanBuckCleanup(opts: {
   stateFile: string;
   timedPhase: <T>(name: string, fn: () => Promise<T>) => Promise<T>;
 }): Promise<void> {
-  const previousGrace = process.env.BNX_BUCK_ORPHAN_STALE_GRACE_SECS;
-  process.env.BNX_BUCK_ORPHAN_STALE_GRACE_SECS = "0";
+  const previousGrace = process.env.VBR_BUCK_ORPHAN_STALE_GRACE_SECS;
+  process.env.VBR_BUCK_ORPHAN_STALE_GRACE_SECS = "0";
   try {
     const res = await opts.timedPhase(
       "final-cleanup-orphan-buck-daemons",
@@ -40,7 +40,7 @@ export async function runFinalOrphanBuckCleanup(opts: {
     );
   } catch {
   } finally {
-    if (previousGrace === undefined) delete process.env.BNX_BUCK_ORPHAN_STALE_GRACE_SECS;
-    else process.env.BNX_BUCK_ORPHAN_STALE_GRACE_SECS = previousGrace;
+    if (previousGrace === undefined) delete process.env.VBR_BUCK_ORPHAN_STALE_GRACE_SECS;
+    else process.env.VBR_BUCK_ORPHAN_STALE_GRACE_SECS = previousGrace;
   }
 }

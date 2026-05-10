@@ -18,10 +18,10 @@ export async function recordNixGcPreflight(logFile: string | null): Promise<void
         .map((p) => p.pid)
         .join(", ")}); continuing verify with potential contention.\n`,
     );
-    process.env.BNX_VERIFY_NIX_GC_DETECTED = "1";
+    process.env.VBR_VERIFY_NIX_GC_DETECTED = "1";
   } else {
     await appendVerifyLogLine(logFile, "[verify] nix gc preflight: ok");
-    process.env.BNX_VERIFY_NIX_GC_DETECTED = "0";
+    process.env.VBR_VERIFY_NIX_GC_DETECTED = "0";
   }
-  process.env.BNX_VERIFY_NIX_GC_PRECHECK_OK = "1";
+  process.env.VBR_VERIFY_NIX_GC_PRECHECK_OK = "1";
 }

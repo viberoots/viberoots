@@ -58,12 +58,12 @@ def node_asset_stage(name, app, assets = [], out = None, **kwargs):
             source_workspace_root_env = True,
         )
         + nix_calling_env_export_buck_graph_json()
-        + "if [ -n \\"$BNX_NODE_ROUTE_TARGET\\" ]; then "
+        + "if [ -n \\"$VBR_NODE_ROUTE_TARGET\\" ]; then "
         + nix_build_out_path_cmd(
             "\\"path:$WORKSPACE_ROOT#graph-generator-selected\\"",
             timeout_var = "TIMEOUT",
             impure = True,
-            build_prefix = "env BUCK_TEST_SRC=\\"$WORKSPACE_ROOT\\" BUCK_TARGET=\\"$BNX_NODE_ROUTE_TARGET\\" ",
+            build_prefix = "env BUCK_TEST_SRC=\\"$WORKSPACE_ROOT\\" BUCK_TARGET=\\"$VBR_NODE_ROUTE_TARGET\\" ",
         )
         + "fi; "
     )
@@ -85,12 +85,12 @@ def node_wasm_inline_module(name, src, out = None, **kwargs):
             source_workspace_root_env = True,
         )
         + nix_calling_env_export_buck_graph_json()
-        + "if [ -n \\"$BNX_NODE_ROUTE_TARGET\\" ]; then "
+        + "if [ -n \\"$VBR_NODE_ROUTE_TARGET\\" ]; then "
         + nix_build_out_path_cmd(
             "\\"path:$WORKSPACE_ROOT#graph-generator-selected\\"",
             timeout_var = "TIMEOUT",
             impure = True,
-            build_prefix = "env BUCK_TEST_SRC=\\"$WORKSPACE_ROOT\\" BUCK_TARGET=\\"$BNX_NODE_ROUTE_TARGET\\" ",
+            build_prefix = "env BUCK_TEST_SRC=\\"$WORKSPACE_ROOT\\" BUCK_TARGET=\\"$VBR_NODE_ROUTE_TARGET\\" ",
         )
         + "fi; "
     )

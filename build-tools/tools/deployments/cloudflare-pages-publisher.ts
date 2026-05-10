@@ -11,7 +11,7 @@ type CloudflarePagesPublishResult = {
 };
 
 function wranglerBin(): string {
-  return process.env.BNX_CLOUDFLARE_PAGES_WRANGLER_BIN?.trim() || "wrangler";
+  return process.env.VBR_CLOUDFLARE_PAGES_WRANGLER_BIN?.trim() || "wrangler";
 }
 
 function cloudflareAccountEnv(deployment: CloudflarePagesDeployment): Record<string, string> {
@@ -121,7 +121,7 @@ function commandError(stdout: string, stderr: string): string {
 }
 
 async function withDefaultWranglerConfig(renderedConfigPath: string): Promise<string> {
-  const workDir = await fsp.mkdtemp(path.join(os.tmpdir(), "bnx-cloudflare-pages-wrangler-"));
+  const workDir = await fsp.mkdtemp(path.join(os.tmpdir(), "vbr-cloudflare-pages-wrangler-"));
   await fsp.copyFile(path.resolve(renderedConfigPath), path.join(workDir, "wrangler.json"));
   return workDir;
 }

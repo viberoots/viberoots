@@ -11,11 +11,11 @@
 
 Many zx tests use `runInTemp(...)` (in `build-tools/tools/tests/lib/test-helpers.ts`) to execute in an isolated copy of the repo. During `v`, the verify runner prepares a **single** Nix-store seed and exports it to all tests:
 
-- `BNX_TEST_SEED_STORE_PATH` points at the seed store path.
-- `BNX_TEST_SEED_KEY` is exported for diagnostics.
-- `BNX_TEST_SEED_PIN_DIR` is a GC root pinned for the verify run.
+- `VBR_TEST_SEED_STORE_PATH` points at the seed store path.
+- `VBR_TEST_SEED_KEY` is exported for diagnostics.
+- `VBR_TEST_SEED_PIN_DIR` is a GC root pinned for the verify run.
 
-In verify mode, `runInTemp` requires `BNX_TEST_SEED_STORE_PATH` and fails fast if it is missing or invalid. Outside verify, you can still set `BNX_TEST_SEED_STORE_PATH` explicitly to reuse a seed.
+In verify mode, `runInTemp` requires `VBR_TEST_SEED_STORE_PATH` and fails fast if it is missing or invalid. Outside verify, you can still set `VBR_TEST_SEED_STORE_PATH` explicitly to reuse a seed.
 
 `runInTemp` also verifies zx initialization using a `node --import <zx-init>` probe, but it does so **once per test worker** (not per temp repo). For debugging, you can force re-probing with:
 

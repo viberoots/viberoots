@@ -44,13 +44,13 @@ def _prepare_node_nix_calling_genrule(name, kwargs, srcs, deps, labels, lockfile
     )
 def _selected_route_build_cmd(selected_route_target):
     return (
-        ("BNX_NODE_ROUTE_TARGET=%s; " % sh_quote(selected_route_target))
-        + "if [ -n \"$BNX_NODE_ROUTE_TARGET\" ]; then "
+        ("VBR_NODE_ROUTE_TARGET=%s; " % sh_quote(selected_route_target))
+        + "if [ -n \"$VBR_NODE_ROUTE_TARGET\" ]; then "
         + nix_build_out_path_cmd(
             "\"path:$WORKSPACE_ROOT#graph-generator-selected\"",
             timeout_var = "TIMEOUT",
             impure = True,
-            build_prefix = "env BUCK_TEST_SRC=\"$WORKSPACE_ROOT\" BUCK_TARGET=\"$BNX_NODE_ROUTE_TARGET\" ",
+            build_prefix = "env BUCK_TEST_SRC=\"$WORKSPACE_ROOT\" BUCK_TARGET=\"$VBR_NODE_ROUTE_TARGET\" ",
         )
         + "fi; "
     )
@@ -92,10 +92,10 @@ def node_asset_stage(
             + ("ASSET_NAME=%s; " % sh_quote(selected.artifact_name))
             + ("ASSET_GLOB=%s; " % sh_quote(selected.artifact_glob))
             + "if resolve_node_source_path node_asset_stage \"$ASSET_RAW\" \"$ASSET_HINT\"; then "
-            + "ASSET_SRC=\"$BNX_WASM_RESOLVED_PATH\"; "
+            + "ASSET_SRC=\"$VBR_WASM_RESOLVED_PATH\"; "
             + "else ASSET_SRC=\"$SRCDIR\"; fi; "
             + "resolve_node_wasm_artifact node_asset_stage \"$ASSET_RAW\" \"$ASSET_SRC\" \"$ASSET_NAME\" \"$ASSET_GLOB\" || exit $?; "
-            + "ASSET_SRC=\"$BNX_WASM_RESOLVED_PATH\"; "
+            + "ASSET_SRC=\"$VBR_WASM_RESOLVED_PATH\"; "
             + ("DEST=\"$OUT_ABS/%s\"; " % dest)
             + "if [ -e \"$DEST\" ] && [ ! -f \"$DEST\" ]; then "
             + "echo \"node_asset_stage: destination is not a file: $DEST\" >&2; exit 2; "
@@ -173,8 +173,8 @@ def node_wasm_inline_module(
         src_ref = "$(location %s)" % _to_abs_label(src)
     cmd = (
         "SCRATCH=\"$PWD\"; OUT_ABS=\"$SCRATCH/$OUT\"; "
-        + ("BNX_NODE_ROUTE_TARGET=%s; " % sh_quote(selected_route_target))
-        + "if [ -n \"$BNX_NODE_ROUTE_TARGET\" ]; then "
+        + ("VBR_NODE_ROUTE_TARGET=%s; " % sh_quote(selected_route_target))
+        + "if [ -n \"$VBR_NODE_ROUTE_TARGET\" ]; then "
         + nix_calling_genrule_bootstrap(
             timeout_var = "TIMEOUT",
             timeout_sec = 180,
@@ -204,11 +204,11 @@ def node_wasm_inline_module(
         + ("SRC_NAME=%s; " % sh_quote(artifact_name))
         + ("SRC_GLOB=%s; " % sh_quote(artifact_glob))
         + "if resolve_node_source_path node_wasm_inline_module \"$SRC_RAW\" \"$SRC_HINT\"; then "
-        + "SRC_PATH=\"$BNX_WASM_RESOLVED_PATH\"; "
+        + "SRC_PATH=\"$VBR_WASM_RESOLVED_PATH\"; "
         + "else SRC_PATH=\"$SRCDIR\"; "
         + "fi; "
         + "resolve_node_wasm_artifact node_wasm_inline_module \"$SRC_RAW\" \"$SRC_PATH\" \"$SRC_NAME\" \"$SRC_GLOB\" || exit $?; "
-        + "SRC_PATH=\"$BNX_WASM_RESOLVED_PATH\"; "
+        + "SRC_PATH=\"$VBR_WASM_RESOLVED_PATH\"; "
         + "if [ ! -f \"$SRC_PATH\" ]; then echo \"node_wasm_inline_module: source not found: $SRC_PATH\" >&2; exit 2; fi; "
         + "b64=\"\"; b64=`base64 < \"$SRC_PATH\" | tr -d '\\n'`; "
         + "OUT_DIR=\"${OUT_ABS%/*}\"; "

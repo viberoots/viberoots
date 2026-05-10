@@ -1,8 +1,8 @@
 #!/usr/bin/env zx-wrapper
 import { shSingleQuote } from "../lib/shell-quote";
 
-export const REMOTE_SSH_IDENTITY_FILE_ENV = "BNX_REMOTE_SSH_IDENTITY_FILE";
-export const REMOTE_SSH_KNOWN_HOSTS_FILE_ENV = "BNX_REMOTE_SSH_KNOWN_HOSTS_FILE";
+export const REMOTE_SSH_IDENTITY_FILE_ENV = "VBR_REMOTE_SSH_IDENTITY_FILE";
+export const REMOTE_SSH_KNOWN_HOSTS_FILE_ENV = "VBR_REMOTE_SSH_KNOWN_HOSTS_FILE";
 
 type ReviewedRemoteEnv = NodeJS.ProcessEnv;
 

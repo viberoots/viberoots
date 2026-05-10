@@ -66,10 +66,10 @@ test("cloudflare-pages deploy reads Vault directly on the reviewed runtime path"
     });
     const originalEnv = { ...process.env };
     process.env.PATH = `${fake.binDir}:${originalEnv.PATH || ""}`;
-    process.env.BNX_CLOUDFLARE_FAKE_PUBLISH_ROOT = fake.publishRoot;
-    process.env.BNX_CLOUDFLARE_FAKE_WRANGLER_LOG = fake.logPath;
-    process.env.BNX_CLOUDFLARE_PAGES_WRANGLER_BIN = path.join(fake.binDir, "wrangler");
-    delete process.env.BNX_DEPLOYMENT_SECRET_FIXTURE_PATH;
+    process.env.VBR_CLOUDFLARE_FAKE_PUBLISH_ROOT = fake.publishRoot;
+    process.env.VBR_CLOUDFLARE_FAKE_WRANGLER_LOG = fake.logPath;
+    process.env.VBR_CLOUDFLARE_PAGES_WRANGLER_BIN = path.join(fake.binDir, "wrangler");
+    delete process.env.VBR_DEPLOYMENT_SECRET_FIXTURE_PATH;
     const restoreSecretContext = activateDeploymentSecretContext({
       kind: "vault",
       credential: {

@@ -25,7 +25,7 @@ export async function sampleProcessCounts(timeoutMs = 1500): Promise<ProcessCoun
   const lines = await processCommandLines({
     timeoutMs,
     pgrepPattern:
-      "buck2d\\[|\\(buck2-forkserver\\)|(^|/)buck2( |$)|(^|/)node(js)?( |$)|(^|/)nix( |$)|BNX_VERIFY_LOG_FILE=|BNX_VERIFY_PROCESS_STATE_FILE=",
+      "buck2d\\[|\\(buck2-forkserver\\)|(^|/)buck2( |$)|(^|/)node(js)?( |$)|(^|/)nix( |$)|VBR_VERIFY_LOG_FILE=|VBR_VERIFY_PROCESS_STATE_FILE=",
   });
   return lines.length > 0 ? countProcessCommands(lines) : null;
 }
@@ -39,7 +39,7 @@ export function countProcessCommands(lines: string[]): ProcessCounts {
     if (/\bnode(?:\s|$)/.test(line) || line.includes("/node ")) node++;
     if (line.includes("buck2") || line.includes("buck2d[")) buck++;
     if (/\bnix(?:\s|$)/.test(line) || line.includes("/nix ")) nix++;
-    if (line.includes("BNX_VERIFY_LOG_FILE=") || line.includes("BNX_VERIFY_PROCESS_STATE_FILE=")) {
+    if (line.includes("VBR_VERIFY_LOG_FILE=") || line.includes("VBR_VERIFY_PROCESS_STATE_FILE=")) {
       verifyEnv++;
     }
   }

@@ -111,7 +111,7 @@ export async function installFakeOpenTofu(tmp: string): Promise<{
     [
       "#!/usr/bin/env bash",
       "set -euo pipefail",
-      'printf \'%s\\n\' "$PWD|$*|${opentofu_provider_credentials:-missing}" >> "$BNX_FAKE_OPENTOFU_LOG"',
+      'printf \'%s\\n\' "$PWD|$*|${opentofu_provider_credentials:-missing}" >> "$VBR_FAKE_OPENTOFU_LOG"',
       "printf '%s\\n' 'fake opentofu apply complete'",
       "",
     ].join("\n"),

@@ -34,7 +34,7 @@ export async function runVercelDeployFrontDoor(opts: {
   }
   const controlPlaneUrl =
     getFlagStr("control-plane-url", "").trim() ||
-    String(process.env.BNX_DEPLOY_CONTROL_PLANE_URL || "").trim();
+    String(process.env.VBR_DEPLOY_CONTROL_PLANE_URL || "").trim();
   if (
     opts.deployment.protectionClass !== "local_only" &&
     (opts.requireServiceForProtectedShared || !!controlPlaneUrl)

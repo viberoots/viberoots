@@ -24,12 +24,12 @@ let
           export SOURCE_DATE_EPOCH=1
           mkdir -p node_modules
           STORE_ROOT="${nm}/node_modules"
-          BNX_NODE_MODULES_STORE="$STORE_ROOT" node - <<'EOF'
+          VBR_NODE_MODULES_STORE="$STORE_ROOT" node - <<'EOF'
           const fs = require("fs");
           const path = require("path");
           const importerDir = ${builtins.toJSON importerDir};
           const cwd = process.cwd();
-          const storeRoot = String(process.env.BNX_NODE_MODULES_STORE || "");
+          const storeRoot = String(process.env.VBR_NODE_MODULES_STORE || "");
           const levels = importerDir.split("/").filter(Boolean).length;
           let repoRoot = cwd;
           for (let i = 0; i < levels; i++) repoRoot = path.dirname(repoRoot);

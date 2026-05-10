@@ -108,7 +108,7 @@ async function main(): Promise<void> {
   const snapshotOnly = getFlagBool("snapshot-only");
   const root = path.resolve(String(process.env.WORKSPACE_ROOT || process.cwd()).trim());
   const tmpBase = process.env.TMPDIR || "/tmp";
-  const workDir = await fsp.mkdtemp(path.join(tmpBase, "bnx-flake-"));
+  const workDir = await fsp.mkdtemp(path.join(tmpBase, "vbr-flake-"));
   const snapDir = path.join(workDir, "src");
   let keepSnapshot = snapshotOnly;
   const withHeartbeat = async <T>(label: string, p: Promise<T>): Promise<T> => {
@@ -171,13 +171,13 @@ async function main(): Promise<void> {
       selectedCppSources != null
         ? {
             ...process.env,
-            BNX_FILTERED_FLAKE_SNAPSHOT: "1",
+            VBR_FILTERED_FLAKE_SNAPSHOT: "1",
             BUCK_GRAPH_JSON: path.join(snapDir, "build-tools", "tools", "buck", "graph.json"),
             BUCK_TEST_SRC: snapDir,
           }
         : {
             ...process.env,
-            BNX_FILTERED_FLAKE_SNAPSHOT: "1",
+            VBR_FILTERED_FLAKE_SNAPSHOT: "1",
           };
     const buildStart = Date.now();
     const runOnce = () =>

@@ -82,6 +82,6 @@ export async function installGooglePlayTargets(
 export function googlePlayFakeEnv(tmp: string): NodeJS.ProcessEnv {
   return {
     ...process.env,
-    BNX_GOOGLE_PLAY_FAKE_STORE_ROOT: path.join(tmp, "fake-store"),
+    VBR_GOOGLE_PLAY_FAKE_STORE_ROOT: path.join(tmp, "fake-store"),
   };
 }

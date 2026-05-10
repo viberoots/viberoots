@@ -15,7 +15,7 @@ test(
   "PR-8 dynamic refresh negative path emits stable failure markers without refresh hot-loop",
   { timeout: TEST_TIMEOUT_MS },
   async () => {
-    await runInTemp("bnx-phase5-refresh-neg", async (tmp, _$) => {
+    await runInTemp("vbr-phase5-refresh-neg", async (tmp, _$) => {
       const $ = _$({ cwd: tmp, stdio: "inherit" });
       await $`scaf new ts webapp-static demo-web --yes --no-tests --skip-lockfile-gen`;
 

@@ -63,7 +63,7 @@ test("nixos-shared-host prompt helper uses inline rules for client install", asy
           sshIdentityFile: "/Users/me/.ssh/mini",
           sshKnownHostsFile: "/Users/me/.ssh/known_hosts-mini",
           controlPlaneUrl: "http://127.0.0.1:7780",
-          controlPlaneTokenEnv: "BNX_DEPLOY_CONTROL_PLANE_TOKEN",
+          controlPlaneTokenEnv: "VBR_DEPLOY_CONTROL_PLANE_TOKEN",
         };
       },
     },
@@ -85,7 +85,7 @@ test("nixos-shared-host prompt helper uses inline rules for client install", asy
     remoteRecordsRoot: "/var/lib/deployment-host/records",
     sshMode: "ssh",
     controlPlaneUrl: "http://127.0.0.1:7780",
-    controlPlaneTokenEnv: "BNX_DEPLOY_CONTROL_PLANE_TOKEN",
+    controlPlaneTokenEnv: "VBR_DEPLOY_CONTROL_PLANE_TOKEN",
   });
   assert.deepEqual(capturedRules?.defaultTemplates, {
     destination: "${profileName}",

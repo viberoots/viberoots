@@ -36,16 +36,16 @@ is_nix_store_git() {
 }
 
 resolve_real_git() {
-  if [[ -n "${BNX_REAL_GIT:-}" ]]; then
-    if [[ ! -x "${BNX_REAL_GIT}" ]]; then
-      echo "git wrapper: BNX_REAL_GIT is not executable: ${BNX_REAL_GIT}" >&2
+  if [[ -n "${VBR_REAL_GIT:-}" ]]; then
+    if [[ ! -x "${VBR_REAL_GIT}" ]]; then
+      echo "git wrapper: VBR_REAL_GIT is not executable: ${VBR_REAL_GIT}" >&2
       return 127
     fi
-    if is_same_file "${BNX_REAL_GIT}" "${SCRIPT_PATH}"; then
-      echo "git wrapper: BNX_REAL_GIT points back to this wrapper: ${BNX_REAL_GIT}" >&2
+    if is_same_file "${VBR_REAL_GIT}" "${SCRIPT_PATH}"; then
+      echo "git wrapper: VBR_REAL_GIT points back to this wrapper: ${VBR_REAL_GIT}" >&2
       return 127
     fi
-    printf '%s\n' "${BNX_REAL_GIT}"
+    printf '%s\n' "${VBR_REAL_GIT}"
     return 0
   fi
 
@@ -65,7 +65,7 @@ resolve_real_git() {
   done
   IFS="$old_ifs"
 
-  echo "git wrapper: could not find flake-provided git on PATH; run inside the Nix dev shell or set BNX_REAL_GIT" >&2
+  echo "git wrapper: could not find flake-provided git on PATH; run inside the Nix dev shell or set VBR_REAL_GIT" >&2
   return 127
 }
 
@@ -117,12 +117,12 @@ cow_copy_tree() {
   local dst="$2"
   local manifest="$3"
 
-  if [[ -n "${BNX_GIT_COW_COPY_PROG_FOR_TEST:-}" ]]; then
-    "${BNX_GIT_COW_COPY_PROG_FOR_TEST}" "$src" "$dst" "$manifest"
+  if [[ -n "${VBR_GIT_COW_COPY_PROG_FOR_TEST:-}" ]]; then
+    "${VBR_GIT_COW_COPY_PROG_FOR_TEST}" "$src" "$dst" "$manifest"
     return $?
   fi
 
-  local ostype="${BNX_GIT_COW_OSTYPE:-${OSTYPE:-}}"
+  local ostype="${VBR_GIT_COW_OSTYPE:-${OSTYPE:-}}"
   if [[ "$ostype" == darwin* ]]; then
     python3 - "$src" "$dst" "$manifest" <<'PY'
 import ctypes

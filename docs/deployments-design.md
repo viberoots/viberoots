@@ -1128,7 +1128,7 @@ How to read this map:
 - `build-tools/tools/deployments/` is the main implementation root for CLI, extraction, validation, shared contracts, and control-plane code
 - the current reviewed `nixos-shared-host` control-plane service entrypoint is `build-tools/tools/deployments/nixos-shared-host-control-plane-service.ts`
 - the current reviewed `nixos-shared-host` worker-loop entrypoint is `build-tools/tools/deployments/nixos-shared-host-control-plane-worker.ts`
-- the current reviewed `nixos-shared-host` authoritative backend is Postgres, configured for the service and worker via `--control-plane-database-url` / `BNX_DEPLOY_CONTROL_PLANE_DATABASE_URL`
+- the current reviewed `nixos-shared-host` authoritative backend is Postgres, configured for the service and worker via `--control-plane-database-url` / `VBR_DEPLOY_CONTROL_PLANE_DATABASE_URL`
 - control-plane status/result reads and canonical protected/shared deploy records come from that backend, keyed by `deploy_run_id` and submission identity
 - reviewed control-plane status/result inspection should resolve by backend-native identifiers through the service surfaces such as `GET /api/v1/status` and `GET /api/v1/records`
 - routine JSON submissions/snapshots under `<records-root>/control-plane/` and protected/shared deploy-record files under `<records-root>/runs/` are no longer the normal operator-readable authority path
@@ -6219,7 +6219,7 @@ Under the hood that may still mean:
 
 For reviewed `cloudflare-pages` `shared_nonprod` and `production_facing` paths, the public repo
 `deploy` front door is now only that thin client. Callers must provide the central service endpoint
-with `--control-plane-url` or `BNX_DEPLOY_CONTROL_PLANE_URL`, and the public path should reject
+with `--control-plane-url` or `VBR_DEPLOY_CONTROL_PLANE_URL`, and the public path should reject
 mixed local execution flags such as `--records-root` or `--control-plane-database-url` instead of
 quietly falling back to provider-local peer mutation. Any remaining local `recordsRoot` helpers are
 for fixture/internal compatibility, not the reviewed public protected/shared boundary.

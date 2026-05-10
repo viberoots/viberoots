@@ -47,9 +47,9 @@ async function writeValues(root: string, deploymentId: string) {
 function fakeHelmOverrides(fake: Awaited<ReturnType<typeof installFakeKubernetesHelm>>) {
   return {
     PATH: `${fake.binDir}:${process.env.PATH || ""}`,
-    BNX_KUBERNETES_HELM_BIN: path.join(fake.binDir, "helm"),
-    BNX_KUBERNETES_FAKE_PUBLISH_ROOT: fake.publishRoot,
-    BNX_KUBERNETES_FAKE_HELM_LOG: fake.logPath,
+    VBR_KUBERNETES_HELM_BIN: path.join(fake.binDir, "helm"),
+    VBR_KUBERNETES_FAKE_PUBLISH_ROOT: fake.publishRoot,
+    VBR_KUBERNETES_FAKE_HELM_LOG: fake.logPath,
   };
 }
 
@@ -81,7 +81,7 @@ test("public kubernetes deploy requires a control-plane URL for protected/shared
         cwd: tmp,
         stdio: "pipe",
       })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment ${deployment.label} --artifact-dir ${artifactDir} --admission-evidence-json ${evidence}`,
-      /kubernetes (shared_nonprod|production_facing) mutation requires --control-plane-url or BNX_DEPLOY_CONTROL_PLANE_URL/,
+      /kubernetes (shared_nonprod|production_facing) mutation requires --control-plane-url or VBR_DEPLOY_CONTROL_PLANE_URL/,
     );
   });
 });

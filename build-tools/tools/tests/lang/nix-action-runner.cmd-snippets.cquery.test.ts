@@ -45,8 +45,8 @@ test("nix_action_runner helpers assemble stable cmd snippets (cquery)", async ()
     const idxExportGraph = out.indexOf("build-tools/tools/buck/export-graph.ts");
     assert.ok(idxExportGraph > idxBootstrap, "expected export-graph snippet after bootstrap");
     assert.ok(
-      out.includes("BNX_NODE_ZX_INIT=") && out.includes("build-tools/tools/dev/zx-init.mjs"),
-      "expected export-graph snippet to export BNX_NODE_ZX_INIT",
+      out.includes("VBR_NODE_ZX_INIT=") && out.includes("build-tools/tools/dev/zx-init.mjs"),
+      "expected export-graph snippet to export VBR_NODE_ZX_INIT",
     );
     assert.ok(
       out.includes("node --experimental-top-level-await") &&

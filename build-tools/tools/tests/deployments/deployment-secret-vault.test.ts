@@ -185,7 +185,7 @@ test("retired Vault-named fixture env var is ignored and required secret flows f
       },
     },
     async (fixturePath) => {
-      process.env.BNX_DEPLOYMENT_VAULT_FIXTURE_PATH = fixturePath;
+      process.env.VBR_DEPLOYMENT_VAULT_FIXTURE_PATH = fixturePath;
       delete process.env[DEPLOYMENT_SECRET_FIXTURE_PATH_ENV];
       delete process.env.VAULT_ADDR;
       delete process.env.VAULT_TOKEN;

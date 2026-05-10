@@ -31,8 +31,8 @@ function firstExecutableOnPath(tool: string, env: NodeJS.ProcessEnv = process.en
 }
 
 function usesTempRepoFakeNix(root: string, env: NodeJS.ProcessEnv = process.env): boolean {
-  if (String(env.BNX_RUN_IN_TEMP_REPO || "").trim() !== "1") return false;
-  if (String(env.BNX_LINK_NODE_FAKE_NIX || "").trim() === "1") return true;
+  if (String(env.VBR_RUN_IN_TEMP_REPO || "").trim() !== "1") return false;
+  if (String(env.VBR_LINK_NODE_FAKE_NIX || "").trim() === "1") return true;
   const nixPath = firstExecutableOnPath("nix", env);
   return nixPath.startsWith(`${path.resolve(root)}${path.sep}`);
 }

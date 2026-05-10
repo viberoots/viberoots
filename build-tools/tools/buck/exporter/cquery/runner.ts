@@ -96,9 +96,9 @@ function computeIsolationFlags(cwd: string): { iso: string; flags: string[]; own
 }
 
 function registerVerifySharedIsolation(iso: string, repoRoot: string, kind: string): void {
-  const stateFile = String(process.env.BNX_VERIFY_PROCESS_STATE_FILE || "").trim();
+  const stateFile = String(process.env.VBR_VERIFY_PROCESS_STATE_FILE || "").trim();
   if (!stateFile || !iso || !repoRoot) return;
-  const ownerPidRaw = Number(process.env.BNX_VERIFY_OWNER_PID || process.pid);
+  const ownerPidRaw = Number(process.env.VBR_VERIFY_OWNER_PID || process.pid);
   const ownerPid = Number.isFinite(ownerPidRaw) && ownerPidRaw > 1 ? ownerPidRaw : process.pid;
   try {
     for (const root of Array.from(new Set([repoRoot, process.cwd()]))) {

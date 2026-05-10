@@ -70,7 +70,7 @@ test("repo deploy CLI fails closed on missing same-host service endpoint for eve
       assert.notEqual(result.exitCode, 0, testCase.operation);
       assert.match(
         String(result.stderr),
-        /requires --control-plane-url or BNX_DEPLOY_CONTROL_PLANE_URL/,
+        /requires --control-plane-url or VBR_DEPLOY_CONTROL_PLANE_URL/,
         testCase.operation,
       );
     }

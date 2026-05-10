@@ -61,7 +61,7 @@ test("JWT login mints an in-memory token for direct Vault secret reads", async (
 test("stale ambient Vault variables do not satisfy deployment secret resolution", async () => {
   const originalEnv = { ...process.env };
   process.env.VAULT_ADDR = "https://ambient.example.invalid";
-  process.env.BNX_VAULT_AUTH_METHOD = "token";
+  process.env.VBR_VAULT_AUTH_METHOD = "token";
   process.env.VAULT_TOKEN = "ambient-token";
   try {
     await assert.rejects(
@@ -88,17 +88,17 @@ test("provider subprocess env scrubbing removes Vault and deployment secrets", (
     PATH: "/bin",
     VAULT_ADDR: "https://vault.example.net",
     VAULT_TOKEN: "vault-token",
-    BNX_VAULT_JWT: "workload.jwt",
-    BNX_VAULT_JWT_FILE: "/tmp/workload.jwt",
-    BNX_DEPLOYER_CLIENT_SECRET: "client-secret",
+    VBR_VAULT_JWT: "workload.jwt",
+    VBR_VAULT_JWT_FILE: "/tmp/workload.jwt",
+    VBR_DEPLOYER_CLIENT_SECRET: "client-secret",
     DEPLOYMENT_CLIENT_SECRET: "deployment-secret",
   });
   assert.equal(env.PATH, "/bin");
   assert.equal(env.VAULT_ADDR, undefined);
   assert.equal(env.VAULT_TOKEN, undefined);
-  assert.equal(env.BNX_VAULT_JWT, undefined);
-  assert.equal(env.BNX_VAULT_JWT_FILE, undefined);
-  assert.equal(env.BNX_DEPLOYER_CLIENT_SECRET, undefined);
+  assert.equal(env.VBR_VAULT_JWT, undefined);
+  assert.equal(env.VBR_VAULT_JWT_FILE, undefined);
+  assert.equal(env.VBR_DEPLOYER_CLIENT_SECRET, undefined);
   assert.equal(env.DEPLOYMENT_CLIENT_SECRET, undefined);
 });
 

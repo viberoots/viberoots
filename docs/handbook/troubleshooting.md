@@ -233,7 +233,7 @@ unexpected outcome.
     `local_only` Vercel fixtures.
   - `--control-plane-url` (or the reviewed `--profile` workflow) is missing.
 - Fix:
-  - Re-run with `--control-plane-url "$BNX_DEPLOY_CONTROL_PLANE_URL"` (or the
+  - Re-run with `--control-plane-url "$VBR_DEPLOY_CONTROL_PLANE_URL"` (or the
     reviewed profile), pass the admitted `--source-run-id`, and remove
     laptop-local artifact or records overrides.
   - For tests or development, use a `local_only` Vercel fixture deployment
@@ -365,7 +365,7 @@ replaySnapshotPath` or rejects the source-run as unsuitable for replay.
   `opentofu_provider_credentials` at the `provision` step. Missing or
   unauthorized credentials fail closed before the adapter runs.
 - The production adapter uses `tofu` from the pinned Nix toolchain unless the
-  worker profile sets `BNX_OPENTOFU_BIN` or `BNX_DEPLOY_OPENTOFU_BIN`.
+  worker profile sets `VBR_OPENTOFU_BIN` or `VBR_DEPLOY_OPENTOFU_BIN`.
 - Plan or config drift appears as an OpenTofu apply mismatch in redacted
   diagnostics. Regenerate and re-admit the reviewed provisioner plan instead
   of applying from local workspace state.

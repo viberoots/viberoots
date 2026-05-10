@@ -108,7 +108,7 @@ We rely on a “buck daemon reaper” to clean up orphaned daemons/isolation dir
 
 - **Where**: `build-tools/tools/tests/lib/test-helpers.ts` + `build-tools/tools/tests/lib/buck-daemon-reaper.ts`
 - **What**:
-  - `BNX_BUCK_REAPER_STATE_FILE` is shared per verify run and temp repos register themselves instead of spawning more helpers.
+  - `VBR_BUCK_REAPER_STATE_FILE` is shared per verify run and temp repos register themselves instead of spawning more helpers.
   - Reaper can reclaim isolations when temp repos are deleted.
 
 ### C) Keep temp repos on the workspace filesystem (macOS path-alias robustness + easier cleanup)
@@ -242,7 +242,7 @@ _Important:_ The PR numbering in this section is **local to this document** and 
   - **(8) `nix build --no-link` everywhere in tests** → PR-2
 - **Verified improvements (not primarily space-saving)**
   - **(A) Reuse Buck2 daemon across zx tests (remove per-test kills)** → PR-4
-  - **(B) Reaper + per-run reaper state file (`BNX_BUCK_REAPER_STATE_FILE`)** → PR-4
+  - **(B) Reaper + per-run reaper state file (`VBR_BUCK_REAPER_STATE_FILE`)** → PR-4
   - **(C) Workspace-local temp repos (`TEST_TMP_IN_REPO`, `TMPDIR=.../buck-out/tmp/tmpdir`)** → PR-3
   - **(D) CoW clone-aware copying** → PR-4
   - **(E) Opt-in `/nix/store` totals collection (`VERIFY_ANALYSIS_STORE_TOTALS=1`)** → PR-3
@@ -468,7 +468,7 @@ This PR focuses on verified non-space improvements that materially affect `v` ru
 #### Scope & Changes
 
 - Stop killing buckd per zx test (`ZX_TEST_KILL_DAEMON` behavior removed/disabled) so caching works and tests don’t run in constant cold-start mode.
-- Ensure a single reaper state file is shared per verify run (`BNX_BUCK_REAPER_STATE_FILE`), and temp repos register themselves instead of spawning per-test helpers.
+- Ensure a single reaper state file is shared per verify run (`VBR_BUCK_REAPER_STATE_FILE`), and temp repos register themselves instead of spawning per-test helpers.
 - Maintain clone-aware copying as a fast path for temp repo creation.
 - Keep expensive store totals collection opt-in to prevent multi-minute “startup stalls”.
 

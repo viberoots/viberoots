@@ -16,8 +16,8 @@ function underManagedHarness(env: NodeJS.ProcessEnv): boolean {
     env.BUCK_TEST_SRC,
     env.BUCK_TEST_TARGET,
     env.BUCK_TARGET,
-    env.BNX_VERIFY_LOCK_DIR,
-    env.BNX_VERIFY_LOG_FILE,
+    env.VBR_VERIFY_LOCK_DIR,
+    env.VBR_VERIFY_LOG_FILE,
     env.VERIFY_TIMEOUT_SECS,
     env.TEST_NIX_TIMEOUT_SECS,
   ].some(hasValue);
@@ -41,7 +41,7 @@ export function shouldRefuseLiveRepoScaffold(opts: {
     return false;
   }
   if (
-    String(env.BNX_RUN_IN_TEMP_REPO || "").trim() === "1" &&
+    String(env.VBR_RUN_IN_TEMP_REPO || "").trim() === "1" &&
     workspaceRoot &&
     cwd === workspaceRoot &&
     workspaceRoot === repoRoot

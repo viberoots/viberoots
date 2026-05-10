@@ -5,15 +5,15 @@ import path from "node:path";
 import { test } from "node:test";
 import { runInTemp } from "./test-helpers";
 
-test("runInTemp: when BNX_BUCK_REAPER_STATE_FILE is set, temp repo roots are registered", async () => {
-  const prev = process.env.BNX_BUCK_REAPER_STATE_FILE;
+test("runInTemp: when VBR_BUCK_REAPER_STATE_FILE is set, temp repo roots are registered", async () => {
+  const prev = process.env.VBR_BUCK_REAPER_STATE_FILE;
   const stateFile = path.join(
     os.tmpdir(),
     `viberoots-test-reaper-state-${process.pid}-${Date.now()}.txt`,
   );
 
   try {
-    process.env.BNX_BUCK_REAPER_STATE_FILE = stateFile;
+    process.env.VBR_BUCK_REAPER_STATE_FILE = stateFile;
     await fsp.writeFile(stateFile, "", "utf8");
 
     const roots: string[] = [];
@@ -35,8 +35,8 @@ test("runInTemp: when BNX_BUCK_REAPER_STATE_FILE is set, temp repo roots are reg
       }
     }
   } finally {
-    if (prev === undefined) delete process.env.BNX_BUCK_REAPER_STATE_FILE;
-    else process.env.BNX_BUCK_REAPER_STATE_FILE = prev;
+    if (prev === undefined) delete process.env.VBR_BUCK_REAPER_STATE_FILE;
+    else process.env.VBR_BUCK_REAPER_STATE_FILE = prev;
     await fsp.rm(stateFile, { force: true }).catch(() => {});
   }
 });

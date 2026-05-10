@@ -124,8 +124,8 @@ export async function acquireVerifyLock(opts: {
     await fsp.symlink(logFile, path.join(logDir, "latest.log")).catch(() => {});
   });
 
-  process.env.BNX_VERIFY_LOCK_DIR = lockDir;
-  process.env.BNX_VERIFY_LOG_FILE = logFile;
+  process.env.VBR_VERIFY_LOCK_DIR = lockDir;
+  process.env.VBR_VERIFY_LOG_FILE = logFile;
 
   // IMPORTANT: process.exit() and the 'exit' event do not await async work.
   // Keep this cleanup synchronous so we don't leave behind a stale verify-lock dir.

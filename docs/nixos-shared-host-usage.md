@@ -210,7 +210,7 @@ What the install flags mean:
   the default unless a future reviewed transport mode exists.
 - `--control-plane-url https://deploy.apps.kilty.io`
   The hosted deployment service URL that laptop clients should call.
-- `--control-plane-token-env BNX_DEPLOY_CONTROL_PLANE_TOKEN`
+- `--control-plane-token-env VBR_DEPLOY_CONTROL_PLANE_TOKEN`
   Default value. This stores the environment variable name that holds the
   deployment service token on the client machine or Jenkins worker; it does not
   store the token value.
@@ -240,7 +240,7 @@ verification for supported SCM backends. In the normal reviewed workflow you do
 not hand-build `laneGovernance` JSON. The service verifies the live governance
 state itself, stores the admitted fact with
 `verificationSource = "service_verified"`, and fails closed on drift. For
-GitHub-backed lanes, the hosted service needs `BNX_DEPLOY_GITHUB_TOKEN` so it
+GitHub-backed lanes, the hosted service needs `VBR_DEPLOY_GITHUB_TOKEN` so it
 can read the live branch-protection state. If a deployment still uses an
 unsupported SCM backend, keep explicit lane-governance evidence in
 `--admission-evidence-json` only as a reviewed compatibility path.
@@ -287,7 +287,7 @@ artifact-binding audit summary; proof MACs, nonces, bearer tokens, and full
 staged paths are not operator-facing fields.
 
 Protected/shared service clients use HTTPS. Loopback HTTP is reserved for
-explicit local fixture flows marked with `BNX_DEPLOY_LOCAL_FIXTURE_SERVICE=1`,
+explicit local fixture flows marked with `VBR_DEPLOY_LOCAL_FIXTURE_SERVICE=1`,
 and clients fail closed when TLS certificate validation is disabled.
 
 If you omit `--artifact-dir`, the deploy command uses the deployment target
@@ -315,7 +315,7 @@ The remote-profile and Jenkins commands use SSH for staging files and basic
 preflight work. The actual deployment request goes through the central
 deployment service recorded in the client profile. Protected/shared profiles
 must use HTTPS service URLs with certificate validation enabled, must provide
-the reviewed `BNX_DEPLOY_CONTROL_PLANE_TOKEN` bearer token for the hosted
+the reviewed `VBR_DEPLOY_CONTROL_PLANE_TOKEN` bearer token for the hosted
 service, and must keep reviewed known-hosts or host-key pinning for SSH
 staging. If the hosted token is missing or rejected, the service fails the
 challenge or submit request closed and still cleans staged artifacts or records

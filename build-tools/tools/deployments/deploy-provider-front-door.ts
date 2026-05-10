@@ -64,7 +64,7 @@ export async function runNixosSharedHostDeployFrontDoor(opts: {
   const protectedShared = opts.deployment.protectionClass !== "local_only";
   const controlPlaneDatabaseUrl =
     getFlagStr("control-plane-database-url", "").trim() ||
-    String(process.env.BNX_DEPLOY_CONTROL_PLANE_DATABASE_URL || "").trim() ||
+    String(process.env.VBR_DEPLOY_CONTROL_PLANE_DATABASE_URL || "").trim() ||
     undefined;
   const paths = {
     statePath: path.resolve(getFlagStr("state", path.join(hostRoot, "platform-state.json"))),
@@ -99,7 +99,7 @@ export async function runNixosSharedHostDeployFrontDoor(opts: {
         smokeConnectOverride: opts.smokeConnectOverride,
         controlPlaneUrl:
           getFlagStr("control-plane-url", "").trim() ||
-          String(process.env.BNX_DEPLOY_CONTROL_PLANE_URL || "").trim(),
+          String(process.env.VBR_DEPLOY_CONTROL_PLANE_URL || "").trim(),
         controlPlaneToken: getFlagStr("control-plane-token", "").trim() || undefined,
         remote: getFlagStr("remote", "").trim(),
         vaultRuntimeInputs: opts.vaultRuntimeInputs,

@@ -65,7 +65,7 @@ async function staleLockOwner(lockDir: string): Promise<boolean> {
 async function acquireLock(lockDir: string, isolation: string): Promise<() => Promise<void>> {
   const timeoutMs = Math.max(
     1_000,
-    Number.parseInt(String(process.env.BNX_SHARED_BUCK_LOCK_TIMEOUT_MS || "300000"), 10) || 300_000,
+    Number.parseInt(String(process.env.VBR_SHARED_BUCK_LOCK_TIMEOUT_MS || "300000"), 10) || 300_000,
   );
   const started = Date.now();
   while (true) {

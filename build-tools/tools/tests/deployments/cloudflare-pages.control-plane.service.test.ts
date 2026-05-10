@@ -63,7 +63,7 @@ test("public cloudflare-pages deploy routes deploy, preview, cleanup, and rollba
         deploymentEnvironment: "mini",
         roleName: "deploy-pleomino-read",
         preferredCredentialSource: "external_oidc_token",
-        externalOidcTokenEnv: "BNX_WORKER_OIDC_TOKEN",
+        externalOidcTokenEnv: "VBR_WORKER_OIDC_TOKEN",
       },
     });
     const artifactA = path.join(tmp, "artifact-a");
@@ -94,7 +94,7 @@ test("public cloudflare-pages deploy routes deploy, preview, cleanup, and rollba
     try {
       const workerEnv = {
         ...fakeCloudflareOverrides(fake),
-        BNX_WORKER_OIDC_TOKEN: workerJwt,
+        VBR_WORKER_OIDC_TOKEN: workerJwt,
       };
       await withEnvOverrides(workerEnv, async () => {
         const harness = await startControlPlaneHarness({
@@ -105,7 +105,7 @@ test("public cloudflare-pages deploy routes deploy, preview, cleanup, and rollba
         });
         try {
           const env = { ...process.env, ...fakeCloudflareOverrides(fake) };
-          delete env.BNX_WORKER_OIDC_TOKEN;
+          delete env.VBR_WORKER_OIDC_TOKEN;
           const profileRoot = await installHarnessClientProfile($, tmp, harness.controlPlane.url);
           const firstRun = await $({
             cwd: tmp,

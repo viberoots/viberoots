@@ -23,12 +23,12 @@ test("verify seed build policy defaults to full-suite only", () => {
 test("verify seed policy honors override mode", () => {
   assert.equal(
     shouldPrepareVerifySeedForRequestedTargets(["//projects/apps/my-app/..."], {
-      BNX_VERIFY_SEED_MODE: "always",
+      VBR_VERIFY_SEED_MODE: "always",
     }),
     true,
   );
   assert.equal(
-    shouldPrepareVerifySeedForRequestedTargets(["//..."], { BNX_VERIFY_SEED_MODE: "never" }),
+    shouldPrepareVerifySeedForRequestedTargets(["//..."], { VBR_VERIFY_SEED_MODE: "never" }),
     false,
   );
 });

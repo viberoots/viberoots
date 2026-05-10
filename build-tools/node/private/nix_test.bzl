@@ -30,7 +30,7 @@ def _node_nix_test_impl(ctx):
     # Compose runner command
     run_cmd = (
         # Skip unified pnpm prewarm at bootstrap; we'll do it only if tests exist
-        "export BNX_SKIP_REQUIRE_UNIFIED_PNPM_STORE=1; "
+        "export VBR_SKIP_REQUIRE_UNIFIED_PNPM_STORE=1; "
         + nix_bootstrap_env_core()
         + ("".join(env_pairs))
         + ("export TEST_NIX_TIMEOUT_SECS=\"%d\"; " % (tout if tout > 0 else 1800))
@@ -44,8 +44,8 @@ def _node_nix_test_impl(ctx):
         + "  export NIX_USE_PREFETCHED_PNPM_STORE=1; "
         + "  export LOCAL_PNPM_STORE=\"$(cat \"$REPO_ROOT/buck-out/.unified-pnpm-store/path\" 2>/dev/null || true)\"; "
         + "fi; "
-        + "export BNX_SKIP_REQUIRE_UNIFIED_PNPM_STORE=0; "
-        + "export BNX_STREAM_NIX_BUILD_LOGS=\"${BNX_STREAM_NIX_BUILD_LOGS:-1}\"; "
+        + "export VBR_SKIP_REQUIRE_UNIFIED_PNPM_STORE=0; "
+        + "export VBR_STREAM_NIX_BUILD_LOGS=\"${VBR_STREAM_NIX_BUILD_LOGS:-1}\"; "
         + nix_bootstrap_env_pnpm_store()
         + ("echo '[node_nix_test] phase=prepare-exact-store target=%s importer=%s' >&2; " % (target_label, imp))
         + ("EXACT_PNPM_STORE=$(cd \"$FLK_ROOT\" && node --experimental-top-level-await --disable-warning=ExperimentalWarning --experimental-strip-types --import \"$FLK_ROOT/build-tools/tools/dev/zx-init.mjs\" \"$FLK_ROOT/build-tools/tools/dev/prepare-exact-pnpm-store.ts\" --importer \"%s\"); " % imp)

@@ -6,8 +6,8 @@ const FALLBACK_FAILED_CHECK = "rls_tenant_isolation";
 
 function runtimeBin(): string {
   return String(
-    process.env.BNX_SUPABASE_MIGRATION_BIN ||
-      process.env.BNX_DEPLOY_SUPABASE_MIGRATION_BIN ||
+    process.env.VBR_SUPABASE_MIGRATION_BIN ||
+      process.env.VBR_DEPLOY_SUPABASE_MIGRATION_BIN ||
       "supabase-migration-runtime",
   ).trim();
 }

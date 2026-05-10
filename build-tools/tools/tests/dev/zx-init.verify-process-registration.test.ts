@@ -83,8 +83,8 @@ test("zx-init registers verify-owned processes only when explicitly opted in", a
   try {
     const baseEnv = {
       ...process.env,
-      BNX_VERIFY_PROCESS_STATE_FILE: stateFile,
-      BNX_VERIFY_LOG_FILE: logFile,
+      VBR_VERIFY_PROCESS_STATE_FILE: stateFile,
+      VBR_VERIFY_LOG_FILE: logFile,
     };
     delete baseEnv.BUCK_ISOLATION_DIR;
     delete baseEnv.BUCK_NESTED_ISO;
@@ -105,7 +105,7 @@ test("zx-init registers verify-owned processes only when explicitly opted in", a
     assert.equal(
       await runNodeWithVerifyEnv({
         ...baseEnv,
-        BNX_VERIFY_REGISTER_PROCESS: "1",
+        VBR_VERIFY_REGISTER_PROCESS: "1",
         BUCK_TEST_TARGET: "root//:zx_init_verify_registration",
       }),
       0,
@@ -146,9 +146,9 @@ test("zx-init consumes verify-owned process registration opt-in before spawning 
 
     const result = await runNodeScriptWithOutput(script, {
       ...process.env,
-      BNX_VERIFY_PROCESS_STATE_FILE: stateFile,
-      BNX_VERIFY_LOG_FILE: logFile,
-      BNX_VERIFY_REGISTER_PROCESS: "1",
+      VBR_VERIFY_PROCESS_STATE_FILE: stateFile,
+      VBR_VERIFY_LOG_FILE: logFile,
+      VBR_VERIFY_REGISTER_PROCESS: "1",
       BUCK_TEST_TARGET: "root//:zx_init_verify_registration_once",
     });
     assert.equal(result.code, 0, `stdout:\n${result.stdout}\nstderr:\n${result.stderr}`);
@@ -172,9 +172,9 @@ test("zx-init registers nested buck isolation against verify owner", async () =>
     assert.equal(
       await runNodeWithVerifyEnv({
         ...process.env,
-        BNX_VERIFY_PROCESS_STATE_FILE: stateFile,
-        BNX_VERIFY_LOG_FILE: logFile,
-        BNX_VERIFY_OWNER_PID: String(process.pid),
+        VBR_VERIFY_PROCESS_STATE_FILE: stateFile,
+        VBR_VERIFY_LOG_FILE: logFile,
+        VBR_VERIFY_OWNER_PID: String(process.pid),
         BUCK_NESTED_ISO: "zxtest-shared-deadbeef12",
         WORKSPACE_ROOT: process.cwd(),
       }),

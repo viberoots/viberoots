@@ -32,7 +32,7 @@ export async function materializeBackendControlPlaneFiles(
   if (!envelope || !snapshotEnvelope) {
     throw new Error(`backend state missing submission or snapshot for ${submissionId}`);
   }
-  const tempDir = await fsp.mkdtemp(path.join(os.tmpdir(), "bnx-control-plane-"));
+  const tempDir = await fsp.mkdtemp(path.join(os.tmpdir(), "vbr-control-plane-"));
   const executionSnapshotPath = path.join(tempDir, "snapshot.json");
   const submissionPath = path.join(tempDir, "submission.json");
   await writeControlPlaneJson(

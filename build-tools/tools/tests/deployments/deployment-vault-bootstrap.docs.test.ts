@@ -32,7 +32,7 @@ test("Vault bootstrap runbook uses reviewed shared-host IdP module and JWT helpe
   assert.match(doc, /\$\{deploymentModulesRoot\}\/shared-host-vault-module\.nix/);
   assert.match(doc, /\$\{deploymentModulesRoot\}\/shared-host-identity-provider-module\.nix/);
   assert.match(doc, /deploy-vault-jwt \\/);
-  assert.match(doc, /--client-secret-env BNX_DEPLOYER_CLIENT_SECRET/);
+  assert.match(doc, /--client-secret-env VBR_DEPLOYER_CLIENT_SECRET/);
   assert.match(doc, /--expect-claim deployment_environment=mini/);
   assert.match(doc, /permission denied[\s\S]*sys\/auth\/\*/);
   assert.match(doc, /useAcmeCertificate = true/);
@@ -42,6 +42,6 @@ test("Vault bootstrap runbook uses reviewed shared-host IdP module and JWT helpe
   assert.match(doc, /useACMEHost = "apps\.kilty\.io"/);
   assert.match(doc, /identity\.apps\.kilty\.io[\s\S]*wildcard certificate/);
   assert.doesNotMatch(doc, /protocol\/openid-connect\/token" \\/);
-  assert.doesNotMatch(doc, /client_secret=\$BNX_DEPLOYER_CLIENT_SECRET/);
+  assert.doesNotMatch(doc, /client_secret=\$VBR_DEPLOYER_CLIENT_SECRET/);
   assert.doesNotMatch(doc, /initialAdminPassword = "replace-after-first-login"/);
 });

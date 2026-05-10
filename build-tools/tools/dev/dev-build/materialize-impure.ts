@@ -6,7 +6,7 @@ import { nodeBin, zxNodeBase } from "./paths";
 import { runNixBuildWithProgress } from "../run-runnable-nix";
 
 function materializeTimeoutSec(): number {
-  const raw = String(process.env.BNX_MATERIALIZE_TIMEOUT_SEC || "").trim();
+  const raw = String(process.env.VBR_MATERIALIZE_TIMEOUT_SEC || "").trim();
   const parsed = Number(raw || "120");
   if (!Number.isFinite(parsed) || parsed <= 0) return 120;
   return Math.floor(parsed);
@@ -18,8 +18,8 @@ async function nixBuildPrintOutPaths(opts: {
   args: string[];
   label: string;
 }): Promise<string> {
-  const prev = process.env.BNX_RUNNABLE_BUILD_TIMEOUT_SEC;
-  process.env.BNX_RUNNABLE_BUILD_TIMEOUT_SEC = String(materializeTimeoutSec());
+  const prev = process.env.VBR_RUNNABLE_BUILD_TIMEOUT_SEC;
+  process.env.VBR_RUNNABLE_BUILD_TIMEOUT_SEC = String(materializeTimeoutSec());
   try {
     return await runNixBuildWithProgress({
       workspaceRoot: opts.root,
@@ -28,8 +28,8 @@ async function nixBuildPrintOutPaths(opts: {
       label: opts.label,
     });
   } finally {
-    if (typeof prev === "string") process.env.BNX_RUNNABLE_BUILD_TIMEOUT_SEC = prev;
-    else delete process.env.BNX_RUNNABLE_BUILD_TIMEOUT_SEC;
+    if (typeof prev === "string") process.env.VBR_RUNNABLE_BUILD_TIMEOUT_SEC = prev;
+    else delete process.env.VBR_RUNNABLE_BUILD_TIMEOUT_SEC;
   }
 }
 

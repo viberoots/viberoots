@@ -71,7 +71,7 @@ test("routine deploy rejects destructive schema-migration release actions", asyn
     });
     await withEnvOverrides(
       {
-        BNX_DEPLOYMENT_SECRET_FIXTURE_PATH: fixturePath,
+        VBR_DEPLOYMENT_SECRET_FIXTURE_PATH: fixturePath,
       },
       async () =>
         await assert.rejects(

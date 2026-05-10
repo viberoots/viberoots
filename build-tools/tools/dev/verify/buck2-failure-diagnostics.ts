@@ -56,7 +56,7 @@ export async function sampleVerifyProcessLines(timeoutMs = 2000): Promise<string
     psArgs: ["-axo", "pid=,ppid=,pgid=,etime=,stat=,command="],
     timeoutMs,
     pgrepPattern:
-      "buck2d\\[|\\(buck2-forkserver\\)|(^|/)buck2( |$)|(^|/)node(js)?( |$)|(^|/)nix( |$)|BNX_VERIFY_LOG_FILE=|BNX_VERIFY_PROCESS_STATE_FILE=",
+      "buck2d\\[|\\(buck2-forkserver\\)|(^|/)buck2( |$)|(^|/)node(js)?( |$)|(^|/)nix( |$)|VBR_VERIFY_LOG_FILE=|VBR_VERIFY_PROCESS_STATE_FILE=",
     pgrepToLine: (pid, cmd) => `${pid} 0 0 00:00 ? ${cmd}`,
   });
   return lines.length > 0 ? lines : null;

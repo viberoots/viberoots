@@ -61,9 +61,9 @@ test("deploy rejects protected/shared kubernetes service without publish secret_
     });
     const previous = { ...process.env };
     process.env.PATH = `${fake.binDir}:${previous.PATH || ""}`;
-    process.env.BNX_KUBERNETES_HELM_BIN = path.join(fake.binDir, "helm");
-    process.env.BNX_KUBERNETES_FAKE_PUBLISH_ROOT = fake.publishRoot;
-    process.env.BNX_KUBERNETES_FAKE_HELM_LOG = fake.logPath;
+    process.env.VBR_KUBERNETES_HELM_BIN = path.join(fake.binDir, "helm");
+    process.env.VBR_KUBERNETES_FAKE_PUBLISH_ROOT = fake.publishRoot;
+    process.env.VBR_KUBERNETES_FAKE_HELM_LOG = fake.logPath;
     try {
       await assert.rejects(
         async () =>
@@ -78,9 +78,9 @@ test("deploy rejects protected/shared kubernetes service without publish secret_
       );
     } finally {
       process.env.PATH = previous.PATH || "";
-      delete process.env.BNX_KUBERNETES_HELM_BIN;
-      delete process.env.BNX_KUBERNETES_FAKE_PUBLISH_ROOT;
-      delete process.env.BNX_KUBERNETES_FAKE_HELM_LOG;
+      delete process.env.VBR_KUBERNETES_HELM_BIN;
+      delete process.env.VBR_KUBERNETES_FAKE_PUBLISH_ROOT;
+      delete process.env.VBR_KUBERNETES_FAKE_HELM_LOG;
     }
   });
 });
@@ -119,9 +119,9 @@ async function exerciseExactArtifactRun(operationKind: ExactRunOperationKind): P
     });
     const previous = { ...process.env };
     process.env.PATH = `${fake.binDir}:${previous.PATH || ""}`;
-    process.env.BNX_KUBERNETES_HELM_BIN = path.join(fake.binDir, "helm");
-    process.env.BNX_KUBERNETES_FAKE_PUBLISH_ROOT = fake.publishRoot;
-    process.env.BNX_KUBERNETES_FAKE_HELM_LOG = fake.logPath;
+    process.env.VBR_KUBERNETES_HELM_BIN = path.join(fake.binDir, "helm");
+    process.env.VBR_KUBERNETES_FAKE_PUBLISH_ROOT = fake.publishRoot;
+    process.env.VBR_KUBERNETES_FAKE_HELM_LOG = fake.logPath;
     try {
       const sourceRevision = `rev-publish-creds-${operationKind}-1`;
       const sourceRecord = {
@@ -180,9 +180,9 @@ async function exerciseExactArtifactRun(operationKind: ExactRunOperationKind): P
       assert.equal(JSON.stringify(record).includes("vault:fake"), false);
     } finally {
       process.env.PATH = previous.PATH || "";
-      delete process.env.BNX_KUBERNETES_HELM_BIN;
-      delete process.env.BNX_KUBERNETES_FAKE_PUBLISH_ROOT;
-      delete process.env.BNX_KUBERNETES_FAKE_HELM_LOG;
+      delete process.env.VBR_KUBERNETES_HELM_BIN;
+      delete process.env.VBR_KUBERNETES_FAKE_PUBLISH_ROOT;
+      delete process.env.VBR_KUBERNETES_FAKE_HELM_LOG;
       fixtureEnv.restore();
       await server.close();
     }

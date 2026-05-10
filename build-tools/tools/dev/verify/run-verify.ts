@@ -106,7 +106,7 @@ export async function runVerify(): Promise<void> {
   await fsp.mkdir(analysisDir, { recursive: true }).catch(() => {});
   await fsp.rm(path.join(root, ".tmp"), { recursive: true, force: true }).catch(() => {});
   await timedPhase("ensure-buck-prelude-config", async () => await ensureBuckPreludeConfig(root));
-  process.env.BNX_SHARED_PRELUDE_PATH = path.join(root, "prelude");
+  process.env.VBR_SHARED_PRELUDE_PATH = path.join(root, "prelude");
   const targetFreeGiB = verifyTargetFreeGiBDefault(args.coverage);
   const runNixStoreOptimize = shouldRunNixStoreOptimizeForRequestedTargets(selection.targets);
   const { freeGiB } = await timedPhase(
@@ -158,15 +158,15 @@ export async function runVerify(): Promise<void> {
       "prepare-verify-seed",
       async () => await prepareVerifySeed({ root, iso }),
     );
-    process.env.BNX_TEST_SEED_STORE_PATH = seed.seedPath;
-    process.env.BNX_TEST_SEED_KEY = seed.seedKey;
-    process.env.BNX_TEST_SEED_PIN_DIR = seed.pinDir;
+    process.env.VBR_TEST_SEED_STORE_PATH = seed.seedPath;
+    process.env.VBR_TEST_SEED_KEY = seed.seedKey;
+    process.env.VBR_TEST_SEED_PIN_DIR = seed.pinDir;
     seedCleanup = seed.cleanup;
   } else {
     process.stderr.write("[verify] seed build: skipped for scoped verify run\n");
-    delete process.env.BNX_TEST_SEED_STORE_PATH;
-    delete process.env.BNX_TEST_SEED_KEY;
-    delete process.env.BNX_TEST_SEED_PIN_DIR;
+    delete process.env.VBR_TEST_SEED_STORE_PATH;
+    delete process.env.VBR_TEST_SEED_KEY;
+    delete process.env.VBR_TEST_SEED_PIN_DIR;
   }
   try {
     const res = await timedPhase(

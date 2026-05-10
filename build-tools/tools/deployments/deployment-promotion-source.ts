@@ -50,7 +50,7 @@ function defaultRecordsRoots(workspaceRoot: string, recordsRoot: string): string
 
 function sharedPromotionBackendError(): Error {
   return new Error(
-    "shared promotion source lookup requires backendDatabaseUrl or BNX_DEPLOY_CONTROL_PLANE_DATABASE_URL",
+    "shared promotion source lookup requires backendDatabaseUrl or VBR_DEPLOY_CONTROL_PLANE_DATABASE_URL",
   );
 }
 
@@ -62,7 +62,7 @@ async function resolvePromotionSourceByPath(
   if (raw.provider === "nixos-shared-host") {
     const backendDatabaseUrl =
       opts?.backendDatabaseUrl ||
-      String(process.env.BNX_DEPLOY_CONTROL_PLANE_DATABASE_URL || "").trim();
+      String(process.env.VBR_DEPLOY_CONTROL_PLANE_DATABASE_URL || "").trim();
     if (!backendDatabaseUrl) {
       throw sharedPromotionBackendError();
     }
@@ -180,7 +180,7 @@ export async function resolveDeploymentPromotionSourceRecordPath(opts: {
 }): Promise<string | undefined> {
   const sharedHostBackendDatabaseUrl =
     opts.backendDatabaseUrl ||
-    String(process.env.BNX_DEPLOY_CONTROL_PLANE_DATABASE_URL || "").trim();
+    String(process.env.VBR_DEPLOY_CONTROL_PLANE_DATABASE_URL || "").trim();
   if (sharedHostBackendDatabaseUrl) {
     const backend: NixosSharedHostControlPlaneBackendTarget = {
       recordsRoot: path.resolve(opts.recordsRoot),
@@ -215,7 +215,7 @@ export async function resolveDeploymentPromotionSource(opts: {
 }): Promise<DeploymentPromotionSource> {
   const sharedHostBackendDatabaseUrl =
     opts.backendDatabaseUrl ||
-    String(process.env.BNX_DEPLOY_CONTROL_PLANE_DATABASE_URL || "").trim();
+    String(process.env.VBR_DEPLOY_CONTROL_PLANE_DATABASE_URL || "").trim();
   if (sharedHostBackendDatabaseUrl) {
     const sharedHostSource = await resolveSharedHostPromotionSourceFromBackend({
       recordsRoot: opts.recordsRoot,

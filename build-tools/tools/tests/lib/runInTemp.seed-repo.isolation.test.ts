@@ -8,8 +8,8 @@ import { runInTemp } from "./test-helpers";
 
 test("runInTemp seed repo does not leak mutations across temp repos", async () => {
   assert.ok(
-    process.env.BNX_TEST_SEED_STORE_PATH,
-    "expected verifier to provide BNX_TEST_SEED_STORE_PATH",
+    process.env.VBR_TEST_SEED_STORE_PATH,
+    "expected verifier to provide VBR_TEST_SEED_STORE_PATH",
   );
 
   const realRepoRoot = process.cwd();

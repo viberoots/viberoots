@@ -22,7 +22,7 @@ export async function firstNixGit(): Promise<string> {
 
 export async function checkedTool(name: string): Promise<string> {
   const found = await commandPath(name);
-  assert.notEqual(found, "", `${name} must be on PATH for BNX_AGENT_SAFEHOUSE_E2E=1`);
+  assert.notEqual(found, "", `${name} must be on PATH for VBR_AGENT_SAFEHOUSE_E2E=1`);
   return found;
 }
 
@@ -148,15 +148,15 @@ export async function createWorktreeWithCodex(opts: {
     cwd: opts.repoRoot,
     env: {
       ...process.env,
-      BNX_CODEX_E2E_PROMPT: prompt,
-      BNX_CODEX_E2E_WORKTREE_NAME: opts.worktreeName,
-      BNX_CODEX_E2E_WRAPPER: opts.codexWrapper,
+      VBR_CODEX_E2E_PROMPT: prompt,
+      VBR_CODEX_E2E_WORKTREE_NAME: opts.worktreeName,
+      VBR_CODEX_E2E_WRAPPER: opts.codexWrapper,
     },
     stdio: "pipe",
     reject: false,
     nothrow: true,
     timeout: 180_000,
-  })`bash --noprofile --norc -c 'exec "$BNX_CODEX_E2E_WRAPPER" --worktree "$BNX_CODEX_E2E_WORKTREE_NAME" exec --sandbox workspace-write "$BNX_CODEX_E2E_PROMPT" < /dev/null'`;
+  })`bash --noprofile --norc -c 'exec "$VBR_CODEX_E2E_WRAPPER" --worktree "$VBR_CODEX_E2E_WORKTREE_NAME" exec --sandbox workspace-write "$VBR_CODEX_E2E_PROMPT" < /dev/null'`;
   assert.equal(res.exitCode, 0, String(res.stderr || res.stdout));
   await fsp.stat(path.join(opts.worktree, ".git"));
   assert.equal(
