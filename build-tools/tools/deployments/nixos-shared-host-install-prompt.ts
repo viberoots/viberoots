@@ -46,7 +46,7 @@ export type ClientPromptInput = {
 };
 
 function defaultRemoteRepoPath(_repoRoot: string): string {
-  return "/srv/common";
+  return "/srv/viberoots";
 }
 
 async function maybePromptInput<T extends Record<string, unknown>>(

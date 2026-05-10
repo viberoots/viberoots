@@ -21,12 +21,12 @@ test("control-plane submit and status responses preserve public service-instance
     dedupe: { mode: "created" as const, requestFingerprint: "sha256:submit" },
     serviceInstance: {
       hostname: "mini",
-      workspaceRoot: "/srv/common",
+      workspaceRoot: "/srv/viberoots",
       gitHead: "8f00f5cd723bed179a48847d2daeea3e0c2dcce1",
       reviewedRef: "env/pleomino/dev",
-      reviewedRepository: "kiltyj/common",
+      reviewedRepository: "kiltyj/viberoots",
       reviewedRemoteName: "origin",
-      reviewedRemoteUrl: "git@github.com:kiltyj/common.git",
+      reviewedRemoteUrl: "git@github.com:kiltyj/viberoots.git",
     },
   };
 

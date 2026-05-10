@@ -64,7 +64,7 @@ test("deploy --status can use an installed service profile for Cloudflare Pages"
       input: {
         profileName: "mini",
         destination: "root@mini.test",
-        remoteRepoPath: "/srv/common",
+        remoteRepoPath: "/srv/viberoots",
         remoteStatePath: "/etc/nixos/deployment-host/platform-state.json",
         remoteRuntimeRoot: "/var/lib/deployment-host/runtime",
         remoteRecordsRoot: "/var/lib/deployment-host/records",

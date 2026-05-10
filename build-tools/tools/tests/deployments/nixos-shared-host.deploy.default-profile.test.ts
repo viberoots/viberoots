@@ -13,7 +13,7 @@ async function installClientProfile($: any, profileRoot: string): Promise<void> 
   process.env[LOCAL_FIXTURE_SERVICE_ENV] = "1";
   await $({
     env: { ...process.env, [LOCAL_FIXTURE_SERVICE_ENV]: "1" },
-  })`zx-wrapper build-tools/tools/deployments/nixos-shared-host-install.ts client install --output-root ${profileRoot} --profile mini --destination mini --remote-repo-path /srv/common --remote-state-path /etc/nixos/deployment-host/platform-state.json --remote-runtime-root /var/lib/deployment-host/runtime --remote-records-root /var/lib/deployment-host/records --ssh-mode ssh --control-plane-url http://127.0.0.1:7780`;
+  })`zx-wrapper build-tools/tools/deployments/nixos-shared-host-install.ts client install --output-root ${profileRoot} --profile mini --destination mini --remote-repo-path /srv/viberoots --remote-state-path /etc/nixos/deployment-host/platform-state.json --remote-runtime-root /var/lib/deployment-host/runtime --remote-records-root /var/lib/deployment-host/records --ssh-mode ssh --control-plane-url http://127.0.0.1:7780`;
 }
 
 test("public deploy plan uses lane default client profile when --profile is omitted", async () => {

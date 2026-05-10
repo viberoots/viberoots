@@ -39,6 +39,9 @@ const STALE_PATTERNS: Array<{ re: RegExp; label: string }> = [
   { re: /(^|[^A-Za-z0-9])bnx(?=[^A-Za-z0-9]|$)/g, label: "bnx" },
   { re: /(^|[^A-Za-z0-9])Bnx(?=[^A-Za-z0-9]|$)/g, label: "Bnx" },
   { re: /(^|[^A-Za-z0-9])BNX(?=[^A-Za-z0-9]|$)/g, label: "BNX" },
+  { re: /\/srv\/common\b/g, label: "/srv/common deployment path" },
+  { re: /\bkiltyj\/common\b/g, label: "kiltyj/common" },
+  { re: /\bgit@github\.com:kiltyj\/common\.git\b/g, label: "old common repo remote" },
 ];
 
 function normalizeRel(p: string): string {

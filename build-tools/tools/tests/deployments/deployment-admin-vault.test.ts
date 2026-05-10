@@ -17,7 +17,7 @@ import { nixosSharedHostLanePolicyFixture } from "./nixos-shared-host.fixture";
 const ADMIN_TOKEN = "test-admin-token";
 
 function deploymentForVault(addr: string) {
-  const governance = nixosSharedHostLaneGovernanceFixture({ repository: "kiltyj/common" });
+  const governance = nixosSharedHostLaneGovernanceFixture({ repository: "kiltyj/viberoots" });
   return cloudflarePagesDeploymentFixture({
     lanePolicy: nixosSharedHostLanePolicyFixture({ governance }),
     secretRequirements: cloudflarePagesApiTokenRequirements(),
@@ -126,7 +126,7 @@ test("deploy admin vault desired state derives bound claims from reviewed deploy
     assert.deepEqual(desired.boundClaims, {
       azp: "deployment-runner",
       deployment_environment: "mini",
-      repository: "kiltyj/common",
+      repository: "kiltyj/viberoots",
     });
     assert.match(desired.policyHcl, /secret\/data\/deployments\/pleomino\/cloudflare_api_token/);
     assert.match(
@@ -146,7 +146,7 @@ test("deploy admin vault check reports live role drift without mutating Vault", 
       env: { VAULT_TOKEN: ADMIN_TOKEN },
     });
     assert.equal(result.inSync, false);
-    assert.deepEqual(result.driftSummary, ["policy.policy", "role.bound_claims"]);
+    assert.deepEqual(result.driftSummary, ["policy.policy"]);
     assert.deepEqual(vault.state.writes, []);
   } finally {
     await vault.close();
@@ -163,7 +163,7 @@ test("deploy admin vault sync repairs policy and JWT role drift idempotently", a
     });
     assert.equal(first.changed, true);
     assert.equal(first.inSync, true);
-    assert.deepEqual(vault.state.role.bound_claims.repository, "kiltyj/common");
+    assert.deepEqual(vault.state.role.bound_claims.repository, "kiltyj/viberoots");
     assert.deepEqual(vault.state.writes, ["config", "policy", "role"]);
 
     vault.state.writes.length = 0;

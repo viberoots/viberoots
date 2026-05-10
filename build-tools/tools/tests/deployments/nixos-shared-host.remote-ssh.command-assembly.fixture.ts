@@ -13,7 +13,7 @@ export const remoteSshCommandAssemblyPlan: NixosSharedHostRemotePlan = {
   profileName: "mini",
   destination: "mini",
   transportMode: "ssh",
-  remoteRepoPath: "/srv/common",
+  remoteRepoPath: "/srv/viberoots",
   remoteStatePath: "/etc/nixos/deployment-host/platform-state.json",
   remoteRuntimeRoot: "/var/lib/deployment-host/runtime",
   remoteRecordsRoot: "/var/lib/deployment-host/records",

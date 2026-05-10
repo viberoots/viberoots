@@ -11,7 +11,7 @@ let
     if reviewedSourceSsh.knownHostsFile == null then githubKnownHostsPath else reviewedSourceSsh.knownHostsFile;
   cloudflarePagesWrangler = pkgs.writeShellScript "vbr-cloudflare-pages-wrangler" ''
     export PATH="${lib.makeBinPath [ pkgs.coreutils pkgs.gnused pkgs.nodejs_22 ]}:$PATH"
-    exec /srv/common/node_modules/.bin/wrangler "$@"
+    exec /srv/viberoots/node_modules/.bin/wrangler "$@"
   '';
   githubKnownHosts = ''
     github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl

@@ -20,7 +20,7 @@ async function installClientProfile(
   process.env[LOCAL_FIXTURE_SERVICE_ENV] = "1";
   await $({
     env: { ...process.env, [LOCAL_FIXTURE_SERVICE_ENV]: "1" },
-  })`zx-wrapper build-tools/tools/deployments/nixos-shared-host-install.ts client install --output-root ${profileRoot} --profile mini --destination mini --remote-repo-path /srv/common --remote-state-path /etc/nixos/deployment-host/platform-state.json --remote-runtime-root /var/lib/deployment-host/runtime --remote-records-root /var/lib/deployment-host/records --ssh-mode ${sshMode} ${sshIdentityFile ? ["--ssh-identity-file", sshIdentityFile] : []} ${sshKnownHostsFile ? ["--ssh-known-hosts", sshKnownHostsFile] : []} --control-plane-url ${controlPlaneUrl}`;
+  })`zx-wrapper build-tools/tools/deployments/nixos-shared-host-install.ts client install --output-root ${profileRoot} --profile mini --destination mini --remote-repo-path /srv/viberoots --remote-state-path /etc/nixos/deployment-host/platform-state.json --remote-runtime-root /var/lib/deployment-host/runtime --remote-records-root /var/lib/deployment-host/records --ssh-mode ${sshMode} ${sshIdentityFile ? ["--ssh-identity-file", sshIdentityFile] : []} ${sshKnownHostsFile ? ["--ssh-known-hosts", sshKnownHostsFile] : []} --control-plane-url ${controlPlaneUrl}`;
 }
 
 async function installReviewedDeployment(workspaceRoot: string): Promise<string> {
@@ -44,7 +44,7 @@ test("deploy plan reads the reviewed remote profile deterministically", async ()
       profileName: "mini",
       destination: "mini",
       transportMode: "ssh",
-      remoteRepoPath: "/srv/common",
+      remoteRepoPath: "/srv/viberoots",
       remoteStatePath: "/etc/nixos/deployment-host/platform-state.json",
       remoteRuntimeRoot: "/var/lib/deployment-host/runtime",
       remoteRecordsRoot: "/var/lib/deployment-host/records",
@@ -211,7 +211,7 @@ test("deploy plan fails closed on malformed client manifests", async () => {
         toolFingerprint: "broken",
         profileName: "mini",
         destination: "mini",
-        remoteRepoPath: "/srv/common",
+        remoteRepoPath: "/srv/viberoots",
         remoteStatePath: "/etc/nixos/deployment-host/platform-state.json",
         remoteRuntimeRoot: "/var/lib/deployment-host/runtime",
         remoteRecordsRoot: "/var/lib/deployment-host/records",

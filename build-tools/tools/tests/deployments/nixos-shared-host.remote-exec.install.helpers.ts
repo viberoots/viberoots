@@ -23,7 +23,7 @@ export async function installHarnessClientProfile(
   await installClientProfile(
     $,
     profileRoot,
-    "/srv/common",
+    "/srv/viberoots",
     path.join(tmp, "remote-state.json"),
     path.join(tmp, "remote-runtime"),
     path.join(tmp, "remote-records"),

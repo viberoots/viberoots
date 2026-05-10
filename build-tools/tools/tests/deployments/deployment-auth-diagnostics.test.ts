@@ -142,8 +142,8 @@ test("auth action summary and realm export stay aligned on reviewed group names"
     "deployments-vault",
   );
   assert.equal(realm.clients[0]?.protocolMappers[3]?.config["claim.value"], "mini");
-  assert.equal(realm.clients[0]?.protocolMappers[4]?.config["claim.value"], "kiltyj/common");
-  assert.equal(realm.clients[1]?.protocolMappers[2]?.config["claim.value"], "kiltyj/common");
+  assert.equal(realm.clients[0]?.protocolMappers[4]?.config["claim.value"], "kiltyj/viberoots");
+  assert.equal(realm.clients[1]?.protocolMappers[2]?.config["claim.value"], "kiltyj/viberoots");
   const commands = action.exampleAdminCommands.join("\n");
   assert.match(
     commands,

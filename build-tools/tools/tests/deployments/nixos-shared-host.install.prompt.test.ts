@@ -55,7 +55,7 @@ test("nixos-shared-host prompt helper uses inline rules for client install", asy
         return {
           profileName: "mini",
           destination: "mini",
-          remoteRepoPath: "/srv/common",
+          remoteRepoPath: "/srv/viberoots",
           remoteStatePath: "/etc/nixos/deployment-host/platform-state.json",
           remoteRuntimeRoot: "/var/lib/deployment-host/runtime",
           remoteRecordsRoot: "/var/lib/deployment-host/records",
@@ -79,7 +79,7 @@ test("nixos-shared-host prompt helper uses inline rules for client install", asy
   ]);
   assert.deepEqual(capturedRules?.defaults, {
     profileName: "default",
-    remoteRepoPath: "/srv/common",
+    remoteRepoPath: "/srv/viberoots",
     remoteStatePath: "/etc/nixos/deployment-host/platform-state.json",
     remoteRuntimeRoot: "/var/lib/deployment-host/runtime",
     remoteRecordsRoot: "/var/lib/deployment-host/records",
@@ -91,7 +91,7 @@ test("nixos-shared-host prompt helper uses inline rules for client install", asy
     destination: "${profileName}",
   });
   assert.deepEqual(capturedInput, {});
-  assert.equal(result.remoteRepoPath, "/srv/common");
+  assert.equal(result.remoteRepoPath, "/srv/viberoots");
   assert.equal(result.sshIdentityFile, "/Users/me/.ssh/mini");
   assert.equal(result.sshKnownHostsFile, "/Users/me/.ssh/known_hosts-mini");
   assert.equal(result.controlPlaneUrl, "http://127.0.0.1:7780");

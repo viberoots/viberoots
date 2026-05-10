@@ -8,7 +8,7 @@ load(
 deployment_lane_governance(
     name = "lane_governance",
     scm_backend = "github",
-    repository = "kiltyj/common",
+    repository = "kiltyj/viberoots",
     branch_protections = [
         {"stage": "dev", "branch": "env/pleomino/dev", "required_checks": "deploy/admission", "fast_forward_only": "true", "normal_advance_principals": "repository-role:admin", "emergency_direct_push_principals": "repository-role:admin"},
         {"stage": "staging", "branch": "env/pleomino/staging", "required_checks": "deploy/admission", "fast_forward_only": "true", "normal_advance_principals": "repository-role:admin", "emergency_direct_push_principals": "repository-role:admin"},

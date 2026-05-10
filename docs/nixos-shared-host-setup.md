@@ -23,11 +23,11 @@ itself.
 For repo-managed local Vault support on `mini`, the reviewed optional service
 modules live at:
 
-- `/srv/common/build-tools/tools/nix/shared-host-identity-provider-module.nix`
-- `/srv/common/build-tools/tools/nix/shared-host-postgres-module.nix`
-- `/srv/common/build-tools/tools/nix/shared-host-vault-module.nix`
-- `/srv/common/build-tools/tools/nix/shared-host-deployment-service-module.nix`
-- `/srv/common/build-tools/tools/nix/shared-host-deploy-auth-callback-module.nix`
+- `/srv/viberoots/build-tools/tools/nix/shared-host-identity-provider-module.nix`
+- `/srv/viberoots/build-tools/tools/nix/shared-host-postgres-module.nix`
+- `/srv/viberoots/build-tools/tools/nix/shared-host-vault-module.nix`
+- `/srv/viberoots/build-tools/tools/nix/shared-host-deployment-service-module.nix`
+- `/srv/viberoots/build-tools/tools/nix/shared-host-deploy-auth-callback-module.nix`
 
 The Vault runbook shows how to use the identity-provider module and the
 reviewed deploy auth diagnostics. Its `deploy-vault-jwt` helper remains
@@ -73,7 +73,7 @@ In other words:
 
 The default reviewed path is:
 
-1. prepare a repo checkout on `mini` at `/srv/common`
+1. prepare a repo checkout on `mini` at `/srv/viberoots`
 2. run `server install` on `mini`
 3. import `/etc/nixos/deployment-host/default.nix` into the
    authoritative NixOS config
@@ -105,7 +105,7 @@ without changing the host.
 Run from the repo checkout on `mini`:
 
 ```bash
-cd /srv/common
+cd /srv/viberoots
 direnv exec . build-tools/tools/bin/nixos-shared-host-install \
   server install
 ```
@@ -214,7 +214,7 @@ sudo nixos-rebuild switch
 Then verify the install:
 
 ```bash
-cd /srv/common
+cd /srv/viberoots
 direnv exec . build-tools/tools/bin/nixos-shared-host-install \
   server status
 ```
@@ -246,18 +246,18 @@ Status field meanings:
 If you also want `mini` itself to run local Postgres and Vault services, the
 repo now includes reviewed importable NixOS modules:
 
-- `/srv/common/build-tools/tools/nix/shared-host-postgres-module.nix`
-- `/srv/common/build-tools/tools/nix/shared-host-vault-module.nix`
-- `/srv/common/build-tools/tools/nix/shared-host-deployment-service-module.nix`
-- `/srv/common/build-tools/tools/nix/shared-host-deploy-auth-callback-module.nix`
+- `/srv/viberoots/build-tools/tools/nix/shared-host-postgres-module.nix`
+- `/srv/viberoots/build-tools/tools/nix/shared-host-vault-module.nix`
+- `/srv/viberoots/build-tools/tools/nix/shared-host-deployment-service-module.nix`
+- `/srv/viberoots/build-tools/tools/nix/shared-host-deploy-auth-callback-module.nix`
 
-Use these when the host keeps a checkout of this repo at `/srv/common` and you
+Use these when the host keeps a checkout of this repo at `/srv/viberoots` and you
 want the service definitions versioned with the rest of the deployment system.
-For a flake-based host, add `/srv/common/build-tools/tools/nix` as a non-flake
+For a flake-based host, add `/srv/viberoots/build-tools/tools/nix` as a non-flake
 path input and import the modules through that input. Do not import
-`/srv/common/...` as an absolute path from `configuration.nix`; pure flake
+`/srv/viberoots/...` as an absolute path from `configuration.nix`; pure flake
 evaluation rejects that unless you rebuild with `--impure`. Do not point the
-input at all of `/srv/common` unless you are comfortable copying the full repo
+input at all of `/srv/viberoots` unless you are comfortable copying the full repo
 into the store during rebuilds.
 
 These modules are intentionally opt-in. The shared-host installer does not
@@ -268,7 +268,7 @@ Example `flake.nix` wiring:
 ```nix
 {
   inputs.deploymentModules = {
-    url = "path:/srv/common/build-tools/tools/nix";
+    url = "path:/srv/viberoots/build-tools/tools/nix";
     flake = false;
   };
 
@@ -356,7 +356,7 @@ deploymentHost.identityProvider = {
     "/var/lib/deployment-host-secrets/bootstrap-first-operator-password";
   bootstrapTokenClaims = {
     deployment_environment = "mini";
-    repository = "kiltyj/common";
+    repository = "kiltyj/viberoots";
   };
   manageNginx = false;
   manageAcme = false;
@@ -475,7 +475,7 @@ direnv exec . build-tools/tools/bin/deploy admin identity grant-user \
 That reviewed remote path writes the authoritative realm files under the host
 config root, keeps flake evaluation pure, and then optionally runs the
 preflighted host-apply helper instead of relying on hand-edited files under
-`/srv/common`. During host reconciliation, the identity-provider module applies
+`/srv/viberoots`. During host reconciliation, the identity-provider module applies
 that reviewed bootstrap delta to both fresh installs and existing persisted
 realms before the steady-state human operator flow begins. The reviewed auth
 session already identifies the logged-in
@@ -533,7 +533,7 @@ bootstrap runbook.
 
 ## Start The Deployment Service
 
-Run these long-lived processes on `mini` from `/srv/common`.
+Run these long-lived processes on `mini` from `/srv/viberoots`.
 
 Plain-language version:
 
@@ -687,7 +687,7 @@ Common example values for the client-install flags:
 - `--destination mini`
   Defaults to the profile name. Override only when the destination label should
   differ from the local profile name.
-- `--remote-repo-path /srv/common`
+- `--remote-repo-path /srv/viberoots`
   Default value. Override only when the checkout on the host lives elsewhere.
 - `--remote-state-path /etc/nixos/deployment-host/platform-state.json`
   Default value. The state file is flake-visible and must not contain secrets.

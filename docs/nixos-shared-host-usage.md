@@ -70,14 +70,14 @@ For a fresh `mini` install, follow this exact order:
 
 1. run the server install on `mini`
 2. optionally import the reviewed service modules from
-   `/srv/common/build-tools/tools/nix/shared-host-identity-provider-module.nix`,
-   `/srv/common/build-tools/tools/nix/shared-host-postgres-module.nix` and
-   `/srv/common/build-tools/tools/nix/shared-host-vault-module.nix` when you want
+   `/srv/viberoots/build-tools/tools/nix/shared-host-identity-provider-module.nix`,
+   `/srv/viberoots/build-tools/tools/nix/shared-host-postgres-module.nix` and
+   `/srv/viberoots/build-tools/tools/nix/shared-host-vault-module.nix` when you want
    repo-managed local identity-provider, Postgres, and Vault services on `mini`.
    Also import
-   `/srv/common/build-tools/tools/nix/shared-host-deployment-service-module.nix`
+   `/srv/viberoots/build-tools/tools/nix/shared-host-deployment-service-module.nix`
    when `mini` should serve the reviewed hosted deployment API route and
-   `/srv/common/build-tools/tools/nix/shared-host-deploy-auth-callback-module.nix`
+   `/srv/viberoots/build-tools/tools/nix/shared-host-deploy-auth-callback-module.nix`
    when `mini` should serve the reviewed public PKCE callback route.
 3. wire `/etc/nixos/deployment-host/default.nix` into the
    authoritative NixOS config and apply it with `sudo nixos-rebuild switch`
@@ -114,27 +114,27 @@ instructions live in
 If you want `mini` itself to run the local services, the reviewed importable
 starting modules live here:
 
-- `/srv/common/build-tools/tools/nix/shared-host-postgres-module.nix`
-- `/srv/common/build-tools/tools/nix/shared-host-vault-module.nix`
-- `/srv/common/build-tools/tools/nix/shared-host-identity-provider-module.nix`
-- `/srv/common/build-tools/tools/nix/shared-host-deployment-service-module.nix`
-- `/srv/common/build-tools/tools/nix/shared-host-deploy-auth-callback-module.nix`
+- `/srv/viberoots/build-tools/tools/nix/shared-host-postgres-module.nix`
+- `/srv/viberoots/build-tools/tools/nix/shared-host-vault-module.nix`
+- `/srv/viberoots/build-tools/tools/nix/shared-host-identity-provider-module.nix`
+- `/srv/viberoots/build-tools/tools/nix/shared-host-deployment-service-module.nix`
+- `/srv/viberoots/build-tools/tools/nix/shared-host-deploy-auth-callback-module.nix`
 
 For a flake-based `/etc/nixos` host, expose only the module directory as a
 non-flake input:
 
 ```nix
 inputs.deploymentModules = {
-  url = "path:/srv/common/build-tools/tools/nix";
+  url = "path:/srv/viberoots/build-tools/tools/nix";
   flake = false;
 };
 ```
 
 Then import the modules through `deploymentModules` or a `specialArgs` value
-derived from it. Do not import `/srv/common/...` directly from
+derived from it. Do not import `/srv/viberoots/...` directly from
 `configuration.nix` during `nixos-rebuild switch --flake`; pure flake evaluation
 rejects absolute paths outside the flake input graph. Avoid pointing the input at
-all of `/srv/common`, since that copies the full repo into the store.
+all of `/srv/viberoots`, since that copies the full repo into the store.
 
 On the current `mini` host shape, those modules augment an existing
 configuration that already owns nginx, wildcard ACME, firewall lists, and DNS
@@ -194,7 +194,7 @@ What the install flags mean:
 - `--destination mini`
   The human-readable destination name stored in the profile. It defaults to the
   profile name, so the reviewed `mini` workflow does not need this flag.
-- `--remote-repo-path /srv/common`
+- `--remote-repo-path /srv/viberoots`
   The default repo checkout on `mini` that remote deploy commands should use.
   Override only if the checkout lives elsewhere.
 - `--remote-state-path /etc/nixos/deployment-host/platform-state.json`
@@ -229,7 +229,7 @@ direnv exec . build-tools/tools/bin/deploy \
 The plan output should show:
 
 - destination `mini`
-- remote repo path `/srv/common`
+- remote repo path `/srv/viberoots`
 - remote state path `/etc/nixos/deployment-host/platform-state.json`
 - remote runtime root `/var/lib/deployment-host/runtime`
 - remote records root `/var/lib/deployment-host/records`

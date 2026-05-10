@@ -44,7 +44,7 @@ test("nixos-shared-host client install accepts required parameters by stdin and 
     const payload = JSON.stringify({
       profileName: "mini",
       destination: "mini",
-      remoteRepoPath: "/srv/common",
+      remoteRepoPath: "/srv/viberoots",
       remoteStatePath: "/etc/nixos/deployment-host/platform-state.json",
       remoteRuntimeRoot: "/var/lib/deployment-host/runtime",
       remoteRecordsRoot: "/var/lib/deployment-host/records",
@@ -123,7 +123,7 @@ test("nixos-shared-host client list reports malformed profiles without blocking 
           toolFingerprint: "old",
           profileName: "default",
           destination: "default",
-          remoteRepoPath: "/srv/common",
+          remoteRepoPath: "/srv/viberoots",
           remoteStatePath: "/var/lib/viberoots/nixos-shared-host/platform-state.json",
           remoteRuntimeRoot: "/var/lib/viberoots/nixos-shared-host/runtime",
           remoteRecordsRoot: "/var/lib/viberoots/nixos-shared-host/records",

@@ -26,7 +26,7 @@ test("Vault bootstrap runbook uses reviewed shared-host IdP module and JWT helpe
   assert.doesNotMatch(doc, /url = "path:\/srv\/common";/);
   assert.match(
     doc,
-    /inputs\.deploymentModules = \{[\s\S]*url = "path:\/srv\/common\/build-tools\/tools\/nix";[\s\S]*flake = false;/,
+    /inputs\.deploymentModules = \{[\s\S]*url = "path:\/srv\/viberoots\/build-tools\/tools\/nix";[\s\S]*flake = false;/,
   );
   assert.match(doc, /deploymentModulesRoot = deploymentModules/);
   assert.match(doc, /\$\{deploymentModulesRoot\}\/shared-host-vault-module\.nix/);

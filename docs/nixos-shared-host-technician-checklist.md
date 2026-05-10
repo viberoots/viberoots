@@ -22,7 +22,7 @@ Confirm all of these before making changes:
 
 - `mini` is a NixOS machine
 - `/etc/nix/nix.conf` on `mini` already enables `nix-command` and `flakes`
-- the reviewed repo checkout on `mini` exists at `/srv/common`
+- the reviewed repo checkout on `mini` exists at `/srv/viberoots`
 - the authoritative config root on `mini` is `/etc/nixos`
 - the authoritative config entry on `mini` is `/etc/nixos/flake.nix` when it
   exists, otherwise `/etc/nixos/configuration.nix`
@@ -37,7 +37,7 @@ If any input is wrong, stop and ask for help rather than inventing a new path.
 Run from the repo checkout on `mini`:
 
 ```bash
-cd /srv/common
+cd /srv/viberoots
 direnv exec . build-tools/tools/bin/nixos-shared-host-install \
   server install
 ```
@@ -80,7 +80,7 @@ sudo nixos-rebuild switch
 Then verify the install:
 
 ```bash
-cd /srv/common
+cd /srv/viberoots
 direnv exec . build-tools/tools/bin/nixos-shared-host-install \
   server status
 ```
@@ -93,7 +93,7 @@ Completion criteria:
 
 ## Start The Deployment Service
 
-Run on `mini` from `/srv/common`:
+Run on `mini` from `/srv/viberoots`:
 
 ```bash
 export VBR_DEPLOY_CONTROL_PLANE_DATABASE_URL='postgres://deployctl:REDACTED@127.0.0.1:5432/deployctl'
@@ -149,7 +149,7 @@ The installed profile should be here:
 What success looks like:
 
 - the `mini` profile is listed by `client list`
-- the profile points at `/srv/common`
+- the profile points at `/srv/viberoots`
 - the profile points at the reviewed remote state, runtime, and records paths
 - the profile stores the deployment service endpoint and token-env binding
 

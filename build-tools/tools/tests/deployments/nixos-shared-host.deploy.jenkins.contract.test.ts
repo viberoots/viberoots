@@ -19,7 +19,7 @@ test("jenkins wrapper contract", async (t) => {
     await installClientProfile(
       $,
       profileRoot,
-      "/srv/common",
+      "/srv/viberoots",
       "/etc/nixos/deployment-host/platform-state.json",
       "/var/lib/deployment-host/runtime",
       "/var/lib/deployment-host/records",
@@ -37,7 +37,7 @@ test("jenkins wrapper contract", async (t) => {
       assert.equal(summary.planOnly, true);
       assert.equal(summary.remotePlan.profileName, "mini");
       assert.equal(summary.remotePlan.destination, "mini");
-      assert.equal(summary.remotePlan.remoteRepoPath, "/srv/common");
+      assert.equal(summary.remotePlan.remoteRepoPath, "/srv/viberoots");
       assert.equal(summary.jenkinsContract.transport.nonInteractive, true);
       assert.equal(summary.jenkinsContract.transport.identityFile, auth.identityFile);
       assert.equal(summary.jenkinsContract.transport.knownHostsFile, auth.knownHostsFile);

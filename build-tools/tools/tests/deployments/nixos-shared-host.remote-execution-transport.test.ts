@@ -20,12 +20,12 @@ test("remote service submission error explains when the service requires a diffe
         status: {
           serviceInstance: {
             hostname: "mini",
-            workspaceRoot: "/srv/common",
+            workspaceRoot: "/srv/viberoots",
             gitHead: "8f00f5cd723bed179a48847d2daeea3e0c2dcce1",
             reviewedRef: "env/pleomino/dev",
-            reviewedRepository: "kiltyj/common",
+            reviewedRepository: "kiltyj/viberoots",
             reviewedRemoteName: "origin",
-            reviewedRemoteUrl: "git@github.com:kiltyj/common.git",
+            reviewedRemoteUrl: "git@github.com:kiltyj/viberoots.git",
           },
         },
       },
@@ -59,7 +59,7 @@ test("remote service submission error explains when the service requires a diffe
     /--admit-for-commit 85e2c9ee8dd909fc041f693fe8e937e34e7b36ef/,
   );
   assert.match(String(error.message), /service_hostname: mini/);
-  assert.match(String(error.message), /service_workspace_root: \/srv\/common/);
+  assert.match(String(error.message), /service_workspace_root: \/srv\/viberoots/);
   assert.match(String(error.message), /service_git_head: 8f00f5cd723bed179a48847d2daeea3e0c2dcce1/);
   assert.match(String(error.message), /service_reviewed_remote: origin/);
 });

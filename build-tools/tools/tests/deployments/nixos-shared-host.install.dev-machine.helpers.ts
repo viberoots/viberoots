@@ -11,7 +11,7 @@ const INSTALL_SCRIPT = path.join(
   "nixos-shared-host-install.ts",
 );
 
-const DEFAULT_REMOTE_REPO_PATH = "/srv/common";
+const DEFAULT_REMOTE_REPO_PATH = "/srv/viberoots";
 const DEFAULT_REMOTE_STATE_PATH = "/etc/nixos/deployment-host/platform-state.json";
 const DEFAULT_REMOTE_RUNTIME_ROOT = "/var/lib/deployment-host/runtime";
 const DEFAULT_REMOTE_RECORDS_ROOT = "/var/lib/deployment-host/records";

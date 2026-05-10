@@ -330,8 +330,8 @@ use that for `clusterAddress`.
 
 Then import the reviewed Vault module from the repo checkout once. Because
 `nixos-rebuild switch --flake /etc/nixos#mini` evaluates the host flake in pure
-mode, do not import `/srv/common/...` as an absolute path from
-`configuration.nix`. Also avoid making all of `/srv/common` a flake input,
+mode, do not import `/srv/viberoots/...` as an absolute path from
+`configuration.nix`. Also avoid making all of `/srv/viberoots` a flake input,
 because that snapshots the full repo into the store on rebuild. Add only the
 small module directory as a non-flake path input instead:
 
@@ -339,7 +339,7 @@ small module directory as a non-flake path input instead:
 # /etc/nixos/flake.nix
 {
   inputs.deploymentModules = {
-    url = "path:/srv/common/build-tools/tools/nix";
+    url = "path:/srv/viberoots/build-tools/tools/nix";
     flake = false;
   };
 
@@ -358,7 +358,7 @@ small module directory as a non-flake path input instead:
 Then add `deploymentModulesRoot` to the existing argument set at the top of
 `configuration.nix` and import the module through that flake input. This keeps
 the import pure while copying only the small `build-tools/tools/nix` subtree
-from the checkout that lives at `/srv/common`:
+from the checkout that lives at `/srv/viberoots`:
 
 ```nix
 { config, lib, pkgs, deploymentModulesRoot, nixpkgsUnstable, nixosHardware, nixMinecraft, ... }:
@@ -839,7 +839,7 @@ existing `virtualHosts = (...) // { ... };` expression:
       "/var/lib/deployment-host-secrets/bootstrap-first-operator-password";
     bootstrapTokenClaims = {
       deployment_environment = "mini";
-      repository = "kiltyj/common";
+      repository = "kiltyj/viberoots";
     };
     databasePasswordFile = "/var/lib/deployment-host-secrets/keycloak-db-password";
 
@@ -963,7 +963,7 @@ Identity-provider configuration checklist:
    - `azp = "deployment-runner"`
    - `azp = "deployment-cli"` for human flows
    - `deployment_environment = "mini"`
-   - `repository = "kiltyj/common"`
+   - `repository = "kiltyj/viberoots"`
    - a reviewed deployer group or role claim for human flows
 8. Store the service-account client secret outside the repo, for example in the Jenkins
    credential store or the reviewed host secret store.
@@ -987,7 +987,7 @@ One practical Keycloak admin-console path is:
    `deployment_environment` with value `mini`, JSON type `String`, and access
    token inclusion enabled.
 9. Add another `Hardcoded claim` mapper for `repository` with value
-   `kiltyj/common`, JSON type `String`, and access token inclusion
+   `kiltyj/viberoots`, JSON type `String`, and access token inclusion
    enabled.
 10. Create `deployment-cli` as a public client, require PKCE, allow loopback
     redirect URIs for the CLI callback, add a `groups` mapper for reviewed
@@ -1116,7 +1116,7 @@ deploy-vault-jwt \
   --out /tmp/mini-workload.jwt \
   --audience deployments-vault \
   --expect-claim deployment_environment=mini \
-  --expect-claim repository=kiltyj/common \
+  --expect-claim repository=kiltyj/viberoots \
   --print-claims
 ```
 
@@ -1204,7 +1204,7 @@ The generated role command has this shape:
 vault write auth/jwt/role/deploy-pleomino-read \
   role_type="jwt" \
   bound_audiences="deployments-vault" \
-  bound_claims='{"azp":"deployment-runner","deployment_environment":"mini","repository":"kiltyj/common"}' \
+  bound_claims='{"azp":"deployment-runner","deployment_environment":"mini","repository":"kiltyj/viberoots"}' \
   user_claim="sub" \
   token_policies="deploy-pleomino-read" \
   token_ttl="30m" \
@@ -1217,7 +1217,7 @@ Example values and when to use them:
   Attach only the read policy created above.
 - `bound_audiences="deployments-vault"`
   Require the workload JWT audience expected by deployment jobs.
-- `bound_claims='{"azp":"deployment-runner","deployment_environment":"mini","repository":"kiltyj/common"}'`
+- `bound_claims='{"azp":"deployment-runner","deployment_environment":"mini","repository":"kiltyj/viberoots"}'`
   Bind the role to reviewed workload identity claims. Use the provider's stable
   claims for the deployment client, environment, repository, project, service
   account, branch, or job identity.

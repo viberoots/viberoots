@@ -162,7 +162,7 @@ test("nixos shared host usage guide stays present as the reviewed operator-facin
   );
   assert.match(
     setupDoc,
-    /inputs\.deploymentModules = \{[\s\S]*url = "path:\/srv\/common\/build-tools\/tools\/nix";[\s\S]*flake = false;/,
+    /inputs\.deploymentModules = \{[\s\S]*url = "path:\/srv\/viberoots\/build-tools\/tools\/nix";[\s\S]*flake = false;/,
     "setup guide must document narrow non-flake path input wiring for repo-hosted service modules",
   );
   assert.match(
@@ -178,7 +178,7 @@ test("nixos shared host usage guide stays present as the reviewed operator-facin
   assert.match(setupDoc, /\$\{deploymentModulesRoot\}\/nixos-shared-host-module\.nix/);
   assert.match(
     usageDoc,
-    /Avoid pointing the input at\s+all of `\/srv\/common`, since that copies the full repo into the store/,
+    /Avoid pointing the input at\s+all of `\/srv\/viberoots`, since that copies the full repo into the store/,
     "usage guide must avoid full-repo path inputs for service modules",
   );
   assert.match(
