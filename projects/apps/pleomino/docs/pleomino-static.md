@@ -34,7 +34,7 @@ That means Pleomino should be able to migrate off the current `ts/webapp-ssr-vit
 ## Why The Existing `ts/webapp-static` Template Is Not Enough
 
 We already have a static scaffold:
-[`build-tools/tools/scaffolding/templates/ts/webapp-static`](/Users/kiltyj/Code/bucknix-fresh/build-tools/tools/scaffolding/templates/ts/webapp-static)
+[`build-tools/tools/scaffolding/templates/ts/webapp-static`](/Users/kiltyj/Code/viberoots/build-tools/tools/scaffolding/templates/ts/webapp-static)
 
 But based on Pleomino, it is missing important production-grade PWA contracts:
 
@@ -158,7 +158,7 @@ The template and tooling should keep generated `dist/` artifacts out of source-f
 
 Add a new scaffold under:
 
-- [`build-tools/tools/scaffolding/templates/ts/webapp-static-pwa`](/Users/kiltyj/Code/bucknix-fresh/build-tools/tools/scaffolding/templates/ts)
+- [`build-tools/tools/scaffolding/templates/ts/webapp-static-pwa`](/Users/kiltyj/Code/viberoots/build-tools/tools/scaffolding/templates/ts)
 
 Expected files:
 

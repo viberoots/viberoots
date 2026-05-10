@@ -18,7 +18,7 @@ let
   sanitize = H.sanitizeName;
 in
   if cmd == "" then builtins.throw "node planner: missing genrule cmd for ${name}"
-  else pkgs.stdenvNoCC.mkDerivation {
+  else pkgs.stdenvNoCC.mkDerivation ({
     pname = "node-${kind}-" + (sanitize name);
     version = sanitize info.importer;
     src = repoStoreRoot;
@@ -56,4 +56,4 @@ in
         chmod +x "$out/bin/$base" || true
       '' else ""}
     '';
-  }
+  } // H.darwinBashrcSandboxProfileAttrs)

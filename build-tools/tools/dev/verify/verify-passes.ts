@@ -41,6 +41,8 @@ export async function runVerifyBuckPasses(opts: {
   analysisDir: string;
   onPgid: (pgid: number) => void;
   onPgidDone?: (pgid: number) => void;
+  onNestedIso?: (iso: string) => void;
+  onNestedIsoDone?: (iso: string) => void;
 }): Promise<number> {
   const plan = resolveVerifyTargetPlan({ root: opts.root, iso: opts.iso, targets: opts.targets });
   try {
@@ -68,7 +70,8 @@ export async function runVerifyBuckPasses(opts: {
   const startPass = async (pass: (typeof passes)[number], passIso = opts.iso) => {
     const index = passIndexes.get(pass) ?? 0;
     const passAnalysisDir = path.join(opts.analysisDir, `pass-${index + 1}`);
-    const startS = Math.floor(Date.now() / 1000);
+    const startMs = Date.now();
+    const startS = Math.floor(startMs / 1000);
     await appendVerifyPassLog(
       opts.logFile,
       `[verify] target pass begin name=${pass.name} index=${index + 1}/${passes.length} iso=${passIso} start_s=${startS} target_count=${pass.targets.length} targets=${pass.targets.join(" ")}`,
@@ -85,6 +88,7 @@ export async function runVerifyBuckPasses(opts: {
       analysisDir: passAnalysisDir,
     });
     opts.onPgid(spawned.pgid);
+    opts.onNestedIso?.(spawned.nestedIso);
     const rails = await startVerifySafetyRails({
       root: opts.root,
       analysisDir: passAnalysisDir,
@@ -100,10 +104,16 @@ export async function runVerifyBuckPasses(opts: {
     return {
       pgid: spawned.pgid,
       wait: async () => {
-        const status = await spawned.wait();
-        rails.stop();
-        opts.onPgidDone?.(spawned.pgid);
-        if (passIso !== opts.iso) await killBuckIsolation(opts.root, passIso).catch(() => {});
+        let status = 1;
+        try {
+          status = await spawned.wait();
+        } finally {
+          rails.stop();
+          opts.onPgidDone?.(spawned.pgid);
+          await killBuckIsolation(opts.root, spawned.nestedIso).catch(() => {});
+          opts.onNestedIsoDone?.(spawned.nestedIso);
+          if (passIso !== opts.iso) await killBuckIsolation(opts.root, passIso).catch(() => {});
+        }
         if (rails.telemetryPath) {
           const summary = await summarizeVerifySafetyRailsTelemetry(rails.telemetryPath).catch(
             () => null,
@@ -119,7 +129,7 @@ export async function runVerifyBuckPasses(opts: {
         }
         await appendVerifyPassLog(
           opts.logFile,
-          `[verify] target pass end name=${pass.name} index=${index + 1}/${passes.length} status=${status}`,
+          `[verify] target pass end name=${pass.name} index=${index + 1}/${passes.length} status=${status} duration_s=${Math.round((Date.now() - startMs) / 1000)}`,
         );
         return status;
       },
@@ -127,6 +137,7 @@ export async function runVerifyBuckPasses(opts: {
   };
 
   for (const group of groupVerifyPassesForExecution(passes)) {
+    const groupStartMs = Date.now();
     const useDedicatedPassIsolation = group.length > 1;
     if (group.length > 1) {
       await appendVerifyPassLog(
@@ -197,7 +208,7 @@ export async function runVerifyBuckPasses(opts: {
     if (group.length > 1) {
       await appendVerifyPassLog(
         opts.logFile,
-        `[verify] target pass group end mode=concurrent isolation=per-pass passes=${group.map((pass) => pass.name).join(",")} status=${status}`,
+        `[verify] target pass group end mode=concurrent isolation=per-pass passes=${group.map((pass) => pass.name).join(",")} status=${status} duration_s=${Math.round((Date.now() - groupStartMs) / 1000)}`,
       );
     }
     if (status !== 0) {

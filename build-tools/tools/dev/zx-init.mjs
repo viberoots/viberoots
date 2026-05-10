@@ -159,6 +159,7 @@ register(
 const verifyProcessStateFile = String(process.env.BNX_VERIFY_PROCESS_STATE_FILE || "").trim();
 const verifyLogFile = String(process.env.BNX_VERIFY_LOG_FILE || "").trim();
 const verifyTarget = String(process.env.BUCK_TEST_TARGET || "").trim();
+const verifyOwnerPidRaw = String(process.env.BNX_VERIFY_OWNER_PID || "").trim();
 const shouldRegisterVerifyProcess =
   String(process.env.BNX_VERIFY_REGISTER_PROCESS || "").trim() === "1";
 if (shouldRegisterVerifyProcess) {
@@ -181,6 +182,24 @@ if (
       stateFile: verifyProcessStateFile,
       logFile: verifyLogFile,
       target: verifyTarget,
+    });
+  } catch {}
+}
+
+const nestedBuckIso = String(
+  process.env.BUCK_NESTED_ISO || process.env.BUCK_ISOLATION_DIR || "",
+).trim();
+if (verifyProcessStateFile && nestedBuckIso && !globalThis.__bnxVerifyBuckIsolationRegistered) {
+  try {
+    globalThis.__bnxVerifyBuckIsolationRegistered = true;
+    const ownerPid = Number(verifyOwnerPidRaw || process.pid);
+    const ownedState = await import("./verify/owned-process-state");
+    await ownedState.registerBuckIsolation({
+      stateFile: verifyProcessStateFile,
+      iso: nestedBuckIso,
+      repoRoot: process.env.WORKSPACE_ROOT || WORKSPACE_ROOT_FIXED,
+      ownerPid: Number.isFinite(ownerPid) && ownerPid > 1 ? ownerPid : process.pid,
+      kind: "zx-test-nested",
     });
   } catch {}
 }

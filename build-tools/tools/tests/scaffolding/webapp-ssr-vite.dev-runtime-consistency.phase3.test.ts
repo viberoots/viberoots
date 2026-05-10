@@ -11,7 +11,7 @@ import {
   httpGet,
   pickFreePort,
   stopServer,
-  waitForHttpOk,
+  waitForChildHttpOk,
 } from "./lib/webapp-static-hmr";
 
 const TEST_TIMEOUT_MS =
@@ -102,7 +102,7 @@ test(
       });
 
       try {
-        await waitForHttpOk(`http://127.0.0.1:${port}/`);
+        await waitForChildHttpOk(devServer, `http://127.0.0.1:${port}/`, 90_000);
 
         const serverPid = devServer.pid;
         assert.ok(serverPid && serverPid > 0, "dev server pid must be available");

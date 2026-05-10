@@ -1,6 +1,6 @@
 REVIEWED_DEPLOYMENT_TEST_OWNERSHIP = {
     "build-tools/tools/tests/deployments/cloudflare-containers.contract.test.ts": True, "build-tools/tools/tests/deployments/cloudflare-containers.routing-smoke.test.ts": True, "build-tools/tools/tests/deployments/cloudflare-containers.validation.test.ts": True, "build-tools/tools/tests/deployments/deployment-domain.labels.cquery.test.ts": True, "build-tools/tools/tests/deployments/deployment-domain.file-size-lint.test.ts": True, "build-tools/tools/tests/deployments/deployment-domain.taxonomy-drift.test.ts": True,
-    "build-tools/tools/tests/deployments/deployment-docs.front-door-parity.test.ts": True,
+    "build-tools/tools/tests/deployments/deployment-query-helpers.test.ts": True, "build-tools/tools/tests/deployments/deployment-docs.front-door-parity.test.ts": True,
     "build-tools/tools/tests/deployments/deployment-control-plane.pr89.docs.test.ts": True,
     "build-tools/tools/tests/deployments/deployment-auth-session.pr90.docs.test.ts": True,
     "build-tools/tools/tests/deployments/deployment-control-plane.pr92.docs.test.ts": True,

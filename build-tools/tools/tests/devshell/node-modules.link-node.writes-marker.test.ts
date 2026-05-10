@@ -50,11 +50,25 @@ test("link-node writes marker at repo root", async () => {
     const zxInitPath = path.join(tmp, "build-tools/tools/dev/zx-init.mjs");
     const env = {
       ...process.env,
+      BNX_LINK_NODE_FAKE_NIX: "1",
       PATH: `${binDir}:${process.env.PATH || ""}`,
       WORKSPACE_ROOT: tmp,
     };
 
-    await runNodeWithZx({ script, cwd: tmp, env, zxInitPath, stdio: "pipe" });
+    try {
+      await runNodeWithZx({ script, cwd: tmp, env, zxInitPath, stdio: "pipe" });
+    } catch (err) {
+      const e = err as { message?: unknown; stdout?: unknown; stderr?: unknown };
+      throw new Error(
+        [
+          String(e?.message || err),
+          "--- link-node stdout ---",
+          String(e?.stdout || ""),
+          "--- link-node stderr ---",
+          String(e?.stderr || ""),
+        ].join("\n"),
+      );
+    }
 
     const nm = path.join(tmp, "node_modules");
     assert.ok(await pathExists(nm));

@@ -188,14 +188,14 @@ export async function createVercelNextArtifact(opts: {
     path.join(outputDir, "static", "_next", "static"),
   );
   await fsp.writeFile(
-    path.join(outputDir, "bucknix.json"),
+    path.join(outputDir, "viberoots.json"),
     JSON.stringify(
       {
         schemaVersion: VERCEL_NEXT_ARTIFACT_SCHEMA,
         projectName: config.projectName,
         framework: config.framework,
         runtime: config.runtime,
-        source: "bucknix-node-webapp-dist",
+        source: "viberoots-node-webapp-dist",
       },
       null,
       2,

@@ -8,7 +8,7 @@ import { test } from "node:test";
 import { ensureSharedNixTarballCacheRepo } from "./test-helpers/xdg-cache";
 
 async function makeTempXdgCacheRoot(): Promise<string> {
-  return await fsp.mkdtemp(path.join(os.tmpdir(), "bucknix-xdg-cache-test-"));
+  return await fsp.mkdtemp(path.join(os.tmpdir(), "viberoots-xdg-cache-test-"));
 }
 
 test("ensureSharedNixTarballCacheRepo removes an invalid tarball cache repo", async () => {

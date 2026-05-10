@@ -30,13 +30,13 @@ import { runInTemp } from "../lib/test-helpers";
 let buckQueryNonce = 0;
 
 function freshBuckEnv(tmp: string, prefix: string): NodeJS.ProcessEnv {
-  return {
-    ...process.env,
-    BUCK_NESTED_ISO: stableBuckIsolation(
-      path.join(tmp, `.${prefix}-${++buckQueryNonce}`),
-      `zxtest-${prefix}`,
-    ),
-  };
+  const isolation = stableBuckIsolation(
+    path.join(tmp, `.${prefix}-${++buckQueryNonce}`),
+    `zxtest-${prefix}`,
+  );
+  const env = { ...process.env, BUCK_ISOLATION_DIR: isolation, BUCK_NESTED_ISO: isolation };
+  delete env.BUCK_ISOLATION_DIR_EXPORTER;
+  return env;
 }
 
 async function writeDeploymentJson(filePath: string, deployment: unknown) {

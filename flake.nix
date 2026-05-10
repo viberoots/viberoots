@@ -1,6 +1,6 @@
 # flake.nix — devshell and zx-wrapper
 {
-  description = "bucknix-fresh devshell and scaffolding";
+  description = "viberoots devshell and scaffolding";
 
   nixConfig = {
     allowed-impure-env-vars = [

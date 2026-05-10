@@ -1,14 +1,52 @@
 #!/usr/bin/env zx-wrapper
+import { stableBuckIsolation } from "../lib/buck-command-env";
 import { normalizeTargetLabel } from "../lib/labels";
+import { registerBuckIsolationSync } from "../dev/verify/owned-process-state";
 
 const CONFIG_SUFFIX = /\s+\([^)]*\)$/;
 
-export function deploymentBuckEnv(env: NodeJS.ProcessEnv = process.env): NodeJS.ProcessEnv {
-  return {
+export function deploymentBuckEnv(
+  workspaceRoot?: string,
+  env: NodeJS.ProcessEnv = process.env,
+): NodeJS.ProcessEnv {
+  const buckEnv: NodeJS.ProcessEnv = {
     ...env,
     HOME: env.BUCK2_REAL_HOME || env.HOME,
     SSL_CERT_FILE: env.SSL_CERT_FILE || env.NIX_SSL_CERT_FILE,
   };
+  const inheritedIsolation = String(
+    buckEnv.BUCK_ISOLATION_DIR ||
+      buckEnv.BUCK_ISOLATION_DIR_EXPORTER ||
+      buckEnv.BUCK_NESTED_ISO ||
+      "",
+  ).trim();
+  if (buckEnv.BUCK_NO_ISOLATION !== "1" && !inheritedIsolation && workspaceRoot) {
+    buckEnv.BUCK_NESTED_ISO = stableBuckIsolation(workspaceRoot, "deployment-query");
+    registerVerifySharedIsolation(
+      buckEnv.BUCK_NESTED_ISO,
+      workspaceRoot,
+      "deployment-query",
+      buckEnv,
+    );
+  }
+  return buckEnv;
+}
+
+function registerVerifySharedIsolation(
+  iso: string,
+  repoRoot: string,
+  kind: string,
+  env: NodeJS.ProcessEnv,
+): void {
+  const stateFile = String(env.BNX_VERIFY_PROCESS_STATE_FILE || "").trim();
+  if (!stateFile || !iso || !repoRoot) return;
+  const ownerPidRaw = Number(env.BNX_VERIFY_OWNER_PID || process.pid);
+  const ownerPid = Number.isFinite(ownerPidRaw) && ownerPidRaw > 1 ? ownerPidRaw : process.pid;
+  try {
+    for (const root of Array.from(new Set([repoRoot, process.cwd()]))) {
+      registerBuckIsolationSync({ stateFile, iso, repoRoot: root, ownerPid, kind });
+    }
+  } catch {}
 }
 
 export function deploymentIsolationArgs(env: NodeJS.ProcessEnv = process.env): string[] {

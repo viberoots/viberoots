@@ -13,7 +13,7 @@ test("Vault bootstrap runbook uses reviewed shared-host IdP module and JWT helpe
   assert.match(doc, /deploymentHost\.identityProvider/);
   assert.match(doc, /deploymentHost\.vault/);
   assert.match(doc, /complete Vault service wiring for the recommended module path/);
-  assert.doesNotMatch(doc, /bucknix\.mini/);
+  assert.doesNotMatch(doc, /viberoots\.mini/);
   assert.doesNotMatch(doc, /mini-(identity-provider|postgres|vault)-module\.nix/);
   assert.doesNotMatch(doc, /If you do not import the module/);
   assert.doesNotMatch(doc, /minimal host where/);

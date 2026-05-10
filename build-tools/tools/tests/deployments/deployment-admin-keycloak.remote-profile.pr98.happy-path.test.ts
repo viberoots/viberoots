@@ -18,7 +18,7 @@ import {
   configRootFor,
   CONTROL_PLANE_TOKEN,
   enableInteractivePkceVaultRuntime,
-  freshKeycloakBuckIsolation,
+  freshKeycloakBuckEnv,
   membershipFileFor,
   realmFileFor,
 } from "./deployment-admin-keycloak.remote-profile.pr98.helpers";
@@ -60,9 +60,7 @@ test("remote profile sync infers acting principal and admin groups from the revi
       );
       const resultPromise = $({
         cwd: tmp,
-        env: remoteExecEnv(fixture.env, {
-          BUCK_NESTED_ISO: freshKeycloakBuckIsolation(tmp),
-        }),
+        env: freshKeycloakBuckEnv(tmp, remoteExecEnv(fixture.env)),
         stdio: "pipe",
       })`zx-wrapper build-tools/tools/deployments/deploy.ts admin keycloak sync --deployment ${REVIEWED_PLEOMINO_DEPLOYMENT_LABEL} --profile mini --profile-root ${fixture.profileRoot} --remote-config-root ${configRootFor(tmp)}`;
       await completePendingAuthSession(controlPlane.url, fixture.remoteRecordsRoot);
@@ -136,9 +134,7 @@ test("remote profile grant-user defaults self-service grants to the logged-in em
       );
       const selfPromise = $({
         cwd: tmp,
-        env: remoteExecEnv(fixture.env, {
-          BUCK_NESTED_ISO: freshKeycloakBuckIsolation(tmp),
-        }),
+        env: freshKeycloakBuckEnv(tmp, remoteExecEnv(fixture.env)),
         stdio: "pipe",
       })`zx-wrapper build-tools/tools/deployments/deploy.ts admin keycloak grant-user --deployment ${REVIEWED_PLEOMINO_DEPLOYMENT_LABEL} --profile mini --profile-root ${fixture.profileRoot} --remote-config-root ${remoteConfigRoot} --action submit`;
       await completePendingAuthSession(controlPlane.url, fixture.remoteRecordsRoot);
@@ -155,9 +151,7 @@ test("remote profile grant-user defaults self-service grants to the logged-in em
 
       const crossPromise = $({
         cwd: tmp,
-        env: remoteExecEnv(fixture.env, {
-          BUCK_NESTED_ISO: freshKeycloakBuckIsolation(tmp),
-        }),
+        env: freshKeycloakBuckEnv(tmp, remoteExecEnv(fixture.env)),
         stdio: "pipe",
       })`zx-wrapper build-tools/tools/deployments/deploy.ts admin keycloak grant-user --deployment ${REVIEWED_PLEOMINO_DEPLOYMENT_LABEL} --profile mini --profile-root ${fixture.profileRoot} --remote-config-root ${remoteConfigRoot} --action approve --user-email alice@example.com`;
       await completePendingAuthSession(controlPlane.url, fixture.remoteRecordsRoot);

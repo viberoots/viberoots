@@ -10,14 +10,22 @@ import { resolveToolPathSync } from "../../lib/tool-paths";
 function startSignatureForPid(pid: number, timeoutMs: number) {
   const psPath = resolveToolPathSync("ps");
   return new Promise<string>((resolve) => {
-    const child = spawn(psPath, ["-p", String(pid), "-o", "lstart="], {
-      stdio: ["ignore", "pipe", "ignore"],
-    });
+    let child;
+    try {
+      child = spawn(psPath, ["-p", String(pid), "-o", "lstart="], {
+        stdio: ["ignore", "pipe", "ignore"],
+      });
+    } catch {
+      resolve(pidAlive(pid) ? `pid:${pid}` : "");
+      return;
+    }
     let buf = "";
     child.stdout.setEncoding("utf8");
     child.stdout.on("data", (d) => (buf += d));
-    child.on("error", () => resolve(""));
-    child.on("close", () => resolve(String(buf || "").trim()));
+    child.on("error", () => resolve(pidAlive(pid) ? `pid:${pid}` : ""));
+    child.on("close", () =>
+      resolve(String(buf || "").trim() || (pidAlive(pid) ? `pid:${pid}` : "")),
+    );
     const t = setTimeout(
       () => {
         try {
@@ -85,7 +93,7 @@ async function waitForStateLine(
 test("buck-daemon-reaper: reaps registered verify-owned node processes after parent exit", async () => {
   const stateFile = path.join(
     os.tmpdir(),
-    `bucknix-verify-owned-state-${process.pid}-${Date.now()}.txt`,
+    `viberoots-verify-owned-state-${process.pid}-${Date.now()}.txt`,
   );
   await fsp.writeFile(stateFile, "", "utf8");
   const parent = spawn(process.execPath, ["-e", "setInterval(() => {}, 1000)"], {

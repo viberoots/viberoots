@@ -20,5 +20,5 @@ test("buck-daemon-reaper-utils: handles /private<->/var temp path aliasing safel
     cwdIsInsideTempRepo("/private/var/folders/aa/bb/T/other-repo/buck-out/v2", tmp),
     false,
   );
-  assert.equal(cwdIsInsideTempRepo("/Users/kiltyj/Code/bucknix-fresh/buck-out/v2", tmp), false);
+  assert.equal(cwdIsInsideTempRepo("/Users/kiltyj/Code/viberoots/buck-out/v2", tmp), false);
 });

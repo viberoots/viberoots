@@ -73,7 +73,7 @@ async function runLockfileCommandsWithGcRetry(opts: {
   try {
     await runCommands();
   } catch (error) {
-    const gcPids = activeNixGcPids();
+    const gcPids = await activeNixGcPids();
     if (gcPids.length === 0) throw error;
     const cfg = gcWaitConfig();
     console.warn(

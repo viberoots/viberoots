@@ -7,6 +7,7 @@ import {
   escapeRegExp,
   makeFakeAgentTools,
   repoRoot,
+  safehouseLaunchPattern,
   scratchRoot,
 } from "./agent-wrapper-test-helpers.ts";
 
@@ -35,12 +36,7 @@ test("codex --worktree attaches to an existing named worktree", async () => {
     const worktreeRealRoot = await fsp.realpath(worktreeRoot);
     const log = await fsp.readFile(fake.log, "utf8");
     assert.doesNotMatch(log, /git worktree add/);
-    assert.match(
-      log,
-      new RegExp(
-        `safehouse --workdir=${escapeRegExp(worktreeRealRoot)} --add-dirs-ro=/nix/store --append-profile=.* --env `,
-      ),
-    );
+    assert.match(log, new RegExp(safehouseLaunchPattern(worktreeRealRoot)));
     assert.match(log, /codex --dangerously-bypass-approvals-and-sandbox exec task/);
     assert.doesNotMatch(log, /codex .*--worktree/);
   } finally {
@@ -71,12 +67,7 @@ test("codex --worktree recreates a missing worktree from an existing branch", as
     const log = await fsp.readFile(fake.log, "utf8");
     assert.match(log, /git worktree add .*branch-only worktree-branch-only/);
     assert.doesNotMatch(log, /git worktree add -b worktree-branch-only/);
-    assert.match(
-      log,
-      new RegExp(
-        `safehouse --workdir=${escapeRegExp(worktreeRealRoot)} --add-dirs-ro=/nix/store --append-profile=.* --env `,
-      ),
-    );
+    assert.match(log, new RegExp(safehouseLaunchPattern(worktreeRealRoot)));
     assert.match(log, /codex --dangerously-bypass-approvals-and-sandbox exec task/);
   } finally {
     await fsp.rm(tmp, { recursive: true, force: true });

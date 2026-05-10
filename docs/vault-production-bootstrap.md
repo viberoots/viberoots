@@ -1749,9 +1749,9 @@ Jenkins-bound secret values.
 
 ## Related Docs
 
-- [Secrets Usage](/Users/kiltyj/Code/bucknix-fresh/docs/secrets-usage.md)
-- [Deployment And Secrets API](/Users/kiltyj/Code/bucknix-fresh/docs/deployment-secrets-api.md)
-- [Deployments Usage](/Users/kiltyj/Code/bucknix-fresh/docs/deployments-usage.md)
+- [Secrets Usage](/Users/kiltyj/Code/viberoots/docs/secrets-usage.md)
+- [Deployment And Secrets API](/Users/kiltyj/Code/viberoots/docs/deployment-secrets-api.md)
+- [Deployments Usage](/Users/kiltyj/Code/viberoots/docs/deployments-usage.md)
 
 ## External References
 

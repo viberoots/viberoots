@@ -1,7 +1,7 @@
 import path from "node:path";
 import crypto from "node:crypto";
 import { nodeFlagsWithZx } from "../../lib/node-run";
-import { resolveToolPath } from "../../lib/tool-paths";
+import { buckProcessTableLines } from "../../lib/process-inspection";
 
 export type Isolation = {
   buckIsolation: string;
@@ -20,9 +20,7 @@ export type CreateIsolationOptions = {
 
 async function reapChildBuckDaemonsByPrefix(prefixes: string[]): Promise<void> {
   try {
-    const psPath = await resolveToolPath("ps");
-    const { stdout } = await $({ stdio: "pipe" })`${psPath} -A -o pid=,comm=`;
-    const lines = String(stdout || "").split("\n");
+    const lines = await buckProcessTableLines(2000);
     for (const ln of lines) {
       const m = ln.match(/buck2d\[([^\]]+)\]/);
       if (!m) continue;
@@ -38,9 +36,7 @@ async function reapChildBuckDaemonsByPrefix(prefixes: string[]): Promise<void> {
 
 async function reapExporterDaemonsFromPs(): Promise<void> {
   try {
-    const psPath = await resolveToolPath("ps");
-    const { stdout } = await $({ stdio: "pipe" })`${psPath} -A -o pid=,command=`;
-    const lines = String(stdout || "").split("\n");
+    const lines = await buckProcessTableLines(2000);
     for (const ln of lines) {
       const m = ln.match(/--isolation-dir\s+(exporter-[^\s]+)/);
       if (!m) continue;

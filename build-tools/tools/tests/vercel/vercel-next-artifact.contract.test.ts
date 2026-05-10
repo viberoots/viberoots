@@ -94,6 +94,12 @@ test("Vercel Next artifact identity is stable for identical finalized output byt
       "app.js",
     ),
   );
+  await fsp.access(path.join(tmp, "first", "out", ".vercel", "output", "viberoots.json"));
+  const staleMarker = ["buck", "nix.json"].join("");
+  await assert.rejects(
+    () => fsp.access(path.join(tmp, "first", "out", ".vercel", "output", staleMarker)),
+    /ENOENT/,
+  );
 });
 
 test("Vercel Next artifact rejects ambient local and environment state", async () => {
@@ -115,7 +121,7 @@ test("Vercel Next artifact rejects ambient local and environment state", async (
   );
 
   await fsp.rm(path.join(appDir, ".vercel"), { recursive: true, force: true });
-  process.env.VERCEL_TEST_UNDECLARED_BUCKNIX = "1";
+  process.env.VERCEL_TEST_UNDECLARED_VIBEROOTS = "1";
   try {
     await assert.rejects(
       () =>
@@ -129,6 +135,6 @@ test("Vercel Next artifact rejects ambient local and environment state", async (
       /undeclared Vercel environment variables/,
     );
   } finally {
-    delete process.env.VERCEL_TEST_UNDECLARED_BUCKNIX;
+    delete process.env.VERCEL_TEST_UNDECLARED_VIBEROOTS;
   }
 });

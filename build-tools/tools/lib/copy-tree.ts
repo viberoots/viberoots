@@ -137,7 +137,7 @@ export async function probeCopyFileCloneSupport(): Promise<boolean> {
   const tryFlag = cloneFlagForMode("try");
   if (tryFlag === null) return false;
 
-  const dir = await fsp.mkdtemp(path.join(os.tmpdir(), "bucknix-clone-probe-"));
+  const dir = await fsp.mkdtemp(path.join(os.tmpdir(), "viberoots-clone-probe-"));
   try {
     const src = path.join(dir, "src.txt");
     const dst = path.join(dir, "dst.txt");

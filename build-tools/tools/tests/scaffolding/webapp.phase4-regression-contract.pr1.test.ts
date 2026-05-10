@@ -19,7 +19,9 @@ function lockPathForScope(key: string, scopeRootAbs: string): string {
     .digest("hex")
     .slice(0, 16);
   const base =
-    process.platform === "win32" ? path.join(os.tmpdir(), "bucknix-locks") : "/tmp/bucknix-locks";
+    process.platform === "win32"
+      ? path.join(os.tmpdir(), "viberoots-locks")
+      : "/tmp/viberoots-locks";
   return path.join(base, `lock-${h}.lck`);
 }
 

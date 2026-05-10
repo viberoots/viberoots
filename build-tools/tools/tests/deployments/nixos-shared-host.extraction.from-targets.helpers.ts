@@ -98,7 +98,7 @@ export async function writeSharedLaneTargets(filePath: string): Promise<void> {
       "deployment_lane_governance(",
       '    name = "lane_governance",',
       '    scm_backend = "github",',
-      '    repository = "kiltyj/bucknix-fresh",',
+      '    repository = "kiltyj/viberoots",',
       "    branch_protections = [",
       '        {"stage": "dev", "branch": "env/pleomino/dev", "required_checks": "deploy/pleomino-dev", "fast_forward_only": "true", "normal_advance_principals": "app:deploy-bot", "emergency_direct_push_principals": "team:sre-break-glass"},',
       '        {"stage": "staging", "branch": "env/pleomino/staging", "required_checks": "deploy/pleomino-staging", "fast_forward_only": "true", "normal_advance_principals": "app:deploy-bot", "emergency_direct_push_principals": "team:sre-break-glass"},',

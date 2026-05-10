@@ -31,7 +31,7 @@ export async function ensureRepoLocalTmpRoot(
       user = os.userInfo().username || "";
     } catch {}
     const suffix = user ? `-${user}` : "";
-    tmpdir = path.join(systemTmpRoot, `bucknix-verify${suffix}`, "tmpdir");
+    tmpdir = path.join(systemTmpRoot, `viberoots-verify${suffix}`, "tmpdir");
     delete env.TEST_TMP_IN_REPO;
   } else if (platform === "darwin") {
     let user = "";
@@ -39,7 +39,7 @@ export async function ensureRepoLocalTmpRoot(
       user = os.userInfo().username || "";
     } catch {}
     const suffix = user ? `-${user}` : "";
-    tmpdir = path.join(systemTmpRoot, `bucknix-verify${suffix}.noindex`, "tmpdir");
+    tmpdir = path.join(systemTmpRoot, `viberoots-verify${suffix}.noindex`, "tmpdir");
     delete env.TEST_TMP_IN_REPO;
   } else {
     env.TEST_TMP_IN_REPO = "1";

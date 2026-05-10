@@ -7,6 +7,7 @@ import { ensureBuckReaperStarted } from "./buck-reaper";
 import { getCgoToolchainPathsOncePerWorker, getDarwinSdkPathOncePerWorker } from "./cgo-toolchain";
 import { rewriteCoverageUrls } from "./coverage";
 import { cleanupTempRepoProcesses } from "../../../dev/verify/temp-repo-process-cleanup";
+import { registerBuckIsolationSync } from "../../../dev/verify/owned-process-state";
 import { rsyncRepoTo } from "./rsync";
 import { initTempRepoFromSeedStore } from "./seed-store";
 import { shSingleQuote } from "./shell-quote";
@@ -24,6 +25,7 @@ import {
 } from "../../../lib/pinned-nixpkgs";
 import { externalPnpmStateDirs } from "../../../lib/pnpm-state-paths";
 import { stableBuckIsolation } from "../../../lib/buck-command-env";
+import { resolveToolPathSync } from "../../../lib/tool-paths";
 
 const LOCAL_FIXTURE_SERVICE_ENV = "BNX_DEPLOY_LOCAL_FIXTURE_SERVICE";
 
@@ -32,6 +34,12 @@ let cachedPinnedNixpkgsPath: Promise<string> | null = null;
 let cachedPinnedCacertPath: Promise<string> | null = null;
 let cachedUnifiedPnpmStorePath: Promise<string> | null = null;
 let envMutationQueue: Promise<void> = Promise.resolve();
+
+function transientNixStoreError(output: unknown): boolean {
+  const text = String(output || "");
+  return /path '\/nix\/store\/[^']+' is not valid/.test(text) || /database is locked/.test(text);
+}
+
 async function withTempProcessEnv<T>(
   overrides: Record<string, string | undefined>,
   fn: () => Promise<T>,
@@ -64,19 +72,57 @@ async function withTempProcessEnv<T>(
 
 async function exportDevEnvOncePerWorker($: any): Promise<string> {
   if (cachedDevEnvExport) return await cachedDevEnvExport;
-  cachedDevEnvExport = (async () => {
+  cachedDevEnvExport = exportDevEnvWithRetry($).catch((err) => {
+    cachedDevEnvExport = null;
+    throw err;
+  });
+  return await cachedDevEnvExport;
+}
+
+async function exportDevEnvWithRetry($: any): Promise<string> {
+  const runOnce = async () => {
     // Avoid direnv here: it can be slow and re-run per temp repo, while nix develop is deterministic.
-    const out = await $({
+    return await $({
       cwd: process.cwd(),
       stdio: "pipe",
+      reject: false,
+      nothrow: true,
       env: {
         ...process.env,
         IN_NIX_SHELL: "1",
       },
     })`bash --noprofile --norc -c 'if command -v nix >/dev/null 2>&1; then NO_NODE_MODULES_LINK=1 nix develop --accept-flake-config -c env -0; elif command -v direnv >/dev/null 2>&1; then eval "$(direnv export bash)"; env -0; else printf ""; fi'`;
-    return String((out as any).stdout || "");
-  })();
-  return await cachedDevEnvExport;
+  };
+  let out = await runOnce();
+  if (
+    Number(out.exitCode || 0) !== 0 &&
+    transientNixStoreError(`${out.stdout || ""}\n${out.stderr || ""}`)
+  ) {
+    console.error("[runInTemp] transient nix store error while exporting dev env; retrying once");
+    await new Promise((resolve) => setTimeout(resolve, 750));
+    out = await runOnce();
+  }
+  if (Number(out.exitCode || 0) !== 0) {
+    throw new Error(
+      String(out.stderr || out.stdout || "nix develop failed while exporting dev env"),
+    );
+  }
+  return String((out as any).stdout || "");
+}
+
+async function retryTransientNixStoreFailure<T>(
+  label: string,
+  runOnce: () => Promise<T>,
+  outputFor: (result: T) => unknown,
+  failed: (result: T) => boolean,
+): Promise<T> {
+  let out = await runOnce();
+  if (failed(out) && transientNixStoreError(outputFor(out))) {
+    console.error(`[runInTemp] transient nix store error while ${label}; retrying once`);
+    await new Promise((resolve) => setTimeout(resolve, 750));
+    out = await runOnce();
+  }
+  return out;
 }
 
 async function pinnedNixpkgsPathOncePerWorker($: any): Promise<string> {
@@ -133,33 +179,33 @@ async function stableTestHomeRoot(): Promise<string> {
     user = os.userInfo().username || "";
   } catch {}
   const suffix = user ? `-${user}` : "";
-  const root = path.join(base, `bucknix-test-home${suffix}`);
+  const root = path.join(base, `viberoots-test-home${suffix}`);
   await fsp.mkdir(root, { recursive: true }).catch(() => {});
   return root;
 }
 
 async function stableGoModCacheRoot(): Promise<string> {
-  if (process.platform === "win32") return path.join(os.tmpdir(), "bucknix-go-modcache");
+  if (process.platform === "win32") return path.join(os.tmpdir(), "viberoots-go-modcache");
   const base = "/tmp";
   let user = "";
   try {
     user = os.userInfo().username || "";
   } catch {}
   const suffix = user ? `-${user}` : "";
-  const root = path.join(base, `bucknix-go-modcache${suffix}`);
+  const root = path.join(base, `viberoots-go-modcache${suffix}`);
   await fsp.mkdir(root, { recursive: true }).catch(() => {});
   return root;
 }
 
 async function stableXdgCacheRoot(): Promise<string> {
-  if (process.platform === "win32") return path.join(os.tmpdir(), "bucknix-xdg-cache");
+  if (process.platform === "win32") return path.join(os.tmpdir(), "viberoots-xdg-cache");
   const base = "/tmp";
   let user = "";
   try {
     user = os.userInfo().username || "";
   } catch {}
   const suffix = user ? `-${user}` : "";
-  const root = path.join(base, `bucknix-xdg-cache${suffix}`);
+  const root = path.join(base, `viberoots-xdg-cache${suffix}`);
   await fsp.mkdir(root, { recursive: true }).catch(() => {});
   return root;
 }
@@ -250,6 +296,42 @@ async function removeTreeWithWritableFallback(target: string, $: any): Promise<v
   }
 }
 
+async function createTempBuck2Shim(tmp: string, iso: string): Promise<string> {
+  const shimDir = path.join(tmp, ".buck2_shim", "bin");
+  await fsp.mkdir(shimDir, { recursive: true });
+  const realBuck2 = resolveToolPathSync("buck2");
+  const shimPath = path.join(shimDir, "buck2");
+  await fsp.writeFile(
+    shimPath,
+    [
+      "#!/usr/bin/env bash",
+      "set -euo pipefail",
+      `real_buck2=${JSON.stringify(realBuck2)}`,
+      `iso=${JSON.stringify(iso)}`,
+      'for arg in "$@"; do',
+      '  if [[ "$arg" == "--isolation-dir" ]]; then',
+      '    exec "$real_buck2" "$@"',
+      "  fi",
+      "done",
+      'exec "$real_buck2" --isolation-dir "$iso" "$@"',
+      "",
+    ].join("\n"),
+    "utf8",
+  );
+  await fsp.chmod(shimPath, 0o755);
+  return shimDir;
+}
+
+function prependPath(env: Record<string, string>, dir: string): void {
+  env.PATH = [dir, env.PATH || process.env.PATH || ""].filter(Boolean).join(path.delimiter);
+}
+
+async function prependTempRepoBin(env: Record<string, string>, tmp: string): Promise<void> {
+  const binDir = path.join(tmp, "build-tools", "tools", "bin");
+  const st = await fsp.stat(binDir).catch(() => null);
+  if (st?.isDirectory()) prependPath(env, binDir);
+}
+
 export async function runInTemp<T>(
   name: string,
   fn: (tmp: string, $: any) => Promise<T>,
@@ -280,6 +362,8 @@ export async function runInTemp<T>(
     exportEnv.WORKSPACE_ROOT = tmp;
     exportEnv.BUCK_TEST_SRC = tmp;
     exportEnv.REPO_ROOT = tmp;
+    exportEnv.BNX_RUN_IN_TEMP_REPO = "1";
+    exportEnv.SCAF_ALLOW_LIVE_REPO = "1";
     exportEnv.TEST_NO_BROWSER = exportEnv.TEST_NO_BROWSER || "1";
     exportEnv[LOCAL_FIXTURE_SERVICE_ENV] = exportEnv[LOCAL_FIXTURE_SERVICE_ENV] || "1";
     exportEnv.HOME = home;
@@ -291,6 +375,7 @@ export async function runInTemp<T>(
       exportEnv.XDG_CONFIG_HOME = process.env.XDG_CONFIG_HOME || path.join(os.homedir(), ".config");
     }
     exportEnv.ZX_INIT = zxInitPathFromWorkspace();
+    await prependTempRepoBin(exportEnv, tmp);
     const nodeOpts = ["--experimental-strip-types", `--import ${exportEnv.ZX_INIT}`];
     exportEnv.NODE_OPTIONS = [nodeOpts.join(" "), exportEnv.NODE_OPTIONS || ""]
       .filter(Boolean)
@@ -325,18 +410,30 @@ export async function runInTemp<T>(
     await ensureSharedNixTarballCacheRepo(activeXdgCacheHome);
   });
   const tempNestedIso = stableBuckIsolation(tmp, "zxtest-shared");
+  registerRunInTempBuckIsolation(tempNestedIso);
+  const buck2ShimDir = await timeAsync(
+    "runInTemp createTempBuck2Shim",
+    async () => await createTempBuck2Shim(tmp, tempNestedIso),
+  );
   const tempSetupEnv = {
     ...process.env,
     WORKSPACE_ROOT: tmp,
     BUCK_TEST_SRC: tmp,
+    BUCK_ISOLATION_DIR: tempNestedIso,
     BUCK_NESTED_ISO: tempNestedIso,
     TEST_NO_BROWSER: process.env.TEST_NO_BROWSER || "1",
     [LOCAL_FIXTURE_SERVICE_ENV]: process.env[LOCAL_FIXTURE_SERVICE_ENV] || "1",
     BUCK_EXPORTER_REUSE_DAEMON: process.env.BUCK_EXPORTER_REUSE_DAEMON || "1",
+    BUCKD_STARTUP_TIMEOUT: process.env.BUCKD_STARTUP_TIMEOUT || "300",
+    BUCKD_STARTUP_INIT_TIMEOUT:
+      process.env.BUCKD_STARTUP_INIT_TIMEOUT || process.env.BUCKD_STARTUP_TIMEOUT || "300",
+    BNX_RUN_IN_TEMP_REPO: "1",
+    SCAF_ALLOW_LIVE_REPO: "1",
     REPO_ROOT: process.cwd(),
     HOME: home,
     XDG_CACHE_HOME: activeXdgCacheHome,
   };
+  prependPath(tempSetupEnv, buck2ShimDir);
   const goModCacheRoot = await timeAsync(
     "runInTemp stableGoModCacheRoot",
     async () => await stableGoModCacheRoot(),
@@ -393,11 +490,22 @@ export async function runInTemp<T>(
   });
 
   if ((process.env.TEST_NEED_DEV_ENV || "") === "1") {
-    const chk =
-      await $setup`nix build ${`path:${tmp}#buck2-prelude`} --no-link --accept-flake-config --print-build-logs`.nothrow();
+    const chk = await retryTransientNixStoreFailure(
+      "checking temp repo buck2-prelude",
+      async () =>
+        await $setup`nix build ${`path:${tmp}#buck2-prelude`} --no-link --accept-flake-config --print-build-logs`.nothrow(),
+      (out) => `${(out as any).stdout || ""}\n${(out as any).stderr || ""}`,
+      (out) => Number((out as any).exitCode || 0) !== 0,
+    );
     if (chk.exitCode !== 0) {
+      const detail = `${String(chk.stdout || "")}\n${String(chk.stderr || "")}`.trim();
       throw new Error(
-        "dev-shell check failed: nix build path:<tmp>#buck2-prelude did not succeed in temp repo; ensure direnv/dev shell is active",
+        [
+          "dev-shell check failed: nix build path:<tmp>#buck2-prelude did not succeed in temp repo; ensure direnv/dev shell is active",
+          detail,
+        ]
+          .filter(Boolean)
+          .join("\n"),
       );
     }
   }
@@ -443,10 +551,16 @@ export async function runInTemp<T>(
   } catch {}
   exportEnv.WORKSPACE_ROOT = tmp;
   exportEnv.BUCK_TEST_SRC = tmp;
+  exportEnv.BNX_RUN_IN_TEMP_REPO = "1";
+  exportEnv.SCAF_ALLOW_LIVE_REPO = "1";
+  exportEnv.BUCK_ISOLATION_DIR = tempNestedIso;
   exportEnv.BUCK_NESTED_ISO = tempNestedIso;
   exportEnv.TEST_NO_BROWSER = exportEnv.TEST_NO_BROWSER || "1";
   exportEnv[LOCAL_FIXTURE_SERVICE_ENV] = exportEnv[LOCAL_FIXTURE_SERVICE_ENV] || "1";
   exportEnv.BUCK_EXPORTER_REUSE_DAEMON = exportEnv.BUCK_EXPORTER_REUSE_DAEMON || "1";
+  exportEnv.BUCKD_STARTUP_TIMEOUT = exportEnv.BUCKD_STARTUP_TIMEOUT || "300";
+  exportEnv.BUCKD_STARTUP_INIT_TIMEOUT =
+    exportEnv.BUCKD_STARTUP_INIT_TIMEOUT || exportEnv.BUCKD_STARTUP_TIMEOUT;
   exportEnv.HOME = home;
   exportEnv.XDG_CACHE_HOME = exportEnv.XDG_CACHE_HOME || xdgCacheHome;
   if (!exportEnv.BUCK2_REAL_HOME && realHome) {
@@ -501,6 +615,8 @@ export async function runInTemp<T>(
   }
   exportEnv.DIRENV_LOG_FORMAT = "";
   exportEnv.ZX_INIT = zxInitPathFromWorkspace();
+  prependPath(exportEnv, buck2ShimDir);
+  await prependTempRepoBin(exportEnv, tmp);
   const wantsUnifiedPnpmStore =
     String(process.env.TEST_DISABLE_UNIFIED_PNPM_STORE || "").trim() !== "1";
   if (wantsUnifiedPnpmStore) {
@@ -597,6 +713,22 @@ export async function runInTemp<T>(
       await removeTreeWithWritableFallback(home, $);
     }
   }
+}
+
+function registerRunInTempBuckIsolation(iso: string): void {
+  const stateFile = String(process.env.BNX_VERIFY_PROCESS_STATE_FILE || "").trim();
+  if (!stateFile || !iso) return;
+  const ownerPidRaw = Number(process.env.BNX_VERIFY_OWNER_PID || process.pid);
+  const ownerPid = Number.isFinite(ownerPidRaw) && ownerPidRaw > 1 ? ownerPidRaw : process.pid;
+  try {
+    registerBuckIsolationSync({
+      stateFile,
+      iso,
+      repoRoot: process.cwd(),
+      ownerPid,
+      kind: "run-in-temp-zxtest",
+    });
+  } catch {}
 }
 
 export async function runInScratchTemp<T>(

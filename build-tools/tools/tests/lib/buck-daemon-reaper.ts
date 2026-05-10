@@ -2,11 +2,10 @@
 import { spawn } from "node:child_process";
 import path from "node:path";
 import { resolveToolPathSync } from "../../lib/tool-paths";
+import { buckProcessTableLines } from "../../lib/process-inspection";
 import { cwdIsInsideTempRepo } from "./buck-daemon-reaper-utils";
-import {
-  cleanupRegisteredVerifyProcesses,
-  parseVerifyOwnedState,
-} from "../../dev/verify/owned-process-state";
+import { cleanupRegisteredVerifyProcesses } from "../../dev/verify/owned-process-cleanup";
+import { parseVerifyOwnedState } from "../../dev/verify/owned-process-state";
 
 type Args = {
   parent?: string;
@@ -34,11 +33,22 @@ function isPidAlive(pid: number): boolean {
 
 async function processStartSignature(pid: number, timeoutMs: number): Promise<string> {
   if (!Number.isFinite(pid) || pid <= 1) return "";
-  const psPath = resolveToolPathSync("ps");
-  return await new Promise<string>((resolve) => {
-    const child = spawn(psPath, ["-p", String(pid), "-o", "lstart="], {
-      stdio: ["ignore", "pipe", "ignore"],
-    });
+  let psPath = "";
+  try {
+    psPath = resolveToolPathSync("ps");
+  } catch {
+    return isPidAlive(pid) ? `pid:${pid}` : "";
+  }
+  const result = await new Promise<string>((resolve) => {
+    let child;
+    try {
+      child = spawn(psPath, ["-p", String(pid), "-o", "lstart="], {
+        stdio: ["ignore", "pipe", "ignore"],
+      });
+    } catch {
+      resolve("");
+      return;
+    }
     let buf = "";
     child.stdout.setEncoding("utf8");
     child.stdout.on("data", (d) => (buf += d));
@@ -55,6 +65,8 @@ async function processStartSignature(pid: number, timeoutMs: number): Promise<st
     );
     child.on("close", () => clearTimeout(t));
   });
+  if (!result && isPidAlive(pid)) return `pid:${pid}`;
+  return result;
 }
 
 async function tempRepoStillExists(tmpRepoRoot: string): Promise<boolean> {
@@ -71,31 +83,19 @@ async function sleep(ms: number): Promise<void> {
 }
 
 async function psLines(timeoutMs: number): Promise<string[]> {
-  const psPath = resolveToolPathSync("ps");
-  const stdout = await new Promise<string>((resolve) => {
-    const child = spawn(psPath, ["-A", "-o", "pid=,ppid=,command="], {
-      stdio: ["ignore", "pipe", "ignore"],
-    });
-    let buf = "";
-    child.stdout.setEncoding("utf8");
-    child.stdout.on("data", (d) => (buf += d));
-    child.on("error", () => resolve(""));
-    child.on("close", () => resolve(buf));
-    const t = setTimeout(
-      () => {
-        try {
-          child.kill("SIGKILL");
-        } catch {}
-        resolve("");
-      },
-      Math.max(100, timeoutMs),
-    );
-    child.on("close", () => clearTimeout(t));
-  });
-  return String(stdout || "")
-    .split(/\r?\n/)
-    .map((l) => l.trim())
-    .filter(Boolean);
+  return await buckProcessTableLines(timeoutMs);
+}
+
+async function buckCommandForPid(pid: number, timeoutMs: number): Promise<string> {
+  const prefix = `${pid} `;
+  for (const line of await buckProcessTableLines(timeoutMs)) {
+    if (!line.startsWith(prefix)) continue;
+    const fields = line.match(/^\d+\s+\d+\s+\S+\s+(.*)$/);
+    if (fields) return fields[1] || "";
+    const fallback = line.match(/^\d+\s+\d+\s+(.*)$/);
+    if (fallback) return fallback[1] || "";
+  }
+  return "";
 }
 
 async function readBuck2dProcesses(): Promise<Array<{ pid: number; cmd: string }>> {
@@ -188,24 +188,7 @@ async function killBuckIsoInRepo(
   // If buck2 kill didn't terminate the daemon, SIGKILL the matching buck2d.
   // Guard against PID reuse by verifying the command line includes the expected isolation dir.
   if (Number.isFinite(buck2dPid) && buck2dPid > 1 && isPidAlive(buck2dPid)) {
-    const psPath = resolveToolPathSync("ps");
-    const cmd = await new Promise<string>((resolve) => {
-      const child = spawn(psPath, ["-p", String(buck2dPid), "-o", "command="], {
-        stdio: ["ignore", "pipe", "ignore"],
-      });
-      let buf = "";
-      child.stdout.setEncoding("utf8");
-      child.stdout.on("data", (d) => (buf += d));
-      child.on("error", () => resolve(""));
-      child.on("close", () => resolve(String(buf || "").trim()));
-      const t = setTimeout(() => {
-        try {
-          child.kill("SIGKILL");
-        } catch {}
-        resolve("");
-      }, 1500);
-      child.on("close", () => clearTimeout(t));
-    });
+    const cmd = await buckCommandForPid(buck2dPid, 1500);
     if (cmd.includes("buck2d[") && cmd.includes(`--isolation-dir ${iso} `)) {
       try {
         process.kill(buck2dPid, "SIGKILL");
@@ -256,24 +239,7 @@ async function reapBuckDaemonsForTempRepo(tmpRepoRoot: string): Promise<void> {
     // matching buck2d for this forkserver+iso, SIGKILL it. Guard against PID reuse by verifying
     // command line contains both buck2d and the expected isolation dir.
     if (iso && Number.isFinite(f.ppid) && f.ppid > 1 && isPidAlive(f.ppid)) {
-      const psPath = resolveToolPathSync("ps");
-      const parentCmd = await new Promise<string>((resolve) => {
-        const child = spawn(psPath, ["-p", String(f.ppid), "-o", "command="], {
-          stdio: ["ignore", "pipe", "ignore"],
-        });
-        let buf = "";
-        child.stdout.setEncoding("utf8");
-        child.stdout.on("data", (d) => (buf += d));
-        child.on("error", () => resolve(""));
-        child.on("close", () => resolve(String(buf || "").trim()));
-        const t = setTimeout(() => {
-          try {
-            child.kill("SIGKILL");
-          } catch {}
-          resolve("");
-        }, 1500);
-        child.on("close", () => clearTimeout(t));
-      });
+      const parentCmd = await buckCommandForPid(f.ppid, 1500);
       if (parentCmd.includes("buck2d[") && parentCmd.includes(`--isolation-dir ${iso} `)) {
         try {
           process.kill(f.ppid, "SIGKILL");
@@ -287,30 +253,9 @@ async function reapBuckDaemonsForTempRepo(tmpRepoRoot: string): Promise<void> {
   try {
     const base = path.basename(path.resolve(tmpRepoRoot));
     if (base) {
-      const psPath = resolveToolPathSync("ps");
-      const res = await new Promise<string>((resolve) => {
-        const child = spawn(psPath, ["-A", "-o", "pid=,command="], {
-          stdio: ["ignore", "pipe", "ignore"],
-        });
-        let buf = "";
-        child.stdout.setEncoding("utf8");
-        child.stdout.on("data", (d) => (buf += d));
-        child.on("error", () => resolve(""));
-        child.on("close", () => resolve(buf));
-        const t = setTimeout(() => {
-          try {
-            child.kill("SIGKILL");
-          } catch {}
-          resolve(buf);
-        }, 2000);
-        child.on("close", () => clearTimeout(t));
-      });
-      const lines = String(res || "")
-        .split(/\r?\n/)
-        .map((l) => l.trim())
-        .filter(Boolean);
+      const lines = await buckProcessTableLines(2000);
       for (const l of lines) {
-        const m = l.match(/^(\d+)\s+(.*)$/);
+        const m = l.match(/^(\d+)\s+\d+\s+\S+\s+(.*)$/) || l.match(/^(\d+)\s+\d+\s+(.*)$/);
         if (!m) continue;
         const pid = Number(m[1]);
         const cmd = m[2] || "";

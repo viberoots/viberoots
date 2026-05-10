@@ -1,10 +1,7 @@
-import * as fsp from "node:fs/promises";
-import path from "node:path";
 import {
   buck2Kill,
   isPidAlive,
   isTempRepoRoot,
-  listIsolationDirs,
   liveOwnerPidFromEphemeralIsolation,
   parsePsLine,
   pathExists,
@@ -12,9 +9,19 @@ import {
   tryRepoRootFromStateDir,
 } from "./buck-orphan-cleanup-lib";
 import type { ForkserverProc } from "./buck-orphan-cleanup-lib";
-import { parseVerifyOwnedState } from "./owned-process-state";
-import { cleanupTempRepoProcesses } from "./temp-repo-process-cleanup";
+import {
+  cleanupOrphanRegisteredBuckIsolations,
+  cleanupOrphanRegisteredTempRepos,
+  cleanupRegisteredBuckIsolations,
+  cleanupRegisteredTempRepos,
+} from "./registered-buck-cleanup";
 import { cleanupOrphanVerifyProcesses, etimeToSeconds } from "./verify-owned-orphan-cleanup";
+
+export {
+  cleanupOrphanRegisteredTempRepos,
+  cleanupRegisteredBuckIsolations,
+  cleanupRegisteredTempRepos,
+};
 
 function parseForkservers(lines: string[]): ForkserverProc[] {
   const forks: ForkserverProc[] = [];
@@ -50,7 +57,7 @@ export function isLikelyEphemeralIsolation(iso: string): boolean {
   if (!s) return false;
   if (/^v-\d+-\d+$/.test(s)) return true;
   if (/^verify-nested-(?:\d+-)?[a-f0-9]{12}$/.test(s)) return true;
-  if (/^zxtest-shared-[a-f0-9]{10}$/.test(s)) return true;
+  if (/^zxtest-[A-Za-z0-9_-]+-[a-f0-9]{10}$/.test(s)) return true;
   if (/^debug-[A-Za-z0-9._-]+-\d{9,}$/.test(s)) return true;
   if (/^targeted-[A-Za-z0-9._-]+-\d{9,}$/.test(s)) return true;
   if (/^(parity_|sanitize_|importer_strings_)/.test(s)) return true;
@@ -64,7 +71,7 @@ export async function cleanupOrphanBuckDaemons(opts: {
   includeOwnerlessEphemeral?: boolean;
 }): Promise<{ scanned: number; candidates: number; killed: number }> {
   const maxKills = Math.max(0, opts.maxKills ?? 50);
-  const includeOwnerlessEphemeral = opts.includeOwnerlessEphemeral ?? true;
+  const includeOwnerlessEphemeral = opts.includeOwnerlessEphemeral ?? false;
   const ignoreLiveOwnerPid = opts.ignoreLiveOwnerPid ?? -1;
   const staleGraceRaw = Number.parseInt(
     String(process.env.BNX_BUCK_ORPHAN_STALE_GRACE_SECS || "120"),
@@ -105,6 +112,14 @@ export async function cleanupOrphanBuckDaemons(opts: {
   }
 
   const daemons = parseBuckDaemons(lines);
+  const forkserversByIso = new Map<string, ForkserverProc[]>();
+  for (const fork of forks) {
+    const mapped = tryRepoRootFromStateDir(fork.stateDir);
+    if (!mapped) continue;
+    const existing = forkserversByIso.get(mapped.iso) ?? [];
+    existing.push(fork);
+    forkserversByIso.set(mapped.iso, existing);
+  }
   for (const d of daemons) {
     if (d.ppid > 1 && isPidAlive(d.ppid)) continue;
     if (!isLikelyEphemeralIsolation(d.iso)) continue;
@@ -122,9 +137,24 @@ export async function cleanupOrphanBuckDaemons(opts: {
     candidates++;
     if (killed >= maxKills) continue;
     if (!isPidAlive(d.pid)) continue;
+    const matchingForkservers = forkserversByIso.get(d.iso) ?? [];
+    for (const fork of matchingForkservers) {
+      const mapped = tryRepoRootFromStateDir(fork.stateDir);
+      if (!mapped) continue;
+      if (await pathExists(mapped.repoRoot)) {
+        await buck2Kill(mapped.repoRoot, mapped.iso, 5000);
+      }
+    }
     try {
       process.kill(d.pid, "SIGKILL");
     } catch {}
+    for (const fork of matchingForkservers) {
+      if (fork.ppid > 1 && isPidAlive(fork.ppid)) continue;
+      if (!isPidAlive(fork.pid)) continue;
+      try {
+        process.kill(fork.pid, "SIGKILL");
+      } catch {}
+    }
     killed++;
     if (opts.log) {
       await opts.log(
@@ -132,119 +162,33 @@ export async function cleanupOrphanBuckDaemons(opts: {
       );
     }
   }
+  const registeredIsoRes = await cleanupOrphanRegisteredBuckIsolations({
+    log: opts.log,
+    maxKills: Math.max(0, maxKills - killed),
+  }).catch(() => ({ scanned: 0, candidates: 0, killed: 0 }));
+  killed += registeredIsoRes.killed;
+  const registeredTempRepoRes = await cleanupOrphanRegisteredTempRepos({
+    log: opts.log,
+    maxKills: Math.max(0, maxKills - killed),
+  }).catch(() => ({ scanned: 0, candidates: 0, killed: 0 }));
+  killed += registeredTempRepoRes.killed;
   const verifyProcRes = await cleanupOrphanVerifyProcesses(opts).catch(() => ({
     scanned: 0,
     candidates: 0,
     killed: 0,
   }));
   return {
-    scanned: forks.length + daemons.length + verifyProcRes.scanned,
-    candidates: candidates + verifyProcRes.candidates,
+    scanned:
+      forks.length +
+      daemons.length +
+      registeredIsoRes.scanned +
+      registeredTempRepoRes.scanned +
+      verifyProcRes.scanned,
+    candidates:
+      candidates +
+      registeredIsoRes.candidates +
+      registeredTempRepoRes.candidates +
+      verifyProcRes.candidates,
     killed: killed + verifyProcRes.killed,
   };
-}
-
-export async function cleanupRegisteredTempRepos(opts: {
-  stateFile: string;
-  log?: (line: string) => Promise<void>;
-  maxKills?: number;
-  removeRoots?: boolean;
-}): Promise<{ roots: number; killed: number }> {
-  const stateFile = String(opts.stateFile || "").trim();
-  if (!stateFile) return { roots: 0, killed: 0 };
-  const txt = await fsp.readFile(stateFile, "utf8").catch(() => "");
-  const parsed = parseVerifyOwnedState(txt);
-  const roots = parsed.roots
-    .map((l) => l.trim())
-    .filter(Boolean)
-    .map((p) => path.resolve(p))
-    .filter((p) => p.length > 1);
-  const uniqueRoots = Array.from(new Set(roots));
-  if (uniqueRoots.length === 0) return { roots: 0, killed: 0 };
-
-  let forks = parseForkservers(await psLines(2000));
-  let killed = 0;
-  const maxKills = Math.max(0, opts.maxKills ?? 200);
-  for (const root of uniqueRoots) {
-    if (killed >= maxKills) break;
-    if (!(await pathExists(root))) continue;
-    const isos = await listIsolationDirs(root);
-    for (const iso of isos) {
-      if (killed >= maxKills) break;
-      await buck2Kill(root, iso, 5000);
-    }
-  }
-  for (let pass = 0; pass < 3 && killed < maxKills; pass++) {
-    let matchedThisPass = 0;
-    for (const f of forks) {
-      if (killed >= maxKills) break;
-      const mapped = tryRepoRootFromStateDir(f.stateDir);
-      if (!mapped) continue;
-      const { repoRoot, iso } = mapped;
-      const absRepo = path.resolve(repoRoot);
-      if (!uniqueRoots.includes(absRepo)) continue;
-      matchedThisPass++;
-      if (await pathExists(absRepo)) {
-        await buck2Kill(absRepo, iso, 5000);
-      }
-      if (isPidAlive(f.pid)) {
-        try {
-          process.kill(f.pid, "SIGKILL");
-        } catch {}
-      }
-      if (f.ppid > 1 && isPidAlive(f.ppid)) {
-        try {
-          process.kill(f.ppid, "SIGKILL");
-        } catch {}
-      }
-      killed++;
-      if (opts.log) {
-        await opts.log(
-          `[verify] temp-repo buck cleanup: killed forkserver pid=${f.pid} ppid=${f.ppid} etime=${f.etime} repo=${repoRoot} iso=${iso}`,
-        );
-      }
-    }
-    if (matchedThisPass === 0) break;
-    forks = parseForkservers(await psLines(2000));
-  }
-
-  const lines2 = await psLines(2000);
-  for (const root of uniqueRoots) {
-    if (killed >= maxKills) break;
-    if (!(await pathExists(root))) continue;
-    const base = path.basename(path.resolve(root));
-    if (!base) continue;
-    const prefix = `buck2d[${base}]`;
-    for (const ln of lines2) {
-      if (killed >= maxKills) break;
-      if (!ln.includes(prefix)) continue;
-      const m = ln.match(/^(\d+)\s+(\d+)\s+(\S+)\s+(.*)$/);
-      if (!m) continue;
-      const pid = Number(m[1]);
-      const etime = m[3] || "";
-      if (!Number.isFinite(pid) || pid <= 1) continue;
-      if (!isPidAlive(pid)) continue;
-      try {
-        process.kill(pid, "SIGKILL");
-      } catch {}
-      killed++;
-      if (opts.log) {
-        await opts.log(
-          `[verify] temp-repo buck cleanup: killed buck2d pid=${pid} etime=${etime} repo=${root}`,
-        );
-      }
-    }
-  }
-  const procRes = await cleanupTempRepoProcesses({
-    roots: uniqueRoots,
-    log: opts.log,
-    maxKills: maxKills * 2,
-  });
-  killed += procRes.killed;
-  if (opts.removeRoots) {
-    for (const root of uniqueRoots) {
-      await fsp.rm(root, { recursive: true, force: true }).catch(() => {});
-    }
-  }
-  return { roots: uniqueRoots.length, killed };
 }

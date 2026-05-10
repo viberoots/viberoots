@@ -9,7 +9,7 @@ test("runInTemp: when BNX_BUCK_REAPER_STATE_FILE is set, temp repo roots are reg
   const prev = process.env.BNX_BUCK_REAPER_STATE_FILE;
   const stateFile = path.join(
     os.tmpdir(),
-    `bucknix-test-reaper-state-${process.pid}-${Date.now()}.txt`,
+    `viberoots-test-reaper-state-${process.pid}-${Date.now()}.txt`,
   );
 
   try {

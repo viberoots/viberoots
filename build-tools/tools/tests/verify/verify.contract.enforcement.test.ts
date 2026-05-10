@@ -21,7 +21,7 @@ test("verify contract: TMPDIR policy + coverage gating + disk gate strings prese
     "expected verify TMPDIR policy to branch for Linux hosts",
   );
   assert.ok(
-    tmpRoot.includes('"/tmp"') && tmpRoot.includes("bucknix-verify"),
+    tmpRoot.includes('"/tmp"') && tmpRoot.includes("viberoots-verify"),
     "expected verify to place Linux temp repos outside the workspace under /tmp",
   );
   assert.ok(
@@ -58,6 +58,19 @@ test("verify contract: TMPDIR policy + coverage gating + disk gate strings prese
       signalShutdown.includes("process.exit(exitCode)"),
     "expected verify signal cleanup to terminate the parent process and release the verify lock",
   );
+
+  const verifyPasses = await fsp.readFile("build-tools/tools/dev/verify/verify-passes.ts", "utf8");
+  assert.ok(
+    runVerify.includes("activeNestedIsos") &&
+      runVerify.includes("onNestedIso:") &&
+      runVerify.includes("onNestedIsoDone:"),
+    "expected verify signal cleanup to track active nested Buck isolations",
+  );
+  assert.ok(
+    verifyPasses.includes("spawned.nestedIso") &&
+      verifyPasses.includes("killBuckIsolation(opts.root, spawned.nestedIso)"),
+    "expected verify passes to kill child Buck nested isolations after each pass",
+  );
 });
 
 test("verify macOS temp roots opt generated output trees out of metadata indexing", async () => {
@@ -66,7 +79,7 @@ test("verify macOS temp roots opt generated output trees out of metadata indexin
   const user = os.userInfo().username || "";
   const suffix = user ? `-${user}` : "";
   const systemTmpRoot = path.join(root, "system-tmp");
-  const expectedTmpdir = path.join(systemTmpRoot, `bucknix-verify${suffix}.noindex`, "tmpdir");
+  const expectedTmpdir = path.join(systemTmpRoot, `viberoots-verify${suffix}.noindex`, "tmpdir");
 
   try {
     const staleSystemFile = path.join(expectedTmpdir, "stale-temp-repo", "file.txt");

@@ -66,11 +66,12 @@ export async function queryDeploymentNodesWithAttrs(
   const normalizedLabels = Array.from(new Set(labels.map((label) => normalizeTargetLabel(label))));
   const attrFlags = Array.from(new Set(attrs)).flatMap((attr) => ["--output-attribute", attr]);
   const query = `set(${normalizedLabels.join(" ")})`;
+  const buckEnv = deploymentBuckEnv(workspaceRoot, opts?.env);
   const { stdout } = await $({
     cwd: workspaceRoot,
     stdio: "pipe",
-    env: deploymentBuckEnv(opts?.env),
-  })`buck2 ${deploymentIsolationArgs(opts?.env)} cquery --target-platforms prelude//platforms:default ${query} --json ${attrFlags}`.quiet();
+    env: buckEnv,
+  })`buck2 ${deploymentIsolationArgs(buckEnv)} cquery --target-platforms prelude//platforms:default ${query} --json ${attrFlags}`.quiet();
   return nodesFromCqueryJson(JSON.parse(String(stdout || "{}")) as Record<string, any>);
 }
 
@@ -152,11 +153,12 @@ async function resolveDeploymentFromNodes(
 
 export async function listDeploymentTargets(workspaceRoot: string): Promise<string[]> {
   const query = 'kind("deployment_target", //...)';
+  const buckEnv = deploymentBuckEnv(workspaceRoot);
   const { stdout } = await $({
     cwd: workspaceRoot,
     stdio: "pipe",
-    env: deploymentBuckEnv(),
-  })`buck2 ${deploymentIsolationArgs()} cquery --target-platforms prelude//platforms:default ${query} --json --output-attribute name`.quiet();
+    env: buckEnv,
+  })`buck2 ${deploymentIsolationArgs(buckEnv)} cquery --target-platforms prelude//platforms:default ${query} --json --output-attribute name`.quiet();
   const raw = JSON.parse(String(stdout || "{}")) as Record<string, unknown>;
   return Object.keys(raw)
     .map((target) => normalizeQueryTarget(target))

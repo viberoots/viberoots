@@ -55,7 +55,7 @@ export async function uploadCloudflarePagesClientArtifact(opts: {
     await fetch(new URL("/api/v1/artifact-uploads/static-webapp", opts.controlPlaneUrl), {
       method: "POST",
       headers: {
-        "content-type": "application/vnd.bucknix.static-webapp-artifact+json",
+        "content-type": "application/vnd.viberoots.static-webapp-artifact+json",
         "x-bnx-submission-id": opts.submissionId,
         ...authHeaders(opts.controlPlaneToken),
       },

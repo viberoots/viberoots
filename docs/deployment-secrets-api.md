@@ -18,9 +18,9 @@ Use this document when you need:
 
 Open the usage guides first when you want the shortest operator path:
 
-- [Deployments Usage](/Users/kiltyj/Code/bucknix-fresh/docs/deployments-usage.md)
-- [Secrets Usage](/Users/kiltyj/Code/bucknix-fresh/docs/secrets-usage.md)
-- [Vault Production Bootstrap Runbook](/Users/kiltyj/Code/bucknix-fresh/docs/vault-production-bootstrap.md)
+- [Deployments Usage](/Users/kiltyj/Code/viberoots/docs/deployments-usage.md)
+- [Secrets Usage](/Users/kiltyj/Code/viberoots/docs/secrets-usage.md)
+- [Vault Production Bootstrap Runbook](/Users/kiltyj/Code/viberoots/docs/vault-production-bootstrap.md)
 
 ## Plain-Language Glossary
 
@@ -37,21 +37,21 @@ Open the usage guides first when you want the shortest operator path:
 These are the public surfaces you can rely on:
 
 1. the repo-level `deploy` CLI in
-   [build-tools/tools/bin/deploy](/Users/kiltyj/Code/bucknix-fresh/build-tools/tools/bin/deploy)
+   [build-tools/tools/bin/deploy](/Users/kiltyj/Code/viberoots/build-tools/tools/bin/deploy)
 2. the shared deployment service endpoints implemented by
-   [nixos-shared-host-control-plane-server.ts](/Users/kiltyj/Code/bucknix-fresh/build-tools/tools/deployments/nixos-shared-host-control-plane-server.ts)
+   [nixos-shared-host-control-plane-server.ts](/Users/kiltyj/Code/viberoots/build-tools/tools/deployments/nixos-shared-host-control-plane-server.ts)
 3. the shared request and response contracts in
-   [deployment-control-plane-contract.ts](/Users/kiltyj/Code/bucknix-fresh/build-tools/tools/deployments/deployment-control-plane-contract.ts)
+   [deployment-control-plane-contract.ts](/Users/kiltyj/Code/viberoots/build-tools/tools/deployments/deployment-control-plane-contract.ts)
 4. the provider submit-request contracts in
-   [nixos-shared-host-control-plane-api-contract.ts](/Users/kiltyj/Code/bucknix-fresh/build-tools/tools/deployments/nixos-shared-host-control-plane-api-contract.ts)
+   [nixos-shared-host-control-plane-api-contract.ts](/Users/kiltyj/Code/viberoots/build-tools/tools/deployments/nixos-shared-host-control-plane-api-contract.ts)
    and
-   [cloudflare-pages-control-plane-api-contract.ts](/Users/kiltyj/Code/bucknix-fresh/build-tools/tools/deployments/cloudflare-pages-control-plane-api-contract.ts)
+   [cloudflare-pages-control-plane-api-contract.ts](/Users/kiltyj/Code/viberoots/build-tools/tools/deployments/cloudflare-pages-control-plane-api-contract.ts)
 5. the `secretspec` helpers in
-   [deployment-secretspec.ts](/Users/kiltyj/Code/bucknix-fresh/build-tools/tools/deployments/deployment-secretspec.ts),
-   [deployment-secret-runtime.ts](/Users/kiltyj/Code/bucknix-fresh/build-tools/tools/deployments/deployment-secret-runtime.ts),
-   [deployment-secret-runtime-helpers.ts](/Users/kiltyj/Code/bucknix-fresh/build-tools/tools/deployments/deployment-secret-runtime-helpers.ts),
+   [deployment-secretspec.ts](/Users/kiltyj/Code/viberoots/build-tools/tools/deployments/deployment-secretspec.ts),
+   [deployment-secret-runtime.ts](/Users/kiltyj/Code/viberoots/build-tools/tools/deployments/deployment-secret-runtime.ts),
+   [deployment-secret-runtime-helpers.ts](/Users/kiltyj/Code/viberoots/build-tools/tools/deployments/deployment-secret-runtime-helpers.ts),
    and
-   [deployment-secret-vault.ts](/Users/kiltyj/Code/bucknix-fresh/build-tools/tools/deployments/deployment-secret-vault.ts)
+   [deployment-secret-vault.ts](/Users/kiltyj/Code/viberoots/build-tools/tools/deployments/deployment-secret-vault.ts)
 
 ## `deploy` CLI
 
@@ -413,7 +413,7 @@ The service returns JSON on all endpoints.
 ### Schema Names
 
 The shared schema constants are exported from
-[deployment-control-plane-contract.ts](/Users/kiltyj/Code/bucknix-fresh/build-tools/tools/deployments/deployment-control-plane-contract.ts):
+[deployment-control-plane-contract.ts](/Users/kiltyj/Code/viberoots/build-tools/tools/deployments/deployment-control-plane-contract.ts):
 
 - `deployment-control-plane-submit-request@1`
 - `deployment-control-plane-submit-response@1`
@@ -705,7 +705,7 @@ backend behind that surface.
 ### Public Types And Helpers
 
 The public `secretspec` helpers are exported from
-[deployment-secretspec.ts](/Users/kiltyj/Code/bucknix-fresh/build-tools/tools/deployments/deployment-secretspec.ts):
+[deployment-secretspec.ts](/Users/kiltyj/Code/viberoots/build-tools/tools/deployments/deployment-secretspec.ts):
 
 - `DeploymentSecretBackendKind`
 - `DeploymentSecretContractBinding`
@@ -713,7 +713,7 @@ The public `secretspec` helpers are exported from
 - `deploymentSecretBindingsForStep()`
 
 The runtime helpers are exported from
-[deployment-secret-runtime.ts](/Users/kiltyj/Code/bucknix-fresh/build-tools/tools/deployments/deployment-secret-runtime.ts):
+[deployment-secret-runtime.ts](/Users/kiltyj/Code/viberoots/build-tools/tools/deployments/deployment-secret-runtime.ts):
 
 - `DeploymentSecretMaterial`
 - `DeploymentSecretBackend`
@@ -722,9 +722,9 @@ The runtime helpers are exported from
 The Vault-backed helpers are exported from:
 
 - `createDeploymentVaultSecretBackend()` in
-  [deployment-secret-vault.ts](/Users/kiltyj/Code/bucknix-fresh/build-tools/tools/deployments/deployment-secret-vault.ts)
+  [deployment-secret-vault.ts](/Users/kiltyj/Code/viberoots/build-tools/tools/deployments/deployment-secret-vault.ts)
 - `createVaultDeploymentSecretRuntime()` in
-  [deployment-secret-runtime-helpers.ts](/Users/kiltyj/Code/bucknix-fresh/build-tools/tools/deployments/deployment-secret-runtime-helpers.ts)
+  [deployment-secret-runtime-helpers.ts](/Users/kiltyj/Code/viberoots/build-tools/tools/deployments/deployment-secret-runtime-helpers.ts)
 
 ### Requirement Shape
 
@@ -895,7 +895,7 @@ export BNX_DEPLOYMENT_SECRET_FIXTURE_PATH="$PWD/secret-fixture.json"
 ```
 
 Production operators should also read
-[Vault Production Bootstrap Runbook](/Users/kiltyj/Code/bucknix-fresh/docs/vault-production-bootstrap.md).
+[Vault Production Bootstrap Runbook](/Users/kiltyj/Code/viberoots/docs/vault-production-bootstrap.md).
 That runbook bootstraps Vault as the source of truth for the JWT-first runtime
 path and also shows how to export this fixture format for local/test workflows.
 
@@ -1082,18 +1082,18 @@ is still no repo-local `deploy auth status` or `deploy auth logout` command.
 
 ## When To Open Which Doc
 
-Open [Deployments Usage](/Users/kiltyj/Code/bucknix-fresh/docs/deployments-usage.md)
+Open [Deployments Usage](/Users/kiltyj/Code/viberoots/docs/deployments-usage.md)
 when you want the fastest operator command path.
 
-Open [Secrets Usage](/Users/kiltyj/Code/bucknix-fresh/docs/secrets-usage.md)
+Open [Secrets Usage](/Users/kiltyj/Code/viberoots/docs/secrets-usage.md)
 when you need the shortest explanation of the `secretspec` and Vault model.
 
-Open [Vault Production Bootstrap Runbook](/Users/kiltyj/Code/bucknix-fresh/docs/vault-production-bootstrap.md)
+Open [Vault Production Bootstrap Runbook](/Users/kiltyj/Code/viberoots/docs/vault-production-bootstrap.md)
 when you need the operator workflow for initializing Vault, enabling KV/JWT auth,
 writing policies, storing secrets, and exporting the current secret fixture.
 
-Open [Deployments Design](/Users/kiltyj/Code/bucknix-fresh/docs/deployments-design.md)
+Open [Deployments Design](/Users/kiltyj/Code/viberoots/docs/deployments-design.md)
 when you need the architectural rationale behind the API surface.
 
-Open [Deployment Contract](/Users/kiltyj/Code/bucknix-fresh/docs/deployments-contract.md)
+Open [Deployment Contract](/Users/kiltyj/Code/viberoots/docs/deployments-contract.md)
 when you need the fail-closed behavioral rules that the public APIs must obey.

@@ -12,27 +12,26 @@ async function importPluginFromWorkspace() {
     process.cwd(),
     "build-tools",
     "tools",
-    "eslint-plugin-bucknix",
+    "eslint-plugin-viberoots",
     "index.js",
   );
   const mod = await import(pathToFileURL(pluginPath).href);
   return (mod as any).default || mod;
 }
 
-test("bucknix/no-raw-graph-json flags direct reads and allows allowlisted paths", async () => {
+test("viberoots/no-raw-graph-json flags direct reads and allows allowlisted paths", async () => {
   await runInTemp("eslint-rule-check", async (tmp, $) => {
     const plugin = await importPluginFromWorkspace();
 
     const eslint = new ESLint({
       cwd: tmp,
-      overrideConfigFile: null,
+      overrideConfigFile: true,
       overrideConfig: [
         {
           files: ["**/*.*"],
           languageOptions: { parser: parser as any, sourceType: "module", ecmaVersion: "latest" },
-          // Use a unique plugin key here to avoid collisions with any preloaded configs
-          plugins: { bucktest: plugin },
-          rules: { "bucktest/no-raw-graph-json": "error" },
+          plugins: { viberoots: plugin },
+          rules: { "viberoots/no-raw-graph-json": "error" },
         },
       ],
     });
@@ -58,7 +57,7 @@ test("bucknix/no-raw-graph-json flags direct reads and allows allowlisted paths"
     const hasViolation = resBad.some(
       (r) =>
         r.errorCount > 0 &&
-        (r.messages || []).some((m) => m.ruleId === "bucktest/no-raw-graph-json"),
+        (r.messages || []).some((m) => m.ruleId === "viberoots/no-raw-graph-json"),
     );
     if (!hasViolation) {
       console.error(

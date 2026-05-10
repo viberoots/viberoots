@@ -1,5 +1,7 @@
+import { spawn } from "node:child_process";
 import path from "node:path";
 import { isPidAlive, parsePsLine, psLines } from "./buck-orphan-cleanup-lib";
+import { resolveToolPathSync } from "../../lib/tool-paths";
 
 function normalizeRoot(p: string): string {
   return path.resolve(String(p || "").trim()).replace(/\/+$/, "");
@@ -28,6 +30,7 @@ function isScopedTempDevProcess(cmd: string): boolean {
   if (c.includes("next/dist/bin/next") && c.includes(" dev")) return true;
   if (c.includes("next-server")) return true;
   if (c.includes("watch-wasm-producer.ts")) return true;
+  if (c.includes("wasm-watch-coordinator-daemon.ts")) return true;
   if (c.includes("dev-with-wasm-watch.ts")) return true;
   if (c.includes("/scripts/dev-wasm-watch.mjs")) return true;
   if (c.includes("pnpm exec vite")) return true;
@@ -65,6 +68,54 @@ function collectScopedProcesses(lines: string[], roots: string[]): Proc[] {
   return out;
 }
 
+async function pgrepScopedProcessLines(roots: string[]): Promise<string[]> {
+  let pgrepPath = "";
+  try {
+    pgrepPath = resolveToolPathSync("pgrep");
+  } catch {
+    return [];
+  }
+  const lines: string[] = [];
+  for (const root of roots.flatMap((r) => rootVariants(r))) {
+    const pattern = root.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const next = await new Promise<string[]>((resolve) => {
+      let child;
+      try {
+        child = spawn(pgrepPath, ["-afil", pattern], {
+          stdio: ["ignore", "pipe", "ignore"],
+        });
+      } catch {
+        resolve([]);
+        return;
+      }
+      let buf = "";
+      child.stdout.setEncoding("utf8");
+      child.stdout.on("data", (d) => (buf += d));
+      child.on("error", () => resolve([]));
+      child.on("close", () => {
+        resolve(
+          String(buf || "")
+            .split(/\r?\n/)
+            .map((l) => l.trim())
+            .filter(Boolean)
+            .flatMap((line) => {
+              const match = line.match(/^(\d+)\s+(.*)$/);
+              if (!match) return [];
+              const pid = Number(match[1]);
+              const cmd = String(match[2] || "").trim();
+              if (!Number.isFinite(pid) || pid <= 1) return [];
+              if (!cmd.includes(root)) return [];
+              if (cmd.includes("pgrep -afil")) return [];
+              return [`${pid} 0 00:00 ${cmd}`];
+            }),
+        );
+      });
+    });
+    lines.push(...next);
+  }
+  return Array.from(new Set(lines));
+}
+
 async function signalPids(pids: number[], sig: NodeJS.Signals): Promise<number> {
   let sent = 0;
   for (const pid of pids) {
@@ -87,7 +138,7 @@ export async function cleanupTempRepoProcesses(opts: {
   );
   if (roots.length === 0) return { scanned: 0, candidates: 0, killed: 0 };
   const maxKills = Math.max(0, opts.maxKills ?? 500);
-  const lines = await psLines(2000);
+  const lines = [...(await psLines(2000)), ...(await pgrepScopedProcessLines(roots))];
   const procs = collectScopedProcesses(lines, roots);
   const capped = procs.slice(0, maxKills);
   const pids = capped.map((p) => p.pid);

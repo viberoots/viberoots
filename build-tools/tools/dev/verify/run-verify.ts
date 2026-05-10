@@ -36,27 +36,34 @@ import {
   startBuckWatchdog,
   writeVerifyIsoMarker,
 } from "./process-control";
+import { initializeVerifyProcessState } from "./run-verify-state";
 import { prepareVerifySeed, shouldPrepareVerifySeedForRequestedTargets } from "./seed";
 import { isNonBuildSystemOnlyVerifyTargets } from "./target-scope";
 import { maybeWriteVerifyTimingSummary, runTemplateManifestCheck } from "./template-manifest-check";
 import { ensureRepoLocalTmpRoot } from "./tmp-root";
 import { runVerifyBuckPasses } from "./verify-passes";
 import { computeZxTestNodeModulesOut } from "./zx-node-modules";
-
 export async function runVerify(): Promise<void> {
   const phaseTimer = createVerifyPhaseTimer({ appendLine: appendVerifyLogLine });
   const timedPhase = phaseTimer.timedPhase;
   const invocationCwd = process.cwd();
   const root = repoRoot();
+  const { iso, stateFile } = await initializeVerifyProcessState(root);
+  let cleanupRegisteredTempRepoState = createRegisteredStateCleaner({ stateFile, logFile: null });
+  const cleanupEarlyFailure = async (error: unknown): Promise<never> => {
+    await cleanupRegisteredTempRepoState();
+    throw error;
+  };
   const { args, selection } = await resolveRequestedVerifyScope({
     root,
     invocationCwd,
     args: parseVerifyArgs(),
-  });
+  }).catch(cleanupEarlyFailure);
   const zxInitPath = path.join(root, "build-tools", "tools", "dev", "zx-init.mjs");
   await timedPhase("ensure-pinned-nixpkgs", async () => await ensureVerifyPinnedNixpkgs(root));
   if (args.explainSelection) {
     await runExplainSelection({ root, selection });
+    await createRegisteredStateCleaner({ stateFile, logFile: null })();
     return;
   }
   await timedPhase("startup-check", async () => await runStartupCheck(root));
@@ -69,18 +76,21 @@ export async function runVerify(): Promise<void> {
         lintFilters: selection.lintFilters,
         includeBuildSystemPolicy: !nonBuildSystemOnlyScope,
       }),
-  );
+  ).catch(cleanupEarlyFailure);
   await timedPhase(
     "template-manifest-check",
     async () => await runTemplateManifestCheck({ root, zxInitPath, nonBuildSystemOnlyScope }),
-  );
-
+  ).catch(cleanupEarlyFailure);
   const allowConcurrent = process.env.VERIFY_ALLOW_CONCURRENT === "1";
   const lock = await timedPhase(
     "acquire-verify-lock",
     async () => await acquireVerifyLock({ root, allowConcurrent }),
-  );
+  ).catch(cleanupEarlyFailure);
   await phaseTimer.setLogFile(lock.logFile);
+  cleanupRegisteredTempRepoState = createRegisteredStateCleaner({
+    stateFile,
+    logFile: lock.logFile,
+  });
   await timedPhase("ensure-repo-local-tmp-root", async () => await ensureRepoLocalTmpRoot(root));
   await timedPhase(
     "cleanup-legacy-pnpm-state",
@@ -114,16 +124,11 @@ export async function runVerify(): Promise<void> {
     "setup-coverage",
     async () => await setupCoverage({ root, enabled: args.coverage }),
   );
-  const iso = `v-${process.pid}-${Date.now()}`;
   const verifyStartS = Math.floor(Date.now() / 1000);
   await writeVerifyIsoMarker(lock.lockDir, iso);
   await appendVerifyLogLine(lock.logFile, `[verify] begin iso=${iso} start_s=${verifyStartS}`);
   await timedPhase("nix-gc-preflight", async () => await recordNixGcPreflight(lock.logFile));
   await timedPhase("log-verify-revision", async () => await logVerifyRevision(root, lock.logFile));
-  const stateFile = path.join(process.env.TMPDIR || "/tmp", `bucknix-buck-reaper-${iso}.txt`);
-  process.env.BNX_BUCK_REAPER_STATE_FILE = stateFile;
-  process.env.BNX_VERIFY_PROCESS_STATE_FILE = stateFile;
-  await fsp.writeFile(stateFile, "", "utf8").catch(() => {});
   await timedPhase(
     "start-buck-daemon-reaper",
     async () => await startBuckDaemonReaper({ root, zxInitPath, iso, stateFile }),
@@ -178,12 +183,9 @@ export async function runVerify(): Promise<void> {
     );
   } catch {}
   const activePgids = new Set<number>();
+  const activeNestedIsos = new Set<string>();
   let requestedExitCode: number | null = null;
   let shutdownPromise: Promise<void> | null = null;
-  const cleanupRegisteredTempRepoState = createRegisteredStateCleaner({
-    stateFile,
-    logFile: lock.logFile,
-  });
   let shutdownLogged = false;
   const requestShutdown = (sig: NodeJS.Signals): Promise<void> => {
     requestedExitCode = sig === "SIGINT" ? 130 : 143;
@@ -202,6 +204,9 @@ export async function runVerify(): Promise<void> {
         }
         const pgids = activePgids.size > 0 ? [...activePgids] : [process.pid];
         await Promise.all(pgids.map(async (pgid) => await killProcessGroup(pgid)));
+        await Promise.all(
+          [...activeNestedIsos].map(async (nestedIso) => await killBuckIsolation(root, nestedIso)),
+        );
         await killBuckIsolation(root, iso);
         await cleanupRegisteredTempRepoState();
       })();
@@ -226,11 +231,12 @@ export async function runVerify(): Promise<void> {
         analysisDir,
         onPgid: (nextPgid) => activePgids.add(nextPgid),
         onPgidDone: (donePgid) => activePgids.delete(donePgid),
+        onNestedIso: (nestedIso) => activeNestedIsos.add(nestedIso),
+        onNestedIsoDone: (nestedIso) => activeNestedIsos.delete(nestedIso),
       }),
   );
   if (shutdownPromise) await shutdownPromise;
   await cleanupRegisteredTempRepoState();
-
   await maybeWriteVerifyTimingSummary({ root, logFile: lock.logFile, zxInitPath });
   if (status === 0 && cov.rawDir) await runMergedCoverageReport({ root, rawDir: cov.rawDir });
   if (seedCleanup) {
@@ -238,6 +244,6 @@ export async function runVerify(): Promise<void> {
     seedCleanup = null;
   }
   await timedPhase("kill-verify-buck-isolation", async () => await killBuckIsolation(root, iso));
-  await runFinalOrphanBuckCleanup({ logFile: lock.logFile, timedPhase });
+  await runFinalOrphanBuckCleanup({ logFile: lock.logFile, stateFile, timedPhase });
   process.exit(requestedExitCode ?? status);
 }

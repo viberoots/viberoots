@@ -76,8 +76,9 @@ export async function pidAlive(pid: number): Promise<boolean> {
     if (stat.includes("Z")) return false;
     return true;
   } catch {
-    // If ps is unavailable or errors, treat the PID as not alive to avoid hangs in watch mode.
-    return false;
+    // If ps is unavailable but kill(0) succeeded, keep the lock live. In sandboxed
+    // environments /bin/ps can be denied even for same-user processes.
+    return true;
   }
 }
 
@@ -110,6 +111,7 @@ export async function pidStartSignature(pid: number): Promise<string> {
 
 export async function pidAliveWithSignature(pid: number, expectedSig: string): Promise<boolean> {
   if (!(await pidAlive(pid))) return false;
+  if (!expectedSig) return true;
   const sig = await pidStartSignature(pid);
   if (!sig) return false;
   return sig === expectedSig;

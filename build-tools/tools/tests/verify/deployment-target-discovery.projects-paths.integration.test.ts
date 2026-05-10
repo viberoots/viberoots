@@ -54,7 +54,7 @@ test("deployment target discovery resolves projects/deployments labels from an i
           "deployment_lane_governance(",
           '    name = "lane_governance",',
           '    scm_backend = "github",',
-          '    repository = "kiltyj/bucknix-fresh",',
+          '    repository = "kiltyj/viberoots",',
           "    branch_protections = [",
           '        {"stage": "dev", "branch": "env/pleomino/dev", "required_checks": "", "fast_forward_only": "true", "normal_advance_principals": "app:deploy-bot", "emergency_direct_push_principals": "team:sre-break-glass"},',
           "    ],",

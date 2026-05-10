@@ -14,21 +14,21 @@ This document defines the deployment model, not the current implementation statu
 
 Normative-source note:
 
-- [Deployment Contract](/Users/kiltyj/Code/bucknix-fresh/docs/deployments-contract.md) is the fail-closed normative source for shared operator and implementation guarantees across the deployment model
+- [Deployment Contract](/Users/kiltyj/Code/viberoots/docs/deployments-contract.md) is the fail-closed normative source for shared operator and implementation guarantees across the deployment model
 - the structured provider-capability registry under `build-tools/tools/deployments/provider-capabilities/**` is the authoritative source for reviewed provider-specific support and constraints
-- [Deployment Provider Capabilities](/Users/kiltyj/Code/bucknix-fresh/docs/deployment-provider-capabilities.md) is the rendered normative doc view of that reviewed registry
+- [Deployment Provider Capabilities](/Users/kiltyj/Code/viberoots/docs/deployment-provider-capabilities.md) is the rendered normative doc view of that reviewed registry
 - this design doc explains rationale, structure, examples, and policy intent
 - when this document restates a cross-cutting contract rule for readability, the contract doc remains authoritative if wording ever drifts
 - when this document summarizes provider support for readability, the provider-capabilities doc remains authoritative if wording ever drifts
 
 Companion docs:
 
-- [Deployments Usage](/Users/kiltyj/Code/bucknix-fresh/docs/deployments-usage.md)
-- [Deployment Contract](/Users/kiltyj/Code/bucknix-fresh/docs/deployments-contract.md)
-- [Deployment Schema](/Users/kiltyj/Code/bucknix-fresh/docs/deployments-schema.md)
-- [Deployment Provider Capabilities](/Users/kiltyj/Code/bucknix-fresh/docs/deployment-provider-capabilities.md)
-- [Deployment Scenarios](/Users/kiltyj/Code/bucknix-fresh/docs/deployment-scenarios.md)
-- [Deployment Implementation Plan](/Users/kiltyj/Code/bucknix-fresh/docs/deployment-plan.md)
+- [Deployments Usage](/Users/kiltyj/Code/viberoots/docs/deployments-usage.md)
+- [Deployment Contract](/Users/kiltyj/Code/viberoots/docs/deployments-contract.md)
+- [Deployment Schema](/Users/kiltyj/Code/viberoots/docs/deployments-schema.md)
+- [Deployment Provider Capabilities](/Users/kiltyj/Code/viberoots/docs/deployment-provider-capabilities.md)
+- [Deployment Scenarios](/Users/kiltyj/Code/viberoots/docs/deployment-scenarios.md)
+- [Deployment Implementation Plan](/Users/kiltyj/Code/viberoots/docs/deployment-plan.md)
 
 The implementation-plan document is operational planning only. It may describe rollout order or work
 breakdown, but the design, contract, schema, and provider-capabilities documents remain authoritative
@@ -730,7 +730,7 @@ Plain-language version:
 
 This section is a reader-oriented summary of the fixed behavioral contract.
 For exact fail-closed wording, the authoritative source remains
-[Deployment Contract](/Users/kiltyj/Code/bucknix-fresh/docs/deployments-contract.md).
+[Deployment Contract](/Users/kiltyj/Code/viberoots/docs/deployments-contract.md).
 
 Some implementation details remain open, but the following behavioral contracts are fixed:
 
@@ -1057,7 +1057,7 @@ Code-location map:
 
 ```mermaid
 flowchart TB
-    ROOT["bucknix-fresh repo"]
+    ROOT["viberoots repo"]
 
     subgraph CLI["CLI and repo-facing front door"]
         BIN["build-tools/tools/bin/deploy<br/>thin executable wrapper"]
@@ -3641,7 +3641,7 @@ Summary-table rule:
 - this table is an onboarding summary, not the normative capability registry
 - every row summarizes reviewed built-in provider support only; broader abstract deployment-model
   possibilities elsewhere in this design doc are not automatic built-in support claims
-- [Deployment Provider Capabilities](/Users/kiltyj/Code/bucknix-fresh/docs/deployment-provider-capabilities.md) is the authoritative reviewed contract for built-in provider support
+- [Deployment Provider Capabilities](/Users/kiltyj/Code/viberoots/docs/deployment-provider-capabilities.md) is the authoritative reviewed contract for built-in provider support
 - a provider adapter must not widen support beyond that capability contract without updating the authoritative provider-capability entry first
 - the generic deployment model defines what is expressible in principle, but the provider-capabilities doc defines what each built-in provider actually supports
 - a deployment may therefore be valid in the abstract model but still rejected by a specific built-in provider capability entry; that is expected, not a contradiction
@@ -6230,11 +6230,11 @@ The user should not need to think about that wiring.
 
 Hand off the design together with these companion documents:
 
-- [Deployment Contract](/Users/kiltyj/Code/bucknix-fresh/docs/deployments-contract.md)
-- [Deployment Schema](/Users/kiltyj/Code/bucknix-fresh/docs/deployments-schema.md)
-- [Deployment Provider Capabilities](/Users/kiltyj/Code/bucknix-fresh/docs/deployment-provider-capabilities.md)
-- [Deployment Scenarios](/Users/kiltyj/Code/bucknix-fresh/docs/deployment-scenarios.md)
-- [Deployment Implementation Plan](/Users/kiltyj/Code/bucknix-fresh/docs/deployment-plan.md)
+- [Deployment Contract](/Users/kiltyj/Code/viberoots/docs/deployments-contract.md)
+- [Deployment Schema](/Users/kiltyj/Code/viberoots/docs/deployments-schema.md)
+- [Deployment Provider Capabilities](/Users/kiltyj/Code/viberoots/docs/deployment-provider-capabilities.md)
+- [Deployment Scenarios](/Users/kiltyj/Code/viberoots/docs/deployment-scenarios.md)
+- [Deployment Implementation Plan](/Users/kiltyj/Code/viberoots/docs/deployment-plan.md)
 
 Use them as follows:
 

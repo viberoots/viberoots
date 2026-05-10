@@ -40,7 +40,7 @@ test("public cloudflare-pages deploy routes deploy, preview, cleanup, and rollba
       aud: "deployments-vault",
       azp: "deployment-runner",
       deployment_environment: "mini",
-      repository: "kiltyj/bucknix-fresh",
+      repository: "kiltyj/viberoots",
     });
     const vault = await startFakeVaultServer(
       {

@@ -30,13 +30,13 @@ import {
 let buckQueryNonce = 0;
 
 function freshBuckQueryEnv(tmp: string): NodeJS.ProcessEnv {
-  return {
-    ...process.env,
-    BUCK_NESTED_ISO: stableBuckIsolation(
-      path.join(tmp, `.lane-governance-query-${++buckQueryNonce}`),
-      "zxtest-lane-governance",
-    ),
-  };
+  const isolation = stableBuckIsolation(
+    path.join(tmp, `.lane-governance-query-${++buckQueryNonce}`),
+    "zxtest-lane-governance",
+  );
+  const env = { ...process.env, BUCK_ISOLATION_DIR: isolation, BUCK_NESTED_ISO: isolation };
+  delete env.BUCK_ISOLATION_DIR_EXPORTER;
+  return env;
 }
 
 export function nixosSharedHostLaneGovernanceFixture(
@@ -46,7 +46,7 @@ export function nixosSharedHostLaneGovernanceFixture(
     ref: overrides.ref || "//projects/deployments/pleomino-shared:lane_governance",
     name: overrides.name || "lane_governance",
     scmBackend: (overrides.scmBackend || "github") as DeploymentScmBackend,
-    repository: overrides.repository || "kiltyj/bucknix-fresh",
+    repository: overrides.repository || "kiltyj/viberoots",
     branchProtections: overrides.branchProtections || [
       {
         stage: "dev",

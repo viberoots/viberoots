@@ -1,5 +1,4 @@
-import { spawnSync } from "node:child_process";
-import { resolveToolPathSync } from "./tool-paths";
+import { processTableLines } from "./process-inspection";
 
 function isExactTokenOrNixBin(token: string, binName: "nix" | "nix-store"): boolean {
   if (token === binName) return true;
@@ -25,12 +24,13 @@ export function isNixGcCommand(cmd: string): boolean {
   return false;
 }
 
-export function activeNixGcPids(): number[] {
-  const out = spawnSync(resolveToolPathSync("ps"), ["-axo", "pid=,command="], {
-    encoding: "utf8",
+export async function activeNixGcPids(): Promise<number[]> {
+  const lines = await processTableLines({
+    psArgs: ["-axo", "pid=,command="],
+    timeoutMs: 1500,
+    pgrepPattern: "nix store gc|nix-store .*--gc|nix-store .*-gc",
+    pgrepToLine: (pid, cmd) => `${pid} ${cmd}`,
   });
-  if (out.status !== 0) return [];
-  const lines = String(out.stdout || "").split("\n");
   const pids: number[] = [];
   for (const line of lines) {
     const s = line.trim();
@@ -72,7 +72,7 @@ export async function waitForNoActiveNixGc(opts?: {
   const pollMs = Math.max(250, Number(opts?.pollMs || cfg.pollMs));
   const started = Date.now();
   while (true) {
-    const pids = activeNixGcPids();
+    const pids = await activeNixGcPids();
     if (pids.length === 0) return [];
     const elapsed = Date.now() - started;
     if (elapsed >= timeoutMs) return pids;

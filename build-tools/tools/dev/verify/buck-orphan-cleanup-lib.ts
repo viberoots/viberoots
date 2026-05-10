@@ -1,6 +1,7 @@
 import { spawn } from "node:child_process";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
+import { buckProcessTableLines } from "../../lib/process-inspection";
 import { resolveToolPathSync } from "../../lib/tool-paths";
 
 export type ForkserverProc = {
@@ -23,34 +24,7 @@ export function parsePsLine(
 }
 
 export async function psLines(timeoutMs: number): Promise<string[]> {
-  const psPath = resolveToolPathSync("ps");
-  return await new Promise<string[]>((resolve) => {
-    const child = spawn(psPath, ["-A", "-o", "pid=,ppid=,etime=,command="], {
-      stdio: ["ignore", "pipe", "ignore"],
-    });
-    let buf = "";
-    child.stdout.setEncoding("utf8");
-    child.stdout.on("data", (d) => (buf += d));
-    child.on("error", () => resolve([]));
-    child.on("close", () => {
-      resolve(
-        String(buf || "")
-          .split(/\r?\n/)
-          .map((l) => l.trim())
-          .filter(Boolean),
-      );
-    });
-    const t = setTimeout(
-      () => {
-        try {
-          child.kill("SIGKILL");
-        } catch {}
-        resolve([]);
-      },
-      Math.max(250, timeoutMs),
-    );
-    child.on("close", () => clearTimeout(t));
-  });
+  return await buckProcessTableLines(timeoutMs);
 }
 
 export function tryRepoRootFromStateDir(
@@ -73,8 +47,8 @@ export function isTempRepoRoot(repoRoot: string): boolean {
     r.includes(`${path.sep}buck-out${path.sep}tmp${path.sep}tmpdir${path.sep}`) ||
     r.startsWith("/tmp/bnx-") ||
     r.startsWith("/private/tmp/bnx-") ||
-    r.startsWith("/tmp/bucknix-") ||
-    r.startsWith("/private/tmp/bucknix-")
+    r.startsWith("/tmp/viberoots-") ||
+    r.startsWith("/private/tmp/viberoots-")
   );
 }
 

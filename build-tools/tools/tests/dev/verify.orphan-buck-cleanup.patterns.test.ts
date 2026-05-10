@@ -25,7 +25,7 @@ test("orphan buck cleanup: matches ephemeral verify/debug/test isolations only",
     "v2",
     "exporter-shared-1a82e8dd60",
     "devbuild-shared-1a82e8dd60",
-    "bucknix-fresh",
+    "viberoots",
     "debug-manual-no-timestamp",
   ];
   for (const iso of yes) assert.equal(isLikelyEphemeralIsolation(iso), true, iso);

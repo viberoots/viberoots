@@ -39,11 +39,11 @@ test("verify orphan cleanup: kills orphaned verify-owned node processes only", a
   }
 });
 
-test("verify orphan cleanup: kills orphaned verify-env test processes without registration", async () => {
+test("verify orphan cleanup: kills orphaned registered verify-env test processes", async () => {
   const files = await createProcessFiles({ kind: "orphan-env", ownerPid: 999998 });
   const orphanPid = await spawnOrphanedVerifyProcess({
     files,
-    registered: false,
+    registered: true,
     target: "root//:verify_orphan_env_process_cleanup",
   });
 
@@ -66,7 +66,7 @@ test("verify orphan cleanup: kills orphaned verify-env test processes without re
   }
 });
 
-test("verify env cleanup: kills current-run verify test process groups without registration", async () => {
+test("verify env cleanup: kills current-run registered verify test process groups", async () => {
   const files = await createProcessFiles({ kind: "current-env", ownerPid: process.pid });
   const child = spawnCurrentVerifyEnvProcess(files, "root//:verify_current_env_process_cleanup");
   assert.ok(child.pid && child.pid > 1);

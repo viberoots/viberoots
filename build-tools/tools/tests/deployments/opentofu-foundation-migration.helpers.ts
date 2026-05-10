@@ -27,7 +27,7 @@ export function foundationDeploymentFixture(): OpenTofuDeployment {
     governanceRef: "//projects/deployments/platform-shared:lane_governance",
     governance: {
       scmBackend: "github",
-      repository: "kiltyj/bucknix-fresh",
+      repository: "kiltyj/viberoots",
       branchProtections: BRANCH_PROTECTIONS,
       fingerprint: "sha256:governance",
     },
@@ -115,7 +115,7 @@ export function laneGovernanceEvidence(deployment: OpenTofuDeployment) {
       verifiedAt: "2026-05-07T12:00:00.000Z",
       verificationSource: "client_supplied" as const,
       scmBackend: "github" as const,
-      repository: "kiltyj/bucknix-fresh",
+      repository: "kiltyj/viberoots",
       branchProtections: BRANCH_PROTECTIONS,
     },
   };

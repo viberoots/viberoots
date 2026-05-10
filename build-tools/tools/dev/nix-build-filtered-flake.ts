@@ -1,8 +1,10 @@
 #!/usr/bin/env zx-wrapper
+import fs from "node:fs";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { runNixBuildWithTransientRetry } from "./build-selected-nix-retry";
 import { getFlagBool, getFlagStr } from "../lib/cli";
+import { resolveToolPathSync } from "../lib/tool-paths";
 import {
   computeSelectedCppPackageClosure,
   FILTERED_FLAKE_RSYNC_EXCLUDES,
@@ -18,6 +20,23 @@ async function pathExists(filePath: string): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+function executablePath(filePath: string): string {
+  const candidate = filePath.trim();
+  if (!candidate || !path.isAbsolute(candidate)) return "";
+  try {
+    fs.accessSync(candidate, fs.constants.X_OK);
+    return candidate;
+  } catch {
+    return "";
+  }
+}
+
+function resolveNixBin(): string {
+  const fromEnv = executablePath(String(process.env.NIX_BIN || ""));
+  if (fromEnv) return fromEnv;
+  return resolveToolPathSync("nix");
 }
 
 async function readSelectedCppSnapshotSources(
@@ -147,6 +166,7 @@ async function main(): Promise<void> {
     }
     const flakeRef = `path:${snapDir}#${attr}`;
     console.error("[nix-build-filtered-flake] building attr:", attr);
+    const nixBin = resolveNixBin();
     const nixEnv =
       selectedCppSources != null
         ? {
@@ -168,7 +188,7 @@ async function main(): Promise<void> {
           env: nixEnv,
           reject: false,
           nothrow: true,
-        })`nix build --impure ${flakeRef} --accept-flake-config --option min-free 0 --option max-free 0 --no-link --print-out-paths`,
+        })`${nixBin} build --impure ${flakeRef} --accept-flake-config --option min-free 0 --option max-free 0 --no-link --print-out-paths`,
       );
     const res = await runNixBuildWithTransientRetry({ runOnce });
     if (Number(res.exitCode || 0) !== 0) {

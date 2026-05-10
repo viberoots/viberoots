@@ -1,5 +1,6 @@
 import crypto from "node:crypto";
 import process from "node:process";
+import { resolveToolPathSync } from "../../lib/tool-paths";
 
 type VerifyBuck2TestEnvArgsOptions = {
   iso: string;
@@ -20,12 +21,33 @@ function maybeEnvArg(name: string, value: string | undefined): string[] {
   return typeof value === "string" ? ["--env", `${name}=${value}`] : [];
 }
 
+function resolveOptionalToolPath(tool: string): string | undefined {
+  try {
+    return resolveToolPathSync(tool);
+  } catch {
+    return undefined;
+  }
+}
+
+function buckdStartupTimeout(): string {
+  return process.env.BUCKD_STARTUP_TIMEOUT || "300";
+}
+
+function buckdStartupInitTimeout(): string {
+  return process.env.BUCKD_STARTUP_INIT_TIMEOUT || buckdStartupTimeout();
+}
+
 export function buildVerifyTestEnvArgs(opts: VerifyBuck2TestEnvArgsOptions): string[] {
   const nestedIso = verifyNestedBuckIsolation(opts.iso, opts.passName);
   const extraEnvArgs: string[] = [];
   const sslCertFile = process.env.SSL_CERT_FILE || process.env.NIX_SSL_CERT_FILE;
   const sslCertDir = process.env.SSL_CERT_DIR || process.env.NIX_SSL_CERT_DIR;
   const nodeExtraCaCerts = process.env.NODE_EXTRA_CA_CERTS || sslCertFile;
+  const nixDaemonSocketPath = process.env.NIX_DAEMON_SOCKET_PATH || "/var/run/nix-daemon.socket";
+  const nixRemote = process.env.NIX_REMOTE || "daemon";
+  const nixBin = process.env.NIX_BIN || resolveOptionalToolPath("nix");
+  const patchBin = process.env.PATCH_BIN || resolveOptionalToolPath("patch");
+  const gitBin = process.env.GIT_BIN || resolveOptionalToolPath("git");
   if (process.env.TEST_TIMING) extraEnvArgs.push("--env", `TEST_TIMING=${process.env.TEST_TIMING}`);
   if (process.env.TEST_TIMING_SUMMARY) {
     extraEnvArgs.push("--env", `TEST_TIMING_SUMMARY=${process.env.TEST_TIMING_SUMMARY}`);
@@ -49,6 +71,8 @@ export function buildVerifyTestEnvArgs(opts: VerifyBuck2TestEnvArgsOptions): str
     `BNX_VERIFY_LOCK_DIR=${process.env.BNX_VERIFY_LOCK_DIR || ""}`,
     "--env",
     `BNX_VERIFY_LOG_FILE=${process.env.BNX_VERIFY_LOG_FILE || ""}`,
+    "--env",
+    `BNX_VERIFY_REGISTER_PROCESS=1`,
     "--env",
     `BNX_TEST_SEED_STORE_PATH=${process.env.BNX_TEST_SEED_STORE_PATH || ""}`,
     "--env",
@@ -82,9 +106,20 @@ export function buildVerifyTestEnvArgs(opts: VerifyBuck2TestEnvArgsOptions): str
     ...maybeEnvArg("SSL_CERT_DIR", sslCertDir),
     ...maybeEnvArg("NODE_EXTRA_CA_CERTS", nodeExtraCaCerts),
     "--env",
+    `NIX_DAEMON_SOCKET_PATH=${nixDaemonSocketPath}`,
+    "--env",
+    `NIX_REMOTE=${nixRemote}`,
+    ...maybeEnvArg("NIX_BIN", nixBin),
+    ...maybeEnvArg("PATCH_BIN", patchBin),
+    ...maybeEnvArg("GIT_BIN", gitBin),
+    "--env",
     `BUCK_NESTED_ISO=${nestedIso}`,
     "--env",
     `BUCK_EXPORTER_REUSE_DAEMON=${process.env.BUCK_EXPORTER_REUSE_DAEMON || "1"}`,
+    "--env",
+    `BUCKD_STARTUP_TIMEOUT=${buckdStartupTimeout()}`,
+    "--env",
+    `BUCKD_STARTUP_INIT_TIMEOUT=${buckdStartupInitTimeout()}`,
     ...maybeEnvArg(
       "NODE_V8_COVERAGE",
       process.env.COVERAGE === "1" ? process.env.NODE_V8_COVERAGE : undefined,

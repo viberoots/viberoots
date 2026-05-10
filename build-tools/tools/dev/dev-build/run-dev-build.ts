@@ -15,6 +15,7 @@ import { runStartupCheck } from "./startup";
 import { normalizeDevBuildTargetArgs } from "./target-args";
 import { maybeAutoImpureFromUntrackedFiles } from "./untracked";
 import { pruneDeadDevBuildIsolationDirs } from "../clean-temp-outs-lib";
+import { registerBuckIsolationSync } from "../verify/owned-process-state";
 import { getArgvTokens } from "../../lib/cli";
 import { findRepoRoot } from "../../lib/repo";
 
@@ -91,6 +92,16 @@ export async function runDevBuild(): Promise<void> {
   const iso = createIsolation({
     reuseDaemon: useFreshIsolationForMissingPatchDirs ? false : undefined,
   });
+  const stateFile = String(process.env.BNX_VERIFY_PROCESS_STATE_FILE || "").trim();
+  if (stateFile && iso.buckIsolation) {
+    registerBuckIsolationSync({
+      stateFile,
+      iso: iso.buckIsolation,
+      repoRoot: root,
+      ownerPid: process.pid,
+      kind: "dev-build",
+    });
+  }
   iso.attachSignalHandlers();
   iso.attachExitHandlers();
   await iso.startWatchdog(root);
@@ -191,5 +202,4 @@ export async function runDevBuild(): Promise<void> {
 
   await restoreFlakeLock(root);
   await runHousekeeping({ isCI, root });
-  process.exit(0);
 }

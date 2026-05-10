@@ -36,11 +36,11 @@ test("verify seed policy honors override mode", () => {
 test("verify seed staging stays outside volatile verify TMPDIR", () => {
   const root = seedStageRootDirForTest();
   if (process.platform === "win32") {
-    assert.equal(root, path.join(os.tmpdir(), "bucknix-test-seed"));
+    assert.equal(root, path.join(os.tmpdir(), "viberoots-test-seed"));
     return;
   }
-  assert.ok(root.startsWith("/tmp/bucknix-test-seed"));
-  assert.ok(!root.includes("/bucknix-verify"));
+  assert.ok(root.startsWith("/tmp/viberoots-test-seed"));
+  assert.ok(!root.includes("/viberoots-verify"));
 });
 
 test("verify seed staging rebuilds stale ready stages missing required repo files", async () => {

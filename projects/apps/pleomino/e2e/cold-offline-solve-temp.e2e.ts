@@ -1,5 +1,6 @@
 import { createRequire } from "node:module";
-import { execSync, spawn } from "node:child_process";
+import { spawn } from "node:child_process";
+import { terminateListenersOnPort } from "./process-control";
 
 const runnerRequire = createRequire(process.argv[1] ?? import.meta.url);
 const { expect, test } = runnerRequire("playwright/test") as any;
@@ -7,23 +8,12 @@ const { expect, test } = runnerRequire("playwright/test") as any;
 const HASH = "#s=AwAAAAAAAEAE";
 const APP_URL = `http://localhost:4173/games/pleomino${HASH}`;
 
-function killPort(port: number) {
-  const pids = execSync(`lsof -ti tcp:${port}`, { encoding: "utf8" })
-    .trim()
-    .split(/\s+/)
-    .filter(Boolean)
-    .map((value) => Number(value));
-  for (const pid of pids) {
-    process.kill(pid, "SIGTERM");
-  }
-}
-
 test("cold offline reopen can still solve partial board", async ({ browser }) => {
   const server = spawn(
     "zsh",
     [
       "-lc",
-      "cd /Users/kiltyj/Code/bucknix-fresh/projects/apps/pleomino && direnv exec /Users/kiltyj/Code/bucknix-fresh pnpm run preview -- --host 127.0.0.1 --port 4173",
+      "cd /Users/kiltyj/Code/viberoots/projects/apps/pleomino && direnv exec /Users/kiltyj/Code/viberoots pnpm run preview -- --host 127.0.0.1 --port 4173",
     ],
     {
       stdio: "inherit",
@@ -47,7 +37,7 @@ test("cold offline reopen can still solve partial board", async ({ browser }) =>
   console.log("before state", before, beforePlaced, await page.url());
   await page.close();
 
-  killPort(4173);
+  terminateListenersOnPort(4173);
   await context.setOffline(true);
   page = await context.newPage();
   page.on("console", (msg) => console.log("console2:", msg.type(), msg.text()));

@@ -150,15 +150,18 @@ export async function synchronizeInstalledDeployments(
   workspaceRoot: string,
   deployments: ReviewedDeployment[],
 ): Promise<void> {
+  const syncIsolation = stableBuckIsolation(
+    path.join(workspaceRoot, `.synthetic-install-sync-${++syntheticInstallBuckNonce}`),
+    "zxtest-install-sync",
+  );
   const queryEnv: NodeJS.ProcessEnv = {
     ...process.env,
     // Use a fresh temp-repo buck isolation after rewriting synthetic TARGETS so cquery does not
     // reuse a stale package view from an earlier install in the same temp workspace.
-    BUCK_NESTED_ISO: stableBuckIsolation(
-      path.join(workspaceRoot, `.synthetic-install-sync-${++syntheticInstallBuckNonce}`),
-      "zxtest-install-sync",
-    ),
+    BUCK_ISOLATION_DIR: syncIsolation,
+    BUCK_NESTED_ISO: syncIsolation,
   };
+  delete queryEnv.BUCK_ISOLATION_DIR_EXPORTER;
   const resolved = await Promise.all(
     deployments.map((deployment) =>
       resolveDeploymentFromTarget(workspaceRoot, deployment.label, { env: queryEnv }),

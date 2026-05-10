@@ -16,7 +16,7 @@ import {
   configRootFor,
   CONTROL_PLANE_TOKEN,
   enableInteractivePkceVaultRuntime,
-  freshKeycloakBuckIsolation,
+  freshKeycloakBuckEnv,
 } from "./deployment-admin-keycloak.remote-profile.pr98.helpers";
 
 test("remote profile grant-user reviewed auth errors", async (t) => {
@@ -58,9 +58,7 @@ test("remote profile grant-user reviewed auth errors", async (t) => {
         );
         const resultPromise = $({
           cwd: tmp,
-          env: remoteExecEnv(fixture.env, {
-            BUCK_NESTED_ISO: freshKeycloakBuckIsolation(tmp),
-          }),
+          env: freshKeycloakBuckEnv(tmp, remoteExecEnv(fixture.env)),
           stdio: "pipe",
         })`zx-wrapper build-tools/tools/deployments/deploy.ts admin keycloak grant-user --deployment ${REVIEWED_PLEOMINO_DEPLOYMENT_LABEL} --profile mini --profile-root ${fixture.profileRoot} --remote-config-root ${configRootFor(tmp)} --action submit`.nothrow();
         await completePendingAuthSession(controlPlane.url, fixture.remoteRecordsRoot);
@@ -114,9 +112,7 @@ test("remote profile grant-user reviewed auth errors", async (t) => {
         );
         const resultPromise = $({
           cwd: tmp,
-          env: remoteExecEnv(fixture.env, {
-            BUCK_NESTED_ISO: freshKeycloakBuckIsolation(tmp),
-          }),
+          env: freshKeycloakBuckEnv(tmp, remoteExecEnv(fixture.env)),
           stdio: "pipe",
         })`zx-wrapper build-tools/tools/deployments/deploy.ts admin keycloak grant-user --deployment ${REVIEWED_PLEOMINO_DEPLOYMENT_LABEL} --profile mini --profile-root ${fixture.profileRoot} --remote-config-root ${configRootFor(tmp)} --action submit`.nothrow();
         await completePendingAuthSession(controlPlane.url, fixture.remoteRecordsRoot, 400);

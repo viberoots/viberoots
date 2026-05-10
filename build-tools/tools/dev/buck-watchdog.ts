@@ -1,9 +1,9 @@
 #!/usr/bin/env zx-wrapper
 import "zx/globals";
 import { getFlagStr } from "../lib/cli";
-import { resolveToolPath } from "../lib/tool-paths";
 import { ownerPidForIsolation } from "./buck-watchdog-lib";
 import * as fsp from "node:fs/promises";
+import { psLines } from "./verify/buck-orphan-cleanup-lib";
 
 function isPidAlive(pid: number): boolean {
   try {
@@ -40,9 +40,7 @@ async function tryBuckKillIsolation(iso: string, logFile: string, reason: string
 
 async function sweepOrphans(patterns: RegExp, logFile: string, reason: string) {
   try {
-    const psPath = await resolveToolPath("ps");
-    const { stdout } = await $({ stdio: "pipe" })`${psPath} -A -o pid=,command=`;
-    const lines = String(stdout || "").split("\n");
+    const lines = await psLines(2000);
     for (const ln of lines) {
       const pidFromLine = Number((ln.match(/^\s*(\d+)\s+/) || [])[1] || "0");
       // Extract isolation from a running buck2d command line

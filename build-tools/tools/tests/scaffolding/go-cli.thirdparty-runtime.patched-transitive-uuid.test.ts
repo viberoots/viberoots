@@ -60,6 +60,15 @@ async function ensureNodeOnPath(tmp: string): Promise<string> {
   return localBin;
 }
 
+function resolvedToolEnv(): NodeJS.ProcessEnv {
+  const env: NodeJS.ProcessEnv = {};
+  for (const key of ["BASH", "BNX_BASH_BIN", "GIT_BIN", "NIX_BIN", "PATCH_BIN"] as const) {
+    const value = process.env[key];
+    if (value) env[key] = value;
+  }
+  return env;
+}
+
 async function seedUuidModuleCache(
   tmp: string,
   sh: any,
@@ -134,6 +143,7 @@ async function startPatchPkgSession(
         .filter(Boolean)
         .join(path.delimiter),
       PATH: `${path.dirname(process.execPath)}:${localBin}:${process.env.PATH || ""}`,
+      ...resolvedToolEnv(),
       ...goEnv,
     },
   })`build-tools/tools/bin/patch-pkg start go github.com/google/uuid`;
@@ -169,6 +179,7 @@ async function applyPatchPkg(
         .filter(Boolean)
         .join(path.delimiter),
       PATH: `${path.dirname(process.execPath)}:${localBin}:${process.env.PATH || ""}`,
+      ...resolvedToolEnv(),
       ...goEnv,
     },
   })`build-tools/tools/bin/patch-pkg apply go github.com/google/uuid --target //projects/apps/demo-cli:demo-cli --force`;
@@ -532,6 +543,7 @@ test("go cli with transitive third-party patched uuid runtime", async () => {
             .filter(Boolean)
             .join(path.delimiter),
           PATH: `${path.dirname(process.execPath)}:${localBin}:${process.env.PATH || ""}`,
+          ...resolvedToolEnv(),
           ...goEnv,
         },
       })`build-tools/tools/bin/patch-pkg apply go github.com/google/uuid --target //projects/apps/demo-cli:demo-cli --force`;

@@ -1,7 +1,6 @@
-import { spawn } from "node:child_process";
 import * as fsp from "node:fs/promises";
 import os from "node:os";
-import { resolveToolPathSync } from "../../lib/tool-paths";
+import { processTableLines } from "../../lib/process-inspection";
 
 export type VerifyProcessSnapshot = {
   total: number;
@@ -53,41 +52,14 @@ export async function sampleVerifyProcessSnapshot(
 }
 
 export async function sampleVerifyProcessLines(timeoutMs = 2000): Promise<string[] | null> {
-  let psPath = "";
-  try {
-    psPath = resolveToolPathSync("ps");
-  } catch {
-    return null;
-  }
-  return await new Promise<string[] | null>((resolve) => {
-    const proc = spawn(psPath, ["-axo", "pid=,ppid=,pgid=,etime=,stat=,command="], {
-      stdio: ["ignore", "pipe", "ignore"],
-    });
-    let settled = false;
-    let timer: NodeJS.Timeout | null = null;
-    let buf = "";
-    const finish = (lines: string[] | null) => {
-      if (settled) return;
-      settled = true;
-      if (timer) clearTimeout(timer);
-      resolve(lines);
-    };
-    timer = setTimeout(
-      () => {
-        try {
-          proc.kill("SIGKILL");
-        } catch {}
-        finish(null);
-      },
-      Math.max(250, timeoutMs),
-    );
-    proc.stdout.setEncoding("utf8");
-    proc.stdout.on("data", (chunk) => {
-      buf += chunk;
-    });
-    proc.on("error", () => finish(null));
-    proc.on("close", () => finish(String(buf || "").split("\n")));
+  const lines = await processTableLines({
+    psArgs: ["-axo", "pid=,ppid=,pgid=,etime=,stat=,command="],
+    timeoutMs,
+    pgrepPattern:
+      "buck2d\\[|\\(buck2-forkserver\\)|(^|/)buck2( |$)|(^|/)node(js)?( |$)|(^|/)nix( |$)|BNX_VERIFY_LOG_FILE=|BNX_VERIFY_PROCESS_STATE_FILE=",
+    pgrepToLine: (pid, cmd) => `${pid} 0 0 00:00 ? ${cmd}`,
   });
+  return lines.length > 0 ? lines : null;
 }
 
 export async function appendBuck2FailureDiagnostics(opts: {

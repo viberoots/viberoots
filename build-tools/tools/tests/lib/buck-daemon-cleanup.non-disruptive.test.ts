@@ -4,31 +4,15 @@ import { spawn } from "node:child_process";
 import path from "node:path";
 import * as fsp from "node:fs/promises";
 import { test } from "node:test";
-import { resolveToolPathSync } from "../../lib/tool-paths";
+import { buckProcessTableLines } from "../../lib/process-inspection";
 import { runInTemp } from "./test-helpers";
 
-function psForkserversForToken(token: string): Promise<string[]> {
-  const psPath = resolveToolPathSync("ps");
-  return new Promise((resolve) => {
-    const child = spawn(psPath, ["-A", "-o", "pid=,ppid=,command="], {
-      stdio: ["ignore", "pipe", "ignore"],
-    });
-    let buf = "";
-    child.stdout.setEncoding("utf8");
-    child.stdout.on("data", (d) => (buf += d));
-    child.on("error", () => resolve([]));
-    child.on("close", () => {
-      const lines = String(buf || "")
-        .split(/\r?\n/)
-        .map((l) => l.trim())
-        .filter(Boolean);
-      resolve(
-        lines.filter(
-          (l) => l.includes("(buck2-forkserver)") && l.includes("--state-dir") && l.includes(token),
-        ),
-      );
-    });
-  });
+async function psForkserversForToken(token: string): Promise<string[]> {
+  const lines = await buckProcessTableLines(2000);
+  return lines.filter(
+    (line) =>
+      line.includes("(buck2-forkserver)") && line.includes("--state-dir") && line.includes(token),
+  );
 }
 
 async function waitForPresent(token: string, timeoutMs: number): Promise<void> {

@@ -18,13 +18,13 @@ const REQUIRED_STAGE_FILES = [
 ];
 
 export function seedStageRootDirForTest(): string {
-  if (process.platform === "win32") return path.join(os.tmpdir(), "bucknix-test-seed");
+  if (process.platform === "win32") return path.join(os.tmpdir(), "viberoots-test-seed");
   let user = "";
   try {
     user = os.userInfo().username || "";
   } catch {}
   const suffix = user ? `-${user}` : "";
-  return path.join("/tmp", `bucknix-test-seed${suffix}`);
+  return path.join("/tmp", `viberoots-test-seed${suffix}`);
 }
 
 function seedStageRootDir(): string {

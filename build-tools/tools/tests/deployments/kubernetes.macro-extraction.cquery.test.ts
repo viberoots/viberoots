@@ -33,7 +33,7 @@ async function writeTargets(tmp: string): Promise<void> {
     [
       'load("//build-tools/deployments:defs.bzl", "deployment_admission_policy", "deployment_defaults", "deployment_lane_governance", "deployment_lane_policy")',
       'deployment_defaults(name = "defaults", visibility = ["PUBLIC"])',
-      'deployment_lane_governance(name = "lane_governance", scm_backend = "github", repository = "kiltyj/bucknix-fresh", branch_protections = [{"stage": "prod", "branch": "env/pleomino/prod", "required_checks": "deploy/pleomino-prod", "fast_forward_only": "true", "normal_advance_principals": "app:deploy-bot", "emergency_direct_push_principals": "team:sre-break-glass"}], visibility = ["PUBLIC"])',
+      'deployment_lane_governance(name = "lane_governance", scm_backend = "github", repository = "kiltyj/viberoots", branch_protections = [{"stage": "prod", "branch": "env/pleomino/prod", "required_checks": "deploy/pleomino-prod", "fast_forward_only": "true", "normal_advance_principals": "app:deploy-bot", "emergency_direct_push_principals": "team:sre-break-glass"}], visibility = ["PUBLIC"])',
       'deployment_lane_policy(name = "lane", defaults = ":defaults", stages = ["prod"], stage_branches = {"prod": "env/pleomino/prod"}, allowed_promotion_edges = [], governance_policy = ":lane_governance", visibility = ["PUBLIC"])',
       'deployment_admission_policy(name = "prod_release", allowed_refs = ["env/pleomino/prod"], required_checks = ["deploy/pleomino-prod"], visibility = ["PUBLIC"])',
     ].join("\n"),

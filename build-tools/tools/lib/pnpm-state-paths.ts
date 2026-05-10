@@ -19,7 +19,7 @@ function stablePnpmStateBase(): string {
     user = os.userInfo().username || "";
   } catch {}
   const suffix = user ? `-${sanitizeFragment(user)}` : "";
-  return path.join(tmpBase, `bucknix-pnpm${suffix}`);
+  return path.join(tmpBase, `viberoots-pnpm${suffix}`);
 }
 
 export async function sharedExactPnpmStateRoot(lockHash: string): Promise<string> {

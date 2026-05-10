@@ -52,7 +52,7 @@ async function startFakeVault() {
       bound_claims: {
         azp: "deployment-runner",
         deployment_environment: "mini",
-        repository: "kiltyj/bucknix-fresh",
+        repository: "kiltyj/viberoots",
       },
       token_policies: ["deploy-pleomino-read"],
     },

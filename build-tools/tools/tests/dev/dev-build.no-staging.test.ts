@@ -12,7 +12,12 @@ void (async function main() {
     await $tmp`git add -A && git commit -qm init`;
 
     // Refresh glue and build via the helper
-    await $tmp`build-tools/tools/dev/dev-build.ts build //... --no-materialize`;
+    await $tmp({
+      env: {
+        ...process.env,
+        DEV_BUILD_LOW_SPACE_GB: "0",
+      },
+    })`build-tools/tools/dev/dev-build.ts build //... --no-materialize`;
 
     // Ensure no index changes occurred
     const { stdout } = await $tmp`git status --porcelain`;

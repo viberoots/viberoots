@@ -5,7 +5,7 @@
 //   node build-tools/tools/dev/buck-kill-stale.ts --kill --include exporter- --dry-run
 //   node build-tools/tools/dev/buck-kill-stale.ts --kill --include '^zxtest-' --yes
 import { getFlagBool, getFlagStr } from "../lib/cli";
-import { resolveToolPathSync } from "../lib/tool-paths";
+import { buckProcessTableLines } from "../lib/process-inspection";
 
 type Args = {
   list?: boolean;
@@ -31,16 +31,7 @@ function unique<T>(arr: T[]): T[] {
 }
 
 async function psLines(): Promise<string[]> {
-  // Cross-platform-ish: use a broad format including command and args
-  const psPath = resolveToolPathSync("ps");
-  const args =
-    process.platform === "darwin"
-      ? [psPath, "-A", "-o", "pid=,command="]
-      : [psPath, "-e", "-o", "pid=,command="];
-  const { stdout } = await $({ stdio: "pipe" })`${args}`;
-  return String(stdout || "")
-    .split(/\r?\n/)
-    .filter(Boolean);
+  return await buckProcessTableLines(2000);
 }
 
 function extractBuckIsolations(lines: string[]): Array<{ pid: string; iso: string }> {

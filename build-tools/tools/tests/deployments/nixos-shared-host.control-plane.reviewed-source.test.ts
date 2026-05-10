@@ -47,7 +47,7 @@ test("backend snapshots the reviewed ref from the remote instead of ambient loca
     await $({
       cwd: tmp,
       stdio: "pipe",
-    })`git remote set-url origin git@github.com:kiltyj/bucknix-fresh.git`;
+    })`git remote set-url origin git@github.com:kiltyj/viberoots.git`;
     const remoteRevision = await gitStdout(tmp, $, "rev-parse", "env/pleomino/dev");
     await commitLocalChange(tmp, $, "local-drift");
     await $({ cwd: tmp, stdio: "pipe" })`git branch -f env/pleomino/dev HEAD`;

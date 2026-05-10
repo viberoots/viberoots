@@ -19,11 +19,22 @@ export function freshKeycloakBuckIsolation(tmp: string): string {
   );
 }
 
-function freshBuckQueryEnv(tmp: string): NodeJS.ProcessEnv {
-  return {
-    ...process.env,
-    BUCK_NESTED_ISO: freshKeycloakBuckIsolation(tmp),
+export function freshKeycloakBuckEnv(
+  tmp: string,
+  base: NodeJS.ProcessEnv = process.env,
+): NodeJS.ProcessEnv {
+  const isolation = freshKeycloakBuckIsolation(tmp);
+  const env = {
+    ...base,
+    BUCK_ISOLATION_DIR: isolation,
+    BUCK_NESTED_ISO: isolation,
   };
+  delete env.BUCK_ISOLATION_DIR_EXPORTER;
+  return env;
+}
+
+function freshBuckQueryEnv(tmp: string): NodeJS.ProcessEnv {
+  return freshKeycloakBuckEnv(tmp);
 }
 
 export function configRootFor(tmp: string) {

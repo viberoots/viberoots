@@ -55,5 +55,7 @@ export function buckCommandEnv(): NodeJS.ProcessEnv {
   if (!env.BUCK_EXPORTER_REUSE_DAEMON) {
     env.BUCK_EXPORTER_REUSE_DAEMON = "1";
   }
+  env.BUCKD_STARTUP_TIMEOUT = env.BUCKD_STARTUP_TIMEOUT || "300";
+  env.BUCKD_STARTUP_INIT_TIMEOUT = env.BUCKD_STARTUP_INIT_TIMEOUT || env.BUCKD_STARTUP_TIMEOUT;
   return env;
 }

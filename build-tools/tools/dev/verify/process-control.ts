@@ -1,12 +1,18 @@
-import "zx/globals";
 import { spawn } from "node:child_process";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
-import { resolveToolPath } from "../../lib/tool-paths";
+import { processStartSignature } from "../../lib/process-inspection";
 
 export async function killBuckIsolation(root: string, iso: string): Promise<void> {
-  await $({ stdio: "ignore", cwd: root })`buck2 --isolation-dir ${iso} kill`.nothrow();
+  await new Promise<void>((resolve) => {
+    const child = spawn("buck2", ["--isolation-dir", iso, "kill"], {
+      cwd: root,
+      stdio: "ignore",
+    });
+    child.on("error", () => resolve());
+    child.on("close", () => resolve());
+  });
 }
 
 export async function killProcessGroup(pgid: number): Promise<void> {
@@ -36,10 +42,7 @@ export async function startBuckDaemonReaper(opts: {
   iso: string;
   stateFile: string;
 }): Promise<void> {
-  const psPath = await resolveToolPath("ps");
-  const parentSig = await $({ stdio: "pipe" })`${psPath} -p ${process.pid} -o lstart=`
-    .then((r) => String(r.stdout || "").trim())
-    .catch(() => "");
+  const parentSig = await processStartSignature(process.pid);
   if (!parentSig) return;
 
   const script = path.join(

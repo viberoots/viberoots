@@ -8,16 +8,29 @@ import { test } from "node:test";
 import { resolveToolPathSync } from "../../lib/tool-paths";
 
 function startSignatureForPid(pid: number, timeoutMs: number) {
-  const psPath = resolveToolPathSync("ps");
+  let psPath = "";
+  try {
+    psPath = resolveToolPathSync("ps");
+  } catch {
+    return Promise.resolve(pidAlive(pid) ? `pid:${pid}` : "");
+  }
   return new Promise<string>((resolve) => {
-    const child = spawn(psPath, ["-p", String(pid), "-o", "lstart="], {
-      stdio: ["ignore", "pipe", "ignore"],
-    });
+    let child;
+    try {
+      child = spawn(psPath, ["-p", String(pid), "-o", "lstart="], {
+        stdio: ["ignore", "pipe", "ignore"],
+      });
+    } catch {
+      resolve(pidAlive(pid) ? `pid:${pid}` : "");
+      return;
+    }
     let buf = "";
     child.stdout.setEncoding("utf8");
     child.stdout.on("data", (d) => (buf += d));
-    child.on("error", () => resolve(""));
-    child.on("close", () => resolve(String(buf || "").trim()));
+    child.on("error", () => resolve(pidAlive(pid) ? `pid:${pid}` : ""));
+    child.on("close", () =>
+      resolve(String(buf || "").trim() || (pidAlive(pid) ? `pid:${pid}` : "")),
+    );
     const t = setTimeout(
       () => {
         try {
@@ -29,6 +42,15 @@ function startSignatureForPid(pid: number, timeoutMs: number) {
     );
     child.on("close", () => clearTimeout(t));
   });
+}
+
+function pidAlive(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 function waitForExit(child: import("node:child_process").ChildProcess, timeoutMs: number) {
@@ -51,7 +73,7 @@ function waitForExit(child: import("node:child_process").ChildProcess, timeoutMs
 }
 
 test("buck-daemon-reaper: exits promptly after parent exits", async () => {
-  const tmp = await fsp.mkdtemp(path.join(os.tmpdir(), "bucknix-reaper-test-"));
+  const tmp = await fsp.mkdtemp(path.join(os.tmpdir(), "viberoots-reaper-test-"));
   try {
     const parent = spawn(process.execPath, ["-e", "setInterval(() => {}, 1000)"], {
       stdio: "ignore",

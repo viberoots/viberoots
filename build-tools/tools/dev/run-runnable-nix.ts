@@ -1,7 +1,7 @@
 import { spawn, spawnSync } from "node:child_process";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import { resolveToolPathSync } from "../lib/tool-paths";
+import { processTableLines } from "../lib/process-inspection";
 
 function runnableBuildTimeoutSec(): number {
   const raw = String(process.env.BNX_RUNNABLE_BUILD_TIMEOUT_SEC || "").trim();
@@ -34,17 +34,15 @@ async function emitTimeoutDiagnostics(opts: {
   const ts = new Date().toISOString().replace(/[:.]/g, "-");
   const outDir = path.join(opts.workspaceRoot, "buck-out", "tmp");
   const outPath = path.join(outDir, `run-runnable-timeout-${ts}.log`);
-  const ps = spawnSync(
-    resolveToolPathSync("ps"),
-    ["-Ao", "pid,ppid,pgid,stat,etime,time,command"],
-    {
-      encoding: "utf8",
-    },
-  );
   const safePid = opts.childPid > 0 ? opts.childPid : -1;
-  const psLines = String(ps.stdout || "")
-    .split("\n")
-    .filter((line) => line.includes(`${safePid}`) || line.includes("graph-generator-selected"));
+  const psLines = (
+    await processTableLines({
+      psArgs: ["-Ao", "pid,ppid,pgid,stat,etime,time,command"],
+      timeoutMs: 2000,
+      pgrepPattern: "graph-generator-selected|nix|buck2|node",
+      pgrepToLine: (pid, cmd) => `${pid} ? ? ? ? ? ${cmd}`,
+    })
+  ).filter((line) => line.includes(`${safePid}`) || line.includes("graph-generator-selected"));
   let samplePath = "";
   if (process.platform === "darwin" && safePid > 0) {
     samplePath = path.join(outDir, `run-runnable-timeout-sample-${ts}.txt`);

@@ -4,7 +4,7 @@ import path from "node:path";
 import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
 
-test("patch-go: workspace parent dir is bucknix-patch-go", async () => {
+test("patch-go: workspace parent dir is viberoots-patch-go", async () => {
   await runInTemp("patch-go-ws-prefix", async (tmp, $) => {
     // Prepare fake pristine source and resolver mapping
     const origin = path.join(tmp, "gomodcache", "golang.org", "x", "net@v0.24.0");
@@ -27,7 +27,7 @@ test("patch-go: workspace parent dir is bucknix-patch-go", async () => {
       process.exit(2);
     }
     const parent = path.basename(path.dirname(ws));
-    if (parent !== "bucknix-patch-go") {
+    if (parent !== "viberoots-patch-go") {
       console.error("unexpected workspace parent dir", { parent, ws });
       process.exit(2);
     }

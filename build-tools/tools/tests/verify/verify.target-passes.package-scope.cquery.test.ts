@@ -80,6 +80,14 @@ test("verify target pass loading keeps wildcard scope broad while isolating labe
     isolatedPass.targets.includes("//projects/apps/pleomino:pr14_latency"),
     "expected isolated project test to remain in the isolated batch",
   );
+  assert.ok(
+    isolatedPass.targets.includes("//:dev_verify_orphan_owned_process_cleanup"),
+    "expected process cleanup probes to run outside concurrent verify passes",
+  );
+  assert.ok(
+    isolatedPass.targets.includes("//:dev_verify_temp_repo_buck_cleanup_scoped"),
+    "expected temp-repo cleanup probes to run outside concurrent verify passes",
+  );
   assert.equal(isolatedPass.threadsOverride, 1);
   const sharedPass = passes.find((pass) => pass.name === "shared");
   assert.ok(sharedPass, "expected wildcard expansion to keep a shared verify pass");
@@ -91,6 +99,14 @@ test("verify target pass loading keeps wildcard scope broad while isolating labe
   assert.ok(
     resourceLimitedPass?.targets.includes("//:deployments_nixos_shared_host_reuse_e2e"),
     "expected resource-heavy deployment tests to run outside the shared pass",
+  );
+  assert.ok(
+    resourceLimitedPass?.targets.includes("//:scaffolding_node_cli_scaffold_lockfile_present"),
+    "expected resource-heavy scaffold tests to run outside the shared pass",
+  );
+  assert.ok(
+    resourceLimitedPass?.targets.includes("//:planner_planner_dev_overrides_go_log_present"),
+    "expected resource-heavy planner tests to run outside the shared pass",
   );
   assert.ok(
     resourceLimitedPass?.targets.every((target) => !isolatedPass.targets.includes(target)),

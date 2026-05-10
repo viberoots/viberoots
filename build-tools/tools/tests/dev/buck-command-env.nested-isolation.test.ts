@@ -2,6 +2,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
+  buckCommandEnv,
   resolveNestedBuckIsolation,
   stableBuckIsolation,
   workspaceRootForBuckEnv,
@@ -27,4 +28,22 @@ test("buck command env helpers prefer inherited nested isolations", () => {
     isolationDir: "already-set",
     ownsIsolation: false,
   });
+});
+
+test("buck command env gives nested buck daemons a full-suite startup budget", () => {
+  const prevTimeout = process.env.BUCKD_STARTUP_TIMEOUT;
+  const prevInitTimeout = process.env.BUCKD_STARTUP_INIT_TIMEOUT;
+  try {
+    delete process.env.BUCKD_STARTUP_TIMEOUT;
+    delete process.env.BUCKD_STARTUP_INIT_TIMEOUT;
+    const env = buckCommandEnv();
+    assert.equal(env.BUCKD_STARTUP_TIMEOUT, "300");
+    assert.equal(env.BUCKD_STARTUP_INIT_TIMEOUT, "300");
+  } finally {
+    if (typeof prevTimeout === "string") process.env.BUCKD_STARTUP_TIMEOUT = prevTimeout;
+    else delete process.env.BUCKD_STARTUP_TIMEOUT;
+    if (typeof prevInitTimeout === "string")
+      process.env.BUCKD_STARTUP_INIT_TIMEOUT = prevInitTimeout;
+    else delete process.env.BUCKD_STARTUP_INIT_TIMEOUT;
+  }
 });

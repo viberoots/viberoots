@@ -1,16 +1,29 @@
 import { appendVerifyLogLine } from "./process-control";
 import { isNixGcCommand } from "../../lib/nix-gc-lock";
-import { resolveToolPath } from "../../lib/tool-paths";
+import { processTableLines } from "../../lib/process-inspection";
 
-export async function activeNixGcProcesses(): Promise<Array<{ pid: number; command: string }>> {
-  const psPath = await resolveToolPath("ps");
-  const out = await $({
-    stdio: "pipe",
-    reject: false,
-  })`${psPath} -axo pid=,command=`;
-  if ((out as any).exitCode !== 0) return [];
+type PsResult = {
+  exitCode?: number | null;
+  stdout?: unknown;
+};
+
+export async function activeNixGcProcesses(opts?: {
+  runPs?: (psPath: string) => Promise<PsResult>;
+}): Promise<Array<{ pid: number; command: string }>> {
+  const lines = opts?.runPs
+    ? await opts
+        .runPs("ps")
+        .then((out) =>
+          (out as any).exitCode === 0 ? String((out as any).stdout || "").split("\n") : [],
+        )
+        .catch(() => [])
+    : await processTableLines({
+        psArgs: ["-axo", "pid=,command="],
+        timeoutMs: 1500,
+        pgrepPattern: "nix store gc|nix-store .*--gc|nix-store .*-gc",
+        pgrepToLine: (pid, cmd) => `${pid} ${cmd}`,
+      });
   const rows: Array<{ pid: number; command: string }> = [];
-  const lines = String((out as any).stdout || "").split("\n");
   for (const line of lines) {
     const s = line.trim();
     if (!s) continue;

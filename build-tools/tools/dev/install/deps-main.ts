@@ -31,14 +31,20 @@ type Flags = {
 // Resolve absolute workspace root path without requiring callers to run from repo root.
 async function resolveWorkspaceRoot(): Promise<string> {
   const cwd = process.cwd();
+  let gitRoot = "";
+  try {
+    const { stdout } = await $({ stdio: "pipe" })`git -C ${cwd} rev-parse --show-toplevel`.quiet();
+    gitRoot = String(stdout || "").trim();
+  } catch {}
+  if (!gitRoot) gitRoot = await findRepoRoot(cwd);
   const wr = String(process.env.WORKSPACE_ROOT || "").trim();
   if (wr) {
     try {
       const abs = path.resolve(wr);
-      if (cwd === abs || cwd.startsWith(abs + path.sep)) return abs;
+      if (abs === gitRoot) return abs;
     } catch {}
   }
-  return await findRepoRoot(cwd);
+  return gitRoot;
 }
 console.log("Installing dependencies...");
 const envDryRun = process.env.INSTALL_DEPS_DRY_RUN === "1";

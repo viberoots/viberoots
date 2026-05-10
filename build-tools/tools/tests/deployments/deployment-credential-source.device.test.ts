@@ -12,7 +12,7 @@ function deviceLogin(issuer: string, messages: string[]) {
     audience: "deployments-vault",
     boundClaims: {
       deployment_environment: "mini",
-      repository: "kiltyj/bucknix-fresh",
+      repository: "kiltyj/viberoots",
     },
     timeoutMs: 5_000,
     prompt: (message) => messages.push(message),

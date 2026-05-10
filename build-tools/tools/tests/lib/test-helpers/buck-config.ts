@@ -91,7 +91,7 @@ export async function ensureBuckConfigForTempRepo(tmp: string, $: any): Promise<
     "default_platform = //:no_cgo",
     "user_platform = //:no_cgo",
     "target_platforms = //:no_cgo",
-    "action_env = SDKROOT,CPATH,LIBRARY_PATH,CGO_CFLAGS,CGO_CPPFLAGS,CGO_ENABLED,WORKSPACE_ROOT,REPO_ROOT",
+    "action_env = SDKROOT,CPATH,LIBRARY_PATH,CGO_CFLAGS,CGO_CPPFLAGS,CGO_ENABLED,WORKSPACE_ROOT,BUCK_TEST_SRC,BUCK_GRAPH_JSON,BUCK_ISOLATION_DIR,BUCK_NESTED_ISO,REPO_ROOT",
     "EOF",
     "mkdir -p toolchains",
     "printf '[buildfile]\\nname = TARGETS\\n' > toolchains/.buckconfig",

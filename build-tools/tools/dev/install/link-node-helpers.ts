@@ -1,11 +1,10 @@
 import crypto from "node:crypto";
-import { spawnSync } from "node:child_process";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { activeNixGcPids } from "../../lib/nix-gc-lock";
 import { type ManagedCommandActivity, runManagedCommand } from "../../lib/managed-command";
+import { processTableLines } from "../../lib/process-inspection";
 import { pathExists } from "../../lib/repo";
-import { resolveToolPathSync } from "../../lib/tool-paths";
 
 export async function withHeartbeat<T>(
   label: string,
@@ -28,23 +27,9 @@ export async function withHeartbeat<T>(
     }
   };
   const describeChild = (pid: number): string => {
-    if (!pid || pid <= 0) return "pid=unknown alive=false";
-    try {
-      const out = spawnSync(
-        resolveToolPathSync("ps"),
-        ["-p", String(pid), "-o", "state=,etime=,command="],
-        { encoding: "utf8" },
-      );
-      if (out.status !== 0) return `pid=${pid} alive=false`;
-      const line = String(out.stdout || "").trim();
-      if (!line) return `pid=${pid} alive=false`;
-      const toks = line.split(/\s+/);
-      const state = toks[0] || "?";
-      const etime = toks[1] || "?";
-      return `pid=${pid} alive=true state=${state} elapsed=${etime}`;
-    } catch {
-      return `pid=${pid} alive=${isAlive(pid)}`;
-    }
+    if (!pid || pid <= 0) return "pid=unknown alive=false state=unknown";
+    const alive = isAlive(pid);
+    return `pid=${pid} alive=${alive} state=${alive ? "running" : "exited"}`;
   };
   const timer = setInterval(() => {
     const elapsed = Math.floor((Date.now() - started) / 1000);
@@ -74,12 +59,14 @@ export async function withHeartbeat<T>(
     }
     if (bucket <= lastNoOutputBucket) return;
     lastNoOutputBucket = bucket;
-    const gcPids = activeNixGcPids();
-    const gc = gcPids.length > 0 ? gcPids.join(",") : "none";
-    const stall = silentForSec >= noOutputWarnSec ? " likely_waiting=true" : "";
-    console.error(
-      `[link-node] waiting phase=${label} elapsed=${elapsed}s ${describeChild(childPid)} bytes=${bytes} no_output_for=${silentForSec}s nix_gc=${gc}${stall}`,
-    );
+    void (async () => {
+      const gcPids = await activeNixGcPids();
+      const gc = gcPids.length > 0 ? gcPids.join(",") : "none";
+      const stall = silentForSec >= noOutputWarnSec ? " likely_waiting=true" : "";
+      console.error(
+        `[link-node] waiting phase=${label} elapsed=${elapsed}s ${describeChild(childPid)} bytes=${bytes} no_output_for=${silentForSec}s nix_gc=${gc}${stall}`,
+      );
+    })();
   }, 15000);
   try {
     return await promise;
@@ -204,14 +191,18 @@ function commandMatchesScope(cmd: string, flakeRefBase: string): boolean {
   return hints.some((h) => cmd.includes(`${h}#`) || cmd.includes(h));
 }
 
-function findCompetingNodeModulesBuilds(attr: string, flakeRefBase: string): CompetingBuild[] {
-  const out = spawnSync(resolveToolPathSync("ps"), ["-axo", "pid=,etime=,command="], {
-    encoding: "utf8",
+async function findCompetingNodeModulesBuilds(
+  attr: string,
+  flakeRefBase: string,
+): Promise<CompetingBuild[]> {
+  const lines = await processTableLines({
+    psArgs: ["-axo", "pid=,etime=,command="],
+    timeoutMs: 1500,
+    pgrepPattern: "nix build .*#node-modules",
+    pgrepToLine: (pid, cmd) => `${pid} 00:00 ${cmd}`,
   });
-  if (out.status !== 0) return [];
   const self = Number(process.pid || 0);
   const needle = `#node-modules.${attr}`;
-  const lines = String(out.stdout || "").split("\n");
   const res: CompetingBuild[] = [];
   for (const line of lines) {
     const s = line.trim();
@@ -230,8 +221,8 @@ function findCompetingNodeModulesBuilds(attr: string, flakeRefBase: string): Com
   return res;
 }
 
-export function failOnCompetingBuilds(attr: string, flakeRefBase: string): void {
-  const conflicts = findCompetingNodeModulesBuilds(attr, flakeRefBase);
+export async function failOnCompetingBuilds(attr: string, flakeRefBase: string): Promise<void> {
+  const conflicts = await findCompetingNodeModulesBuilds(attr, flakeRefBase);
   if (conflicts.length > 0) {
     const sample = conflicts
       .slice(0, 3)

@@ -28,9 +28,14 @@ test("filtered flake snapshot excludes large generated artifacts", async () => {
     }
   }
 
-  if (!helper.includes("nix build --impure")) {
+  if (!helper.includes("build --impure")) {
     throw new Error(
       "nix-build-filtered-flake must use --impure so selected planner env reaches filtered flake builds",
+    );
+  }
+  if (!helper.includes("process.env.NIX_BIN") || !helper.includes('resolveToolPathSync("nix")')) {
+    throw new Error(
+      "nix-build-filtered-flake must invoke an explicit nix binary path so minimal Buck test PATHs work",
     );
   }
 });

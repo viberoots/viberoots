@@ -10,6 +10,16 @@ import { zxInitPathFromWorkspace } from "./zx-init-probe";
 let buckReaperStateFile: string | null = null;
 let buckReaperStarted = false;
 
+function isPidAlive(pid: number): boolean {
+  if (!Number.isFinite(pid) || pid <= 1) return false;
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 async function startSignatureForPid(pid: number, $: any): Promise<string> {
   try {
     const psPath = await resolveToolPath("ps");
@@ -19,9 +29,9 @@ async function startSignatureForPid(pid: number, $: any): Promise<string> {
       nothrow: true,
       timeout: 1000,
     })`${psPath} -p ${pid} -o lstart=`;
-    return String(res.stdout || "").trim();
+    return String(res.stdout || "").trim() || (isPidAlive(pid) ? `pid:${pid}` : "");
   } catch {
-    return "";
+    return isPidAlive(pid) ? `pid:${pid}` : "";
   }
 }
 
@@ -34,7 +44,7 @@ export async function ensureBuckReaperStarted(tmp: string, $: any): Promise<void
     }
     if (!buckReaperStateFile) {
       const token = `${process.pid}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
-      buckReaperStateFile = path.join(os.tmpdir(), `bucknix-buck-reaper-${token}.txt`);
+      buckReaperStateFile = path.join(os.tmpdir(), `viberoots-buck-reaper-${token}.txt`);
     }
     await fsp.appendFile(buckReaperStateFile, `${tmp}\n`, "utf8");
 

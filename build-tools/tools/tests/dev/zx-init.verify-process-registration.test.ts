@@ -86,6 +86,8 @@ test("zx-init registers verify-owned processes only when explicitly opted in", a
       BNX_VERIFY_PROCESS_STATE_FILE: stateFile,
       BNX_VERIFY_LOG_FILE: logFile,
     };
+    delete baseEnv.BUCK_ISOLATION_DIR;
+    delete baseEnv.BUCK_NESTED_ISO;
     const noTargetEnv = { ...baseEnv };
     delete noTargetEnv.BUCK_TEST_TARGET;
     assert.equal(await runNodeWithVerifyEnv(noTargetEnv), 0);
@@ -154,6 +156,35 @@ test("zx-init consumes verify-owned process registration opt-in before spawning 
       .split(/\r?\n/)
       .filter((line) => line.startsWith("process\t"));
     assert.equal(records.length, 1);
+  } finally {
+    await fsp.rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("zx-init registers nested buck isolation against verify owner", async () => {
+  const dir = await fsp.mkdtemp(path.join(os.tmpdir(), "zx-init-buck-isolation-registration-"));
+  const stateFile = path.join(dir, "state.txt");
+  const logFile = path.join(dir, "verify.log");
+  await fsp.writeFile(stateFile, "", "utf8");
+  await fsp.writeFile(logFile, "", "utf8");
+
+  try {
+    assert.equal(
+      await runNodeWithVerifyEnv({
+        ...process.env,
+        BNX_VERIFY_PROCESS_STATE_FILE: stateFile,
+        BNX_VERIFY_LOG_FILE: logFile,
+        BNX_VERIFY_OWNER_PID: String(process.pid),
+        BUCK_NESTED_ISO: "zxtest-shared-deadbeef12",
+        WORKSPACE_ROOT: process.cwd(),
+      }),
+      0,
+    );
+    const txt = await fsp.readFile(stateFile, "utf8");
+    assert.match(txt, /^isolation\t/m);
+    assert.match(txt, /"iso":"zxtest-shared-deadbeef12"/);
+    assert.match(txt, /"kind":"zx-test-nested"/);
+    assert.match(txt, new RegExp(`"ownerPid":${process.pid}`));
   } finally {
     await fsp.rm(dir, { recursive: true, force: true });
   }

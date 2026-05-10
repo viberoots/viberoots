@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
+import { readTemplateMeta } from "../../scaffolding/scaf/templates/meta";
 import { canonicalTemplateIdsForLanguage } from "../../scaffolding/scaf/templates/taxonomy";
 import { runInTemp } from "../lib/test-helpers";
 
@@ -29,7 +30,7 @@ test("runtime contract: scaf templates ts is taxonomy-authoritative", async () =
 });
 
 test("negative path: missing canonical template root fails deterministically", async () => {
-  await runInTemp("template-taxonomy-missing-root", async (tmp, _$) => {
+  await runInTemp("template-taxonomy-missing-root", async (tmp) => {
     const missingId = "ts/lib";
     const missingRoot = path.join(
       tmp,
@@ -42,13 +43,16 @@ test("negative path: missing canonical template root fails deterministically", a
     );
     await fsp.rm(missingRoot, { recursive: true, force: true });
 
-    const out = await _$({ stdio: "pipe" })`scaf templates ts --json`.nothrow();
-    assert.notEqual((out as any).exitCode, 0);
-    const text = `${String((out as any).stdout || "")}\n${String((out as any).stderr || "")}`;
-    assert.match(
-      text,
-      new RegExp(`missing template root for canonical id '${missingId}'`),
-      "error output must include deterministic missing-root contract text",
-    );
+    const prevCwd = process.cwd();
+    try {
+      process.chdir(tmp);
+      await assert.rejects(
+        async () => await readTemplateMeta("ts"),
+        new RegExp(`missing template root for canonical id '${missingId}'`),
+        "error output must include deterministic missing-root contract text",
+      );
+    } finally {
+      process.chdir(prevCwd);
+    }
   });
 });

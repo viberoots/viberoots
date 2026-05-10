@@ -69,7 +69,7 @@ test("patch-cpp applies overlay to real nixpkgs zlib and changes runtime zlibVer
     const orig = await fsp.readFile(zlibH, "utf8");
     const patched = orig.replace(
       /#define\s+ZLIB_VERSION\s+"[^"]+"/,
-      '#define ZLIB_VERSION "9.9.9-bucknix"',
+      '#define ZLIB_VERSION "9.9.9-viberoots"',
     );
     if (patched === orig) {
       console.error("failed to patch ZLIB_VERSION in zlib.h");
@@ -135,7 +135,7 @@ test("patch-cpp applies overlay to real nixpkgs zlib and changes runtime zlibVer
     await $({ cwd: tmp })`cc -I${ws} main.c -o zver`;
     const runOut = await $({ cwd: tmp })`./zver`;
     const printed = String(runOut.stdout || "").trim();
-    if (printed !== "9.9.9-bucknix") {
+    if (printed !== "9.9.9-viberoots") {
       console.error(`expected patched ZLIB_VERSION, got: ${printed}`);
       process.exit(2);
     }

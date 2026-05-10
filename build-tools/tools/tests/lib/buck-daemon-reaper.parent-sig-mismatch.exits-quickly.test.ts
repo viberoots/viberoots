@@ -26,8 +26,11 @@ function waitForExit(child: import("node:child_process").ChildProcess, timeoutMs
 }
 
 test("buck-daemon-reaper: does not wait when parent-sig mismatches (pid reuse guard)", async () => {
-  const stateFile = path.join(os.tmpdir(), `bucknix-reaper-state-${process.pid}-${Date.now()}.txt`);
-  const tmp = await fsp.mkdtemp(path.join(os.tmpdir(), "bucknix-reaper-test-"));
+  const stateFile = path.join(
+    os.tmpdir(),
+    `viberoots-reaper-state-${process.pid}-${Date.now()}.txt`,
+  );
+  const tmp = await fsp.mkdtemp(path.join(os.tmpdir(), "viberoots-reaper-test-"));
   try {
     await fsp.writeFile(stateFile, `${tmp}\n`, "utf8");
 

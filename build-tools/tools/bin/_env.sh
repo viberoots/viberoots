@@ -4,6 +4,25 @@ set -euo pipefail
 # Directory of this helper script (build-tools/tools/bin)
 export ENV_SH_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
+env_reexec_from_cwd_repo() {
+	local caller_path="${BASH_SOURCE[1]:-$0}"
+	local tool_name
+	tool_name="$(basename "$caller_path")"
+	local script_root
+	script_root="$(cd "${ENV_SH_DIR}/../../.." && pwd)"
+	local cwd_root=""
+	if command -v git >/dev/null 2>&1; then
+		cwd_root="$(git rev-parse --show-toplevel 2>/dev/null || true)"
+	fi
+	[[ -n "${cwd_root}" ]] || return 0
+	cwd_root="$(cd "${cwd_root}" && pwd)"
+	[[ "${cwd_root}" != "${script_root}" ]] || return 0
+	local cwd_tool="${cwd_root}/build-tools/tools/bin/${tool_name}"
+	if [[ -x "${cwd_tool}" ]]; then
+		exec "${cwd_tool}" "$@"
+	fi
+}
+
 env_init_paths() {
 	local script_path="$1"
 	export SCRIPT_DIR="$(cd "$(dirname "$script_path")" && pwd)"
@@ -175,6 +194,8 @@ run_ts() {
 	local target_ts="${ENV_SH_DIR}/${rel_path}"
 	node_ts "${LIVE_ROOT}" "${target_ts}" "$@"
 }
+
+env_reexec_from_cwd_repo "$@"
 
 # Auto-initialize paths on source if not already set, then ensure coverage dir when enabled
 if [[ -z "${SCRIPT_DIR:-}" || -z "${REPO_ROOT:-}" || -z "${LIVE_ROOT:-}" ]]; then

@@ -1208,9 +1208,9 @@ Protected/shared observability and durable-record redaction rules:
 
 ## Companion Docs
 
-- [Deployment Contract](/Users/kiltyj/Code/bucknix-fresh/docs/deployments-contract.md)
-- [Deployment Design](/Users/kiltyj/Code/bucknix-fresh/docs/deployments-design.md)
-- [Deployment Control-Plane Observability](/Users/kiltyj/Code/bucknix-fresh/docs/deployment-control-plane-observability.md)
-- [Deployment Provider Capabilities](/Users/kiltyj/Code/bucknix-fresh/docs/deployment-provider-capabilities.md)
-- [Deployment Scenarios](/Users/kiltyj/Code/bucknix-fresh/docs/deployment-scenarios.md)
-- [Deployment Implementation Plan](/Users/kiltyj/Code/bucknix-fresh/docs/deployment-plan.md)
+- [Deployment Contract](/Users/kiltyj/Code/viberoots/docs/deployments-contract.md)
+- [Deployment Design](/Users/kiltyj/Code/viberoots/docs/deployments-design.md)
+- [Deployment Control-Plane Observability](/Users/kiltyj/Code/viberoots/docs/deployment-control-plane-observability.md)
+- [Deployment Provider Capabilities](/Users/kiltyj/Code/viberoots/docs/deployment-provider-capabilities.md)
+- [Deployment Scenarios](/Users/kiltyj/Code/viberoots/docs/deployment-scenarios.md)
+- [Deployment Implementation Plan](/Users/kiltyj/Code/viberoots/docs/deployment-plan.md)

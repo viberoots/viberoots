@@ -83,13 +83,17 @@ export function freshRebuildCloudflareEnv(
   tmp: string,
   fake: Awaited<ReturnType<typeof installFakeCloudflarePagesWrangler>>,
 ): NodeJS.ProcessEnv {
-  return {
+  const isolation = stableBuckIsolation(
+    path.join(tmp, `.cloudflare-rebuild-query-${++buckQueryNonce}`),
+    "zxtest-cloudflare-rebuild",
+  );
+  const env = {
     ...fakeCloudflareEnv(fake),
-    BUCK_NESTED_ISO: stableBuckIsolation(
-      path.join(tmp, `.cloudflare-rebuild-query-${++buckQueryNonce}`),
-      "zxtest-cloudflare-rebuild",
-    ),
+    BUCK_ISOLATION_DIR: isolation,
+    BUCK_NESTED_ISO: isolation,
   };
+  delete env.BUCK_ISOLATION_DIR_EXPORTER;
+  return env;
 }
 
 export async function createSourceRun(

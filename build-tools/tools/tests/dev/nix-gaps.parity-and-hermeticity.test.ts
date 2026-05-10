@@ -39,6 +39,7 @@ async function selectedBuildOutPath(
   tmp: string,
   $: any,
   target: string,
+  nixBin: string,
   env: Record<string, string>,
 ): Promise<string> {
   const res = await $({
@@ -49,7 +50,7 @@ async function selectedBuildOutPath(
       BUCK_TARGET: target,
       BUCK_TEST_SRC: tmp,
     },
-  })`nix build --impure -L ${`path:${tmp}#graph-generator-selected`} --accept-flake-config --no-link --print-out-paths`;
+  })`${nixBin} build --impure -L ${`path:${tmp}#graph-generator-selected`} --accept-flake-config --no-link --print-out-paths`;
   const outPath = parseLastOutPath(res.stdout);
   assert.ok(outPath, `expected nix output path for ${target}`);
   return outPath;
@@ -171,7 +172,7 @@ test(
       ];
 
       for (const c of cases) {
-        const outPath = await selectedBuildOutPath(tmp, $, c.target, minimalEnv);
+        const outPath = await selectedBuildOutPath(tmp, $, c.target, nixBin, minimalEnv);
         await c.validate(outPath, $);
       }
     });

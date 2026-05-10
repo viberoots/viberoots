@@ -39,7 +39,9 @@ function lockPathFor(key: string, scopeRootAbs?: string): string {
   // Use a stable system-wide directory to avoid test sandboxes or dev shells changing TMPDIR.
   // On POSIX, prefer /tmp; on Windows, fallback to os.tmpdir().
   const base =
-    process.platform === "win32" ? path.join(os.tmpdir(), "bucknix-locks") : "/tmp/bucknix-locks";
+    process.platform === "win32"
+      ? path.join(os.tmpdir(), "viberoots-locks")
+      : "/tmp/viberoots-locks";
   return path.join(base, `lock-${h}.lck`);
 }
 

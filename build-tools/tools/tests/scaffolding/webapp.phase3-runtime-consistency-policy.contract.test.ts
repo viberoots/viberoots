@@ -154,7 +154,10 @@ test("Phase-3 policy docs: SSR runtime consistency and startup guidance stay exp
   );
   assert.match(hmrPlan, /Deterministic failure signatures and recovery commands by change class/);
   assert.match(hmrPlan, /Stale install lock state during dependency\/bootstrap steps/);
-  assert.match(hmrPlan, /inspect `\/tmp\/bucknix-locks\/` for orphaned lock directories and retry/);
+  assert.match(
+    hmrPlan,
+    /inspect `\/tmp\/viberoots-locks\/` for orphaned lock directories and retry/,
+  );
   assert.match(hmrPlan, /## E2E Runner Policy/);
   assert.match(hmrPlan, /Current selected runner contract for this suite/);
   assert.match(hmrPlan, /Escalation triggers to adopt Playwright coverage in a future phase/);
@@ -172,7 +175,7 @@ test("Phase-3 policy docs: SSR runtime consistency and startup guidance stay exp
   assert.match(scaffoldingDoc, /stale install lock state during dependency\/bootstrap/);
   assert.match(
     scaffoldingDoc,
-    /inspect `\/tmp\/bucknix-locks\/` for orphaned lock directories and retry/,
+    /inspect `\/tmp\/viberoots-locks\/` for orphaned lock directories and retry/,
   );
   assert.match(scaffoldingDoc, /Shared Phase-4 regression helper contract/);
   assert.match(scaffoldingDoc, /lib\/wasm-watch\.ts/);

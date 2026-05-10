@@ -1,8 +1,10 @@
 import * as fsp from "node:fs/promises";
+import os from "node:os";
 import path from "node:path";
 
 export const repoRoot = process.cwd();
 export const scratchRoot = path.join(repoRoot, "buck-out", "tmp");
+export const externalScratchRoot = path.join(os.tmpdir(), "viberoots-agent-wrapper-tests");
 
 export async function writeExecutable(file: string, text: string): Promise<void> {
   await fsp.writeFile(file, text, "utf8");
@@ -11,6 +13,14 @@ export async function writeExecutable(file: string, text: string): Promise<void>
 
 export function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+export function safehouseNixReadOnlyPattern(): string {
+  return "/nix/store:/var/run/nix-daemon\\.socket(?::/nix/var/nix/daemon-socket/socket)?(?::/etc/nix)?(?::/private/var/run/nix-daemon\\.socket)?(?::/(?:private/)?etc/bashrc)*(?::/(?:private/)?etc/profile)*(?::/(?:private/)?etc/static/bashrc)*(?::/private/etc/nix)?(?::/(?:private/)?var/db/xcode_select_link)*(?::[^ ]+)?";
+}
+
+export function safehouseLaunchPattern(worktreeRealRoot: string): string {
+  return `safehouse --workdir=${escapeRegExp(worktreeRealRoot)}(?: --add-dirs=[^ ]+)? --add-dirs-ro=${safehouseNixReadOnlyPattern()} --append-profile=.* --env `;
 }
 
 export async function makeFakeAgentTools(
@@ -130,6 +140,9 @@ fi
     `#!/usr/bin/env bash
 printf '${toolName} %s\\n' "$*" >> "${log}"
 printf '${safehouseEnv}=%s\\n' "\${${safehouseEnv}:-}" >> "${log}"
+printf 'HOME=%s\\n' "\${HOME:-}" >> "${log}"
+printf 'CODEX_HOME=%s\\n' "\${CODEX_HOME:-}" >> "${log}"
+printf 'CLAUDE_CONFIG_DIR=%s\\n' "\${CLAUDE_CONFIG_DIR:-}" >> "${log}"
 `,
   );
   await writeExecutable(
@@ -138,8 +151,22 @@ printf '${safehouseEnv}=%s\\n' "\${${safehouseEnv}:-}" >> "${log}"
 printf 'safehouse %s\\n' "$*" >> "${log}"
 while [ "$#" -gt 0 ]; do
   case "$1" in
-    --workdir=*|--add-dirs-ro=*|--append-profile=*|--env) shift ;;
-    --workdir|--add-dirs-ro|--append-profile) shift 2 ;;
+    --append-profile=*)
+      profile="\${1#--append-profile=}"
+      printf 'append-profile-begin\\n' >> "${log}"
+      cat "$profile" >> "${log}" 2>/dev/null || true
+      printf 'append-profile-end\\n' >> "${log}"
+      shift
+      ;;
+    --append-profile)
+      profile="\${2:-}"
+      printf 'append-profile-begin\\n' >> "${log}"
+      cat "$profile" >> "${log}" 2>/dev/null || true
+      printf 'append-profile-end\\n' >> "${log}"
+      shift 2
+      ;;
+    --workdir=*|--add-dirs=*|--add-dirs-ro=*|--env) shift ;;
+    --workdir|--add-dirs|--add-dirs-ro) shift 2 ;;
     *) exec "$@" ;;
   esac
 done

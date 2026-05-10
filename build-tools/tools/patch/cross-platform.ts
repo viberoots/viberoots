@@ -36,7 +36,7 @@ export async function makeWorkspace(args: {
   moduleKey: string;
 }): Promise<string> {
   const { lang, originPath, moduleKey } = args;
-  const base = path.join(os.tmpdir(), `bucknix-patch-${lang}`);
+  const base = path.join(os.tmpdir(), `viberoots-patch-${lang}`);
   const stamp = new Date()
     .toISOString()
     .replace(/[-:TZ.]/g, "")

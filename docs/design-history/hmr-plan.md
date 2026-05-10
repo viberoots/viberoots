@@ -64,7 +64,7 @@ Deterministic failure signatures and recovery commands by change class:
   - recovery: run `pnpm run dev:wasm:watch` directly and fix the reported producer command/path issue
 - Stale install lock state during dependency/bootstrap steps:
   - signature: install/dependency commands block or fail on install-lock acquisition
-  - recovery: remove stale lock state by re-running `i`; if needed, inspect `/tmp/bucknix-locks/` for orphaned lock directories and retry
+  - recovery: remove stale lock state by re-running `i`; if needed, inspect `/tmp/viberoots-locks/` for orphaned lock directories and retry
 
 ## E2E Runner Policy
 

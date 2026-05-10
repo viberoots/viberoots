@@ -56,7 +56,7 @@ export async function ensureOriginAndWorkspace(
   const { pname, version, srcPath } = pre || (await resolveNixpkg(attrNorm));
   const key = `${attrNorm}@${version}`.toLowerCase();
   const safeKey = encodeNixAttrForPatchPrefix(key);
-  const base = path.join(os.tmpdir(), "bucknix-patch-cpp");
+  const base = path.join(os.tmpdir(), "viberoots-patch-cpp");
   await fsp.mkdir(base, { recursive: true });
   const originRoot = await fsp.mkdtemp(path.join(base, `origin-${safeKey}-`));
   const wsRoot = await fsp.mkdtemp(path.join(base, `ws-${safeKey}-`));

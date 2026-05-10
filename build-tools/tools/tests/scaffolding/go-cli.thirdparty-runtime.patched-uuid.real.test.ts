@@ -10,6 +10,15 @@ async function writeFileAbs(p: string, content: string) {
   await fsp.writeFile(p, content, "utf8");
 }
 
+function resolvedToolEnv(): NodeJS.ProcessEnv {
+  const env: NodeJS.ProcessEnv = {};
+  for (const key of ["BASH", "BNX_BASH_BIN", "GIT_BIN", "NIX_BIN", "PATCH_BIN"] as const) {
+    const value = process.env[key];
+    if (value) env[key] = value;
+  }
+  return env;
+}
+
 async function writeBuckConfig(sh: any) {
   await sh`bash --noprofile --norc -c ${`set -euo pipefail
     printf '.\n' > .buckroot
@@ -131,6 +140,7 @@ test("go cli with local lib + third-party patched uuid runtime (prefetched real 
           .filter(Boolean)
           .join(path.delimiter),
         PATH: `${path.dirname(process.execPath)}:${process.env.PATH || ""}`,
+        ...resolvedToolEnv(),
       },
     })`build-tools/tools/bin/patch-pkg start go github.com/google/uuid`;
     const ws =
@@ -167,6 +177,7 @@ test("go cli with local lib + third-party patched uuid runtime (prefetched real 
           .filter(Boolean)
           .join(path.delimiter),
         PATH: `${path.dirname(process.execPath)}:${process.env.PATH || ""}`,
+        ...resolvedToolEnv(),
       },
     })`build-tools/tools/bin/patch-pkg apply go github.com/google/uuid --target //projects/apps/demo-cli:demo-cli --force`;
 

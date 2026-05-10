@@ -1,5 +1,6 @@
 #!/usr/bin/env zx-wrapper
 import crypto from "node:crypto";
+import fs from "node:fs";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { getFlagBool } from "../../lib/cli";
@@ -16,6 +17,25 @@ import {
   recoverOutPathFromExistingSymlink,
   withHeartbeat,
 } from "./link-node-helpers";
+
+function firstExecutableOnPath(tool: string, env: NodeJS.ProcessEnv = process.env): string {
+  for (const entry of String(env.PATH || "").split(path.delimiter)) {
+    if (!entry) continue;
+    const candidate = path.join(entry, tool);
+    try {
+      fs.accessSync(candidate, fs.constants.X_OK);
+      return path.resolve(candidate);
+    } catch {}
+  }
+  return "";
+}
+
+function usesTempRepoFakeNix(root: string, env: NodeJS.ProcessEnv = process.env): boolean {
+  if (String(env.BNX_RUN_IN_TEMP_REPO || "").trim() !== "1") return false;
+  if (String(env.BNX_LINK_NODE_FAKE_NIX || "").trim() === "1") return true;
+  const nixPath = firstExecutableOnPath("nix", env);
+  return nixPath.startsWith(`${path.resolve(root)}${path.sep}`);
+}
 
 export async function relinkNodeModules(force: boolean) {
   const root = repoRoot();
@@ -97,15 +117,17 @@ export async function relinkNodeModules(force: boolean) {
         );
         buildFlakeRefBase = tempFlake.flakeRef.replace(/#pnpm$/, "");
       }
-      const gcCfg = gcWaitConfig();
-      const gcPids = await waitForNoActiveNixGc({
-        timeoutMs: gcCfg.timeoutMs,
-        pollMs: gcCfg.pollMs,
-      });
-      if (gcPids.length > 0) {
-        throw new Error(nixGcLockMessage("[link-node] nix build", gcPids));
+      if (!usesTempRepoFakeNix(root)) {
+        const gcCfg = gcWaitConfig();
+        const gcPids = await waitForNoActiveNixGc({
+          timeoutMs: gcCfg.timeoutMs,
+          pollMs: gcCfg.pollMs,
+        });
+        if (gcPids.length > 0) {
+          throw new Error(nixGcLockMessage("[link-node] nix build", gcPids));
+        }
       }
-      failOnCompetingBuilds(attr, buildFlakeRefBase);
+      await failOnCompetingBuilds(attr, buildFlakeRefBase);
       console.error(
         "[link-node] building nix attr",
         `node-modules.${attr}`,

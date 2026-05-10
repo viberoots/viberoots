@@ -59,6 +59,15 @@ async function ensureNodeOnPath(tmp: string): Promise<string> {
   return localBin;
 }
 
+function resolvedToolEnv(): NodeJS.ProcessEnv {
+  const env: NodeJS.ProcessEnv = {};
+  for (const key of ["BASH", "BNX_BASH_BIN", "GIT_BIN", "NIX_BIN", "PATCH_BIN"] as const) {
+    const value = process.env[key];
+    if (value) env[key] = value;
+  }
+  return env;
+}
+
 async function startPatchPkgSession(sh: any, tmp: string): Promise<{ origin: string; ws: string }> {
   // Synthesize a minimal pristine source tree for github.com/google/uuid to avoid network
   const origin = path.join(tmp, "uuid-origin");
@@ -95,6 +104,7 @@ async function startPatchPkgSession(sh: any, tmp: string): Promise<{ origin: str
         .filter(Boolean)
         .join(path.delimiter),
       PATH: `${path.dirname(process.execPath)}:${localBin}:${process.env.PATH || ""}`,
+      ...resolvedToolEnv(),
     },
   })`build-tools/tools/bin/patch-pkg start go github.com/google/uuid`;
   const ws =
@@ -124,6 +134,7 @@ async function applyPatchPkg(sh: any, tmp: string, resolveOrigin: string) {
         .filter(Boolean)
         .join(path.delimiter),
       PATH: `${path.dirname(process.execPath)}:${localBin}:${process.env.PATH || ""}`,
+      ...resolvedToolEnv(),
     },
   })`build-tools/tools/bin/patch-pkg apply go github.com/google/uuid --target //projects/apps/demo-cli:demo-cli --force`;
 }

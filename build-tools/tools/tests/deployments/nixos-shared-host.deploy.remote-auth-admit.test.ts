@@ -9,7 +9,7 @@ import { startNixosSharedHostControlPlaneWorkerLoop } from "../../deployments/ni
 import { runInTemp } from "../lib/test-helpers";
 import { startFakeOidcServer } from "./deploy-vault-jwt.test-helpers";
 import {
-  freshRemoteExecBuckIsolation,
+  freshRemoteExecBuckEnv,
   installClientProfile,
   prepareRemoteExecFixture,
   requirePleominoDevCheck,
@@ -93,9 +93,7 @@ test("remote profile admit-and-deploy fails closed when the authenticated submit
       );
       const resultPromise = $({
         cwd: tmp,
-        env: remoteExecEnv(fixture.env, {
-          BUCK_NESTED_ISO: freshRemoteExecBuckIsolation(tmp),
-        }),
+        env: freshRemoteExecBuckEnv(tmp, remoteExecEnv(fixture.env)),
         stdio: "pipe",
       })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment ${REVIEWED_PLEOMINO_DEPLOYMENT_LABEL} --profile mini --profile-root ${fixture.profileRoot} --artifact-dir ${fixture.artifactDir} --admit-and-deploy deploy/pleomino-dev --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(server.port)} --smoke-connect-protocol https:`.nothrow();
       await completePendingAuthSession(controlPlane.url, fixture.remoteRecordsRoot);

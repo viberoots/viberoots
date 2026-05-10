@@ -35,7 +35,10 @@ export async function createProcessFiles(opts: {
 }): Promise<ProcessFiles> {
   const repoRoot = process.cwd();
   const suffix = `${process.pid}-${Date.now()}`;
-  const stateFile = path.join(os.tmpdir(), `bucknix-buck-reaper-v-${opts.ownerPid}-${suffix}.txt`);
+  const stateFile = path.join(
+    os.tmpdir(),
+    `viberoots-buck-reaper-v-${opts.ownerPid}-${suffix}.txt`,
+  );
   const logFile = path.join(
     repoRoot,
     "buck-out",
@@ -64,9 +67,15 @@ export async function waitForVisibleOrphanInPs(
   const start = Date.now();
   while (Date.now() - start < timeoutMs) {
     const stdout = await new Promise<string>((resolve) => {
-      const child = spawn(psPath, ["eww", "-p", String(pid), "-o", "pid=,ppid=,pgid=,command="], {
-        stdio: ["ignore", "pipe", "ignore"],
-      });
+      let child;
+      try {
+        child = spawn(psPath, ["eww", "-p", String(pid), "-o", "pid=,ppid=,pgid=,command="], {
+          stdio: ["ignore", "pipe", "ignore"],
+        });
+      } catch {
+        resolve("");
+        return;
+      }
       let buf = "";
       child.stdout.setEncoding("utf8");
       child.stdout.on("data", (chunk) => {
@@ -80,6 +89,16 @@ export async function waitForVisibleOrphanInPs(
       .map((entry) => entry.trim())
       .find(Boolean);
     if (line && (await isExpectedOrphanLine(line, pid, files, opts.requireRegistered))) return;
+    if (!line && opts.requireRegistered) {
+      const stateText = await fsp.readFile(files.stateFile, "utf8").catch(() => "");
+      if (
+        parseVerifyOwnedState(stateText).processes.some(
+          (entry) => entry.pid === pid && entry.logFile === files.logFile,
+        )
+      ) {
+        return;
+      }
+    }
     await new Promise((resolve) => setTimeout(resolve, 50));
   }
   throw new Error(`pid ${pid} did not become a visible orphan within ${timeoutMs}ms`);
@@ -144,17 +163,23 @@ export async function spawnOrphanedVerifyProcess(opts: {
 }
 
 export function spawnCurrentVerifyEnvProcess(files: ProcessFiles, target: string): ChildProcess {
-  return spawn(process.execPath, ["-e", "setInterval(() => {}, 1000)"], {
-    detached: true,
-    stdio: "ignore",
-    env: {
-      ...process.env,
-      BNX_VERIFY_PROCESS_STATE_FILE: files.stateFile,
-      BNX_BUCK_REAPER_STATE_FILE: files.stateFile,
-      BNX_VERIFY_LOG_FILE: files.logFile,
-      BUCK_TEST_TARGET: target,
+  const zxInit = path.join(process.cwd(), "build-tools", "tools", "dev", "zx-init.mjs");
+  return spawn(
+    process.execPath,
+    ["--experimental-strip-types", "--import", zxInit, "-e", "setInterval(() => {}, 1000)"],
+    {
+      detached: true,
+      stdio: "ignore",
+      env: {
+        ...process.env,
+        BNX_VERIFY_PROCESS_STATE_FILE: files.stateFile,
+        BNX_BUCK_REAPER_STATE_FILE: files.stateFile,
+        BNX_VERIFY_LOG_FILE: files.logFile,
+        BNX_VERIFY_REGISTER_PROCESS: "1",
+        BUCK_TEST_TARGET: target,
+      },
     },
-  });
+  );
 }
 
 async function collectChildStdout(child: ChildProcess): Promise<string> {

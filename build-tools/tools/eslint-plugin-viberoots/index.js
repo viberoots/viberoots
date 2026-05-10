@@ -1,5 +1,5 @@
 /**
- * ESLint plugin: bucknix
+ * ESLint plugin: viberoots
  * Rule: no-raw-graph-json — forbid direct reads of build-tools/tools/buck/graph.json outside allowlisted internals.
  */
 

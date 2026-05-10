@@ -10,7 +10,7 @@ Operator-command note:
 - deployment ids such as `pleomino-prod` remain the conceptual identity of the release target
 - the reviewed public repo-level CLI selects that target with a Buck label such as
   `--deployment //projects/deployments/pleomino-prod:deploy`
-- start with [Deployments Usage](/Users/kiltyj/Code/bucknix-fresh/docs/deployments-usage.md)
+- start with [Deployments Usage](/Users/kiltyj/Code/viberoots/docs/deployments-usage.md)
   when you need the reviewed day-to-day operator path before the scenario-level
   policy detail
 
@@ -433,8 +433,8 @@ Expected behavior:
 
 ## Companion Docs
 
-- [Deployment Design](/Users/kiltyj/Code/bucknix-fresh/docs/deployments-design.md)
-- [Deployment Contract](/Users/kiltyj/Code/bucknix-fresh/docs/deployments-contract.md)
-- [Deployment Schema](/Users/kiltyj/Code/bucknix-fresh/docs/deployments-schema.md)
-- [Deployment Provider Capabilities](/Users/kiltyj/Code/bucknix-fresh/docs/deployment-provider-capabilities.md)
-- [Deployment Implementation Plan](/Users/kiltyj/Code/bucknix-fresh/docs/deployment-plan.md)
+- [Deployment Design](/Users/kiltyj/Code/viberoots/docs/deployments-design.md)
+- [Deployment Contract](/Users/kiltyj/Code/viberoots/docs/deployments-contract.md)
+- [Deployment Schema](/Users/kiltyj/Code/viberoots/docs/deployments-schema.md)
+- [Deployment Provider Capabilities](/Users/kiltyj/Code/viberoots/docs/deployment-provider-capabilities.md)
+- [Deployment Implementation Plan](/Users/kiltyj/Code/viberoots/docs/deployment-plan.md)

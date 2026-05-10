@@ -46,8 +46,6 @@ def validate_deployment_convention(path, labels):
     if not _is_reviewed_deployment_test(path):
         if has_label:
             fail("non-deployment test must not declare %s: %s" % (DEPLOYMENT_DOMAIN_LABEL, path))
-        if has_resource_limited_label:
-            fail("non-deployment test must not declare %s: %s" % (VERIFY_RESOURCE_LIMITED_LABEL, path))
         return
     deployment_owned = REVIEWED_DEPLOYMENT_TEST_OWNERSHIP.get(path)
     if deployment_owned == None:

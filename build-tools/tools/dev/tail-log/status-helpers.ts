@@ -1,4 +1,5 @@
 import { execFileSync } from "node:child_process";
+import { processCommandLinesSync } from "../../lib/process-inspection";
 import { resolveToolPathSync } from "../../lib/tool-paths";
 
 export function getExtraStatusLines(isTty: boolean): string {
@@ -66,18 +67,10 @@ function truncateAnsi(input: string, maxVisible: number): string {
 }
 
 function getProcessCommands(): string[] {
-  try {
-    const out = execFileSync(resolveToolPathSync("ps"), ["-A", "-o", "command="], {
-      encoding: "utf8",
-      stdio: ["ignore", "pipe", "ignore"],
-    });
-    return String(out || "")
-      .split("\n")
-      .map((x) => x.trim())
-      .filter(Boolean);
-  } catch {
-    return [];
-  }
+  return processCommandLinesSync({
+    pgrepPattern:
+      "buck2d\\[|\\(buck2-forkserver\\)|(^|/)buck2( |$)|(^|/)node(js)?( |$)|(^|/)vite( |$)|(^|/)next( |$)",
+  });
 }
 
 function getBuckProcessCount(commands: string[]): number {

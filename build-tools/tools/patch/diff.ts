@@ -1,10 +1,29 @@
+import fs from "node:fs";
+import path from "node:path";
+
+import { resolveToolPathSync } from "../lib/tool-paths";
 import { runPatchCommand } from "./lib/command-runner";
 import { createDbg } from "./lib/util";
 const dbg = createDbg("patch-diff");
 
+function executableEnvPath(value: string | undefined): string {
+  const candidate = String(value || "").trim();
+  if (!candidate || !path.isAbsolute(candidate)) return "";
+  try {
+    fs.accessSync(candidate, fs.constants.X_OK);
+    return candidate;
+  } catch {
+    return "";
+  }
+}
+
+function resolveGitBin(): string {
+  return executableEnvPath(process.env.GIT_BIN) || resolveToolPathSync("git");
+}
+
 export async function makeUnifiedDiff(srcDir: string, dstDir: string): Promise<string> {
   // Require git --no-index so we get canonical a/ and b/ prefixes; do not fallback.
-  const res = await runPatchCommand("git", [
+  const res = await runPatchCommand(resolveGitBin(), [
     "-c",
     "core.filemode=false",
     "--no-pager",

@@ -1,6 +1,8 @@
 import { spawn } from "node:child_process";
 import process from "node:process";
 
+import { resolveWatchdogShell, watchdogEnvFor } from "./managed-command-watchdog";
+
 export type ManagedCommandResult = {
   ok: boolean;
   code: number | null;
@@ -19,15 +21,6 @@ export type ManagedCommandActivity = {
   childPid?: number;
   outputChunks?: number;
 };
-
-function watchdogEnvFor(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
-  const scrubbed = { ...env };
-  delete scrubbed.BUCK_TEST_TARGET;
-  delete scrubbed.BNX_VERIFY_LOG_FILE;
-  delete scrubbed.BNX_VERIFY_PROCESS_STATE_FILE;
-  delete scrubbed.BNX_BUCK_REAPER_STATE_FILE;
-  return scrubbed;
-}
 
 export async function runManagedCommand(opts: {
   command: string;
@@ -99,7 +92,7 @@ export async function runManagedCommand(opts: {
     const graceSec = Math.max(1, Math.ceil(killGraceMs / 1000));
     const parentPid = process.pid;
     const env = opts.env || process.env;
-    const shell = String(env.BASH || env.SHELL || "bash").trim() || "bash";
+    const shell = resolveWatchdogShell(env);
     const script = [
       "set -u",
       'P="$1"',
@@ -214,7 +207,14 @@ export async function runManagedCommand(opts: {
   const result = await new Promise<ManagedCommandResult>((resolve) => {
     child.once("error", (err) => {
       ended = true;
-      stderr += String(err && (err.stack || err.message) ? err.stack || err.message : err);
+      const message = String(err && (err.stack || err.message) ? err.stack || err.message : err);
+      stderr += [
+        `failed to spawn command: ${opts.command}`,
+        opts.args.length > 0 ? `args: ${opts.args.join(" ")}` : "",
+        message,
+      ]
+        .filter(Boolean)
+        .join("\n");
       resolve({
         ok: false,
         code: null,

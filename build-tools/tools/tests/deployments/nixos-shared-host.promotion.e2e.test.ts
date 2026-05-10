@@ -5,12 +5,16 @@ import path from "node:path";
 import { test } from "node:test";
 import { resolveCrossDeploymentPromotionSelection } from "../../deployments/deployment-promotion";
 import { runInTemp } from "../lib/test-helpers";
-import { cloudflarePagesDeploymentFixture } from "./cloudflare-pages.fixture";
+import {
+  cloudflarePagesDeploymentFixture,
+  installCloudflarePagesTargets,
+} from "./cloudflare-pages.fixture";
 import { installFakeCloudflarePagesWrangler } from "./cloudflare-pages.fake-wrangler";
 import { writeReviewedLaneAdmissionEvidenceJson } from "./deployment-lane-governance.fixture";
 import { startCloudflarePagesPublicServer } from "./cloudflare-pages.public-server";
 import {
   ensureNixosSharedHostStageBranch,
+  installNixosSharedHostTargets,
   nixosSharedHostAdmissionPolicyFixture,
   nixosSharedHostDeploymentFixture,
   nixosSharedHostLanePolicyFixture,
@@ -116,6 +120,8 @@ test("nixos-shared-host allows reviewed cross-provider same-artifact promotion o
     await writeWranglerConfig(
       path.join(tmp, "projects", "deployments", "pleomino-dev-pages", "wrangler.jsonc"),
     );
+    await installCloudflarePagesTargets(tmp, [source]);
+    await installNixosSharedHostTargets(tmp, [target]);
     await ensureNixosSharedHostStageBranch(tmp, $, source);
     await ensureNixosSharedHostStageBranch(tmp, $, target);
     await writeDeploymentJson(sourceJson, source);
@@ -182,6 +188,8 @@ test("nixos-shared-host promotion rejects retained source runs that drift out of
     await writeWranglerConfig(
       path.join(tmp, "projects", "deployments", "pleomino-dev-pages", "wrangler.jsonc"),
     );
+    await installCloudflarePagesTargets(tmp, [source]);
+    await installNixosSharedHostTargets(tmp, [target]);
     await ensureNixosSharedHostStageBranch(tmp, $, source);
     await ensureNixosSharedHostStageBranch(tmp, $, target);
     await writeDeploymentJson(sourceJson, source);

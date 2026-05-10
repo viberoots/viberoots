@@ -4,6 +4,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { getImporterRootsContract } from "../../../lib/importer-roots";
 import { withSharedBuckIsolationStartupLock } from "../../../lib/shared-buck-isolation-lock";
+import { registerBuckIsolationSync } from "../../../dev/verify/owned-process-state";
 import { isRetryableCqueryError, resetBuckDaemon } from "./retry";
 
 export type CqueryRunnerOptions = {
@@ -80,6 +81,7 @@ function computeIsolationFlags(cwd: string): { iso: string; flags: string[]; own
         process.env.BUCK_NESTED_ISO ||
         stableExporterIsolation(cwd),
     ).trim();
+    registerVerifySharedIsolation(shared, cwd, "exporter-shared");
     return { iso: shared, flags: ["--isolation-dir", shared], ownsIso: false };
   }
   const parentIso = String(
@@ -91,6 +93,18 @@ function computeIsolationFlags(cwd: string): { iso: string; flags: string[]; own
   }
   const iso = `exporter-${process.pid}`;
   return { iso, flags: ["--isolation-dir", iso], ownsIso: true };
+}
+
+function registerVerifySharedIsolation(iso: string, repoRoot: string, kind: string): void {
+  const stateFile = String(process.env.BNX_VERIFY_PROCESS_STATE_FILE || "").trim();
+  if (!stateFile || !iso || !repoRoot) return;
+  const ownerPidRaw = Number(process.env.BNX_VERIFY_OWNER_PID || process.pid);
+  const ownerPid = Number.isFinite(ownerPidRaw) && ownerPidRaw > 1 ? ownerPidRaw : process.pid;
+  try {
+    for (const root of Array.from(new Set([repoRoot, process.cwd()]))) {
+      registerBuckIsolationSync({ stateFile, iso, repoRoot: root, ownerPid, kind });
+    }
+  } catch {}
 }
 
 async function withBuckCleanup<T>(iso: string, ownsIso: boolean, fn: () => Promise<T>): Promise<T> {

@@ -7,7 +7,7 @@ import { scanFlatPatchDir } from "../../lib/provider-sync";
 import { decodeNameVersionFromPatch } from "../../lib/providers";
 
 async function mkTmpDir(): Promise<string> {
-  const base = await fsp.mkdtemp(path.join(os.tmpdir(), "bucknix-parity-"));
+  const base = await fsp.mkdtemp(path.join(os.tmpdir(), "viberoots-parity-"));
   return base;
 }
 

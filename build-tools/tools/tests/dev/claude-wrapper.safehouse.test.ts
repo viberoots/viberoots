@@ -5,8 +5,10 @@ import path from "node:path";
 import { test } from "node:test";
 import {
   escapeRegExp,
+  externalScratchRoot,
   makeFakeAgentTools,
   repoRoot,
+  safehouseLaunchPattern,
   scratchRoot,
   writeExecutable,
 } from "./agent-wrapper-test-helpers.ts";
@@ -31,6 +33,7 @@ test("claude worktree flags create through CoW git and launch in safehouse", asy
           ...process.env,
           PATH: `${path.dirname(wrapper)}:${fake.bin}:/usr/bin:/bin`,
           BNX_CLAUDE_GIT_WRAPPER_FOR_TEST: path.join(fake.bin, "git"),
+          CLAUDE_CONFIG_DIR: path.join(tmp, "home", ".claude"),
         },
       })`${wrapper} ${flag} ${name} -p hello`;
 
@@ -40,15 +43,20 @@ test("claude worktree flags create through CoW git and launch in safehouse", asy
       const log = await fsp.readFile(fake.log, "utf8");
       assert.match(log, new RegExp(`git worktree add -b worktree-${escapeRegExp(name)} `));
       assert.match(log, new RegExp(escapeRegExp(worktreeRoot)));
+      assert.match(log, new RegExp(safehouseLaunchPattern(worktreeRealRoot)));
+      assert.match(log, /safehouse .* --add-dirs=[^ ]+\/\.claude /);
       assert.match(
         log,
-        new RegExp(
-          `safehouse --workdir=${escapeRegExp(worktreeRealRoot)} --add-dirs-ro=/nix/store --append-profile=.* --env `,
-        ),
+        /\(allow file-read\* .* \(literal "\/etc\/bashrc"\) \(literal "\/private\/etc\/bashrc"\)/,
       );
+      assert.match(log, /\(allow mach-lookup \(global-name "com\.apple\.sysmond"\)\)/);
+      assert.match(log, /\(allow process-info\*\)/);
+      assert.match(log, /\(allow signal\)/);
       assert.match(log, /claude --dangerously-skip-permissions -p hello/);
+      assert.match(log, /HOME=.*\/buck-out\/tmp\/safehouse-home/);
+      assert.match(log, /CLAUDE_CONFIG_DIR=.*\/\.claude/);
       assert.doesNotMatch(log, /claude .*--worktree/);
-      assert.doesNotMatch(log, /claude .*-w/);
+      assert.doesNotMatch(log, /^claude .*-w/m);
     } finally {
       await fsp.rm(tmp, { recursive: true, force: true });
     }
@@ -105,9 +113,7 @@ printf 'native-claude %s\\n' "$*" >> "${fake.log}"
     const log = await fsp.readFile(fake.log, "utf8");
     assert.match(
       log,
-      new RegExp(
-        `safehouse --workdir=${escapeRegExp(worktreeRealRoot)} --add-dirs-ro=/nix/store --append-profile=.* --env ${escapeRegExp(nativeClaude)} `,
-      ),
+      new RegExp(`${safehouseLaunchPattern(worktreeRealRoot)}${escapeRegExp(nativeClaude)} `),
     );
     assert.match(log, /native-claude --dangerously-skip-permissions --help/);
     assert.doesNotMatch(log, /^claude /m);
@@ -135,12 +141,7 @@ test("claude wrapper resumes sessions from worktrees through safehouse", async (
     assert.equal(res.exitCode, 0, String(res.stderr || res.stdout));
     const worktreeRealRoot = await fsp.realpath(worktreeRoot);
     const log = await fsp.readFile(fake.log, "utf8");
-    assert.match(
-      log,
-      new RegExp(
-        `safehouse --workdir=${escapeRegExp(worktreeRealRoot)} --add-dirs-ro=/nix/store --append-profile=.* --env `,
-      ),
-    );
+    assert.match(log, new RegExp(safehouseLaunchPattern(worktreeRealRoot)));
     assert.match(log, /claude --dangerously-skip-permissions --resume session-123 -p continue/);
   } finally {
     await fsp.rm(tmp, { recursive: true, force: true });
@@ -166,12 +167,7 @@ test("claude wrapper runs worktree agents through safehouse", async () => {
     assert.equal(res.exitCode, 0, String(res.stderr || res.stdout));
     const worktreeRealRoot = await fsp.realpath(worktreeRoot);
     const log = await fsp.readFile(fake.log, "utf8");
-    assert.match(
-      log,
-      new RegExp(
-        `safehouse --workdir=${escapeRegExp(worktreeRealRoot)} --add-dirs-ro=/nix/store --append-profile=.* --env `,
-      ),
-    );
+    assert.match(log, new RegExp(safehouseLaunchPattern(worktreeRealRoot)));
     assert.match(log, /claude --dangerously-skip-permissions --print hello/);
     assert.match(log, /BNX_CLAUDE_SAFEHOUSE_ACTIVE=1/);
   } finally {
@@ -180,8 +176,8 @@ test("claude wrapper runs worktree agents through safehouse", async () => {
 });
 
 test("claude wrapper leaves main repo orchestration unsandboxed by default", async () => {
-  await fsp.mkdir(scratchRoot, { recursive: true });
-  const tmp = await fsp.mkdtemp(path.join(scratchRoot, "claude-wrapper-"));
+  await fsp.mkdir(externalScratchRoot, { recursive: true });
+  const tmp = await fsp.mkdtemp(path.join(externalScratchRoot, "claude-wrapper-"));
   try {
     const gitRoot = path.join(tmp, "repo");
     await fsp.mkdir(gitRoot, { recursive: true });

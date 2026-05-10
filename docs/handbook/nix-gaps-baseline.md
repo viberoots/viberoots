@@ -8,7 +8,7 @@ I regenerate this file by running `node --experimental-strip-types --import ./bu
 
 ## Environment summary
 
-- repo: /Users/kiltyj/Code/bucknix-fresh
+- repo: /Users/kiltyj/Code/viberoots
 - platform: darwin
 - release: 24.6.0
 - node: v22.17.0

@@ -48,7 +48,7 @@ build-tools/tools/bin/patch-pkg start cpp zlib
 
 # The command prints a workspace path. Edit files under that path, e.g.:
 # Example: bump the reported version string
-sed -i '' 's/#define ZLIB_VERSION \".*\"/#define ZLIB_VERSION \"9.9.9-bucknix\"/' "$PRINTED_WORKSPACE/zlib.h"
+sed -i '' 's/#define ZLIB_VERSION \".*\"/#define ZLIB_VERSION \"9.9.9-viberoots\"/' "$PRINTED_WORKSPACE/zlib.h"
 ```
 
 2. Generate the patch

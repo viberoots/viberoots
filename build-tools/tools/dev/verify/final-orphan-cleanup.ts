@@ -1,9 +1,11 @@
 #!/usr/bin/env zx-wrapper
 import { cleanupOrphanBuckDaemons } from "./buck-orphan-cleanup";
 import { appendVerifyLogLine } from "./process-control";
+import { cleanupRegisteredBuckIsolations } from "./registered-buck-cleanup";
 
 export async function runFinalOrphanBuckCleanup(opts: {
   logFile: string | null;
+  stateFile: string;
   timedPhase: <T>(name: string, fn: () => Promise<T>) => Promise<T>;
 }): Promise<void> {
   const previousGrace = process.env.BNX_BUCK_ORPHAN_STALE_GRACE_SECS;
@@ -22,6 +24,19 @@ export async function runFinalOrphanBuckCleanup(opts: {
     await appendVerifyLogLine(
       opts.logFile,
       `[verify] final buck2 orphan cleanup: scanned_forkservers=${res.scanned} candidates=${res.candidates} killed=${res.killed}`,
+    );
+    const registeredRes = await opts.timedPhase(
+      "final-cleanup-registered-buck-isolations",
+      async () =>
+        await cleanupRegisteredBuckIsolations({
+          stateFile: opts.stateFile,
+          log: async (line) => await appendVerifyLogLine(opts.logFile, line),
+          maxKills: Number.MAX_SAFE_INTEGER,
+        }),
+    );
+    await appendVerifyLogLine(
+      opts.logFile,
+      `[verify] final registered buck cleanup: scanned_isolations=${registeredRes.scanned} candidates=${registeredRes.candidates} killed=${registeredRes.killed}`,
     );
   } catch {
   } finally {

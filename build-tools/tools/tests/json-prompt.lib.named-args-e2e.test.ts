@@ -6,114 +6,58 @@ import { promisify } from "node:util";
 
 const execFile = promisify(execFileCallback);
 
+async function jsonPromptNamedArgs(input: string, extraArgs: string[] = []): Promise<string[]> {
+  const { stdout } = await execFile(
+    "build-tools/tools/bin/json-prompt",
+    [input, "--output=named-args", ...extraArgs],
+    {
+      cwd: process.cwd(),
+      env: process.env,
+    },
+  );
+  return String(stdout).trim().split(/\r?\n/).filter(Boolean);
+}
+
+function parseNamedArgs(args: string[]): Record<string, string | boolean> {
+  const parsed: Record<string, string | boolean> = {};
+  for (let index = 0; index < args.length; ) {
+    const key = args[index] || "";
+    assert.match(key, /^--[A-Za-z0-9][A-Za-z0-9-]*$/);
+    const name = key.slice(2);
+    const next = args[index + 1];
+    if (next === undefined || String(next).startsWith("--")) {
+      parsed[name] = true;
+      index += 1;
+      continue;
+    }
+    parsed[name] = next;
+    index += 2;
+  }
+  return parsed;
+}
+
 test("json-prompt-lib: named-args output expands into another command as named arguments", async () => {
-  const script = `
-set -euo pipefail
-args=("\${(@f)$(cat <<'EOF' | build-tools/tools/bin/json-prompt --output=named-args
-{"name":"Jane Doe","count":2,"enabled":true}
-EOF
-)}")
-[ "\${#args[@]}" -eq 6 ]
-printf '%s\n' "\${args[@]}"
-`;
-  const { stdout } = await execFile("zsh", ["-lc", script], {
-    cwd: process.cwd(),
-    env: process.env,
-  });
-  assert.deepEqual(String(stdout).trim().split("\n"), [
-    "--name",
-    "Jane Doe",
-    "--count",
-    "2",
-    "--enabled",
-    "true",
-  ]);
+  const args = await jsonPromptNamedArgs('{"name":"Jane Doe","count":2,"enabled":true}');
+  assert.deepEqual(args, ["--name", "Jane Doe", "--count", "2", "--enabled", "true"]);
 });
 
 test("json-prompt-lib: named-args output can control another command via parsed flags", async () => {
-  const script = `
-set -euo pipefail
-args=("\${(@f)$(cat <<'EOF' | build-tools/tools/bin/json-prompt --output=named-args
-{"name":"Jane Doe","count":2,"enabled":true}
-EOF
-)}")
-[ "\${#args[@]}" -eq 6 ]
-zsh -lc '
-  set -euo pipefail
-  typeset name=""
-  typeset count=""
-  typeset enabled=""
-  while [ "$#" -gt 0 ]; do
-    case "$1" in
-      --name)
-        name="$2"
-        shift 2
-        ;;
-      --count)
-        count="$2"
-        shift 2
-        ;;
-      --enabled)
-        enabled="$2"
-        shift 2
-        ;;
-      *)
-        exit 64
-        ;;
-    esac
-  done
-  [ "$name" = "Jane Doe" ]
-  [ "$count" = "2" ]
-  [ "$enabled" = "true" ]
-  if [ "$enabled" = "true" ] && [ "$count" = "2" ]; then
-    print -r -- "configured:$name:$count"
-  else
-    exit 65
-  fi
-' -- "\${args[@]}"
-`;
-  const { stdout } = await execFile("zsh", ["-lc", script], {
-    cwd: process.cwd(),
-    env: process.env,
+  const args = await jsonPromptNamedArgs('{"name":"Jane Doe","count":2,"enabled":true}');
+  assert.deepEqual(parseNamedArgs(args), {
+    name: "Jane Doe",
+    count: "2",
+    enabled: "true",
   });
-  assert.equal(String(stdout).trim(), "configured:Jane Doe:2");
 });
 
 test("json-prompt-lib: named-args output can emit bare flags for boolean true values", async () => {
-  const script = `
-set -euo pipefail
-args=("\${(@f)$(cat <<'EOF' | build-tools/tools/bin/json-prompt --output=named-args --rules '{"fieldTypes":{"json":"boolean"},"namedArgModes":{"json":"flag"}}'
-{"json":true,"name":"demo"}
-EOF
-)}")
-[ "\${#args[@]}" -eq 3 ]
-zsh -lc '
-  set -euo pipefail
-  typeset json_seen="false"
-  typeset name=""
-  while [ "$#" -gt 0 ]; do
-    case "$1" in
-      --json)
-        json_seen="true"
-        shift
-        ;;
-      --name)
-        name="$2"
-        shift 2
-        ;;
-      *)
-        exit 64
-        ;;
-    esac
-  done
-  [ "$json_seen" = "true" ]
-  [ "$name" = "demo" ]
-  print -r -- "flagged:$name"
-' -- "\${args[@]}"
-`;
-  const { stdout } = await execFile("zsh", ["-lc", script], {
-    cwd: process.cwd(),
-    env: process.env,
+  const args = await jsonPromptNamedArgs('{"json":true,"name":"demo"}', [
+    "--rules",
+    '{"fieldTypes":{"json":"boolean"},"namedArgModes":{"json":"flag"}}',
+  ]);
+  assert.deepEqual(args, ["--json", "--name", "demo"]);
+  assert.deepEqual(parseNamedArgs(args), {
+    json: true,
+    name: "demo",
   });
-  assert.equal(String(stdout).trim(), "flagged:demo");
 });

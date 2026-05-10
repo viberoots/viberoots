@@ -441,26 +441,103 @@ write_home_deny_profile() {
   {
     printf '(deny file-read-data (literal "%s"))\n' "$escaped_home"
     printf '(deny file-write* (literal "%s"))\n' "$escaped_home"
+    printf '(allow file-read-metadata (literal "%s") (literal "%s/.gitconfig") (literal "%s/.config") (literal "%s/.config/git") (literal "%s/.config/git/config"))\n' "$escaped_home" "$escaped_home" "$escaped_home" "$escaped_home" "$escaped_home"
+    printf '(allow file-read-metadata (literal "/etc") (literal "/etc/bashrc") (literal "/etc/profile") (literal "/etc/static") (literal "/etc/static/bashrc") (literal "/etc/nix") (literal "/nix") (literal "/nix/var") (literal "/nix/var/nix") (literal "/nix/var/nix/daemon-socket") (literal "/var") (literal "/var/db") (literal "/private") (literal "/private/etc") (literal "/private/etc/bashrc") (literal "/private/etc/profile") (literal "/private/etc/static") (literal "/private/etc/static/bashrc") (literal "/private/etc/nix") (literal "/private/var") (literal "/private/var/db"))\n'
+    printf '(allow file-read-metadata (literal "/Applications") (literal "/Applications/Xcode.app") (literal "/Applications/Xcode.app/Contents") (literal "/Applications/Xcode.app/Contents/Developer"))\n'
+    printf '(allow file-read* (literal "/var/db/xcode_select_link") (literal "/private/var/db/xcode_select_link"))\n'
+    printf '(allow file-read* (literal "/nix/var/nix/daemon-socket/socket") (literal "/etc/bashrc") (literal "/private/etc/bashrc") (literal "/etc/profile") (literal "/private/etc/profile") (literal "/etc/static/bashrc") (literal "/private/etc/static/bashrc") (literal "/etc/nix") (literal "/private/etc/nix"))\n'
+    printf '(allow mach-lookup (global-name "com.apple.sysmond"))\n'
+    printf '(allow process-info*)\n'
+    printf '(allow signal)\n'
   } >"$profile"
+}
+
+nix_safehouse_readonly_paths() {
+  local paths=("/nix/store" "/var/run/nix-daemon.socket")
+  local developer_dir=""
+  [[ -e "/nix/var/nix/daemon-socket/socket" ]] && paths+=("/nix/var/nix/daemon-socket/socket")
+  [[ -e "/etc/nix" ]] && paths+=("/etc/nix")
+  if [[ "$(uname -s 2>/dev/null || true)" == "Darwin" ]]; then
+    paths+=("/private/var/run/nix-daemon.socket")
+    [[ -e "/etc/bashrc" ]] && paths+=("/etc/bashrc")
+    [[ -e "/private/etc/bashrc" ]] && paths+=("/private/etc/bashrc")
+    [[ -e "/etc/profile" ]] && paths+=("/etc/profile")
+    [[ -e "/private/etc/profile" ]] && paths+=("/private/etc/profile")
+    [[ -e "/etc/static/bashrc" ]] && paths+=("/etc/static/bashrc")
+    [[ -e "/private/etc/static/bashrc" ]] && paths+=("/private/etc/static/bashrc")
+    [[ -e "/private/etc/nix" ]] && paths+=("/private/etc/nix")
+    [[ -e "/var/db/xcode_select_link" ]] && paths+=("/var/db/xcode_select_link")
+    [[ -e "/private/var/db/xcode_select_link" ]] && paths+=("/private/var/db/xcode_select_link")
+    developer_dir="$(xcode-select -p 2>/dev/null || true)"
+    if [[ -z "$developer_dir" ]]; then
+      developer_dir="/Applications/Xcode.app/Contents/Developer"
+    fi
+    [[ -e "$developer_dir" ]] && paths+=("$developer_dir")
+  fi
+  local IFS=:
+  printf '%s\n' "${paths[*]}"
 }
 
 run_claude_in_safehouse() {
   local root="$1"
   shift
+  local claude_config_dir=""
+  local claude_config_args=()
+  local home_real=""
+  local nix_bin
   local profile
   local root_real
+  local safehouse_cache
+  local safehouse_home
+  local nix_ro_paths
+  local safehouse_path="${PATH:-}"
   local status
   root_real="$(real_path "$root")"
-  profile="$(mktemp "${TMPDIR:-/tmp}/bnx-claude-safehouse.XXXXXX.sb")"
+  if [[ -n "${HOME:-}" ]]; then
+    home_real="$(cd -- "$HOME" 2>/dev/null && pwd -P || true)"
+  fi
+  if [[ -n "${CLAUDE_CONFIG_DIR:-}" ]]; then
+    case "$CLAUDE_CONFIG_DIR" in
+      /*) claude_config_dir="$CLAUDE_CONFIG_DIR" ;;
+      *) claude_config_dir="$root_real/$CLAUDE_CONFIG_DIR" ;;
+    esac
+  elif [[ -n "$home_real" ]]; then
+    claude_config_dir="$home_real/.claude"
+  fi
+  safehouse_cache="$root_real/buck-out/tmp/safehouse-cache/xdg"
+  safehouse_home="$root_real/buck-out/tmp/safehouse-home"
+  mkdir -p -- "$safehouse_cache" "$safehouse_home"
+  if [[ -n "$claude_config_dir" ]]; then
+    mkdir -p -- "$claude_config_dir" 2>/dev/null || true
+    if [[ -d "$claude_config_dir" ]]; then
+      rm -rf -- "$safehouse_home/.claude"
+      ln -s -- "$claude_config_dir" "$safehouse_home/.claude"
+      claude_config_args=(--add-dirs="$claude_config_dir")
+    fi
+  fi
+  nix_ro_paths="$(nix_safehouse_readonly_paths)"
+  nix_bin="$(find_tool_excluding_wrapper_dir nix || true)"
+  if [[ -n "$nix_bin" ]]; then
+    safehouse_path="$(dirname -- "$nix_bin"):${safehouse_path}"
+  fi
+  profile="$(mktemp "${TMPDIR:-/tmp}/bnx-claude-safehouse.XXXXXX")"
   write_home_deny_profile "$profile"
   set +e
   env \
     BNX_CLAUDE_SAFEHOUSE_ACTIVE=1 \
     BNX_CLAUDE_SAFEHOUSE_ROOT="$root_real" \
+    CLAUDE_CONFIG_DIR="$claude_config_dir" \
     DISABLE_AUTOUPDATER=1 \
+    HOME="$safehouse_home" \
+    NIX_DAEMON_SOCKET_PATH="/var/run/nix-daemon.socket" \
+    NIX_REMOTE="daemon" \
+    PATH="$safehouse_path" \
+    BUCK2_REAL_HOME="$safehouse_home" \
+    XDG_CACHE_HOME="$safehouse_cache" \
     "$safehouse" \
     --workdir="$root_real" \
-    --add-dirs-ro=/nix/store \
+    ${claude_config_args[@]+"${claude_config_args[@]}"} \
+    --add-dirs-ro="$nix_ro_paths" \
     --append-profile="$profile" \
     --env \
     "$real_claude" \

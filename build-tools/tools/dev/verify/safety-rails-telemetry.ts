@@ -1,7 +1,6 @@
-import { spawn } from "node:child_process";
 import * as fsp from "node:fs/promises";
 import os from "node:os";
-import { resolveToolPath } from "../../lib/tool-paths";
+import { processCommandLines } from "../../lib/process-inspection";
 
 export type ProcessCounts = {
   total: number;
@@ -23,34 +22,12 @@ export type VerifySafetyRailsTelemetrySummary = {
 };
 
 export async function sampleProcessCounts(timeoutMs = 1500): Promise<ProcessCounts | null> {
-  const psPath = await resolveToolPath("ps").catch(() => "");
-  if (!psPath) return null;
-  return await new Promise<ProcessCounts | null>((resolve) => {
-    const child = spawn(psPath, ["-axo", "command="], { stdio: ["ignore", "pipe", "ignore"] });
-    let buf = "";
-    child.stdout.setEncoding("utf8");
-    child.stdout.on("data", (chunk) => {
-      buf += chunk;
-    });
-    child.on("error", () => resolve(null));
-    child.on("close", () => {
-      const lines = String(buf || "")
-        .split(/\r?\n/)
-        .map((line) => line.trim())
-        .filter(Boolean);
-      resolve(countProcessCommands(lines));
-    });
-    const timer = setTimeout(
-      () => {
-        try {
-          child.kill("SIGKILL");
-        } catch {}
-        resolve(null);
-      },
-      Math.max(250, timeoutMs),
-    );
-    child.on("close", () => clearTimeout(timer));
+  const lines = await processCommandLines({
+    timeoutMs,
+    pgrepPattern:
+      "buck2d\\[|\\(buck2-forkserver\\)|(^|/)buck2( |$)|(^|/)node(js)?( |$)|(^|/)nix( |$)|BNX_VERIFY_LOG_FILE=|BNX_VERIFY_PROCESS_STATE_FILE=",
   });
+  return lines.length > 0 ? countProcessCommands(lines) : null;
 }
 
 export function countProcessCommands(lines: string[]): ProcessCounts {

@@ -39,7 +39,7 @@ test("shared-host identity provider module bootstraps generated identity imports
               bootstrapFirstOperatorPasswordFile = "/var/lib/deployment-host-secrets/bootstrap-first-operator-password";
               bootstrapTokenClaims = {
                 deployment_environment = "mini";
-                repository = "kiltyj/bucknix-fresh";
+                repository = "kiltyj/viberoots";
               };
               manageNginx = true;
               manageAcme = true;
@@ -130,7 +130,7 @@ test("shared-host identity provider module bootstraps generated identity imports
     assert.match(out.bootstrapScript, /"claim\.name":"deployment_environment"/);
     assert.match(out.bootstrapScript, /"claim\.value":"mini"/);
     assert.match(out.bootstrapScript, /"claim\.name":"repository"/);
-    assert.match(out.bootstrapScript, /"claim\.value":"kiltyj\/bucknix-fresh"/);
+    assert.match(out.bootstrapScript, /"claim\.value":"kiltyj\/viberoots"/);
     assert.match(out.bootstrapScript, /generated_realm_tmp="\$\(mktemp\)"/);
     assert.doesNotMatch(out.bootstrapScript, /cmp -s "\$generated_realm_tmp"/);
     assert.match(out.bootstrapScript, /install -m 0644 "\$generated_realm_tmp"/);

@@ -1,7 +1,7 @@
 import tseslint from "@typescript-eslint/eslint-plugin";
 import tsparser from "@typescript-eslint/parser";
 import prettier from "eslint-config-prettier";
-import bucknix from "./build-tools/tools/eslint-plugin-bucknix/index.js";
+import viberoots from "./build-tools/tools/eslint-plugin-viberoots/index.js";
 
 export default [
   {
@@ -37,11 +37,11 @@ export default [
     },
     plugins: {
       "@typescript-eslint": tseslint,
-      bucknix,
+      viberoots,
     },
     rules: {
       curly: ["error", "all"],
-      "bucknix/no-raw-graph-json": "error",
+      "viberoots/no-raw-graph-json": "error",
       ...prettier.rules,
     },
   },

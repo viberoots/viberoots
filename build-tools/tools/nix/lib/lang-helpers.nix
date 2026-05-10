@@ -182,6 +182,17 @@ let
         builtins.throw "Dev overrides are forbidden in CI"
       else null;
 
+  darwinBashrcSandboxProfileAttrs =
+    lib.optionalAttrs pkgs.stdenv.isDarwin {
+      sandboxProfile = ''
+        (allow file-read*
+          (literal "/etc/bashrc")
+          (literal "/private/etc/bashrc")
+          (subpath "/etc/static")
+          (subpath "/private/etc/static"))
+      '';
+    };
+
  in rec {
   inherit
     segs
@@ -201,7 +212,8 @@ let
     patchesMapFromDirs
     pythonPatchesMapFromDirs
     readDevOverrides
-    guardNoDevOverridesInCI;
+    guardNoDevOverridesInCI
+    darwinBashrcSandboxProfileAttrs;
   patchesMapFromDirToStore = { dir, normalizeVersion ? (v: v), namePrefix ? "patch" }:
     patchesMapFromDirWith { inherit dir normalizeVersion namePrefix; materialize = true; };
 
@@ -222,5 +234,3 @@ let
         materialize = true;
       };
 }
-
-

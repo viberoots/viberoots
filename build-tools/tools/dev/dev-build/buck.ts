@@ -31,6 +31,10 @@ export async function runBuckCommand(opts: {
     return await $({
       stdio: "inherit",
       cwd: opts.root,
+      env: {
+        ...process.env,
+        HOME: process.env.BUCK2_REAL_HOME || process.env.HOME,
+      },
     })`bash --noprofile --norc -c ${cmd}`.catch((e) => e);
   });
   const code = typeof proc?.exitCode === "number" ? proc.exitCode : 1;

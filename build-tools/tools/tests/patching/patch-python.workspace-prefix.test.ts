@@ -4,7 +4,7 @@ import path from "node:path";
 import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
 
-test("patch-python: workspace parent dir is bucknix-patch-python", async () => {
+test("patch-python: workspace parent dir is viberoots-patch-python", async () => {
   await runInTemp("patch-python-ws-prefix", async (tmp, $) => {
     // Minimal Python importer with uv.lock
     const importer = path.join(tmp, "apps", "pytool");
@@ -34,7 +34,7 @@ test("patch-python: workspace parent dir is bucknix-patch-python", async () => {
       process.exit(2);
     }
     const parent = path.basename(path.dirname(ws));
-    if (parent !== "bucknix-patch-python") {
+    if (parent !== "viberoots-patch-python") {
       console.error("unexpected workspace parent dir", { parent, ws });
       process.exit(2);
     }

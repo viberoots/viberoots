@@ -30,13 +30,13 @@ in {
         fi
       fi
       # Guard against recursive shell hook invocation only when this root is already wired.
-      if [ -n "''${_BUCKNIX_DEVSHELL_ACTIVE:-}" ] && [ "''${_BUCKNIX_DEVSHELL_ROOT:-}" = "$dev_root" ]; then
+      if [ -n "''${_VIBEROOTS_DEVSHELL_ACTIVE:-}" ] && [ "''${_VIBEROOTS_DEVSHELL_ROOT:-}" = "$dev_root" ]; then
         if command -v i >/dev/null 2>&1; then
           return 0
         fi
       fi
-      export _BUCKNIX_DEVSHELL_ACTIVE=1
-      export _BUCKNIX_DEVSHELL_ROOT="$dev_root"
+      export _VIBEROOTS_DEVSHELL_ACTIVE=1
+      export _VIBEROOTS_DEVSHELL_ROOT="$dev_root"
       is_interactive=0
       case "$-" in
         *i*) is_interactive=1 ;;

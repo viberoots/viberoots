@@ -1,7 +1,9 @@
+import * as fsp from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
 import { isPidAlive } from "./buck-orphan-cleanup-lib";
-import { readProcessIdentity } from "./owned-process-state";
+import { cleanupRegisteredVerifyProcesses } from "./owned-process-cleanup";
+import { parseVerifyOwnedState, readProcessIdentity } from "./owned-process-state";
 import {
   dedupeByProcessGroup,
   etimeToSeconds,
@@ -26,11 +28,21 @@ async function signalVerifyProcessGroup(
   try {
     process.kill(-proc.pgid, "SIGTERM");
   } catch {}
+  if (proc.pgid === proc.pid) {
+    try {
+      process.kill(proc.pid, "SIGTERM");
+    } catch {}
+  }
   await new Promise((resolve) => setTimeout(resolve, 500));
   if (isPidAlive(proc.pid)) {
     try {
       process.kill(-proc.pgid, "SIGKILL");
     } catch {}
+    if (proc.pgid === proc.pid) {
+      try {
+        process.kill(proc.pid, "SIGKILL");
+      } catch {}
+    }
     await new Promise((resolve) => setTimeout(resolve, 100));
   }
   if (!isPidAlive(proc.pid)) {
@@ -60,17 +72,40 @@ export async function cleanupCurrentVerifyEnvProcesses(opts: {
   // unwinding. Give normal teardown a brief chance to finish before treating
   // same-run env-bearing processes as leaks.
   await new Promise((resolve) => setTimeout(resolve, 750));
-  const lines = await psLinesWithEnv(10000);
-  const scanned = dedupeByProcessGroup(parseEnvVerifyProcesses(lines));
-  const procs = scanned.filter(
-    (proc) => path.resolve(proc.stateFile) === stateFile && path.resolve(proc.logFile) === logFile,
-  );
+  let scanned: EnvVerifyProc[] = [];
+  let procs: EnvVerifyProc[] = [];
+  const deadline = Date.now() + 5000;
+  while (true) {
+    const lines = await psLinesWithEnv(10000);
+    scanned = dedupeByProcessGroup(parseEnvVerifyProcesses(lines));
+    procs = scanned.filter(
+      (proc) =>
+        path.resolve(proc.stateFile) === stateFile && path.resolve(proc.logFile) === logFile,
+    );
+    if (procs.length > 0) break;
+    const stateText = await fsp.readFile(stateFile, "utf8").catch(() => "");
+    const registered = parseVerifyOwnedState(stateText).processes.some(
+      (entry) => path.resolve(entry.logFile) === logFile,
+    );
+    if (registered || Date.now() >= deadline) break;
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
   let killed = 0;
   for (const proc of procs) {
     if (killed >= maxKills) break;
     if (await signalVerifyProcessGroup(proc, { log: opts.log, reason: "cleanup" })) killed++;
   }
-  return { scanned: scanned.length, candidates: procs.length, killed };
+  const registered = await cleanupRegisteredVerifyProcesses({
+    stateFile,
+    logFile,
+    log: opts.log,
+    maxKills: Math.max(0, maxKills - killed),
+  }).catch(() => ({ processes: 0, killed: 0 }));
+  return {
+    scanned: scanned.length + registered.processes,
+    candidates: procs.length + registered.processes,
+    killed: killed + registered.killed,
+  };
 }
 
 async function cleanupOrphanVerifyEnvProcesses(opts: {
@@ -125,7 +160,9 @@ export async function cleanupOrphanVerifyProcesses(opts: {
     if (etimeToSeconds(proc.etime) < staleGraceSec) continue;
     candidates++;
     if (killed >= maxKills) continue;
-    const current = await readProcessIdentity(proc.pid).catch(() => null);
+    const current = await readProcessIdentity(proc.pid, 1500, {
+      allowPidFallback: proc.startSig.startsWith("pid:"),
+    }).catch(() => null);
     if (!current || current.pgid !== proc.pgid) continue;
     if (current.startSig !== proc.startSig) continue;
     if (await signalVerifyProcessGroup(proc, { log: opts.log, reason: "orphan cleanup" })) {

@@ -8,12 +8,14 @@ import { parseBuck2ProgressFromLines } from "./buck2-output";
 import { createBuck2SlowestRecorder } from "./buck2-slowest";
 import { verifyBuck2Threads } from "./buck2-threads";
 import { buildVerifyTestEnvArgs, previewVerifyNestedBuckIsolation } from "./buck2-test-env";
+import { registerVerifyBuckTestIsolations } from "./verify-buck-isolation-registration";
 import { resolveToolPathSync } from "../../lib/tool-paths";
 
 export { verifyBuck2Threads, type VerifyBuck2ThreadsOptions } from "./buck2-threads";
 
 export type SpawnedVerifyTests = {
   pgid: number;
+  nestedIso: string;
   wait: () => Promise<number>;
 };
 
@@ -52,6 +54,7 @@ export function spawnVerifyBuck2Tests(opts: {
   const threads = opts.threadsOverride ?? verifyBuck2Threads({ targetCount: opts.targets.length });
   const passName = String(opts.passName || "shared");
   const nestedIso = previewVerifyNestedBuckIsolation(opts.iso, passName);
+  registerVerifyBuckTestIsolations({ parentIso: opts.iso, nestedIso, repoRoot: opts.root });
   const testEnvArgs = buildVerifyTestEnvArgs({
     iso: opts.iso,
     passName,
@@ -243,6 +246,5 @@ export function spawnVerifyBuck2Tests(opts: {
     await slowest.write(opts.logFile, passName);
     return exitCode ?? 1;
   };
-
-  return { pgid, wait };
+  return { pgid, nestedIso, wait };
 }

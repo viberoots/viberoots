@@ -1,8 +1,7 @@
 import * as fsp from "node:fs/promises";
-import { spawn } from "node:child_process";
 import path from "node:path";
 import process from "node:process";
-import { resolveToolPathSync } from "./tool-paths";
+import { processStartSignature as inspectProcessStartSignature } from "./process-inspection";
 
 type LockOwner = {
   pid: number;
@@ -28,30 +27,7 @@ function pidAlive(pid: number): boolean {
 }
 
 async function processStartSignature(pid: number): Promise<string | null> {
-  if (!Number.isFinite(pid) || pid <= 1) return null;
-  const psPath = resolveToolPathSync("ps");
-  return await new Promise<string | null>((resolve) => {
-    const child = spawn(psPath, ["-p", String(pid), "-o", "lstart="], {
-      stdio: ["ignore", "pipe", "ignore"],
-    });
-    let buf = "";
-    child.stdout.setEncoding("utf8");
-    child.stdout.on("data", (chunk) => {
-      buf += chunk;
-    });
-    child.on("error", () => resolve(null));
-    child.on("close", () => {
-      const sig = String(buf || "").trim();
-      resolve(sig || null);
-    });
-    const timer = setTimeout(() => {
-      try {
-        child.kill("SIGKILL");
-      } catch {}
-      resolve(null);
-    }, 1_500);
-    child.on("close", () => clearTimeout(timer));
-  });
+  return await inspectProcessStartSignature(pid);
 }
 
 function sanitizeIsolationName(isolation: string): string {
@@ -79,6 +55,7 @@ async function staleLockOwner(lockDir: string): Promise<boolean> {
     const expectedSig = typeof owner.startSig === "string" ? owner.startSig.trim() : "";
     if (!expectedSig) return false;
     const currentSig = await processStartSignature(ownerPid);
+    if (!currentSig) return false;
     return currentSig !== expectedSig;
   } catch {
     return true;

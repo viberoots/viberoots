@@ -3,26 +3,22 @@ import * as fs from "node:fs";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
-import { resolveToolPath } from "../../lib/tool-paths";
+import { processStartSignature } from "../../lib/process-inspection";
 
 async function pidStartSignature(pid: number): Promise<string> {
-  try {
-    const psPath = await resolveToolPath("ps");
-    const { stdout } = await $({ stdio: "pipe" })`${psPath} -p ${pid} -o lstart=`;
-    return String(stdout || "").trim();
-  } catch {
-    return "";
-  }
+  return (await processStartSignature(pid)) || "";
 }
 
 async function pidAliveWithSignature(pid: number, sig: string): Promise<boolean> {
-  if (!pid || !sig) return false;
+  if (!pid) return false;
   try {
     process.kill(pid, 0);
   } catch {
     return false;
   }
+  if (!sig) return true;
   const cur = await pidStartSignature(pid);
+  if (!cur) return true;
   return Boolean(cur) && cur === sig;
 }
 

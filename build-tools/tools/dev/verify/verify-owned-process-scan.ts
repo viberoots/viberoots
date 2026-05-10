@@ -1,9 +1,8 @@
-import { spawn } from "node:child_process";
 import * as fsp from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import process from "node:process";
-import { resolveToolPathSync } from "../../lib/tool-paths";
+import { processTableLines } from "../../lib/process-inspection";
 import { isPidAlive } from "./buck-orphan-cleanup-lib";
 import { parseVerifyOwnedState } from "./owned-process-state";
 
@@ -38,47 +37,17 @@ export function etimeToSeconds(etime: string): number {
     .split(":")
     .map((x) => Number(x))
     .filter((n) => Number.isFinite(n) && n >= 0);
-  if (parts.length === 3) {
-    const [h, m, s] = parts;
-    return days * 86400 + h * 3600 + m * 60 + s;
-  }
-  if (parts.length === 2) {
-    const [m, s] = parts;
-    return days * 86400 + m * 60 + s;
-  }
+  if (parts.length === 3) return days * 86400 + parts[0] * 3600 + parts[1] * 60 + parts[2];
+  if (parts.length === 2) return days * 86400 + parts[0] * 60 + parts[1];
   return days * 86400;
 }
 
 export async function psLinesWithEnv(timeoutMs: number): Promise<string[]> {
-  const psPath = resolveToolPathSync("ps");
-  return await new Promise<string[]>((resolve) => {
-    const child = spawn(psPath, ["eww", "-A", "-o", "pid=,ppid=,pgid=,etime=,command="], {
-      stdio: ["ignore", "pipe", "ignore"],
-    });
-    let buf = "";
-    child.stdout.setEncoding("utf8");
-    child.stdout.on("data", (chunk) => {
-      buf += chunk;
-    });
-    child.on("error", () => resolve([]));
-    child.on("close", () => {
-      resolve(
-        String(buf || "")
-          .split(/\r?\n/)
-          .map((line) => line.trim())
-          .filter(Boolean),
-      );
-    });
-    const timer = setTimeout(
-      () => {
-        try {
-          child.kill("SIGKILL");
-        } catch {}
-        resolve([]);
-      },
-      Math.max(250, timeoutMs),
-    );
-    child.on("close", () => clearTimeout(timer));
+  return await processTableLines({
+    psArgs: ["eww", "-A", "-o", "pid=,ppid=,pgid=,etime=,command="],
+    timeoutMs,
+    pgrepPattern: "BNX_VERIFY_LOG_FILE=|BNX_VERIFY_PROCESS_STATE_FILE=",
+    pgrepToLine: (pid, cmd) => `${pid} 0 ${pid} 00:00 ${cmd}`,
   });
 }
 
@@ -165,17 +134,22 @@ export function parseEnvVerifyProcesses(lines: string[]): EnvVerifyProc[] {
 
 export function ownerPidFromStateFile(stateFile: string): number | null {
   const base = path.basename(stateFile);
-  const match = base.match(/^bucknix-buck-reaper-v-(\d+)-/);
+  const match = base.match(/^viberoots-buck-reaper-v-(\d+)-/);
   if (!match) return null;
   const pid = Number(match[1]);
   return Number.isFinite(pid) && pid > 1 ? pid : null;
 }
 
-async function listCandidateStateFiles(): Promise<string[]> {
+export async function listCandidateStateFiles(): Promise<string[]> {
   const dirs = new Set<string>();
   const tmpDir = String(process.env.TMPDIR || os.tmpdir()).trim();
   if (tmpDir) dirs.add(path.resolve(tmpDir));
   dirs.add(path.resolve(os.tmpdir()));
+  const user = String(process.env.USER || process.env.LOGNAME || "").trim();
+  if (user) {
+    dirs.add(path.resolve("/tmp", `viberoots-verify-${user}.noindex`, "tmpdir"));
+    dirs.add(path.resolve("/private/tmp", `viberoots-verify-${user}.noindex`, "tmpdir"));
+  }
   const currentStateFile = String(process.env.BNX_VERIFY_PROCESS_STATE_FILE || "").trim();
   if (currentStateFile) dirs.add(path.dirname(path.resolve(currentStateFile)));
 
@@ -184,7 +158,7 @@ async function listCandidateStateFiles(): Promise<string[]> {
     const entries = await fsp.readdir(dir, { withFileTypes: true }).catch(() => []);
     for (const entry of entries) {
       if (!entry.isFile()) continue;
-      if (!/^bucknix-buck-reaper-v-.*\.txt$/.test(entry.name)) continue;
+      if (!/^viberoots-buck-reaper-v-.*\.txt$/.test(entry.name)) continue;
       const stateFile = path.join(dir, entry.name);
       const ownerPid = ownerPidFromStateFile(stateFile);
       if (ownerPid && isPidAlive(ownerPid)) continue;
@@ -230,14 +204,18 @@ export function mergeWithLiveProcessRows(
   const out: RegisteredVerifyOwnedProc[] = [];
   for (const entry of registered) {
     const live = liveRows.get(entry.pid);
-    if (!live) continue;
-    out.push({
-      ...live,
-      startSig: entry.startSig,
-      logFile: entry.logFile,
-      target: entry.target,
-      stateFile: entry.stateFile,
-    });
+    if (live) {
+      out.push({
+        ...live,
+        startSig: entry.startSig,
+        logFile: entry.logFile,
+        target: entry.target,
+        stateFile: entry.stateFile,
+      });
+      continue;
+    }
+    if (!entry.startSig.startsWith("pid:") || !isPidAlive(entry.pid)) continue;
+    out.push(entry);
   }
   return out;
 }

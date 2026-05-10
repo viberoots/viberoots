@@ -40,6 +40,14 @@ export function shouldRefuseLiveRepoScaffold(opts: {
   if (workspaceRoot && workspaceRoot !== repoRoot && cwd === workspaceRoot) {
     return false;
   }
+  if (
+    String(env.BNX_RUN_IN_TEMP_REPO || "").trim() === "1" &&
+    workspaceRoot &&
+    cwd === workspaceRoot &&
+    workspaceRoot === repoRoot
+  ) {
+    return false;
+  }
 
   return cwd === repoRoot;
 }

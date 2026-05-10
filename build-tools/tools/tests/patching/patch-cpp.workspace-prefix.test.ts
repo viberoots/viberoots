@@ -4,7 +4,7 @@ import path from "node:path";
 import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
 
-test("patch-cpp: workspace parent dir is bucknix-patch-cpp", async () => {
+test("patch-cpp: workspace parent dir is viberoots-patch-cpp", async () => {
   await runInTemp("patch-cpp-ws-prefix", async (tmp, $) => {
     const storeSrc = path.join(tmp, "nix-store", "zlib-src");
     await fsp.mkdir(storeSrc, { recursive: true });
@@ -24,7 +24,7 @@ test("patch-cpp: workspace parent dir is bucknix-patch-cpp", async () => {
       process.exit(2);
     }
     const parent = path.basename(path.dirname(ws));
-    if (parent !== "bucknix-patch-cpp") {
+    if (parent !== "viberoots-patch-cpp") {
       console.error("unexpected workspace parent dir", { parent, ws });
       process.exit(2);
     }

@@ -23,6 +23,40 @@ test("verify child env reuses a shared nested buck isolation per pass", () => {
   });
   assert.ok(envArgs.includes(`BUCK_NESTED_ISO=${shared}`));
   assert.ok(envArgs.includes("BUCK_EXPORTER_REUSE_DAEMON=1"));
+  assert.ok(envArgs.includes("BUCKD_STARTUP_TIMEOUT=300"));
+  assert.ok(envArgs.includes("BUCKD_STARTUP_INIT_TIMEOUT=300"));
+  assert.ok(envArgs.includes("NIX_DAEMON_SOCKET_PATH=/var/run/nix-daemon.socket"));
+  assert.ok(envArgs.includes("NIX_REMOTE=daemon"));
+  assert.ok(
+    envArgs.some((arg) => arg.startsWith("NIX_BIN=")),
+    "verify should pass an absolute nix path into Buck test actions",
+  );
+  assert.ok(
+    envArgs.some((arg) => arg.startsWith("PATCH_BIN=")),
+    "verify should pass an absolute patch path into Buck test actions",
+  );
+  assert.ok(
+    envArgs.some((arg) => arg.startsWith("GIT_BIN=")),
+    "verify should pass an absolute git path into Buck test actions",
+  );
+});
+
+test("verify child env preserves explicit nix binary path", () => {
+  const prev = process.env.NIX_BIN;
+  try {
+    process.env.NIX_BIN = "/nix/store/demo-nix/bin/nix";
+    const envArgs = buildVerifyTestEnvArgs({
+      iso: "v-123",
+      passName: "shared",
+      zxNodeModulesOut: "/tmp/zx-node-modules",
+      nodeTestTimeoutMs: 120_000,
+      testNixTimeoutSecs: 1800,
+    });
+    assert.ok(envArgs.includes("NIX_BIN=/nix/store/demo-nix/bin/nix"));
+  } finally {
+    if (typeof prev === "string") process.env.NIX_BIN = prev;
+    else delete process.env.NIX_BIN;
+  }
 });
 
 test("verify child env propagates dev-shell Nix certificate env", () => {

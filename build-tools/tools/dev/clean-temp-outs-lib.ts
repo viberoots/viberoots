@@ -1,7 +1,6 @@
-import { spawn } from "node:child_process";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import { resolveToolPathSync } from "../lib/tool-paths";
+import { buckProcessCommandLines } from "../lib/process-inspection";
 import { ownerPidForIsolation } from "./buck-watchdog-lib";
 
 export function shouldRemoveDeadOwnedBuckIsolationDir(
@@ -37,33 +36,14 @@ export function defaultIsPidAlive(pid: number): boolean {
 }
 
 async function liveBuckIsolationDirs(): Promise<ReadonlySet<string>> {
-  const psPath = resolveToolPathSync("ps");
-  return await new Promise<ReadonlySet<string>>((resolve) => {
-    const child = spawn(psPath, ["-axo", "command="], { stdio: ["ignore", "pipe", "ignore"] });
-    let buf = "";
-    child.stdout.setEncoding("utf8");
-    child.stdout.on("data", (chunk) => {
-      buf += chunk;
-    });
-    child.on("error", () => resolve(new Set()));
-    child.on("close", () => {
-      const live = new Set<string>();
-      for (const line of String(buf || "").split(/\r?\n/)) {
-        if (!line.includes("buck2d[") || !line.includes("--isolation-dir")) continue;
-        const match = line.match(/--isolation-dir\s+([^\s]+)/);
-        const iso = match?.[1] ? String(match[1]).trim() : "";
-        if (iso) live.add(iso);
-      }
-      resolve(live);
-    });
-    const timer = setTimeout(() => {
-      try {
-        child.kill("SIGKILL");
-      } catch {}
-      resolve(new Set());
-    }, 2_000);
-    child.on("close", () => clearTimeout(timer));
-  });
+  const live = new Set<string>();
+  for (const line of await buckProcessCommandLines(2000)) {
+    if (!line.includes("buck2d[") || !line.includes("--isolation-dir")) continue;
+    const match = line.match(/--isolation-dir\s+([^\s]+)/);
+    const iso = match?.[1] ? String(match[1]).trim() : "";
+    if (iso) live.add(iso);
+  }
+  return live;
 }
 
 export async function pruneDeadOwnedBuckIsolationDirs(

@@ -6,7 +6,7 @@ Create a detailed design document for a `scaf`-generated `ts/webapp-ssr-vite` ap
 The doc will be implementation-ready and aligned to repo conventions (`METHODOLOGY.XML`, scaffold contracts, Starlark API usage, and PR workflow).
 
 Current runtime note: Pleomino has since migrated onto the static-PWA app shape in
-[`projects/apps/pleomino/docs/pleomino-static.md`](/Users/kiltyj/Code/bucknix-fresh/projects/apps/pleomino/docs/pleomino-static.md).
+[`projects/apps/pleomino/docs/pleomino-static.md`](/Users/kiltyj/Code/viberoots/projects/apps/pleomino/docs/pleomino-static.md).
 The gameplay architecture in this document still applies, but delivery/runtime references should be
 read alongside that static-PWA migration plan.
 

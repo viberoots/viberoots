@@ -5,7 +5,7 @@ import path from "node:path";
 import { test } from "node:test";
 import {
   REVIEWED_PLEOMINO_DEPLOYMENT_LABEL,
-  freshRemoteExecBuckIsolation,
+  freshRemoteExecBuckEnv,
   prepareRemoteExecFixture,
   requirePleominoDevCheck,
   remoteExecEnv,
@@ -29,9 +29,7 @@ test("remote profile deploy surface keeps missing admission guidance discoverabl
     await requirePleominoDevCheck(tmp);
     const result = await $({
       cwd: tmp,
-      env: remoteExecEnv(fixture.env, {
-        BUCK_NESTED_ISO: freshRemoteExecBuckIsolation(tmp),
-      }),
+      env: freshRemoteExecBuckEnv(tmp, remoteExecEnv(fixture.env)),
       stdio: "pipe",
     })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment ${REVIEWED_PLEOMINO_DEPLOYMENT_LABEL} --profile mini --profile-root ${fixture.profileRoot} --artifact-dir ${fixture.artifactDir} --admit-and-deploy`.nothrow();
     assert.notEqual(result.exitCode, 0);

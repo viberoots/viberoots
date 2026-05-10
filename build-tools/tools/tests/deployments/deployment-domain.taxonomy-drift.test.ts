@@ -19,6 +19,9 @@ async function copyCurrentBuckClassificationFiles(tmp: string): Promise<void> {
   const relPaths = [
     "build-tools/tools/tests/defs.bzl",
     "build-tools/tools/tests/deployment_conventions.bzl",
+    "build-tools/tools/tests/isolated_test_conventions.bzl",
+    "build-tools/tools/tests/resource_limited_conventions.bzl",
+    "build-tools/tools/tests/resource_limited_taxonomy.bzl",
     "build-tools/tools/tests/deployments/deployment_domain_taxonomy.bzl",
     "build-tools/tools/tests/deployments/deployment_resource_limited_taxonomy.bzl",
   ];
@@ -109,21 +112,20 @@ test("deployment-domain taxonomy drift fails closed for unclassified deployment 
 });
 
 test("resource-limited deployment taxonomy stays data-only", async () => {
-  const relPath = "build-tools/tools/tests/deployments/deployment_resource_limited_taxonomy.bzl";
-  const text = await fsp.readFile(path.join(process.cwd(), relPath), "utf8");
-  const executablePatterns = [
-    /\bload\s*\(/,
-    /^\s*def\s+/m,
-    /^\s*if\s+/m,
-    /^\s*for\s+/m,
-    /\bfor\b.*\bin\b/,
+  const relPaths = [
+    "build-tools/tools/tests/deployments/deployment_resource_limited_taxonomy.bzl",
+    "build-tools/tools/tests/resource_limited_taxonomy.bzl",
   ];
-  const codeOnly = text
-    .split("\n")
-    .map((line) => line.replace(/#.*/, ""))
-    .join("\n");
+  const executablePatterns = [/\bload\s*\(/, /^\s*if\s+/m, /^\s*for\s+/m, /\bfor\b.*\bin\b/];
 
-  for (const pattern of executablePatterns) {
-    assert.doesNotMatch(codeOnly, pattern, `${relPath} must remain metadata-only`);
+  for (const relPath of relPaths) {
+    const text = await fsp.readFile(path.join(process.cwd(), relPath), "utf8");
+    const codeOnly = text
+      .split("\n")
+      .map((line) => line.replace(/#.*/, ""))
+      .join("\n");
+    for (const pattern of executablePatterns) {
+      assert.doesNotMatch(codeOnly, pattern, `${relPath} must keep resource membership data-only`);
+    }
   }
 });

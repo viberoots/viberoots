@@ -12,7 +12,7 @@ function runtimeBase(issuerUrl: string, env: NodeJS.ProcessEnv) {
     roleName: "deploy-pleomino-read",
     issuerUrl,
     audience: "deployments-vault",
-    repository: "kiltyj/bucknix-fresh",
+    repository: "kiltyj/viberoots",
     deploymentEnvironment: "mini",
     humanClientId: "deployment-cli",
     serviceClientId: "deployment-runner",
@@ -34,7 +34,7 @@ test("Jenkins Secret Text source mints a typed in-memory Vault JWT", async () =>
     assert.equal(result.addr, "https://vault.example.net:8200");
     const claims = decodeJwtPayload(result.workloadJwt);
     assert.equal(claims.azp, "deployment-runner");
-    assert.equal(claims.repository, "kiltyj/bucknix-fresh");
+    assert.equal(claims.repository, "kiltyj/viberoots");
   } finally {
     await server.close();
   }
@@ -47,7 +47,7 @@ test("external OIDC source validates claims without a Keycloak client secret", a
     aud: "deployments-vault",
     azp: "deployment-runner",
     deployment_environment: "mini",
-    repository: "kiltyj/bucknix-fresh",
+    repository: "kiltyj/viberoots",
   });
   try {
     const result = await resolveCredentialSourceVaultJwt({

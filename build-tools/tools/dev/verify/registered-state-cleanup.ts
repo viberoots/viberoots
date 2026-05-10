@@ -1,5 +1,5 @@
-import { cleanupRegisteredTempRepos } from "./buck-orphan-cleanup";
-import { cleanupRegisteredVerifyProcesses } from "./owned-process-state";
+import { cleanupRegisteredBuckIsolations, cleanupRegisteredTempRepos } from "./buck-orphan-cleanup";
+import { cleanupRegisteredVerifyProcesses } from "./owned-process-cleanup";
 import { appendVerifyLogLine } from "./process-control";
 import { cleanupCurrentVerifyEnvProcesses } from "./verify-owned-orphan-cleanup";
 
@@ -9,6 +9,15 @@ export function createRegisteredStateCleaner(opts: { stateFile: string; logFile:
     if (!cleanupPromise) {
       cleanupPromise = (async () => {
         try {
+          const isoRes = await cleanupRegisteredBuckIsolations({
+            stateFile: opts.stateFile,
+            log: async (line) => await appendVerifyLogLine(opts.logFile, line),
+            maxKills: 200,
+          });
+          await appendVerifyLogLine(
+            opts.logFile,
+            `[verify] registered buck isolation cleanup: scanned=${isoRes.scanned} killed=${isoRes.killed}`,
+          );
           const envProcRes = await cleanupCurrentVerifyEnvProcesses({
             stateFile: opts.stateFile,
             logFile: opts.logFile,

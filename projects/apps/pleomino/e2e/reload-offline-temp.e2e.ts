@@ -1,5 +1,5 @@
 import { createRequire } from "node:module";
-import { execSync } from "node:child_process";
+import { terminateListenersOnPort } from "./process-control";
 
 const runnerRequire = createRequire(process.argv[1] ?? import.meta.url);
 const { expect, test } = runnerRequire("playwright/test") as any;
@@ -24,14 +24,7 @@ test("reloads from service worker when server is gone", async ({ page }) => {
   });
   console.log("sw state", JSON.stringify(swState));
 
-  const pids = execSync("lsof -ti tcp:4173", { encoding: "utf8" })
-    .trim()
-    .split(/\s+/)
-    .filter(Boolean)
-    .map((value) => Number(value));
-  for (const pid of pids) {
-    process.kill(pid, "SIGTERM");
-  }
+  terminateListenersOnPort(4173);
   await page.waitForTimeout(500);
 
   let reloadFailed = false;

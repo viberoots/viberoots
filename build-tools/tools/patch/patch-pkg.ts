@@ -154,6 +154,6 @@ async function main() {
 }
 
 main().catch((e) => {
-  console.error(e?.message || e);
+  console.error(e?.stack || e?.message || e);
   process.exit(1);
 });

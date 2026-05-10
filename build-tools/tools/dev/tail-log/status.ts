@@ -175,7 +175,14 @@ export async function renderStatusWatchLoop(args: TailLogArgs): Promise<void> {
 
       if (args.selection.kind === "pid") {
         if (!pidSig) {
-          done = true;
+          const alive = await pidAliveWithSignature(args.selection.pid, "");
+          if (!alive) {
+            if (res.active) {
+              rerender = true;
+            } else {
+              done = true;
+            }
+          }
         } else {
           const alive = await pidAliveWithSignature(args.selection.pid, pidSig);
           if (!alive) {

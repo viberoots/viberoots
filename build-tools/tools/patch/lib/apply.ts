@@ -1,4 +1,5 @@
 #!/usr/bin/env zx-wrapper
+import fs from "node:fs";
 import * as fsp from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -6,6 +7,7 @@ import crypto from "node:crypto";
 import { debugEnabled } from "./util";
 import { repoRoot as _repoRoot } from "../../lib/repo";
 import { copyFileCloneAware, copyTree } from "../../lib/copy-tree";
+import { resolveToolPathSync } from "../../lib/tool-paths";
 import { runPatchCommand } from "./command-runner";
 import {
   readForceFlag,
@@ -78,6 +80,21 @@ export function resolvePatchDir(
   throw new Error("missing --target //<pkg>:name or --patch-dir for local patch placement");
 }
 
+function executableEnvPath(value: string | undefined): string {
+  const candidate = String(value || "").trim();
+  if (!candidate || !path.isAbsolute(candidate)) return "";
+  try {
+    fs.accessSync(candidate, fs.constants.X_OK);
+    return candidate;
+  } catch {
+    return "";
+  }
+}
+
+function resolvePatchBin(): string {
+  return executableEnvPath(process.env.PATCH_BIN) || resolveToolPathSync("patch");
+}
+
 export async function writePatchIfChanged(
   dst: string,
   data: string,
@@ -128,13 +145,14 @@ export async function verifyPatchDryRun(
   patchPath: string,
   mode: "go" | "cpp" | "python",
 ): Promise<void> {
-  const tmpRoot = await fsp.mkdtemp(path.join(os.tmpdir(), `bucknix-patch-verify-${mode}-`));
+  const tmpRoot = await fsp.mkdtemp(path.join(os.tmpdir(), `viberoots-patch-verify-${mode}-`));
   const tmpCopy = path.join(tmpRoot, path.basename(originPath));
+  const patchBin = resolvePatchBin();
   await cpRecursive(originPath, tmpCopy);
   if (mode === "cpp") {
     // C++ path: run quiet, capture output; mirror existing behavior
     const res = await runPatchCommand(
-      "patch",
+      patchBin,
       ["-s", "-p1", "--dry-run", "-i", path.resolve(patchPath)],
       { cwd: tmpCopy, env: { ...process.env, LC_ALL: "C" } },
     );
@@ -145,7 +163,7 @@ export async function verifyPatchDryRun(
     return;
   }
   // Go/Python path: inherit stdio; throw on failure
-  const res = await runPatchCommand("patch", ["-p1", "--dry-run", "-i", path.resolve(patchPath)], {
+  const res = await runPatchCommand(patchBin, ["-p1", "--dry-run", "-i", path.resolve(patchPath)], {
     cwd: tmpCopy,
   });
   if ((res.code || 0) !== 0) {

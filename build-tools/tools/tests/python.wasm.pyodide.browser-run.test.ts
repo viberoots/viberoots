@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import * as fs from "node:fs/promises";
 import path from "node:path";
 import test from "node:test";
+import { runNixBuildWithTransientRetry } from "../dev/build-selected-nix-retry";
 import { runInTemp } from "./lib/test-helpers";
 
 test("python wasm (pyodide): build-and-run prints pyodide banner", async () => {
@@ -63,10 +64,18 @@ nix_python_wasm_app(
       BUCK_QUERY_ROOTS: "projects/apps,projects/libs,third_party,build-tools/go,build-tools/cpp",
       PY_WASM_BACKEND: "pyodide",
     };
-    const out = await $({
-      cwd: tmp,
-      env,
-    })`nix build --impure -L --accept-flake-config ${`path:${tmp}#graph-generator-selected`} --no-link --print-out-paths`;
+    const out = await runNixBuildWithTransientRetry({
+      runOnce: async () =>
+        await $({
+          cwd: tmp,
+          env,
+          reject: false,
+          nothrow: true,
+        })`nix build --impure -L --accept-flake-config ${`path:${tmp}#graph-generator-selected`} --no-link --print-out-paths`,
+    });
+    if (Number(out.exitCode || 0) !== 0) {
+      throw new Error(String(out.stderr || out.stdout || "nix build failed"));
+    }
     const outPath = String(out.stdout || "")
       .trim()
       .split("\n")
