@@ -195,7 +195,7 @@ test("deploy admin sync and grant-user keep audit provenance and idempotent writ
       /"included\.custom\.audience": "deployments-vault"/,
     );
     assert.match(await fsp.readFile(realmFile, "utf8"), /"claim\.name": "deployment_environment"/);
-    assert.match(await fsp.readFile(realmFile, "utf8"), /"claim\.value": "kiltyj\/viberoots"/);
+    assert.match(await fsp.readFile(realmFile, "utf8"), /"claim\.value": "viberoots\/viberoots"/);
     assert.match(await fsp.readFile(realmFile, "utf8"), /"clientId": "deployment-runner"/);
     assert.match(await fsp.readFile(realmFile, "utf8"), /"serviceAccountsEnabled": true/);
 
