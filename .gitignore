@@ -12,9 +12,9 @@ result
 
 # Local temp artifacts
 .tmp/
-.local/deploy-vault/
-.local/deployments/
+.local/
 .claude/worktrees/
+.claude/settings.local.json
 .codex/worktrees/
 deployment-host/identity-provider/*.json
 plugins/repo-skills/skills/**/references/*.local.md
@@ -25,6 +25,7 @@ plugins/repo-skills/skills/**/references/*.local.md
 # Editors
 .vscode/
 .idea/
+.cursor/
 __pycache__/
 
 # Generated glue (not committed per design)
@@ -78,4 +79,7 @@ projects/apps/**/app/ts-modules.manifest.json
 
 # Generated wasm producer artifacts
 projects/apps/**/.wasm-producer/
+
+# Vite/webapp build output (rebuilt by Buck or `vite build`; never read from the tracked tree)
+projects/apps/**/dist/
 **/test-results

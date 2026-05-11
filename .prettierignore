@@ -7,3 +7,4 @@ dist/
 prelude/
 result
 **/*.generated.*
+.claude/settings.local.json

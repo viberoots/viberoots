@@ -6,6 +6,7 @@ export const ALLOWED_PATHS = new Set([
   "docs/repo-rename.md",
   "docs/runtime-prefix-migration.md",
   "docs/contributor-naming-conventions.md",
+  "docs/mini-name-migration-instructions.md",
   "mayday-test-time-debugging.md",
   "pnpm-lock.yaml",
 ]);

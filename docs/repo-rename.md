@@ -488,6 +488,9 @@ excluded from the stale-names-lint enforcement.
   context.
 - `docs/contributor-naming-conventions.md`: excluded via `ALLOWED_PATHS`. The conventions
   doc names the stale tokens in enforcement examples so contributors know what is blocked.
+- `docs/mini-name-migration-instructions.md`: excluded via `ALLOWED_PATHS`. Operator
+  runbook for migrating the `mini` shared host from the old names; must reference
+  `/srv/common`, `BNX_*`, and `kiltyj/common` to describe what is being replaced.
 - `mayday-test-time-debugging.md`: excluded via `ALLOWED_PATHS`. Historical debugging log;
   not active operator documentation.
 - `pnpm-lock.yaml`: excluded via `ALLOWED_PATHS`. Third-party lockfile content-addressed
