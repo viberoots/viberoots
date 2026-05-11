@@ -16,6 +16,10 @@ Reviewed context:
   `kiltyj/common`, and `git@github.com:kiltyj/common.git`.
 - Repository identity also appears as `bucknix-fresh`, `kiltyj/bucknix-fresh`, absolute local paths
   containing `/bucknix-fresh/`, and possible Git remote URLs derived from those strings.
+- The GitHub-side owner namespace is also temporary. Earlier rename PRs land the repo at
+  `kiltyj/viberoots`, but the final canonical home is the `viberoots` organization
+  (`viberoots/viberoots`). The `kiltyj` user namespace must not retain a copy of the repo, a fork, or
+  load-bearing redirects once the org-level move is complete.
 - Active code and tests also contain completed-plan and completed-phase references such as
   `pr14_latency`, `deployment-auth-session.pr90.docs.test.ts`, `PR-7 zero-wasm default`, and
   `Phase-5 PR-10 policy`. These PR and phase numbers should not remain in code-facing identifiers
@@ -40,6 +44,8 @@ Canonical replacements:
 - deployment repo path `/srv/common` -> `/srv/viberoots`
 - deployment repository `kiltyj/common` -> `kiltyj/viberoots`
 - deployment remote URL `git@github.com:kiltyj/common.git` -> `git@github.com:kiltyj/viberoots.git`
+- GitHub owner namespace `kiltyj/viberoots` -> `viberoots/viberoots`
+- GitHub remote URL `git@github.com:kiltyj/viberoots.git` -> `git@github.com:viberoots/viberoots.git`
 
 Non-goals:
 
@@ -468,6 +474,127 @@ would gradually reappear through scaffolds, docs, generated examples, tests, or 
 
 It adds ongoing maintenance for stale-name, plan-number, and migration-label allowlists and may
 require updating tests whenever new historical docs are added.
+
+## PR-5: GitHub owner-namespace rename from kiltyj to viberoots
+
+### 1. Intent
+
+Move the GitHub-side repository identity from the personal account `kiltyj/viberoots` to a dedicated
+organization `viberoots/viberoots`, so the project's remote identity matches the project name and is
+no longer tied to a personal account.
+
+### 2. Scope of changes
+
+- Move the GitHub repository from `kiltyj/viberoots` to `viberoots/viberoots`. The chosen mechanism
+  (GitHub transfer with automatic redirect, or recreate-and-force-push under the new org) is recorded
+  in this PR's implementation notes when it lands.
+- Replace `kiltyj/viberoots` with `viberoots/viberoots` in all active source, tests, fixtures,
+  operator runbooks, command examples, and Buck/Nix configuration that names the remote.
+- Replace `git@github.com:kiltyj/viberoots.git` with `git@github.com:viberoots/viberoots.git`
+  everywhere it appears as a reviewed default or operator example.
+- Replace `https://github.com/kiltyj/viberoots` URLs in active docs, README badges, and any GitHub
+  Pages or workflow references.
+- Update OIDC issuers, identity-provider claim mappings, deployment-host workload-identity
+  expectations, Vault role configs, and any deploy-key registrations that hard-code the `kiltyj`
+  account name or organization claim.
+- Update the local workstation `github` git remote URL.
+- Update the `mini` host's `/srv/viberoots` checkout to use the new remote URL, including the
+  `docs/mini-name-migration-instructions.md` runbook so operators land at `viberoots/viberoots`
+  directly rather than transiting through `kiltyj/viberoots`.
+- Add `kiltyj/viberoots` and `git@github.com:kiltyj/viberoots.git` to the stale-names lint's
+  `STALE_PATTERNS`, with parallel updates to the test enforcement allowlist.
+- Audit and remove any incidental forks, branches, or deploy keys under `kiltyj/viberoots` that
+  would resurrect the old identity. Once the move is complete, the GitHub auto-redirect is acceptable
+  only as a temporary fallback during cutover; it must not become a long-lived alias and no new
+  `kiltyj/viberoots` repository may be created to take its place.
+
+### 3. External prerequisites
+
+- The `viberoots` GitHub organization must exist with the operator's account as owner.
+- PR-1 through PR-4 must be merged so the repo lives at `kiltyj/viberoots` and is in a state where
+  the only outstanding identity migration is the owner-namespace move.
+- Registered GitHub Apps, deploy keys, branch protection rules, environments, repository-scoped
+  secrets, and OIDC trust relationships that currently target `kiltyj/viberoots` must be re-registered
+  or transferred under the new org before active automation switches over.
+- CI systems (Jenkins, any GitHub Actions runners) and the `mini` host must be ready to use the new
+  remote URL.
+- Collaborators and external automation must be informed of the new clone URL and the cutover date.
+
+### 4. Tests to be added
+
+- Add `kiltyj/viberoots` and `git@github.com:kiltyj/viberoots.git` to the stale-names lint's
+  `STALE_PATTERNS`, with negative tests proving they are rejected outside the planning-document
+  allowlist.
+- Update NixOS shared-host install, deployment auth, control-plane, and remote-execution tests that
+  previously asserted `kiltyj/viberoots` to assert `viberoots/viberoots`.
+- Add a targeted stale-identity test that fails on active deployment fixtures containing
+  `kiltyj/viberoots` or the old remote URL.
+- Update operator-docs and runbook tests that assert remote-URL strings.
+
+### 5. Docs to be added or updated
+
+- Update operator runbooks and deployment usage docs to reference `viberoots/viberoots`.
+- Update `docs/mini-name-migration-instructions.md` to point directly at `viberoots/viberoots` and
+  instruct operators to skip the transitional `kiltyj/viberoots` state on first migration.
+- Update README badges, contribution docs, and any external-collaboration docs whose URLs include
+  the owner namespace.
+- Update the "Canonical replacements" section of this plan with the
+  `kiltyj/viberoots -> viberoots/viberoots` entries.
+- Update the "Retained references and enforcement allowlist notes" section to record that
+  planning-document references to `kiltyj/viberoots` are retained for the same reason
+  `kiltyj/common` references are retained: the plan must name the stale tokens it replaces.
+
+### 6. Acceptance criteria
+
+- Active source, tests, fixtures, operator docs, and command examples no longer use
+  `kiltyj/viberoots` or `git@github.com:kiltyj/viberoots.git`.
+- The stale-names lint rejects `kiltyj/viberoots` and the old remote URL outside the
+  planning-document allowlist.
+- The local workstation `github` remote and the `mini` host's checkout both push and fetch from
+  `viberoots/viberoots`.
+- OIDC, Vault, and deployment workload-identity configs that previously referenced the `kiltyj`
+  account name have been updated, and a deployment dry-run completes against the new identity.
+- No `kiltyj/viberoots` repository, fork, or deploy key exists under the `kiltyj` user namespace
+  after cutover. The only persistence of the old identity is the GitHub automatic redirect, which is
+  treated as a temporary safety net rather than a supported alias.
+
+### 7. Risks
+
+- GitHub's automatic redirect from `kiltyj/viberoots` to `viberoots/viberoots` masks half-migrated
+  callers, making it easy to miss automation that still points at the old slug.
+- OIDC identity claims, federated-trust configurations, and Vault role bindings that encode the
+  account name will fail closed if not updated in lockstep with the move.
+- Deploy keys registered against the old repo identity do not automatically transfer in all
+  configurations and may need re-creation under the new org.
+- The transferred repo retains commit history, but org-level settings (branch protection,
+  environments, secrets) must be re-applied; missing one silently weakens governance.
+- Pre-existing PRs from collaborators will need rebasing onto the new remote.
+
+### 8. Mitigations
+
+- Treat the move as a coordinated cutover with a short maintenance window: pause CI and active
+  deployments, update remote URLs, re-run a deployment dry-run, then resume.
+- Inventory every callable surface that references the old slug before the move, including OIDC
+  trust policies, Vault roles, Jenkins job configs, and the `mini` host's git remote, and confirm
+  each has been updated.
+- Use the GitHub auto-redirect as a transitional safety net only; immediately add the old slug to
+  `STALE_PATTERNS` so new code cannot reintroduce it.
+- Re-register deploy keys, branch protection rules, environments, and repository-scoped secrets
+  under `viberoots/viberoots` before deleting the old configurations.
+- Sequence after PR-1..PR-4 so the only outstanding rename is the owner-namespace move, and the
+  stale-names enforcement infrastructure is already in place to catch regressions.
+
+### 9. Consequences of not implementing this PR
+
+The canonical repository identity would remain tied to a personal GitHub account, blocking
+cross-maintainer ownership, complicating long-term governance, and leaving an avoidable mismatch
+between the project name and the remote URL.
+
+### 10. Downsides for implementing this PR
+
+It is a one-shot coordinated cutover that requires synchronized updates to remote URLs across every
+clone, CI worker, OIDC trust policy, and deployment-host checkout. The work cannot be rolled out
+incrementally without leaving callers half-migrated.
 
 ---
 
