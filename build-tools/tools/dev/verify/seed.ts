@@ -131,6 +131,11 @@ function seedBuildTimeoutSec(): number {
 async function buildSeedStorePath(root: string): Promise<string> {
   const timeoutSec = seedBuildTimeoutSec();
   const flakeRef = `${root}#test-seed`;
+  // Pin the built derivation as a Nix GC root so nix-collect-garbage does not evict
+  // the current seed between verify runs. Each build overwrites the symlink, so only
+  // the most-recent seed derivation is pinned; older ones remain GC-eligible.
+  const gcRootPath = path.join(seedRootDir(root), "nix-root");
+  await fsp.mkdir(seedRootDir(root), { recursive: true }).catch(() => {});
   process.stderr.write(`[verify] seed build: nix build ${flakeRef} (timeout=${timeoutSec}s)\n`);
   const cmd = await runManagedCommand({
     command: "nix",
@@ -142,7 +147,8 @@ async function buildSeedStorePath(root: string): Promise<string> {
       "--impure",
       flakeRef,
       "--accept-flake-config",
-      "--no-link",
+      "--out-link",
+      gcRootPath,
       "--print-out-paths",
     ],
     cwd: root,

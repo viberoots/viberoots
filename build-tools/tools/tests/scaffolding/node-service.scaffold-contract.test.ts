@@ -40,6 +40,12 @@ test(
       );
 
       await $`git init`;
+      // Nix evaluates the flake at `tmp` by accessing git blob objects as direct
+      // loose-object filesystem paths (.git/objects/XY/...). After `git add -A && git
+      // commit`, git auto-gc can fire and pack loose blobs — the paths then disappear and
+      // Nix evaluation fails with "path '.git/objects/XY/...' does not exist". Suppressing
+      // auto-gc in this ephemeral repo keeps every blob loose for the duration of the build.
+      await $`git config gc.auto 0`;
       await $`scaf new ts service demo-service --yes`;
       await $`bash --noprofile --norc -c 'set -euo pipefail; git -C ${tmp} config user.email test@example.com; git -C ${tmp} config user.name test; git -C ${tmp} add -A; git -C ${tmp} commit -m scaffold'`;
       await $({
