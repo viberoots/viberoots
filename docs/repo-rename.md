@@ -742,6 +742,138 @@ paths. The new "Sprinkle" lexicon, while distinctive and on-brand with `viberoot
 defending in security or compliance prose where bare verbs ("sprinkle the production token") risk
 understating the gravity of the operation.
 
+## PR-7: Rename closeout audit hardening and residual compatibility cleanup
+
+### 1. Intent
+
+Close the residual gaps found by the post-PR-6 rename assessment: the current checkout still has a
+local `github` remote pointing at the old repository, `docs/deployment-plan.md` still contains active
+`secretspec` prose because the whole file is broadly allowlisted, path names with completed PR
+numbers can bypass stale-name enforcement, and one active planner-visible Starlark helper still keeps
+a migration-era compatibility alias for the old provider-realization vocabulary.
+
+This PR is a closeout and hardening pass. It should not introduce new naming policy; it should make
+the PR-1 through PR-6 policy true in the current checkout and enforceable in future changes.
+
+### 2. Scope of changes
+
+- Update the local workstation `github` remote from the old `kiltyj/common` URL to
+  `git@github.com:viberoots/viberoots.git`, and add a lightweight checked-in verification or
+  operator checklist entry so future closeout reviews explicitly check the local remote.
+- Replace active `secretspec` prose in `docs/deployment-plan.md` with `SprinkleRef`, including the
+  later active PR-101 host-secret section. Keep only the already-reviewed historical retrospective
+  references, such as the PR-37-era narrative, under a narrow retained-reference rule.
+- Narrow stale-name enforcement for `docs/deployment-plan.md` so the whole file is no longer
+  exempt from `secretspec` checks. Use a section-aware, line-range, or similarly narrow allowlist for
+  retrospective sections that intentionally quote the old vocabulary.
+- Extend stale-name linting so it checks tracked file paths as well as file contents for stale repo
+  names, completed-plan `pr<N>` / `PR-<N>` identifiers, completed-phase `phase<N>` identifiers, and
+  unapproved migration labels.
+- Rename, remove, or explicitly archive active source paths that still encode completed PR numbers,
+  including `build-tools/tools/dev/move-maps/reorg-pr3.txt` and
+  `build-tools/tools/dev/move-maps/reorg-pr5.txt`.
+- Remove the `realize_providers_into` compatibility alias from planner-visible Starlark wiring, and
+  require callers to use the canonical `provider_realization_mode` vocabulary.
+- Remove support for the legacy `"srcs"` provider-realization value and require `"inputs"` for the
+  behavior where provider edges are realized into `srcs`.
+- Update any call sites, tests, probes, docs, or diagnostics that mention the old alias or the
+  legacy `"srcs"` vocabulary.
+- Update the retained-reference notes in this plan so every remaining old-name, completed-plan,
+  completed-phase, `legacy`, `v1`, or `v2` exception is narrow, current, and enforced by code rather
+  than relying on a broad file-level exemption.
+
+### 3. External prerequisites
+
+- The canonical GitHub repository `viberoots/viberoots` must exist and be accessible from the
+  workstation running the closeout.
+- Any local clone that still uses `kiltyj/common`, `kiltyj/viberoots`, or a GitHub redirect must be
+  ready for a direct remote URL update.
+- PR-1 through PR-6 should already be landed so the closeout can be strict without blocking active
+  migration work.
+
+### 4. Tests to be added
+
+- Add a stale-name lint test proving file paths are scanned, not only file contents. The test should
+  fail on temporary tracked-path fixtures such as `reorg-pr3.txt`, `legacy-helper.ts`, and
+  `deployment-secretspec.ts` unless they are under a reviewed narrow allowlist.
+- Add a regression test proving `docs/deployment-plan.md` is no longer completely allowlisted for
+  `secretspec`, while the explicitly retained historical retrospective section remains allowed.
+- Add a negative test proving active prose outside the retrospective allowlist cannot mix
+  `secretspec` and `SprinkleRef` in the same file.
+- Add Starlark wiring tests proving `realize_providers_into` is rejected or absent from the public
+  helper surface and that `"srcs"` is no longer accepted as a provider-realization mode.
+- Update existing planner-visible wiring probe tests to use `provider_realization_mode = "inputs"`
+  for the canonical provider-to-inputs path.
+- Add or update a repository-remote contract test or documented manual check that asserts the local
+  `github` remote is expected to be `git@github.com:viberoots/viberoots.git` during rename closeout.
+- Keep the existing pre-commit and verify-preflight wiring tests passing after the new path-scanning
+  behavior is added.
+
+### 5. Docs to be added or updated
+
+- Update `docs/deployment-plan.md` active prose to use `SprinkleRef`, leaving only narrow historical
+  retrospective references to the old name.
+- Update this plan's retained-reference notes with the final narrow allowlist entries and remove any
+  statement that implies the whole `docs/deployment-plan.md` file is exempt.
+- Update contributor naming conventions if the manual local-remote verification step should be part
+  of future rename or repository-identity closeouts.
+- Update any active build-system or Starlark wiring docs that still describe the
+  `realize_providers_into` alias or legacy `"srcs"` vocabulary.
+
+### 6. Acceptance criteria
+
+- `git remote -v` for the local `github` remote points at
+  `git@github.com:viberoots/viberoots.git` for both fetch and push in the closeout workspace.
+- Active prose in `docs/deployment-plan.md` no longer uses the in-house `secretspec` name; any
+  remaining references are historical retrospective quotes covered by a narrow allowlist.
+- The stale-name lint fails on stale tokens in tracked file paths as well as file contents.
+- Active checked-in paths no longer include completed-plan names such as `reorg-pr3.txt` or
+  `reorg-pr5.txt` unless they are moved under an explicitly historical/archival boundary with a
+  narrow reason.
+- Planner-visible Starlark helper surfaces no longer expose `realize_providers_into`, and the
+  legacy `"srcs"` provider-realization value is removed in favor of canonical `"inputs"`.
+- The retained-reference notes in this plan match the implemented allowlists exactly enough that a
+  reviewer can audit every remaining exception without reverse-engineering the lint code.
+- Pre-commit and verify/CI continue to run stale-name enforcement, and the full active-source scan
+  rejects old names, completed plan/phase numbered identifiers, and unapproved migration labels even
+  when hooks are skipped.
+
+### 7. Risks
+
+- Tightening path scanning may reveal many filenames that were previously invisible to enforcement,
+  especially historical move maps and test fixtures.
+- Removing `realize_providers_into` and `"srcs"` could break Starlark macros or probes that still
+  rely on the compatibility vocabulary.
+- Narrowing `docs/deployment-plan.md` allowlists can be noisy because the file is large and contains
+  both active planning and historical retrospective sections.
+- Local git remote state is outside tracked source, so it cannot be fully enforced by ordinary
+  checked-in tests.
+
+### 8. Mitigations
+
+- Start with path-scanning tests against small fixture repositories so diagnostics are clear before
+  scanning the full repo.
+- Rename or archive only the specific active paths discovered by the stricter scan; do not apply a
+  blind path rewrite across historical docs.
+- Replace `realize_providers_into` call sites mechanically with `provider_realization_mode`, then
+  rely on targeted Starlark wiring tests to prove behavior stayed unchanged.
+- Keep `docs/deployment-plan.md` allowlists line- or section-specific and document the exact
+  retained historical ranges in this plan.
+- Treat local remote verification as a closeout command/checklist item plus optional developer
+  diagnostic, rather than trying to make normal tests depend on one developer's local git config.
+
+### 9. Consequences of not implementing this PR
+
+The rename would appear complete under the current stale-name lint while still retaining old
+repository remote state, active `secretspec` prose, path-level completed-plan identifiers, and a
+planner-visible compatibility alias that contradicts the no-compatibility-alias closeout policy.
+
+### 10. Downsides for implementing this PR
+
+This is mostly enforcement and cleanup work, so it can feel stricter than the visible runtime
+benefit. It may require small coordinated edits across Starlark helpers, tests, docs, and local git
+configuration before the repo reaches a genuinely closed rename state.
+
 ---
 
 ## Retained references and enforcement allowlist notes

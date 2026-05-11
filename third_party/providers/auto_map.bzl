@@ -10,23 +10,23 @@ MODULE_PROVIDERS = {
         "//third_party/providers:lf_e72df436fd28_projects_apps_pleomino__projects_apps_pleomino_pnpm_lock_yaml",
     ],
 
-    "//projects/apps/pleomino:pr10_offline_acceptance": [
+    "//projects/apps/pleomino:hash-regression": [
         "//third_party/providers:lf_e72df436fd28_projects_apps_pleomino__projects_apps_pleomino_pnpm_lock_yaml",
     ],
 
-    "//projects/apps/pleomino:pr13_regression": [
+    "//projects/apps/pleomino:latency-guardrail": [
         "//third_party/providers:lf_e72df436fd28_projects_apps_pleomino__projects_apps_pleomino_pnpm_lock_yaml",
     ],
 
-    "//projects/apps/pleomino:pr14_latency": [
+    "//projects/apps/pleomino:offline-acceptance": [
         "//third_party/providers:lf_e72df436fd28_projects_apps_pleomino__projects_apps_pleomino_pnpm_lock_yaml",
     ],
 
-    "//projects/apps/pleomino:pr15_seeded": [
+    "//projects/apps/pleomino:seeded-solver": [
         "//third_party/providers:lf_e72df436fd28_projects_apps_pleomino__projects_apps_pleomino_pnpm_lock_yaml",
     ],
 
-    "//projects/apps/pleomino:pr4_static_pwa_hardening": [
+    "//projects/apps/pleomino:static-pwa-contracts": [
         "//third_party/providers:lf_e72df436fd28_projects_apps_pleomino__projects_apps_pleomino_pnpm_lock_yaml",
     ],
 
