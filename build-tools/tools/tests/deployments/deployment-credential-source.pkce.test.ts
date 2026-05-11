@@ -45,7 +45,7 @@ test("PKCE login prints URL, validates callback state once, and skips browser in
       audience: "deployments-vault",
       boundClaims: {
         deployment_environment: "mini",
-        repository: "kiltyj/viberoots",
+        repository: "viberoots/viberoots",
       },
       openBrowser: false,
       timeoutMs: 5_000,
@@ -80,7 +80,7 @@ test("PKCE login supports a reviewed reverse-proxied public callback profile", a
       audience: "deployments-vault",
       boundClaims: {
         deployment_environment: "mini",
-        repository: "kiltyj/viberoots",
+        repository: "viberoots/viberoots",
       },
       openBrowser: false,
       callbackProfile: {
@@ -195,7 +195,7 @@ test("PKCE callback rejects state mismatch without leaking the code", async () =
       audience: "deployments-vault",
       boundClaims: {
         deployment_environment: "mini",
-        repository: "kiltyj/viberoots",
+        repository: "viberoots/viberoots",
       },
       openBrowser: false,
       timeoutMs: 5_000,

@@ -46,7 +46,7 @@ export function nixosSharedHostLaneGovernanceFixture(
     ref: overrides.ref || "//projects/deployments/pleomino-shared:lane_governance",
     name: overrides.name || "lane_governance",
     scmBackend: (overrides.scmBackend || "github") as DeploymentScmBackend,
-    repository: overrides.repository || "kiltyj/viberoots",
+    repository: overrides.repository || "viberoots/viberoots",
     branchProtections: overrides.branchProtections || [
       {
         stage: "dev",

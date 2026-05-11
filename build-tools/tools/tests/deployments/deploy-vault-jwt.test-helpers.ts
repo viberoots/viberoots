@@ -78,7 +78,7 @@ export async function startFakeOidcServer(opts?: {
         aud: "deployments-vault",
         azp: body.get("client_id"),
         deployment_environment: "mini",
-        repository: "kiltyj/viberoots",
+        repository: "viberoots/viberoots",
         ...(opts?.claims || {}),
       };
       sendJson(

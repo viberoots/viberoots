@@ -46,6 +46,8 @@ const STALE_PATTERNS: Array<{ re: RegExp; label: string }> = [
   { re: /\/srv\/common\b/g, label: "/srv/common deployment path" },
   { re: /\bkiltyj\/common\b/g, label: "kiltyj/common" },
   { re: /\bgit@github\.com:kiltyj\/common\.git\b/g, label: "old common repo remote" },
+  { re: /\bkiltyj\/viberoots\b/g, label: "kiltyj/viberoots" },
+  { re: /\bgit@github\.com:kiltyj\/viberoots\.git\b/g, label: "old viberoots repo remote" },
 ];
 
 function normalizeRel(p: string): string {

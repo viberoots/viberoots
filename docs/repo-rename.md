@@ -617,13 +617,18 @@ excluded from the stale-names-lint enforcement.
   doc names the stale tokens in enforcement examples so contributors know what is blocked.
 - `docs/mini-name-migration-instructions.md`: excluded via `ALLOWED_PATHS`. Operator
   runbook for migrating the `mini` shared host from the old names; must reference
-  `/srv/common`, `BNX_*`, and `kiltyj/common` to describe what is being replaced.
+  `/srv/common`, `BNX_*`, `kiltyj/common`, and `kiltyj/viberoots` to describe what is being
+  replaced at each migration stage.
 - `mayday-test-time-debugging.md`: excluded via `ALLOWED_PATHS`. Historical debugging log;
   not active operator documentation.
 - `pnpm-lock.yaml`: excluded via `ALLOWED_PATHS`. Third-party lockfile content-addressed
   integrity strings may coincidentally contain stale substrings and must not be renamed.
 - Files under `docs/build-history/` and `docs/design-history/`: excluded via
   `ALLOWED_PREFIXES`. These are inert historical records, not active instructions.
+- `docs/repo-rename.md` references to `kiltyj/viberoots`: retained for the same reason as
+  `kiltyj/common` references — the plan document must name the stale tokens it replaces. The
+  PR-5 sections name `kiltyj/viberoots` and `git@github.com:kiltyj/viberoots.git` to describe
+  what is being moved to the `viberoots` org.
 - `build-tools/tools/tests/deployments/nixos-shared-host.control-plane-service-env.test.ts`:
   excluded via `ALLOWED_PATHS`. This test asserts that the old `BNX_DEPLOY_CONTROL_PLANE_TOKEN`
   variable is rejected; the old variable name must appear as a test fixture string.

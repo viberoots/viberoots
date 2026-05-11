@@ -27,6 +27,8 @@ const REPO_NAME_PATTERNS: Array<{ re: RegExp; label: string }> = [
   { re: /\/srv\/common\b/g, label: "stale name: /srv/common deployment path" },
   { re: /\bkiltyj\/common\b/g, label: "stale name: kiltyj/common" },
   { re: /git@github\.com:kiltyj\/common\.git/g, label: "stale name: old common repo remote" },
+  { re: /\bkiltyj\/viberoots\b/g, label: "stale name: kiltyj/viberoots" },
+  { re: /git@github\.com:kiltyj\/viberoots\.git/g, label: "stale name: old viberoots repo remote" },
 ];
 
 const PLAN_NUMBER_PATTERNS: Array<{ re: RegExp; label: string }> = [

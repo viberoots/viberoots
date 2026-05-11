@@ -54,6 +54,8 @@ in {
       fi
 
       if [ -d "$PWD/build-tools/tools/bin" ]; then
+        export CMUX_CUSTOM_CLAUDE_PATH="$PWD/build-tools/tools/bin/claude"
+        export CMUX_CUSTOM_CODEX_PATH="$PWD/build-tools/tools/bin/codex"
         mkdir -p "$PWD/.direnv/bin" 2>/dev/null || true
         if [ "$(uname -s 2>/dev/null || true)" = "Darwin" ]; then
           if [ ! -x "$PWD/.direnv/bin/apfs-clone-checker" ] && command -v clang >/dev/null 2>&1; then
@@ -238,7 +240,7 @@ EOF
     '';
     buildInputs = [
       pkgs.git pkgs.buck2 pkgs.go pkgs.pnpm pkgs.nodejs_22 zx-wrapper pkgs.jq pkgs.rsync pkgs.copier pkgs.yq
-      pkgs.secretspec pkgs.jc pkgs.coreutils pkgs.gomod2nix pkgs.opentofu
+      pkgs.jc pkgs.coreutils pkgs.gomod2nix pkgs.opentofu
     ] ++ (if pkgs.stdenv.isDarwin then [ agent-safehouse ] else [])
       ++ (if pkgs.stdenv.isLinux then [ pkgs.fuse-overlayfs pkgs.xdg-utils ] else []);
   };

@@ -50,7 +50,7 @@ test("deploy --print-vault-bootstrap emits deployment-derived JSON", async () =>
       --vault-jwt-role deploy-pleomino-read`;
     const payload = JSON.parse(String(result.stdout));
     assert.equal(payload.schemaVersion, "deployment-vault-bootstrap@1");
-    assert.equal(payload.deployment.repository, "kiltyj/viberoots");
+    assert.equal(payload.deployment.repository, "viberoots/viberoots");
     assert.equal(
       payload.deployment.providerTargetIdentity,
       "cloudflare-pages:web-platform-staging/pleomino-staging-pages",
@@ -58,7 +58,7 @@ test("deploy --print-vault-bootstrap emits deployment-derived JSON", async () =>
     assert.deepEqual(payload.vault.boundClaims, {
       azp: "deployment-runner",
       deployment_environment: "staging",
-      repository: "kiltyj/viberoots",
+      repository: "viberoots/viberoots",
     });
     const policyMatches =
       payload.policyHcl.match(/secret\/data\/deployments\/pleomino\/cloudflare_api_token/g) || [];

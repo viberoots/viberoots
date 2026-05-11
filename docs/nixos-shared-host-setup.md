@@ -356,7 +356,7 @@ deploymentHost.identityProvider = {
     "/var/lib/deployment-host-secrets/bootstrap-first-operator-password";
   bootstrapTokenClaims = {
     deployment_environment = "mini";
-    repository = "kiltyj/viberoots";
+    repository = "viberoots/viberoots";
   };
   manageNginx = false;
   manageAcme = false;

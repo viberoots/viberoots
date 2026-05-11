@@ -2,7 +2,7 @@
 
 Aligns the `mini` shared-host deployment (server + local client profile) with
 the completed repo rename from `bucknix`/`bnx`/`kiltyj/common` to
-`viberoots`/`vbr`/`kiltyj/viberoots`.
+`viberoots`/`vbr`/`viberoots/viberoots`.
 
 ## What is stale
 
@@ -16,7 +16,7 @@ the completed repo rename from `bucknix`/`bnx`/`kiltyj/common` to
 **Remote `mini` host** — the following surfaces still carry old names:
 
 - repo checkout at `/srv/common` (should be `/srv/viberoots`)
-- git remote `git@github.com:kiltyj/common.git` (should be `git@github.com:kiltyj/viberoots.git`)
+- git remote `git@github.com:kiltyj/common.git` (should be `git@github.com:viberoots/viberoots.git`)
 - deployment-service / worker shell env or systemd `EnvironmentFile` exporting `BNX_DEPLOY_*` instead of `VBR_DEPLOY_*`
 - any `/etc/nixos/flake.nix` / `configuration.nix` import paths or `deploymentModulesRoot` inputs pointing at `/srv/common`
 - the host-side `direnv` / `.envrc` cache for `/srv/common`
@@ -27,10 +27,10 @@ path — it stays put across the rename. (See [docs/nixos-shared-host-setup.md:1
 
 ## Preconditions
 
-- Repo rename PRs (PR-1..PR-4 in [docs/repo-rename.md](docs/repo-rename.md)) are merged on `main`.
-- GitHub repo `kiltyj/viberoots` exists and accepts the existing deploy key
+- Repo rename PRs (PR-1..PR-5 in [docs/repo-rename.md](docs/repo-rename.md)) are merged on `main`.
+- GitHub repo `viberoots/viberoots` exists and accepts the existing deploy key
   used by `mini`. Verify locally: `ssh -T git@github.com` from `mini` returns
-  successfully, and the key is registered on `kiltyj/viberoots`.
+  successfully, and the key is registered on `viberoots/viberoots`.
 - You have root SSH to `mini.home.kilty.io`.
 - No deploy run is currently in `pending_approval`. Drain or approve in-flight
   runs first so the service can be stopped cleanly.
@@ -68,7 +68,7 @@ local mutations that crept into `/srv/common`:
 
 ```bash
 cd /srv
-git clone git@github.com:kiltyj/viberoots.git viberoots
+git clone git@github.com:viberoots/viberoots.git viberoots
 chown -R root:root /srv/viberoots   # match prior ownership of /srv/common
 ```
 
@@ -84,7 +84,7 @@ If you would rather rename in place (faster, but inherits any local cruft):
 ```bash
 mv /srv/common /srv/viberoots
 cd /srv/viberoots
-git remote set-url origin git@github.com:kiltyj/viberoots.git
+git remote set-url origin git@github.com:viberoots/viberoots.git
 git fetch origin
 git checkout main && git pull --ff-only
 ```
@@ -93,7 +93,7 @@ Verify the remote either way:
 
 ```bash
 cd /srv/viberoots && git remote -v
-# expect: origin  git@github.com:kiltyj/viberoots.git (fetch/push)
+# expect: origin  git@github.com:viberoots/viberoots.git (fetch/push)
 ```
 
 ### A3. Update the NixOS host config
@@ -109,7 +109,7 @@ Expected hits, with the change to make:
 
 - `/etc/nixos/flake.nix` — the `deploymentModulesRoot` input (or any
   `path:/srv/common/...` / `git+ssh://.../kiltyj/common` input). Rewrite to
-  `/srv/viberoots` or `kiltyj/viberoots`.
+  `/srv/viberoots` or `viberoots/viberoots`.
 - `/etc/nixos/configuration.nix` (or the file the flake's `modules` list
   imports) — any `import /srv/common/...` lines.
 - Optional service modules from [docs/nixos-shared-host-setup.md:244](docs/nixos-shared-host-setup.md) (local Postgres, local Vault, nginx vhost wiring) if they reference the repo path.

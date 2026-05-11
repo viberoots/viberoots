@@ -39,7 +39,7 @@ test("shared-host identity provider module bootstraps generated identity imports
               bootstrapFirstOperatorPasswordFile = "/var/lib/deployment-host-secrets/bootstrap-first-operator-password";
               bootstrapTokenClaims = {
                 deployment_environment = "mini";
-                repository = "kiltyj/viberoots";
+                repository = "viberoots/viberoots";
               };
               manageNginx = true;
               manageAcme = true;

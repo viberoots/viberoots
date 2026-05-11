@@ -57,7 +57,7 @@ test("deployment Vault runtime mints a fresh JWT from deployment-derived claims"
     assert.equal(credential?.role, "deploy-pleomino-read");
     const claims = decodeJwtPayload(credential?.kind === "jwt" ? credential.workloadJwt : "");
     assert.equal(claims.deployment_environment, "mini");
-    assert.equal(claims.repository, "kiltyj/viberoots");
+    assert.equal(claims.repository, "viberoots/viberoots");
     assert.equal(claims.azp, "deployment-runner");
     await cleanupDeploymentVaultRuntime(result);
     assert.equal(credential?.kind === "jwt" ? credential.workloadJwt : "missing", "");

@@ -20,7 +20,7 @@ test("deploy-vault-jwt mints through discovery and writes a restricted token fil
       audience: "deployments-vault",
       boundClaims: {
         deployment_environment: "mini",
-        repository: "kiltyj/viberoots",
+        repository: "viberoots/viberoots",
       },
     });
     assert.equal((await fsp.readFile(out, "utf8")).trim(), result.token);

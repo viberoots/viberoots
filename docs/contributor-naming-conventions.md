@@ -8,17 +8,17 @@ This document describes the canonical naming rules enforced by the repository's
 Use these names for all repository identity, packages, plugins, environment variables, and
 operational paths:
 
-| Concept                    | Canonical form                        |
-| -------------------------- | ------------------------------------- |
-| Product name (lowercase)   | `viberoots`                           |
-| Product name (title case)  | `Viberoots`                           |
-| Product name (uppercase)   | `VIBEROOTS`                           |
-| Short prefix (lowercase)   | `vbr`                                 |
-| Short prefix (title case)  | `Vbr`                                 |
-| Short prefix (uppercase)   | `VBR`                                 |
-| Repository slug            | `kiltyj/viberoots`                    |
-| Remote URL                 | `git@github.com:kiltyj/viberoots.git` |
-| Deployment repository path | `/srv/viberoots`                      |
+| Concept                    | Canonical form                           |
+| -------------------------- | ---------------------------------------- |
+| Product name (lowercase)   | `viberoots`                              |
+| Product name (title case)  | `Viberoots`                              |
+| Product name (uppercase)   | `VIBEROOTS`                              |
+| Short prefix (lowercase)   | `vbr`                                    |
+| Short prefix (title case)  | `Vbr`                                    |
+| Short prefix (uppercase)   | `VBR`                                    |
+| Repository slug            | `viberoots/viberoots`                    |
+| Remote URL                 | `git@github.com:viberoots/viberoots.git` |
+| Deployment repository path | `/srv/viberoots`                         |
 
 ## Stale names blocked in active source
 
@@ -32,9 +32,12 @@ source files, test files, templates, scaffolds, or operator-facing docs:
 - `/srv/common` (deployment host path only)
 - `kiltyj/common` (repository slug only)
 - `git@github.com:kiltyj/common.git`
+- `kiltyj/viberoots` (repository slug only)
+- `git@github.com:kiltyj/viberoots.git`
 
-Exceptions: `docs/repo-rename.md`, `docs/runtime-prefix-migration.md`, `pnpm-lock.yaml`,
-files under `docs/build-history/`, and files under `docs/design-history/`.
+Exceptions: `docs/repo-rename.md`, `docs/runtime-prefix-migration.md`,
+`docs/contributor-naming-conventions.md`, `docs/mini-name-migration-instructions.md`,
+`pnpm-lock.yaml`, files under `docs/build-history/`, and files under `docs/design-history/`.
 
 ## Plan/phase number identifiers
 
