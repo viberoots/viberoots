@@ -213,7 +213,7 @@ Phase 5 module contract terms (PR-1 baseline):
   - Buck probe failures in producer-surface and module-dependency normalization contract tests are hard failures.
   - Probe commands must not use silent early-return paths on non-zero exit.
 
-Phase-3 runtime consistency checks for `webapp-ssr-vite` in one `pnpm run dev` session:
+Runtime consistency checks for `webapp-ssr-vite` in one `pnpm run dev` session:
 
 - Client module edits update client-visible output without restarting the dev process.
 - Server module edits update SSR output without restarting the dev process.

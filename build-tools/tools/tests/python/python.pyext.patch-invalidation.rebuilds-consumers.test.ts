@@ -54,7 +54,7 @@ test("python: patch change in linked C++ producer rebuilds pyext consumer runtim
       "utf8",
     );
 
-    const patchV1 = [
+    const initialPatchText = [
       "diff --git a/src/add.cc b/src/add.cc",
       "--- a/src/add.cc",
       "+++ b/src/add.cc",
@@ -63,7 +63,7 @@ test("python: patch change in linked C++ producer rebuilds pyext consumer runtim
       '+extern "C" int add(int a, int b) { return a + b; }',
       "",
     ].join("\n");
-    await fs.writeFile(libPatchAbs, patchV1, "utf8");
+    await fs.writeFile(libPatchAbs, initialPatchText, "utf8");
 
     await fs.writeFile(
       path.join(appDir, "native", "ext.cpp"),
@@ -145,8 +145,8 @@ test("python: patch change in linked C++ producer rebuilds pyext consumer runtim
 
     const drv1 = await nixEvalSelectedDrvPath(tmp, $, extLabel);
 
-    const patchV2 = patchV1.replace("return a + b;", "return a + b + 1;");
-    await fs.writeFile(libPatchAbs, patchV2, "utf8");
+    const updatedPatchText = initialPatchText.replace("return a + b;", "return a + b + 1;");
+    await fs.writeFile(libPatchAbs, updatedPatchText, "utf8");
 
     const drv2 = await nixEvalSelectedDrvPath(tmp, $, extLabel);
     assert.notEqual(drv1, drv2, `expected drvPath to change after patch edit; drv=${drv1}`);

@@ -81,20 +81,24 @@ Permitted uses of `legacy` and `v1`/`v2`:
 
 The `stale-names-lint` tool runs automatically:
 
-- **Pre-commit** (via `lint-staged`): scans staged `.ts`, `.tsx`, `.bzl`, `.nix`, and `.md`
-  files for stale names.
+- **Pre-commit** (via `lint-staged`): scans staged `.ts`, `.tsx`, `.bzl`, `.nix`, `.md`,
+  JavaScript/data config files, and extensionless `TARGETS` files for stale names.
 - **Verify/CI** (via `v`): scans all tracked source files before running Buck tests.
+
+Active docs are checked for stale names everywhere and for completed plan/phase identifiers or
+migration labels in command-like examples. Historical planning docs are excluded only through
+explicit allowlists.
 
 To run the full-source scan manually:
 
 ```
-node build-tools/tools/dev/stale-names-lint.ts
+zx-wrapper build-tools/tools/dev/stale-names-lint.ts
 ```
 
 To scan specific files (for example when debugging a pre-commit failure):
 
 ```
-node build-tools/tools/dev/stale-names-lint.ts build-tools/tools/my-file.ts
+zx-wrapper build-tools/tools/dev/stale-names-lint.ts build-tools/tools/my-file.ts
 ```
 
 The verification test `no-stale-viberoots-names.enforcement.test` provides an independent
@@ -131,7 +135,7 @@ Every inventory entry must be resolved before the owning PR merges:
   all affected files, and the enforcement test confirms the active source is clean.
 - **`removed`**: the compatibility path, migration shim, or outdated surface has been deleted.
 - **`retained-in-allowlist`**: the identifier is intentionally kept and a narrow allowlist entry
-  has been added to `build-tools/tools/dev/stale-names-lint.ts` (in `ALLOWED_PATHS`,
+  has been added to `build-tools/tools/dev/stale-names-lint-allowlists.ts` (in `ALLOWED_PATHS`,
   `ALLOWED_PREFIXES`, or `PLAN_NUMBER_SKIP_PATHS`) with a one-line reason explaining why the
   token is not a stale migration artifact (for example, a real external schema version).
 
@@ -144,5 +148,5 @@ migration database. If the file is still present, the `rename-inventory.closeout
 `build-tools/tools/tests/linting/` will fail, blocking merge.
 
 Any retained entries must have their allowlist wiring in place before deletion. Running
-`node build-tools/tools/dev/stale-names-lint.ts` after deletion confirms no stale identifiers
+`zx-wrapper build-tools/tools/dev/stale-names-lint.ts` after deletion confirms no stale identifiers
 remain in active source.

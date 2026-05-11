@@ -49,7 +49,7 @@ test("cpp: patch change in repo lib via link_deps rebuilds consumer", async () =
       "utf8",
     );
 
-    const patchV1 = [
+    const initialPatchText = [
       "diff --git a/src/greeter.cpp b/src/greeter.cpp",
       "--- a/src/greeter.cpp",
       "+++ b/src/greeter.cpp",
@@ -60,7 +60,7 @@ test("cpp: patch change in repo lib via link_deps rebuilds consumer", async () =
       " }",
       "",
     ].join("\n");
-    await fsp.writeFile(patchFile, patchV1, "utf8");
+    await fsp.writeFile(patchFile, initialPatchText, "utf8");
 
     await fsp.writeFile(
       path.join(libDir, "TARGETS"),
@@ -145,8 +145,8 @@ test("cpp: patch change in repo lib via link_deps rebuilds consumer", async () =
         `expected demo binary to print 1 after initial patch; got=${JSON.stringify(v1)}`,
       );
 
-    const patchV2 = patchV1.replace("+  return 1;", "+  return 2;");
-    await fsp.writeFile(patchFile, patchV2, "utf8");
+    const updatedPatchText = initialPatchText.replace("+  return 1;", "+  return 2;");
+    await fsp.writeFile(patchFile, updatedPatchText, "utf8");
 
     const out2 = await nixBuildSelected({
       tmp,

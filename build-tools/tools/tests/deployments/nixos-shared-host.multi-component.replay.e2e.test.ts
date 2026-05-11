@@ -128,14 +128,14 @@ test("nixos-shared-host multi-component rollback replays recorded per-component 
     const hostRoot = path.join(tmp, "host");
     const recordsRoot = path.join(tmp, "records");
     const statePath = path.join(tmp, "platform-state.json");
-    const frontendV1 = path.join(tmp, "artifacts", "frontend-v1");
-    const apiV1 = path.join(tmp, "artifacts", "api-v1");
-    const frontendV2 = path.join(tmp, "artifacts", "frontend-v2");
-    const apiV2 = path.join(tmp, "artifacts", "api-v2");
-    await writeArtifact(frontendV1, "frontend-v1");
-    await writeArtifact(apiV1, "api-v1");
-    await writeArtifact(frontendV2, "frontend-v2");
-    await writeArtifact(apiV2, "api-v2");
+    const firstFrontendArtifact = path.join(tmp, "artifacts", "frontend-v1");
+    const firstApiArtifact = path.join(tmp, "artifacts", "api-v1");
+    const secondFrontendArtifact = path.join(tmp, "artifacts", "frontend-v2");
+    const secondApiArtifact = path.join(tmp, "artifacts", "api-v2");
+    await writeArtifact(firstFrontendArtifact, "frontend-v1");
+    await writeArtifact(firstApiArtifact, "api-v1");
+    await writeArtifact(secondFrontendArtifact, "frontend-v2");
+    await writeArtifact(secondApiArtifact, "api-v2");
     await ensureNixosSharedHostStageBranch(tmp, $, deployment);
     await writeDeploymentJson(deploymentJson, deployment);
     const admissionEvidenceJson = await writeReviewedLaneAdmissionEvidenceJson({
@@ -162,11 +162,11 @@ test("nixos-shared-host multi-component rollback replays recorded per-component 
     try {
       const first = await $({
         cwd: tmp,
-      })`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment ${deployment.label} --admission-evidence-json ${admissionEvidenceJson} --component-artifacts ${componentArtifactFlag({ frontend: frontendV1, api: apiV1 })} --control-plane-url ${harness.controlPlane.url} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(server.port)} --smoke-connect-protocol https:`;
+      })`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment ${deployment.label} --admission-evidence-json ${admissionEvidenceJson} --component-artifacts ${componentArtifactFlag({ frontend: firstFrontendArtifact, api: firstApiArtifact })} --control-plane-url ${harness.controlPlane.url} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(server.port)} --smoke-connect-protocol https:`;
       const firstSummary = JSON.parse(String(first.stdout));
       await $({
         cwd: tmp,
-      })`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment ${deployment.label} --admission-evidence-json ${admissionEvidenceJson} --component-artifacts ${componentArtifactFlag({ frontend: frontendV2, api: apiV2 })} --control-plane-url ${harness.controlPlane.url} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(server.port)} --smoke-connect-protocol https:`;
+      })`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment ${deployment.label} --admission-evidence-json ${admissionEvidenceJson} --component-artifacts ${componentArtifactFlag({ frontend: secondFrontendArtifact, api: secondApiArtifact })} --control-plane-url ${harness.controlPlane.url} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(server.port)} --smoke-connect-protocol https:`;
       await fsp.rm(path.join(tmp, "artifacts"), { recursive: true, force: true });
       const rollback = await $({
         cwd: tmp,

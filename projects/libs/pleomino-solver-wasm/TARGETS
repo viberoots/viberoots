@@ -27,6 +27,6 @@ genrule(
           + "WASM_EXTS=.wasm "
           + "OUT_PATH=\"$OUT\" "
           + "zx-wrapper \"$(location //build-tools/tools/wasm:export-wasm-from-nix)\"",
-    labels = ["kind:wasm"],
+    labels = ["lang:cpp", "kind:wasm"],
     visibility = ["PUBLIC"],
 )

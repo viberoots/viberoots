@@ -4,8 +4,11 @@ import path from "node:path";
 import { test } from "node:test";
 
 const EXCLUDED_DIRS = new Set([
+  ".claude",
+  ".codex",
   ".git",
   ".direnv",
+  ".nix-zsh",
   "buck-out",
   "coverage",
   "dist",

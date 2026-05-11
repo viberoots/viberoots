@@ -36,8 +36,8 @@ async function pathExists(p: string): Promise<boolean> {
 test("devshell marker avoids nix eval", async () => {
   await runInTemp("devshell-marker", async (tmp) => {
     const lockfile = path.join(tmp, "pnpm-lock.yaml");
-    const lockV1 = "lockfileVersion: 1\n";
-    await fsp.writeFile(lockfile, lockV1, "utf8");
+    const initialLockText = "lockfileVersion: 1\n";
+    await fsp.writeFile(lockfile, initialLockText, "utf8");
 
     const fakeOut1 = path.join(tmp, "fake-out-1");
     await fsp.mkdir(path.join(fakeOut1, "node_modules"), { recursive: true });
@@ -68,7 +68,7 @@ test("devshell marker avoids nix eval", async () => {
     await runNodeWithZx({ script, cwd: tmp, env: baseEnv, zxInitPath, stdio: "pipe" });
     assert.equal(await pathExists(path.join(tmp, "node_modules")), false);
 
-    const lockHash = crypto.createHash("sha256").update(lockV1).digest("hex");
+    const lockHash = crypto.createHash("sha256").update(initialLockText).digest("hex");
     const markerPath = path.join(tmp, "buck-out", "tmp", "node-modules-link.root.json");
     await fsp.mkdir(path.dirname(markerPath), { recursive: true });
     await fsp.writeFile(

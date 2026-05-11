@@ -480,7 +480,7 @@ excluded from the stale-names-lint enforcement.
 ### Historical old-name references excluded from active-source enforcement
 
 - `docs/repo-rename.md` (this file): excluded via `ALLOWED_PATHS` in
-  `build-tools/tools/dev/stale-names-lint.ts` and the parallel allowlist in
+  `build-tools/tools/dev/stale-names-lint-allowlists.ts` and the parallel allowlist in
   `build-tools/tools/tests/linting/no-stale-viberoots-names.enforcement.test.ts`.
   This file is the planning document for the rename itself and must name the stale tokens.
 - `docs/runtime-prefix-migration.md`: excluded via `ALLOWED_PATHS`. This file records the
@@ -509,7 +509,7 @@ entries are needed for PR-N headings in plan documents.
 
 The following active source paths use `phase0` as an operational deployment concept (the
 first deployment group in the release pipeline, not a completed plan phase number) and are
-excluded via `PLAN_NUMBER_SKIP_PATHS` in `stale-names-lint.ts`:
+excluded via `PLAN_NUMBER_SKIP_PATHS` in `stale-names-lint-allowlists.ts`:
 
 - `build-tools/tools/deployments/deployment-phase0-admission.ts`
 - `build-tools/tools/deployments/deployment-phase0-prerequisite-chain.ts`
@@ -522,6 +522,19 @@ excluded via `PLAN_NUMBER_SKIP_PATHS` in `stale-names-lint.ts`:
 - `build-tools/tools/tests/deployments/phase0-deployments.readiness-secrets.test.ts`
 - `build-tools/tools/tests/deployments/phase0-deployments.smoke.test.ts`
 - `build-tools/tools/nix/shared-host-identity-provider-migration.nix`
+
+The rename-inventory closeout test is also excluded via `PLAN_NUMBER_SKIP_PATHS` because it carries
+deliberate stale-token fixtures that prove duplicate `PR-N` inventory entries resolve to a single
+reviewed replacement and contextual tokens cannot be marked as blindly replaceable.
+
+Additional deployment and OpenTofu phase0 paths are excluded because `phase0` names the first
+deployment/admission stage in the live deployment model, not a completed planning phase. The same
+operational exception covers deployment OpenTofu `stack.json` phase labels and the reviewed
+`projects/deployments/platform-shared/` phase0 contract helpers.
+
+Active `.md` and `.rst` docs still run plan-number and migration-label enforcement for command-like
+example lines. Historical planning docs and plan documents with structural `PR-N` headings are
+excluded through `ALLOWED_PREFIXES`, `ALLOWED_PATHS`, or `PLAN_NUMBER_SKIP_PATHS`.
 
 ### Retained legacy / v1 / v2 references and reasons
 
@@ -560,9 +573,35 @@ because the string values are compared across deployment records.
   Same rationale — external promotion compatibility family string for third-party Kubernetes
   service deployments.
 
-These strings are excluded from the migration-label `MIGRATION_LABEL_PATTERNS` in
-`stale-names-lint.ts` because the tool's `MIGRATION_LABEL_PATTERNS` only matches
-`legacy[A-Z_]...` / `legacy-[a-z]` identifiers, not `v1`/`v2` strings that appear inside
-colon-delimited schema discriminants. The plan (§2 non-goals and §4 acceptance criteria)
-explicitly carves out "intentionally versioned long-lived schemas whose version number is
-part of the external contract" from migration-label enforcement.
+The migration-label `MIGRATION_LABEL_PATTERNS` in `stale-names-lint.ts` rejects internal snake-case
+`v1` / `v2` helper-style identifiers, `v1_` / `v2_` prefixes, and reviewed Camel/Pascal helper,
+contract, fixture, surface, wiring, profile, manifest, `parse*`, and `create*` version labels. It
+deliberately does not reject external protocol paths such as `/api/v1`, Vault `kv-v2`, package
+versions such as `@v1.2.3`, Buck `buck-out/v2`, or reviewed schema strings such as
+`node-dist-server-v1`.
+
+The following paths are excluded via `MIGRATION_LABEL_SKIP_PATHS` because they intentionally carry
+reviewed fixture strings:
+
+- `build-tools/tools/tests/deployments/deployment-admission.fixture.ts`
+- `build-tools/tools/tests/deployments/deployment-admission.supply-chain.replay.test.ts`
+- `build-tools/tools/tests/deployments/deployment-admission.supply-chain.test.ts`
+- `build-tools/tools/tests/deployments/deployment-admin-keycloak.remote-profile.test.ts`
+- `build-tools/tools/tests/lang/importer-wiring.macros-avoid-direct-lockfile-parsing.enforcement.test.ts`
+- `build-tools/tools/tests/lang/importer-wiring.no-v2-paths.enforcement.test.ts`
+- `build-tools/tools/tests/lang/package-local-wiring.enforcement.no-bypass.test.ts`
+- `build-tools/tools/tests/deployments/nixos-shared-host.install.manifest.contract.test.ts`
+- `build-tools/tools/tests/linting/rename-inventory.closeout.test.ts`
+- `build-tools/tools/tests/linting/stale-names-lint.behavior.test.ts`
+- `build-tools/tools/tests/scaffolding/webapp.module-dep-label-normalization.contract.test.ts`
+- `projects/apps/pleomino/src/game/persistence-state-v1.ts`
+
+The NixOS shared-host install/client manifest paths below are retained because the suffix identifies
+the serialized install/client manifest schema currently written to hosts and parsed by deployment
+tools:
+
+- `build-tools/tools/deployments/nixos-shared-host-client-manifest.ts`
+- `build-tools/tools/deployments/nixos-shared-host-host-apply.ts`
+- `build-tools/tools/deployments/nixos-shared-host-install-contract.ts`
+- `build-tools/tools/deployments/nixos-shared-host-install-host-support.ts`
+- `build-tools/tools/deployments/nixos-shared-host-install-host.ts`

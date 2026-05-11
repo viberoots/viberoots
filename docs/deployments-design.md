@@ -426,7 +426,7 @@ flowchart TB
         SEC2["Secrets and runtime-config integration"]
         OBS2["Audit / metrics / dashboards"]
         CAP["Provider capability registry"]
-        PV2["Provider API clients"]
+        PROVIDERS["Provider API clients"]
     end
 
     CLI2 --> EX
@@ -463,10 +463,10 @@ flowchart TB
     ORCH --> PUB
     ORCH --> SMK
 
-    PROV --> PV2
-    ACT --> PV2
-    PUB --> PV2
-    SMK --> PV2
+    PROV --> PROVIDERS
+    ACT --> PROVIDERS
+    PUB --> PROVIDERS
+    SMK --> PROVIDERS
 
     API --> OBS2
     ORCH --> OBS2

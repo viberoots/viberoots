@@ -23,20 +23,20 @@ test("nixos-shared-host publisher stages immutable releases and atomically activ
     const deployment = nixosSharedHostDeploymentFixture();
     const rendered = renderNixosSharedHostConfig(createNixosSharedHostPlatformState([deployment]));
     const hostRoot = path.join(tmp, "host");
-    const artifactV1 = path.join(tmp, "artifact-v1");
-    const artifactV2 = path.join(tmp, "artifact-v2");
+    const firstArtifactDir = path.join(tmp, "artifact-v1");
+    const secondArtifactDir = path.join(tmp, "artifact-v2");
     await materializeNixosSharedHostRuntime(hostRoot, rendered);
-    await writeArtifact(artifactV1, "v1");
-    await writeArtifact(artifactV2, "v2");
+    await writeArtifact(firstArtifactDir, "v1");
+    await writeArtifact(secondArtifactDir, "v2");
     const container = rendered.containers[deployment.providerTarget.containerName];
     const containerRoot = nixosSharedHostContainerRoot(hostRoot, container.containerName);
     const first = await publishNixosSharedHostStaticWebapp({
-      artifactDir: artifactV1,
+      artifactDir: firstArtifactDir,
       containerRoot,
       layout: container,
     });
     const second = await publishNixosSharedHostStaticWebapp({
-      artifactDir: artifactV2,
+      artifactDir: secondArtifactDir,
       containerRoot,
       layout: container,
     });

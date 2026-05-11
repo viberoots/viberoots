@@ -1,11 +1,11 @@
 # Deployment Verify Scope
 
-This document records the first reviewed deployment-domain test label and the first reviewed
-build-system ownership boundary from PR-4.5.1, the fail-closed path classifier from PR-4.5.2, the
-deployment-aware verify/CI execution path from PR-4.5.3, the PR-12.1 ownership split that moves
-mutable deployment-domain taxonomy data into the reviewed deployment-owned test area, and the PR-44
-methodology closeout that adds a deployment-domain file-size guardrail. The goal is to keep
-deployment-only selection resting on explicit metadata instead of path guesses.
+This document records the first reviewed deployment-domain test label, the first reviewed
+build-system ownership boundary, the fail-closed path classifier, the deployment-aware verify/CI
+execution path, the ownership split that moves mutable deployment-domain taxonomy data into the
+reviewed deployment-owned test area, and the methodology closeout that adds a deployment-domain
+file-size guardrail. The goal is to keep deployment-only selection resting on explicit metadata
+instead of path guesses.
 
 ## Reviewed Buck label
 
@@ -71,7 +71,7 @@ Touches to these reviewed shared paths still stay on the full build-system verif
 
 ## Deployment-impact classifier
 
-PR-4.5.2 adds a fail-closed classifier over changed paths with these stable modes:
+The fail-closed classifier covers changed paths with these stable modes:
 
 - `deployment-only`
 - `deployment-and-project-impact`
@@ -110,7 +110,7 @@ zx-wrapper build-tools/tools/dev/inspect-deployment-impact.ts \
 
 ## Deployment-aware verify execution
 
-PR-4.5.3 adds the first execution control:
+The first execution control is:
 
 - `VBR_DEPLOYMENT_TEST_SCOPE=auto|always|never`
 - `auto`:
@@ -135,7 +135,7 @@ suite, union scope, or full build-system scope ran.
 
 ## Deployment-domain methodology guardrail
 
-PR-44 started the deployment-owned file-size closeout, and the current contract keeps those files
+The deployment-owned file-size closeout started this contract, and the current contract keeps those files
 inside the repo-wide owner-local methodology gate:
 
 - command: `zx-wrapper build-tools/tools/dev/file-size-lint.ts --scope=source --fail=true`
@@ -164,7 +164,7 @@ into smaller focused modules instead of adding shared verify wiring. If a checke
 artifact truly needs an exception, it must live in an owner-local `methodology-exceptions.json`
 below the owning subtree.
 
-## Historical non-goals for PR-4.5.2
+## Historical Non-Goals
 
 - This PR does not change verify selector behavior yet.
 - This PR does not make deployment-only skipping available yet.

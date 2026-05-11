@@ -56,7 +56,7 @@ int add(int a, int b) { return a + b; }
 `,
     );
 
-    const patchV1 = [
+    const initialPatchText = [
       "diff --git a/src/addon.c b/src/addon.c",
       "--- a/src/addon.c",
       "+++ b/src/addon.c",
@@ -66,7 +66,7 @@ int add(int a, int b) { return a + b; }
       "+int add(int a, int b) { return a + b + 1; }",
       "",
     ].join("\n");
-    await fs.writeFile(patchFile, patchV1, "utf8");
+    await fs.writeFile(patchFile, initialPatchText, "utf8");
 
     await fs.outputFile(
       path.join(coreDir, "TARGETS"),
@@ -127,13 +127,13 @@ nix_go_tiny_wasm_lib(
     await fs.access(wasm1);
     const inst1 = await instantiateWasmFromFile(wasm1);
     const got1 = (inst1.exports as any).add2and3();
-    if (got1 !== 6) throw new Error(`expected 6 from patched v1; got ${got1}`);
+    if (got1 !== 6) throw new Error(`expected 6 from the initial patch; got ${got1}`);
 
-    const patchV2 = patchV1.replace(
+    const updatedPatchText = initialPatchText.replace(
       "+int add(int a, int b) { return a + b + 1; }",
       "+int add(int a, int b) { return a + b + 2; }",
     );
-    await fs.writeFile(patchFile, patchV2, "utf8");
+    await fs.writeFile(patchFile, updatedPatchText, "utf8");
 
     const out2 = await buildSelectedOutPath({
       tmp,

@@ -56,6 +56,37 @@ test("lint-staged config includes stale-names-lint for bzl/nix/md staged files",
   );
 });
 
+test("lint-staged config includes stale-names-lint for js/json/yaml staged files", async () => {
+  const pkg = JSON.parse(await fsp.readFile("package.json", "utf8")) as Record<string, unknown>;
+  const lintStaged = pkg["lint-staged"] as Record<string, string | string[]> | undefined;
+  assert.ok(lintStaged != null && typeof lintStaged === "object");
+
+  const dataGlob = lintStaged["**/*.{js,mjs,cjs,json,yml,yaml}"];
+  assert.ok(
+    Array.isArray(dataGlob),
+    "lint-staged must have an array of commands for **/*.{js,mjs,cjs,json,yml,yaml} files",
+  );
+  const dataCommands = dataGlob as string[];
+  const staleNamesInData = dataCommands.some((cmd) => cmd.includes("stale-names-lint"));
+  assert.ok(
+    staleNamesInData,
+    "lint-staged data/script files must invoke stale-names-lint so package.json and config files cannot introduce stale names or migration labels",
+  );
+});
+
+test("lint-staged config includes stale-names-lint for extensionless TARGETS files", async () => {
+  const pkg = JSON.parse(await fsp.readFile("package.json", "utf8")) as Record<string, unknown>;
+  const lintStaged = pkg["lint-staged"] as Record<string, string | string[]> | undefined;
+  assert.ok(lintStaged != null && typeof lintStaged === "object");
+
+  const targetCommands = lintStaged["**/TARGETS"];
+  assert.ok(Array.isArray(targetCommands), "lint-staged must cover extensionless TARGETS files");
+  assert.ok(
+    (targetCommands as string[]).some((cmd) => cmd.includes("stale-names-lint")),
+    "lint-staged TARGETS files must invoke stale-names-lint",
+  );
+});
+
 test("pre-commit hook delegates to lint-staged", async () => {
   const preCommit = await fsp.readFile(".husky/pre-commit", "utf8");
   assert.ok(
