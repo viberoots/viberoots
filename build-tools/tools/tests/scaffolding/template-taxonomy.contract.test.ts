@@ -41,8 +41,8 @@ function sortedUnique(values: string[]): string[] {
 test("taxonomy canonical TypeScript id set stays stable", () => {
   assert.deepEqual(sortedUnique(CANONICAL_TS_TEMPLATE_IDS), sortedUnique(EXPECTED_TS_TEMPLATE_IDS));
   assertCanonicalTemplateIdsUnique(CANONICAL_TS_TEMPLATE_IDS);
-  const legacyNodeIds = CANONICAL_TS_TEMPLATE_IDS.filter((id) => id.startsWith("node/"));
-  assert.equal(legacyNodeIds.length, 0);
+  const nodeIds = CANONICAL_TS_TEMPLATE_IDS.filter((id) => id.startsWith("node/"));
+  assert.equal(nodeIds.length, 0);
 });
 
 test("taxonomy matches templates/ts filesystem roots", async () => {

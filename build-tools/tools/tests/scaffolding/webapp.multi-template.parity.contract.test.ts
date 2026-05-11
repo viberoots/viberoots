@@ -10,7 +10,7 @@ async function readTemplate(relativePath: string): Promise<string> {
   return await fsp.readFile(path.join(REPO_ROOT, relativePath), "utf8");
 }
 
-test("Phase-5 PR-4 parity: ts/wasm module-key helpers align across static, SSR vite, SSR next", async () => {
+test("multi-template parity: ts/wasm module-key helpers align across static, SSR vite, SSR next", async () => {
   const staticAppWasm = await readTemplate(
     "build-tools/tools/scaffolding/templates/ts/webapp-static/src/wasm-contract.ts.jinja",
   );

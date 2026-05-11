@@ -40,7 +40,7 @@ export function parseFileSizeLintArgs(): FileSizeLintOptions {
     };
   }
 
-  const legacyExts = new Set([
+  const defaultExts = new Set([
     ".ts",
     ".tsx",
     ".js",
@@ -52,8 +52,8 @@ export function parseFileSizeLintArgs(): FileSizeLintOptions {
     ".rs",
     ".nix",
   ]);
-  const legacyInclude =
-    include.length > 0 ? include : Array.from(legacyExts).map((ext) => `**/*${ext}`);
+  const defaultInclude =
+    include.length > 0 ? include : Array.from(defaultExts).map((ext) => `**/*${ext}`);
 
   return {
     root,
@@ -61,6 +61,6 @@ export function parseFileSizeLintArgs(): FileSizeLintOptions {
     threshold,
     failOnOffenders,
     allowKnown,
-    scope: { include: legacyInclude, exclude },
+    scope: { include: defaultInclude, exclude },
   };
 }

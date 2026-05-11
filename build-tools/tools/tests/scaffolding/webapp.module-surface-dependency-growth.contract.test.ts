@@ -8,7 +8,7 @@ import { syncModuleContractsForApp } from "../../dev/sync-module-contracts-core"
 import { parseTsModuleManifest } from "../../scaffolding/webapp-module-manifests";
 import { runInTemp } from "../lib/test-helpers";
 
-test("PR-7 module-surface dependency growth: adding workspace TS dep updates TS module contract", async () => {
+test("module-surface dependency growth: adding workspace TS dep updates TS module contract", async () => {
   await runInTemp("webapp-module-surface-dependency-growth", async (tmp, _$) => {
     const $ = _$({ cwd: tmp, stdio: "inherit" });
     await $`scaf new ts webapp-static demo-web --yes --no-tests --skip-lockfile-gen`;

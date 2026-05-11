@@ -41,12 +41,12 @@ function canonicalTsTemplatesPattern(): RegExp {
 }
 
 test("docs contract: no canonical TypeScript examples route through scaf new node", async () => {
-  const legacyPattern = canonicalTsTemplatesPattern();
+  const oldNodePattern = canonicalTsTemplatesPattern();
   for (const doc of DOCS_WITH_REQUIRED_TS_EXAMPLES) {
     const content = await fsp.readFile(doc.path, "utf8");
     assert.doesNotMatch(
       content,
-      legacyPattern,
+      oldNodePattern,
       `${doc.path} still contains legacy node command path`,
     );
     for (const fragment of doc.requiredFragments) {

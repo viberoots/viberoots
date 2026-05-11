@@ -18,17 +18,17 @@ test("command surface: TypeScript templates are ts-only", async () => {
       const tsHelp = await $`scaf help ts ${template}`;
       assert.match(String(tsHelp.stdout || ""), new RegExp(`scaf new ts ${template} <name>`));
 
-      const legacyNew = await $`scaf new node ${template} ${demoName} --yes --dry-run`.nothrow();
-      assert.notEqual(legacyNew.exitCode, 0);
+      const oldNodeCmd = await $`scaf new node ${template} ${demoName} --yes --dry-run`.nothrow();
+      assert.notEqual(oldNodeCmd.exitCode, 0);
       assert.match(
-        `${legacyNew.stdout || ""}\n${legacyNew.stderr || ""}`,
+        `${oldNodeCmd.stdout || ""}\n${oldNodeCmd.stderr || ""}`,
         new RegExp(`TypeScript templates use 'ts'\\. Try: scaf new ts ${template} ${demoName}`),
       );
 
-      const legacyHelp = await $`scaf help node ${template}`.nothrow();
-      assert.notEqual(legacyHelp.exitCode, 0);
+      const oldNodeHelp = await $`scaf help node ${template}`.nothrow();
+      assert.notEqual(oldNodeHelp.exitCode, 0);
       assert.match(
-        `${legacyHelp.stdout || ""}\n${legacyHelp.stderr || ""}`,
+        `${oldNodeHelp.stdout || ""}\n${oldNodeHelp.stderr || ""}`,
         new RegExp(`TypeScript templates use 'ts'\\. Try: scaf help ts ${template}`),
       );
     }

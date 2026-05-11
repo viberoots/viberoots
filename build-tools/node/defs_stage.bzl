@@ -27,13 +27,14 @@ def _apply_default_lockfile_label(lockfile_label, labels, macro_name):
         return default_lockfile_label_from_package()
     return lockfile_label
 def _prepare_node_nix_calling_genrule(name, kwargs, srcs, deps, labels, lockfile_label):
+    kind = None if [l for l in (labels or []) if l.startswith("kind:")] else "gen"
     return prepare_language_wiring(
         name = name,
         kwargs = kwargs,
         srcs = srcs,
         deps = deps,
         lang = "node",
-        kind = "gen",
+        kind = kind,
         labels = labels,
         lockfile_label = lockfile_label,
         MODULE_PROVIDERS = MODULE_PROVIDERS,

@@ -39,7 +39,7 @@ test("package-local language macros must not bypass prepare_language_wiring()", 
       offenders.push({
         file,
         reason:
-          "must not call prepare_package_local_wiring_legacy_mutating(...); mutating helpers are legacy-only",
+          "must not call prepare_package_local_wiring_legacy_mutating(...); mutating helpers are removed",
       });
     }
     if (txt.includes("prepare_package_local_wiring_v2(")) {

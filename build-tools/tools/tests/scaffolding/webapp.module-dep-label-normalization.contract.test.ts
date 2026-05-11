@@ -10,7 +10,7 @@ async function writeTargets(dir: string, body: string) {
   await fsp.writeFile(path.join(dir, "TARGETS"), body, "utf8");
 }
 
-test("PR-6 module_deps infers __surface labels and preserves explicit overrides", async () => {
+test("module_deps infers __surface labels and preserves explicit overrides", async () => {
   await runInTemp("webapp-module-dep-label-normalization", async (tmp, $) => {
     await writeTargets(
       path.join(tmp, "projects", "libs", "math-wasm"),
@@ -69,7 +69,7 @@ test("PR-6 module_deps infers __surface labels and preserves explicit overrides"
   });
 });
 
-test("PR-6 module_deps missing inferred surface fails with inferred label in diagnostics", async () => {
+test("module_deps missing inferred surface fails with inferred label in diagnostics", async () => {
   await runInTemp("webapp-module-dep-label-normalization-missing", async (tmp, $) => {
     await fsp.mkdir(path.join(tmp, "projects", "apps", "web"), { recursive: true });
     await fsp.writeFile(

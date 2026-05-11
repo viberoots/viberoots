@@ -150,17 +150,17 @@ EOF'`;
       cwd: tmp,
     })`bash --noprofile --norc -c 'cat > tmp/control/TARGETS <<'\''EOF'\''
 go_library(
-    name = "legacy_lib",
+    name = "probe_lib",
     srcs = ["pkg/lib.go"],
 )
 
 go_binary(
-    name = "legacy_bin",
+    name = "probe_bin",
     srcs = ["pkg/main.go"],
 )
 
 go_test(
-    name = "legacy_test",
+    name = "probe_test",
     srcs = ["pkg/lib_test.go"],
 )
 EOF'`;
@@ -169,25 +169,25 @@ EOF'`;
       $,
       tmp,
       "go_buck_rule_route_control",
-      "kind(go_library, //tmp/control:legacy_lib)",
+      "kind(go_library, //tmp/control:probe_lib)",
     );
     if (libProbe.exitCode !== 0) return;
-    assert.ok(libProbe.stdout.includes("//tmp/control:legacy_lib"));
+    assert.ok(libProbe.stdout.includes("//tmp/control:probe_lib"));
 
     const binProbe = await cqueryKind(
       $,
       tmp,
       "go_buck_rule_route_control",
-      "kind(go_binary, //tmp/control:legacy_bin)",
+      "kind(go_binary, //tmp/control:probe_bin)",
     );
-    assert.ok(binProbe.stdout.includes("//tmp/control:legacy_bin"));
+    assert.ok(binProbe.stdout.includes("//tmp/control:probe_bin"));
 
     const testProbe = await cqueryKind(
       $,
       tmp,
       "go_buck_rule_route_control",
-      "kind(go_test, //tmp/control:legacy_test)",
+      "kind(go_test, //tmp/control:probe_test)",
     );
-    assert.ok(testProbe.stdout.includes("//tmp/control:legacy_test"));
+    assert.ok(testProbe.stdout.includes("//tmp/control:probe_test"));
   });
 });

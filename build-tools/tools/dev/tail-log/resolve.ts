@@ -19,13 +19,15 @@ function latestSymlinkFor(root: string): string {
 }
 
 async function worktreeRoots(): Promise<string[]> {
-  try {
-    const wtParent = path.join(workspaceRoot, ".claude", "worktrees");
-    const entries = await fs.readdir(wtParent);
-    return entries.map((n) => path.join(wtParent, n));
-  } catch {
-    return [];
+  const roots: string[] = [];
+  for (const toolDir of [".claude", ".codex"]) {
+    try {
+      const wtParent = path.join(workspaceRoot, toolDir, "worktrees");
+      const entries = await fs.readdir(wtParent);
+      for (const n of entries) roots.push(path.join(wtParent, n));
+    } catch {}
   }
+  return roots;
 }
 
 async function candidateRoots(): Promise<string[]> {

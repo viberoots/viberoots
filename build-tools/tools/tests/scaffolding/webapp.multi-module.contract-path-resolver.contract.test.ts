@@ -10,7 +10,7 @@ import {
   resolveModuleContractsPaths,
 } from "../../dev/module-contract-paths";
 
-test("PR-2 resolver derives deterministic app-id and canonical output paths", () => {
+test("resolver derives deterministic app-id and canonical output paths", () => {
   const appTarget = "//projects/apps/demo-web:app";
   const appId = deriveAppIdFromTargetLabel(appTarget);
   assert.equal(appId, "projects-apps-demo-web-app");
@@ -34,7 +34,7 @@ test("PR-2 resolver derives deterministic app-id and canonical output paths", ()
   );
 });
 
-test("PR-2 resolver infers app target from app cwd", () => {
+test("resolver infers app target from app cwd", () => {
   const appTarget = deriveAppTargetLabelFromCwd(
     path.join("/repo", "projects", "apps", "my-app"),
     "/repo",
@@ -42,7 +42,7 @@ test("PR-2 resolver infers app target from app cwd", () => {
   assert.equal(appTarget, "//projects/apps/my-app:app");
 });
 
-test("PR-2 resolver accepts symlink-equivalent temp roots", async (t) => {
+test("resolver accepts symlink-equivalent temp roots", async (t) => {
   if (process.platform !== "darwin") t.skip("macOS /tmp canonicalizes through /private/tmp");
   const root = await fsp.mkdtemp(path.join(os.tmpdir(), "module-contract-paths-"));
   t.after(async () => {

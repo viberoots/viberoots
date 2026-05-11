@@ -30,12 +30,12 @@ export type RawNixosSharedHostComponent = {
 };
 
 export function readRawNixosSharedHostComponents(node: GraphNode): RawNixosSharedHostComponent[] {
-  const legacyTarget = readLabel(node, "component");
-  const legacyKind = readString(node, "component_kind");
-  const legacyAppName = readString(node, "app_name");
-  const legacyPort = Number(node.container_port || 0);
-  const legacyHealthPath = readString(node, "health_path");
-  const legacyTargetGroup = readString(node, "target_group");
+  const singleTarget = readLabel(node, "component");
+  const singleKind = readString(node, "component_kind");
+  const singleAppName = readString(node, "app_name");
+  const singlePort = Number(node.container_port || 0);
+  const singleHealthPath = readString(node, "health_path");
+  const singleTargetGroup = readString(node, "target_group");
   const raw = readStringRecordList(node, "components").map((entry) => ({
     id: entry.id || "",
     kind: entry.kind || "",
@@ -43,7 +43,7 @@ export function readRawNixosSharedHostComponents(node: GraphNode): RawNixosShare
     appName: entry.app_name || "",
     containerPort: Number(entry.container_port || 0),
     healthPath: entry.health_path || "",
-    targetGroup: entry.target_group || legacyTargetGroup,
+    targetGroup: entry.target_group || singleTargetGroup,
     ssrFramework: entry.ssr_framework || "",
     ssrRuntimeContract: entry.ssr_runtime_contract || "",
     ssrServerEntry: entry.ssr_server_entry || "",
@@ -55,12 +55,12 @@ export function readRawNixosSharedHostComponents(node: GraphNode): RawNixosShare
   return [
     {
       id: "default",
-      kind: legacyKind,
-      target: legacyTarget,
-      appName: legacyAppName,
-      containerPort: legacyPort,
-      healthPath: legacyHealthPath,
-      targetGroup: legacyTargetGroup,
+      kind: singleKind,
+      target: singleTarget,
+      appName: singleAppName,
+      containerPort: singlePort,
+      healthPath: singleHealthPath,
+      targetGroup: singleTargetGroup,
       ssrFramework: "",
       ssrRuntimeContract: "",
       ssrServerEntry: "",

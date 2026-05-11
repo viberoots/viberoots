@@ -468,3 +468,101 @@ would gradually reappear through scaffolds, docs, generated examples, tests, or 
 
 It adds ongoing maintenance for stale-name, plan-number, and migration-label allowlists and may
 require updating tests whenever new historical docs are added.
+
+---
+
+## Retained references and enforcement allowlist notes
+
+This section documents every intentionally retained old-name reference, PR/phase-number
+reference, or `legacy`/`v1`/`v2` reference in active source, along with the reason each is
+excluded from the stale-names-lint enforcement.
+
+### Historical old-name references excluded from active-source enforcement
+
+- `docs/repo-rename.md` (this file): excluded via `ALLOWED_PATHS` in
+  `build-tools/tools/dev/stale-names-lint.ts` and the parallel allowlist in
+  `build-tools/tools/tests/linting/no-stale-viberoots-names.enforcement.test.ts`.
+  This file is the planning document for the rename itself and must name the stale tokens.
+- `docs/runtime-prefix-migration.md`: excluded via `ALLOWED_PATHS`. This file records the
+  `BNX_*` → `VBR_*` migration history and must reference old variable names for operator
+  context.
+- `docs/contributor-naming-conventions.md`: excluded via `ALLOWED_PATHS`. The conventions
+  doc names the stale tokens in enforcement examples so contributors know what is blocked.
+- `mayday-test-time-debugging.md`: excluded via `ALLOWED_PATHS`. Historical debugging log;
+  not active operator documentation.
+- `pnpm-lock.yaml`: excluded via `ALLOWED_PATHS`. Third-party lockfile content-addressed
+  integrity strings may coincidentally contain stale substrings and must not be renamed.
+- Files under `docs/build-history/` and `docs/design-history/`: excluded via
+  `ALLOWED_PREFIXES`. These are inert historical records, not active instructions.
+- `build-tools/tools/tests/deployments/nixos-shared-host.control-plane-service-env.test.ts`:
+  excluded via `ALLOWED_PATHS`. This test asserts that the old `BNX_DEPLOY_CONTROL_PLANE_TOKEN`
+  variable is rejected; the old variable name must appear as a test fixture string.
+- Files under `third_party/uv2nix/`: excluded via `ALLOWED_PREFIXES`. The `uv2nix` third-party
+  library uses `nixpkgs.legacyPackages`, which is an upstream Nixpkgs API name and must not
+  be renamed.
+
+### PR-number and phase-number references excluded from active-code enforcement
+
+Plan/phase numbers in `.md` plan-document headings are skipped by `stale-names-lint` because
+the tool checks `isDocFile()` before applying `PLAN_NUMBER_PATTERNS`. No additional allowlist
+entries are needed for PR-N headings in plan documents.
+
+The following active source paths use `phase0` as an operational deployment concept (the
+first deployment group in the release pipeline, not a completed plan phase number) and are
+excluded via `PLAN_NUMBER_SKIP_PATHS` in `stale-names-lint.ts`:
+
+- `build-tools/tools/deployments/deployment-phase0-admission.ts`
+- `build-tools/tools/deployments/deployment-phase0-prerequisite-chain.ts`
+- `build-tools/tools/deployments/deployment-phase0-release.ts`
+- `build-tools/tools/tests/deployments/deployment-phase0-admission.test.ts`
+- `build-tools/tools/tests/deployments/deployment-phase0-release.test.ts`
+- `build-tools/tools/tests/deployments/deployment-readiness-gates.phase0-access.fixture.ts`
+- `build-tools/tools/tests/deployments/deployment-readiness-gates.phase0-access.test.ts`
+- `build-tools/tools/tests/deployments/phase0-deployments.contract.test.ts`
+- `build-tools/tools/tests/deployments/phase0-deployments.readiness-secrets.test.ts`
+- `build-tools/tools/tests/deployments/phase0-deployments.smoke.test.ts`
+- `build-tools/tools/nix/shared-host-identity-provider-migration.nix`
+
+### Retained legacy / v1 / v2 references and reasons
+
+The following `v1`/`v2` references in active source are **intentionally retained real
+external schema version strings** that are part of the deployment promotion compatibility
+contract. Renaming them would silently break cross-version promotion compatibility checks
+because the string values are compared across deployment records.
+
+- **`"node-dist-server-v1"`** in `build-tools/tools/deployments/contract-types.ts`
+  (type discriminant on `NixosSharedHostSsrRuntimeContract`): This is a versioned runtime
+  contract discriminant that is serialised into deployment records and compared by the
+  promotion compatibility checker. Renaming it would require a coordinated migration of all
+  existing deployment records. It is an intentionally versioned long-lived schema version,
+  not a migration-era internal label.
+
+- **`"static-webapp:exact-environment-neutral-v1"`** in
+  `build-tools/tools/deployments/deployment-promotion-contract.ts`
+  (return value of `promotionCompatibilityFamily()`): This is a promotion compatibility
+  family string used to match deployments that can be promoted interchangeably. The `v1`
+  suffix is the schema version of the compatibility contract, serialised into deployment
+  promotion records. Renaming it without a coordinated migration of all existing records
+  would silently break promotion compatibility checks.
+
+- **`"mobile-app:ios-store-bundle-v1"`** in `deployment-promotion-contract.ts`: Same
+  rationale as above — external promotion compatibility family string for iOS App Store
+  deployments.
+
+- **`"mobile-app:android-store-bundle-v1"`** in `deployment-promotion-contract.ts`: Same
+  rationale — external promotion compatibility family string for Google Play deployments.
+
+- **`"service:kubernetes-runtime-v1"`** in `deployment-promotion-contract.ts`: Same
+  rationale — external promotion compatibility family string for Kubernetes service
+  deployments.
+
+- **`"third-party-service:kubernetes-runtime-v1"`** in `deployment-promotion-contract.ts`:
+  Same rationale — external promotion compatibility family string for third-party Kubernetes
+  service deployments.
+
+These strings are excluded from the migration-label `MIGRATION_LABEL_PATTERNS` in
+`stale-names-lint.ts` because the tool's `MIGRATION_LABEL_PATTERNS` only matches
+`legacy[A-Z_]...` / `legacy-[a-z]` identifiers, not `v1`/`v2` strings that appear inside
+colon-delimited schema discriminants. The plan (§2 non-goals and §4 acceptance criteria)
+explicitly carves out "intentionally versioned long-lived schemas whose version number is
+part of the external contract" from migration-label enforcement.

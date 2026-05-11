@@ -20,6 +20,19 @@ async function runVerifyFileSizePreflight(root: string, zxInitPath: string): Pro
   }
 }
 
+async function runVerifyStaleNamesPreflight(root: string, zxInitPath: string): Promise<void> {
+  const script = path.resolve(root, "build-tools/tools/dev/stale-names-lint.ts");
+  process.stderr.write("[verify] stale-names preflight: scanning active source for stale names\n");
+  try {
+    await runNodeWithZx({ cwd: root, script, args: ["--full"], zxInitPath, stdio: "inherit" });
+  } catch {
+    process.stderr.write(
+      "error: stale-names preflight failed; fix stale repo names, plan numbers, or migration labels and re-run 'v'\n",
+    );
+    process.exit(2);
+  }
+}
+
 async function runVerifyNixGapsPolicyPreflight(root: string, zxInitPath: string): Promise<void> {
   const script = path.resolve(root, "build-tools/tools/dev/nix-gaps-inventory-check.ts");
   const args = [
@@ -188,6 +201,8 @@ export async function runVerifyLintPreflight(
       process.exit(2);
     }
   }
+
+  await runVerifyStaleNamesPreflight(root, zxInitPath);
 
   if (includeBuildSystemPolicy) {
     await runVerifyFileSizePreflight(root, zxInitPath);

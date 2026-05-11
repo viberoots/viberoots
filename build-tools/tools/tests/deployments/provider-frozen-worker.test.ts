@@ -124,7 +124,7 @@ test("provider workers reject non-shared and mismatched admission snapshots", as
           submissionAdmission,
         });
       await assert.rejects(
-        rejectEnvelope("legacy-envelope", { decision: "admitted", reason: "legacy" }),
+        rejectEnvelope("old-admission-envelope", { decision: "admitted", reason: "legacy" }),
         /shared submission admission/,
       );
       await assert.rejects(

@@ -36,11 +36,11 @@ export function loadPersistedGameStateFromHash(
   if (compactRestored) {
     return compactRestored;
   }
-  const legacyRaw = decodeLegacyHashState(token);
-  if (!legacyRaw) {
+  const rawToken = decodeLegacyHashState(token);
+  if (!rawToken) {
     return null;
   }
-  return restorePersistedGameState(legacyRaw, baseline);
+  return restorePersistedGameState(rawToken, baseline);
 }
 
 export function savePersistedGameStateToHash(

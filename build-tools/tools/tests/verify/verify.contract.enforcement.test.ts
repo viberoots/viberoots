@@ -91,7 +91,7 @@ test("verify macOS temp roots opt generated output trees out of metadata indexin
       "stale-temp-repo",
       "file.txt",
     );
-    const legacyStaleFile = path.join(
+    const staleOldTmpdirFile = path.join(
       root,
       "buck-out",
       "tmp",
@@ -103,8 +103,8 @@ test("verify macOS temp roots opt generated output trees out of metadata indexin
     await fsp.writeFile(staleSystemFile, "system", "utf8");
     await fsp.mkdir(path.dirname(staleFile), { recursive: true });
     await fsp.writeFile(staleFile, "stale", "utf8");
-    await fsp.mkdir(path.dirname(legacyStaleFile), { recursive: true });
-    await fsp.writeFile(legacyStaleFile, "legacy", "utf8");
+    await fsp.mkdir(path.dirname(staleOldTmpdirFile), { recursive: true });
+    await fsp.writeFile(staleOldTmpdirFile, "legacy", "utf8");
 
     await ensureRepoLocalTmpRoot(root, { env, platform: "darwin", systemTmpRoot });
 
@@ -119,7 +119,7 @@ test("verify macOS temp roots opt generated output trees out of metadata indexin
       "expected verify to clear stale repo-local temp dirs",
     );
     await assert.rejects(
-      fsp.stat(legacyStaleFile),
+      fsp.stat(staleOldTmpdirFile),
       "expected verify to clear legacy repo-local temp dirs",
     );
     await Promise.all(

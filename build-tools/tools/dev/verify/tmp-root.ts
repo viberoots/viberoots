@@ -22,8 +22,8 @@ export async function ensureRepoLocalTmpRoot(
   const platform = opts.platform ?? process.platform;
   const liveRoot = env.LIVE_ROOT || root;
   const systemTmpRoot = opts.systemTmpRoot ?? "/tmp";
-  const legacyRepoTmpdir = path.join(liveRoot, "buck-out", "tmp", "tmpdir");
-  let tmpdir = legacyRepoTmpdir;
+  const staleRepoTmpdir = path.join(liveRoot, "buck-out", "tmp", "tmpdir");
+  let tmpdir = staleRepoTmpdir;
   const repoLocalTmpdir = platform !== "linux" && platform !== "darwin";
   if (platform === "linux") {
     let user = "";
@@ -51,10 +51,10 @@ export async function ensureRepoLocalTmpRoot(
         ? fsp.rm(tmpdir, { recursive: true, force: true }).catch(() => {})
         : Promise.resolve(),
       platform === "darwin"
-        ? fsp.rm(legacyRepoTmpdir, { recursive: true, force: true }).catch(() => {})
+        ? fsp.rm(staleRepoTmpdir, { recursive: true, force: true }).catch(() => {})
         : Promise.resolve(),
       platform === "darwin"
-        ? fsp.rm(`${legacyRepoTmpdir}.noindex`, { recursive: true, force: true }).catch(() => {})
+        ? fsp.rm(`${staleRepoTmpdir}.noindex`, { recursive: true, force: true }).catch(() => {})
         : Promise.resolve(),
     ]);
   }

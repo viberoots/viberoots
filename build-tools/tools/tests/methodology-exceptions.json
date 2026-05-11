@@ -49,8 +49,8 @@
       "justification": "Legacy multi-module manifest contract pending decomposition."
     },
     {
-      "path": "scaffolding/webapp.phase3-runtime-consistency-policy.contract.test.ts",
-      "justification": "Legacy phase-3 runtime consistency policy contract pending decomposition."
+      "path": "scaffolding/webapp.runtime-consistency-policy.contract.test.ts",
+      "justification": "SSR runtime consistency policy contract: three distinct behavioral contracts covering template policy, policy docs, and shared helper wiring."
     },
     {
       "path": "template_conventions.bzl",

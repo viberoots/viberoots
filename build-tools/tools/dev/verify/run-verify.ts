@@ -93,7 +93,7 @@ export async function runVerify(): Promise<void> {
   });
   await timedPhase("ensure-repo-local-tmp-root", async () => await ensureRepoLocalTmpRoot(root));
   await timedPhase(
-    "cleanup-legacy-pnpm-state",
+    "cleanup-stale-pnpm-state",
     async () => await cleanupVerifyLegacyPnpmState(root),
   );
   const analysisDir = path.join(

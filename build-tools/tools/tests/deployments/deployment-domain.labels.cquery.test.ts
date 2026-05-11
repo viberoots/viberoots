@@ -18,7 +18,7 @@ const RESOURCE_LIMITED_EXEMPT_TEMP_REPO_SCRIPTS = new Set([
   "build-tools/tools/tests/deployments/deployment-targets.install.cloudflare.test.ts",
   "build-tools/tools/tests/deployments/nixos-shared-host.control-plane.governance.service.test.ts",
   "build-tools/tools/tests/deployments/nixos-shared-host.host-module.nix-eval.test.ts",
-  "build-tools/tools/tests/deployments/nixos-shared-host.identity-provider.pr95.realm-files.nix-eval.test.ts",
+  "build-tools/tools/tests/deployments/nixos-shared-host.identity-provider.realm-files.nix-eval.test.ts",
   "build-tools/tools/tests/deployments/nixos-shared-host.install.host-modes.test.ts",
   "build-tools/tools/tests/deployments/nixos-shared-host.install.ssh-guess.test.ts",
   "build-tools/tools/tests/deployments/static-webapp-artifact-admission.test.ts",

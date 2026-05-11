@@ -36,7 +36,7 @@ test("importer-scoped macros delegate lockfile parsing/enforcement to //build-to
       txt.includes("prepare_node_importer_nix_calling_genrule_kwargs(");
     assert(usesSharedImporterWiring, `${file} must use shared importer wiring helpers`);
 
-    const legacyOrRemovedHelpers = [
+    const removedHelpers = [
       "prepare_importer_genrule_kwargs_legacy_mutating(",
       "prepare_importer_non_genrule_wiring_legacy_mutating(",
       "prepare_importer_srcsless_rule_wiring_legacy_mutating(",
@@ -47,7 +47,7 @@ test("importer-scoped macros delegate lockfile parsing/enforcement to //build-to
       "prepare_importer_nix_calling_genrule_wiring_v2(",
       "prepare_importer_non_genrule_nix_calling_wiring_v2(",
     ];
-    for (const needle of legacyOrRemovedHelpers) {
+    for (const needle of removedHelpers) {
       assert(
         !txt.includes(needle),
         `${file} must not call ${needle} directly; legacy/migration-only helpers are forbidden in macro files`,

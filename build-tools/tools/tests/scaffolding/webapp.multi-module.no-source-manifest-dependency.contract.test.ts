@@ -15,7 +15,7 @@ const TEST_TIMEOUT_MS =
   Number(process.env.TEST_NIX_TIMEOUT_SECS || process.env.VERIFY_TIMEOUT_SECS || "1200") * 1000;
 
 test(
-  "PR-2 watcher does not require source-tree manifest files",
+  "multi-module watcher does not require source-tree manifest files",
   { timeout: TEST_TIMEOUT_MS },
   async () => {
     await runInTemp("webapp-no-source-manifest-dependency", async (tmp, _$) => {

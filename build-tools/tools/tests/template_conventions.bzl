@@ -119,7 +119,7 @@ _TEMPLATE_TEST_CONVENTIONS = {
         "template_roots": ["build-tools/tools/scaffolding/templates/ts/webapp-ssr-vite"],
         "classification": "template:contract",
     },
-    "build-tools/tools/tests/scaffolding/webapp-ssr-vite.dev-runtime-consistency.phase3.test.ts": {
+    "build-tools/tools/tests/scaffolding/webapp-ssr-vite.dev-runtime-consistency.test.ts": {
         "template_roots": ["build-tools/tools/scaffolding/templates/ts/webapp-ssr-vite"],
         "classification": "template:contract",
         "extra_labels": ["verify:isolated"],
@@ -143,7 +143,7 @@ _TEMPLATE_TEST_CONVENTIONS = {
         "template_roots": ["build-tools/tools/scaffolding/templates/ts/webapp-ssr-vite"],
         "classification": "template:contract",
     },
-    "build-tools/tools/tests/scaffolding/webapp.phase2-wasm-producer-policy.contract.test.ts": {
+    "build-tools/tools/tests/scaffolding/webapp.wasm-producer-policy.contract.test.ts": {
         "template_roots": [
             "build-tools/tools/scaffolding/templates/ts/webapp-static",
             "build-tools/tools/scaffolding/templates/ts/webapp-ssr-vite",
@@ -151,7 +151,7 @@ _TEMPLATE_TEST_CONVENTIONS = {
         ],
         "classification": "template:shared",
     },
-    "build-tools/tools/tests/scaffolding/webapp.phase3-runtime-consistency-policy.contract.test.ts": {
+    "build-tools/tools/tests/scaffolding/webapp.runtime-consistency-policy.contract.test.ts": {
         "template_roots": [
             "build-tools/tools/scaffolding/templates/ts/webapp-ssr-vite",
             "build-tools/tools/scaffolding/templates/ts/webapp-ssr-next",
@@ -246,7 +246,7 @@ _TEMPLATE_TEST_CONVENTIONS = {
         ],
         "classification": "template:shared",
     },
-    "build-tools/tools/tests/scaffolding/webapp.phase5.hardcoded-runtime-path-policy.contract.test.ts": {
+    "build-tools/tools/tests/scaffolding/webapp.hardcoded-runtime-path-policy.contract.test.ts": {
         "template_roots": [
             "build-tools/tools/scaffolding/templates/ts/webapp-static",
             "build-tools/tools/scaffolding/templates/ts/webapp-ssr-vite",
@@ -254,7 +254,7 @@ _TEMPLATE_TEST_CONVENTIONS = {
         ],
         "classification": "template:shared",
     },
-    "build-tools/tools/tests/scaffolding/webapp.phase5.final-goal-validation.contract.test.ts": {
+    "build-tools/tools/tests/scaffolding/webapp.wasm-runtime-authority.contract.test.ts": {
         "template_roots": [
             "build-tools/tools/scaffolding/templates/ts/webapp-static",
             "build-tools/tools/scaffolding/templates/ts/webapp-ssr-vite",
@@ -262,7 +262,7 @@ _TEMPLATE_TEST_CONVENTIONS = {
         ],
         "classification": "template:shared",
     },
-    "build-tools/tools/tests/scaffolding/webapp.phase5.final-goal-validation.static.contract.test.ts": {
+    "build-tools/tools/tests/scaffolding/webapp.wasm-runtime-authority.static.contract.test.ts": {
         "template_roots": [
             "build-tools/tools/scaffolding/templates/ts/webapp-static",
             "build-tools/tools/scaffolding/templates/ts/webapp-ssr-vite",
@@ -270,7 +270,7 @@ _TEMPLATE_TEST_CONVENTIONS = {
         ],
         "classification": "template:shared",
     },
-    "build-tools/tools/tests/scaffolding/webapp.phase5.final-goal-validation.ssr-next.contract.test.ts": {
+    "build-tools/tools/tests/scaffolding/webapp.wasm-runtime-authority.ssr-next.contract.test.ts": {
         "template_roots": [
             "build-tools/tools/scaffolding/templates/ts/webapp-static",
             "build-tools/tools/scaffolding/templates/ts/webapp-ssr-vite",
@@ -278,7 +278,7 @@ _TEMPLATE_TEST_CONVENTIONS = {
         ],
         "classification": "template:shared",
     },
-    "build-tools/tools/tests/scaffolding/webapp.phase5.generated-authority-runtime.contract.test.ts": {
+    "build-tools/tools/tests/scaffolding/webapp.generated-authority-runtime.contract.test.ts": {
         "template_roots": [
             "build-tools/tools/scaffolding/templates/ts/webapp-static",
             "build-tools/tools/scaffolding/templates/ts/webapp-ssr-vite",
@@ -286,7 +286,7 @@ _TEMPLATE_TEST_CONVENTIONS = {
         ],
         "classification": "template:shared",
     },
-    "build-tools/tools/tests/scaffolding/webapp.phase5.runtime-path-canonicalization.contract.test.ts": {
+    "build-tools/tools/tests/scaffolding/webapp.runtime-path-canonicalization.contract.test.ts": {
         "template_roots": [
             "build-tools/tools/scaffolding/templates/ts/webapp-static",
             "build-tools/tools/scaffolding/templates/ts/webapp-ssr-vite",
@@ -294,7 +294,7 @@ _TEMPLATE_TEST_CONVENTIONS = {
         ],
         "classification": "template:shared",
     },
-    "build-tools/tools/tests/scaffolding/webapp.phase5.runtime-path-fallback-probe-removal.contract.test.ts": {
+    "build-tools/tools/tests/scaffolding/webapp.runtime-path-fallback-probe-removal.contract.test.ts": {
         "template_roots": [
             "build-tools/tools/scaffolding/templates/ts/webapp-static",
             "build-tools/tools/scaffolding/templates/ts/webapp-ssr-vite",
@@ -302,7 +302,7 @@ _TEMPLATE_TEST_CONVENTIONS = {
         ],
         "classification": "template:shared",
     },
-    "build-tools/tools/tests/scaffolding/webapp.phase5.legacy-flag-removal.contract.test.ts": {
+    "build-tools/tools/tests/scaffolding/webapp.single-module-watcher-flag-removal.contract.test.ts": {
         "template_roots": [
             "build-tools/tools/scaffolding/templates/ts/webapp-static",
             "build-tools/tools/scaffolding/templates/ts/webapp-ssr-vite",
@@ -310,7 +310,7 @@ _TEMPLATE_TEST_CONVENTIONS = {
         ],
         "classification": "template:shared",
     },
-    "build-tools/tools/tests/scaffolding/webapp.phase5.top-wasm-bridge-removal.contract.test.ts": {
+    "build-tools/tools/tests/scaffolding/webapp.top-wasm-bridge-removal.contract.test.ts": {
         "template_roots": [
             "build-tools/tools/scaffolding/templates/ts/webapp-static",
             "build-tools/tools/scaffolding/templates/ts/webapp-ssr-vite",

@@ -15,7 +15,7 @@ const TEST_TIMEOUT_MS =
   Number(process.env.TEST_NIX_TIMEOUT_SECS || process.env.VERIFY_TIMEOUT_SECS || "1200") * 1000;
 
 test(
-  "PR-7 zero-wasm default (ssr-vite): install, build, and dev stay healthy without wasm modules",
+  "zero-wasm default (ssr-vite): install, build, and dev stay healthy without wasm modules",
   { timeout: TEST_TIMEOUT_MS },
   async () => {
     await runInTemp("webapp-zero-wasm-default-ssr-vite", async (tmp, _$) => {

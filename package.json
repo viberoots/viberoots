@@ -24,9 +24,13 @@
   "lint-staged": {
     "**/*.{ts,tsx}": [
       "pnpm exec eslint --max-warnings=0 --no-warn-ignored --fix --ignore-pattern buck-out --ignore-pattern coverage --ignore-pattern .clinic --ignore-pattern '**/.vite-cache/**' --",
-      "pnpm -s fmt:write --"
+      "pnpm -s fmt:write --",
+      "node build-tools/tools/dev/stale-names-lint.ts"
     ],
-    "**/*.{js,mjs,cjs,md,json,yml,yaml}": [
+    "**/*.{bzl,nix,md}": [
+      "node build-tools/tools/dev/stale-names-lint.ts"
+    ],
+    "**/*.{js,mjs,cjs,json,yml,yaml}": [
       "pnpm -s fmt:write --"
     ]
   },

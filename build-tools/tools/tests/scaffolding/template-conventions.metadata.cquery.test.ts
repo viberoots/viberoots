@@ -121,14 +121,12 @@ const EXPECTATIONS: TemplateExpectation[] = [
     requiredTemplateRoots: ["build-tools/tools/scaffolding/templates/ts/webapp-ssr-vite/"],
   },
   {
-    script:
-      "build-tools/tools/tests/scaffolding/webapp-ssr-vite.dev-runtime-consistency.phase3.test.ts",
+    script: "build-tools/tools/tests/scaffolding/webapp-ssr-vite.dev-runtime-consistency.test.ts",
     requiredLabels: ["template:ts/webapp-ssr-vite", "template:contract", "verify:isolated"],
     requiredTemplateRoots: ["build-tools/tools/scaffolding/templates/ts/webapp-ssr-vite/"],
   },
   {
-    script:
-      "build-tools/tools/tests/scaffolding/webapp.phase2-wasm-producer-policy.contract.test.ts",
+    script: "build-tools/tools/tests/scaffolding/webapp.wasm-producer-policy.contract.test.ts",
     requiredLabels: [
       "template:ts/webapp-static",
       "template:ts/webapp-ssr-vite",
@@ -143,7 +141,7 @@ const EXPECTATIONS: TemplateExpectation[] = [
   },
   {
     script:
-      "build-tools/tools/tests/scaffolding/webapp.phase3-runtime-consistency-policy.contract.test.ts",
+      "build-tools/tools/tests/scaffolding/webapp.runtime-consistency-policy.contract.test.ts",
     requiredLabels: [
       "template:ts/webapp-ssr-vite",
       "template:ts/webapp-ssr-next",

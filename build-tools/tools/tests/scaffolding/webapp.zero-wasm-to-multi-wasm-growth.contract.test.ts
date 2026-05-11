@@ -26,7 +26,7 @@ async function readWasmManifest(manifestPath: string): Promise<WasmModuleManifes
 }
 
 test(
-  "PR-7 zero-wasm to multi-wasm growth: first wasm module is picked up without target rewiring",
+  "zero-wasm to multi-wasm growth: first wasm module is picked up without target rewiring",
   { timeout: TEST_TIMEOUT_MS },
   async () => {
     await runInTemp("webapp-zero-to-multi-wasm-growth", async (tmp, _$) => {

@@ -21,17 +21,17 @@ test("verify target pass loading expands package scopes before isolating labeled
   assert.deepEqual(
     targets.map((entry) => entry.target),
     [
-      "//projects/apps/pleomino:pr10_offline_acceptance",
-      "//projects/apps/pleomino:pr13_regression",
-      "//projects/apps/pleomino:pr14_latency",
-      "//projects/apps/pleomino:pr15_seeded",
-      "//projects/apps/pleomino:pr4_static_pwa_hardening",
+      "//projects/apps/pleomino:hash-regression",
+      "//projects/apps/pleomino:latency-guardrail",
+      "//projects/apps/pleomino:offline-acceptance",
+      "//projects/apps/pleomino:seeded-solver",
+      "//projects/apps/pleomino:static-pwa-contracts",
       "//projects/apps/pleomino:unit",
     ],
   );
   assert.ok(
     targets
-      .find((entry) => entry.target === "//projects/apps/pleomino:pr14_latency")
+      .find((entry) => entry.target === "//projects/apps/pleomino:latency-guardrail")
       ?.labels.includes(VERIFY_ISOLATED_LABEL),
     "expected package-scope expansion to preserve verify:isolated labels",
   );
@@ -40,16 +40,16 @@ test("verify target pass loading expands package scopes before isolating labeled
   assert.deepEqual(passes, [
     {
       name: "isolated",
-      targets: ["//projects/apps/pleomino:pr14_latency"],
+      targets: ["//projects/apps/pleomino:latency-guardrail"],
       threadsOverride: 1,
     },
     {
       name: "shared",
       targets: [
-        "//projects/apps/pleomino:pr10_offline_acceptance",
-        "//projects/apps/pleomino:pr13_regression",
-        "//projects/apps/pleomino:pr15_seeded",
-        "//projects/apps/pleomino:pr4_static_pwa_hardening",
+        "//projects/apps/pleomino:hash-regression",
+        "//projects/apps/pleomino:offline-acceptance",
+        "//projects/apps/pleomino:seeded-solver",
+        "//projects/apps/pleomino:static-pwa-contracts",
         "//projects/apps/pleomino:unit",
       ],
     },
@@ -69,7 +69,7 @@ test("verify target pass loading keeps wildcard scope broad while isolating labe
     "expected wildcard expansion to retain build-system zx tests",
   );
   assert.ok(
-    targetSet.has("//projects/apps/pleomino:pr14_latency"),
+    targetSet.has("//projects/apps/pleomino:latency-guardrail"),
     "expected wildcard expansion to retain isolated project tests",
   );
 
@@ -77,7 +77,7 @@ test("verify target pass loading keeps wildcard scope broad while isolating labe
   const isolatedPass = passes.find((pass) => pass.name === "isolated");
   assert.ok(isolatedPass, "expected wildcard expansion to keep an isolated serial batch");
   assert.ok(
-    isolatedPass.targets.includes("//projects/apps/pleomino:pr14_latency"),
+    isolatedPass.targets.includes("//projects/apps/pleomino:latency-guardrail"),
     "expected isolated project test to remain in the isolated batch",
   );
   assert.ok(

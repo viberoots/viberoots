@@ -7,7 +7,7 @@ import type { VercelApiClient } from "../../deployments/vercel-api";
 import { deploymentWithVercelSecret } from "./vercel.control-plane.helpers";
 import { vercelDeploymentFixture } from "./vercel.fixture";
 
-const legacyAdmission = { decision: "admitted", reason: "legacy" };
+const defaultAdmission = { decision: "admitted", reason: "legacy" };
 
 async function writeJson(filePath: string, value: Record<string, unknown>) {
   await fsp.mkdir(path.dirname(filePath), { recursive: true });
@@ -39,7 +39,7 @@ export async function executeFrozenProviderSnapshot(opts: {
     lifecycleState: "queued",
     terminationReason: null,
     dedupe: { mode: "created", requestFingerprint: opts.provider },
-    admission: opts.submissionAdmission ?? opts.snapshot.admission ?? legacyAdmission,
+    admission: opts.submissionAdmission ?? opts.snapshot.admission ?? defaultAdmission,
   });
   return await opts.execute({
     workspaceRoot: opts.tmp,

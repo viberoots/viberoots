@@ -15,7 +15,7 @@ import {
 
 test("verify target passes batch isolated targets ahead of the shared batch", () => {
   const passes = planVerifyTargetPasses([
-    { target: "//projects/apps/pleomino:pr14_latency", labels: [VERIFY_ISOLATED_LABEL] },
+    { target: "//projects/apps/pleomino:latency-guardrail", labels: [VERIFY_ISOLATED_LABEL] },
     { target: "//projects/apps/pleomino:unit", labels: ["kind:test"] },
     {
       target: "//:deployments_nixos_shared_host_reuse_e2e",
@@ -31,7 +31,7 @@ test("verify target passes batch isolated targets ahead of the shared batch", ()
     {
       name: "isolated",
       targets: [
-        "//projects/apps/pleomino:pr14_latency",
+        "//projects/apps/pleomino:latency-guardrail",
         "//:scaffolding_webapp_ssr_next_contracts",
       ],
       threadsOverride: 1,
@@ -68,7 +68,7 @@ test("verify target passes keep isolated labels stricter than resource-limited l
 test("verify target passes can preserve per-target isolated pass mode for debugging", () => {
   const passes = planVerifyTargetPasses(
     [
-      { target: "//projects/apps/pleomino:pr14_latency", labels: [VERIFY_ISOLATED_LABEL] },
+      { target: "//projects/apps/pleomino:latency-guardrail", labels: [VERIFY_ISOLATED_LABEL] },
       {
         target: "//:scaffolding_webapp_ssr_next_contracts",
         labels: ["kind:test", VERIFY_ISOLATED_LABEL],
@@ -79,8 +79,8 @@ test("verify target passes can preserve per-target isolated pass mode for debugg
 
   assert.deepEqual(passes, [
     {
-      name: "isolated://projects/apps/pleomino:pr14_latency",
-      targets: ["//projects/apps/pleomino:pr14_latency"],
+      name: "isolated://projects/apps/pleomino:latency-guardrail",
+      targets: ["//projects/apps/pleomino:latency-guardrail"],
       threadsOverride: 1,
     },
     {

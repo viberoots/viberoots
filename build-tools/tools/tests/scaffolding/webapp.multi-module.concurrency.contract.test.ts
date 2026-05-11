@@ -32,7 +32,7 @@ async function writeAndTouch(filePath: string, text: string): Promise<void> {
 }
 
 test(
-  "PR-2 concurrency: manifest-driven watcher handles 5 module keys fairly in one session",
+  "multi-module watcher: manifest-driven watcher handles 5 module keys fairly in one session",
   { timeout: TEST_TIMEOUT_MS },
   async () => {
     await runInTemp("vbr-multi-module-watch", async (tmp, _$) => {

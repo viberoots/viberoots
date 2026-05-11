@@ -46,7 +46,10 @@ function validateKindLabels(name: string, kindLabels: string[], problems: string
     if (!isAllowedKindLabel(k)) problems.push(`${name} has invalid kind label: ${k}`);
   }
   const distinctKinds = new Set(uniq.map((k) => k.slice("kind:".length)));
-  if (distinctKinds.size > 1) {
+  // kind:wasm is a wasm-variant co-classification; it may coexist with one primary kind
+  // (e.g. kind:lib on C++ emscripten targets that are also wasm artifacts).
+  const nonWasmKinds = [...distinctKinds].filter((k) => k !== "wasm");
+  if (nonWasmKinds.length > 1) {
     problems.push(`${name} has multiple kind labels: ${uniq.join(", ")}`);
   }
 }

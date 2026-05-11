@@ -56,3 +56,31 @@ test("verify includes a bounded lint preflight (enforcement)", async () => {
     "expected verify preflight to invoke nix-gaps policy checker with canonical docs paths",
   );
 });
+
+test("verify lint-preflight invokes stale-names-lint for full active-source scan (enforcement)", async () => {
+  const txt = await fsp.readFile("build-tools/tools/dev/verify/lint-preflight.ts", "utf8");
+
+  // The preflight module must call the stale-names-lint step.
+  assert.ok(
+    txt.includes("stale-names-lint.ts"),
+    "expected verify lint-preflight to invoke stale-names-lint.ts so active source is scanned for stale repo names, plan numbers, and migration labels before Buck tests run",
+  );
+
+  // The preflight step must run the full-source scan, not just staged-file mode.
+  assert.ok(
+    txt.includes('"--full"') || txt.includes("'--full'") || txt.includes("--full"),
+    "expected verify stale-names preflight to pass --full so the entire active source tree is scanned rather than only staged files",
+  );
+
+  // The preflight must emit a recognisable diagnostic label so operators know which step failed.
+  assert.ok(
+    txt.includes("stale-names preflight"),
+    "expected verify lint-preflight to log a 'stale-names preflight' label so operators can identify the failing step from verify output",
+  );
+
+  // The preflight must exit non-zero on failures — confirmed by the error-path exit call.
+  assert.ok(
+    txt.includes("stale-names preflight failed") || txt.includes("process.exit(2)"),
+    "expected verify stale-names preflight to call process.exit(2) on failure so verify aborts with an actionable non-zero exit code",
+  );
+});

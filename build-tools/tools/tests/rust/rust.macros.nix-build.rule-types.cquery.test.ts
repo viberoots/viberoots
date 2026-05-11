@@ -43,12 +43,12 @@ test("rust macros: rust_library and rust_binary use rust_nix_build", async () =>
     })`buck2 cquery --target-platforms //:no_cgo "kind(rust_nix_build, //projects/apps/rustapp:app)"`;
     assert.ok(String(binProbe.stdout || "").includes("//projects/apps/rustapp:app"));
 
-    const legacyProbe = await $({
+    const genruleProbe = await $({
       cwd: tmp,
       stdio: "pipe",
       reject: false,
       nothrow: true,
     })`buck2 cquery --target-platforms //:no_cgo "kind(genrule, //projects/apps/rustapp:lib)"`;
-    assert.equal(String(legacyProbe.stdout || "").trim(), "");
+    assert.equal(String(genruleProbe.stdout || "").trim(), "");
   });
 });

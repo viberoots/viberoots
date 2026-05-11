@@ -254,7 +254,7 @@ Troubleshooting when local dependency edits do not refresh:
 - For Next SSR templates, verify `transpilePackages` includes local workspace package names and `experimental.externalDir` remains enabled.
 - If wasm producer updates do not apply, run `pnpm run dev:wasm:watch` and verify the logged build command uses `build-tools/tools/dev/build-wasm-producer.ts`.
 
-Shared Phase-4 regression helper contract:
+Shared regression helper contract:
 
 - Reuse `build-tools/tools/tests/scaffolding/lib/wasm-watch.ts` helpers for deterministic file mutation (`writeAndBumpMtime`), process no-restart assertions, watcher failure-signature checks, and local-link validation.
 - Keep template-specific behavior assertions in template tests; keep deterministic probe/mutation primitives in the shared helper module.

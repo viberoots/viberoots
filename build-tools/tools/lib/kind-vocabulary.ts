@@ -6,9 +6,12 @@ export type KindValue =
   | "bin"
   | "bundle"
   | "carchive"
+  | "deployment"
   | "gen"
   | "headers"
   | "lib"
+  | "migration-bundle"
+  | "migrations"
   | "packaging"
   | "pyext"
   | "pyext_wasm"
@@ -22,9 +25,12 @@ export const ALLOWED_KIND_VALUES: ReadonlyArray<KindValue> = [
   "bin",
   "bundle",
   "carchive",
+  "deployment",
   "gen",
   "headers",
   "lib",
+  "migration-bundle",
+  "migrations",
   "packaging",
   "pyext",
   "pyext_wasm",

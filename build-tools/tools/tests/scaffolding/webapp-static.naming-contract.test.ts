@@ -32,23 +32,27 @@ test("ts webapp-static naming contract", async () => {
 
     await $`scaf new ts webapp-static demo-web --yes --dry-run`;
 
-    const legacy = await $`scaf new node webapp-static demo-web --yes --dry-run`.nothrow();
-    if (legacy.exitCode === 0) {
+    const oldNodeCmd = await $`scaf new node webapp-static demo-web --yes --dry-run`.nothrow();
+    if (oldNodeCmd.exitCode === 0) {
       throw new Error("expected scaf new node webapp-static to fail");
     }
-    const legacyErr = `${legacy.stdout || ""}\n${legacy.stderr || ""}`;
+    const oldNodeCmdErr = `${oldNodeCmd.stdout || ""}\n${oldNodeCmd.stderr || ""}`;
     if (
-      !legacyErr.includes("TypeScript templates use 'ts'. Try: scaf new ts webapp-static demo-web")
+      !oldNodeCmdErr.includes(
+        "TypeScript templates use 'ts'. Try: scaf new ts webapp-static demo-web",
+      )
     ) {
       throw new Error("expected clear cutover error for node/webapp-static");
     }
 
-    const legacyHelp = await $`scaf help node webapp-static`.nothrow();
-    if (legacyHelp.exitCode === 0) {
+    const oldNodeHelp = await $`scaf help node webapp-static`.nothrow();
+    if (oldNodeHelp.exitCode === 0) {
       throw new Error("expected scaf help node webapp-static to fail");
     }
-    const legacyHelpErr = `${legacyHelp.stdout || ""}\n${legacyHelp.stderr || ""}`;
-    if (!legacyHelpErr.includes("TypeScript templates use 'ts'. Try: scaf help ts webapp-static")) {
+    const oldNodeHelpErr = `${oldNodeHelp.stdout || ""}\n${oldNodeHelp.stderr || ""}`;
+    if (
+      !oldNodeHelpErr.includes("TypeScript templates use 'ts'. Try: scaf help ts webapp-static")
+    ) {
       throw new Error("expected clear cutover help error for node/webapp-static");
     }
   });

@@ -51,12 +51,12 @@ async function listMarkdownFilesRecursively(root: string): Promise<string[]> {
 }
 
 test("docs contract: active docs use ts command paths for canonical TypeScript templates", async () => {
-  const legacyPattern = canonicalTsTemplatesPattern();
+  const oldNodePattern = canonicalTsTemplatesPattern();
   for (const doc of ACTIVE_DOC_COMMAND_CONTRACT) {
     const content = await fsp.readFile(doc.path, "utf8");
     assert.doesNotMatch(
       content,
-      legacyPattern,
+      oldNodePattern,
       `${doc.path} still contains legacy node command path`,
     );
     for (const fragment of doc.requiredFragments) {

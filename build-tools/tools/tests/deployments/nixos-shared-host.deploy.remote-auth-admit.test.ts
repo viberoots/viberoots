@@ -16,7 +16,7 @@ import {
   remoteExecEnv,
   REVIEWED_PLEOMINO_DEPLOYMENT_LABEL,
 } from "./nixos-shared-host.deploy.remote-exec.helpers";
-import { enableInteractivePkceVaultRuntime } from "./deployment-admin-keycloak.remote-profile.pr98.helpers";
+import { enableInteractivePkceVaultRuntime } from "./deployment-admin-keycloak.remote-profile.helpers";
 import { startNixosSharedHostPublicServer } from "./nixos-shared-host.public-server";
 
 const CONTROL_PLANE_TOKEN = "test-control-plane-token";

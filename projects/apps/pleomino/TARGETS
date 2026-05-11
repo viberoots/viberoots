@@ -25,18 +25,18 @@ nix_node_test(
 )
 
 nix_node_test(
-    name = "pr13_regression",
+    name = "hash-regression",
     patterns = ["test/game-solve-preview-hash-regression.test.tsx"],
 )
 
 nix_node_test(
-    name = "pr14_latency",
+    name = "latency-guardrail",
     patterns = ["test/game-solve-latency-guardrail.test.tsx"],
     labels = ["verify:isolated"],
 )
 
 nix_node_test(
-    name = "pr15_seeded",
+    name = "seeded-solver",
     patterns = [
         "test/game-solver-seeded-selection.test.ts",
         "test/game-solver-runtime.test.ts",
@@ -45,7 +45,7 @@ nix_node_test(
 )
 
 nix_node_test(
-    name = "pr4_static_pwa_hardening",
+    name = "static-pwa-contracts",
     patterns = [
         "test/game-screen-startup-browser.test.tsx",
         "test/game-screen-persistence-browser.test.tsx",
@@ -54,7 +54,7 @@ nix_node_test(
 )
 
 nix_node_test(
-    name = "pr10_offline_acceptance",
+    name = "offline-acceptance",
     patterns = [
         "test/game-offline-relaunch-solve-browser.test.tsx",
         "test/pwa-service-worker-registration.test.ts",

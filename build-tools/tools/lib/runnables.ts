@@ -75,7 +75,7 @@ function normalizeRunnableContract(v: unknown): RunnableContract | null {
   };
 }
 
-function legacyRunnableFromBins(bins: string[]): RunnableContract | null {
+function runnableFromBins(bins: string[]): RunnableContract | null {
   if (bins.length === 0) return null;
   return {
     kind: "native-bin",
@@ -94,8 +94,7 @@ export function parseRunnableManifest(text: string): RunnableManifestEntry[] {
     const label = String((raw as any)?.label || "");
     if (!label) continue;
     const bins = asStringArray((raw as any)?.bins);
-    const runnable =
-      normalizeRunnableContract((raw as any)?.runnable) || legacyRunnableFromBins(bins);
+    const runnable = normalizeRunnableContract((raw as any)?.runnable) || runnableFromBins(bins);
     out.push({
       label,
       kind: typeof (raw as any)?.kind === "string" ? (raw as any).kind : undefined,

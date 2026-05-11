@@ -10,7 +10,7 @@ async function writeTarget(dir: string, body: string) {
   await fsp.writeFile(path.join(dir, "TARGETS"), body, "utf8");
 }
 
-test("PR-6 producer surfaces expose deterministic contract attrs", async () => {
+test("producer surfaces expose deterministic contract attrs", async () => {
   await runInTemp("webapp-producer-surface-contract", async (tmp, $) => {
     await writeTarget(
       path.join(tmp, "projects", "libs", "go-wasm"),

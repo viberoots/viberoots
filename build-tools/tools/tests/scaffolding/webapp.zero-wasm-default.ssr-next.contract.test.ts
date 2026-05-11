@@ -18,7 +18,7 @@ const NEXT_DEV_READY_TIMEOUT_MS = Number(
 );
 
 test(
-  "PR-7 zero-wasm default (ssr-next): install, build, and dev stay healthy without wasm modules",
+  "zero-wasm default (ssr-next): install, build, and dev stay healthy without wasm modules",
   { timeout: TEST_TIMEOUT_MS },
   async () => {
     await runInTemp("webapp-zero-wasm-default-ssr-next", async (tmp, _$) => {

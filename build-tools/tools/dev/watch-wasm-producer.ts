@@ -23,12 +23,12 @@ function uniqueSorted(values: string[]): string[] {
   return Array.from(new Set(values.filter(Boolean))).sort((a, b) => a.localeCompare(b));
 }
 
-function failLegacyFlags(legacyFlags: string[]): never {
+function failDeprecatedFlags(deprecatedFlags: string[]): never {
   throw new Error(
     [
-      "[wasm-watch] legacy-args:unsupported",
-      `[wasm-watch] legacy-args:received ${legacyFlags.join(",")}`,
-      "[wasm-watch] migration: remove legacy watcher flags and run `pnpm run dev:wasm:watch` without --watch/--build-cmd/--build-out/--sync-out.",
+      "[wasm-watch] deprecated-args:unsupported",
+      `[wasm-watch] deprecated-args:received ${deprecatedFlags.join(",")}`,
+      "[wasm-watch] migration: remove old watcher flags and run `pnpm run dev:wasm:watch` without --watch/--build-cmd/--build-out/--sync-out.",
     ].join("\n"),
   );
 }
@@ -43,7 +43,7 @@ async function main() {
   const buildCmdRaw = getFlagStr("build-cmd", "");
   const buildOutRaw = getFlagStr("build-out", "");
   const syncOutRaw = getFlagStr("sync-out", "");
-  const legacyFlags = [watchRaw, buildCmdRaw, buildOutRaw, syncOutRaw]
+  const deprecatedFlags = [watchRaw, buildCmdRaw, buildOutRaw, syncOutRaw]
     .map((value, idx) =>
       String(value || "").trim() !== ""
         ? (["--watch", "--build-cmd", "--build-out", "--sync-out"][idx] as string)
@@ -58,7 +58,7 @@ async function main() {
   let generatedAppTarget = "";
   let generatedRoot = "";
 
-  if (legacyFlags.length > 0) failLegacyFlags(legacyFlags);
+  if (deprecatedFlags.length > 0) failDeprecatedFlags(deprecatedFlags);
 
   if (!wasmManifest && !tsManifest) {
     const resolved = resolveModuleContractsPaths({

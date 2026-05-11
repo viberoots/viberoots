@@ -53,7 +53,7 @@ const TEMPLATE_WATCHERS: TemplateWatcherExpectation[] = [
   },
 ];
 
-test("PR-2 contract: watcher emits module-scoped deterministic markers", async () => {
+test("multi-module watcher emits module-scoped deterministic markers", async () => {
   const watcherPath = path.join(
     REPO_ROOT,
     "build-tools",
@@ -82,7 +82,7 @@ test("PR-2 contract: watcher emits module-scoped deterministic markers", async (
   assert.match(source, /validateTsManifestProbes/);
 });
 
-test("PR-2 contract: template watchers rely on generated contract paths", async () => {
+test("multi-module watcher: template watchers rely on generated contract paths", async () => {
   for (const item of TEMPLATE_WATCHERS) {
     const abs = path.join(REPO_ROOT, item.scriptPath);
     const source = await fsp.readFile(abs, "utf8");
