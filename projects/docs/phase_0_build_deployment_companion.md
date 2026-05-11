@@ -29,7 +29,7 @@ The adaptation is about repository shape and delivery mechanics:
 - build deployable artifacts through Buck/Nix rather than provider-side ad hoc builds
 - publish through the repo-level `deploy` front door
 - encode secrets, runtime config, OpenTofu provisioning, smoke checks, promotion, rollback, and deploy-blocking readiness gates in deployment metadata and CI
-- use `secretspec` as the stable secret contract and Vault as the production secret backend
+- use `SprinkleRef` as the stable secret contract and Vault as the production secret backend
 - add a Vercel deployment provider so the console can stay on Vercel while still participating in the repo's deployment model
 
 This keeps app-specific code out of platform-named packages while making the first application's boundary explicit. The split is a one-way CI-enforced import rule, not a multi-app framework: no `app_templates`, no recipes, no plugin registry. Platform packages contain whatever the data-room app currently needs from them; they grow when data-room needs new platform capabilities, not in anticipation of a second app.
@@ -341,7 +341,7 @@ Requirements:
 - routine deploy rejects destructive plans unless a reviewed destructive workflow or target exception is used
 - apply consumes the exact reviewed plan or a fail-closed equivalent resolved-input snapshot
 - state backend is declared and environment-scoped
-- provider credentials are declared through `secret_requirements`, resolved through `secretspec`, and read from Vault at execution time
+- provider credentials are declared through `secret_requirements`, resolved through `SprinkleRef`, and read from Vault at execution time
 - provision-only flows are first-class and audited
 - promotion compatibility accounts for provisioner type, stack identity, state backend, and allowed environment-specific differences
 
@@ -394,11 +394,11 @@ These can be modeled as either:
 
 The provider route is cleaner if the deployment system needs normal deploy records, target identity, locking, status, retry, rollback, and provision-only semantics for infrastructure as the main artifact. The provisioner-only route is cleaner if we want to avoid adding a new provider kind and can express the workflow using existing provision-only machinery.
 
-Either way, foundation infrastructure should still use the same lane/admission policy, Vault/secretspec secret resolution, plan/diff review, and immutable execution snapshot model as app deployments.
+Either way, foundation infrastructure should still use the same lane/admission policy, Vault/SprinkleRef secret resolution, plan/diff review, and immutable execution snapshot model as app deployments.
 
-## 10. Vault And `secretspec` Requirements
+## 10. Vault And `SprinkleRef` Requirements
 
-Secrets must use this repo's existing `secretspec` contract model.
+Secrets must use this repo's existing `SprinkleRef` contract model.
 
 The stable repo-owned surface is:
 
@@ -406,7 +406,7 @@ The stable repo-owned surface is:
 - each requirement names a stable `contract_id`, such as `secret://deployments/platform/vercel_api_token`
 - admission freezes non-secret admitted secret references
 - runtime resolves secret values only for the lifecycle step that needs them
-- Vault is the production backend behind the `secretspec` contract
+- Vault is the production backend behind the `SprinkleRef` contract
 - local/test fixtures remain explicit non-production overrides, not the production path
 
 For this project, secrets should be grouped by deployment family and purpose, not by implementation accident. Example contract IDs:
@@ -508,9 +508,9 @@ Requirements:
 
 - declare all Vercel runtime environment variables needed by the console
 - declare all build-time public configuration separately from runtime secrets
-- declare Vercel API credentials through `secret_requirements` with stable `secretspec` contract IDs
+- declare Vercel API credentials through `secret_requirements` with stable `SprinkleRef` contract IDs
 - resolve Vercel publish credentials from Vault through the deployment secret runtime during `publish` and `preview_cleanup`
-- leave Vercel project, domain, and environment-setting mutation to the deployment's `opentofu-stack` provisioner, which resolves any `provision` credentials through the same Vault/secretspec runtime
+- leave Vercel project, domain, and environment-setting mutation to the deployment's `opentofu-stack` provisioner, which resolves any `provision` credentials through the same Vault/SprinkleRef runtime
 - never store secret values in `TARGETS`
 - support environment-scoped values for dev, staging, and prod
 - fail closed when a required secret or runtime config value is absent
@@ -518,7 +518,7 @@ Requirements:
 
 The console should generally need less secret material than `data-room-web`, because policy and privileged service-role operations belong in the web process. Vercel should receive only what the thin console needs, such as public base URLs, AuthKit browser-facing configuration, and non-secret feature flags.
 
-The Vercel provider should not write durable Vercel project settings as part of the publish step. If Vercel environment variables or project settings must change, that mutation is provisioning and should be driven by an `opentofu-stack` provisioner. Runtime secret values should still originate from Vault/secretspec and should not be hand-entered in the Vercel dashboard for protected/shared environments.
+The Vercel provider should not write durable Vercel project settings as part of the publish step. If Vercel environment variables or project settings must change, that mutation is provisioning and should be driven by an `opentofu-stack` provisioner. Runtime secret values should still originate from Vault/SprinkleRef and should not be hand-entered in the Vercel dashboard for protected/shared environments.
 
 ### 11.5 Preview Support
 
@@ -606,7 +606,7 @@ If the chosen production runtime is not already represented by a reviewed provid
 - canonical service identity
 - immutable service artifact or image digest
 - environment-scoped secrets and runtime config
-- `secretspec`/Vault resolution for provider credentials and runtime secrets
+- `SprinkleRef`/Vault resolution for provider credentials and runtime secrets
 - `opentofu-stack` provisioner support when service infrastructure is deployment-owned
 - health checks
 - retry, rollback, and promotion behavior
@@ -625,7 +625,7 @@ Recommended order:
 3. Split schema migrations and RLS tests between `projects/libs/platform-db` and `projects/libs/data-room-db`.
 4. Add deployment metadata skeletons for console, web, worker, foundation, and shared lane policy.
 5. Add or extend `opentofu-stack` provisioner support and foundation deployment support.
-6. Define `secret_requirements` and Vault/secretspec contract IDs for every provider, provisioner, and runtime secret.
+6. Define `secret_requirements` and Vault/SprinkleRef contract IDs for every provider, provisioner, and runtime secret.
 7. Implement or select the container runtime provider for web and worker.
 8. Implement the Vercel provider enough for `local_only` or dev deployment.
 9. Add provider capability entries and validation for Vercel, OpenTofu/provisioning, and the chosen container runtime.
@@ -649,7 +649,7 @@ Use this checklist when reviewing the implementation plan:
 - Does every deployable artifact have a Buck target?
 - Does protected/shared deployment consume admitted immutable artifacts?
 - Are secrets and runtime config declared in deployment metadata rather than hardcoded?
-- Do all secrets use stable `secretspec` contract IDs and Vault-backed runtime resolution?
+- Do all secrets use stable `SprinkleRef` contract IDs and Vault-backed runtime resolution?
 - Is the Vercel provider based on prebuilt artifacts rather than Vercel Git auto-builds for production?
 - Are readiness gates represented as CI or admission checks?
 - Is Connect throwaway code structurally isolated under `platform-ragie/connect/`, with the throwaway tag on every file?

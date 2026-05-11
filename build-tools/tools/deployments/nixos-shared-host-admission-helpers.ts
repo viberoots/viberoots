@@ -2,7 +2,7 @@
 import type { NixosSharedHostDeployment } from "./contract";
 import type { DeploymentSecretContext } from "./deployment-secret-context";
 import { resolveSourceRunAdmittedSecretReferences } from "./deployment-secret-admission";
-import type { DeploymentSecretAdmittedReference } from "./deployment-secretspec";
+import type { DeploymentSecretAdmittedReference } from "./deployment-sprinkle-ref";
 import { nixosSharedHostDeploymentTargetIdentity } from "./nixos-shared-host-components";
 import type { NixosSharedHostAdmittedContext } from "./nixos-shared-host-admission";
 import type { NixosSharedHostReviewedSourceSnapshot } from "./nixos-shared-host-reviewed-source-snapshot";

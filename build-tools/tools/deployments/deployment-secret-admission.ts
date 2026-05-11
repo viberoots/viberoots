@@ -2,7 +2,7 @@
 import { resolveDeploymentVaultAdmittedReferences } from "./deployment-secret-vault";
 import type { DeploymentSecretContext } from "./deployment-secret-context";
 import type { DeploymentRequirement } from "./deployment-requirements";
-import type { DeploymentSecretAdmittedReference } from "./deployment-secretspec";
+import type { DeploymentSecretAdmittedReference } from "./deployment-sprinkle-ref";
 
 type SourceAdmittedContextLike = {
   secretRequirements?: DeploymentRequirement[];

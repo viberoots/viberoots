@@ -394,7 +394,7 @@ deploymentHost.deployAuthCallback = {
 ```
 
 `bootstrapFirstOperatorPasswordFile` is a host-managed secret path, not a Nix
-store value. Use secretspec or your host secret mechanism to place a temporary
+store value. Use SprinkleRef or your host secret mechanism to place a temporary
 first-login password there. The migration reads it during service start, sets it
 once for `bootstrapFirstOperatorEmail`, and writes a marker under
 `generatedImportRoot` so later rebuilds do not reset the operator's password.
@@ -443,7 +443,7 @@ direnv exec . build-tools/tools/bin/deploy admin identity grant-user \
 ```
 
 `deploymentHost.identityProvider.databasePasswordFile` is a host-managed secret
-path, not a repo-managed artifact. Keep `secretspec` as the reviewed repo-level
+path, not a repo-managed artifact. Keep `SprinkleRef` as the reviewed repo-level
 secret contract for deployment flows, and let Vault or another reviewed host
 secret system provide the concrete runtime file. The identity-provider module
 can run its bootstrap migration with a root-owned restricted database password

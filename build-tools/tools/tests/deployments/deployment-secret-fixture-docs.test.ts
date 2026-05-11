@@ -36,7 +36,7 @@ test("secret fixture docs use the reviewed neutral fixture contract vocabulary",
 
   assert.match(
     secretsUsageDoc,
-    /`secretspec` is the contract layer[\s\S]*admitted secret references[\s\S]*Vault[\s\S]*secret fixture/,
+    /`SprinkleRef` is the contract layer[\s\S]*admitted secret references[\s\S]*Vault[\s\S]*secret fixture/,
     "secrets usage must explain the contract, admission, Vault, and secret fixture layers together",
   );
   assert.match(

@@ -27,7 +27,7 @@ path — it stays put across the rename. (See [docs/nixos-shared-host-setup.md:1
 
 ## Preconditions
 
-- Repo rename PRs (PR-1..PR-5 in [docs/repo-rename.md](docs/repo-rename.md)) are merged on `main`.
+- Repo rename PRs (PR-1..PR-6 in [docs/repo-rename.md](docs/repo-rename.md)) are merged on `main`.
 - GitHub repo `viberoots/viberoots` exists and accepts the existing deploy key
   used by `mini`. Verify locally: `ssh -T git@github.com` from `mini` returns
   successfully, and the key is registered on `viberoots/viberoots`.

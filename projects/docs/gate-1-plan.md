@@ -43,7 +43,7 @@ This PR gives later Gate 1 work a real home under the intended `projects/` layou
   - `data-room-*` cannot import `apps/*`.
   - app targets cannot import other app targets.
 - Add the special boundary check that `data-room-mcp-tools` cannot import `platform-ragie/connect/`, even though those packages may not exist yet. The rule should be present before the directories are created.
-- Add `secretspec` contract declarations for the Gate 1 live test:
+- Add `SprinkleRef` contract declarations for the Gate 1 live test:
   - `secret://deployments/platform/ragie_api_key`
   - environment-scoped Ragie test partition prefix or runtime config, if the repo models non-secret runtime config separately.
 - Add a local-only fixture path for developer validation that is explicitly separate from production secret resolution.
@@ -52,7 +52,7 @@ This PR gives later Gate 1 work a real home under the intended `projects/` layou
 ### 3. External prerequisites
 
 - Maintainer access to CI configuration and repo build settings so new Buck/Nix, lint, and test targets can be wired into the normal PR checks.
-- Agreement from the build/deployment owner on the `secretspec` contract IDs for Ragie test access; the secret value itself does not need to be provisioned until PR 3.
+- Agreement from the build/deployment owner on the `SprinkleRef` contract IDs for Ragie test access; the secret value itself does not need to be provisioned until PR 3.
 - Access to the repo's secret-contract or Vault administration workflow, or a designated owner who can approve the new non-production Ragie secret contract.
 - Confirmation that the package names in architecture section 17 remain acceptable before the directories are created.
 - No live Ragie account, Supabase project, WorkOS setup, Vercel project, or container runtime account is required for this PR.
@@ -77,7 +77,7 @@ This PR gives later Gate 1 work a real home under the intended `projects/` layou
 - Boundary checks fail on deliberate violations and pass on the real codebase.
 - CI can run all non-secret Gate 1 checks.
 - No raw Ragie client import is available outside `platform-ragie`.
-- Secret requirements are declared through `secretspec`/runtime config contracts, not `.env` files or committed provider settings.
+- Secret requirements are declared through `SprinkleRef`/runtime config contracts, not `.env` files or committed provider settings.
 
 ### 7. Risks related to the PR
 

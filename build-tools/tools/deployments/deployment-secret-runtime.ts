@@ -4,7 +4,7 @@ import {
   deploymentSecretBindingsForStep,
   deploymentSecretContractBindings,
   type DeploymentSecretReference,
-} from "./deployment-secretspec";
+} from "./deployment-sprinkle-ref";
 import type { DeploymentRequirement, DeploymentRequirementStep } from "./deployment-requirements";
 
 export type DeploymentSecretMaterial = {

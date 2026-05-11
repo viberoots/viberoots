@@ -6,7 +6,7 @@ import {
   resolveInitialAdmittedSecretReferences,
   resolveSourceRunAdmittedSecretReferences,
 } from "./deployment-secret-admission";
-import type { DeploymentSecretAdmittedReference } from "./deployment-secretspec";
+import type { DeploymentSecretAdmittedReference } from "./deployment-sprinkle-ref";
 import {
   resolveDeploymentReviewedTargetEnvironment,
   type DeploymentReviewedTargetEnvironmentAdmission,

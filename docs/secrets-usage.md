@@ -10,7 +10,7 @@ If you are new here, the key idea is simple:
 
 Use this guide when you want the shortest path to:
 
-- understand what `secretspec` means
+- understand what `SprinkleRef` means
 - know when a deployment should declare `secret_requirements`
 - resolve secrets at runtime through the current Vault-backed helpers
 - bootstrap Vault as the production source of truth and, when needed, export
@@ -19,7 +19,7 @@ Use this guide when you want the shortest path to:
 
 ## Reviewed Front Door
 
-The main public surface is the `secretspec` layer described in
+The main public surface is the `SprinkleRef` layer described in
 [Deployment And Secrets API](/Users/kiltyj/Code/viberoots/docs/deployment-secrets-api.md).
 
 For day-to-day operator deployment flows, start with
@@ -34,7 +34,7 @@ For production Vault bring-up and the optional local/test export bridge into
 
 ## Plain-Language Glossary
 
-- `secretspec`: the stable way this repo names a required secret without
+- `SprinkleRef`: the stable way this repo names a required secret without
   storing the secret value
 - `secret_requirements`: the list of secrets a deployment needs
 - contract id: the stable name of one secret, such as
@@ -47,7 +47,7 @@ For production Vault bring-up and the optional local/test export bridge into
 
 ## How The Layers Fit Together
 
-- `secretspec` is the contract layer that names required secrets in repo-owned
+- `SprinkleRef` is the contract layer that names required secrets in repo-owned
   metadata.
 - admitted secret references are the replay/runtime reference layer that freezes
   the exact non-secret resolution details for one run.
@@ -62,7 +62,7 @@ For production Vault bring-up and the optional local/test export bridge into
 - admission freezes admitted secret references, not secret values
 - runtime secret values are resolved only when a lifecycle step actually needs
   them
-- Vault is the current backend, but callers use the stable `secretspec` layer
+- Vault is the current backend, but callers use the stable `SprinkleRef` layer
 - external provider credentials are never satisfied from ambient provider
   environment variables such as local CLI tokens; they must be declared as
   `secret_requirements` and resolved by the secret runtime
@@ -689,7 +689,7 @@ when you are setting up Vault itself, configuring JWT auth roles, writing secret
 or generating the optional local/test runtime export from Vault.
 
 Open [Deployments Design](/Users/kiltyj/Code/viberoots/docs/deployments-design.md)
-when you need the architectural rationale behind `secretspec`, replay
+when you need the architectural rationale behind `SprinkleRef`, replay
 snapshots, and Vault-backed resolution.
 
 Open [Deployment Contract](/Users/kiltyj/Code/viberoots/docs/deployments-contract.md)

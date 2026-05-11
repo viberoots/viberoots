@@ -38,8 +38,8 @@ async function writeSecretFixture(filePath: string, contracts: Record<string, un
   );
 }
 
-test("cloudflare-pages deploy keeps secretspec-backed Vault values out of records and snapshots", async () => {
-  await runInTemp("cloudflare-pages-secretspec", async (tmp, $) => {
+test("cloudflare-pages deploy keeps SprinkleRef-backed Vault values out of records and snapshots", async () => {
+  await runInTemp("cloudflare-pages-sprinkle-ref", async (tmp, $) => {
     const deployment = cloudflarePagesDeploymentFixture({
       secretRequirements: [
         deploymentRequirementFixture({
@@ -68,9 +68,9 @@ test("cloudflare-pages deploy keeps secretspec-backed Vault values out of record
     const admissionEvidence = deploymentAdmissionEvidenceFixture({
       deployment,
       operationKind: "deploy",
-      sourceRevision: "rev-cloudflare-secretspec-1",
-      artifactIdentity: "artifact-cloudflare-secretspec-1",
-      artifactLineageId: "artifact-cloudflare-secretspec-1",
+      sourceRevision: "rev-cloudflare-sprinkle-ref-1",
+      artifactIdentity: "artifact-cloudflare-sprinkle-ref-1",
+      artifactLineageId: "artifact-cloudflare-sprinkle-ref-1",
     });
     const server = await startCloudflarePagesPublicServer({
       deployment,
@@ -122,8 +122,8 @@ test("cloudflare-pages deploy keeps secretspec-backed Vault values out of record
   });
 });
 
-test("cloudflare-pages admission fails closed when a required secretspec contract is missing", async () => {
-  await runInTemp("cloudflare-pages-secretspec-missing", async (tmp, $) => {
+test("cloudflare-pages admission fails closed when a required SprinkleRef contract is missing", async () => {
+  await runInTemp("cloudflare-pages-sprinkle-ref-missing", async (tmp, $) => {
     const deployment = cloudflarePagesDeploymentFixture({
       secretRequirements: [
         deploymentRequirementFixture({
@@ -146,9 +146,9 @@ test("cloudflare-pages admission fails closed when a required secretspec contrac
     const admissionEvidence = deploymentAdmissionEvidenceFixture({
       deployment,
       operationKind: "deploy",
-      sourceRevision: "rev-cloudflare-secretspec-2",
-      artifactIdentity: "artifact-cloudflare-secretspec-2",
-      artifactLineageId: "artifact-cloudflare-secretspec-2",
+      sourceRevision: "rev-cloudflare-sprinkle-ref-2",
+      artifactIdentity: "artifact-cloudflare-sprinkle-ref-2",
+      artifactLineageId: "artifact-cloudflare-sprinkle-ref-2",
     });
     const originalEnv = { ...process.env };
     process.env.PATH = `${fake.binDir}:${originalEnv.PATH || ""}`;

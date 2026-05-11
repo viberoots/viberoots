@@ -103,5 +103,5 @@ test("identity-provider docs use portable host secret reconciliation guidance", 
   assert.doesNotMatch(combined, /\bpull-switch\b/);
   assert.match(combined, /nixos-rebuild switch --flake/);
   assert.match(combined, /host-managed secret/);
-  assert.match(combined, /secretspec/);
+  assert.match(combined, /SprinkleRef/);
 });

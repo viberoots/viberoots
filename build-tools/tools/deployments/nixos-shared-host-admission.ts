@@ -11,7 +11,7 @@ import {
   sameRequirementSet,
   type DeploymentRequirement,
 } from "./deployment-requirements";
-import type { DeploymentSecretAdmittedReference } from "./deployment-secretspec";
+import type { DeploymentSecretAdmittedReference } from "./deployment-sprinkle-ref";
 import {
   gitIsAncestor,
   replayMismatch,

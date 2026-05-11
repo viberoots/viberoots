@@ -2,7 +2,7 @@
 import type { DeploymentAdmissionPolicyEvaluation } from "./deployment-admission-evidence";
 import type { DeploymentRequirement } from "./deployment-requirements";
 import { resolveInitialAdmittedSecretReferences } from "./deployment-secret-admission";
-import type { DeploymentSecretAdmittedReference } from "./deployment-secretspec";
+import type { DeploymentSecretAdmittedReference } from "./deployment-sprinkle-ref";
 import {
   resolveDeploymentReviewedTargetEnvironment,
   type DeploymentReviewedTargetEnvironmentAdmission,

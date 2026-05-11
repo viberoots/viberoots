@@ -879,7 +879,7 @@ existing `virtualHosts = (...) // { ... };` expression:
 
 The module enables Keycloak with a local PostgreSQL database, binds the HTTP
 listener to `127.0.0.1`, and keeps the database password file as an out-of-store
-host-managed secret path. Keep `secretspec` as the reviewed repo-level contract
+host-managed secret path. Keep `SprinkleRef` as the reviewed repo-level contract
 for deployment secrets, while Vault or another reviewed host secret system owns
 the concrete runtime file at
 `deploymentHost.identityProvider.databasePasswordFile`. The bootstrap migration

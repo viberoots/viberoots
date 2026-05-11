@@ -24,6 +24,7 @@ const ALLOWED_PATHS = new Set([
   "build-tools/tools/tests/deployments/nixos-shared-host.control-plane-service-env.test.ts",
   "build-tools/tools/tests/linting/no-stale-viberoots-names.enforcement.test.ts",
   "docs/contributor-naming-conventions.md",
+  "docs/deployment-plan.md",
   "docs/mini-name-migration-instructions.md",
   "docs/repo-rename.md",
   "docs/runtime-prefix-migration.md",
@@ -48,6 +49,8 @@ const STALE_PATTERNS: Array<{ re: RegExp; label: string }> = [
   { re: /\bgit@github\.com:kiltyj\/common\.git\b/g, label: "old common repo remote" },
   { re: /\bkiltyj\/viberoots\b/g, label: "kiltyj/viberoots" },
   { re: /\bgit@github\.com:kiltyj\/viberoots\.git\b/g, label: "old viberoots repo remote" },
+  { re: /\bsecretspec\b/g, label: "secretspec (use SprinkleRef)" },
+  { re: /\bSecretspec\b/g, label: "Secretspec (use SprinkleRef)" },
 ];
 
 function normalizeRel(p: string): string {

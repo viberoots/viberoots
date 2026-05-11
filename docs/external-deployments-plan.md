@@ -10,7 +10,7 @@ Reviewed context:
   requires new target types to augment the existing `scaf` tooling rather than introducing a second
   scaffold mechanism.
 - [`docs/deployment-plan.md`](deployment-plan.md) already plans and implements a substantial shared
-  deployment system around provider capabilities, deployment metadata, secretspec/Vault, admission,
+  deployment system around provider capabilities, deployment metadata, SprinkleRef/Vault, admission,
   immutable artifact reuse, and protected/shared control-plane execution.
 - The current repo already has reviewed deployment paths for `nixos-shared-host`, `cloudflare-pages`,
   `s3-static`, mobile store providers, and a Kubernetes service provider implementation path. It also
@@ -184,7 +184,7 @@ available.
 ### 1. Intent
 
 Turn the Vercel provider into a production-eligible external publisher that uses the existing
-admission, secretspec/Vault, immutable artifact, retry, rollback, preview, and record contracts.
+admission, SprinkleRef/Vault, immutable artifact, retry, rollback, preview, and record contracts.
 
 ### 2. Scope of changes
 
@@ -203,7 +203,7 @@ admission, secretspec/Vault, immutable artifact, retry, rollback, preview, and r
 ### 3. External prerequisites
 
 - Vercel team/project access.
-- Vercel API token stored through the repo's Vault/secretspec backend.
+- Vercel API token stored through the repo's Vault/SprinkleRef backend.
 - DNS/domain ownership for any production or staging aliases used in smoke tests.
 - Network egress from the deployment worker to Vercel APIs.
 
@@ -211,7 +211,7 @@ admission, secretspec/Vault, immutable artifact, retry, rollback, preview, and r
 
 - Fake Vercel API tests for publish, preview, cleanup, retry, rollback, and ambiguous API outcome
   failure.
-- Secretspec tests proving Vercel tokens are resolved only through the secret runtime and are not
+- SprinkleRef tests proving Vercel tokens are resolved only through the secret runtime and are not
   written to records.
 - Protected/shared service submission tests proving laptop-local artifact paths are rejected.
 - Smoke tests against fixture HTTP servers for success and failure cases.
@@ -287,7 +287,7 @@ infrastructure remains deployment-owned, reviewed, admitted, and recorded.
 - Plan parsing tests for no-op, create/update, and destructive changes.
 - Admission tests proving plan fingerprints are required and replayed.
 - Provision-only control-plane tests for protected/shared foundation deployments.
-- Secretspec tests proving provision credentials are scoped to `provision` and redacted from records.
+- SprinkleRef tests proving provision credentials are scoped to `provision` and redacted from records.
 - Promotion compatibility tests for stack identity, backend identity, and allowed env differences.
 - Fixture stack tests using fake providers or dry-run JSON where live APIs are not required.
 
@@ -431,7 +431,7 @@ public web ingress and private worker execution.
   the shortest reviewed route unless the team explicitly chooses another runtime.
 - Cluster access, namespace policy, service accounts, ingress controller, and registry or artifact
   staging strategy.
-- Provider credentials stored through Vault/secretspec.
+- Provider credentials stored through Vault/SprinkleRef.
 
 ### 4. Tests to be added
 
@@ -553,7 +553,7 @@ surfaces to maintain.
 
 ### 1. Intent
 
-Promote external-service requirements into deployment metadata, secretspec contracts,
+Promote external-service requirements into deployment metadata, SprinkleRef contracts,
 runtime config contracts, and deploy-blocking readiness gates.
 
 ### 2. Scope of changes
@@ -811,7 +811,7 @@ step.
 - Fake OpenTofu apply tests proving only the admitted plan fingerprint can be applied.
 - Negative tests for missing plan artifacts, mismatched plan fingerprints, mismatched stack config
   fingerprints, state backend drift, and missing `provision` credentials.
-- Secretspec tests proving provider credentials are scoped to `provision` and never written to
+- SprinkleRef tests proving provider credentials are scoped to `provision` and never written to
   records.
 - Destructive-plan tests proving routine flows reject delete/replace/unknown actions unless a
   reviewed destructive workflow or exception is present.
@@ -883,7 +883,7 @@ instead of relying on ambient Helm or cluster environment state.
 
 ### 4. Tests to be added
 
-- Secretspec tests proving Kubernetes publish credentials resolve only at `publish` and are redacted
+- SprinkleRef tests proving Kubernetes publish credentials resolve only at `publish` and are redacted
   from records.
 - Fake Helm tests proving the publisher receives only reviewed credential inputs and no ambient
   provider environment secrets.
@@ -1337,7 +1337,7 @@ artifacts while keeping the existing fake client as an explicit local/test fixtu
 
 ### 3. External prerequisites
 
-- Vercel team/project access and API token stored through the repo's Vault/secretspec backend.
+- Vercel team/project access and API token stored through the repo's Vault/SprinkleRef backend.
 - Network egress from the deployment worker to Vercel APIs.
 - DNS/domain ownership for any configured production or staging aliases.
 
@@ -1345,7 +1345,7 @@ artifacts while keeping the existing fake client as an explicit local/test fixtu
 
 - Fake HTTP Vercel API tests for upload, create deployment, alias/domain assignment, polling,
   success, provider failure, and ambiguous outcome handling.
-- Secretspec tests proving Vercel tokens are resolved only through deployment secret runtime and are
+- SprinkleRef tests proving Vercel tokens are resolved only through deployment secret runtime and are
   not written to records or diagnostics.
 - Selection tests proving live provider profiles use the live client and local/test profiles keep
   using the fake client.
@@ -1692,7 +1692,7 @@ the external-source and GitHub gates that decide whether design partners may see
   `fetch_full_document` denial evidence.
 - Policy tests proving direct-upload pilot admission can pass with Gates 1-4 while connector-demo
   admission still blocks until Gate 5 passes.
-- Secretspec tests proving live gate credentials resolve only through reviewed secret runtime steps.
+- SprinkleRef tests proving live gate credentials resolve only through reviewed secret runtime steps.
 - Regression tests proving readiness admission consumes PR-19 deployment metadata without requiring
   another build-system extraction change.
 
@@ -1776,7 +1776,7 @@ migration bundle from PR-19, Supabase apply step, and post-apply isolation check
   diagnostics.
 - Admission/prerequisite tests proving web and worker deployments block when required foundation
   migration evidence is absent, stale, failed, or bound to the wrong source revision.
-- Secretspec tests proving Supabase migration credentials are scoped to the migration/provision step
+- SprinkleRef tests proving Supabase migration credentials are scoped to the migration/provision step
   and are not recorded.
 
 ### 5. Docs to be added or updated

@@ -37,7 +37,7 @@ Vercel-hosted Next.js management console
   request_access, fetch_full_document
 + OpenTofu IaC, invoked through deployment-owned `opentofu-stack` provisioners
   (no separate top-level `infra/` tree); state in S3/R2
-+ Buck/Nix builds; admitted immutable artifacts; secrets via secretspec/Vault
++ Buck/Nix builds; admitted immutable artifacts; secrets via SprinkleRef/Vault
 ```
 
 The **security rule** that drives the architecture:
@@ -821,7 +821,7 @@ The GitHub source is authorized through our own GitHub App, not through Ragie:
 - One GitHub App installation per tenant connection.
 - The founder installs the app on exactly one selected repository for the Phase 0 demo. Org-wide installation is rejected unless the selected repository list contains exactly one repository.
 - Repository permissions: `Contents: read` and `Metadata: read` are required for file discovery and content reads. `Pull requests: read` and `Issues: read` are optional and enabled only if PR/issue discussions are part of the demo corpus. No write permissions, no Actions/Workflows permission, no Secrets permission, no Packages permission.
-- The platform stores the GitHub App private key through `secretspec`/Vault and stores installation/repository identifiers in Postgres. Short-lived installation access tokens are minted by the worker when needed and are not persisted.
+- The platform stores the GitHub App private key through `SprinkleRef`/Vault and stores installation/repository identifiers in Postgres. Short-lived installation access tokens are minted by the worker when needed and are not persisted.
 - GitHub source credentials are a deliberate exception to the Ragie-Connect throwaway model. They are held by the platform because Ragie does not provide the needed source type and GitHub is a must-have. This exception is narrow and must pass its own security review before external demo use.
 
 The Phase 0 importer reads only the repository default branch. It does not clone or index commit history, branches, tags, private forks, Actions logs, releases, packages, secrets, deployments, or organization/team membership.
@@ -1939,15 +1939,15 @@ This is the differentiated product proof. Everything else in the architecture ex
 
 ### 14.1 Secrets
 
-Phase 0 uses the repo's `secretspec` contract model with Vault as the production secret backend; see §17.6 for the build/deployment-side details. The architecture-level rules:
+Phase 0 uses the repo's `SprinkleRef` contract model with Vault as the production secret backend; see §17.6 for the build/deployment-side details. The architecture-level rules:
 
-- Ragie API key, WorkOS API key, Supabase service role key, and `source_grant_secret` (HMAC key) are all declared via `secret_requirements` with stable `secretspec` contract IDs and resolved through Vault at runtime. They are never available to browser code, Vercel frontend runtime, or MCP clients.
+- Ragie API key, WorkOS API key, Supabase service role key, and `source_grant_secret` (HMAC key) are all declared via `secret_requirements` with stable `SprinkleRef` contract IDs and resolved through Vault at runtime. They are never available to browser code, Vercel frontend runtime, or MCP clients.
 - Vercel environment variables hold only AuthKit public client config; never backend service credentials. The Vercel publisher receives only what the thin console needs.
 - The `source_grant_secret` is never exposed; tokens are HMAC'd inside the web process before storage. The contract supports versioned rotation (§7.2); Phase 0 ships with a single secret version.
 - Step-specific secret requirements (`publish`, `provision`, `smoke`, `preview_cleanup`) keep audit clear about what was used when.
 - Ragie key rotation runbook tested before first design partner.
 - **Connect source-system credentials (Drive/Notion/Slack OAuth tokens) are held by Ragie, not by the platform.** This is a deliberate Phase 0 throwaway tradeoff: it removes a credential-management burden from us but means a Ragie compromise would expose connected source systems. The production replacement either takes ownership of these tokens directly or accepts this dependency explicitly with contractual safeguards. This is one of the six replacement triggers in §8.8.6.
-- **GitHub credentials are platform-held by design.** The GitHub App private key and optional webhook secret are declared through `secretspec`/Vault. Per-tenant rows store installation and repository IDs only. Installation access tokens are short-lived, minted by the worker, and never persisted.
+- **GitHub credentials are platform-held by design.** The GitHub App private key and optional webhook secret are declared through `SprinkleRef`/Vault. Per-tenant rows store installation and repository IDs only. Installation access tokens are short-lived, minted by the worker, and never persisted.
 
 ### 14.2 Customer data deletion
 
@@ -2333,7 +2333,7 @@ The platform/data-room split adds one specific operational concern: migrations m
 
 ### 17.6 Secrets
 
-Secrets use the repo's `secretspec` contract model with Vault as the production backend. Every deployment provider and provisioner declares its secrets in `secret_requirements` with stable contract IDs (e.g., `secret://deployments/platform/vercel_api_token`, `secret://deployments/platform/supabase_service_role_key`, `secret://deployments/platform/source_grant_hmac_secret`). Step-specific requirements (`publish`, `provision`, `smoke`, `preview_cleanup`) make audit clear about what was used when.
+Secrets use the repo's `SprinkleRef` contract model with Vault as the production backend. Every deployment provider and provisioner declares its secrets in `secret_requirements` with stable contract IDs (e.g., `secret://deployments/platform/vercel_api_token`, `secret://deployments/platform/supabase_service_role_key`, `secret://deployments/platform/source_grant_hmac_secret`). Step-specific requirements (`publish`, `provision`, `smoke`, `preview_cleanup`) make audit clear about what was used when.
 
 Secret values never live in `TARGETS` files, Vercel project settings committed to the repo, `.env` files, or CI variables that bypass the deployment secret runtime. Local/test fixtures are explicit non-production overrides.
 
@@ -2366,7 +2366,7 @@ Build:
 - `platform-domain`, `platform-db`, `data-room-domain`, `data-room-db` packages with Buck targets
 - Buck/Nix toolchain configured; every deployable artifact has a Buck target
 - Initial deployment metadata skeletons under `projects/deployments/`: `data-room-console-dev`, `data-room-web-dev`, `data-room-worker-dev`, `platform-foundation-dev`, `platform-shared`
-- `secret_requirements` declared with `secretspec` contract IDs for the secrets Phase 0 needs (Vercel API token, Supabase service-role key, WorkOS keys, Ragie API key, GitHub App private key, optional GitHub webhook secret, `source_grant_secret` HMAC key, OpenTofu state credentials)
+- `secret_requirements` declared with `SprinkleRef` contract IDs for the secrets Phase 0 needs (Vercel API token, Supabase service-role key, WorkOS keys, Ragie API key, GitHub App private key, optional GitHub webhook secret, `source_grant_secret` HMAC key, OpenTofu state credentials)
 - `opentofu-stack` provisioner configured for foundation-dev
 - CI runs migrations, RLS tests, and the dependency-boundary lint on every PR. CI also enforces that **nothing in `platform-*` imports from `data-room-*`**, that nothing in `data-room-mcp-tools` imports from `platform-ragie/connect/`, and that nothing imports `resolveReviewPreview` outside console handlers.
 - **Replacement epic created in the team's planning tool** with the six trigger conditions from §8.8.6 as completion criteria

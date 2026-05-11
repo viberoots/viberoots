@@ -124,7 +124,7 @@ REVIEWED_DEPLOYMENT_TEST_OWNERSHIP = {
     "build-tools/tools/tests/deployments/cloudflare-pages.records.contract.test.ts": True,
     "build-tools/tools/tests/deployments/cloudflare-pages.rollback.e2e.test.ts": True,
     "build-tools/tools/tests/deployments/cloudflare-pages.rollback.guardrails.test.ts": True,
-    "build-tools/tools/tests/deployments/cloudflare-pages.secretspec.e2e.test.ts": True,
+    "build-tools/tools/tests/deployments/cloudflare-pages.sprinkle-ref.e2e.test.ts": True,
     "build-tools/tools/tests/deployments/cloudflare-pages.status-profile.test.ts": True,
     "build-tools/tools/tests/deployments/cloudflare-pages.vault-direct.e2e.test.ts": True,
     "build-tools/tools/tests/deployments/cloudflare-pages.target-transition.test.ts": True,

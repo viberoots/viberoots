@@ -34,10 +34,22 @@ source files, test files, templates, scaffolds, or operator-facing docs:
 - `git@github.com:kiltyj/common.git`
 - `kiltyj/viberoots` (repository slug only)
 - `git@github.com:kiltyj/viberoots.git`
+- `secretspec`, `Secretspec` (in-house concept name: use `SprinkleRef` instead)
 
 Exceptions: `docs/repo-rename.md`, `docs/runtime-prefix-migration.md`,
 `docs/contributor-naming-conventions.md`, `docs/mini-name-migration-instructions.md`,
-`pnpm-lock.yaml`, files under `docs/build-history/`, and files under `docs/design-history/`.
+`docs/deployment-plan.md` (retrospective PR-37 and surrounding narratives retain the old
+vocabulary for historical accuracy), `pnpm-lock.yaml`, files under `docs/build-history/`,
+and files under `docs/design-history/`.
+
+## In-house concept names
+
+| Stale name   | Canonical replacement | Rationale                                                                                                                            |
+| ------------ | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| `secretspec` | `SprinkleRef`         | Removes collision with the unrelated Cachix `secretspec` CLI; the layer covers `config://` and `runtime://` inputs, not just secrets |
+| `Secretspec` | `SprinkleRef`         | Title-case form of the same stale concept name                                                                                       |
+
+Use `SprinkleRef` in all prose, identifiers, file names, and doc glossary entries. The `secret://`, `config://`, and `runtime://` URI schemes are unchanged — they are operator-visible serialized identifiers and renaming them would be a breaking change.
 
 ## Plan/phase number identifiers
 

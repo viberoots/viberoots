@@ -27,7 +27,7 @@ import {
   type DeploymentSecretAdmittedReference,
   type DeploymentSecretContractBinding,
   type DeploymentSecretReference,
-} from "./deployment-secretspec";
+} from "./deployment-sprinkle-ref";
 import type { DeploymentRequirement } from "./deployment-requirements";
 
 function materialFromEntry(

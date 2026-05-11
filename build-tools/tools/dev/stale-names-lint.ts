@@ -29,6 +29,8 @@ const REPO_NAME_PATTERNS: Array<{ re: RegExp; label: string }> = [
   { re: /git@github\.com:kiltyj\/common\.git/g, label: "stale name: old common repo remote" },
   { re: /\bkiltyj\/viberoots\b/g, label: "stale name: kiltyj/viberoots" },
   { re: /git@github\.com:kiltyj\/viberoots\.git/g, label: "stale name: old viberoots repo remote" },
+  { re: /\bsecretspec\b/g, label: "stale name: secretspec (use SprinkleRef)" },
+  { re: /\bSecretspec\b/g, label: "stale name: Secretspec (use SprinkleRef)" },
 ];
 
 const PLAN_NUMBER_PATTERNS: Array<{ re: RegExp; label: string }> = [

@@ -913,7 +913,7 @@ treated as settled policy, not open brainstorming:
   - `provision` should not auto-retry by default; explicit operator rerun is preferred
   - `publish` may auto-retry for clearly transient failures, up to 2 retries with backoff
   - `smoke` may auto-retry for transient readiness/network failures, up to 3 retries within an overall timeout budget
-- secrets should use `secretspec` as the repo-level contract layer and Vault as the initial production backend
+- secrets should use `SprinkleRef` as the repo-level contract layer and Vault as the initial production backend
 - protected or shared-environment deploys should be admitted only by the shared control plane
   - direct local mutating deploys to those environments are out of policy except for explicitly controlled emergency procedures
   - the CI system is intentionally not part of the authoritative mutating deployment model
@@ -4866,7 +4866,7 @@ Policy:
 - checked-in deployment files such as `TARGETS`, `wrangler.jsonc`, and `smoke.ts` must not contain credentials or secret values
 - publishers, provisioners, and smoke checks receive secrets only as runtime inputs
 - Buck metadata is not a secrets channel
-- `secretspec` should be the repo-level contract/interface for required secret inputs
+- `SprinkleRef` should be the repo-level contract/interface for required secret inputs
 - Vault should be the initial production backend behind that contract
 - backend switching should remain possible without changing deployment metadata semantics
 - runtime-secret injection must avoid leaking secret material into Buck metadata, checked-in files, or durable deployment records

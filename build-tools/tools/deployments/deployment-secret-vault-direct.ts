@@ -4,7 +4,7 @@ import {
   type DeploymentSecretAdmittedReference,
   type DeploymentSecretContractBinding,
   type DeploymentSecretReference,
-} from "./deployment-secretspec";
+} from "./deployment-sprinkle-ref";
 import type { DeploymentSecretMaterial } from "./deployment-secret-runtime";
 import {
   resolveVaultClientCredential,

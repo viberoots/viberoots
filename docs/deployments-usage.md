@@ -20,7 +20,7 @@ Use the deeper docs when needed:
 - [Deployment Contract](/Users/kiltyj/Code/viberoots/docs/deployments-contract.md)
   for fail-closed shared operator and implementation guarantees
 - [Deployment And Secrets API](/Users/kiltyj/Code/viberoots/docs/deployment-secrets-api.md)
-  for the public CLI, control-plane, and `secretspec` helper surface
+  for the public CLI, control-plane, and `SprinkleRef` helper surface
 - [Secrets Usage](/Users/kiltyj/Code/viberoots/docs/secrets-usage.md)
   for declaring deployment secret requirements and understanding the Vault
   workflow

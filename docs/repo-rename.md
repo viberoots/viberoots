@@ -28,6 +28,11 @@ Reviewed context:
   internal `v1`/`v2` helper or contract names, and first-version schema names. Because this repo has
   not launched and has no external users, these labels should either become canonical behavior names
   or be removed when they only exist to preserve an abandoned migration path.
+- The in-house `secretspec` concept names the contract layer for required deployment inputs (secrets
+  through `secret://`, plus non-secret runtime config through `config://` and `runtime://`). The name
+  collides with the unrelated Cachix `secretspec` CLI in nixpkgs and over-indexes on secrets even
+  though the layer covers other input kinds. The canonical replacement is `SprinkleRef`, with paired
+  casings for identifiers and prose.
 
 Canonical replacements:
 
@@ -46,6 +51,9 @@ Canonical replacements:
 - deployment remote URL `git@github.com:kiltyj/common.git` -> `git@github.com:kiltyj/viberoots.git`
 - GitHub owner namespace `kiltyj/viberoots` -> `viberoots/viberoots`
 - GitHub remote URL `git@github.com:kiltyj/viberoots.git` -> `git@github.com:viberoots/viberoots.git`
+- in-house concept `secretspec` -> `SprinkleRef`
+- in-house concept `Secretspec` -> `SprinkleRef`
+- TypeScript module `deployment-secretspec.ts` -> `deployment-sprinkle-ref.ts`
 
 Non-goals:
 
@@ -596,6 +604,144 @@ It is a one-shot coordinated cutover that requires synchronized updates to remot
 clone, CI worker, OIDC trust policy, and deployment-host checkout. The work cannot be rolled out
 incrementally without leaving callers half-migrated.
 
+## PR-6: In-house input-contract layer rename from secretspec to SprinkleRef
+
+### 1. Intent
+
+Replace the in-house `secretspec` concept name with `SprinkleRef` everywhere it appears as a code
+identifier, file name, or doc glossary entry. The rename removes the namespace collision with the
+unrelated Cachix `secretspec` CLI and adopts a name that no longer over-indexes on secrets, since
+the layer also covers `config://` and `runtime://` runtime inputs.
+
+### 2. Scope of changes
+
+- Rename the in-house concept name `secretspec` to `SprinkleRef` in prose docs, glossary entries,
+  and design-doc references.
+- Rename the TypeScript module
+  `build-tools/tools/deployments/deployment-secretspec.ts` to
+  `build-tools/tools/deployments/deployment-sprinkle-ref.ts` (final canonical filename agreed
+  during implementation) and update all importers.
+- Rename TypeScript identifiers that contain the literal string `secretspec`. Existing
+  secret-specific type names such as `DeploymentSecretBackendKind` and
+  `DeploymentSecretContractBinding` keep their `Secret*` prefixes; only identifiers that say
+  `secretspec` are renamed.
+- Rename the test file
+  `build-tools/tools/tests/deployments/cloudflare-pages.secretspec.e2e.test.ts` to a
+  `cloudflare-pages.sprinkle-ref.e2e.test.ts` form. Update the two `.bzl` taxonomy files
+  (`deployment_resource_limited_taxonomy.bzl`, `deployment_domain_taxonomy.bzl`) that reference the
+  test by path.
+- Update the contributor naming conventions doc with the canonical `secretspec` -> `SprinkleRef`
+  rule and the rationale (collision with the Cachix CLI; layer covers non-secret inputs too).
+- Update active-prose sections of the operator and design docs that currently use the old
+  vocabulary, including `docs/secrets-usage.md`, `docs/deployment-secrets-api.md`,
+  `docs/deployments-design.md`, `docs/deployments-usage.md`, `docs/vault-production-bootstrap.md`,
+  `docs/nixos-shared-host-setup.md`, and the relevant `projects/docs/*` design docs
+  (`gate-1-plan.md`, `phase_0_*.md`).
+- Update `docs/deployment-plan.md` active prose. The retrospective PR-37 narrative and surrounding
+  retrospective sections that quote the old vocabulary in completed-PR context are retained as-is
+  and added to the retained-references list; rewriting them would distort the historical record.
+- Update `docs/mini-name-migration-instructions.md`: bump the preconditions list from "PR-1..PR-5"
+  to "PR-1..PR-6". `mini` is still in the pre-PR-3 state at the time PR-6 lands, so the runbook
+  body continues to describe the original migration from `bucknix`/`bnx`/`kiltyj/common` to
+  `viberoots`/`vbr`/`viberoots/viberoots`. The runbook does not currently reference the
+  `secretspec` layer name; verify during PR-6 implementation that no host-side surface emits the
+  old token, and add operator instructions only if such a surface is discovered.
+- Add the in-house `secretspec` token to the stale-names lint's `STALE_PATTERNS` once the rename
+  has landed, so the old name cannot be reintroduced. This is now safe because
+  `pkgs.secretspec` has already been removed from
+  `build-tools/tools/nix/devshell.nix` and the Cachix tool is no longer pulled into the dev shell.
+- Leave the `secret://`, `config://`, and `runtime://` URI schemes unchanged. These are
+  operator-visible identifiers serialized in deployment records and reviewed admission fixtures;
+  renaming them would be a breaking change with no benefit.
+- Do not generalize the existing secret-specific type system
+  (`DeploymentSecretContractBinding` and friends) to cover `config://` / `runtime://` inputs as
+  first-class peers. That work, if pursued, is a separate refactor with its own design discussion
+  and is explicitly out of scope here.
+
+### 3. External prerequisites
+
+- PR-1 through PR-5 should be merged ahead of this PR so the rename does not conflict with
+  concurrent identity migrations or operator-runbook churn.
+- The Cachix `pkgs.secretspec` dependency has already been removed from the dev shell, so no
+  further external coordination is required.
+
+### 4. Tests to be added
+
+- Add the in-house `secretspec` token to the stale-names lint's `STALE_PATTERNS` with a negative
+  test proving it is rejected outside the planning-document and historical-retrospective
+  allowlist.
+- Update the renamed `cloudflare-pages.sprinkle-ref.e2e.test.ts` (and any other test that asserts
+  the old token as a string) to use the new name. Behavioral assertions are unchanged.
+- Add an active-code lint or test that fails when a stale lowercase `secretspec` and a new
+  `SprinkleRef` are mixed in the same file, catching half-migrated state.
+
+### 5. Docs to be added or updated
+
+- Replace `secretspec` with `SprinkleRef` in the public docs listed in the scope section.
+- Update the contributor naming conventions doc with the rename rule and the rationale.
+- Update `docs/mini-name-migration-instructions.md` preconditions to reference PR-1..PR-6, with no
+  change to the body since `mini` is still in the pre-PR-3 state and the runbook does not
+  reference the `secretspec` layer name today.
+- Update the "Canonical replacements" section of this plan with the `secretspec -> SprinkleRef`
+  entries (already done as part of this PR's plan update).
+- Update the "Retained references and enforcement allowlist notes" section to record that this
+  planning document and the retrospective sections of `docs/deployment-plan.md` are excluded from
+  `secretspec` enforcement.
+
+### 6. Acceptance criteria
+
+- No active code identifier, filename, or operator-facing doc references the in-house
+  `secretspec` name.
+- The renamed TypeScript module, test file, and `.bzl` taxonomy references are aligned and pass
+  type-checking and the test suite without behavioral changes.
+- The stale-names lint rejects the in-house `secretspec` token outside the planning-document and
+  historical-retrospective allowlist.
+- `docs/mini-name-migration-instructions.md` lists "PR-1..PR-6" in its preconditions and is
+  otherwise unchanged for the pre-PR-3 `mini` state.
+- The `secret://`, `config://`, and `runtime://` URI schemes remain unchanged in deployment
+  records and admission fixtures.
+
+### 7. Risks
+
+- The "Sprinkle" lexicon is whimsical and may face friction in security or compliance reviews if
+  the prose reads as flippant when the contract is resolving production secrets.
+- The diff is wide (many docs and code identifiers) which makes review slow and partial rebases
+  risky.
+- Concurrent in-flight work may reintroduce `secretspec` while the rename is in progress; without
+  lint enforcement during the migration, drift is likely.
+- Some retrospective sections of `docs/deployment-plan.md` quote the old vocabulary in
+  completed-PR narratives; mechanically rewriting them would distort history.
+- The mini runbook's body is unchanged by PR-6 today, but if the runbook later grows
+  `secretspec`-aware operator steps (for example, an explicit Vault role check), those would need
+  to be authored using the new vocabulary.
+
+### 8. Mitigations
+
+- Use full noun phrases in compliance-facing prose ("the SprinkleRef contract for the production
+  API token") rather than the bare verb to preserve gravity.
+- Land the rename in a single coordinated cutover; do not split across multiple PRs.
+- Add the lint rule in the same PR that lands the rename, with explicit allowlists for the
+  rename-plan and historical-retrospective sections, so drift is blocked immediately.
+- Mark historical retrospective sections of `docs/deployment-plan.md` as allowlisted rather than
+  rewritten; only active-prose sections are updated.
+- During PR-6 implementation, grep `docs/mini-name-migration-instructions.md` for any new
+  references to the old or new layer name and update both the preconditions list and any body
+  references in lockstep.
+
+### 9. Consequences of not implementing this PR
+
+The codebase retains a namespace collision with the unrelated Cachix `secretspec` CLI and a layer
+name that misrepresents its scope (the layer covers `config://` and `runtime://` inputs too, not
+just secrets). New contributors continue to be misled by the doc glossary, and any future re-add
+of the Cachix tool to the dev shell would resurrect the collision in a load-bearing way.
+
+### 10. Downsides for implementing this PR
+
+It is a wide, mostly-mechanical rename that touches many doc files and a smaller number of code
+paths. The new "Sprinkle" lexicon, while distinctive and on-brand with `viberoots`, may need
+defending in security or compliance prose where bare verbs ("sprinkle the production token") risk
+understating the gravity of the operation.
+
 ---
 
 ## Retained references and enforcement allowlist notes
@@ -629,6 +775,14 @@ excluded from the stale-names-lint enforcement.
   `kiltyj/common` references — the plan document must name the stale tokens it replaces. The
   PR-5 sections name `kiltyj/viberoots` and `git@github.com:kiltyj/viberoots.git` to describe
   what is being moved to the `viberoots` org.
+- `docs/repo-rename.md` references to the in-house `secretspec`: retained for the same reason as
+  the other stale tokens — the plan must name what is being renamed. PR-6 names `secretspec`,
+  `Secretspec`, and `deployment-secretspec.ts` to describe what is being replaced with
+  `SprinkleRef`.
+- `docs/deployment-plan.md` retrospective sections quoting the in-house `secretspec` vocabulary
+  (PR-37 and surrounding retrospective narratives): excluded via a path-specific allowlist entry
+  added in PR-6. Mechanically rewriting completed-PR narratives would distort the historical
+  record. Active-prose sections of the same file are updated in PR-6.
 - `build-tools/tools/tests/deployments/nixos-shared-host.control-plane-service-env.test.ts`:
   excluded via `ALLOWED_PATHS`. This test asserts that the old `BNX_DEPLOY_CONTROL_PLANE_TOKEN`
   variable is rejected; the old variable name must appear as a test fixture string.

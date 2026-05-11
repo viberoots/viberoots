@@ -13,7 +13,7 @@ Use this document when you need:
 
 - the public `deploy` CLI surface
 - the shared control-plane HTTP API and schema names
-- the TypeScript helpers for `secretspec` and Vault-backed secret resolution
+- the TypeScript helpers for `SprinkleRef` and Vault-backed secret resolution
 - short examples you can copy without reading the implementation first
 
 Open the usage guides first when you want the shortest operator path:
@@ -29,7 +29,7 @@ Open the usage guides first when you want the shortest operator path:
 - worker: the background process that performs accepted deployment work
 - `submissionId`: the ID of the request you sent to the deployment service
 - `deployRunId`: the ID of the actual deployment run
-- `secretspec`: the stable repo-level way to name a secret dependency without
+- `SprinkleRef`: the stable repo-level way to name a secret dependency without
   storing the secret value in the repo
 
 ## What Is Public And Stable
@@ -46,8 +46,8 @@ These are the public surfaces you can rely on:
    [nixos-shared-host-control-plane-api-contract.ts](/Users/kiltyj/Code/viberoots/build-tools/tools/deployments/nixos-shared-host-control-plane-api-contract.ts)
    and
    [cloudflare-pages-control-plane-api-contract.ts](/Users/kiltyj/Code/viberoots/build-tools/tools/deployments/cloudflare-pages-control-plane-api-contract.ts)
-5. the `secretspec` helpers in
-   [deployment-secretspec.ts](/Users/kiltyj/Code/viberoots/build-tools/tools/deployments/deployment-secretspec.ts),
+5. the `SprinkleRef` helpers in
+   [deployment-sprinkle-ref.ts](/Users/kiltyj/Code/viberoots/build-tools/tools/deployments/deployment-sprinkle-ref.ts),
    [deployment-secret-runtime.ts](/Users/kiltyj/Code/viberoots/build-tools/tools/deployments/deployment-secret-runtime.ts),
    [deployment-secret-runtime-helpers.ts](/Users/kiltyj/Code/viberoots/build-tools/tools/deployments/deployment-secret-runtime-helpers.ts),
    and
@@ -696,16 +696,16 @@ curl \
   }'
 ```
 
-## `secretspec` And Vault Runtime APIs
+## `SprinkleRef` And Vault Runtime APIs
 
-The `secretspec` layer is the stable public surface. It lets callers name the
+The `SprinkleRef` layer is the stable public surface. It lets callers name the
 secret they need without caring about the backend details. Vault is the current
 backend behind that surface.
 
 ### Public Types And Helpers
 
-The public `secretspec` helpers are exported from
-[deployment-secretspec.ts](/Users/kiltyj/Code/viberoots/build-tools/tools/deployments/deployment-secretspec.ts):
+The public `SprinkleRef` helpers are exported from
+[deployment-sprinkle-ref.ts](/Users/kiltyj/Code/viberoots/build-tools/tools/deployments/deployment-sprinkle-ref.ts):
 
 - `DeploymentSecretBackendKind`
 - `DeploymentSecretContractBinding`
@@ -773,7 +773,7 @@ secret bindings:
 import {
   deploymentSecretContractBindings,
   deploymentSecretBindingsForStep,
-} from "./build-tools/tools/deployments/deployment-secretspec.ts";
+} from "./build-tools/tools/deployments/deployment-sprinkle-ref.ts";
 
 const bindings = deploymentSecretContractBindings(requirements);
 const publishBindings = deploymentSecretBindingsForStep(bindings, "publish");
@@ -1037,7 +1037,7 @@ The runtime contract is intentionally narrow:
 - `enterStep(step)` resolves only the secrets needed for that lifecycle step
 - initial admission freezes `admittedSecretReferences` with the exact non-secret
   Vault selector information needed for replay-safe runtime fetches
-- `secretspec` stays the contract layer, admitted secret references stay the
+- `SprinkleRef` stays the contract layer, admitted secret references stay the
   replay/runtime layer, Vault stays the production backend, and the secret
   fixture stays the local/test override format
 - required contracts fail when missing, revoked, expired, or no longer
@@ -1086,7 +1086,7 @@ Open [Deployments Usage](/Users/kiltyj/Code/viberoots/docs/deployments-usage.md)
 when you want the fastest operator command path.
 
 Open [Secrets Usage](/Users/kiltyj/Code/viberoots/docs/secrets-usage.md)
-when you need the shortest explanation of the `secretspec` and Vault model.
+when you need the shortest explanation of the `SprinkleRef` and Vault model.
 
 Open [Vault Production Bootstrap Runbook](/Users/kiltyj/Code/viberoots/docs/vault-production-bootstrap.md)
 when you need the operator workflow for initializing Vault, enabling KV/JWT auth,
