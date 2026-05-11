@@ -16,7 +16,7 @@ test("node nix build phases only relink node_modules when target differs", async
   }
   if (
     !webapp.includes(
-      'if wr != "" then (builtins.path { path = filterRepo (builtins.toPath wr); name = "repo"; }) else repoSnapshot;',
+      'if wr != "" then (builtins.path { path = builtins.toPath wr; name = "repo"; filter = filterRepo (builtins.toPath wr); }) else repoSnapshot;',
     )
   ) {
     throw new Error("node-webapp.nix must use WORKSPACE_ROOT-aware filtered repo snapshot");

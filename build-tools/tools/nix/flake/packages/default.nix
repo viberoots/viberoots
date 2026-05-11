@@ -7,7 +7,7 @@ let
     else if mkNodeMods != null then mkNodeMods { }
     else builtins.throw "packages/default.nix requires nodeMods or mkNodeMods";
   filterRepo = import ./filter-repo.nix { inherit lib; };
-  repoSnapshot = builtins.path { path = filterRepo repoRoot; name = "repo"; };
+  repoSnapshot = builtins.path { path = repoRoot; name = "repo"; filter = filterRepo repoRoot; };
 
   importers = import ./importers.nix { inherit lib filterRepo repoSnapshot repoRoot; };
   graph = import ./graph.nix { inherit pkgs repoSnapshot uv2nixLib repoRoot; nodeMods = resolvedNodeMods; };

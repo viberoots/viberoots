@@ -1,15 +1,13 @@
-{ lib }:
+{ lib, goOnly ? false, excludeCppReqs ? false, roots ? [] }:
+# Returns a filter predicate for use with builtins.path { filter = ...; }.
+# Callers are responsible for reading any env vars (e.g. TEST_PARTIAL_CLONE_GO_ONLY,
+# TEST_EXCLUDE_CPP_REQS, TEST_RSYNC_ROOTS) and passing the derived values as args,
+# keeping this function pure so the resulting store path is determined solely by the
+# selected file content and does not force --impure on the enclosing derivation.
 path:
 let
   root = builtins.toString path;
   rootWithSlash = root + "/";
-  goOnly = builtins.getEnv "TEST_PARTIAL_CLONE_GO_ONLY" == "1";
-  excludeCppReqs = builtins.getEnv "TEST_EXCLUDE_CPP_REQS" == "1";
-  rootsEnv = lib.trim (builtins.getEnv "TEST_RSYNC_ROOTS");
-  rootsRaw =
-    if rootsEnv == "" then []
-    else builtins.split "[,[:space:]]+" rootsEnv;
-  roots = lib.filter (r: r != "") (map (r: lib.removePrefix "/" r) rootsRaw);
   rootDirs = [
     ".husky"
     "build-tools"
@@ -75,14 +73,11 @@ let
       (isRootFile rel && !isExcludedRootFile base) ||
       builtins.any (d: top == d) rootDirs;
 in
-builtins.filterSource
-  (p: _type:
-    let
-      s = builtins.toString p;
-      rel = if lib.hasPrefix rootWithSlash s then lib.removePrefix rootWithSlash s else s;
-    in
-      rel == "" ||
-      (!(isExcludedPath rel)) &&
-      (if roots != [] then allowByRoots rel else allowByDefault rel)
-  )
-  path
+p: _type:
+  let
+    s = builtins.toString p;
+    rel = if lib.hasPrefix rootWithSlash s then lib.removePrefix rootWithSlash s else s;
+  in
+    rel == "" ||
+    (!(isExcludedPath rel)) &&
+    (if roots != [] then allowByRoots rel else allowByDefault rel)

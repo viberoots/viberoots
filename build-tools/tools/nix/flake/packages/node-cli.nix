@@ -16,7 +16,7 @@ let
           let
             wr = builtins.getEnv "WORKSPACE_ROOT";
           in
-          if wr != "" then (builtins.path { path = filterRepo (builtins.toPath wr); name = "repo"; }) else repoSnapshot;
+          if wr != "" then (builtins.path { path = builtins.toPath wr; name = "repo"; filter = filterRepo (builtins.toPath wr); }) else repoSnapshot;
         nativeBuildInputs = [ esbuild pkgs.nodejs_22 ];
         buildPhase = ''
           set -euo pipefail

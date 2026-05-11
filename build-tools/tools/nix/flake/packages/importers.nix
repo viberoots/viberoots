@@ -3,7 +3,7 @@ let
   wr = builtins.getEnv "WORKSPACE_ROOT";
   wrPath = if wr != "" then (builtins.toPath wr) else null;
   srcRoot =
-    if wr != "" then (builtins.path { path = filterRepo (builtins.toPath wr); name = "repo"; }) else repoSnapshot;
+    if wr != "" then (builtins.path { path = builtins.toPath wr; name = "repo"; filter = filterRepo (builtins.toPath wr); }) else repoSnapshot;
   allowGenerate = (builtins.getEnv "NIX_PNPM_ALLOW_GENERATE") == "1";
 
   appsListing =
