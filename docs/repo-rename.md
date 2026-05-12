@@ -836,6 +836,112 @@ This is mostly enforcement and cleanup work, so it can feel stricter than the vi
 benefit. It may require small coordinated edits across Starlark helpers, tests, docs, and local git
 configuration before the repo reaches a genuinely closed rename state.
 
+## PR-8: Temp Buck isolation registration hardening and cleanup enforcement
+
+### 1. Intent
+
+Close the cleanup gap found during PR-7 validation: `runInTemp` now provides automatic temp Buck
+isolation registration, but tests can still bypass that safety net by passing their own explicit
+`buck2 --isolation-dir ...` inside a temp repo. The closeout should make the automatic path the
+default contract for future tests and reserve independent nested Buck isolations for rare,
+documented cases.
+
+This PR should not require individual test authors to register new tests manually. It should harden
+the shared helpers and enforcement so ordinary new `runInTemp` tests inherit registration,
+reaping, and final cleanup automatically.
+
+### 2. Scope of changes
+
+- Audit all `runInTemp` tests that invoke Buck and replace computed or ad hoc explicit
+  `--isolation-dir` values with the shared temp isolation, `inheritedBuckIsolation(...)`, or another
+  already-registered helper path.
+- Tighten the existing hardcoded-isolation enforcement so it catches any explicit
+  `buck2 --isolation-dir` inside `runInTemp`, including template expressions and helper-generated
+  names, unless the line uses an approved inherited isolation helper or a narrow allow comment.
+- Require every allow comment for an independent nested Buck isolation to state why the test cannot
+  reuse the registered temp isolation.
+- Keep the `runInTemp` Buck shim as the primary path for plain `buck2 ...` commands, and make sure
+  docs and tests describe that as the expected pattern.
+- Make the registered-isolation cleanup tests cover both plain-shim Buck calls and explicit
+  inherited-isolation calls, including the case where the live Buck daemon/forkserver displays the
+  checkout name instead of the temp repo name.
+- Add a final leak gate or documented verification step that scans for leftover verify/temp Buck
+  daemon and forkserver processes after a full `v` run.
+
+### 3. External prerequisites
+
+- PR-7's registered Buck cleanup fix must be present so cleanup can use exact registered isolation
+  ids rather than repo-root or display-name assumptions.
+- The full-suite `v` run should be available locally because this PR is specifically about
+  concurrency and cleanup behavior under the normal verify harness.
+
+### 4. Tests to be added
+
+- Extend `run-in-temp.no-hardcoded-buck-isolations.enforcement.test.ts` so it fails on computed
+  explicit isolation forms such as `buck2 --isolation-dir ${iso}` and
+  `buck2 --isolation-dir ${isoForTmp(tmp)}` inside `runInTemp`.
+- Add positive fixtures proving plain `buck2 ...` inside `runInTemp` is accepted because the Buck
+  shim injects the registered temp isolation automatically.
+- Add positive fixtures proving `inheritedBuckIsolation(...)` remains accepted for tests that need
+  to spell the isolation explicitly while still sharing the registered isolation.
+- Update the C++ and Node invalidation tests that currently create unregistered explicit
+  isolations so they use the registered path.
+- Keep or add cleanup regression tests proving registered isolation cleanup kills temp Buck
+  daemon/forkserver pairs even when the process command line reports the checkout display name.
+- Validate with the full `v` suite and a post-run process scan for verify/temp Buck leftovers.
+
+### 5. Docs to be added or updated
+
+- Update the test-helper documentation or contributor testing guidance to state that `runInTemp`
+  tests should call plain `buck2 ...` by default and rely on the shim-provided registered isolation.
+- Document `inheritedBuckIsolation(...)` as the approved escape hatch when a test must pass
+  `--isolation-dir` explicitly.
+- Document the required post-full-suite leak check used during this closeout so future cleanup work
+  has a concrete verification pattern.
+
+### 6. Acceptance criteria
+
+- No `runInTemp` test creates an unregistered ad hoc Buck isolation.
+- The hardcoded-isolation enforcement catches literal, computed, and helper-generated explicit
+  `buck2 --isolation-dir` forms inside `runInTemp` unless they use the approved inherited helper or
+  a narrow documented allow comment.
+- Ordinary new `runInTemp` tests require no per-test registration to get Buck cleanup coverage.
+- Targeted cleanup and enforcement tests pass.
+- A full-suite `v` run passes.
+- A post-run process scan shows no leftover verify/temp Buck daemons or forkservers from the suite.
+
+### 7. Risks
+
+- Some tests may intentionally use separate Buck daemon state to prove invalidation behavior, and
+  converting them blindly could reduce coverage.
+- Overly broad linting could reject harmless non-executable examples or tests that are not actually
+  inside a `runInTemp` callback.
+- The process-leak scan is platform-sensitive because process listings differ between macOS and
+  Linux.
+
+### 8. Mitigations
+
+- Review each explicit isolation call site and preserve independent-daemon semantics only when the
+  test needs them, with a narrow allow comment.
+- Implement the enforcement using source-aware matching around files that call `runInTemp`, and keep
+  positive fixtures for the accepted patterns.
+- Keep process matching based on registered isolation ids and known verify/temp isolation prefixes,
+  not broad repo-name or display-name heuristics.
+- Treat the post-run leak scan as validation evidence for this closeout rather than as a replacement
+  for the registered cleanup tests.
+
+### 9. Consequences of not implementing this PR
+
+Future tests could accidentally bypass the registered cleanup layer with computed explicit Buck
+isolations. That would recreate the same class of orphaned Buck daemon/forkserver leaks under
+verify concurrency, even though the shared `runInTemp` helper itself is correct.
+
+### 10. Downsides for implementing this PR
+
+The enforcement is stricter than the current style and may require small edits across existing
+tests that already pass. The benefit is primarily operational: fewer intermittent slowdowns,
+orphaned processes, and filesystem-indexing churn during full-suite validation.
+
 ---
 
 ## Retained references and enforcement allowlist notes
