@@ -40,6 +40,7 @@ const ALLOWED_PATHS = new Set([
   "build-tools/tools/tests/lib/test-helpers/buck-procs.ts",
   "build-tools/tools/tests/lib/test-helpers/buck-reaper.ts",
   "build-tools/tools/tests/linting/process-inspection-commands.enforcement.test.ts",
+  "TESTING.md",
   "ps.txt",
   "projects/apps/pleomino/e2e/process-control.ts",
 ]);

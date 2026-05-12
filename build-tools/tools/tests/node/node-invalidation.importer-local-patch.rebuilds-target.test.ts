@@ -6,8 +6,6 @@ import { runInTemp } from "../lib/test-helpers";
 
 test("node: importer-local patch touch triggers rebuild of target", async () => {
   await runInTemp("node-invalidation-patch-touch", async (tmp, $) => {
-    const iso1 = `node-inval-1-${process.pid}-${Date.now()}`;
-    const iso2 = `node-inval-2-${process.pid}-${Date.now()}`;
     await $`git init`;
 
     // Minimal PNPM lockfile with one importer
@@ -42,9 +40,9 @@ test("node: importer-local patch touch triggers rebuild of target", async () => 
     await fsp.writeFile(path.join(tmp, "projects/apps/demo/TARGETS"), targets, "utf8");
 
     // Initial build
-    await $`buck2 --isolation-dir ${iso1} build --target-platforms //:no_cgo //projects/apps/demo:t`;
+    await $`buck2 build --target-platforms //:no_cgo //projects/apps/demo:t`;
     const so1 =
-      await $`buck2 --isolation-dir ${iso1} targets --target-platforms //:no_cgo --show-output //projects/apps/demo:t`;
+      await $`buck2 targets --target-platforms //:no_cgo --show-output //projects/apps/demo:t`;
     const line =
       String(so1.stdout || "")
         .trim()
@@ -67,9 +65,9 @@ test("node: importer-local patch touch triggers rebuild of target", async () => 
     // Modify the existing importer-local patch and rebuild
     await fsp.appendFile(basePatch, "# change\n", "utf8");
 
-    await $`buck2 --isolation-dir ${iso2} build --target-platforms //:no_cgo //projects/apps/demo:t`;
+    await $`buck2 build --target-platforms //:no_cgo //projects/apps/demo:t`;
     const so2 =
-      await $`buck2 --isolation-dir ${iso2} targets --target-platforms //:no_cgo --show-output //projects/apps/demo:t`;
+      await $`buck2 targets --target-platforms //:no_cgo --show-output //projects/apps/demo:t`;
     const line2 =
       String(so2.stdout || "")
         .trim()

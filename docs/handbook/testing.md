@@ -21,6 +21,24 @@ In verify mode, `runInTemp` requires `VBR_TEST_SEED_STORE_PATH` and fails fast i
 
 - `TEST_FORCE_ZX_INIT_PROBE=1`
 
+### Buck isolation in temp repos
+
+Inside `runInTemp`, call plain `buck2 ...` by default. The temp-repo helper places a `buck2` shim first on `PATH`; the shim injects the registered temp Buck isolation automatically, so ordinary tests get verify registration, reaping, and final cleanup without per-test setup.
+
+Use `inheritedBuckIsolation(...)` only when a test must spell `--isolation-dir` explicitly, for example when passing the isolation through a helper that cannot rely on `PATH`. Do not compute ad hoc isolation names from `tmp`, `process.pid`, `Date.now()`, or helper-generated suffixes inside `runInTemp`.
+
+Independent nested Buck daemons are allowed only with a narrow `lint: allow-hardcoded-buck-isolation: <why this cannot reuse the registered isolation>` comment next to the command. The explanation must state why the registered temp isolation is not sufficient.
+
+After a full `v` run, scan the live process table for leftover verify/temp Buck daemons and forkservers. A clean scan prints no rows:
+
+```bash
+ps -axo pid=,ppid=,command= |
+  awk '/buck2d\[|\(buck2-forkserver\)/ && /viberoots-verify|viberoots-run-in-temp|verify-nested|zxtest-shared/ { print }'
+```
+
+The verify log should also include both final cleanup summaries, including
+`final registered buck cleanup`, so the scan and cleanup accounting can be reviewed together.
+
 ## Coverage
 
 - Enable: `COVERAGE=1` via Buck test executor `-- --env COVERAGE=1`.

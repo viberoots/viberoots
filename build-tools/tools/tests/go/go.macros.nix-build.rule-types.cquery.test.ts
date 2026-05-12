@@ -1,12 +1,11 @@
 #!/usr/bin/env zx-wrapper
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { runInTemp } from "../lib/test-helpers";
+import { inheritedBuckIsolation, runInTemp } from "../lib/test-helpers";
 
 async function cqueryKind(
   $: any,
   tmp: string,
-  isolationDir: string,
   expression: string,
 ): Promise<{ exitCode: number; stdout: string }> {
   const probe = await $({
@@ -14,7 +13,7 @@ async function cqueryKind(
     stdio: "pipe",
     reject: false,
     nothrow: true,
-  })`buck2 --isolation-dir ${isolationDir} cquery --target-platforms //:no_cgo ${expression}`;
+  })`buck2 --isolation-dir ${inheritedBuckIsolation("go_nix_build_rule_types")} cquery --target-platforms //:no_cgo ${expression}`;
   return {
     exitCode: Number(probe.exitCode ?? 1),
     stdout: String(probe.stdout || ""),
@@ -70,53 +69,23 @@ nix_go_test(
 )
 EOF'`;
 
-    const libProbe = await cqueryKind(
-      $,
-      tmp,
-      "go_nix_build_rule_types",
-      "kind(go_nix_build, //tmp/pkg:lib)",
-    );
+    const libProbe = await cqueryKind($, tmp, "kind(go_nix_build, //tmp/pkg:lib)");
     if (libProbe.exitCode !== 0) return;
     assert.ok(libProbe.stdout.includes("//tmp/pkg:lib"));
 
-    const binProbe = await cqueryKind(
-      $,
-      tmp,
-      "go_nix_build_rule_types",
-      "kind(go_nix_build, //tmp/pkg:app)",
-    );
+    const binProbe = await cqueryKind($, tmp, "kind(go_nix_build, //tmp/pkg:app)");
     assert.ok(binProbe.stdout.includes("//tmp/pkg:app"));
 
-    const testProbe = await cqueryKind(
-      $,
-      tmp,
-      "go_nix_build_rule_types",
-      "kind(go_nix_test, //tmp/pkg:lib_test)",
-    );
+    const testProbe = await cqueryKind($, tmp, "kind(go_nix_test, //tmp/pkg:lib_test)");
     assert.ok(testProbe.stdout.includes("//tmp/pkg:lib_test"));
 
-    const libBuck = await cqueryKind(
-      $,
-      tmp,
-      "go_nix_build_rule_types",
-      "kind(go_library, //tmp/pkg:lib)",
-    );
+    const libBuck = await cqueryKind($, tmp, "kind(go_library, //tmp/pkg:lib)");
     assert.equal(libBuck.stdout.trim(), "");
 
-    const binBuck = await cqueryKind(
-      $,
-      tmp,
-      "go_nix_build_rule_types",
-      "kind(go_binary, //tmp/pkg:app)",
-    );
+    const binBuck = await cqueryKind($, tmp, "kind(go_binary, //tmp/pkg:app)");
     assert.equal(binBuck.stdout.trim(), "");
 
-    const testBuck = await cqueryKind(
-      $,
-      tmp,
-      "go_nix_build_rule_types",
-      "kind(go_test, //tmp/pkg:lib_test)",
-    );
+    const testBuck = await cqueryKind($, tmp, "kind(go_test, //tmp/pkg:lib_test)");
     assert.equal(testBuck.stdout.trim(), "");
   });
 });
@@ -165,29 +134,14 @@ go_test(
 )
 EOF'`;
 
-    const libProbe = await cqueryKind(
-      $,
-      tmp,
-      "go_buck_rule_route_control",
-      "kind(go_library, //tmp/control:probe_lib)",
-    );
+    const libProbe = await cqueryKind($, tmp, "kind(go_library, //tmp/control:probe_lib)");
     if (libProbe.exitCode !== 0) return;
     assert.ok(libProbe.stdout.includes("//tmp/control:probe_lib"));
 
-    const binProbe = await cqueryKind(
-      $,
-      tmp,
-      "go_buck_rule_route_control",
-      "kind(go_binary, //tmp/control:probe_bin)",
-    );
+    const binProbe = await cqueryKind($, tmp, "kind(go_binary, //tmp/control:probe_bin)");
     assert.ok(binProbe.stdout.includes("//tmp/control:probe_bin"));
 
-    const testProbe = await cqueryKind(
-      $,
-      tmp,
-      "go_buck_rule_route_control",
-      "kind(go_test, //tmp/control:probe_test)",
-    );
+    const testProbe = await cqueryKind($, tmp, "kind(go_test, //tmp/control:probe_test)");
     assert.ok(testProbe.stdout.includes("//tmp/control:probe_test"));
   });
 });

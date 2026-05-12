@@ -4,10 +4,6 @@ import path from "node:path";
 import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
 
-function isoForTmp(tmp: string): string {
-  return `tmp-cpp-nixssl-${path.basename(tmp).replace(/[^A-Za-z0-9_.-]/g, "-")}`;
-}
-
 test("cpp openssl include via nixpkg_deps at call site", async () => {
   await runInTemp("cpp-nixpkg-include-openssl", async (tmp, $) => {
     const appDir = path.join(tmp, "projects/apps/demo");
@@ -70,6 +66,6 @@ nix_cpp_test(
 `;
     await fs.outputFile(path.join(appDir, "TARGETS"), targets);
 
-    await $`buck2 --isolation-dir ${isoForTmp(tmp)} test --target-platforms prelude//platforms:default //projects/apps/demo:demo_openssl_gtest`;
+    await $`buck2 test --target-platforms prelude//platforms:default //projects/apps/demo:demo_openssl_gtest`;
   });
 });

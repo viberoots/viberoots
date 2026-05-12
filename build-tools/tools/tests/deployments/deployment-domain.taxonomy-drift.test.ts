@@ -3,7 +3,6 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
-import { resolveNestedBuckIsolation } from "../../lib/buck-command-env";
 import { runInTemp } from "../lib/test-helpers";
 
 function buckEnv(): NodeJS.ProcessEnv {
@@ -87,23 +86,11 @@ test("deployment-domain taxonomy drift fails closed for unclassified deployment 
       ].join("\n"),
       "utf8",
     );
-    const { isolationDir, ownsIsolation } = resolveNestedBuckIsolation({
-      root: tmp,
-      prefix: "deployment-domain-taxonomy-drift",
-    });
     const result = await $({
       cwd: tmp,
       stdio: "pipe",
       env: buckEnv(),
-    })`buck2 --isolation-dir ${isolationDir} cquery --target-platforms prelude//platforms:default //...`.nothrow();
-    if (ownsIsolation) {
-      await $({
-        cwd: tmp,
-        stdio: "ignore",
-        reject: false,
-        env: buckEnv(),
-      })`buck2 --isolation-dir ${isolationDir} kill`;
-    }
+    })`buck2 cquery --target-platforms prelude//platforms:default //...`.nothrow();
     assert.notEqual(result.exitCode, 0);
     assert.match(String(result.stderr || ""), /deployment-domain taxonomy drift/);
     assert.match(String(result.stderr || ""), /deployment_domain_taxonomy\.bzl/);

@@ -143,6 +143,11 @@ During `v`, verify prepares a single Nix-store seed and exports it to all tests:
 
 `runInTemp` requires `VBR_TEST_SEED_STORE_PATH` in verify mode and fails fast if it is missing or invalid. Outside verify, you can still set `VBR_TEST_SEED_STORE_PATH` explicitly.
 
+- Inside `runInTemp`, prefer plain `buck2 ...`; the helper shim injects the registered temp Buck isolation automatically.
+- Use `inheritedBuckIsolation(...)` only when a test must pass `--isolation-dir` explicitly.
+- Do not compute ad hoc nested Buck isolation names inside `runInTemp` unless an adjacent `lint: allow-hardcoded-buck-isolation: <why>` comment explains why the registered isolation cannot be reused.
+- After a full `v` run, scan for leftover verify/temp Buck processes with `ps -axo pid=,ppid=,command= | awk '/buck2d\\[|\\(buck2-forkserver\\)/ && /viberoots-verify|viberoots-run-in-temp|verify-nested|zxtest-shared/ { print }'`. A clean scan prints no rows.
+
 - By default, the temp copy excludes common heavy paths (e.g., `buck-out`, `.git`, `node_modules`, `coverage`, `.direnv`, `test-logs/`), while keeping essentials like `flake.nix`.
 - When you only need specific roots for a test, you can limit what is copied using `TEST_RSYNC_ROOTS` (comma or space separated).
 

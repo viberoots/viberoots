@@ -4,10 +4,6 @@ import path from "node:path";
 import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
 
-function isoForTmp(tmp: string): string {
-  return `tmp-cpp-nixattrs-${path.basename(tmp).replace(/[^A-Za-z0-9_.-]/g, "-")}`;
-}
-
 test("cpp gtest include via nixpkg_deps at call site (no providers)", async () => {
   await runInTemp("cpp-nixattrs-gtest-include", async (tmp, $) => {
     const appDir = path.join(tmp, "projects/apps/demo");
@@ -71,6 +67,6 @@ nix_cpp_test(
 `;
     await fs.outputFile(path.join(appDir, "TARGETS"), targets);
     // Build and run the test; explicit platform to bind toolchains
-    await $`buck2 --isolation-dir ${isoForTmp(tmp)} test --target-platforms prelude//platforms:default //projects/apps/demo:demo_gtest`;
+    await $`buck2 test --target-platforms prelude//platforms:default //projects/apps/demo:demo_gtest`;
   });
 });
