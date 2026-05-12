@@ -117,6 +117,13 @@ When adding or materially editing scaffold command guidance:
   - `i` (install deps), `b` (build), `v` (verify / full test suite)
   - `v` lint/prettier preflight is changed-file scoped by default; `VERIFY_SKIP_LINT=1` still skips
     the preflight when explicitly requested
+- `runInTemp` Buck isolation contract:
+  - use plain `buck2 ...` inside `runInTemp`; the temp-repo shim injects the registered isolation
+  - explicit `buck2 --isolation-dir ...` is linted across multiline strings, template-built commands,
+    arrays, and shared helper files imported by `runInTemp` tests
+  - use `inheritedBuckIsolation(...)` or `BUCK_NESTED_ISO` only when an explicit inherited isolation
+    is required
+  - rare independent nested daemons need `lint: allow-hardcoded-buck-isolation: <specific reason>`
 - `p` (run runnable target in `run.prod` mode), `d` (run runnable target in `run.dev` mode when available)
   - `v` includes a preflight run of the nix-gaps inventory/exception policy checker and fails fast on drift.
 - TypeScript scaffolding command surface (ts-only):

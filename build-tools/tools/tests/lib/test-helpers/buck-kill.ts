@@ -113,6 +113,7 @@ export async function killBuckDaemonsForRepo(repoRoot: string, $: any): Promise<
             reject: false,
             nothrow: true,
             timeout: BUCK_KILL_TIMEOUT_MS,
+            // lint: allow-hardcoded-buck-isolation: cleanup must kill each discovered temp daemon
           })`buck2 --isolation-dir ${iso} kill`,
       ),
     );

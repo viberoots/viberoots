@@ -2,91 +2,16 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
+import {
+  ALLOW_COMMENT,
+  collectIsolationFragmentHelpersForFiles,
+  collectRunInTempScanFiles,
+  findExplicitIsolationViolations,
+  normalizeRelPath,
+} from "./run-in-temp-buck-isolation-lint.ts";
 
-const EXCLUDED_DIRS = new Set([
-  ".git",
-  ".direnv",
-  "buck-out",
-  "node_modules",
-  "coverage",
-  "result",
-  "test-logs",
-]);
-
-const RUN_IN_TEMP_RE = /\brunInTemp\s*\(/;
-const EXPLICIT_BUCK_ISO_RE = /\bbuck2\s+--isolation-dir\b/;
-const APPROVED_INHERITED_ISO_RE = /\binheritedBuckIsolation\s*\(|\bBUCK_NESTED_ISO\b/;
-const ALLOW_COMMENT = "lint: allow-hardcoded-buck-isolation";
 const SELF_TEST_PATH =
   "build-tools/tools/tests/linting/run-in-temp.no-hardcoded-buck-isolations.enforcement.test.ts";
-
-function normalizeRelPath(p: string): string {
-  return p.replaceAll("\\", "/").replace(/^\.\/+/, "");
-}
-
-function allowCommentHasJustification(line: string): boolean {
-  const idx = line.indexOf(ALLOW_COMMENT);
-  if (idx < 0) return false;
-  const suffix = line
-    .slice(idx + ALLOW_COMMENT.length)
-    .replace(/^[:\s-]+/, "")
-    .trim();
-  return suffix.length >= 12;
-}
-
-function findExplicitIsolationViolations(text: string): Array<{ line: number; reason: string }> {
-  if (!RUN_IN_TEMP_RE.test(text)) return [];
-  const hits: Array<{ line: number; reason: string }> = [];
-  const lines = text.split(/\r?\n/);
-  for (let index = 0; index < lines.length; index++) {
-    const line = lines[index] || "";
-    if (!EXPLICIT_BUCK_ISO_RE.test(line)) continue;
-    if (APPROVED_INHERITED_ISO_RE.test(line)) continue;
-    const allowLine = [line, lines[index - 1] || ""].find((candidate) =>
-      candidate.includes(ALLOW_COMMENT),
-    );
-    if (allowLine) {
-      if (!allowCommentHasJustification(allowLine)) {
-        hits.push({ line: index + 1, reason: "allow comment needs a justification" });
-      }
-      continue;
-    }
-    hits.push({ line: index + 1, reason: "use the registered runInTemp buck isolation" });
-  }
-  return hits;
-}
-
-async function listTestFiles(repoRoot: string): Promise<string[]> {
-  const out: string[] = [];
-  const root = path.join(repoRoot, "build-tools", "tools", "tests");
-  const stack: string[] = [root];
-
-  while (stack.length) {
-    const cur = stack.pop()!;
-    const relDir = normalizeRelPath(path.relative(repoRoot, cur));
-    const parts = relDir.split("/").filter(Boolean);
-    if (parts.some((part) => EXCLUDED_DIRS.has(part))) continue;
-
-    let entries: Array<any> = [];
-    try {
-      entries = await fsp.readdir(cur, { withFileTypes: true } as any);
-    } catch {
-      continue;
-    }
-
-    for (const entry of entries) {
-      const abs = path.join(cur, entry.name);
-      if (entry.isDirectory()) {
-        stack.push(abs);
-        continue;
-      }
-      if (entry.name.endsWith(".test.ts")) out.push(abs);
-    }
-  }
-
-  out.sort((a, b) => a.localeCompare(b));
-  return out;
-}
 
 test("runInTemp isolation lint catches computed explicit buck isolations", () => {
   const bad = String.raw`
@@ -103,6 +28,59 @@ await runInTemp("bad", async (tmp, $) => {
   }
 });
 
+test("runInTemp isolation lint catches multiline, split, and array command forms", () => {
+  const bad = String.raw`
+import { runInTemp } from "../lib/test-helpers";
+await runInTemp("bad", async (tmp, $) => {
+  await $\`buck2
+    --isolation-dir \${iso}
+    build //:x\`;
+  await $(["buck2", "--isolation-dir", isoForTmp(tmp), "test", "//:x"]);
+});
+`;
+  const hits = findExplicitIsolationViolations(bad);
+  if (hits.length !== 2) {
+    throw new Error(`expected 2 violations, got ${JSON.stringify(hits)}`);
+  }
+});
+
+test("runInTemp isolation lint catches helper-generated commands", () => {
+  const helper = String.raw`
+export function buckWithIso(tmp: string): string {
+  return \`buck2 --isolation-dir \${isoForTmp(tmp)} build //:x\`;
+}
+`;
+  const hits = findExplicitIsolationViolations(helper);
+  if (hits.length !== 1) {
+    throw new Error(`expected 1 violation, got ${JSON.stringify(hits)}`);
+  }
+});
+
+test("runInTemp isolation lint catches helper-generated isolation fragments", () => {
+  const helper = String.raw`
+export function isoFlag(tmp: string): string {
+  return \`--isolation-dir \${isoForTmp(tmp)}\`;
+}
+`;
+  const caller = String.raw`
+import { runInTemp } from "../lib/test-helpers";
+import { isoFlag } from "./fixture-helper";
+await runInTemp("bad", async (tmp, $) => {
+  await $\`buck2 \${isoFlag(tmp)} build //:x\`;
+});
+`;
+  const hits = findExplicitIsolationViolations(caller, "fixture.test.ts", ["isoFlag"]);
+  if (hits.length !== 1 || !hits[0]?.reason.includes("fragment")) {
+    throw new Error(`expected helper-fragment violation, got ${JSON.stringify(hits)}`);
+  }
+  const helperHits = findExplicitIsolationViolations(helper);
+  if (helperHits.length !== 0) {
+    throw new Error(
+      `expected fragment helper alone to avoid direct-command hits, got ${JSON.stringify(helperHits)}`,
+    );
+  }
+});
+
 test("runInTemp isolation lint accepts shim and inherited isolation patterns", () => {
   const good = String.raw`
 import { inheritedBuckIsolation, runInTemp } from "../lib/test-helpers";
@@ -114,6 +92,88 @@ await runInTemp("good", async (tmp, $) => {
   const hits = findExplicitIsolationViolations(good);
   if (hits.length !== 0) {
     throw new Error(`expected no violations, got ${JSON.stringify(hits)}`);
+  }
+});
+
+test("runInTemp isolation lint accepts justified allow comments", () => {
+  const good = String.raw`
+import { runInTemp } from "../lib/test-helpers";
+await runInTemp("good", async (tmp, $) => {
+  // ${ALLOW_COMMENT}: validates isolated cache invalidation with a separate daemon
+  await $\`buck2 --isolation-dir separate build //:x\`;
+});
+`;
+  const hits = findExplicitIsolationViolations(good);
+  if (hits.length !== 0) {
+    throw new Error(`expected no violations, got ${JSON.stringify(hits)}`);
+  }
+});
+
+test("runInTemp isolation lint scans imported helper files", async () => {
+  const repo = await fsp.mkdtemp(path.join(process.cwd(), "buck-out/tmp/isolation-lint-"));
+  const tests = path.join(repo, "build-tools/tools/tests/linting");
+  await fsp.mkdir(tests, { recursive: true });
+  await fsp.writeFile(
+    path.join(tests, "fixture.test.ts"),
+    'import { buckWithIso } from "./fixture-helper";\nrunInTemp("x", () => buckWithIso("x"));\n',
+    "utf8",
+  );
+  const helper = path.join(tests, "fixture-helper.ts");
+  await fsp.writeFile(
+    helper,
+    "export function buckWithIso(iso: string): string { return `buck2 --isolation-dir ${iso} build //:x`; }\n",
+    "utf8",
+  );
+  const scanned = (await collectRunInTempScanFiles(repo)).map((file) =>
+    normalizeRelPath(path.relative(repo, file)),
+  );
+  if (!scanned.includes("build-tools/tools/tests/linting/fixture-helper.ts")) {
+    throw new Error(`expected helper to be scanned, got ${JSON.stringify(scanned)}`);
+  }
+  const helpers = await collectIsolationFragmentHelpersForFiles(
+    scanned.map((file) => path.join(repo, file)),
+  );
+  if (helpers.length !== 0) {
+    throw new Error(`expected no fragment helpers, got ${JSON.stringify(helpers)}`);
+  }
+  await fsp.rm(repo, { recursive: true, force: true });
+});
+
+test("runInTemp isolation lint composes imported helper-returned fragments", async () => {
+  const helperBodies = [
+    "export function isoFlag(tmp: string): string { return `--isolation-dir ${isoForTmp(tmp)}`; }",
+    "export const isoFlag = (tmp: string): string => `--isolation-dir ${isoForTmp(tmp)}`;",
+  ];
+  for (const helperBody of helperBodies) {
+    const repo = await fsp.mkdtemp(path.join(process.cwd(), "buck-out/tmp/isolation-fragment-"));
+    const tests = path.join(repo, "build-tools/tools/tests/linting");
+    await fsp.mkdir(tests, { recursive: true });
+    const testFile = path.join(tests, "fixture.test.ts");
+    await fsp.writeFile(
+      testFile,
+      [
+        'import { runInTemp } from "../lib/test-helpers";',
+        'import { isoFlag } from "./fixture-helper";',
+        'runInTemp("x", async (tmp, $) => $`buck2 ${isoFlag(tmp)} build //:x`);',
+        "",
+      ].join("\n"),
+      "utf8",
+    );
+    await fsp.writeFile(path.join(tests, "fixture-helper.ts"), `${helperBody}\n`, "utf8");
+    const scanned = await collectRunInTempScanFiles(repo);
+    const helpers = await collectIsolationFragmentHelpersForFiles(scanned);
+    if (!helpers.includes("isoFlag")) {
+      throw new Error(`expected fragment helper to be collected, got ${JSON.stringify(helpers)}`);
+    }
+    const hits = findExplicitIsolationViolations(
+      await fsp.readFile(testFile, "utf8"),
+      "build-tools/tools/tests/linting/fixture.test.ts",
+      helpers,
+    );
+    if (hits.length !== 1 || !hits[0]?.reason.includes("fragment")) {
+      throw new Error(`expected composed helper-fragment violation, got ${JSON.stringify(hits)}`);
+    }
+    await fsp.rm(repo, { recursive: true, force: true });
   }
 });
 
@@ -133,14 +193,15 @@ await runInTemp("bad", async (tmp, $) => {
 
 test("runInTemp tests reuse inherited buck isolation unless explicitly opted out", async () => {
   const repoRoot = process.cwd();
-  const files = await listTestFiles(repoRoot);
+  const files = await collectRunInTempScanFiles(repoRoot);
+  const isolationFragmentHelpers = await collectIsolationFragmentHelpersForFiles(files);
   const hits: Array<{ file: string; line: number; reason: string }> = [];
 
   for (const abs of files) {
     const rel = normalizeRelPath(path.relative(repoRoot, abs));
     if (rel === SELF_TEST_PATH) continue;
     const text = await fsp.readFile(abs, "utf8");
-    for (const hit of findExplicitIsolationViolations(text)) {
+    for (const hit of findExplicitIsolationViolations(text, rel, isolationFragmentHelpers)) {
       hits.push({
         file: rel,
         line: hit.line,
