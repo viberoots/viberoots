@@ -1,23 +1,12 @@
 import * as fsp from "node:fs/promises";
-import path from "node:path";
-
-const EXCLUDED_DIRS = new Set([
-  ".git",
-  ".direnv",
-  "buck-out",
-  "node_modules",
-  "coverage",
-  "result",
-  "test-logs",
-]);
-
-const RUN_IN_TEMP_RE = /\brunIn(?:Scratch)?Temp\s*\(/;
-const BUCK_ISO_RE = /\bbuck2\b[\s\S]{0,600}?--isolation-dir\b/g;
+const BUCK_ISO_RE = /\bbuck2\b(?=\s|`|["']\s*,)(?:(?!\bbuck2\b)[\s\S]){0,600}?--isolation-dir\b/g;
 const APPROVED_INHERITED_ISO_RE = /\binheritedBuckIsolation\s*\(|\bBUCK_NESTED_ISO\b/;
+const APPROVED_INHERITED_ENV_RE = /\bBUCK_(?:NESTED_ISO|ISOLATION_DIR(?:_EXPORTER)?)\b/;
 const IDENTIFIER_RE = "[A-Za-z_$][\\w$]*";
 export const ALLOW_COMMENT = "lint: allow-hardcoded-buck-isolation";
 
 export type IsolationViolation = { line: number; reason: string };
+type CommandRange = { text: string; start: number };
 
 export function normalizeRelPath(p: string): string {
   return p.replaceAll("\\", "/").replace(/^\.\/+/, "");
@@ -55,15 +44,91 @@ function contextFor(text: string, offset: number, linesBefore = 2, linesAfter = 
   return text.slice(start, end);
 }
 
+function nearestBefore(text: string, offset: number, needle: string): number {
+  return text.lastIndexOf(needle, offset);
+}
+
+function commandRangeForOffset(text: string, offset: number): CommandRange {
+  const lineStart = text.lastIndexOf("\n", offset) + 1;
+  const lineEndIdx = text.indexOf("\n", offset);
+  const lineEnd = lineEndIdx < 0 ? text.length : lineEndIdx;
+  const templateStart = nearestBefore(text, offset, "`");
+  const arrayStart = nearestBefore(text, offset, "[");
+
+  if (templateStart >= 0) {
+    const templateEnd = text.indexOf("`", offset);
+    if (templateEnd >= 0)
+      return { text: text.slice(templateStart, templateEnd + 1), start: templateStart };
+  }
+
+  if (arrayStart >= 0) {
+    const arrayEnd = text.indexOf("]", offset);
+    if (arrayEnd >= 0) return { text: text.slice(arrayStart, arrayEnd + 1), start: arrayStart };
+  }
+
+  return { text: text.slice(lineStart, lineEnd), start: lineStart };
+}
+
+function commandForOffset(text: string, offset: number): string {
+  return commandRangeForOffset(text, offset).text;
+}
+
+function firstCommandStartOnLine(text: string, lineStart: number): number {
+  const lineEndIdx = text.indexOf("\n", lineStart);
+  const lineEnd = lineEndIdx < 0 ? text.length : lineEndIdx;
+  const line = text.slice(lineStart, lineEnd);
+  const starts = ["`", "["]
+    .map((needle) => line.indexOf(needle))
+    .filter((idx) => idx >= 0)
+    .sort((a, b) => a - b);
+  return lineStart + (starts[0] ?? 0);
+}
+
+function commandHasApprovedInheritedIsolation(text: string, offset: number): boolean {
+  return APPROVED_INHERITED_ISO_RE.test(commandForOffset(text, offset));
+}
+
+function allowCommentForCommand(text: string, offset: number): string | undefined {
+  const command = commandRangeForOffset(text, offset);
+  if (command.text.includes(ALLOW_COMMENT)) return command.text;
+  const prevLineEnd = text.lastIndexOf("\n", Math.max(0, text.lastIndexOf("\n", offset) - 1));
+  const commandLineStart = text.lastIndexOf("\n", offset) + 1;
+  const prevLine = text.slice(prevLineEnd + 1, Math.max(0, commandLineStart - 1));
+  return prevLine.trimStart().startsWith("//") &&
+    prevLine.includes(ALLOW_COMMENT) &&
+    command.start === firstCommandStartOnLine(text, commandLineStart)
+    ? prevLine
+    : undefined;
+}
+
 function maskLineComments(text: string): string {
-  return text
-    .split(/\r?\n/)
-    .map((line) => {
-      const idx = line.indexOf("//");
-      if (idx < 0) return line;
-      return `${line.slice(0, idx)}${" ".repeat(line.length - idx)}`;
-    })
-    .join("\n");
+  let masked = "";
+  let quote: "'" | '"' | "`" | undefined;
+  let escaped = false;
+  for (let idx = 0; idx < text.length; idx += 1) {
+    const ch = text[idx]!;
+    const next = text[idx + 1];
+
+    if (quote === undefined && ch === "/" && next === "/") {
+      const end = text.indexOf("\n", idx);
+      const commentEnd = end < 0 ? text.length : end;
+      masked += " ".repeat(commentEnd - idx);
+      idx = commentEnd - 1;
+      continue;
+    }
+
+    masked += ch;
+    if (escaped) {
+      escaped = false;
+    } else if (quote !== undefined && ch === "\\") {
+      escaped = true;
+    } else if (quote !== undefined && ch === quote) {
+      quote = undefined;
+    } else if (quote === undefined && (ch === "'" || ch === '"' || ch === "`")) {
+      quote = ch;
+    }
+  }
+  return masked;
 }
 
 function regexEscape(text: string): string {
@@ -99,6 +164,7 @@ export function collectIsolationFragmentHelpers(text: string): string[] {
   for (const re of patterns) {
     for (const match of masked.matchAll(re)) {
       const snippet = match[0] ?? "";
+      if (APPROVED_INHERITED_ENV_RE.test(snippet)) continue;
       if (!/\bbuck2\b/.test(snippet)) helpers.add(match[1]!);
     }
   }
@@ -121,9 +187,9 @@ export function findExplicitIsolationViolations(
   for (const match of maskLineComments(text).matchAll(BUCK_ISO_RE)) {
     const offset = match.index ?? 0;
     const context = contextFor(text, offset);
-    if (APPROVED_INHERITED_ISO_RE.test(context)) continue;
     if (isApprovedRegisteredHelper(relPath, context)) continue;
-    const allowLine = context.split(/\r?\n/).find((line) => line.includes(ALLOW_COMMENT));
+    if (commandHasApprovedInheritedIsolation(text, offset)) continue;
+    const allowLine = allowCommentForCommand(text, offset);
     if (allowLine) {
       if (!allowCommentLineHasJustification(allowLine)) {
         hits.push({
@@ -140,9 +206,8 @@ export function findExplicitIsolationViolations(
   }
   for (const match of helperFragmentMatches(maskLineComments(text), isolationFragmentHelpers)) {
     const offset = match.index ?? 0;
-    const context = contextFor(text, offset);
-    if (APPROVED_INHERITED_ISO_RE.test(context)) continue;
-    const allowLine = context.split(/\r?\n/).find((line) => line.includes(ALLOW_COMMENT));
+    if (commandHasApprovedInheritedIsolation(text, offset)) continue;
+    const allowLine = allowCommentForCommand(text, offset);
     if (allowLine) {
       if (!allowCommentLineHasJustification(allowLine)) {
         hits.push({
@@ -167,69 +232,4 @@ export async function collectIsolationFragmentHelpersForFiles(files: string[]): 
     for (const helper of collectIsolationFragmentHelpers(text)) helpers.add(helper);
   }
   return [...helpers].sort();
-}
-
-async function listTsFiles(repoRoot: string): Promise<string[]> {
-  const out: string[] = [];
-  const stack = [path.join(repoRoot, "build-tools", "tools", "tests")];
-  while (stack.length) {
-    const cur = stack.pop()!;
-    const relDir = normalizeRelPath(path.relative(repoRoot, cur));
-    if (relDir.split("/").some((part) => EXCLUDED_DIRS.has(part))) continue;
-    let entries: Array<any> = [];
-    try {
-      entries = await fsp.readdir(cur, { withFileTypes: true } as any);
-    } catch {
-      continue;
-    }
-    for (const entry of entries) {
-      const abs = path.join(cur, entry.name);
-      if (entry.isDirectory()) stack.push(abs);
-      if (entry.isFile() && entry.name.endsWith(".ts")) out.push(abs);
-    }
-  }
-  return out.sort((a, b) => a.localeCompare(b));
-}
-
-function localImportSpecifiers(text: string): string[] {
-  const specs = new Set<string>();
-  const patterns = [
-    /\b(?:import|export)\s+(?:[^"'()]*?\s+from\s+)?["'](\.[^"']+)["']/g,
-    /\bimport\s*\(\s*["'](\.[^"']+)["']\s*\)/g,
-  ];
-  for (const re of patterns) {
-    for (const match of text.matchAll(re)) specs.add(match[1]!);
-  }
-  return [...specs].sort();
-}
-
-function resolveLocalImport(
-  fromFile: string,
-  spec: string,
-  knownFiles: Set<string>,
-): string | null {
-  const base = path.resolve(path.dirname(fromFile), spec);
-  const candidates = [base, `${base}.ts`, path.join(base, "index.ts")];
-  return candidates.find((candidate) => knownFiles.has(candidate)) ?? null;
-}
-
-export async function collectRunInTempScanFiles(repoRoot: string): Promise<string[]> {
-  const files = await listTsFiles(repoRoot);
-  const known = new Set(files);
-  const textByFile = new Map<string, string>();
-  for (const file of files) textByFile.set(file, await fsp.readFile(file, "utf8"));
-
-  const queue = files.filter((file) => RUN_IN_TEMP_RE.test(textByFile.get(file) ?? ""));
-  const seen = new Set(queue);
-  for (let i = 0; i < queue.length; i += 1) {
-    const file = queue[i]!;
-    for (const spec of localImportSpecifiers(textByFile.get(file) ?? "")) {
-      const next = resolveLocalImport(file, spec, known);
-      if (next && !seen.has(next)) {
-        seen.add(next);
-        queue.push(next);
-      }
-    }
-  }
-  return [...seen].sort((a, b) => a.localeCompare(b));
 }

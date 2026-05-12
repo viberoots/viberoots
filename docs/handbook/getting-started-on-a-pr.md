@@ -122,8 +122,10 @@ When adding or materially editing scaffold command guidance:
   - explicit `buck2 --isolation-dir ...` is linted across multiline strings, template-built commands,
     arrays, and shared helper files imported by `runInTemp` tests
   - use `inheritedBuckIsolation(...)` or `BUCK_NESTED_ISO` only when an explicit inherited isolation
-    is required
+    is required; those forms approve only the command that contains them, not neighboring commands
   - rare independent nested daemons need `lint: allow-hardcoded-buck-isolation: <specific reason>`
+  - helper files outside `build-tools/tools/tests` are part of this lint when a `runInTemp` test
+    imports them into the Buck command-generation graph; unrelated helpers stay outside the scan
 - `p` (run runnable target in `run.prod` mode), `d` (run runnable target in `run.dev` mode when available)
   - `v` includes a preflight run of the nix-gaps inventory/exception policy checker and fails fast on drift.
 - TypeScript scaffolding command surface (ts-only):

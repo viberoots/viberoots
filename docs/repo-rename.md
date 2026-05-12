@@ -1031,6 +1031,101 @@ leave the PR-8 closeout narrower than the plan requires.
 The lint becomes more sophisticated and may need careful fixture maintenance when shared test helpers
 change. The tradeoff is a smaller bypass surface for Buck daemon and forkserver cleanup leaks.
 
+## PR-10: runInTemp Buck isolation lint graph and approval precision
+
+### 1. Intent
+
+Close the remaining PR-8/PR-9 end-of-range enforcement gaps by making the `runInTemp` Buck
+isolation lint approve inherited-isolation usage at the offending command level, not at the
+surrounding context-window level, and by scanning helper files outside `build-tools/tools/tests`
+when they participate in `runInTemp` Buck command generation.
+
+### 2. Scope of changes
+
+- Replace the current context-window approval for explicit `buck2 --isolation-dir` hits with
+  command-aware approval that accepts only the specific command using `inheritedBuckIsolation(...)`,
+  `BUCK_NESTED_ISO`, or a narrow documented allow comment.
+- Add a regression path where a bad command such as `buck2 --isolation-dir ${isoForTmp(tmp)}` is
+  near a separate approved inherited-isolation command and still fails enforcement.
+- Extend the scan surface from files rooted under `build-tools/tools/tests` to the participating
+  helper files outside that tree that are in the `runInTemp` command-generation import graph.
+- Include focused coverage for deployment-style query helpers or equivalent non-test-tree helpers
+  that assemble Buck commands used by `runInTemp` tests.
+- Keep the scan bounded to files that participate in `runInTemp` Buck command generation so inert
+  examples and unrelated helper modules do not become enforcement targets.
+
+### 3. External prerequisites
+
+- PR-9's source-aware `runInTemp` Buck isolation lint must be present.
+- The existing enforcement fixture harness must support colocating approved and rejected command
+  forms in the same fixture file.
+- The lint implementation must have access to enough TypeScript import information to identify
+  non-test-tree helpers that feed `runInTemp` command generation.
+
+### 4. Tests to be added
+
+- Add a negative fixture proving a bad explicit isolation command fails even when an approved
+  `inheritedBuckIsolation(...)` command appears within the old 11-line context window.
+- Add a negative fixture proving `BUCK_NESTED_ISO` only approves the command that actually uses it,
+  not a neighboring bad explicit isolation.
+- Add positive fixtures proving approved inherited-isolation commands and documented allow comments
+  still pass when approval is evaluated per command.
+- Add focused fixtures where a `build-tools/tools/tests` `runInTemp` test imports a helper outside
+  that tree, the helper assembles a Buck command, and an unapproved explicit isolation in that
+  helper fails enforcement.
+- Add a positive import-graph fixture proving unrelated outside-tree helpers are not scanned unless
+  they participate in `runInTemp` Buck command generation.
+
+### 5. Docs to be added or updated
+
+- Update the contributor testing or test-helper documentation to state that approved inherited Buck
+  isolation forms are evaluated per generated command, not per nearby source context.
+- Document that non-test-tree helper files are included in the lint when they are imported into the
+  `runInTemp` Buck command-generation graph.
+- Document the intended boundedness of the graph scan so future helpers know when they are part of
+  the enforcement surface.
+
+### 6. Acceptance criteria
+
+- A bad explicit `buck2 --isolation-dir` command inside a `runInTemp` command-generation flow cannot
+  be waived merely because an approved inherited-isolation command appears nearby.
+- `inheritedBuckIsolation(...)`, `BUCK_NESTED_ISO`, and documented allow comments approve only the
+  command they apply to.
+- Helper files outside `build-tools/tools/tests` are scanned when they participate in the
+  `runInTemp` Buck command-generation import graph.
+- Focused regression fixtures cover both neighboring-approved-command bypasses and outside-tree
+  helper scan participation.
+
+### 7. Risks
+
+- Command-aware approval can be brittle if the lint cannot reliably identify command boundaries
+  across template strings, arrays, and helper-returned fragments.
+- Import-graph expansion can accidentally over-scan unrelated files if participation is inferred too
+  broadly.
+- Under-scanning remains possible if helper participation is based only on direct imports and misses
+  wrapper modules.
+
+### 8. Mitigations
+
+- Keep the approval model tied to parsed or normalized command units rather than raw line windows.
+- Add both positive and negative fixtures with approved and rejected commands close together in the
+  same file.
+- Bound the graph walk to modules reachable from `runInTemp` test files that contribute Buck command
+  strings or command builders, and cover direct and wrapper-helper cases with fixtures.
+
+### 9. Consequences of not implementing this PR
+
+The lint can continue to waive a bad explicit isolation when an approved inherited command happens
+to appear nearby, and helpers outside `build-tools/tools/tests` can keep assembling unregistered
+Buck commands without being scanned. That leaves the cleanup enforcement dependent on file layout
+and source proximity rather than the actual generated command.
+
+### 10. Downsides for implementing this PR
+
+The enforcement needs more precise command attribution and a small import-graph model, which adds
+maintenance cost to the lint fixtures. The benefit is that approval and scan coverage line up with
+the commands that can actually leak Buck daemon or forkserver state.
+
 ---
 
 ## Retained references and enforcement allowlist notes

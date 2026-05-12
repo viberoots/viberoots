@@ -106,6 +106,7 @@ export function liveOwnerPidFromEphemeralIsolation(iso: string): number | null {
 export async function buck2Kill(repoRoot: string, iso: string, timeoutMs: number): Promise<void> {
   const buck2Path = resolveToolPathSync("buck2");
   await new Promise<void>((resolve) => {
+    // lint: allow-hardcoded-buck-isolation: verify orphan cleanup kills the registered candidate
     const child = spawn(buck2Path, ["--isolation-dir", iso, "kill"], {
       cwd: repoRoot,
       stdio: ["ignore", "ignore", "ignore"],

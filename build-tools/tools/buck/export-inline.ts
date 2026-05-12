@@ -142,6 +142,7 @@ export async function exportInlineGraph(opts: InlineExportOptions): Promise<void
   await fsp.writeFile(tmp, data, "utf8");
   await fsp.rename(tmp, opts.outPath);
   if (plan.useIso) {
+    // lint: allow-hardcoded-buck-isolation: inline export owns and kills its selected isolation
     await $({ stdio: "pipe" })`buck2 --isolation-dir ${plan.iso} kill`.nothrow();
   }
 }
