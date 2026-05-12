@@ -41,6 +41,33 @@ export function tryRepoRootFromStateDir(
   return { repoRoot, iso };
 }
 
+export function macosPathVariants(p: string): string[] {
+  const r = path.resolve(p);
+  const out = [r];
+  if (r.startsWith("/private/tmp/") || r.startsWith("/private/var/")) {
+    out.push(path.resolve(r.slice("/private".length)));
+  } else if (r.startsWith("/tmp/") || r.startsWith("/var/")) {
+    out.push(path.resolve(`/private${r}`));
+  }
+  return Array.from(new Set(out));
+}
+
+export function pathsEquivalent(a: string, b: string): boolean {
+  const bVariants = new Set(macosPathVariants(b));
+  return macosPathVariants(a).some((variant) => bVariants.has(variant));
+}
+
+export function pathStartsWithRootVariant(child: string, root: string): boolean {
+  const childVariants = macosPathVariants(child);
+  const rootVariants = macosPathVariants(root);
+  for (const c of childVariants) {
+    for (const r of rootVariants) {
+      if (c === r || c.startsWith(r + path.sep)) return true;
+    }
+  }
+  return false;
+}
+
 export function isTempRepoRoot(repoRoot: string): boolean {
   const r = path.resolve(repoRoot);
   return (
@@ -105,6 +132,13 @@ export async function pathExists(p: string): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+export async function existingPathVariant(p: string): Promise<string | null> {
+  for (const variant of macosPathVariants(p)) {
+    if (await pathExists(variant)) return variant;
+  }
+  return null;
 }
 
 export async function listIsolationDirs(repoRoot: string): Promise<string[]> {

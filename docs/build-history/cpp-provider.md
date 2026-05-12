@@ -1,4 +1,4 @@
-> Note: As of PR 2 in `docs/cpp/drop-cpp-provider.md`, C++ provider sync is a no‑op. This document is retained for historical context only. The generator described below is not used by current builds; new work should rely on `nixpkg:` labels and the planner. See `docs/handbook/cpp-pr2-migration.md` and `build-tools/tools/buck/inspect-cpp-attrs.ts`.
+> Note: C++ provider sync is a no-op. This document is retained for historical context only. The generator described below is not used by current builds; new work should rely on `nixpkg:` labels and the planner. See `docs/handbook/cpp-provider-sync-migration.md` and `build-tools/tools/buck/inspect-cpp-attrs.ts`.
 
 ## C++ nixpkgs Providers — Auto-Generated Stamp Rules
 

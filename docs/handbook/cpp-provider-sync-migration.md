@@ -1,4 +1,4 @@
-## C++ Provider Sync → No-op (PR 2)
+## C++ Provider Sync No-op
 
 This repo no longer generates or consumes C++ provider rules. C++ targets declare `nixpkg_deps` at call sites, macros stamp `nixpkg:` labels, and the planner consumes those labels directly.
 
@@ -13,4 +13,4 @@ This repo no longer generates or consumes C++ provider rules. C++ targets declar
   - `node build-tools/tools/buck/inspect-cpp-attrs.ts --json`
   - `node build-tools/tools/buck/inspect-cpp-attrs.ts --target //<pkg>:<name>`
 
-Rationale and full context: see `docs/cpp/drop-cpp-provider.md` (Target State and PR 2).
+Rationale and full context: see `docs/cpp/drop-cpp-provider.md` (target state).

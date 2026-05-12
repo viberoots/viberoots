@@ -24,7 +24,6 @@ const ALLOWED_PATHS = new Set([
   "build-tools/tools/tests/deployments/nixos-shared-host.control-plane-service-env.test.ts",
   "build-tools/tools/tests/linting/no-stale-viberoots-names.enforcement.test.ts",
   "docs/contributor-naming-conventions.md",
-  "docs/deployment-plan.md",
   "docs/mini-name-migration-instructions.md",
   "docs/repo-rename.md",
   "docs/runtime-prefix-migration.md",
@@ -33,6 +32,8 @@ const ALLOWED_PATHS = new Set([
 ]);
 
 const ALLOWED_PREFIXES = ["docs/build-history/", "docs/design-history/"];
+const retiredInputContractTerm = ["secret", "spec"].join("");
+const retiredInputContractTitle = "Secret" + "spec";
 
 const STALE_PATTERNS: Array<{ re: RegExp; label: string }> = [
   { re: /\bbucknix\b/g, label: "bucknix" },
@@ -49,8 +50,14 @@ const STALE_PATTERNS: Array<{ re: RegExp; label: string }> = [
   { re: /\bgit@github\.com:kiltyj\/common\.git\b/g, label: "old common repo remote" },
   { re: /\bkiltyj\/viberoots\b/g, label: "kiltyj/viberoots" },
   { re: /\bgit@github\.com:kiltyj\/viberoots\.git\b/g, label: "old viberoots repo remote" },
-  { re: /\bsecretspec\b/g, label: "secretspec (use SprinkleRef)" },
-  { re: /\bSecretspec\b/g, label: "Secretspec (use SprinkleRef)" },
+  {
+    re: new RegExp(`\\b${retiredInputContractTerm}\\b`, "g"),
+    label: "retired input-contract term (use SprinkleRef)",
+  },
+  {
+    re: new RegExp(`\\b${retiredInputContractTitle}\\b`, "g"),
+    label: "retired title-case input-contract term (use SprinkleRef)",
+  },
 ];
 
 function normalizeRel(p: string): string {
@@ -122,8 +129,12 @@ test("active source has no stale bucknix repository names", async () => {
     }
 
     for (const pattern of STALE_PATTERNS) {
+      for (const match of rel.matchAll(pattern.re)) {
+        hits.push(`${rel}:1 stale ${pattern.label} in tracked file path`);
+      }
       for (const match of text.matchAll(pattern.re)) {
-        hits.push(`${rel}:${lineNumberForOffset(text, match.index ?? 0)} stale ${pattern.label}`);
+        const offset = match.index ?? 0;
+        hits.push(`${rel}:${lineNumberForOffset(text, offset)} stale ${pattern.label}`);
       }
     }
   }

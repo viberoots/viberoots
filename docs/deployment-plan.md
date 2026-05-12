@@ -4918,11 +4918,11 @@ work lands.
 
 ---
 
-## PR-37: `secretspec`/Vault backend + protected/shared credential-lifecycle closeout
+## PR-37: `SprinkleRef`/Vault backend + protected/shared credential-lifecycle closeout
 
 ### Description
 
-I will close the remaining secret-runtime gap by making `secretspec` and the initial Vault-backed
+I will close the remaining secret-runtime gap by making `SprinkleRef` and the initial Vault-backed
 protected/shared credential model real instead of leaving them as design-level intent. This PR
 adds the reviewed secret-contract resolution path, backend boundary, least-privilege credential
 posture, renewal/reacquire rules, and fail-closed execution behavior for expiring or revoked
@@ -4930,7 +4930,7 @@ credentials during protected/shared mutation.
 
 ### Scope & Changes
 
-- Implement `secretspec` as the authoritative repo-level secret-contract interface for deployment
+- Implement `SprinkleRef` as the authoritative repo-level secret-contract interface for deployment
   runtime inputs.
 - Implement Vault as the initial production backend behind that interface for protected/shared
   flows, while keeping the contract backend-switchable so deployment metadata semantics do not
@@ -4952,7 +4952,7 @@ credentials during protected/shared mutation.
 ### Tests (in this PR)
 
 - Add secret-contract tests covering:
-  - `secretspec` resolution through the reviewed backend boundary
+  - `SprinkleRef` resolution through the reviewed backend boundary
   - missing required secret contracts
   - backend-agnostic contract semantics despite Vault as the initial backend
 - Add protected/shared execution tests proving:
@@ -4967,7 +4967,7 @@ credentials during protected/shared mutation.
 
 ### Docs (in this PR)
 
-- Document `secretspec` as the authoritative secret-contract layer and Vault as the initial
+- Document `SprinkleRef` as the authoritative secret-contract layer and Vault as the initial
   production backend behind it.
 - Document protected/shared credential posture, renewal or reacquire rules, and fail-closed
   behavior on expiry or revocation.
@@ -4991,7 +4991,7 @@ credentials during protected/shared mutation.
 
 ### Acceptance Criteria
 
-- Protected/shared mutation uses `secretspec` as the reviewed secret-contract interface and Vault
+- Protected/shared mutation uses `SprinkleRef` as the reviewed secret-contract interface and Vault
   as the initial production backend behind it.
 - Secret values never cross into Buck metadata, checked-in files, durable records, replay
   snapshots, or unredacted operator-visible surfaces.
@@ -5005,7 +5005,7 @@ hard to reason about if the backend boundary and runtime authority are not kept 
 
 ### Mitigation
 
-Keep `secretspec` as the stable repo contract, keep Vault behind that boundary, and test
+Keep `SprinkleRef` as the stable repo contract, keep Vault behind that boundary, and test
 credential-selection, renewal, expiry, and redaction behavior in the same PR.
 
 ### Consequence of Not Implementing
@@ -8544,18 +8544,18 @@ path both implemented and safe to hand to operators.
 
 ### Description
 
-I will close the remaining secret-runtime design gap left after the initial `secretspec` / Vault
+I will close the remaining secret-runtime design gap left after the initial `SprinkleRef` / Vault
 slice. The current implementation enforces the reviewed secret lifecycle rules, but the
 protected/shared runtime still consumes an exported `deployment-vault-fixture@1` handoff file
 rather than reading Vault directly, and admission / replay still preserve mostly contract-level
 `secret_requirements` instead of one explicit admitted set of non-secret resolved secret
 references. This PR moves the reviewed production path to direct Vault-backed runtime resolution
-while preserving `secretspec` as the stable repo contract and making retry / rollback / promotion
+while preserving `SprinkleRef` as the stable repo contract and making retry / rollback / promotion
 semantics explicit through admitted secret-reference snapshots rather than ambient backend state.
 
 ### Scope & Changes
 
-- Keep `secretspec` as the authoritative repo-level secret contract for deployment inputs, but
+- Keep `SprinkleRef` as the authoritative repo-level secret contract for deployment inputs, but
   extend the admitted protected/shared secret model so the runtime does not depend on an exported
   fixture as the production handoff path.
 - Replace the current production-oriented fixture handoff with a reviewed direct Vault runtime
@@ -8616,7 +8616,7 @@ semantics explicit through admitted secret-reference snapshots rather than ambie
 
 - Update the deployment design / contract / secrets docs so they describe the final reviewed
   secret-runtime model accurately:
-  - `secretspec` as the stable repo contract
+  - `SprinkleRef` as the stable repo contract
   - Vault as the initial production backend behind that contract
   - admitted secret references as the replay / retry / rollback source of truth
   - direct runtime Vault reads for normal protected/shared execution
@@ -8670,7 +8670,7 @@ not kept extremely explicit.
 
 ### Mitigation
 
-Keep `secretspec` as the only repo contract, make admitted secret references first-class and
+Keep `SprinkleRef` as the only repo contract, make admitted secret references first-class and
 versioned, keep Vault behind the backend boundary, preserve the fixture path only for local/test
 workflows, and add fail-closed replay / redaction tests in the same PR.
 
@@ -8836,7 +8836,7 @@ needed for this repo.
   - when not to use the fixture path
   - which path is the reviewed production/default path
   - how fixture precedence interacts with direct Vault env vars
-- Keep `secretspec` unchanged as the stable repo-level secret contract/interface above both the
+- Keep `SprinkleRef` unchanged as the stable repo-level secret contract/interface above both the
   direct Vault path and the fixture override path.
 
 ### Tests (in this PR)
@@ -8882,7 +8882,7 @@ needed for this repo.
 - The reviewed fixture override env var no longer contains `VAULT` in its name.
 - Direct Vault resolution remains the reviewed production/default path.
 - Reviewed docs and tests make it unambiguous when the fixture path should and should not be used.
-- `secretspec` remains the stable contract layer and is not conflated with either runtime transport
+- `SprinkleRef` remains the stable contract layer and is not conflated with either runtime transport
   path.
 
 ### Risks
@@ -8930,7 +8930,7 @@ keeps the real Vault backend naming only on the surfaces that actually talk to V
 - Audit reviewed docs and examples so they stop referring to the local/test fixture as if it were
   itself a Vault runtime path.
 - Ensure the final reviewed terminology draws one explicit line between:
-  - `secretspec` as the contract layer
+  - `SprinkleRef` as the contract layer
   - admitted secret references as the replay/runtime reference layer
   - the secret fixture as the local/test override format
   - Vault as the initial production backend
@@ -8951,7 +8951,7 @@ keeps the real Vault backend naming only on the surfaces that actually talk to V
   neutral secret-fixture terminology consistently.
 - Document the fixture format as a local/test/bootstrap contract rather than a production runtime
   transport, and keep the direct Vault path described separately and explicitly.
-- Add or tighten one canonical explanation of how `secretspec`, admitted secret references, direct
+- Add or tighten one canonical explanation of how `SprinkleRef`, admitted secret references, direct
   Vault access, and the secret fixture each relate without overlapping names.
 
 ### Verification Commands
@@ -8974,7 +8974,7 @@ keeps the real Vault backend naming only on the surfaces that actually talk to V
 - Fixture-only schema and helper names no longer imply that the local/test fixture is itself a
   direct Vault runtime path.
 - Direct Vault naming remains only on code/docs that actually speak to Vault.
-- Reviewed documentation uses one coherent vocabulary for `secretspec`, admitted secret references,
+- Reviewed documentation uses one coherent vocabulary for `SprinkleRef`, admitted secret references,
   direct Vault, and the secret fixture.
 
 ### Risks
@@ -13862,7 +13862,7 @@ hooks now need to read `deploymentHost.identityProvider.databasePasswordFile` be
 Keycloak service starts, but the long-standing reviewed bootstrap guidance still creates
 `/var/lib/deployment-host-secrets/keycloak-db-password` as a root-owned `0600` host secret.
 That mismatch is especially important in this repo because the host already runs Vault and has been
-using `secretspec` as the reviewed secret-contract layer, while concrete secret files remain a
+using `SprinkleRef` as the reviewed secret-contract layer, while concrete secret files remain a
 host-runtime concern rather than a repo-managed artifact.
 
 The reviewed design should be:
@@ -13873,7 +13873,7 @@ The reviewed design should be:
 - the main identity-provider process remains unprivileged
 - reviewed docs and tests describe portable `nixos-rebuild switch` host reconciliation behavior,
   not a local shell alias such as `pull-switch`
-- `secretspec` remains the stable repo-level contract for deployment secrets, while the host module
+- `SprinkleRef` remains the stable repo-level contract for deployment secrets, while the host module
   cleanly consumes host-managed runtime secret paths for its own bootstrap dependencies
 
 ### Scope & Changes
@@ -13893,7 +13893,7 @@ The reviewed design should be:
   - avoid coupling module correctness to whether the host exposes a resolvable static `keycloak`
     account versus a dynamic runtime identity
 - Align the reviewed secret story with the repo's existing secret architecture:
-  - keep `secretspec` as the stable repo contract/interface
+  - keep `SprinkleRef` as the stable repo contract/interface
   - treat Vault or another host secret backend as the concrete host-side provider
   - allow `deploymentHost.identityProvider.databasePasswordFile` to point at a host-managed secret
     path produced by the reviewed host secret system
@@ -13927,7 +13927,7 @@ The reviewed design should be:
   so the reviewed bootstrap path is compatible with host-managed secrets, Vault-backed operator
   expectations, and restricted secret-file permissions.
 - Update any related secret/runtime docs to clarify that:
-  - `secretspec` remains the repo-level secret contract
+  - `SprinkleRef` remains the repo-level secret contract
   - concrete host secret files are supplied by the host secret system
   - reviewed identity bootstrap migration consumes those paths declaratively
 - Replace `pull-switch` references in affected setup or test-oriented docs with portable rebuild
@@ -13978,7 +13978,7 @@ cases, and document the host-secret contract explicitly in the reviewed runbooks
 
 Even with PR-100, operators will still hit non-declarative host-secret permission failures during
 identity bootstrap migration and will be forced into one-off manual fixes that conflict with the
-repo's `secretspec`/Vault-oriented secret-management philosophy.
+repo's `SprinkleRef`/Vault-oriented secret-management philosophy.
 
 ### Downsides for Implementing
 

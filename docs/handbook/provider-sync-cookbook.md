@@ -10,7 +10,7 @@ Provider sync writes deterministic Buck provider glue from lockfiles and patch i
   - Go: `third_party/providers/TARGETS.auto`
   - Node (PNPM): `third_party/providers/TARGETS.node.auto` (when lockfiles present)
   - Mapping file: `third_party/providers/nix_attr_map.bzl` (canonical nixpkgs attr map)
-- C++: provider sync is a **no-op** by design (see `docs/handbook/cpp-pr2-migration.md`).
+- C++: provider sync is a **no-op** by design (see `docs/handbook/cpp-provider-sync-migration.md`).
 - **Idempotency**: re-running should not change output when inputs are unchanged.
 - **Tests**: create a single patch using fixtures and assert stable provider name and paths.
 

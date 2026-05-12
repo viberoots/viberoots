@@ -8,11 +8,13 @@ import { promisify } from "node:util";
 
 const execFileAsync = promisify(execFile);
 const script = "build-tools/tools/dev/stale-names-lint.ts";
+const retiredInputContractTerm = ["secret", "spec"].join("");
 
 async function writeFixture(name: string, text: string): Promise<string> {
   await fsp.mkdir("buck-out/tmp", { recursive: true });
   const dir = await fsp.mkdtemp(path.join(process.cwd(), "buck-out/tmp/stale-names-"));
   const file = path.join(dir, name);
+  await fsp.mkdir(path.dirname(file), { recursive: true });
   await fsp.writeFile(file, text, "utf8");
   return file;
 }
@@ -117,5 +119,38 @@ test("stale-names-lint rejects migration labels in active doc command examples",
   await assert.rejects(
     execFileAsync("zx-wrapper", [script, file], { cwd: process.cwd() }),
     /legacy\* identifier/,
+  );
+});
+
+test("stale-names-lint rejects stale names in supplied file paths", async () => {
+  const staleNames = [
+    "reorg-pr3.txt",
+    "docs/pr3-helper.ts",
+    "build-tools/foo/pr3.test.ts",
+    "legacy-helper.ts",
+    `deployment-${retiredInputContractTerm}.ts`,
+  ];
+  for (const name of staleNames) {
+    const file = await writeFixture(name, "const ok = true;\n");
+    await assert.rejects(
+      execFileAsync("zx-wrapper", [script, file], { cwd: process.cwd() }),
+      /stale name|completed-plan|migration label/,
+    );
+  }
+});
+
+test("stale-names-lint rejects retired input-contract term everywhere", async () => {
+  const result = await execFileAsync("zx-wrapper", [script, "docs/deployment-plan.md"], {
+    cwd: process.cwd(),
+  });
+  assert.match(result.stderr, /no stale names found/);
+
+  const mixed = await writeFixture(
+    "fixture.md",
+    `Active docs must use SprinkleRef, not ${retiredInputContractTerm} terminology.\n`,
+  );
+  await assert.rejects(
+    execFileAsync("zx-wrapper", [script, mixed], { cwd: process.cwd() }),
+    /retired input-contract term/,
   );
 });

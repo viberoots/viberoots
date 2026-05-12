@@ -6,7 +6,7 @@ function assert(condition: boolean, message: string) {
   if (!condition) throw new Error(message);
 }
 
-test("Go macros must not use legacy mutating planner-visible stub helper (enforced abstraction boundary)", async () => {
+test("Go macros must not use removed mutating planner-visible stub helper", async () => {
   const file = "build-tools/go/defs.bzl";
   const txt = await fsp.readFile(file, "utf8");
   assert(

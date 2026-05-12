@@ -410,7 +410,7 @@ export async function runInTemp<T>(
     await ensureSharedNixTarballCacheRepo(activeXdgCacheHome);
   });
   const tempNestedIso = stableBuckIsolation(tmp, "zxtest-shared");
-  registerRunInTempBuckIsolation(tempNestedIso);
+  registerRunInTempBuckIsolation(tempNestedIso, tmp);
   const buck2ShimDir = await timeAsync(
     "runInTemp createTempBuck2Shim",
     async () => await createTempBuck2Shim(tmp, tempNestedIso),
@@ -715,7 +715,7 @@ export async function runInTemp<T>(
   }
 }
 
-function registerRunInTempBuckIsolation(iso: string): void {
+function registerRunInTempBuckIsolation(iso: string, repoRoot: string): void {
   const stateFile = String(process.env.VBR_VERIFY_PROCESS_STATE_FILE || "").trim();
   if (!stateFile || !iso) return;
   const ownerPidRaw = Number(process.env.VBR_VERIFY_OWNER_PID || process.pid);
@@ -724,7 +724,7 @@ function registerRunInTempBuckIsolation(iso: string): void {
     registerBuckIsolationSync({
       stateFile,
       iso,
-      repoRoot: process.cwd(),
+      repoRoot: path.resolve(repoRoot),
       ownerPid,
       kind: "run-in-temp-zxtest",
     });

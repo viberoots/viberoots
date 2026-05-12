@@ -16,14 +16,36 @@ export async function killBuckIsolation(root: string, iso: string): Promise<void
 }
 
 export async function killProcessGroup(pgid: number): Promise<void> {
+  const alive = () => {
+    try {
+      process.kill(-pgid, 0);
+      return true;
+    } catch {
+      return false;
+    }
+  };
+  const sleep = async (ms: number) => await new Promise((resolve) => setTimeout(resolve, ms));
+
   try {
     process.kill(-pgid, "SIGTERM");
   } catch {}
-  setTimeout(() => {
+  const termDeadline = Date.now() + 10_000;
+  while (alive() && Date.now() < termDeadline) {
+    await sleep(250);
+  }
+  if (!alive()) return;
+  try {
+    process.kill(-pgid, "SIGKILL");
+  } catch {}
+  const killDeadline = Date.now() + 2_000;
+  while (alive() && Date.now() < killDeadline) {
+    await sleep(100);
+  }
+  if (alive()) {
     try {
       process.kill(-pgid, "SIGKILL");
     } catch {}
-  }, 10_000);
+  }
 }
 
 export async function writeVerifyIsoMarker(lockDir: string | null, iso: string): Promise<void> {

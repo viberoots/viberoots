@@ -133,7 +133,7 @@ createDeploymentSecretRuntimeForAdmittedContext({
   admittedContext,
   fallbackTargetScope,
   secretContext,
-})
+});
 ```
 
 This helper selects the backend from admitted references first, then from
@@ -466,7 +466,7 @@ resolveInitialAdmittedSecretReferences({
   secretContext,
   vaultRuntime,
   infisicalRuntime,
-})
+});
 ```
 
 Rules:

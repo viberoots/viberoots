@@ -34,22 +34,16 @@ source files, test files, templates, scaffolds, or operator-facing docs:
 - `git@github.com:kiltyj/common.git`
 - `kiltyj/viberoots` (repository slug only)
 - `git@github.com:kiltyj/viberoots.git`
-- `secretspec`, `Secretspec` (in-house concept name: use `SprinkleRef` instead)
 
 Exceptions: `docs/repo-rename.md`, `docs/runtime-prefix-migration.md`,
 `docs/contributor-naming-conventions.md`, `docs/mini-name-migration-instructions.md`,
-`docs/deployment-plan.md` (retrospective PR-37 and surrounding narratives retain the old
-vocabulary for historical accuracy), `pnpm-lock.yaml`, files under `docs/build-history/`,
-and files under `docs/design-history/`.
+`pnpm-lock.yaml`, files under `docs/build-history/`, and files under `docs/design-history/`.
 
 ## In-house concept names
 
-| Stale name   | Canonical replacement | Rationale                                                                                                                            |
-| ------------ | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| `secretspec` | `SprinkleRef`         | Removes collision with the unrelated Cachix `secretspec` CLI; the layer covers `config://` and `runtime://` inputs, not just secrets |
-| `Secretspec` | `SprinkleRef`         | Title-case form of the same stale concept name                                                                                       |
-
-Use `SprinkleRef` in all prose, identifiers, file names, and doc glossary entries. The `secret://`, `config://`, and `runtime://` URI schemes are unchanged — they are operator-visible serialized identifiers and renaming them would be a breaking change.
+Use `SprinkleRef` in all prose, identifiers, file names, and doc glossary entries for the repo-owned
+deployment input contract. The `secret://`, `config://`, and `runtime://` URI schemes are unchanged:
+they are operator-visible serialized identifiers and renaming them would be a breaking change.
 
 ## Plan/phase number identifiers
 
@@ -101,7 +95,8 @@ The `stale-names-lint` tool runs automatically:
 - **Verify/CI** (via `v`): scans all tracked source files before running Buck tests.
 
 Active docs are checked for stale names everywhere and for completed plan/phase identifiers or
-migration labels in command-like examples. Historical planning docs are excluded only through
+migration labels in command-like examples. Tracked file paths are checked too, so stale names in
+filenames fail even when file contents are clean. Historical planning docs are excluded only through
 explicit allowlists.
 
 To run the full-source scan manually:
@@ -118,6 +113,22 @@ zx-wrapper build-tools/tools/dev/stale-names-lint.ts build-tools/tools/my-file.t
 
 The verification test `no-stale-viberoots-names.enforcement.test` provides an independent
 full-source assertion that runs in the normal `v` / `buck2 test //...` suite.
+
+## Repository Remote Closeout
+
+During rename closeout, local clones should point the `github` remote directly at the canonical
+repository:
+
+```
+git remote get-url github
+git remote get-url --push github
+```
+
+Both commands should print:
+
+```
+git@github.com:viberoots/viberoots.git
+```
 
 ## Temporary Rename Inventory
 

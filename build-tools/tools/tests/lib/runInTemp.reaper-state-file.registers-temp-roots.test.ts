@@ -3,10 +3,12 @@ import * as fsp from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
+import { parseVerifyOwnedState } from "../../dev/verify/owned-process-state";
 import { runInTemp } from "./test-helpers";
 
 test("runInTemp: when VBR_BUCK_REAPER_STATE_FILE is set, temp repo roots are registered", async () => {
-  const prev = process.env.VBR_BUCK_REAPER_STATE_FILE;
+  const prevReaper = process.env.VBR_BUCK_REAPER_STATE_FILE;
+  const prevVerify = process.env.VBR_VERIFY_PROCESS_STATE_FILE;
   const stateFile = path.join(
     os.tmpdir(),
     `viberoots-test-reaper-state-${process.pid}-${Date.now()}.txt`,
@@ -14,6 +16,7 @@ test("runInTemp: when VBR_BUCK_REAPER_STATE_FILE is set, temp repo roots are reg
 
   try {
     process.env.VBR_BUCK_REAPER_STATE_FILE = stateFile;
+    process.env.VBR_VERIFY_PROCESS_STATE_FILE = stateFile;
     await fsp.writeFile(stateFile, "", "utf8");
 
     const roots: string[] = [];
@@ -34,9 +37,21 @@ test("runInTemp: when VBR_BUCK_REAPER_STATE_FILE is set, temp repo roots are reg
         throw new Error(`expected state file to include temp repo root: ${r}`);
       }
     }
+
+    const parsed = parseVerifyOwnedState(txt);
+    for (const r of roots) {
+      const isolation = parsed.isolations.find(
+        (entry) => entry.kind === "run-in-temp-zxtest" && entry.repoRoot === r,
+      );
+      if (!isolation) {
+        throw new Error(`expected runInTemp isolation to be registered under temp repo root: ${r}`);
+      }
+    }
   } finally {
-    if (prev === undefined) delete process.env.VBR_BUCK_REAPER_STATE_FILE;
-    else process.env.VBR_BUCK_REAPER_STATE_FILE = prev;
+    if (prevReaper === undefined) delete process.env.VBR_BUCK_REAPER_STATE_FILE;
+    else process.env.VBR_BUCK_REAPER_STATE_FILE = prevReaper;
+    if (prevVerify === undefined) delete process.env.VBR_VERIFY_PROCESS_STATE_FILE;
+    else process.env.VBR_VERIFY_PROCESS_STATE_FILE = prevVerify;
     await fsp.rm(stateFile, { force: true }).catch(() => {});
   }
 });

@@ -6,6 +6,7 @@ import { buckProcessTableLines } from "../../lib/process-inspection";
 import { cwdIsInsideTempRepo } from "./buck-daemon-reaper-utils";
 import { cleanupRegisteredVerifyProcesses } from "../../dev/verify/owned-process-cleanup";
 import { parseVerifyOwnedState } from "../../dev/verify/owned-process-state";
+import { cleanupRegisteredBuckIsolations } from "../../dev/verify/registered-buck-cleanup";
 
 type Args = {
   parent?: string;
@@ -279,6 +280,7 @@ async function reapRegisteredRoots(tmpRepoRoot: string, stateFile: string): Prom
     } catch {}
   }
   await cleanupRegisteredVerifyProcesses({ stateFile, maxKills: 200 }).catch(() => {});
+  await cleanupRegisteredBuckIsolations({ stateFile, maxKills: 200 }).catch(() => {});
   const seen = new Set<string>();
   for (const r of tmpRoots) {
     const abs = path.resolve(r);

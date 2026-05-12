@@ -28,11 +28,9 @@ Reviewed context:
   internal `v1`/`v2` helper or contract names, and first-version schema names. Because this repo has
   not launched and has no external users, these labels should either become canonical behavior names
   or be removed when they only exist to preserve an abandoned migration path.
-- The in-house `secretspec` concept names the contract layer for required deployment inputs (secrets
-  through `secret://`, plus non-secret runtime config through `config://` and `runtime://`). The name
-  collides with the unrelated Cachix `secretspec` CLI in nixpkgs and over-indexes on secrets even
-  though the layer covers other input kinds. The canonical replacement is `SprinkleRef`, with paired
-  casings for identifiers and prose.
+- The in-house `SprinkleRef` concept names the contract layer for required deployment inputs
+  (secrets through `secret://`, plus non-secret runtime config through `config://` and
+  `runtime://`). `SprinkleRef` is the canonical name for identifiers and prose.
 
 Canonical replacements:
 
@@ -51,9 +49,6 @@ Canonical replacements:
 - deployment remote URL `git@github.com:kiltyj/common.git` -> `git@github.com:kiltyj/viberoots.git`
 - GitHub owner namespace `kiltyj/viberoots` -> `viberoots/viberoots`
 - GitHub remote URL `git@github.com:kiltyj/viberoots.git` -> `git@github.com:viberoots/viberoots.git`
-- in-house concept `secretspec` -> `SprinkleRef`
-- in-house concept `Secretspec` -> `SprinkleRef`
-- TypeScript module `deployment-secretspec.ts` -> `deployment-sprinkle-ref.ts`
 
 Non-goals:
 
@@ -604,52 +599,36 @@ It is a one-shot coordinated cutover that requires synchronized updates to remot
 clone, CI worker, OIDC trust policy, and deployment-host checkout. The work cannot be rolled out
 incrementally without leaving callers half-migrated.
 
-## PR-6: In-house input-contract layer rename from secretspec to SprinkleRef
+## PR-6: In-house input-contract layer finalization as SprinkleRef
 
 ### 1. Intent
 
-Replace the in-house `secretspec` concept name with `SprinkleRef` everywhere it appears as a code
-identifier, file name, or doc glossary entry. The rename removes the namespace collision with the
-unrelated Cachix `secretspec` CLI and adopts a name that no longer over-indexes on secrets, since
-the layer also covers `config://` and `runtime://` runtime inputs.
+Finalize `SprinkleRef` as the canonical in-house concept name for the deployment input contract in
+code identifiers, file names, and doc glossary entries. The name covers required secrets through
+`secret://` plus non-secret runtime inputs through `config://` and `runtime://`.
 
 ### 2. Scope of changes
 
-- Rename the in-house concept name `secretspec` to `SprinkleRef` in prose docs, glossary entries,
-  and design-doc references.
-- Rename the TypeScript module
-  `build-tools/tools/deployments/deployment-secretspec.ts` to
-  `build-tools/tools/deployments/deployment-sprinkle-ref.ts` (final canonical filename agreed
-  during implementation) and update all importers.
-- Rename TypeScript identifiers that contain the literal string `secretspec`. Existing
-  secret-specific type names such as `DeploymentSecretBackendKind` and
-  `DeploymentSecretContractBinding` keep their `Secret*` prefixes; only identifiers that say
-  `secretspec` are renamed.
-- Rename the test file
-  `build-tools/tools/tests/deployments/cloudflare-pages.secretspec.e2e.test.ts` to a
-  `cloudflare-pages.sprinkle-ref.e2e.test.ts` form. Update the two `.bzl` taxonomy files
-  (`deployment_resource_limited_taxonomy.bzl`, `deployment_domain_taxonomy.bzl`) that reference the
-  test by path.
-- Update the contributor naming conventions doc with the canonical `secretspec` -> `SprinkleRef`
-  rule and the rationale (collision with the Cachix CLI; layer covers non-secret inputs too).
-- Update active-prose sections of the operator and design docs that currently use the old
-  vocabulary, including `docs/secrets-usage.md`, `docs/deployment-secrets-api.md`,
-  `docs/deployments-design.md`, `docs/deployments-usage.md`, `docs/vault-production-bootstrap.md`,
-  `docs/nixos-shared-host-setup.md`, and the relevant `projects/docs/*` design docs
-  (`gate-1-plan.md`, `phase_0_*.md`).
-- Update `docs/deployment-plan.md` active prose. The retrospective PR-37 narrative and surrounding
-  retrospective sections that quote the old vocabulary in completed-PR context are retained as-is
-  and added to the retained-references list; rewriting them would distort the historical record.
+- Ensure the TypeScript module `build-tools/tools/deployments/deployment-sprinkle-ref.ts`, its
+  importers, and paired test paths use the canonical `SprinkleRef` vocabulary.
+- Preserve existing secret-specific type names such as `DeploymentSecretBackendKind` and
+  `DeploymentSecretContractBinding`; their `Secret*` prefixes describe `secret://` inputs and are
+  not the concept-layer name.
+- Update the contributor naming conventions doc so `SprinkleRef` is the only documented in-house
+  input-contract concept name.
+- Update active-prose sections of the operator and design docs, including `docs/secrets-usage.md`,
+  `docs/deployment-secrets-api.md`, `docs/deployments-design.md`, `docs/deployments-usage.md`,
+  `docs/vault-production-bootstrap.md`, `docs/nixos-shared-host-setup.md`, and relevant
+  `projects/docs/*` design docs.
+- Update `docs/deployment-plan.md` prose so completed-PR narratives also use `SprinkleRef`; the repo
+  no longer retains historical exceptions for the former concept name.
 - Update `docs/mini-name-migration-instructions.md`: bump the preconditions list from "PR-1..PR-5"
   to "PR-1..PR-6". `mini` is still in the pre-PR-3 state at the time PR-6 lands, so the runbook
   body continues to describe the original migration from `bucknix`/`bnx`/`kiltyj/common` to
   `viberoots`/`vbr`/`viberoots/viberoots`. The runbook does not currently reference the
-  `secretspec` layer name; verify during PR-6 implementation that no host-side surface emits the
-  old token, and add operator instructions only if such a surface is discovered.
-- Add the in-house `secretspec` token to the stale-names lint's `STALE_PATTERNS` once the rename
-  has landed, so the old name cannot be reintroduced. This is now safe because
-  `pkgs.secretspec` has already been removed from
-  `build-tools/tools/nix/devshell.nix` and the Cachix tool is no longer pulled into the dev shell.
+  `SprinkleRef` layer name; verify during PR-6 implementation that no host-side surface needs
+  operator instructions.
+- Add stale-name lint coverage so the former concept name cannot be reintroduced.
 - Leave the `secret://`, `config://`, and `runtime://` URI schemes unchanged. These are
   operator-visible identifiers serialized in deployment records and reviewed admission fixtures;
   renaming them would be a breaking change with no benefit.
@@ -662,40 +641,31 @@ the layer also covers `config://` and `runtime://` runtime inputs.
 
 - PR-1 through PR-5 should be merged ahead of this PR so the rename does not conflict with
   concurrent identity migrations or operator-runbook churn.
-- The Cachix `pkgs.secretspec` dependency has already been removed from the dev shell, so no
-  further external coordination is required.
+- No further external coordination is required.
 
 ### 4. Tests to be added
 
-- Add the in-house `secretspec` token to the stale-names lint's `STALE_PATTERNS` with a negative
-  test proving it is rejected outside the planning-document and historical-retrospective
-  allowlist.
-- Update the renamed `cloudflare-pages.sprinkle-ref.e2e.test.ts` (and any other test that asserts
-  the old token as a string) to use the new name. Behavioral assertions are unchanged.
-- Add an active-code lint or test that fails when a stale lowercase `secretspec` and a new
-  `SprinkleRef` are mixed in the same file, catching half-migrated state.
+- Add stale-name lint coverage with a negative test proving the former concept name is rejected.
+- Update `cloudflare-pages.sprinkle-ref.e2e.test.ts` and any other test that asserts the concept
+  name as a string to use `SprinkleRef`. Behavioral assertions are unchanged.
 
 ### 5. Docs to be added or updated
 
-- Replace `secretspec` with `SprinkleRef` in the public docs listed in the scope section.
-- Update the contributor naming conventions doc with the rename rule and the rationale.
+- Update the public docs listed in the scope section to use `SprinkleRef`.
+- Update the contributor naming conventions doc with the canonical concept name and rationale.
 - Update `docs/mini-name-migration-instructions.md` preconditions to reference PR-1..PR-6, with no
   change to the body since `mini` is still in the pre-PR-3 state and the runbook does not
-  reference the `secretspec` layer name today.
-- Update the "Canonical replacements" section of this plan with the `secretspec -> SprinkleRef`
-  entries (already done as part of this PR's plan update).
-- Update the "Retained references and enforcement allowlist notes" section to record that this
-  planning document and the retrospective sections of `docs/deployment-plan.md` are excluded from
-  `secretspec` enforcement.
+  reference the `SprinkleRef` layer name today.
+- Update the "Retained references and enforcement allowlist notes" section so no retained historical
+  exception exists for the former concept name.
 
 ### 6. Acceptance criteria
 
-- No active code identifier, filename, or operator-facing doc references the in-house
-  `secretspec` name.
-- The renamed TypeScript module, test file, and `.bzl` taxonomy references are aligned and pass
+- No active code identifier, filename, plan document, historical narrative, or operator-facing doc
+  references the former in-house concept name.
+- The TypeScript module, test file, and `.bzl` taxonomy references are aligned and pass
   type-checking and the test suite without behavioral changes.
-- The stale-names lint rejects the in-house `secretspec` token outside the planning-document and
-  historical-retrospective allowlist.
+- The stale-names lint rejects the former concept name without a retained-reference allowlist.
 - `docs/mini-name-migration-instructions.md` lists "PR-1..PR-6" in its preconditions and is
   otherwise unchanged for the pre-PR-3 `mini` state.
 - The `secret://`, `config://`, and `runtime://` URI schemes remain unchanged in deployment
@@ -707,12 +677,12 @@ the layer also covers `config://` and `runtime://` runtime inputs.
   the prose reads as flippant when the contract is resolving production secrets.
 - The diff is wide (many docs and code identifiers) which makes review slow and partial rebases
   risky.
-- Concurrent in-flight work may reintroduce `secretspec` while the rename is in progress; without
-  lint enforcement during the migration, drift is likely.
-- Some retrospective sections of `docs/deployment-plan.md` quote the old vocabulary in
-  completed-PR narratives; mechanically rewriting them would distort history.
+- Concurrent in-flight work may reintroduce the former concept name; without lint enforcement, drift
+  is likely.
+- Completed-PR narratives now use `SprinkleRef` too, so the final repo has no historical exception
+  for the former term.
 - The mini runbook's body is unchanged by PR-6 today, but if the runbook later grows
-  `secretspec`-aware operator steps (for example, an explicit Vault role check), those would need
+  `SprinkleRef`-aware operator steps (for example, an explicit Vault role check), those would need
   to be authored using the new vocabulary.
 
 ### 8. Mitigations
@@ -720,37 +690,32 @@ the layer also covers `config://` and `runtime://` runtime inputs.
 - Use full noun phrases in compliance-facing prose ("the SprinkleRef contract for the production
   API token") rather than the bare verb to preserve gravity.
 - Land the rename in a single coordinated cutover; do not split across multiple PRs.
-- Add the lint rule in the same PR that lands the rename, with explicit allowlists for the
-  rename-plan and historical-retrospective sections, so drift is blocked immediately.
-- Mark historical retrospective sections of `docs/deployment-plan.md` as allowlisted rather than
-  rewritten; only active-prose sections are updated.
+- Add the lint rule in the same PR that lands the rename so drift is blocked immediately.
+- Rewrite historical retrospective sections to use `SprinkleRef`, matching the no-retained-term
+  closeout policy.
 - During PR-6 implementation, grep `docs/mini-name-migration-instructions.md` for any new
   references to the old or new layer name and update both the preconditions list and any body
   references in lockstep.
 
 ### 9. Consequences of not implementing this PR
 
-The codebase retains a namespace collision with the unrelated Cachix `secretspec` CLI and a layer
-name that misrepresents its scope (the layer covers `config://` and `runtime://` inputs too, not
-just secrets). New contributors continue to be misled by the doc glossary, and any future re-add
-of the Cachix tool to the dev shell would resurrect the collision in a load-bearing way.
+The codebase would retain mixed vocabulary for the deployment input contract. New contributors would
+continue to see inconsistent glossary, file-name, and test-name examples for the same concept.
 
 ### 10. Downsides for implementing this PR
 
 It is a wide, mostly-mechanical rename that touches many doc files and a smaller number of code
-paths. The new "Sprinkle" lexicon, while distinctive and on-brand with `viberoots`, may need
-defending in security or compliance prose where bare verbs ("sprinkle the production token") risk
-understating the gravity of the operation.
+paths. The "Sprinkle" lexicon may need defending in security or compliance prose where bare verbs
+risk understating the gravity of production secret resolution.
 
 ## PR-7: Rename closeout audit hardening and residual compatibility cleanup
 
 ### 1. Intent
 
 Close the residual gaps found by the post-PR-6 rename assessment: the current checkout still has a
-local `github` remote pointing at the old repository, `docs/deployment-plan.md` still contains active
-`secretspec` prose because the whole file is broadly allowlisted, path names with completed PR
-numbers can bypass stale-name enforcement, and one active planner-visible Starlark helper still keeps
-a migration-era compatibility alias for the old provider-realization vocabulary.
+local `github` remote pointing at the old repository, path names with completed PR numbers can
+bypass stale-name enforcement, and one active planner-visible Starlark helper still keeps a
+migration-era compatibility alias for the old provider-realization vocabulary.
 
 This PR is a closeout and hardening pass. It should not introduce new naming policy; it should make
 the PR-1 through PR-6 policy true in the current checkout and enforceable in future changes.
@@ -760,12 +725,10 @@ the PR-1 through PR-6 policy true in the current checkout and enforceable in fut
 - Update the local workstation `github` remote from the old `kiltyj/common` URL to
   `git@github.com:viberoots/viberoots.git`, and add a lightweight checked-in verification or
   operator checklist entry so future closeout reviews explicitly check the local remote.
-- Replace active `secretspec` prose in `docs/deployment-plan.md` with `SprinkleRef`, including the
-  later active PR-101 host-secret section. Keep only the already-reviewed historical retrospective
-  references, such as the PR-37-era narrative, under a narrow retained-reference rule.
-- Narrow stale-name enforcement for `docs/deployment-plan.md` so the whole file is no longer
-  exempt from `secretspec` checks. Use a section-aware, line-range, or similarly narrow allowlist for
-  retrospective sections that intentionally quote the old vocabulary.
+- Ensure `docs/deployment-plan.md` uses `SprinkleRef` consistently, including the PR-37
+  retrospective narrative and the later PR-101 host-secret section.
+- Remove the retained-reference exception for the former input-contract term; no plan or historical
+  narrative should keep that term.
 - Extend stale-name linting so it checks tracked file paths as well as file contents for stale repo
   names, completed-plan `pr<N>` / `PR-<N>` identifiers, completed-phase `phase<N>` identifiers, and
   unapproved migration labels.
@@ -794,12 +757,12 @@ the PR-1 through PR-6 policy true in the current checkout and enforceable in fut
 ### 4. Tests to be added
 
 - Add a stale-name lint test proving file paths are scanned, not only file contents. The test should
-  fail on temporary tracked-path fixtures such as `reorg-pr3.txt`, `legacy-helper.ts`, and
-  `deployment-secretspec.ts` unless they are under a reviewed narrow allowlist.
-- Add a regression test proving `docs/deployment-plan.md` is no longer completely allowlisted for
-  `secretspec`, while the explicitly retained historical retrospective section remains allowed.
-- Add a negative test proving active prose outside the retrospective allowlist cannot mix
-  `secretspec` and `SprinkleRef` in the same file.
+  fail on temporary tracked-path fixtures such as `reorg-pr3.txt`, `docs/pr3-helper.ts`,
+  `build-tools/foo/pr3.test.ts`, and `legacy-helper.ts` unless they are under a reviewed narrow
+  allowlist.
+- Add a regression test proving `docs/deployment-plan.md` has no retained exception for the former
+  input-contract term.
+- Add a negative test proving active prose cannot reintroduce the former input-contract term.
 - Add Starlark wiring tests proving `realize_providers_into` is rejected or absent from the public
   helper surface and that `"srcs"` is no longer accepted as a provider-realization mode.
 - Update existing planner-visible wiring probe tests to use `provider_realization_mode = "inputs"`
@@ -811,8 +774,7 @@ the PR-1 through PR-6 policy true in the current checkout and enforceable in fut
 
 ### 5. Docs to be added or updated
 
-- Update `docs/deployment-plan.md` active prose to use `SprinkleRef`, leaving only narrow historical
-  retrospective references to the old name.
+- Update `docs/deployment-plan.md` active prose and historical narratives to use `SprinkleRef`.
 - Update this plan's retained-reference notes with the final narrow allowlist entries and remove any
   statement that implies the whole `docs/deployment-plan.md` file is exempt.
 - Update contributor naming conventions if the manual local-remote verification step should be part
@@ -824,8 +786,8 @@ the PR-1 through PR-6 policy true in the current checkout and enforceable in fut
 
 - `git remote -v` for the local `github` remote points at
   `git@github.com:viberoots/viberoots.git` for both fetch and push in the closeout workspace.
-- Active prose in `docs/deployment-plan.md` no longer uses the in-house `secretspec` name; any
-  remaining references are historical retrospective quotes covered by a narrow allowlist.
+- `docs/deployment-plan.md` uses `SprinkleRef` consistently and has no retained historical exception
+  for the former input-contract term.
 - The stale-name lint fails on stale tokens in tracked file paths as well as file contents.
 - Active checked-in paths no longer include completed-plan names such as `reorg-pr3.txt` or
   `reorg-pr5.txt` unless they are moved under an explicitly historical/archival boundary with a
@@ -844,8 +806,8 @@ the PR-1 through PR-6 policy true in the current checkout and enforceable in fut
   especially historical move maps and test fixtures.
 - Removing `realize_providers_into` and `"srcs"` could break Starlark macros or probes that still
   rely on the compatibility vocabulary.
-- Narrowing `docs/deployment-plan.md` allowlists can be noisy because the file is large and contains
-  both active planning and historical retrospective sections.
+- Removing retained input-contract terminology can be noisy because `docs/deployment-plan.md` is
+  large and contains both active planning and historical retrospective sections.
 - Local git remote state is outside tracked source, so it cannot be fully enforced by ordinary
   checked-in tests.
 
@@ -857,16 +819,16 @@ the PR-1 through PR-6 policy true in the current checkout and enforceable in fut
   blind path rewrite across historical docs.
 - Replace `realize_providers_into` call sites mechanically with `provider_realization_mode`, then
   rely on targeted Starlark wiring tests to prove behavior stayed unchanged.
-- Keep `docs/deployment-plan.md` allowlists line- or section-specific and document the exact
-  retained historical ranges in this plan.
+- Rewrite historical deployment-plan narratives to use `SprinkleRef` so no line- or section-specific
+  exception remains for the former input-contract term.
 - Treat local remote verification as a closeout command/checklist item plus optional developer
   diagnostic, rather than trying to make normal tests depend on one developer's local git config.
 
 ### 9. Consequences of not implementing this PR
 
 The rename would appear complete under the current stale-name lint while still retaining old
-repository remote state, active `secretspec` prose, path-level completed-plan identifiers, and a
-planner-visible compatibility alias that contradicts the no-compatibility-alias closeout policy.
+repository remote state, path-level completed-plan identifiers, and a planner-visible compatibility
+alias that contradicts the no-compatibility-alias closeout policy.
 
 ### 10. Downsides for implementing this PR
 
@@ -903,18 +865,14 @@ excluded from the stale-names-lint enforcement.
   integrity strings may coincidentally contain stale substrings and must not be renamed.
 - Files under `docs/build-history/` and `docs/design-history/`: excluded via
   `ALLOWED_PREFIXES`. These are inert historical records, not active instructions.
+- `docs/build-history/move-maps/build-system-reorg-map.txt` and
+  `docs/build-history/move-maps/language-root-reorg-map.txt`: historical file move maps archived
+  under the build-history boundary after PR-7 removed their completed-plan-number filenames from
+  active dev-tool paths.
 - `docs/repo-rename.md` references to `kiltyj/viberoots`: retained for the same reason as
   `kiltyj/common` references — the plan document must name the stale tokens it replaces. The
   PR-5 sections name `kiltyj/viberoots` and `git@github.com:kiltyj/viberoots.git` to describe
   what is being moved to the `viberoots` org.
-- `docs/repo-rename.md` references to the in-house `secretspec`: retained for the same reason as
-  the other stale tokens — the plan must name what is being renamed. PR-6 names `secretspec`,
-  `Secretspec`, and `deployment-secretspec.ts` to describe what is being replaced with
-  `SprinkleRef`.
-- `docs/deployment-plan.md` retrospective sections quoting the in-house `secretspec` vocabulary
-  (PR-37 and surrounding retrospective narratives): excluded via a path-specific allowlist entry
-  added in PR-6. Mechanically rewriting completed-PR narratives would distort the historical
-  record. Active-prose sections of the same file are updated in PR-6.
 - `build-tools/tools/tests/deployments/nixos-shared-host.control-plane-service-env.test.ts`:
   excluded via `ALLOWED_PATHS`. This test asserts that the old `BNX_DEPLOY_CONTROL_PLANE_TOKEN`
   variable is rejected; the old variable name must appear as a test fixture string.
@@ -924,13 +882,33 @@ excluded from the stale-names-lint enforcement.
 
 ### PR-number and phase-number references excluded from active-code enforcement
 
-Plan/phase numbers in `.md` plan-document headings are skipped by `stale-names-lint` because
-the tool checks `isDocFile()` before applying `PLAN_NUMBER_PATTERNS`. No additional allowlist
-entries are needed for PR-N headings in plan documents.
+Plan/phase numbers in ordinary `.md` prose are skipped by `stale-names-lint` unless the line is a
+command-like example. The exact plan-document paths below are also excluded via
+`PLAN_NUMBER_SKIP_PATHS` because they intentionally contain dense structural `PR-N` headings,
+cross-references, or reviewed milestone labels that are planning metadata rather than active code
+identifiers:
+
+- `docs/deployment-plan.md`: active deployment plan with structural PR headings and completed-PR
+  cross-references; stale repository names still run through the separate content checks.
+- `docs/external-deployments-plan.md`: external deployments plan with structural PR headings,
+  completed-PR cross-references, and reviewed Phase 0 rollout prose.
+- `docs/handbook/nix-gaps-plan.md`: Nix migration closeout plan that intentionally names migration
+  phases and old/new route concepts while documenting the completed migration.
+- `docs/handbook/nix-gaps-prs.md`: Nix migration PR execution plan with structural PR headings,
+  implementation snapshots, and superseded-PR notes.
+- `build-tools/tools/tests/linting/stale-names-lint.behavior.test.ts`: deliberate negative fixtures
+  for `PR-N`, `phase<N>`, `legacy`, and internal `v1`/`v2` enforcement behavior.
+- `build-tools/tools/tests/linting/rename-inventory.closeout.test.ts`: deliberate stale-token
+  fixtures proving duplicate `PR-N` inventory entries resolve to one reviewed replacement and
+  contextual tokens cannot be marked blindly replaceable.
+- `build-tools/tools/nix/shared-host-identity-provider-migration.nix`: retains a serialized
+  `.deployment-host-keycloak-bootstrap-admin-created-v2` marker generated on hosts; the suffix is a
+  reviewed host-state schema marker, not a migration-era helper name.
 
 The following active source paths use `phase0` as an operational deployment concept (the
 first deployment group in the release pipeline, not a completed plan phase number) and are
-excluded via `PLAN_NUMBER_SKIP_PATHS` in `stale-names-lint-allowlists.ts`:
+excluded via `PLAN_NUMBER_SKIP_PATHS` or `PLAN_NUMBER_SKIP_PREFIXES` in
+`stale-names-lint-allowlists.ts`:
 
 - `build-tools/tools/deployments/deployment-phase0-admission.ts`
 - `build-tools/tools/deployments/deployment-phase0-prerequisite-chain.ts`
@@ -942,11 +920,6 @@ excluded via `PLAN_NUMBER_SKIP_PATHS` in `stale-names-lint-allowlists.ts`:
 - `build-tools/tools/tests/deployments/phase0-deployments.contract.test.ts`
 - `build-tools/tools/tests/deployments/phase0-deployments.readiness-secrets.test.ts`
 - `build-tools/tools/tests/deployments/phase0-deployments.smoke.test.ts`
-- `build-tools/tools/nix/shared-host-identity-provider-migration.nix`
-
-The rename-inventory closeout test is also excluded via `PLAN_NUMBER_SKIP_PATHS` because it carries
-deliberate stale-token fixtures that prove duplicate `PR-N` inventory entries resolve to a single
-reviewed replacement and contextual tokens cannot be marked as blindly replaceable.
 
 Additional deployment and OpenTofu phase0 paths are excluded because `phase0` names the first
 deployment/admission stage in the live deployment model, not a completed planning phase. The same
@@ -1008,12 +981,18 @@ reviewed fixture strings:
 - `build-tools/tools/tests/deployments/deployment-admission.supply-chain.replay.test.ts`
 - `build-tools/tools/tests/deployments/deployment-admission.supply-chain.test.ts`
 - `build-tools/tools/tests/deployments/deployment-admin-keycloak.remote-profile.test.ts`
+- `build-tools/tools/tests/deployments/nixos-shared-host.install.manifest.contract.test.ts`
 - `build-tools/tools/tests/lang/importer-wiring.macros-avoid-direct-lockfile-parsing.enforcement.test.ts`
 - `build-tools/tools/tests/lang/importer-wiring.no-v2-paths.enforcement.test.ts`
 - `build-tools/tools/tests/lang/package-local-wiring.enforcement.no-bypass.test.ts`
-- `build-tools/tools/tests/deployments/nixos-shared-host.install.manifest.contract.test.ts`
+- `build-tools/tools/tests/lib/providers.lockfile-collision-detection.test.ts`: synthetic
+  lockfile integrity fixture contains `sha512-v2...`, which is package-manager data, not an
+  internal `v2` migration label.
 - `build-tools/tools/tests/linting/rename-inventory.closeout.test.ts`
 - `build-tools/tools/tests/linting/stale-names-lint.behavior.test.ts`
+- `build-tools/tools/tests/scaffolding/sync-providers-node.determinism.test.ts`: synthetic
+  lockfile integrity fixture contains `sha512-v2...`, which is package-manager data, not an
+  internal `v2` migration label.
 - `build-tools/tools/tests/scaffolding/webapp.module-dep-label-normalization.contract.test.ts`
 - `projects/apps/pleomino/src/game/persistence-state-v1.ts`
 

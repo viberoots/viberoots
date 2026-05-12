@@ -2,10 +2,13 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import {
   buck2Kill,
+  existingPathVariant,
   isPidAlive,
   listIsolationDirs,
   parsePsLine,
+  pathStartsWithRootVariant,
   pathExists,
+  pathsEquivalent,
   psLines,
   tryRepoRootFromStateDir,
 } from "./buck-orphan-cleanup-lib";
@@ -34,9 +37,9 @@ function parseForkservers(lines: string[]): ForkserverProc[] {
 }
 
 function rootHasLiveForkserver(root: string, lines: string[]): boolean {
-  const stateDirPrefix = `${path.resolve(root)}${path.sep}buck-out${path.sep}`;
+  const buckOut = path.join(path.resolve(root), "buck-out");
   for (const fork of parseForkservers(lines)) {
-    if (path.resolve(fork.stateDir).startsWith(stateDirPrefix) && isPidAlive(fork.pid)) return true;
+    if (pathStartsWithRootVariant(fork.stateDir, buckOut) && isPidAlive(fork.pid)) return true;
   }
   return false;
 }
@@ -158,11 +161,12 @@ export async function cleanupRegisteredTempRepos(opts: {
   const maxKills = Math.max(0, opts.maxKills ?? 200);
   for (const root of uniqueRoots) {
     if (killed >= maxKills) break;
-    if (!(await pathExists(root))) continue;
-    const isos = await listIsolationDirs(root);
+    const existingRoot = await existingPathVariant(root);
+    if (!existingRoot) continue;
+    const isos = await listIsolationDirs(existingRoot);
     for (const iso of isos) {
       if (killed >= maxKills) break;
-      await buck2Kill(root, iso, 5000);
+      await buck2Kill(existingRoot, iso, 5000);
     }
   }
   for (let pass = 0; pass < 3 && killed < maxKills; pass++) {
@@ -173,10 +177,11 @@ export async function cleanupRegisteredTempRepos(opts: {
       if (!mapped) continue;
       const { repoRoot, iso } = mapped;
       const absRepo = path.resolve(repoRoot);
-      if (!uniqueRoots.includes(absRepo)) continue;
+      if (!uniqueRoots.some((root) => pathsEquivalent(absRepo, root))) continue;
       matchedThisPass++;
-      if (await pathExists(absRepo)) {
-        await buck2Kill(absRepo, iso, 5000);
+      const existingRoot = await existingPathVariant(absRepo);
+      if (existingRoot) {
+        await buck2Kill(existingRoot, iso, 5000);
       }
       if (isPidAlive(f.pid)) {
         try {
@@ -202,7 +207,6 @@ export async function cleanupRegisteredTempRepos(opts: {
   const lines2 = await psLines(2000);
   for (const root of uniqueRoots) {
     if (killed >= maxKills) break;
-    if (!(await pathExists(root))) continue;
     const base = path.basename(path.resolve(root));
     if (!base) continue;
     const prefix = `buck2d[${base}]`;

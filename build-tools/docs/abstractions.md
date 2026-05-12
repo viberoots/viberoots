@@ -588,7 +588,7 @@ The contract is guarded by probe and enforcement tests. If a new macro bypasses 
 - `build-tools/tools/tests/lang/importer-nix-calling-genrule-wiring.attach-patches-providers-global-inputs.probe.test.ts`: proves list and dict `srcs` shapes receive importer-local patch inputs, provider edges, global Nix inputs, and standardized workspace-root env injection.
 - `build-tools/tools/tests/node/node.nix-calling-macros.use-shared-importer-nix-genrule-helper.enforcement.test.ts`: prevents Node Nix-calling macro implementations from bypassing the shared helper.
 - `build-tools/tools/tests/node/node.defs-core.uses-non-mutating-importer-wiring.enforcement.test.ts`: prevents Node macros from falling back to the mutating importer wiring helpers.
-- `build-tools/tools/tests/lang/starlark.no-legacy-mutating-outside-lang.enforcement.test.ts`: prevents reintroduction of legacy mutating wiring helpers outside `//build-tools/lang/*`.
+- `build-tools/tools/tests/lang/starlark.no-mutating-helpers-outside-lang.enforcement.test.ts`: prevents reintroduction of removed mutating wiring helpers outside `//build-tools/lang/*`.
 
 ---
 

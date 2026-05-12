@@ -10,6 +10,7 @@ import {
   cleanupRegisteredBuckIsolations,
   cleanupRegisteredTempRepos,
 } from "../../dev/verify/buck-orphan-cleanup";
+import { pathStartsWithRootVariant } from "../../dev/verify/buck-orphan-cleanup-lib";
 import { registeredIsolationProcessPidsFromLines } from "../../dev/verify/registered-buck-cleanup";
 import { parseVerifyOwnedState } from "../../dev/verify/owned-process-state";
 import { buckProcessTableLines, processCommandLines } from "../../lib/process-inspection";
@@ -386,6 +387,56 @@ test("verify cleanup: registered buck isolation matching accepts pgrep-style ful
   ]);
 
   assert.deepEqual(pids, [42, 43]);
+});
+
+test("verify cleanup: registered buck isolation matching accepts macOS /tmp aliases", () => {
+  const entry = {
+    iso: "zxtest-shared-abcdef1234",
+    repoRoot: "/tmp/viberoots-run-in-temp-example",
+    ownerPid: 1234,
+    kind: "run-in-temp-zxtest",
+    createdAtMs: 1,
+  };
+  const pids = registeredIsolationProcessPidsFromLines(entry, [
+    "50 49 00:00 (buck2-forkserver) forkserver --fd 23 --state-dir /private/tmp/viberoots-run-in-temp-example/buck-out/zxtest-shared-abcdef1234/forkserver",
+    "51 49 00:00 (buck2-forkserver) forkserver --fd 23 --state-dir /private/tmp/viberoots-run-in-temp-example/buck-out/foreign/forkserver",
+  ]);
+
+  assert.deepEqual(pids, [50, 49]);
+});
+
+test("verify cleanup: registered buck isolation matching uses exact isolation when buck root drifts", () => {
+  const entry = {
+    iso: "zxtest-shared-abcdef1234",
+    repoRoot: "/tmp/viberoots-run-in-temp-example",
+    ownerPid: 1234,
+    kind: "run-in-temp-zxtest",
+    createdAtMs: 1,
+  };
+  const pids = registeredIsolationProcessPidsFromLines(entry, [
+    "50 49 00:00 buck2d[viberoots] --isolation-dir zxtest-shared-abcdef1234 daemon {}",
+    "51 50 00:00 (buck2-forkserver) forkserver --fd 23 --state-dir /Users/example/repo/buck-out/zxtest-shared-abcdef1234/forkserver",
+    "52 51 00:00 buck2d[viberoots] --isolation-dir zxtest-shared-other daemon {}",
+  ]);
+
+  assert.deepEqual(pids, [50, 49, 51]);
+});
+
+test("verify cleanup: temp root path matching accepts macOS /tmp aliases", () => {
+  assert.equal(
+    pathStartsWithRootVariant(
+      "/private/tmp/viberoots-run-in-temp-example/buck-out/zxtest-shared/forkserver",
+      "/tmp/viberoots-run-in-temp-example/buck-out",
+    ),
+    true,
+  );
+  assert.equal(
+    pathStartsWithRootVariant(
+      "/private/tmp/viberoots-run-in-temp-other/buck-out/zxtest-shared/forkserver",
+      "/tmp/viberoots-run-in-temp-example/buck-out",
+    ),
+    false,
+  );
 });
 
 test("verify cleanup: stale verify state files remove registered temp roots", async () => {

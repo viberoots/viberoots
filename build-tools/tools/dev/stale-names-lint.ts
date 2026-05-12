@@ -13,6 +13,8 @@ import {
 } from "./stale-names-lint-allowlists";
 
 const execFileAsync = promisify(execFile);
+const RETIRED_INPUT_CONTRACT_TERM = ["secret", "spec"].join("");
+const RETIRED_INPUT_CONTRACT_TITLE = "Secret" + "spec";
 
 const REPO_NAME_PATTERNS: Array<{ re: RegExp; label: string }> = [
   { re: /\bbucknix\b/g, label: "stale name: bucknix" },
@@ -29,11 +31,21 @@ const REPO_NAME_PATTERNS: Array<{ re: RegExp; label: string }> = [
   { re: /git@github\.com:kiltyj\/common\.git/g, label: "stale name: old common repo remote" },
   { re: /\bkiltyj\/viberoots\b/g, label: "stale name: kiltyj/viberoots" },
   { re: /git@github\.com:kiltyj\/viberoots\.git/g, label: "stale name: old viberoots repo remote" },
-  { re: /\bsecretspec\b/g, label: "stale name: secretspec (use SprinkleRef)" },
-  { re: /\bSecretspec\b/g, label: "stale name: Secretspec (use SprinkleRef)" },
+  {
+    re: new RegExp(`\\b${RETIRED_INPUT_CONTRACT_TERM}\\b`, "g"),
+    label: "stale name: retired input-contract term (use SprinkleRef)",
+  },
+  {
+    re: new RegExp(`\\b${RETIRED_INPUT_CONTRACT_TITLE}\\b`, "g"),
+    label: "stale name: retired title-case input-contract term (use SprinkleRef)",
+  },
 ];
 
 const PLAN_NUMBER_PATTERNS: Array<{ re: RegExp; label: string }> = [
+  {
+    re: /(^|[\/._-])pr\d+(?=$|[\/._-])/g,
+    label: "completed-plan PR number in file path or identifier (use behavior-based name)",
+  },
   {
     re: /\.pr\d+\.(docs|service|errors|happy-path|helpers|test)\b/g,
     label: "completed-plan PR number in test file name (use behavior-based name)",
@@ -135,17 +147,12 @@ async function listTrackedFiles(repoRoot: string): Promise<string[]> {
 
 type Hit = { rel: string; line: number; label: string };
 
-async function scanFile(repoRoot: string, rel: string): Promise<Hit[]> {
+function scanText(rel: string, text: string, lineForOffset: (offset: number) => number): Hit[] {
   const hits: Hit[] = [];
-  let text = "";
-  try {
-    text = await fsp.readFile(path.join(repoRoot, rel), "utf8");
-  } catch {
-    return hits;
-  }
   for (const { re, label } of REPO_NAME_PATTERNS) {
     for (const m of text.matchAll(re)) {
-      hits.push({ rel, line: lineNumberForOffset(text, m.index ?? 0), label });
+      const index = m.index ?? 0;
+      hits.push({ rel, line: lineForOffset(index), label });
     }
   }
   if (!skipPlanNumbers(rel)) {
@@ -153,7 +160,7 @@ async function scanFile(repoRoot: string, rel: string): Promise<Hit[]> {
       for (const m of text.matchAll(re)) {
         const index = m.index ?? 0;
         if (!isDocFile(rel) || isDocCommandLine(text, index)) {
-          hits.push({ rel, line: lineNumberForOffset(text, index), label });
+          hits.push({ rel, line: lineForOffset(index), label });
         }
       }
     }
@@ -163,12 +170,33 @@ async function scanFile(repoRoot: string, rel: string): Promise<Hit[]> {
       for (const m of text.matchAll(re)) {
         const index = m.index ?? 0;
         if (!isDocFile(rel) || isDocCommandLine(text, index)) {
-          hits.push({ rel, line: lineNumberForOffset(text, index), label });
+          hits.push({ rel, line: lineForOffset(index), label });
         }
       }
     }
   }
   return hits;
+}
+
+function scanPath(rel: string): Hit[] {
+  const patterns = [
+    ...REPO_NAME_PATTERNS,
+    ...(!skipPlanNumbers(rel) ? PLAN_NUMBER_PATTERNS : []),
+    ...(!MIGRATION_LABEL_SKIP_PATHS.has(rel) ? MIGRATION_LABEL_PATTERNS : []),
+  ];
+  return patterns.flatMap(({ re, label }) =>
+    Array.from(rel.matchAll(re), () => ({ rel, line: 1, label })),
+  );
+}
+
+async function scanFile(repoRoot: string, rel: string): Promise<Hit[]> {
+  let text = "";
+  try {
+    text = await fsp.readFile(path.join(repoRoot, rel), "utf8");
+  } catch {
+    return [];
+  }
+  return scanText(rel, text, (offset) => lineNumberForOffset(text, offset));
 }
 
 async function main(): Promise<void> {
@@ -187,6 +215,7 @@ async function main(): Promise<void> {
   const hits: Hit[] = [];
   for (const rel of relPaths) {
     if (isAllowedFile(rel)) continue;
+    hits.push(...scanPath(rel));
     const fileHits = await scanFile(repoRoot, rel);
     hits.push(...fileHits);
   }

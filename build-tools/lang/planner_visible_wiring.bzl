@@ -16,8 +16,6 @@ def wire_planner_visible_inputs(
         # - "deps": realize provider edges into deps
         # - "inputs": realize provider edges into srcs (for rule shapes that cannot accept deps)
         provider_realization_mode = None,
-        # Back-compat: older call sites used "deps"|"srcs".
-        realize_providers_into = None,
         # Planner-visible targets should be safe-by-default: avoid provider targets in deps unless asked.
         strip_providers_from_deps = True,
         provider_dict_safe = False,
@@ -49,17 +47,12 @@ def wire_planner_visible_inputs(
     if strip_providers_from_deps:
         deps_out = strip_provider_targets(deps_out)
 
-    if provider_realization_mode != None and realize_providers_into != None:
-        fail("wire_planner_visible_inputs: set only one of provider_realization_mode or realize_providers_into")
-
     realize_mode = provider_realization_mode
-    if realize_mode == None:
-        realize_mode = realize_providers_into
 
     if realize_mode != None:
-        if realize_mode not in ("deps", "inputs", "srcs"):
+        if realize_mode not in ("deps", "inputs"):
             fail(
-                "wire_planner_visible_inputs: provider realization must be None, 'deps', or 'inputs' (legacy: 'srcs'); got: %s" %
+                "wire_planner_visible_inputs: provider realization must be None, 'deps', or 'inputs'; got: %s" %
                 realize_mode,
             )
         if MODULE_PROVIDERS == None:
@@ -73,7 +66,7 @@ def wire_planner_visible_inputs(
                 MODULE_PROVIDERS = MODULE_PROVIDERS,
             )
         else:
-            # "inputs" (and legacy "srcs") means: realize provider edges into srcs.
+            # "inputs" means: realize provider edges into srcs.
             if isinstance(srcs_out, dict):
                 if not provider_dict_safe:
                     fail("wire_planner_visible_inputs: provider_dict_safe must be true when srcs is dict-shaped")
@@ -114,8 +107,6 @@ def wire_planner_visible_stub(
         visibility = [],
         MODULE_PROVIDERS = None,
         provider_realization_mode = None,
-        # Back-compat: older call sites used "deps"|"srcs".
-        realize_providers_into = None,
         strip_providers_from_deps = True,
         provider_dict_safe = False,
         provider_key_prefix = PROVIDER_EDGES_KEY_PREFIX,
@@ -134,7 +125,6 @@ def wire_planner_visible_stub(
         deps = deps,
         srcs = srcs,
         provider_realization_mode = provider_realization_mode,
-        realize_providers_into = realize_providers_into,
         strip_providers_from_deps = strip_providers_from_deps,
         provider_dict_safe = provider_dict_safe,
         provider_key_prefix = provider_key_prefix,
@@ -175,8 +165,6 @@ def wire_package_local_planner_visible_stub(
         srcs = [],
         MODULE_PROVIDERS = None,
         provider_realization_mode = None,
-        # Back-compat: older call sites used "deps"|"srcs".
-        realize_providers_into = None,
         strip_providers_from_deps = True,
         provider_dict_safe = False,
         provider_key_prefix = PROVIDER_EDGES_KEY_PREFIX):
@@ -219,7 +207,6 @@ def wire_package_local_planner_visible_stub(
         visibility = kw.get("visibility", []),
         MODULE_PROVIDERS = MODULE_PROVIDERS,
         provider_realization_mode = provider_realization_mode,
-        realize_providers_into = realize_providers_into,
         strip_providers_from_deps = strip_providers_from_deps,
         provider_dict_safe = provider_dict_safe,
         provider_key_prefix = provider_key_prefix,
@@ -234,7 +221,6 @@ def wire_package_local_planner_visible_stub(
         local_patch_dirs = info.local_patch_dirs,
         nixpkg_deps = info.nixpkg_deps,
     )
-
 
 
 

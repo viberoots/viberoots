@@ -23,7 +23,7 @@ async function listBzlFilesUnder(rootDir: string, relDir = ""): Promise<string[]
   return out;
 }
 
-test("no legacy mutating wiring helpers are referenced outside //build-tools/lang/*", async () => {
+test("no removed mutating wiring helpers are referenced outside //build-tools/lang/*", async () => {
   const rootDir = process.cwd();
   const bzlFiles = await listBzlFilesUnder(rootDir);
 

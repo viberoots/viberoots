@@ -1,6 +1,13 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import { buck2Kill, isPidAlive, parsePsLine, pathExists, psLines } from "./buck-orphan-cleanup-lib";
+import {
+  buck2Kill,
+  existingPathVariant,
+  isPidAlive,
+  macosPathVariants,
+  parsePsLine,
+  psLines,
+} from "./buck-orphan-cleanup-lib";
 import { parseVerifyOwnedState, type RegisteredBuckIsolation } from "./owned-process-state";
 import { listCandidateStateFiles } from "./verify-owned-process-scan";
 
@@ -38,7 +45,6 @@ async function killRegisteredIsolations(opts: {
   const processed: RegisteredBuckIsolation[] = [];
   for (const entry of liveEntries) {
     if (killed >= maxKills) break;
-    if (!(await pathExists(entry.repoRoot))) continue;
     const firstProcessKills = await killRegisteredIsolationProcesses(entry, opts.log);
     processKilled += firstProcessKills;
     if (firstProcessKills > 0) {
@@ -47,8 +53,9 @@ async function killRegisteredIsolations(opts: {
     const remaining = registeredIsolationProcessPidsFromLines(entry, await psLines(2000)).some(
       (pid) => isPidAlive(pid),
     );
-    if (remaining) {
-      await buck2Kill(entry.repoRoot, entry.iso, 1000);
+    const existingRoot = await existingPathVariant(entry.repoRoot);
+    if (remaining && existingRoot) {
+      await buck2Kill(existingRoot, entry.iso, 1000);
       processKilled += await killRegisteredIsolationProcesses(entry, opts.log);
     }
     processed.push(entry);
@@ -76,16 +83,18 @@ export function registeredIsolationProcessPidsFromLines(
   lines: string[],
 ): number[] {
   const repoRoot = path.resolve(entry.repoRoot);
-  const stateDir = path.join(repoRoot, "buck-out", entry.iso, "forkserver");
+  const stateDirs = macosPathVariants(path.join(repoRoot, "buck-out", entry.iso, "forkserver"));
   const daemonNeedle = ` --isolation-dir ${entry.iso}`;
+  const forkserverSuffix = `/buck-out/${entry.iso}/forkserver`;
   const pids: number[] = [];
   for (const line of lines) {
     const parsed = parsePsLine(line);
     if (!parsed) continue;
     const isForkserver =
-      line.includes("(buck2-forkserver)") && line.includes(`--state-dir ${stateDir}`);
-    const isDaemon =
-      line.includes(`buck2d[${path.basename(repoRoot)}]`) && line.includes(daemonNeedle);
+      line.includes("(buck2-forkserver)") &&
+      (stateDirs.some((stateDir) => line.includes(`--state-dir ${stateDir}`)) ||
+        line.includes(forkserverSuffix));
+    const isDaemon = line.includes("buck2d[") && line.includes(daemonNeedle);
     if (!isForkserver && !isDaemon) continue;
     pids.push(parsed.pid);
     if (parsed.ppid > 1) pids.push(parsed.ppid);
