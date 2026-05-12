@@ -2970,6 +2970,51 @@ Important note:
 - if something has no publisher and no repo-owned release step, it is usually not a deployment target in this repo at all
 - it is usually just an external dependency that our deployments point at
 
+### Kubernetes Packaging Boundaries
+
+Kubernetes deployments may use Helm as a publisher implementation, but Helm is not
+the deployment control plane.
+
+In this design:
+
+- Buck deployment targets own deployment identity, dependencies, run records, and
+  provider metadata
+- provider capabilities define which provisioner and publisher types are allowed
+- OpenTofu or another reviewed provisioner prepares infrastructure when the repo
+  owns that infrastructure
+- `helm-release` publishes Kubernetes service workloads when the Kubernetes
+  provider capability contract allows it
+- secrets and publish credentials still flow through the deployment secret
+  runtime, not through ambient Helm or cluster environment state
+
+Do not add Helmfile just to coordinate normal multi-service deployments,
+environment selection, dependency order, deploy records, or secret handling.
+Those responsibilities belong to the repo deployment graph and exact-run model.
+
+Helmfile is appropriate only when we need compatibility with a Helmfile-native
+ecosystem that should remain Helmfile-native, such as:
+
+- consuming a third-party stack that is distributed and maintained as a Helmfile
+- supporting operators who must run standard Helmfile workflows directly outside
+  the repo deployment tooling
+- preserving upstream Helmfile environment layering where translating it into
+  repo deployment metadata would create more drift risk than it removes
+
+Do not add Kustomize just to express ordinary per-environment deployment
+differences. Environment identity and deployment differences should normally live
+in deployment metadata, provider config, provisioner config, runtime config
+requirements, and secret requirements.
+
+Kustomize is appropriate only when we need raw Kubernetes manifest overlay
+compatibility that Helm and the repo deployment model do not cover well, such as:
+
+- consuming upstream Kubernetes manifests published as Kustomize bases or overlays
+- producing Kustomize directories because a target GitOps controller requires
+  that artifact shape
+- applying patch-style customization to raw Kubernetes YAML that is awkward or
+  impossible through chart values, and where forking or wrapping the chart is the
+  worse ownership tradeoff
+
 ### Publisher
 
 A publisher is the mechanism that publishes the built artifact to the provider.
