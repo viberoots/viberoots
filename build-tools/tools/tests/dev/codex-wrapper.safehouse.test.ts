@@ -19,16 +19,21 @@ test("codex --worktree creates through the CoW git wrapper and launches the work
   const tmp = await fsp.mkdtemp(path.join(scratchRoot, "codex-wrapper-"));
   try {
     const gitRoot = path.join(tmp, "repo");
+    const home = path.join(tmp, "home");
+    const knownHosts = path.join(home, ".ssh", "known_hosts");
     await fsp.mkdir(gitRoot, { recursive: true });
+    await fsp.mkdir(path.dirname(knownHosts), { recursive: true });
+    await fsp.writeFile(knownHosts, "github.com ssh-ed25519 AAAATEST\n", "utf8");
     const fake = await makeFakeTools(tmp, gitRoot);
     const res = await $({
       cwd: gitRoot,
       stdio: "pipe",
       env: {
         ...process.env,
+        HOME: home,
         PATH: `${path.dirname(wrapper)}:${fake.bin}:/usr/bin:/bin`,
         VBR_CODEX_GIT_WRAPPER_FOR_TEST: path.join(fake.bin, "git"),
-        CODEX_HOME: path.join(tmp, "home", ".codex"),
+        CODEX_HOME: path.join(home, ".codex"),
       },
     })`${wrapper} --worktree native-worker exec task`;
 
@@ -40,6 +45,11 @@ test("codex --worktree creates through the CoW git wrapper and launches the work
     assert.match(log, new RegExp(escapeRegExp(worktreeRoot)));
     assert.match(log, new RegExp(safehouseLaunchPattern(worktreeRealRoot)));
     assert.match(log, /safehouse .* --add-dirs=[^ ]+\/\.codex /);
+    assert.match(log, new RegExp(`--add-dirs-ro=${escapeRegExp(knownHosts)}`));
+    assert.match(
+      log,
+      new RegExp(`\\(allow file-read\\* \\(literal "${escapeRegExp(knownHosts)}"\\)\\)`),
+    );
     assert.match(
       log,
       /\(allow file-read\* .* \(literal "\/etc\/bashrc"\) \(literal "\/private\/etc\/bashrc"\)/,

@@ -24,16 +24,21 @@ test("claude worktree flags create through CoW git and launch in safehouse", asy
     const tmp = await fsp.mkdtemp(path.join(scratchRoot, "claude-wrapper-"));
     try {
       const gitRoot = path.join(tmp, "repo");
+      const home = path.join(tmp, "home");
+      const knownHosts = path.join(home, ".ssh", "known_hosts");
       await fsp.mkdir(gitRoot, { recursive: true });
+      await fsp.mkdir(path.dirname(knownHosts), { recursive: true });
+      await fsp.writeFile(knownHosts, "github.com ssh-ed25519 AAAATEST\n", "utf8");
       const fake = await makeFakeTools(tmp, gitRoot);
       const res = await $({
         cwd: gitRoot,
         stdio: "pipe",
         env: {
           ...process.env,
+          HOME: home,
           PATH: `${path.dirname(wrapper)}:${fake.bin}:/usr/bin:/bin`,
           VBR_CLAUDE_GIT_WRAPPER_FOR_TEST: path.join(fake.bin, "git"),
-          CLAUDE_CONFIG_DIR: path.join(tmp, "home", ".claude"),
+          CLAUDE_CONFIG_DIR: path.join(home, ".claude"),
         },
       })`${wrapper} ${flag} ${name} -p hello`;
 
@@ -45,6 +50,11 @@ test("claude worktree flags create through CoW git and launch in safehouse", asy
       assert.match(log, new RegExp(escapeRegExp(worktreeRoot)));
       assert.match(log, new RegExp(safehouseLaunchPattern(worktreeRealRoot)));
       assert.match(log, /safehouse .* --add-dirs=[^ ]+\/\.claude /);
+      assert.match(log, new RegExp(`--add-dirs-ro=${escapeRegExp(knownHosts)}`));
+      assert.match(
+        log,
+        new RegExp(`\\(allow file-read\\* \\(literal "${escapeRegExp(knownHosts)}"\\)\\)`),
+      );
       assert.match(
         log,
         /\(allow file-read\* .* \(literal "\/etc\/bashrc"\) \(literal "\/private\/etc\/bashrc"\)/,

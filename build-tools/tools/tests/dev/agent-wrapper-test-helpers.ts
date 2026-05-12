@@ -20,7 +20,7 @@ export function safehouseNixReadOnlyPattern(): string {
 }
 
 export function safehouseLaunchPattern(worktreeRealRoot: string): string {
-  return `safehouse --workdir=${escapeRegExp(worktreeRealRoot)}(?: --add-dirs=[^ ]+)? --add-dirs-ro=${safehouseNixReadOnlyPattern()} --append-profile=.* --env `;
+  return `safehouse --workdir=${escapeRegExp(worktreeRealRoot)}(?: --add-dirs=[^ ]+)? --add-dirs-ro=${safehouseNixReadOnlyPattern()}(?: --add-dirs-ro=[^ ]+/\\.ssh/known_hosts)? --append-profile=.* --env `;
 }
 
 export async function makeFakeAgentTools(

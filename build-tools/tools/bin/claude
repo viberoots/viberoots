@@ -431,6 +431,7 @@ real_path() {
 
 write_home_deny_profile() {
   local profile="$1"
+  local known_hosts="${2:-}"
   local home_real=""
   if [[ -n "${HOME:-}" ]]; then
     home_real="$(cd -- "$HOME" 2>/dev/null && pwd -P || true)"
@@ -438,10 +439,17 @@ write_home_deny_profile() {
   [[ -n "$home_real" ]] || return 0
   local escaped_home
   escaped_home="$(sandbox_string_escape "$home_real")"
+  local escaped_known_hosts=""
+  if [[ -n "$known_hosts" ]]; then
+    escaped_known_hosts="$(sandbox_string_escape "$known_hosts")"
+  fi
   {
     printf '(deny file-read-data (literal "%s"))\n' "$escaped_home"
     printf '(deny file-write* (literal "%s"))\n' "$escaped_home"
-    printf '(allow file-read-metadata (literal "%s") (literal "%s/.gitconfig") (literal "%s/.config") (literal "%s/.config/git") (literal "%s/.config/git/config"))\n' "$escaped_home" "$escaped_home" "$escaped_home" "$escaped_home" "$escaped_home"
+    printf '(allow file-read-metadata (literal "%s") (literal "%s/.gitconfig") (literal "%s/.config") (literal "%s/.config/git") (literal "%s/.config/git/config") (literal "%s/.ssh"))\n' "$escaped_home" "$escaped_home" "$escaped_home" "$escaped_home" "$escaped_home" "$escaped_home"
+    if [[ -n "$escaped_known_hosts" ]]; then
+      printf '(allow file-read* (literal "%s"))\n' "$escaped_known_hosts"
+    fi
     printf '(allow file-read-metadata (literal "/etc") (literal "/etc/bashrc") (literal "/etc/profile") (literal "/etc/static") (literal "/etc/static/bashrc") (literal "/etc/nix") (literal "/nix") (literal "/nix/var") (literal "/nix/var/nix") (literal "/nix/var/nix/daemon-socket") (literal "/var") (literal "/var/db") (literal "/private") (literal "/private/etc") (literal "/private/etc/bashrc") (literal "/private/etc/profile") (literal "/private/etc/static") (literal "/private/etc/static/bashrc") (literal "/private/etc/nix") (literal "/private/var") (literal "/private/var/db"))\n'
     printf '(allow file-read-metadata (literal "/Applications") (literal "/Applications/Xcode.app") (literal "/Applications/Xcode.app/Contents") (literal "/Applications/Xcode.app/Contents/Developer"))\n'
     printf '(allow file-read* (literal "/var/db/xcode_select_link") (literal "/private/var/db/xcode_select_link"))\n'
@@ -450,6 +458,15 @@ write_home_deny_profile() {
     printf '(allow process-info*)\n'
     printf '(allow signal)\n'
   } >"$profile"
+}
+
+safehouse_known_hosts_path() {
+  local home_real="$1"
+  [[ -n "$home_real" ]] || return 0
+  local candidate="$home_real/.ssh/known_hosts"
+  [[ -f "$candidate" ]] || return 0
+  cd -- "$(dirname -- "$candidate")" 2>/dev/null || return 0
+  printf '%s/%s\n' "$(pwd -P)" "$(basename -- "$candidate")"
 }
 
 nix_safehouse_readonly_paths() {
@@ -484,6 +501,7 @@ run_claude_in_safehouse() {
   local claude_config_dir=""
   local claude_config_args=()
   local home_real=""
+  local known_hosts=""
   local nix_bin
   local profile
   local root_real
@@ -496,6 +514,7 @@ run_claude_in_safehouse() {
   if [[ -n "${HOME:-}" ]]; then
     home_real="$(cd -- "$HOME" 2>/dev/null && pwd -P || true)"
   fi
+  known_hosts="$(safehouse_known_hosts_path "$home_real")"
   if [[ -n "${CLAUDE_CONFIG_DIR:-}" ]]; then
     case "$CLAUDE_CONFIG_DIR" in
       /*) claude_config_dir="$CLAUDE_CONFIG_DIR" ;;
@@ -507,6 +526,11 @@ run_claude_in_safehouse() {
   safehouse_cache="$root_real/buck-out/tmp/safehouse-cache/xdg"
   safehouse_home="$root_real/buck-out/tmp/safehouse-home"
   mkdir -p -- "$safehouse_cache" "$safehouse_home"
+  rm -f -- "$safehouse_home/.ssh/known_hosts" 2>/dev/null || true
+  if [[ -n "$known_hosts" ]]; then
+    mkdir -p -- "$safehouse_home/.ssh"
+    ln -s -- "$known_hosts" "$safehouse_home/.ssh/known_hosts"
+  fi
   if [[ -n "$claude_config_dir" ]]; then
     mkdir -p -- "$claude_config_dir" 2>/dev/null || true
     if [[ -d "$claude_config_dir" ]]; then
@@ -521,7 +545,7 @@ run_claude_in_safehouse() {
     safehouse_path="$(dirname -- "$nix_bin"):${safehouse_path}"
   fi
   profile="$(mktemp "${TMPDIR:-/tmp}/vbr-claude-safehouse.XXXXXX")"
-  write_home_deny_profile "$profile"
+  write_home_deny_profile "$profile" "$known_hosts"
   set +e
   env \
     VBR_CLAUDE_SAFEHOUSE_ACTIVE=1 \
@@ -538,6 +562,7 @@ run_claude_in_safehouse() {
     --workdir="$root_real" \
     ${claude_config_args[@]+"${claude_config_args[@]}"} \
     --add-dirs-ro="$nix_ro_paths" \
+    ${known_hosts:+--add-dirs-ro="$known_hosts"} \
     --append-profile="$profile" \
     --env \
     "$real_claude" \
