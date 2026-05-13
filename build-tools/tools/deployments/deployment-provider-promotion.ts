@@ -4,19 +4,28 @@ import { requiredDeploymentSourceRef } from "./contract";
 import {
   exactArtifactPromotionErrors,
   promotionCompatibilityErrors,
-  sourcePromotionRevision,
 } from "./deployment-promotion-compatibility";
-import { resolveDeploymentGitCommit } from "./deployment-git-ref";
+import {
+  promotionStageStateErrors,
+  type DeploymentPromotionStageStateSource,
+} from "./deployment-promotion-stage-state";
 import { sourceRefAllowed } from "./deployment-source-ref-policy";
 
 export async function assertCrossDeploymentExactPromotionEligible(opts: {
-  workspaceRoot: string;
+  workspaceRoot?: string;
   deployment: DeploymentTarget;
-  source: {
-    record: { deployRunId: string };
-    replaySnapshot: {
-      admittedContext: { source: { sourceRevision: string } };
-      deployment: DeploymentTarget;
+  recordsRoot: string;
+  backendDatabaseUrl?: string;
+  source: DeploymentPromotionStageStateSource & {
+    record: DeploymentPromotionStageStateSource["record"] & {
+      deploymentId: string;
+      finalOutcome?: string;
+      publishMode?: string;
+    };
+    replaySnapshot: DeploymentPromotionStageStateSource["replaySnapshot"] & {
+      admittedContext: DeploymentPromotionStageStateSource["replaySnapshot"]["admittedContext"] & {
+        lanePolicyFingerprint: string;
+      };
     };
   };
 }) {
@@ -27,16 +36,14 @@ export async function assertCrossDeploymentExactPromotionEligible(opts: {
       `deployment admission policy ${opts.deployment.admissionPolicyRef} does not allow source ref ${targetRef}`,
     );
   }
-  const targetRevision = await resolveDeploymentGitCommit({
-    workspaceRoot: opts.workspaceRoot,
-    revision: targetRef,
-    purpose: "promotion target ref",
-  });
-  if (targetRevision !== sourcePromotionRevision(opts.source)) {
-    errors.push(
-      `source run no longer matches current promotable target state: ${opts.source.record.deployRunId}`,
-    );
-  }
+  errors.push(
+    ...(await promotionStageStateErrors({
+      deployment: opts.deployment,
+      recordsRoot: opts.recordsRoot,
+      backendDatabaseUrl: opts.backendDatabaseUrl,
+      source: opts.source,
+    })),
+  );
   errors.push(...exactArtifactPromotionErrors(opts.deployment));
   if (errors.length > 0) {
     throw new Error(`promotion source run is not eligible: ${opts.source.record.deployRunId}

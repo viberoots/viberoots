@@ -10,14 +10,13 @@ import { normalizeSingleComponentArtifactInput } from "./nixos-shared-host-singl
 import {
   exactArtifactPromotionErrors,
   promotionCompatibilityErrors,
-  sourcePromotionRevision,
 } from "./deployment-promotion-compatibility";
 import type {
   CrossDeploymentPromotionSelection,
   CrossDeploymentPromotionSourceSelection,
   DeploymentPromotionSource,
 } from "./deployment-promotion-types";
-import { resolveDeploymentGitCommit } from "./deployment-git-ref";
+import { promotionStageStateErrors } from "./deployment-promotion-stage-state";
 import { sourceRefAllowed } from "./deployment-source-ref-policy";
 export type {
   CrossDeploymentPromotionSelection,
@@ -28,9 +27,10 @@ export { resolveDeploymentPromotionSource } from "./deployment-promotion-source"
 export { resolveDeploymentPromotionSourceRecordPath } from "./deployment-promotion-source";
 
 async function eligibilityErrors(
-  workspaceRoot: string,
   deployment: DeploymentTarget,
   source: DeploymentPromotionSource,
+  recordsRoot: string,
+  backendDatabaseUrl?: string,
 ): Promise<string[]> {
   const targetRef = requiredDeploymentSourceRef(deployment);
   const errors: string[] = [];
@@ -39,16 +39,14 @@ async function eligibilityErrors(
       `deployment admission policy ${deployment.admissionPolicyRef} does not allow source ref ${targetRef}`,
     );
   }
-  const targetRevision = await resolveDeploymentGitCommit({
-    workspaceRoot,
-    revision: targetRef,
-    purpose: "promotion target ref",
-  });
-  if (targetRevision !== sourcePromotionRevision(source)) {
-    errors.push(
-      `source run no longer matches current promotable target state: ${source.record.deployRunId}`,
-    );
-  }
+  errors.push(
+    ...(await promotionStageStateErrors({
+      deployment,
+      recordsRoot,
+      backendDatabaseUrl,
+      source,
+    })),
+  );
   return errors;
 }
 
@@ -64,7 +62,12 @@ export async function resolveCrossDeploymentPromotionSourceSelection<
   const source = await resolveDeploymentPromotionSource(opts);
   const errors = [
     ...promotionCompatibilityErrors(opts.deployment, source),
-    ...(await eligibilityErrors(opts.workspaceRoot, opts.deployment, source)),
+    ...(await eligibilityErrors(
+      opts.deployment,
+      source,
+      opts.recordsRoot,
+      opts.backendDatabaseUrl,
+    )),
   ];
   if (errors.length > 0) {
     throw new Error(`promotion source run is not eligible: ${source.record.deployRunId}

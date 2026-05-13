@@ -33,6 +33,7 @@ export async function runProviderDeployFrontDoor(opts: {
       rollback: flags.rollback,
       sourceRunId: flags.sourceRunId,
       artifactDirFlag: flags.artifactDirFlag,
+      backendDatabaseUrl: flags.controlPlaneDatabaseUrl,
       ...(opts.admissionEvidence ? { admissionEvidence: opts.admissionEvidence as any } : {}),
       ...(opts.smokeConnectOverride
         ? { smokeConnectOverride: opts.smokeConnectOverride as any }
@@ -114,6 +115,7 @@ export async function runProviderDeployFrontDoor(opts: {
       rollback: flags.rollback,
       sourceRunId: flags.sourceRunId,
       artifactDirFlag: flags.artifactDirFlag,
+      backendDatabaseUrl: flags.controlPlaneDatabaseUrl,
       ...(opts.admissionEvidence ? { admissionEvidence: opts.admissionEvidence as any } : {}),
       ...(opts.smokeConnectOverride
         ? { smokeConnectOverride: opts.smokeConnectOverride as any }

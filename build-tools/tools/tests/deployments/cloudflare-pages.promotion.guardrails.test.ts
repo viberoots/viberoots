@@ -131,8 +131,8 @@ test("promotion rejects source runs from an incompatible current lane policy", a
   });
 });
 
-test("promotion rejects retained source runs that no longer match the current promotable target state", async () => {
-  await runInTemp("cloudflare-pages-promotion-eligibility-drift", async (tmp, $) => {
+test("promotion rejects retained source runs that no longer match source current stage state", async () => {
+  await runInTemp("cloudflare-pages-promotion-source-stage-drift", async (tmp, $) => {
     const recordsRoot = path.join(tmp, "records");
     const backendDatabaseUrl = localHarnessControlPlaneDatabaseUrl(recordsRoot);
     const source = pleominoDevDeployment();
@@ -143,13 +143,7 @@ test("promotion rejects retained source runs that no longer match the current pr
     await installCloudflarePagesTargets(tmp, [staging]);
     await ensureNixosSharedHostReviewedSourceRef(tmp, $, staging);
     const sourceRunId = await createSuccessfulDevRun(tmp, $, recordsRoot, backendDatabaseUrl);
-    await $({ cwd: tmp, stdio: "pipe" })`git config user.email test@example.com`;
-    await $({ cwd: tmp, stdio: "pipe" })`git config user.name Test`;
-    await $({ cwd: tmp, stdio: "pipe" })`git commit --allow-empty -m drift`;
-    await $({
-      cwd: tmp,
-      stdio: "pipe",
-    })`git branch -f ${staging.lanePolicy.stageBranches.staging} HEAD`;
+    await createSuccessfulDevRun(tmp, $, recordsRoot, backendDatabaseUrl);
     await assert.rejects(
       resolveCloudflarePagesPromotionSelection({
         workspaceRoot: tmp,
@@ -158,7 +152,7 @@ test("promotion rejects retained source runs that no longer match the current pr
         sourceRunId,
         backendDatabaseUrl,
       }),
-      /no longer matches current promotable target state/,
+      /source run is not the current stage state/,
     );
   });
 });

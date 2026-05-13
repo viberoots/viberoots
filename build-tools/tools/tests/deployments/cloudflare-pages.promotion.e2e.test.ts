@@ -28,6 +28,7 @@ import {
   writeDemoArtifact,
 } from "./nixos-shared-host.control-plane.helpers";
 import { startNixosSharedHostPublicServer } from "./nixos-shared-host.public-server";
+import { seedSyntheticTargetStageState } from "./nixos-shared-host.promotion.stage-state.helpers";
 
 test("cloudflare-pages allows reviewed cross-provider same-artifact promotion only on declared edges", async () => {
   await runInTemp("cloudflare-pages-promotion-e2e", async (tmp, $) => {
@@ -88,6 +89,7 @@ test("cloudflare-pages allows reviewed cross-provider same-artifact promotion on
         cwd: tmp,
       })`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment ${dev.label} --admission-evidence-json ${devEvidenceJson} --artifact-dir ${artifactDir} --control-plane-url ${harness.controlPlane.url} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(devServer.port)} --smoke-connect-protocol https:`;
       const devSummary = JSON.parse(String(devRun.stdout));
+      await seedSyntheticTargetStageState({ recordsRoot, deployment: staging });
       const stagingPromotion = await resolveCloudflarePagesPromotionSelection({
         workspaceRoot: tmp,
         deployment: staging,
@@ -165,6 +167,7 @@ test("cloudflare-pages promotion fails closed when staging smoke blocks the prom
         cwd: tmp,
       })`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment ${dev.label} --admission-evidence-json ${devEvidenceJson} --artifact-dir ${artifactDir} --control-plane-url ${harness.controlPlane.url} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(devServer.port)} --smoke-connect-protocol https:`;
       const devSummary = JSON.parse(String(devRun.stdout));
+      await seedSyntheticTargetStageState({ recordsRoot, deployment: staging });
       const promotion = await resolveCloudflarePagesPromotionSelection({
         workspaceRoot: tmp,
         deployment: staging,

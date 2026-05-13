@@ -1,8 +1,15 @@
 #!/usr/bin/env zx-wrapper
 import assert from "node:assert/strict";
+import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
+import type { GooglePlayDeployment } from "../../deployments/contract";
+import { resolveCrossDeploymentPromotionSelection } from "../../deployments/deployment-promotion";
+import { resolveDeploymentFromTarget } from "../../deployments/deployment-query";
+import { submitGooglePlayDeploy } from "../../deployments/google-play-deploy";
+import { submitGooglePlayExactArtifactRun } from "../../deployments/google-play-exact-run";
 import { readGooglePlayDeployRecord } from "../../deployments/google-play-records";
+import { localHarnessControlPlaneDatabaseUrl } from "../../deployments/nixos-shared-host-control-plane-backend";
 import { runInTemp } from "../lib/test-helpers";
 import { googlePlayDeploymentFixture } from "./google-play.fixture";
 import { writeReviewedLaneAdmissionEvidenceJson } from "./deployment-lane-governance.fixture";
@@ -14,6 +21,24 @@ import {
 import { mobileReviewedLanePolicy, writeMobileArtifact } from "./mobile-release.e2e.helpers";
 import { writeDeploymentJson } from "./nixos-shared-host.reuse.e2e.helpers";
 import { ensureNixosSharedHostReviewedSourceRef } from "./nixos-shared-host.fixture";
+import {
+  seedCurrentStageState,
+  seedSyntheticTargetStageState,
+} from "./nixos-shared-host.promotion.stage-state.helpers";
+
+async function withGooglePlayFakeStore<T>(tmp: string, fn: () => Promise<T>): Promise<T> {
+  const previous = process.env.VBR_GOOGLE_PLAY_FAKE_STORE_ROOT;
+  process.env.VBR_GOOGLE_PLAY_FAKE_STORE_ROOT = path.join(tmp, "fake-store");
+  try {
+    return await fn();
+  } finally {
+    if (previous === undefined) {
+      delete process.env.VBR_GOOGLE_PLAY_FAKE_STORE_ROOT;
+    } else {
+      process.env.VBR_GOOGLE_PLAY_FAKE_STORE_ROOT = previous;
+    }
+  }
+}
 
 test("google-play deploy and promotion preserve release-health evidence", async () => {
   await runInTemp("google-play-promotion", async (tmp, $) => {
@@ -54,6 +79,7 @@ test("google-play deploy and promotion preserve release-health evidence", async 
       },
     });
     const recordsRoot = path.join(tmp, "records");
+    const backendDatabaseUrl = localHarnessControlPlaneDatabaseUrl(recordsRoot);
     const artifactPath = path.join(tmp, "artifacts", "demo.aab");
     const devJson = path.join(tmp, "dev.json");
     const stagingJson = path.join(tmp, "staging.json");
@@ -77,18 +103,47 @@ test("google-play deploy and promotion preserve release-health evidence", async 
       deploymentLabel: staging.label,
       deployment: staging,
     });
-    const env = googlePlayFakeEnv(tmp);
-    const devRun = await $({
-      cwd: tmp,
-      env,
-    })`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment ${dev.label} --admission-evidence-json ${devEvidenceJson} --artifact-dir ${artifactPath} --records-root ${recordsRoot}`;
-    const devSummary = JSON.parse(String(devRun.stdout));
-    const promotionRun = await $({
-      cwd: tmp,
-      env,
-    })`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment ${staging.label} --admission-evidence-json ${stagingEvidenceJson} --publish-only --source-run-id ${devSummary.deployRunId} --records-root ${recordsRoot}`;
-    const promotionSummary = JSON.parse(String(promotionRun.stdout));
-    const promotionRecord = await readGooglePlayDeployRecord(promotionSummary.recordPath);
+    const resolvedDev = (await resolveDeploymentFromTarget(tmp, dev.label)) as GooglePlayDeployment;
+    const resolvedStaging = (await resolveDeploymentFromTarget(
+      tmp,
+      staging.label,
+    )) as GooglePlayDeployment;
+    const promotionRecord = await withGooglePlayFakeStore(tmp, async () => {
+      const devRun = await submitGooglePlayDeploy({
+        workspaceRoot: tmp,
+        deployment: resolvedDev,
+        artifactPath,
+        recordsRoot,
+        admissionEvidence: JSON.parse(await fsp.readFile(devEvidenceJson, "utf8")),
+      });
+      await seedCurrentStageState({
+        recordsRoot,
+        recordPath: devRun.recordPath,
+        deployment: resolvedDev,
+      });
+      await seedSyntheticTargetStageState({ recordsRoot, deployment: resolvedStaging });
+      const promotion = await resolveCrossDeploymentPromotionSelection({
+        workspaceRoot: tmp,
+        deployment: resolvedStaging,
+        recordsRoot,
+        sourceRunId: devRun.record.deployRunId,
+        backendDatabaseUrl,
+      });
+      const result = await submitGooglePlayExactArtifactRun({
+        workspaceRoot: tmp,
+        deployment: resolvedStaging,
+        recordsRoot,
+        operationKind: "promotion",
+        artifact: promotion.artifact as any,
+        sourceRecord: promotion.sourceRecord as any,
+        parentRunId: promotion.parentRunId,
+        releaseLineageId: promotion.releaseLineageId,
+        artifactLineageId: promotion.artifactLineageId,
+        sourceTrack: (promotion.sourceReplaySnapshot as any).deployment.providerTarget.track,
+        admissionEvidence: JSON.parse(await fsp.readFile(stagingEvidenceJson, "utf8")),
+      });
+      return await readGooglePlayDeployRecord(result.recordPath);
+    });
     assert.equal(promotionRecord.operationKind, "promotion");
     assert.equal(promotionRecord.runnerIdentities.publisher, staging.publisher.type);
     assert.equal(promotionRecord.runnerIdentities.smoke, "google-play-release-health@1");

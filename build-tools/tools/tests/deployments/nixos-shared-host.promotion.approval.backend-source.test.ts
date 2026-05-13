@@ -4,10 +4,7 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
 import { submitDeploymentControlPlaneRunAction } from "../../deployments/deployment-control-plane-run-action";
-import {
-  localHarnessControlPlaneDatabaseUrl,
-  syncBackendDeployRecord,
-} from "../../deployments/nixos-shared-host-control-plane-backend";
+import { localHarnessControlPlaneDatabaseUrl } from "../../deployments/nixos-shared-host-control-plane-backend";
 import { submitNixosSharedHostControlPlaneRun } from "../../deployments/nixos-shared-host-control-plane";
 import { submitNixosSharedHostPublishOnlyRun } from "../../deployments/nixos-shared-host-publish-only";
 import { runInTemp } from "../lib/test-helpers";
@@ -19,6 +16,10 @@ import {
   nixosSharedHostLanePolicyFixture,
 } from "./nixos-shared-host.fixture";
 import { smokeConnectOverride, writeDemoArtifact } from "./nixos-shared-host.control-plane.helpers";
+import {
+  seedCurrentStageState,
+  seedSyntheticTargetStageState,
+} from "./nixos-shared-host.promotion.stage-state.helpers";
 import { startNixosSharedHostPublicServer } from "./nixos-shared-host.public-server";
 
 function promotionLanePolicy() {
@@ -103,10 +104,12 @@ test("shared-host promotion approval rehydrates backend source state when the so
         admissionEvidence: reviewedLaneAdmissionEvidenceFixture({ deployment: source }),
         smokeConnectOverride: smokeConnectOverride(sourceServer.port),
       });
-      await syncBackendDeployRecord(
-        { recordsRoot, databaseUrl: backendDatabaseUrl },
-        sourceRun.recordPath,
-      );
+      await seedCurrentStageState({
+        recordsRoot,
+        recordPath: sourceRun.recordPath,
+        deployment: source,
+      });
+      await seedSyntheticTargetStageState({ recordsRoot, deployment: target });
       await fsp.rm(sourceRun.recordPath, { force: true });
 
       let pending: any;

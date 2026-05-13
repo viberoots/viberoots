@@ -3,6 +3,10 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
+import {
+  resolveCloudflarePagesPromotionSelection,
+  submitCloudflarePagesRebuildPerStagePromotion,
+} from "../../deployments/cloudflare-pages-promotion";
 import { runInTemp } from "../lib/test-helpers";
 import { installCloudflarePagesTargets } from "./cloudflare-pages.fixture";
 import { installFakeCloudflarePagesWrangler } from "./cloudflare-pages.fake-wrangler";
@@ -10,7 +14,6 @@ import { startCloudflarePagesPublicServer } from "./cloudflare-pages.public-serv
 import {
   createSourceRun,
   fakeCloudflareEnv,
-  freshRebuildCloudflareEnv,
   rebuildStagingDeployment,
   writeCloudflareArtifact,
   writeWranglerConfig,
@@ -18,30 +21,27 @@ import {
 import { writeReviewedLaneAdmissionEvidenceJson } from "./deployment-lane-governance.fixture";
 import { writeDeploymentJson } from "./nixos-shared-host.reuse.e2e.helpers";
 import { ensureNixosSharedHostReviewedSourceRef } from "./nixos-shared-host.fixture";
+import { seedSyntheticTargetStageState } from "./nixos-shared-host.promotion.stage-state.helpers";
 
 test("cloudflare-pages rebuild-per-stage promotion rejects publish-only exact-artifact reuse", async () => {
   await runInTemp("cloudflare-pages-rebuild-per-stage-guardrail", async (tmp, $) => {
     const recordsRoot = path.join(tmp, "records");
     const fake = await installFakeCloudflarePagesWrangler(tmp);
-    const { summary } = await createSourceRun(tmp, $, recordsRoot, fake);
+    const { summary, backendDatabaseUrl } = await createSourceRun(tmp, $, recordsRoot, fake);
     const staging = rebuildStagingDeployment();
     const stagingJson = path.join(tmp, "pleomino-rebuild-staging.json");
     await installCloudflarePagesTargets(tmp, [staging]);
     await ensureNixosSharedHostReviewedSourceRef(tmp, $, staging);
     await writeDeploymentJson(stagingJson, staging);
-    const stagingEvidenceJson = await writeReviewedLaneAdmissionEvidenceJson({
-      tmp,
-      $,
-      deploymentLabel: staging.label,
-      deployment: staging,
-    });
+    await seedSyntheticTargetStageState({ recordsRoot, deployment: staging });
     await assert.rejects(
-      async () =>
-        await $({
-          cwd: tmp,
-          stdio: "pipe",
-          env: freshRebuildCloudflareEnv(tmp, fake),
-        })`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment ${staging.label} --admission-evidence-json ${stagingEvidenceJson} --publish-only --source-run-id ${summary.deployRunId} --records-root ${recordsRoot}`,
+      resolveCloudflarePagesPromotionSelection({
+        workspaceRoot: tmp,
+        deployment: staging,
+        recordsRoot,
+        sourceRunId: summary.deployRunId,
+        backendDatabaseUrl,
+      }),
       /requires target-stage rebuild/,
     );
   });
@@ -55,6 +55,7 @@ test("cloudflare-pages rebuild-per-stage promotion admits a new stage artifact b
       deployment: sourceDeployment,
       summary: sourceSummary,
       record: sourceRecord,
+      backendDatabaseUrl,
     } = await createSourceRun(tmp, $, recordsRoot, fake);
     const staging = rebuildStagingDeployment();
     const stagingJson = path.join(tmp, "pleomino-rebuild-staging.json");
@@ -67,6 +68,7 @@ test("cloudflare-pages rebuild-per-stage promotion admits a new stage artifact b
     await ensureNixosSharedHostReviewedSourceRef(tmp, $, sourceDeployment);
     await ensureNixosSharedHostReviewedSourceRef(tmp, $, staging);
     await writeDeploymentJson(stagingJson, staging);
+    await seedSyntheticTargetStageState({ recordsRoot, deployment: staging });
     const stagingEvidenceJson = await writeReviewedLaneAdmissionEvidenceJson({
       tmp,
       $,
@@ -81,11 +83,27 @@ test("cloudflare-pages rebuild-per-stage promotion admits a new stage artifact b
     const originalEnv = { ...process.env };
     Object.assign(process.env, fakeCloudflareEnv(fake));
     try {
-      const run = await $({
-        cwd: tmp,
-        env: freshRebuildCloudflareEnv(tmp, fake),
-      })`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment ${staging.label} --admission-evidence-json ${stagingEvidenceJson} --artifact-dir ${stagingArtifactDir} --source-run-id ${sourceSummary.deployRunId} --records-root ${recordsRoot} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(server.port)} --smoke-connect-protocol https:`;
-      const summary = JSON.parse(String(run.stdout));
+      const result = await submitCloudflarePagesRebuildPerStagePromotion({
+        workspaceRoot: tmp,
+        deployment: staging,
+        artifactDir: stagingArtifactDir,
+        recordsRoot,
+        sourceRunId: sourceSummary.deployRunId,
+        backendDatabaseUrl,
+        admissionEvidence: JSON.parse(await fsp.readFile(stagingEvidenceJson, "utf8")),
+        smokeConnectOverride: {
+          hostname: "127.0.0.1",
+          port: server.port,
+          protocol: "https:",
+          rejectUnauthorized: false,
+        },
+      });
+      const summary = {
+        deployRunId: result.record.deployRunId,
+        operationKind: result.record.operationKind,
+        parentRunId: result.record.parentRunId,
+        recordPath: result.recordPath,
+      };
       const record = JSON.parse(await fsp.readFile(summary.recordPath, "utf8"));
       const snapshot = JSON.parse(
         await fsp.readFile(record.controlPlane.executionSnapshotPath, "utf8"),
@@ -108,7 +126,6 @@ test("cloudflare-pages rebuild-per-stage promotion admits a new stage artifact b
       assert.equal(record.admittedContext.targetEnvironment.targetRef, "main");
       assert.equal(snapshot.operationKind, "promotion");
       assert.equal(snapshot.action.publishBehavior, "deploy");
-      assert.equal(snapshot.action.sourceRecordPath, sourceSummary.recordPath);
       assert.equal(snapshot.action.sourceReplaySnapshotPath, sourceRecord.replaySnapshotPath);
       assert.equal(publishLog?.projectName, staging.providerTarget.project);
       assert.equal(publishLog?.artifactDir, record.artifact.storedArtifactPath);

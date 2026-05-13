@@ -1832,6 +1832,9 @@ through `staging` and `prod` using the repository's default `same_artifact` mode
   `same_artifact`.
 - Add promotion eligibility checks against current control-plane lane state and reviewed
   source-ref policy.
+- Require promotion eligibility to load current stage state for both the selected source deployment
+  and the target deployment. Missing or stale current-stage records fail closed; environment
+  branches, mutable tags, and release-pointer files are not promotion authority.
 - Record:
   - `parent_run_id`
   - `release_lineage_id`
@@ -1877,6 +1880,8 @@ through `staging` and `prod` using the repository's default `same_artifact` mode
 
 - Pleomino can move through a real `dev -> staging -> prod` flow using exact static-webapp artifacts.
 - Promotion respects current lane-policy eligibility and records lineage correctly.
+- Promotion uses `--source-run-id` plus control-plane current stage state, not branch movement or
+  pointer-file edits, to decide whether the selected source run is still promotable.
 - Tests cover both success and fail-closed promotion paths.
 
 ### Risks

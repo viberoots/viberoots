@@ -246,6 +246,13 @@ Use these when:
 For promotion, run the command on the target deployment label and set
 `--source-run-id` to the earlier run you want to promote.
 
+Promotion is service-backed for protected/shared deployments. The control plane
+checks the selected source run against current stage state for the source
+deployment and checks the target deployment's current stage state before it
+admits the target-environment payload. Moving an environment branch, editing a
+release pointer, or selecting a retained but no-longer-current run is not a
+promotion authority.
+
 Common example values:
 
 - deployment label:
@@ -389,7 +396,11 @@ deploy --deployment //projects/deployments/pleomino-prod:deploy \
 
 Promotion requests reuse the admitted upstream run identity. If a stage is
 configured for rebuild-per-stage, Jenkins must submit a stage-specific artifact
-with fresh CI evidence instead of promoting the prior stage's artifact.
+with fresh CI evidence instead of promoting the prior stage's artifact. In both
+cases, the control plane accepts the request only when the selected source run
+and the target deployment remain promotable in current stage state; Jenkins does
+not promote by moving `env/<family>/<stage>` branches or hand-maintained pointer
+files.
 Keep the split explicit: read-only `deploy auth ...` explains the expected
 shape, while privileged `deploy admin ...` applies reviewed identity changes.
 Start with:

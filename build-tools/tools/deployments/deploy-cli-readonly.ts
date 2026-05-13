@@ -46,6 +46,7 @@ export type DeployCliReadonlyFlags = {
   cleanupReason: string;
   sourceRunId: string;
   artifactDirFlag: string;
+  controlPlaneDatabaseUrl: string;
 };
 export function readDeployCliReadonlyFlags(): DeployCliReadonlyFlags {
   return {
@@ -77,6 +78,7 @@ export function readDeployCliReadonlyFlags(): DeployCliReadonlyFlags {
     cleanupReason: getFlagStr("cleanup-reason", "manual_cleanup").trim(),
     sourceRunId: getFlagStr("source-run-id", "").trim(),
     artifactDirFlag: getFlagStr("artifact-dir", "").trim(),
+    controlPlaneDatabaseUrl: getFlagStr("control-plane-database-url", "").trim(),
   };
 }
 function readBootstrapFormat(): VaultBootstrapFormat {

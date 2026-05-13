@@ -21,6 +21,7 @@ export async function runS3StaticDeployFrontDoor(opts: {
   rollback: boolean;
   sourceRunId: string;
   artifactDirFlag: string;
+  backendDatabaseUrl?: string;
   admissionEvidence?: unknown;
   smokeConnectOverride?: unknown;
   hasFlag?: (flag: string) => boolean;
@@ -115,6 +116,8 @@ export async function runS3StaticDeployFrontDoor(opts: {
       await assertCrossDeploymentExactPromotionEligible({
         workspaceRoot: opts.workspaceRoot,
         deployment: opts.deployment,
+        recordsRoot,
+        backendDatabaseUrl: opts.backendDatabaseUrl,
         source,
       });
     }

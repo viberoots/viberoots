@@ -125,6 +125,8 @@ export async function executeKubernetesControlPlaneSubmission(opts: {
                 await assertCrossDeploymentExactPromotionEligible({
                   workspaceRoot: snapshot.workspaceRoot,
                   deployment: snapshot.deployment,
+                  recordsRoot: snapshot.recordsRoot,
+                  backendDatabaseUrl: opts.backend.databaseUrl,
                   source,
                 });
               }

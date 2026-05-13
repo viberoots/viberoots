@@ -20,6 +20,10 @@ import {
   nixosSharedHostLanePolicyFixture,
 } from "./nixos-shared-host.fixture";
 import { startControlPlaneHarness } from "./nixos-shared-host.control-plane.helpers";
+import {
+  seedCurrentStageState,
+  seedSyntheticTargetStageState,
+} from "./nixos-shared-host.promotion.stage-state.helpers";
 import { startNixosSharedHostPublicServer } from "./nixos-shared-host.public-server";
 
 async function writeArtifact(root: string, html: string): Promise<void> {
@@ -159,11 +163,17 @@ test("nixos-shared-host allows reviewed cross-provider same-artifact promotion o
         env: fakeCloudflareEnv(fake),
       })`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment ${source.label} --admission-evidence-json ${sourceEvidenceJson} --artifact-dir ${artifactDir} --records-root ${recordsRoot} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(sourceServer.port)} --smoke-connect-protocol https:`;
       const sourceSummary = JSON.parse(String(sourceRun.stdout));
+      const backendDatabaseUrl = await seedCurrentStageState({
+        recordsRoot,
+        recordPath: sourceSummary.recordPath,
+        deployment: source,
+      });
       const promotion = await resolveCrossDeploymentPromotionSelection({
         workspaceRoot: tmp,
         deployment: target,
         recordsRoot,
         sourceRunId: sourceSummary.deployRunId,
+        backendDatabaseUrl,
       });
       assert.equal(promotion.operationKind, "promotion");
       assert.equal(promotion.parentRunId, sourceSummary.deployRunId);
@@ -176,8 +186,8 @@ test("nixos-shared-host allows reviewed cross-provider same-artifact promotion o
   });
 });
 
-test("nixos-shared-host promotion rejects retained source runs that drift out of lane eligibility", async () => {
-  await runInTemp("nixos-shared-host-promotion-drift", async (tmp, $) => {
+test("nixos-shared-host promotion keeps retained source-run eligibility independent of target ref drift", async () => {
+  await runInTemp("nixos-shared-host-promotion-ref-drift", async (tmp, $) => {
     const source = cloudflareDevDeployment();
     const target = nixosStagingDeployment(source.lanePolicy);
     const artifactDir = path.join(tmp, "artifact");
@@ -210,18 +220,23 @@ test("nixos-shared-host promotion rejects retained source runs that drift out of
         env: fakeCloudflareEnv(fake),
       })`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment ${source.label} --admission-evidence-json ${sourceEvidenceJson} --artifact-dir ${artifactDir} --records-root ${recordsRoot} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(sourceServer.port)} --smoke-connect-protocol https:`;
       const sourceSummary = JSON.parse(String(sourceRun.stdout));
+      const backendDatabaseUrl = await seedCurrentStageState({
+        recordsRoot,
+        recordPath: sourceSummary.recordPath,
+        deployment: source,
+      });
+      await seedSyntheticTargetStageState({ recordsRoot, deployment: target });
       await $({ cwd: tmp, stdio: "pipe" })`git config user.email test@example.com`;
       await $({ cwd: tmp, stdio: "pipe" })`git config user.name Test`;
       await $({ cwd: tmp, stdio: "pipe" })`git commit --allow-empty -m drift`;
-      await assert.rejects(
-        resolveCrossDeploymentPromotionSelection({
-          workspaceRoot: tmp,
-          deployment: target,
-          recordsRoot,
-          sourceRunId: sourceSummary.deployRunId,
-        }),
-        /no longer matches current promotable target state/,
-      );
+      const promotion = await resolveCrossDeploymentPromotionSelection({
+        workspaceRoot: tmp,
+        deployment: target,
+        recordsRoot,
+        sourceRunId: sourceSummary.deployRunId,
+        backendDatabaseUrl,
+      });
+      assert.equal(promotion.parentRunId, sourceSummary.deployRunId);
     } finally {
       await sourceServer.close();
     }

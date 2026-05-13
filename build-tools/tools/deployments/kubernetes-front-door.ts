@@ -24,6 +24,7 @@ export async function runKubernetesDeployFrontDoor(opts: {
   rollback: boolean;
   sourceRunId: string;
   artifactDirFlag: string;
+  backendDatabaseUrl?: string;
   admissionEvidence?: unknown;
   smokeConnectOverride?: unknown;
   hasFlag?: (flag: string) => boolean;
@@ -118,6 +119,8 @@ export async function runKubernetesDeployFrontDoor(opts: {
       await assertCrossDeploymentExactPromotionEligible({
         workspaceRoot: opts.workspaceRoot,
         deployment: opts.deployment,
+        recordsRoot,
+        backendDatabaseUrl: opts.backendDatabaseUrl,
         source,
       });
     }

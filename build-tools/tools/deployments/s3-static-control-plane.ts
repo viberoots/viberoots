@@ -122,6 +122,8 @@ export async function executeS3StaticControlPlaneSubmission(opts: {
                 await assertCrossDeploymentExactPromotionEligible({
                   workspaceRoot: snapshot.workspaceRoot,
                   deployment: snapshot.deployment,
+                  recordsRoot: snapshot.recordsRoot,
+                  backendDatabaseUrl: opts.backend.databaseUrl,
                   source,
                 });
               }

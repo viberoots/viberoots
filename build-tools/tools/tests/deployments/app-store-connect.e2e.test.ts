@@ -1,8 +1,15 @@
 #!/usr/bin/env zx-wrapper
 import assert from "node:assert/strict";
+import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
+import type { AppStoreConnectDeployment } from "../../deployments/contract";
+import { resolveCrossDeploymentPromotionSelection } from "../../deployments/deployment-promotion";
+import { resolveDeploymentFromTarget } from "../../deployments/deployment-query";
+import { submitAppStoreConnectDeploy } from "../../deployments/app-store-connect-deploy";
+import { submitAppStoreConnectExactArtifactRun } from "../../deployments/app-store-connect-exact-run";
 import { readAppStoreConnectDeployRecord } from "../../deployments/app-store-connect-records";
+import { localHarnessControlPlaneDatabaseUrl } from "../../deployments/nixos-shared-host-control-plane-backend";
 import { runInTemp } from "../lib/test-helpers";
 import { appStoreConnectDeploymentFixture } from "./app-store-connect.fixture";
 import { writeReviewedLaneAdmissionEvidenceJson } from "./deployment-lane-governance.fixture";
@@ -14,6 +21,24 @@ import {
 import { mobileReviewedLanePolicy, writeMobileArtifact } from "./mobile-release.e2e.helpers";
 import { writeDeploymentJson } from "./nixos-shared-host.reuse.e2e.helpers";
 import { ensureNixosSharedHostReviewedSourceRef } from "./nixos-shared-host.fixture";
+import {
+  seedCurrentStageState,
+  seedSyntheticTargetStageState,
+} from "./nixos-shared-host.promotion.stage-state.helpers";
+
+async function withAppStoreConnectFakeStore<T>(tmp: string, fn: () => Promise<T>): Promise<T> {
+  const previous = process.env.VBR_APP_STORE_CONNECT_FAKE_STORE_ROOT;
+  process.env.VBR_APP_STORE_CONNECT_FAKE_STORE_ROOT = path.join(tmp, "fake-store");
+  try {
+    return await fn();
+  } finally {
+    if (previous === undefined) {
+      delete process.env.VBR_APP_STORE_CONNECT_FAKE_STORE_ROOT;
+    } else {
+      process.env.VBR_APP_STORE_CONNECT_FAKE_STORE_ROOT = previous;
+    }
+  }
+}
 
 test("app-store-connect deploy and promotion preserve release-health evidence", async () => {
   await runInTemp("app-store-connect-promotion", async (tmp, $) => {
@@ -50,6 +75,7 @@ test("app-store-connect deploy and promotion preserve release-health evidence", 
       },
     });
     const recordsRoot = path.join(tmp, "records");
+    const backendDatabaseUrl = localHarnessControlPlaneDatabaseUrl(recordsRoot);
     const artifactPath = path.join(tmp, "artifacts", "demo.ipa");
     const devJson = path.join(tmp, "dev.json");
     const stagingJson = path.join(tmp, "staging.json");
@@ -73,18 +99,50 @@ test("app-store-connect deploy and promotion preserve release-health evidence", 
       deploymentLabel: staging.label,
       deployment: staging,
     });
-    const env = appStoreConnectFakeEnv(tmp);
-    const devRun = await $({
-      cwd: tmp,
-      env,
-    })`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment ${dev.label} --admission-evidence-json ${devEvidenceJson} --artifact-dir ${artifactPath} --records-root ${recordsRoot}`;
-    const devSummary = JSON.parse(String(devRun.stdout));
-    const promotionRun = await $({
-      cwd: tmp,
-      env,
-    })`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment ${staging.label} --admission-evidence-json ${stagingEvidenceJson} --publish-only --source-run-id ${devSummary.deployRunId} --records-root ${recordsRoot}`;
-    const promotionSummary = JSON.parse(String(promotionRun.stdout));
-    const promotionRecord = await readAppStoreConnectDeployRecord(promotionSummary.recordPath);
+    const resolvedDev = (await resolveDeploymentFromTarget(
+      tmp,
+      dev.label,
+    )) as AppStoreConnectDeployment;
+    const resolvedStaging = (await resolveDeploymentFromTarget(
+      tmp,
+      staging.label,
+    )) as AppStoreConnectDeployment;
+    const promotionRecord = await withAppStoreConnectFakeStore(tmp, async () => {
+      const devRun = await submitAppStoreConnectDeploy({
+        workspaceRoot: tmp,
+        deployment: resolvedDev,
+        artifactPath,
+        recordsRoot,
+        admissionEvidence: JSON.parse(await fsp.readFile(devEvidenceJson, "utf8")),
+      });
+      await seedCurrentStageState({
+        recordsRoot,
+        recordPath: devRun.recordPath,
+        deployment: resolvedDev,
+      });
+      await seedSyntheticTargetStageState({ recordsRoot, deployment: resolvedStaging });
+      const promotion = await resolveCrossDeploymentPromotionSelection({
+        workspaceRoot: tmp,
+        deployment: resolvedStaging,
+        recordsRoot,
+        sourceRunId: devRun.record.deployRunId,
+        backendDatabaseUrl,
+      });
+      const result = await submitAppStoreConnectExactArtifactRun({
+        workspaceRoot: tmp,
+        deployment: resolvedStaging,
+        recordsRoot,
+        operationKind: "promotion",
+        artifact: promotion.artifact as any,
+        sourceRecord: promotion.sourceRecord as any,
+        parentRunId: promotion.parentRunId,
+        releaseLineageId: promotion.releaseLineageId,
+        artifactLineageId: promotion.artifactLineageId,
+        sourceTrack: (promotion.sourceReplaySnapshot as any).deployment.providerTarget.track,
+        admissionEvidence: JSON.parse(await fsp.readFile(stagingEvidenceJson, "utf8")),
+      });
+      return await readAppStoreConnectDeployRecord(result.recordPath);
+    });
     assert.equal(promotionRecord.operationKind, "promotion");
     assert.equal(promotionRecord.runnerIdentities.publisher, staging.publisher.type);
     assert.equal(promotionRecord.runnerIdentities.smoke, "app-store-connect-release-health@1");

@@ -128,7 +128,9 @@ async function resolveSharedHostPromotionSourceFromBackend(opts: {
     databaseUrl: opts.backendDatabaseUrl,
   };
   const envelope = await readBackendDeployRecordEnvelopeByDeployRunId(backend, opts.sourceRunId);
-  if (!envelope) return undefined;
+  if (!envelope || (envelope.record as { provider?: string }).provider !== "nixos-shared-host") {
+    return undefined;
+  }
   const source = await resolveNixosSharedHostReplaySource({
     recordsRoot: path.resolve(opts.recordsRoot),
     backendDatabaseUrl: opts.backendDatabaseUrl,

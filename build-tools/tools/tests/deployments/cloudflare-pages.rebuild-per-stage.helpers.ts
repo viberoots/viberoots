@@ -13,6 +13,7 @@ import {
   nixosSharedHostAdmissionPolicyFixture,
   nixosSharedHostLanePolicyFixture,
 } from "./nixos-shared-host.fixture";
+import { seedCurrentStageState } from "./nixos-shared-host.promotion.stage-state.helpers";
 import { cloudflarePagesDeploymentFixture } from "./cloudflare-pages.fixture";
 import { nixosSharedHostLaneGovernanceFixture } from "./deployment-lane-governance.fixture";
 
@@ -105,6 +106,7 @@ export async function createSourceRun(
   deployment: CloudflarePagesDeployment;
   summary: Record<string, any>;
   record: Record<string, any>;
+  backendDatabaseUrl: string;
 }> {
   const deployment = rebuildDevDeployment();
   const deploymentJson = path.join(tmp, "pleomino-rebuild-dev-pages.json");
@@ -134,7 +136,12 @@ export async function createSourceRun(
     })`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment ${deployment.label} --admission-evidence-json ${admissionEvidenceJson} --artifact-dir ${artifactDir} --records-root ${recordsRoot} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(server.port)} --smoke-connect-protocol https:`;
     const summary = JSON.parse(String(run.stdout));
     const record = JSON.parse(await fsp.readFile(summary.recordPath, "utf8"));
-    return { deployment, summary, record };
+    const backendDatabaseUrl = await seedCurrentStageState({
+      recordsRoot,
+      recordPath: summary.recordPath,
+      deployment,
+    });
+    return { deployment, summary, record, backendDatabaseUrl };
   } finally {
     await server.close();
   }

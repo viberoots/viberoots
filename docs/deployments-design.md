@@ -97,6 +97,7 @@ Future edits should not weaken or silently contradict the following invariants w
 - for promotion, the lane policy and control-plane stage state are authoritative for what is currently promotable; `--source-run-id` is a selector within that admitted policy boundary, not an override around it.
   - the operator may select any earlier admitted source run that is still eligible under the lane's current promotion policy
   - the system must reject source runs that are no longer promotable under current lane policy, even if they remain retained in history
+  - promotion eligibility must load current stage state for both the source deployment and the target deployment; if either stage-state record is unavailable or stale, the promotion fails closed rather than falling back to branch movement, release pointers, or retained run records alone
 - rollback is a new run classified by `operation_kind = rollback`; it should prefer redeploying a prior known-good artifact rather than rebuilding or rewinding Git refs or release pointers.
   - default meaning of "known good" is: a prior run for the same deployment, against the same normal live target and `publish_mode = normal`, with `final_outcome = succeeded` and all required blocking smoke or release-health checks passed for that run
   - stricter lane-specific rollback-candidate policy, such as soak windows or manual pinning, is allowed only when declared explicitly by the authoritative lane policy rather than inferred by convention
@@ -4254,6 +4255,7 @@ Release-admission contract for protected/shared environments:
     - for protected/shared `--publish-only`, retry, rollback, and other immutable-artifact reuse paths, the control plane should replay the recorded deployment snapshot for the selected source run rather than silently re-reading current repo metadata or provider config as if it were the original deployment state
     - for source-run reuse across deployments, the source run must come from another deployment in the same authoritative compatible `lane_policy`, and the requested operation kind must be valid for that source/target pairing
     - for `promotion`, the target lane policy and control-plane stage state are authoritative for what is currently promotable; `--source-run-id` is valid only when it names an earlier admitted run that remains eligible under the lane's current promotion policy
+    - promotion eligibility checks both source and target current stage state through the shared control plane; long-lived environment branches, target-environment branch rewrites, mutable tags, and hand-maintained release-pointer files are never authoritative promotion inputs
   - for `--provision-only` and other non-publishing mutating runs:
     - artifact attestation is not required
     - admission still requires source-ref policy, approval, lane, target, locking policy, and admitted runtime-config/secret contract completeness to pass before mutation
