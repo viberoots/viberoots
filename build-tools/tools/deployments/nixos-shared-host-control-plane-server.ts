@@ -10,9 +10,9 @@ import {
 } from "./nixos-shared-host-control-plane-service-api";
 import { handleControlPlaneArtifactChallenge } from "./nixos-shared-host-control-plane-service-challenge";
 import {
-  readControlPlaneRecord,
-  readControlPlaneStatus,
-} from "./nixos-shared-host-control-plane-service-read";
+  handleControlPlaneReadRoute,
+  isControlPlaneReadRoute,
+} from "./deployment-control-plane-read-routes";
 import {
   createDeploymentAuthLoginSession,
   handleDeploymentAuthCallback,
@@ -181,34 +181,16 @@ export async function startNixosSharedHostControlPlaneServer(opts: {
         writeJson(response, 200, session);
         return;
       }
-      if (request.method === "GET" && url.pathname === "/api/v1/status") {
+      if (isControlPlaneReadRoute(request.method || "", url.pathname)) {
         if (!requireReviewedBearerToken(request, response, opts)) return;
-        const submissionId = url.searchParams.get("submissionId") || "";
-        const deployRunId = url.searchParams.get("deployRunId") || "";
-        const submission = await readControlPlaneStatus(backend, {
-          ...(submissionId ? { submissionId } : {}),
-          ...(deployRunId ? { deployRunId } : {}),
+        const route = await handleControlPlaneReadRoute({
+          method: request.method,
+          pathname: url.pathname,
+          searchParams: url.searchParams,
+          backend,
         });
-        if (!submission) {
-          writeJson(response, 404, { error: "submission not found" });
-          return;
-        }
-        writeJson(response, 200, submission);
-        return;
-      }
-      if (request.method === "GET" && url.pathname === "/api/v1/records") {
-        if (!requireReviewedBearerToken(request, response, opts)) return;
-        const submissionId = url.searchParams.get("submissionId") || "";
-        const deployRunId = url.searchParams.get("deployRunId") || "";
-        const record = await readControlPlaneRecord(backend, {
-          ...(submissionId ? { submissionId } : {}),
-          ...(deployRunId ? { deployRunId } : {}),
-        });
-        if (!record) {
-          writeJson(response, 404, { error: "record not found" });
-          return;
-        }
-        writeJson(response, 200, record);
+        if (!route.handled) throw new Error(`unhandled read route: ${url.pathname}`);
+        writeJson(response, route.statusCode, route.body);
         return;
       }
       if (request.method === "POST" && url.pathname === "/api/v1/run-actions") {

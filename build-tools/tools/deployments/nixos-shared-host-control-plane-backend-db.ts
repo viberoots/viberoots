@@ -112,6 +112,22 @@ async function initializeBackendSchema(pool: BackendPool) {
     );
     CREATE INDEX IF NOT EXISTS deploy_records_by_submission_id
       ON deploy_records(submission_id);
+    CREATE TABLE IF NOT EXISTS current_stage_state (
+      deployment_id TEXT NOT NULL,
+      environment_stage TEXT NOT NULL,
+      current_run_id TEXT NOT NULL,
+      document_json JSONB NOT NULL,
+      updated_at TIMESTAMPTZ NOT NULL,
+      PRIMARY KEY(deployment_id, environment_stage)
+    );
+    CREATE TABLE IF NOT EXISTS stage_state_history (
+      deployment_id TEXT NOT NULL,
+      environment_stage TEXT NOT NULL,
+      deploy_run_id TEXT NOT NULL,
+      document_json JSONB NOT NULL,
+      updated_at TIMESTAMPTZ NOT NULL,
+      PRIMARY KEY(deployment_id, environment_stage, deploy_run_id)
+    );
     CREATE TABLE IF NOT EXISTS artifact_cleanup_janitor_records (
       record_id TEXT PRIMARY KEY,
       submission_id TEXT,

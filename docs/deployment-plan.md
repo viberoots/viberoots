@@ -67,6 +67,8 @@ Completion criteria:
   control-plane authority, immutable artifact handling, retry/rollback/promotion, preview cleanup,
   and authoritative records consistent with
   [Deployments Design](/Users/kiltyj/Code/viberoots/docs/deployments-design.md)
+- protected/shared current deployed state is read from control-plane backend state keyed by
+  deployment id and environment stage; Git release-pointer files are not runtime deployment inputs
 - reviewed deployment-owned files in the deployment domain stay within the repository methodology
   file-size boundary, enforced by the deployment-domain guardrail introduced in PR-44
 

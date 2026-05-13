@@ -3,6 +3,7 @@ import type {
   DeploymentControlPlaneArtifactStatus,
   DeploymentControlPlaneStatus,
 } from "./deployment-control-plane-contract";
+import type { DeploymentCurrentStageState } from "./deployment-current-stage-state";
 import { redactDeploymentAuthText } from "./deployment-auth-redaction";
 
 function phaseMessage(status: DeploymentControlPlaneStatus): string {
@@ -177,6 +178,29 @@ export function formatDeploymentControlPlaneRecordText(record: any): string {
     record.errorFingerprint ? `errorFingerprint: ${String(record.errorFingerprint)}` : undefined,
     record.error || record.smokeError
       ? `diagnostic: ${redactDeploymentAuthText(String(record.error || record.smokeError))}`
+      : undefined,
+  ]
+    .filter(Boolean)
+    .join("\n");
+}
+
+export function formatDeploymentCurrentStageStateText(state: DeploymentCurrentStageState): string {
+  return [
+    `current stage: ${state.deploymentId} ${state.environmentStage}`,
+    `deployment: ${state.deploymentLabel}`,
+    `target: ${state.providerTargetIdentity}`,
+    `currentRunId: ${state.currentRunId}`,
+    state.sourceRunId ? `sourceRunId: ${state.sourceRunId}` : undefined,
+    `sourceRevision: ${state.sourceRevision}`,
+    `artifact: ${state.artifactIdentity}`,
+    `artifactReuseMode: ${state.artifactReuseMode}`,
+    state.parentRunId ? `parentRunId: ${state.parentRunId}` : undefined,
+    state.releaseLineageId ? `releaseLineageId: ${state.releaseLineageId}` : undefined,
+    state.artifactLineageId ? `artifactLineageId: ${state.artifactLineageId}` : undefined,
+    `outcome: ${state.finalOutcome}`,
+    `updatedAt: ${state.updatedAt}`,
+    state.approvalContext
+      ? `approval: ${state.approvalContext.requiredApprovals.join(",") || "none"}`
       : undefined,
   ]
     .filter(Boolean)

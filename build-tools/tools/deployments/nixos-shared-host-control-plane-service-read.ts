@@ -2,6 +2,8 @@
 import {
   readBackendDeployRecordByDeployRunId,
   readBackendDeployRecordBySubmissionId,
+  readBackendCurrentStageState,
+  readBackendStageHistory,
   readBackendSubmissionByDeployRunId,
   readBackendSubmissionBySubmissionId,
   type NixosSharedHostControlPlaneBackendTarget,
@@ -35,4 +37,18 @@ export async function readControlPlaneRecord(
     : opts.deployRunId
       ? await readBackendDeployRecordByDeployRunId(backend, opts.deployRunId)
       : null;
+}
+
+export async function readControlPlaneCurrentStageState(
+  backend: NixosSharedHostControlPlaneBackendTarget,
+  opts: { deploymentId: string; environmentStage: string },
+) {
+  return await readBackendCurrentStageState(backend, opts);
+}
+
+export async function readControlPlaneStageHistory(
+  backend: NixosSharedHostControlPlaneBackendTarget,
+  opts: { deploymentId: string; environmentStage?: string },
+) {
+  return await readBackendStageHistory(backend, opts);
 }

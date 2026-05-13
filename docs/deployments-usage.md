@@ -299,6 +299,28 @@ Use `--status` when you want the full run status JSON, `--print-run-lock-scope`
 when you only need the exact admitted target scope string, and `--approve`
 when the run is waiting for human approval.
 
+To answer what is currently deployed in a protected/shared stage, use the
+control-plane current-stage helpers rather than Git release-pointer files:
+
+```bash
+deploy --deployment //projects/deployments/pleomino-prod:deploy \
+  --current-stage-state \
+  --text \
+  --control-plane-url "$VBR_DEPLOY_CONTROL_PLANE_URL"
+```
+
+```bash
+deploy --deployment //projects/deployments/pleomino-prod:deploy \
+  --stage-history \
+  --control-plane-url "$VBR_DEPLOY_CONTROL_PLANE_URL"
+```
+
+The helpers derive deployment id and environment stage from reviewed deployment
+metadata and call `GET /api/v1/current-stage-state` or
+`GET /api/v1/stage-history`. The current state includes the latest deployed
+source revision, artifact identity, parent/source run, lineage, outcome, and
+approval context.
+
 If you are using the reviewed `nixos-shared-host` client profile workflow, use
 `--profile mini` instead of `--control-plane-url`.
 For auth-required protected/shared runs, the deployment service opens or prints

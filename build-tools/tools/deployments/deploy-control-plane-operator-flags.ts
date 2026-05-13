@@ -4,6 +4,8 @@ import { getFlagBool } from "../lib/cli";
 export type DeployControlPlaneOperatorAction =
   | "status"
   | "record"
+  | "current-stage-state"
+  | "stage-history"
   | "print-run-lock-scope"
   | "approve"
   | "cancel-run"
@@ -17,6 +19,8 @@ export function selectedDeployControlPlaneOperatorAction():
     [
       ["status", getFlagBool("status")],
       ["record", getFlagBool("record")],
+      ["current-stage-state", getFlagBool("current-stage-state")],
+      ["stage-history", getFlagBool("stage-history")],
       ["print-run-lock-scope", getFlagBool("print-run-lock-scope")],
       ["approve", getFlagBool("approve")],
       ["cancel-run", getFlagBool("cancel-run")],

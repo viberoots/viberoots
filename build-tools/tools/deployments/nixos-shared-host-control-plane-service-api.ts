@@ -36,7 +36,7 @@ import { resolveServiceSubmitRequest } from "./nixos-shared-host-control-plane-s
 import { handleProtectedChallengedNixosServiceSubmit } from "./nixos-shared-host-control-plane-service-protected-submit";
 import { resolveNixosSharedHostSubmitContext } from "./nixos-shared-host-control-plane-submit-context";
 // prettier-ignore
-export { readControlPlaneRecord, readControlPlaneStatus } from "./nixos-shared-host-control-plane-service-read";
+export { readControlPlaneCurrentStageState, readControlPlaneRecord, readControlPlaneStageHistory, readControlPlaneStatus } from "./nixos-shared-host-control-plane-service-read";
 
 // prettier-ignore
 export type ServiceRunActionRequest = DeploymentControlPlaneRunActionRequest & { deployRunId?: string; authSessionId?: string; requestedBy?: DeploymentPrincipal; authorization?: DeploymentControlPlaneAuthorization; };

@@ -3,8 +3,10 @@ import {
   decodeBackendJson,
   queryBackend,
   readJson,
+  withBackendClient,
 } from "./nixos-shared-host-control-plane-backend-db";
 import type { NixosSharedHostControlPlaneBackendTarget } from "./nixos-shared-host-control-plane-backend-db";
+import { writeCurrentStageStateForDeployRecord } from "./deployment-current-stage-state";
 
 type DeployRecordDoc = {
   deployRunId: string;
@@ -22,18 +24,28 @@ export async function writeBackendDeployRecordDoc(
       `shared deploy record is missing deployRunId or controlPlane.submissionId: ${recordPath}`,
     );
   }
-  await queryBackend(
-    backend,
-    `INSERT INTO deploy_records (
-      deploy_run_id, submission_id, record_path, document_json, updated_at
-    ) VALUES ($1, $2, $3, $4::jsonb, $5)
-    ON CONFLICT(deploy_run_id) DO UPDATE SET
-      submission_id = EXCLUDED.submission_id,
-      record_path = EXCLUDED.record_path,
-      document_json = EXCLUDED.document_json,
-      updated_at = EXCLUDED.updated_at`,
-    [doc.deployRunId, submissionId, recordPath, JSON.stringify(doc), new Date().toISOString()],
-  );
+  const updatedAt = new Date().toISOString();
+  await withBackendClient(backend, async (client) => {
+    await client.query("BEGIN");
+    try {
+      await client.query(
+        `INSERT INTO deploy_records (
+          deploy_run_id, submission_id, record_path, document_json, updated_at
+        ) VALUES ($1, $2, $3, $4::jsonb, $5)
+        ON CONFLICT(deploy_run_id) DO UPDATE SET
+          submission_id = EXCLUDED.submission_id,
+          record_path = EXCLUDED.record_path,
+          document_json = EXCLUDED.document_json,
+          updated_at = EXCLUDED.updated_at`,
+        [doc.deployRunId, submissionId, recordPath, JSON.stringify(doc), updatedAt],
+      );
+      await writeCurrentStageStateForDeployRecord({ client, record: doc as any, updatedAt });
+      await client.query("COMMIT");
+    } catch (error) {
+      await client.query("ROLLBACK");
+      throw error;
+    }
+  });
   return doc;
 }
 

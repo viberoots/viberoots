@@ -25,7 +25,7 @@ RESOURCE_LIMITED_DEPLOYMENT_TESTS = {
     "build-tools/tools/tests/deployments/deploy.admit-only.contract.test.ts": True,
     "build-tools/tools/tests/deployments/deploy.front-door.contract.test.ts": True,
     "build-tools/tools/tests/deployments/deploy.front-door-readiness.test.ts": True,
-    "build-tools/tools/tests/deployments/deploy.front-door.control-plane-operator.contract.test.ts": True,
+    "build-tools/tools/tests/deployments/deploy.front-door.control-plane-operator.contract.test.ts": True, "build-tools/tools/tests/deployments/deploy.front-door.current-stage-state.test.ts": True,
     "build-tools/tools/tests/deployments/deploy.front-door.hosted-status-ux.test.ts": True,
     "build-tools/tools/tests/deployments/deploy.front-door.provider-target-identity.contract.test.ts": True,
     "build-tools/tools/tests/deployments/phase0-deployments.contract.test.ts": True,

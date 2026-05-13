@@ -5,6 +5,10 @@ import {
   readNixosSharedHostControlPlaneRecordViaService,
   readNixosSharedHostControlPlaneStatusViaService,
 } from "./nixos-shared-host-control-plane-client";
+import {
+  readNixosSharedHostCurrentStageStateViaService,
+  readNixosSharedHostStageHistoryViaService,
+} from "./nixos-shared-host-control-plane-stage-client";
 import { readNixosSharedHostClientProfile } from "./nixos-shared-host-install-dev-machine";
 import {
   resolveServiceClientFromFlags,
@@ -116,5 +120,33 @@ export async function readRecordForOperator(opts: {
         ...(opts.controlPlaneToken ? { token: opts.controlPlaneToken } : {}),
         ...opts.selector,
       }),
+  });
+}
+
+export async function readCurrentStageStateForOperator(opts: {
+  controlPlaneUrl: string;
+  controlPlaneToken?: string;
+  deploymentId: string;
+  environmentStage: string;
+}) {
+  return await readNixosSharedHostCurrentStageStateViaService({
+    controlPlaneUrl: opts.controlPlaneUrl,
+    ...(opts.controlPlaneToken ? { token: opts.controlPlaneToken } : {}),
+    deploymentId: opts.deploymentId,
+    environmentStage: opts.environmentStage,
+  });
+}
+
+export async function readStageHistoryForOperator(opts: {
+  controlPlaneUrl: string;
+  controlPlaneToken?: string;
+  deploymentId: string;
+  environmentStage: string;
+}) {
+  return await readNixosSharedHostStageHistoryViaService({
+    controlPlaneUrl: opts.controlPlaneUrl,
+    ...(opts.controlPlaneToken ? { token: opts.controlPlaneToken } : {}),
+    deploymentId: opts.deploymentId,
+    environmentStage: opts.environmentStage,
   });
 }

@@ -14,7 +14,16 @@ Current reviewed central control-plane implementation note:
 
 - For the current reviewed shared-control-plane path used by `nixos-shared-host` and protected/shared `cloudflare-pages`, `build-tools/tools/bin/deploy --control-plane-url <url>` acts as the thin repo-level client, `build-tools/tools/deployments/nixos-shared-host-control-plane-service.ts` is the reviewed submit/status API process, `build-tools/tools/deployments/nixos-shared-host-control-plane-worker.ts` is the reviewed worker-loop process, and Postgres configured via `--control-plane-database-url <postgres-url>` or `VBR_DEPLOY_CONTROL_PLANE_DATABASE_URL` is the authoritative queue/lock/idempotency/worker-ownership/deploy-record backend.
 - Normal reviewed `nixos-shared-host` and protected/shared `cloudflare-pages` control-plane writes and reads are backend-only: submissions, snapshots, queue state, worker ownership, status/result state, recovery state, and canonical protected/shared deploy records live in Postgres rather than in routine `<records-root>/control-plane/*.json` or `<records-root>/runs/*.json` mirrors.
+- The backend also stores authoritative current stage state keyed by deployment id and
+  `environment_stage`. Successful normal deploy, promotion, retry, and rollback records update
+  that state in the same backend transaction as the deploy record and append stage history with the
+  current run id, source run id when present, source revision, artifact identity, artifact reuse
+  mode, parent run id, release lineage id, artifact lineage id when exact artifact lineage exists,
+  final outcome, update timestamp, and approval context.
 - Reviewed operator inspection/export flows must resolve protected/shared control-plane state by backend-native identifiers (`submission_id`, `deploy_run_id`) through the service surfaces such as `GET /api/v1/status` and `GET /api/v1/records`, not by reading filesystem mirror paths.
+- Operators inspect the current deployed stage through backend-native state surfaces such as
+  `GET /api/v1/current-stage-state` and `GET /api/v1/stage-history`; Git release-pointer JSON is
+  derived audit evidence only if it exists and must not be read as a runtime deployment input.
 - Explicit `pgmem://...` backend URLs remain valid for isolated fixture tests and local harnesses; those harnesses should exercise the same backend-native contracts rather than rely on durable submission or deploy-record mirror files.
 - For public repo-level protected/shared `cloudflare-pages` mutation, missing `--control-plane-url` or `VBR_DEPLOY_CONTROL_PLANE_URL` is a fail-closed configuration error, and mixing that service-routed path with local-only flags such as `--records-root` or `--control-plane-database-url` is out of contract.
 - Protected/shared `cloudflare-pages` service submissions must carry a versioned `artifactInput` descriptor. The service rejects laptop-local `artifactDir` paths, admits uploaded, server-built, CI-attested, or previously admitted artifacts under control-plane storage, and publishes only the admitted artifact reference.

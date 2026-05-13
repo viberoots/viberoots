@@ -18,12 +18,15 @@ import {
 } from "./deploy-control-plane-operator-flags";
 import { printDeployJson } from "./deploy-front-door";
 import {
+  formatDeploymentCurrentStageStateText,
   formatDeploymentControlPlaneRecordText,
   formatDeploymentControlPlaneStatusText,
 } from "./deployment-control-plane-status-format";
 import { submitNixosSharedHostControlPlaneRunActionViaService } from "./nixos-shared-host-control-plane-client";
 import {
   readRecordForOperator,
+  readCurrentStageStateForOperator,
+  readStageHistoryForOperator,
   readStatusForOperator,
   requireLookupSelector,
   resolveServiceClientForOperator,
@@ -153,12 +156,39 @@ export async function maybeRunDeployControlPlaneOperatorCommand(opts: {
   const action = selectedDeployControlPlaneOperatorAction();
   if (!action) return false;
   const actionLabel = operatorActionLabel(action);
-  const selector = requireLookupSelector(actionLabel);
   const serviceClient = await resolveServiceClientForOperator({
     workspaceRoot: opts.workspaceRoot,
     deployment: opts.deployment,
     actionLabel,
   });
+  if (action === "current-stage-state") {
+    const state = await readCurrentStageStateForOperator({
+      controlPlaneUrl: serviceClient.controlPlaneUrl,
+      ...(serviceClient.controlPlaneToken
+        ? { controlPlaneToken: serviceClient.controlPlaneToken }
+        : {}),
+      deploymentId: opts.deployment.deploymentId,
+      environmentStage: opts.deployment.environmentStage,
+    });
+    if (getFlagBool("text")) console.log(formatDeploymentCurrentStageStateText(state));
+    else printDeployJson(state);
+    return true;
+  }
+  if (action === "stage-history") {
+    const history = await readStageHistoryForOperator({
+      controlPlaneUrl: serviceClient.controlPlaneUrl,
+      ...(serviceClient.controlPlaneToken
+        ? { controlPlaneToken: serviceClient.controlPlaneToken }
+        : {}),
+      deploymentId: opts.deployment.deploymentId,
+      environmentStage: opts.deployment.environmentStage,
+    });
+    if (getFlagBool("text")) {
+      console.log(history.map(formatDeploymentCurrentStageStateText).join("\n\n"));
+    } else printDeployJson(history);
+    return true;
+  }
+  const selector = requireLookupSelector(actionLabel);
   if (action === "record") {
     const record = await readRecordForOperator({
       controlPlaneUrl: serviceClient.controlPlaneUrl,

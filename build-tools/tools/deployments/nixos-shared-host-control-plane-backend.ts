@@ -30,6 +30,11 @@ export {
   writeBackendDeployRecordDoc,
 } from "./nixos-shared-host-control-plane-backend-records";
 export {
+  readBackendCurrentStageState,
+  readBackendStageHistory,
+  type DeploymentCurrentStageState,
+} from "./deployment-current-stage-state";
+export {
   acquireBackendControlPlaneLock,
   resolveBackendIdempotency,
   syncBackendRunAction,
