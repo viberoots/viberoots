@@ -13,7 +13,7 @@ import {
   withEnvOverrides,
 } from "./nixos-shared-host.control-plane.helpers";
 import {
-  ensureNixosSharedHostStageBranch,
+  ensureNixosSharedHostReviewedSourceRef,
   nixosSharedHostLanePolicyFixture,
 } from "./nixos-shared-host.fixture";
 import { installHarnessClientProfile } from "./nixos-shared-host.remote-exec.install.helpers";
@@ -68,7 +68,7 @@ test("public kubernetes deploy requires a control-plane URL for protected/shared
     const artifactDir = path.join(tmp, "artifact");
     await writeServiceArtifact(artifactDir, "service-required\n");
     await installKubernetesTargets(tmp, [deployment]);
-    await ensureNixosSharedHostStageBranch(tmp, $, deployment as any);
+    await ensureNixosSharedHostReviewedSourceRef(tmp, $, deployment as any);
     await writeValues(tmp, deployment.deploymentId);
     const evidence = await writeReviewedLaneAdmissionEvidenceJson({
       tmp,
@@ -111,7 +111,7 @@ test("public kubernetes deploy routes deploy, provision-only, retry, and rollbac
     await writeServiceArtifact(artifactA, "api-a\n");
     await writeServiceArtifact(artifactB, "api-b\n");
     await installKubernetesTargets(tmp, [deployment]);
-    await ensureNixosSharedHostStageBranch(tmp, $, deployment as any);
+    await ensureNixosSharedHostReviewedSourceRef(tmp, $, deployment as any);
     await writeValues(tmp, deployment.deploymentId);
     const evidence = await writeReviewedLaneAdmissionEvidenceJson({
       tmp,

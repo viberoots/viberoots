@@ -15,14 +15,14 @@ import {
   writeOpenTofuStackFixture,
 } from "./kubernetes.opentofu-apply.integration.helpers";
 import { installKubernetesTargets, kubernetesDeploymentFixture } from "./kubernetes.fixture";
-import { ensureNixosSharedHostStageBranch } from "./nixos-shared-host.fixture";
+import { ensureNixosSharedHostReviewedSourceRef } from "./nixos-shared-host.fixture";
 
 test("kubernetes provision-only records OpenTofu apply success outcome and redacts secret values", async () => {
   await runInTemp("kubernetes-opentofu-provision-only-success", async (tmp, $) => {
     const deployment = kubernetesDeploymentFixture({ provisioner: openTofuProvisioner() });
     const recordsRoot = path.join(tmp, "records");
     await installKubernetesTargets(tmp, [deployment]);
-    await ensureNixosSharedHostStageBranch(tmp, $, deployment as any);
+    await ensureNixosSharedHostReviewedSourceRef(tmp, $, deployment as any);
     await writeOpenTofuStackFixture({
       workspaceRoot: tmp,
       deploymentId: deployment.deploymentId,
@@ -104,7 +104,7 @@ test("kubernetes provision-only records OpenTofu apply failure outcome with reda
     const deployment = kubernetesDeploymentFixture({ provisioner: openTofuProvisioner() });
     const recordsRoot = path.join(tmp, "records");
     await installKubernetesTargets(tmp, [deployment]);
-    await ensureNixosSharedHostStageBranch(tmp, $, deployment as any);
+    await ensureNixosSharedHostReviewedSourceRef(tmp, $, deployment as any);
     await writeOpenTofuStackFixture({
       workspaceRoot: tmp,
       deploymentId: deployment.deploymentId,

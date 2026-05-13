@@ -15,7 +15,7 @@ import {
 import { runInTemp } from "../lib/test-helpers";
 import { installFakeCloudflarePagesWrangler } from "./cloudflare-pages.fake-wrangler";
 import { startCloudflarePagesPublicServer } from "./cloudflare-pages.public-server";
-import { ensureNixosSharedHostStageBranch } from "./nixos-shared-host.fixture";
+import { ensureNixosSharedHostReviewedSourceRef } from "./nixos-shared-host.fixture";
 
 async function writeArtifact(root: string, html: string): Promise<void> {
   await fsp.mkdir(root, { recursive: true });
@@ -55,7 +55,7 @@ test("cloudflare-pages rollback rejects preview source runs and missing exact ar
       path.join(tmp, "projects", "deployments", "pleomino-staging", "wrangler.jsonc"),
     );
     await installCloudflarePagesTargets(tmp, [deployment]);
-    await ensureNixosSharedHostStageBranch(tmp, $, deployment);
+    await ensureNixosSharedHostReviewedSourceRef(tmp, $, deployment);
     await writeDeploymentJson(deploymentJson, deployment);
     const admissionEvidenceJson = await writeReviewedLaneAdmissionEvidenceJson({
       tmp,
@@ -173,7 +173,7 @@ test("cloudflare-pages production rollback requires fresh approval evidence", as
       path.join(tmp, "projects", "deployments", "pleomino-prod", "wrangler.jsonc"),
     );
     await installCloudflarePagesTargets(tmp, [deployment]);
-    await ensureNixosSharedHostStageBranch(tmp, $, deployment);
+    await ensureNixosSharedHostReviewedSourceRef(tmp, $, deployment);
     await writeDeploymentJson(deploymentJson, deployment);
     const resolvedDeployment = (await resolveDeploymentFromTarget(
       tmp,

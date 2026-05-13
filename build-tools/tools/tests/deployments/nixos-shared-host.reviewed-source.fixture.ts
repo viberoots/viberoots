@@ -25,7 +25,7 @@ function materializedSourceRef(
   return concreteRef;
 }
 
-export async function ensureNixosSharedHostStageBranch(
+export async function ensureNixosSharedHostReviewedSourceRef(
   cwd: string,
   $: any,
   deployment: Pick<NixosSharedHostDeployment, "lanePolicy" | "environmentStage">,

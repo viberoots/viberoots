@@ -33,7 +33,7 @@ test("cloudflare-pages preview records preserve both live and effective preview 
       environmentStage: deployment.environmentStage,
       source: {
         mode: "source_run_reuse",
-        sourceRef: "env/pleomino/staging",
+        sourceRef: "main",
         sourceRevision: "abc123",
         artifactIdentity: "static-webapp:abc123",
         artifactTrustMode: "recorded_exact_artifact",
@@ -41,8 +41,8 @@ test("cloudflare-pages preview records preserve both live and effective preview 
         sourceDeploymentId: deployment.deploymentId,
       },
       targetEnvironment: {
-        mode: "stage_branch_snapshot",
-        targetRef: "env/pleomino/staging",
+        mode: "reviewed_source_snapshot",
+        targetRef: "main",
         targetRevision: "abc123",
         providerTargetIdentity: deployment.providerTarget.providerTargetIdentity,
         lockScope: deployment.providerTarget.providerTargetIdentity,

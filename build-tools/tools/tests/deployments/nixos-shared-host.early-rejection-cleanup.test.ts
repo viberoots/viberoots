@@ -17,7 +17,7 @@ import { createNixosSharedHostSubmissionId } from "../../deployments/nixos-share
 import { stagedUploadCompleteMarkerPath } from "../../deployments/nixos-shared-host-staged-artifact";
 import { runInTemp } from "../lib/test-helpers";
 import {
-  ensureNixosSharedHostStageBranch,
+  ensureNixosSharedHostReviewedSourceRef,
   nixosSharedHostDeploymentFixture,
 } from "./nixos-shared-host.fixture";
 import { reviewedLaneAdmissionEvidenceFixture } from "./deployment-lane-governance.fixture";
@@ -62,7 +62,7 @@ test("bearer-token rejection during challenge issuance still cleans staged artif
       recordsRoot: path.join(tmp, "records"),
     };
     const artifactDir = await writeStagedArtifact(paths.hostRoot, "missing-token");
-    await ensureNixosSharedHostStageBranch(tmp, $, deployment);
+    await ensureNixosSharedHostReviewedSourceRef(tmp, $, deployment);
     const controlPlane = await startNixosSharedHostControlPlaneServer({
       workspaceRoot: tmp,
       paths,
@@ -105,7 +105,7 @@ test("final-submit auth-boundary rejection still cleans staged artifacts before 
       recordsRoot: path.join(tmp, "records"),
     };
     const artifactDir = await writeStagedArtifact(paths.hostRoot, "submit-auth");
-    await ensureNixosSharedHostStageBranch(tmp, $, deployment);
+    await ensureNixosSharedHostReviewedSourceRef(tmp, $, deployment);
     const controlPlane = await startNixosSharedHostControlPlaneServer({
       workspaceRoot: tmp,
       paths,

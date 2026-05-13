@@ -6,7 +6,7 @@ import { promisify } from "node:util";
 import type { DeploymentControlPlaneServiceInstance } from "./deployment-control-plane-contract";
 import { CLOUDFLARE_PAGES_CONTROL_PLANE_SUBMIT_REQUEST_SCHEMA } from "./cloudflare-pages-control-plane-api-contract";
 import { NIXOS_SHARED_HOST_CONTROL_PLANE_SUBMIT_REQUEST_SCHEMA } from "./nixos-shared-host-control-plane-api-contract";
-import { requiredDeploymentStageBranch, type DeploymentTarget } from "./contract";
+import { requiredDeploymentSourceRef, type DeploymentTarget } from "./contract";
 
 const execFileAsync = promisify(execFile);
 
@@ -60,7 +60,7 @@ async function resolveReviewedRemote(
   reviewedRemoteName?: string;
   reviewedRemoteUrl?: string;
 }> {
-  const reviewedRef = requiredDeploymentStageBranch(deployment);
+  const reviewedRef = requiredDeploymentSourceRef(deployment);
   const reviewedRepository = trim((deployment as any)?.lanePolicy?.governance?.repository);
   const remotes = await listGitRemotes(workspaceRoot);
   if (remotes.length === 0) {

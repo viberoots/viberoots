@@ -2,6 +2,7 @@
 import type { DeploymentAdmissionEvidence } from "./deployment-admission-evidence";
 import type { OpenTofuDeployment } from "./contract";
 import { evaluateDeploymentAdmission } from "./deployment-admission-evaluator";
+import { requestedReviewedSourceFromEvidence } from "./deployment-source-revision";
 import { createVaultDeploymentSecretRuntime } from "./deployment-secret-runtime-helpers";
 import {
   createProductionFoundationMigrationAdapter,
@@ -55,6 +56,7 @@ export async function submitOpenTofuFoundationProvisionOnly(opts: {
 }) {
   const deployRunId = `deploy-${Date.now()}-${Math.random().toString(16).slice(2, 10)}`;
   const artifactIdentity = `migration-bundle:${opts.deployment.migrationBundleRef || opts.deployment.component.target}`;
+  const requestedReviewedSource = requestedReviewedSourceFromEvidence(opts.admissionEvidence);
   const admittedContext =
     opts.admittedContext ||
     (await resolveInitialOpenTofuAdmittedContext({
@@ -65,6 +67,7 @@ export async function submitOpenTofuFoundationProvisionOnly(opts: {
       ...(opts.expectedSourceRevision
         ? { expectedSourceRevision: opts.expectedSourceRevision }
         : {}),
+      ...(requestedReviewedSource?.ref ? { requestedSourceRef: requestedReviewedSource.ref } : {}),
     }));
   const provisionerPlan = await writeOpenTofuProvisionerPlan({
     workspaceRoot: opts.workspaceRoot,

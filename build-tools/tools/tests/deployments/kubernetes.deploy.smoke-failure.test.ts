@@ -16,7 +16,7 @@ import {
 } from "./kubernetes.publish-credentials.fixture";
 import { startKubernetesPublicServer } from "./kubernetes.public-server";
 import { writeServiceArtifact } from "./kubernetes.service-artifact.fixture";
-import { ensureNixosSharedHostStageBranch } from "./nixos-shared-host.fixture";
+import { ensureNixosSharedHostReviewedSourceRef } from "./nixos-shared-host.fixture";
 
 async function writeHelmValues(root: string, deploymentId: string, content: string): Promise<void> {
   const configPath = path.join(
@@ -44,7 +44,7 @@ test("kubernetes deploy records service-health smoke failure after publish", asy
     const fake = await installFakeKubernetesHelm(tmp);
     await writeServiceArtifact(artifactDir, "api-service\n");
     await installKubernetesTargets(tmp, [deployment]);
-    await ensureNixosSharedHostStageBranch(tmp, $, deployment as any);
+    await ensureNixosSharedHostReviewedSourceRef(tmp, $, deployment as any);
     await writeHelmValues(
       tmp,
       deployment.deploymentId,

@@ -10,7 +10,7 @@ import {
 import { submitNixosSharedHostControlPlaneRun } from "../../deployments/nixos-shared-host-control-plane";
 import { runInTemp } from "../lib/test-helpers";
 import {
-  ensureNixosSharedHostStageBranch,
+  ensureNixosSharedHostReviewedSourceRef,
   nixosSharedHostDeploymentFixture,
 } from "./nixos-shared-host.fixture";
 import { reviewedLaneAdmissionEvidenceFixture } from "./deployment-lane-governance.fixture";
@@ -29,7 +29,7 @@ test("protected/shared retention blocks early deletion and allows post-window cl
     const hostRoot = path.join(tmp, "host");
     const recordsRoot = path.join(tmp, "records");
     await writeArtifact(artifactDir);
-    await ensureNixosSharedHostStageBranch(tmp, $, deployment);
+    await ensureNixosSharedHostReviewedSourceRef(tmp, $, deployment);
     const server = await startNixosSharedHostPublicServer({ deployment, hostRoot });
     try {
       const result = await submitNixosSharedHostControlPlaneRun({

@@ -27,14 +27,14 @@ function admittedContext(overrides: Partial<CloudflarePagesAdmittedContext> = {}
     targetExceptionRefs: [],
     source: {
       mode: "source_run_reuse",
-      sourceRef: "env/pleomino/staging",
+      sourceRef: "main",
       sourceRevision: "rev",
       artifactIdentity: "artifact",
       artifactTrustMode: "recorded_exact_artifact",
     },
     targetEnvironment: {
-      mode: "stage_branch_snapshot",
-      targetRef: "env/pleomino/staging",
+      mode: "reviewed_source_snapshot",
+      targetRef: "main",
       targetRevision: "rev",
       providerTargetIdentity: targetScope,
       lockScope: targetScope,

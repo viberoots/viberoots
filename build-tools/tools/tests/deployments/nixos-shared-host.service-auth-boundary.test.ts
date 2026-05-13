@@ -7,7 +7,7 @@ import { NIXOS_SHARED_HOST_CONTROL_PLANE_SUBMIT_REQUEST_SCHEMA } from "../../dep
 import { startNixosSharedHostControlPlaneServer } from "../../deployments/nixos-shared-host-control-plane-server";
 import { createNixosSharedHostSubmissionId } from "../../deployments/nixos-shared-host-control-plane-snapshot";
 import { runInTemp } from "../lib/test-helpers";
-import { ensureNixosSharedHostStageBranch } from "./nixos-shared-host.fixture";
+import { ensureNixosSharedHostReviewedSourceRef } from "./nixos-shared-host.fixture";
 import { readJson, writeDemoArtifact } from "./nixos-shared-host.control-plane.helpers";
 import {
   authRequiredDeployment,
@@ -30,7 +30,7 @@ test("auth-required protected/shared service auth boundaries", async (t) => {
   await runInTemp("nixos-service-auth-boundaries", async (tmp, $) => {
     const deployment = authRequiredDeployment();
     const artifactDir = path.join(tmp, "artifact");
-    await ensureNixosSharedHostStageBranch(tmp, $, deployment);
+    await ensureNixosSharedHostReviewedSourceRef(tmp, $, deployment);
     await writeDemoArtifact(artifactDir);
 
     await t.test("submissions derive principal from service session", async () => {

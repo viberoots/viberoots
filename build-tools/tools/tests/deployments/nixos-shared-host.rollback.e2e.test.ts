@@ -6,7 +6,7 @@ import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
 import { readRecord, startControlPlaneHarness } from "./nixos-shared-host.control-plane.helpers";
 import {
-  ensureNixosSharedHostStageBranch,
+  ensureNixosSharedHostReviewedSourceRef,
   installNixosSharedHostTargets,
   nixosSharedHostDeploymentFixture,
 } from "./nixos-shared-host.fixture";
@@ -30,7 +30,7 @@ test("nixos-shared-host rollback restores a prior known-good exact artifact", as
     await writeArtifact(firstArtifactDir, "v1");
     await writeArtifact(secondArtifactDir, "v2");
     await installNixosSharedHostTargets(tmp, [deployment]);
-    await ensureNixosSharedHostStageBranch(tmp, $, deployment);
+    await ensureNixosSharedHostReviewedSourceRef(tmp, $, deployment);
     await writeDeploymentJson(deploymentJson, deployment);
     const admissionEvidenceJson = await writeAdmissionEvidenceJson({
       tmp,

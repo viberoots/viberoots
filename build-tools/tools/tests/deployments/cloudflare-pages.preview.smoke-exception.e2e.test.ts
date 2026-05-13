@@ -15,7 +15,7 @@ import {
 import { installFakeCloudflarePagesWrangler } from "./cloudflare-pages.fake-wrangler";
 import { writeReviewedLaneAdmissionEvidenceJson } from "./deployment-lane-governance.fixture";
 import { startCloudflarePagesPublicServer } from "./cloudflare-pages.public-server";
-import { ensureNixosSharedHostStageBranch } from "./nixos-shared-host.fixture";
+import { ensureNixosSharedHostReviewedSourceRef } from "./nixos-shared-host.fixture";
 import { runInTemp } from "../lib/test-helpers";
 
 async function writeArtifact(root: string, html: string): Promise<void> {
@@ -78,7 +78,7 @@ test("cloudflare-pages preview smoke remains blocking by default without an expl
       path.join(tmp, "projects", "deployments", "pleomino-staging", "wrangler.jsonc"),
     );
     await installCloudflarePagesTargets(tmp, [deployment]);
-    await ensureNixosSharedHostStageBranch(tmp, $, deployment);
+    await ensureNixosSharedHostReviewedSourceRef(tmp, $, deployment);
     await writeDeploymentJson(deploymentJson, deployment);
     const normalServer = await startCloudflarePagesPublicServer({
       deployment,
@@ -164,7 +164,7 @@ test("cloudflare-pages preview records nonblocking smoke failures only when depl
       path.join(tmp, "projects", "deployments", "pleomino-staging", "wrangler.jsonc"),
     );
     await installCloudflarePagesTargets(tmp, [deployment]);
-    await ensureNixosSharedHostStageBranch(tmp, $, deployment);
+    await ensureNixosSharedHostReviewedSourceRef(tmp, $, deployment);
     await writeDeploymentJson(deploymentJson, deployment);
     const normalServer = await startCloudflarePagesPublicServer({
       deployment,

@@ -1,16 +1,16 @@
 #!/usr/bin/env zx-wrapper
 import type { DeploymentTarget } from "./contract";
-import { requiredDeploymentStageBranch } from "./contract";
 import { DeploymentAdmissionError } from "./deployment-control-plane-errors";
 import {
   snapshotReviewedSourceForSubmission,
   type DeploymentReviewedSourceSnapshot,
 } from "./nixos-shared-host-reviewed-source-snapshot";
 import { resolveDeploymentGitCommit } from "./deployment-git-ref";
-import { sourceRefAllowed } from "./deployment-source-ref-policy";
+import { requestedDeploymentReviewedSourceRef } from "./deployment-reviewed-source-ref";
+import { explicitReviewedCommitSha } from "./deployment-source-ref-policy";
 
 export type DeploymentReviewedTargetEnvironmentAdmission = {
-  mode: "stage_branch_snapshot";
+  mode: "reviewed_source_snapshot";
   targetRef: string;
   targetRevision: string;
   providerTargetIdentity: string;
@@ -18,14 +18,8 @@ export type DeploymentReviewedTargetEnvironmentAdmission = {
   reviewedSourceSnapshot?: DeploymentReviewedSourceSnapshot;
 };
 
-function requiredPolicyRef(deployment: DeploymentTarget): string {
-  const sourceRef = requiredDeploymentStageBranch(deployment);
-  if (!sourceRefAllowed(sourceRef, deployment.admissionPolicy.allowedRefs)) {
-    throw new Error(
-      `deployment admission policy ${deployment.admissionPolicyRef} does not allow source ref ${sourceRef}`,
-    );
-  }
-  return sourceRef;
+function requiredPolicyRef(deployment: DeploymentTarget, requestedSourceRef?: string): string {
+  return requestedDeploymentReviewedSourceRef({ deployment, requestedSourceRef }).ref;
 }
 
 function reviewedSourceMismatchMessage(opts: {
@@ -48,11 +42,12 @@ export async function resolveDeploymentReviewedTargetEnvironment(opts: {
   deployment: DeploymentTarget;
   submissionId?: string;
   expectedSourceRevision?: string;
+  requestedSourceRef?: string;
   reviewedSourceSnapshot?: DeploymentReviewedSourceSnapshot;
   providerTargetIdentity?: string;
   lockScope?: string;
 }): Promise<DeploymentReviewedTargetEnvironmentAdmission> {
-  const targetRef = requiredPolicyRef(opts.deployment);
+  const targetRef = requiredPolicyRef(opts.deployment, opts.requestedSourceRef);
   const reviewedSourceSnapshot =
     opts.reviewedSourceSnapshot ||
     (opts.submissionId
@@ -63,10 +58,12 @@ export async function resolveDeploymentReviewedTargetEnvironment(opts: {
           ...(opts.expectedSourceRevision
             ? { expectedSourceRevision: opts.expectedSourceRevision }
             : {}),
+          ...(opts.requestedSourceRef ? { requestedSourceRef: opts.requestedSourceRef } : {}),
         })
       : undefined);
   const targetRevision =
     reviewedSourceSnapshot?.sourceRevision ||
+    explicitReviewedCommitSha(targetRef) ||
     (await resolveDeploymentGitCommit({
       workspaceRoot: opts.workspaceRoot,
       revision: targetRef,
@@ -86,7 +83,7 @@ export async function resolveDeploymentReviewedTargetEnvironment(opts: {
   const providerTargetIdentity =
     opts.providerTargetIdentity || opts.deployment.providerTarget.providerTargetIdentity;
   return {
-    mode: "stage_branch_snapshot",
+    mode: "reviewed_source_snapshot",
     targetRef,
     targetRevision,
     providerTargetIdentity,

@@ -19,7 +19,7 @@ import {
 } from "./kubernetes.publish-credentials.fixture";
 import { startKubernetesPublicServer } from "./kubernetes.public-server";
 import { writeServiceArtifact } from "./kubernetes.service-artifact.fixture";
-import { ensureNixosSharedHostStageBranch } from "./nixos-shared-host.fixture";
+import { ensureNixosSharedHostReviewedSourceRef } from "./nixos-shared-host.fixture";
 
 async function writeHelmValues(root: string, deploymentId: string, content: string): Promise<void> {
   const configPath = path.join(
@@ -42,7 +42,7 @@ test("deploy rejects protected/shared kubernetes service without publish secret_
     const fake = await installFakeKubernetesHelm(tmp);
     await writeServiceArtifact(artifactDir, "api-service\n");
     await installKubernetesTargets(tmp, [deployment]);
-    await ensureNixosSharedHostStageBranch(tmp, $, deployment as any);
+    await ensureNixosSharedHostReviewedSourceRef(tmp, $, deployment as any);
     await writeHelmValues(
       tmp,
       deployment.deploymentId,
@@ -102,7 +102,7 @@ async function exerciseExactArtifactRun(operationKind: ExactRunOperationKind): P
     await fsp.mkdir(storedArtifactPath, { recursive: true });
     await fsp.writeFile(path.join(storedArtifactPath, "marker"), "stored\n", "utf8");
     await installKubernetesTargets(tmp, [deployment]);
-    await ensureNixosSharedHostStageBranch(tmp, $, deployment as any);
+    await ensureNixosSharedHostReviewedSourceRef(tmp, $, deployment as any);
     await writeHelmValues(
       tmp,
       deployment.deploymentId,
@@ -129,7 +129,7 @@ async function exerciseExactArtifactRun(operationKind: ExactRunOperationKind): P
         deploymentId: deployment.deploymentId,
         admittedContext: {
           source: {
-            sourceRef: "env/pleomino/prod",
+            sourceRef: "refs/tags/release/prod",
             sourceRevision,
           },
           admittedSecretReferences: [],

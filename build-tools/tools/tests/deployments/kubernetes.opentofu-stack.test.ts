@@ -25,7 +25,7 @@ import {
   startControlPlaneHarness,
   withEnvOverrides,
 } from "./nixos-shared-host.control-plane.helpers";
-import { ensureNixosSharedHostStageBranch } from "./nixos-shared-host.fixture";
+import { ensureNixosSharedHostReviewedSourceRef } from "./nixos-shared-host.fixture";
 import {
   installFakeOpenTofu,
   reviewedOpenTofuSecretRequirements,
@@ -186,7 +186,7 @@ test("protected kubernetes provision-only records opentofu plan fingerprints", a
     const deployment = openTofuDeployment();
     await installKubernetesTargets(tmp, [deployment]);
     await writeOpenTofuStack(tmp, deployment, ["create"]);
-    await ensureNixosSharedHostStageBranch(tmp, $, deployment as any);
+    await ensureNixosSharedHostReviewedSourceRef(tmp, $, deployment as any);
     const evidence = await writeReviewedLaneAdmissionEvidenceJson({
       tmp,
       $,

@@ -44,6 +44,7 @@ import {
   cleanupReviewedSourceSnapshot,
   snapshotReviewedSourceForSubmission,
 } from "./nixos-shared-host-reviewed-source-snapshot";
+import { requestedReviewedSourceFromEvidence } from "./deployment-source-revision";
 
 function assertExpectedArtifactIdentities(
   snapshot: NixosSharedHostControlPlaneSnapshot,
@@ -114,6 +115,7 @@ export async function prepareBackendNixosSharedHostControlPlaneRun(opts: {
   const submissionId = opts.submissionId || createNixosSharedHostSubmissionId();
   const requestedBy =
     opts.requestedBy || opts.admissionEvidence?.requestedBy || defaultRequestedBy();
+  const requestedReviewedSource = requestedReviewedSourceFromEvidence(opts.admissionEvidence);
   const reviewedSourceSnapshot =
     opts.operationKind !== "explicit_removal"
       ? await snapshotReviewedSourceForSubmission({
@@ -122,6 +124,9 @@ export async function prepareBackendNixosSharedHostControlPlaneRun(opts: {
           submissionId,
           ...(opts.expectedSourceRevision
             ? { expectedSourceRevision: opts.expectedSourceRevision }
+            : {}),
+          ...(requestedReviewedSource?.ref
+            ? { requestedSourceRef: requestedReviewedSource.ref }
             : {}),
         })
       : undefined;

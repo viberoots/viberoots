@@ -17,7 +17,7 @@ import {
 } from "./cloudflare-pages.rebuild-per-stage.helpers";
 import { writeReviewedLaneAdmissionEvidenceJson } from "./deployment-lane-governance.fixture";
 import { writeDeploymentJson } from "./nixos-shared-host.reuse.e2e.helpers";
-import { ensureNixosSharedHostStageBranch } from "./nixos-shared-host.fixture";
+import { ensureNixosSharedHostReviewedSourceRef } from "./nixos-shared-host.fixture";
 
 test("cloudflare-pages rebuild-per-stage promotion rejects publish-only exact-artifact reuse", async () => {
   await runInTemp("cloudflare-pages-rebuild-per-stage-guardrail", async (tmp, $) => {
@@ -27,7 +27,7 @@ test("cloudflare-pages rebuild-per-stage promotion rejects publish-only exact-ar
     const staging = rebuildStagingDeployment();
     const stagingJson = path.join(tmp, "pleomino-rebuild-staging.json");
     await installCloudflarePagesTargets(tmp, [staging]);
-    await ensureNixosSharedHostStageBranch(tmp, $, staging);
+    await ensureNixosSharedHostReviewedSourceRef(tmp, $, staging);
     await writeDeploymentJson(stagingJson, staging);
     const stagingEvidenceJson = await writeReviewedLaneAdmissionEvidenceJson({
       tmp,
@@ -64,8 +64,8 @@ test("cloudflare-pages rebuild-per-stage promotion admits a new stage artifact b
       path.join(tmp, "projects", "deployments", "pleomino-rebuild-staging", "wrangler.jsonc"),
     );
     await installCloudflarePagesTargets(tmp, [sourceDeployment, staging]);
-    await ensureNixosSharedHostStageBranch(tmp, $, sourceDeployment);
-    await ensureNixosSharedHostStageBranch(tmp, $, staging);
+    await ensureNixosSharedHostReviewedSourceRef(tmp, $, sourceDeployment);
+    await ensureNixosSharedHostReviewedSourceRef(tmp, $, staging);
     await writeDeploymentJson(stagingJson, staging);
     const stagingEvidenceJson = await writeReviewedLaneAdmissionEvidenceJson({
       tmp,

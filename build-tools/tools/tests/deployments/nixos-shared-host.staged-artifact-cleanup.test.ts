@@ -18,7 +18,7 @@ import { createNixosSharedHostSubmissionId } from "../../deployments/nixos-share
 import { stagedUploadCompleteMarkerPath } from "../../deployments/nixos-shared-host-staged-artifact";
 import { runInTemp } from "../lib/test-helpers";
 import {
-  ensureNixosSharedHostStageBranch,
+  ensureNixosSharedHostReviewedSourceRef,
   nixosSharedHostDeploymentFixture,
 } from "./nixos-shared-host.fixture";
 import { reviewedLaneAdmissionEvidenceFixture } from "./deployment-lane-governance.fixture";
@@ -75,7 +75,7 @@ test("service removes rejected staged artifacts during challenge authorization f
       databaseUrl: localHarnessControlPlaneDatabaseUrl(paths.recordsRoot),
     };
     const artifactDir = await writeStagedArtifact(paths.hostRoot, "authz");
-    await ensureNixosSharedHostStageBranch(tmp, $, deployment);
+    await ensureNixosSharedHostReviewedSourceRef(tmp, $, deployment);
     const controlPlane = await startNixosSharedHostControlPlaneServer({
       workspaceRoot: tmp,
       paths,
@@ -113,7 +113,7 @@ test("service records redacted janitor metadata when rejected cleanup fails", as
       databaseUrl: localHarnessControlPlaneDatabaseUrl(paths.recordsRoot),
     };
     const artifactDir = await writeStagedArtifact(paths.hostRoot, "janitor-artifact");
-    await ensureNixosSharedHostStageBranch(tmp, $, deployment);
+    await ensureNixosSharedHostReviewedSourceRef(tmp, $, deployment);
     const controlPlane = await startNixosSharedHostControlPlaneServer({
       workspaceRoot: tmp,
       paths,

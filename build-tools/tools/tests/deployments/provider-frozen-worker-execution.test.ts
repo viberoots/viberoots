@@ -12,7 +12,7 @@ import { localHarnessControlPlaneDatabaseUrl } from "../../deployments/nixos-sha
 import { runInTemp } from "../lib/test-helpers";
 import { reviewedLaneAdmissionEvidenceFixture } from "./deployment-lane-governance.fixture";
 import { withEnvOverrides } from "./nixos-shared-host.control-plane.helpers";
-import { ensureNixosSharedHostStageBranch } from "./nixos-shared-host.fixture";
+import { ensureNixosSharedHostReviewedSourceRef } from "./nixos-shared-host.fixture";
 import { installFakeS3StaticAwsCli } from "./s3-static.fake-aws";
 import { s3StaticDeploymentFixture } from "./s3-static.fixture";
 import { startS3StaticPublicServer } from "./s3-static.public-server";
@@ -84,7 +84,7 @@ test("s3-static worker deploy and retry execute from frozen snapshots", async ()
     const recordsRoot = path.join(tmp, "records");
     const deployment = s3StaticDeploymentFixture();
     const fake = await installFakeS3StaticAwsCli(tmp);
-    await ensureNixosSharedHostStageBranch(tmp, $, deployment as any);
+    await ensureNixosSharedHostReviewedSourceRef(tmp, $, deployment as any);
     await writeS3Config(tmp);
     const server = await startS3StaticPublicServer({
       deployment,

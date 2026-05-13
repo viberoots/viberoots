@@ -9,7 +9,7 @@ import { reviewedLaneAdmissionEvidenceFixture } from "./deployment-lane-governan
 import { writeDemoArtifact } from "./nixos-shared-host.control-plane.helpers";
 import {
   deploymentSourceRef,
-  ensureNixosSharedHostStageBranch,
+  ensureNixosSharedHostReviewedSourceRef,
   nixosSharedHostDeploymentFixture,
 } from "./nixos-shared-host.fixture";
 import { runInTemp } from "../lib/test-helpers";
@@ -24,7 +24,7 @@ test("github reviewed-source snapshots fetch the declared repository over SSH", 
     const artifactDir = path.join(tmp, "artifact");
     const recordsRoot = path.join(tmp, "records");
     await writeDemoArtifact(artifactDir);
-    await ensureNixosSharedHostStageBranch(tmp, $, deployment);
+    await ensureNixosSharedHostReviewedSourceRef(tmp, $, deployment);
     const sourceRef = deploymentSourceRef(deployment);
     const expectedRevision = await gitStdout(tmp, $, "rev-parse", sourceRef);
     await $({ cwd: tmp, stdio: "pipe" })`git remote set-url origin ${path.join(tmp, "wrong.git")}`;

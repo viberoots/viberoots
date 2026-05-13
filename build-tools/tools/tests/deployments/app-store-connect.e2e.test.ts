@@ -13,7 +13,7 @@ import {
 } from "./app-store-connect.e2e.helpers";
 import { mobileReviewedLanePolicy, writeMobileArtifact } from "./mobile-release.e2e.helpers";
 import { writeDeploymentJson } from "./nixos-shared-host.reuse.e2e.helpers";
-import { ensureNixosSharedHostStageBranch } from "./nixos-shared-host.fixture";
+import { ensureNixosSharedHostReviewedSourceRef } from "./nixos-shared-host.fixture";
 
 test("app-store-connect deploy and promotion preserve release-health evidence", async () => {
   await runInTemp("app-store-connect-promotion", async (tmp, $) => {
@@ -59,8 +59,8 @@ test("app-store-connect deploy and promotion preserve release-health evidence", 
     await installAppStoreConnectTargets(tmp, [dev, staging]);
     await writeDeploymentJson(devJson, dev);
     await writeDeploymentJson(stagingJson, staging);
-    await ensureNixosSharedHostStageBranch(tmp, $, dev);
-    await ensureNixosSharedHostStageBranch(tmp, $, staging);
+    await ensureNixosSharedHostReviewedSourceRef(tmp, $, dev);
+    await ensureNixosSharedHostReviewedSourceRef(tmp, $, staging);
     const devEvidenceJson = await writeReviewedLaneAdmissionEvidenceJson({
       tmp,
       $,
@@ -126,7 +126,7 @@ test("app-store-connect rollback reuses a prior successful exact artifact", asyn
     await writeAppStoreConnectConfig(tmp, staging);
     await installAppStoreConnectTargets(tmp, [staging]);
     await writeDeploymentJson(stagingJson, staging);
-    await ensureNixosSharedHostStageBranch(tmp, $, staging);
+    await ensureNixosSharedHostReviewedSourceRef(tmp, $, staging);
     const stagingEvidenceJson = await writeReviewedLaneAdmissionEvidenceJson({
       tmp,
       $,

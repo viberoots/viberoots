@@ -14,7 +14,7 @@ import {
 } from "./deployment-reviewed-target-environment";
 
 export type CloudflarePagesSourceAdmission = {
-  mode: "stage_branch_head" | "source_run_reuse" | "promotion_source_run";
+  mode: "reviewed_source_ref" | "source_run_reuse" | "promotion_source_run";
   sourceRef: string;
   sourceRevision: string;
   artifactIdentity: string;
@@ -24,7 +24,7 @@ export type CloudflarePagesSourceAdmission = {
 };
 
 export type CloudflarePagesTargetEnvironmentAdmission = {
-  mode: "stage_branch_snapshot";
+  mode: "reviewed_source_snapshot";
   targetRef: string;
   targetRevision: string;
   providerTargetIdentity: string;
@@ -100,12 +100,14 @@ async function targetEnvironmentAdmission(
   deployment: CloudflarePagesDeployment,
   submissionId?: string,
   expectedSourceRevision?: string,
+  requestedSourceRef?: string,
 ): Promise<CloudflarePagesTargetEnvironmentAdmission> {
   return await resolveDeploymentReviewedTargetEnvironment({
     workspaceRoot,
     deployment,
     ...(submissionId ? { submissionId } : {}),
     ...(expectedSourceRevision ? { expectedSourceRevision } : {}),
+    ...(requestedSourceRef ? { requestedSourceRef } : {}),
   });
 }
 
@@ -115,6 +117,7 @@ export async function resolveInitialCloudflarePagesAdmittedContext(opts: {
   artifactIdentity: string;
   submissionId?: string;
   expectedSourceRevision?: string;
+  requestedSourceRef?: string;
   secretContext?: DeploymentSecretContext;
   deferSecretReferenceResolution?: boolean;
 }): Promise<CloudflarePagesAdmittedContext> {
@@ -123,11 +126,12 @@ export async function resolveInitialCloudflarePagesAdmittedContext(opts: {
     opts.deployment,
     opts.submissionId,
     opts.expectedSourceRevision,
+    opts.requestedSourceRef,
   );
   return {
     ...(await baseContext(opts.deployment, target.lockScope, undefined, opts)),
     source: {
-      mode: "stage_branch_head",
+      mode: "reviewed_source_ref",
       sourceRef: target.targetRef,
       sourceRevision: target.targetRevision,
       artifactIdentity: opts.artifactIdentity,

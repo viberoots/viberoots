@@ -7,7 +7,6 @@ import { runInTemp } from "../lib/test-helpers";
 test("deploy --admit-only prints scoped admission evidence without deploying", async () => {
   await runInTemp("deploy-admit-only-evidence", async (tmp, $) => {
     await writeTempListedDeploymentWorkspace(tmp);
-    await $({ cwd: tmp, stdio: "pipe" })`git branch -f env/demo/dev HEAD`;
     const head = String((await $({ cwd: tmp, stdio: "pipe" })`git rev-parse HEAD`).stdout).trim();
     const result = await $({
       cwd: tmp,

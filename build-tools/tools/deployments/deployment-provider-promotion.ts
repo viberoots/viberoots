@@ -1,6 +1,6 @@
 #!/usr/bin/env zx-wrapper
 import type { DeploymentTarget } from "./contract";
-import { requiredDeploymentStageBranch } from "./contract";
+import { requiredDeploymentSourceRef } from "./contract";
 import {
   exactArtifactPromotionErrors,
   promotionCompatibilityErrors,
@@ -20,7 +20,7 @@ export async function assertCrossDeploymentExactPromotionEligible(opts: {
     };
   };
 }) {
-  const targetRef = requiredDeploymentStageBranch(opts.deployment);
+  const targetRef = requiredDeploymentSourceRef(opts.deployment);
   const errors = [...promotionCompatibilityErrors(opts.deployment, opts.source)];
   if (!sourceRefAllowed(targetRef, opts.deployment.admissionPolicy.allowedRefs)) {
     errors.push(

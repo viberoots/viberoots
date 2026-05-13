@@ -8,7 +8,7 @@ import { runInTemp } from "../lib/test-helpers";
 import { installKubernetesTargets, kubernetesDeploymentFixture } from "./kubernetes.fixture";
 import { writeServiceArtifact } from "./kubernetes.service-artifact.fixture";
 import {
-  ensureNixosSharedHostStageBranch,
+  ensureNixosSharedHostReviewedSourceRef,
   nixosSharedHostAdmissionPolicyFixture,
 } from "./nixos-shared-host.fixture";
 
@@ -76,7 +76,7 @@ test("service-backed kubernetes deploy fails closed when client source differs f
     const artifactDir = path.join(tmp, "artifact");
     await writeServiceArtifact(artifactDir, "source-mismatch\n");
     await installKubernetesTargets(tmp, [deployment]);
-    await ensureNixosSharedHostStageBranch(tmp, $, deployment as any);
+    await ensureNixosSharedHostReviewedSourceRef(tmp, $, deployment as any);
     await writeValues(tmp, deployment.deploymentId);
     const serviceRevision = await gitStdout(tmp, $, "rev-parse", "HEAD");
     const clientRevision = await commitLocalChange(tmp, $, "client-drift");

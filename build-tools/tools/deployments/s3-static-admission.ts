@@ -28,14 +28,14 @@ export type S3StaticAdmittedContext = {
   targetExceptionRefs: string[];
   policyEvaluation?: DeploymentAdmissionPolicyEvaluation;
   source: {
-    mode: "stage_branch_head";
+    mode: "reviewed_source_ref";
     sourceRef: string;
     sourceRevision: string;
     artifactIdentity: string;
     artifactTrustMode: "recorded_exact_artifact";
   };
   targetEnvironment: {
-    mode: "stage_branch_snapshot";
+    mode: "reviewed_source_snapshot";
     targetRef: string;
     targetRevision: string;
     providerTargetIdentity: string;
@@ -49,6 +49,7 @@ export async function resolveInitialS3StaticAdmittedContext(opts: {
   artifactIdentity: string;
   submissionId?: string;
   expectedSourceRevision?: string;
+  requestedSourceRef?: string;
 }): Promise<S3StaticAdmittedContext> {
   const target = await resolveDeploymentReviewedTargetEnvironment(opts);
   return {
@@ -69,7 +70,7 @@ export async function resolveInitialS3StaticAdmittedContext(opts: {
     },
     targetExceptionRefs: opts.deployment.targetExceptions.map((entry) => entry.ref).sort(),
     source: {
-      mode: "stage_branch_head",
+      mode: "reviewed_source_ref",
       sourceRef: target.targetRef,
       sourceRevision: target.targetRevision,
       artifactIdentity: opts.artifactIdentity,
@@ -86,12 +87,13 @@ export async function resolvePromotionS3StaticAdmittedContext(opts: {
   sourceRecord: { deployRunId: string; deploymentId: string };
   submissionId?: string;
   expectedSourceRevision?: string;
+  requestedSourceRef?: string;
 }): Promise<S3StaticAdmittedContext> {
   const admitted = await resolveInitialS3StaticAdmittedContext(opts);
   return {
     ...admitted,
     source: {
-      mode: "stage_branch_head",
+      mode: "reviewed_source_ref",
       sourceRef: admitted.targetEnvironment.targetRef,
       sourceRevision: admitted.targetEnvironment.targetRevision,
       artifactIdentity: opts.artifactIdentity,
@@ -121,6 +123,7 @@ export async function resolveSourceRunS3StaticAdmittedContext(opts: {
   };
   submissionId?: string;
   expectedSourceRevision?: string;
+  requestedSourceRef?: string;
 }): Promise<S3StaticAdmittedContext> {
   const admitted = await resolveInitialS3StaticAdmittedContext(opts);
   const source = opts.sourceRecord.admittedContext?.source;
@@ -135,7 +138,7 @@ export async function resolveSourceRunS3StaticAdmittedContext(opts: {
       targetScope: admitted.targetEnvironment.lockScope,
     }),
     source: {
-      mode: "stage_branch_head",
+      mode: "reviewed_source_ref",
       sourceRef: source.sourceRef,
       sourceRevision: source.sourceRevision,
       artifactIdentity: opts.artifactIdentity,

@@ -57,10 +57,16 @@ export type DeploymentCompatibilityExceptionEvidence = {
   expiresAt: string;
 };
 
+export type DeploymentReviewedSourceEvidence = {
+  ref: string;
+  revision?: string;
+};
+
 export type DeploymentAdmissionEvidence = {
   accessMode?: DeploymentAdmissionAccessMode;
   requestedBy?: DeploymentPrincipal;
   submittedBy?: DeploymentPrincipal;
+  reviewedSource?: DeploymentReviewedSourceEvidence;
   checks?: DeploymentCheckEvidence[];
   approvals?: DeploymentApprovalEvidence[];
   prerequisiteHealth?: DeploymentHealthEvidence[];

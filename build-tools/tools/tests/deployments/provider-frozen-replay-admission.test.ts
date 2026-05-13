@@ -16,7 +16,7 @@ function admittedContext(fingerprint = "sha256:source") {
   return {
     policyEvaluation: policy(fingerprint),
     source: {
-      sourceRef: "env/pleomino/staging",
+      sourceRef: "main",
       sourceRevision: "rev-1",
       artifactIdentity: "artifact:source",
     },
@@ -63,7 +63,7 @@ function workerSnapshot(patch: Record<string, unknown> = {}) {
 test("frozen replay admission rejects deficient source records", () => {
   for (const admittedContextPatch of [
     { admittedSecretReferences: undefined },
-    { source: { sourceRef: "env/pleomino/staging" } },
+    { source: { sourceRef: "main" } },
   ]) {
     assert.throws(
       () =>

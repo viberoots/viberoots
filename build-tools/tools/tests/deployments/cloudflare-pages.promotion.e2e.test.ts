@@ -20,7 +20,7 @@ import {
 import { writeReviewedLaneAdmissionEvidenceJson } from "./deployment-lane-governance.fixture";
 import { startCloudflarePagesPublicServer } from "./cloudflare-pages.public-server";
 import {
-  ensureNixosSharedHostStageBranch,
+  ensureNixosSharedHostReviewedSourceRef,
   installNixosSharedHostTargets,
 } from "./nixos-shared-host.fixture";
 import {
@@ -54,9 +54,9 @@ test("cloudflare-pages allows reviewed cross-provider same-artifact promotion on
     );
     await installNixosSharedHostTargets(tmp, [dev]);
     await installCloudflarePagesTargets(tmp, [staging, prod]);
-    await ensureNixosSharedHostStageBranch(tmp, $, dev);
-    await ensureNixosSharedHostStageBranch(tmp, $, staging);
-    await ensureNixosSharedHostStageBranch(tmp, $, prod);
+    await ensureNixosSharedHostReviewedSourceRef(tmp, $, dev);
+    await ensureNixosSharedHostReviewedSourceRef(tmp, $, staging);
+    await ensureNixosSharedHostReviewedSourceRef(tmp, $, prod);
     await writeDeploymentJson(devJson, dev);
     await writeDeploymentJson(stagingJson, staging);
     await writeDeploymentJson(prodJson, prod);
@@ -135,8 +135,8 @@ test("cloudflare-pages promotion fails closed when staging smoke blocks the prom
     );
     await installNixosSharedHostTargets(tmp, [dev]);
     await installCloudflarePagesTargets(tmp, [staging]);
-    await ensureNixosSharedHostStageBranch(tmp, $, dev);
-    await ensureNixosSharedHostStageBranch(tmp, $, staging);
+    await ensureNixosSharedHostReviewedSourceRef(tmp, $, dev);
+    await ensureNixosSharedHostReviewedSourceRef(tmp, $, staging);
     await writeDeploymentJson(devJson, dev);
     const devEvidenceJson = await writeReviewedLaneAdmissionEvidenceJson({
       tmp,

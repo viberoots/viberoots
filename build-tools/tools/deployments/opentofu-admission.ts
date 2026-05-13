@@ -25,14 +25,14 @@ export type OpenTofuAdmittedContext = {
   targetExceptionRefs: string[];
   policyEvaluation?: DeploymentAdmissionPolicyEvaluation;
   source: {
-    mode: "stage_branch_head";
+    mode: "reviewed_source_ref";
     sourceRef: string;
     sourceRevision: string;
     artifactIdentity: string;
     artifactTrustMode: "recorded_exact_artifact";
   };
   targetEnvironment: {
-    mode: "stage_branch_snapshot";
+    mode: "reviewed_source_snapshot";
     targetRef: string;
     targetRevision: string;
     providerTargetIdentity: string;
@@ -46,6 +46,7 @@ export async function resolveInitialOpenTofuAdmittedContext(opts: {
   artifactIdentity: string;
   submissionId?: string;
   expectedSourceRevision?: string;
+  requestedSourceRef?: string;
 }): Promise<OpenTofuAdmittedContext> {
   const target = await resolveDeploymentReviewedTargetEnvironment(opts);
   return {
@@ -66,7 +67,7 @@ export async function resolveInitialOpenTofuAdmittedContext(opts: {
     },
     targetExceptionRefs: opts.deployment.targetExceptions.map((entry) => entry.ref).sort(),
     source: {
-      mode: "stage_branch_head",
+      mode: "reviewed_source_ref",
       sourceRef: target.targetRef,
       sourceRevision: target.targetRevision,
       artifactIdentity: opts.artifactIdentity,

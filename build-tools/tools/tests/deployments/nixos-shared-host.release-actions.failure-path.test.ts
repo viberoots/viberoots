@@ -11,7 +11,7 @@ import { submitNixosSharedHostControlPlaneRun } from "../../deployments/nixos-sh
 import { submitNixosSharedHostPublishOnlyRun } from "../../deployments/nixos-shared-host-publish-only";
 import { runInTemp } from "../lib/test-helpers";
 import { deploymentAdmissionEvidenceFixture } from "./deployment-admission.fixture";
-import { ensureNixosSharedHostStageBranch } from "./nixos-shared-host.fixture";
+import { ensureNixosSharedHostReviewedSourceRef } from "./nixos-shared-host.fixture";
 import { writeDemoArtifact } from "./nixos-shared-host.control-plane.helpers";
 import { startNixosSharedHostPublicServer } from "./nixos-shared-host.public-server";
 import {
@@ -27,7 +27,7 @@ test("nixos-shared-host success path skips failure_only release actions", async 
     const hostRoot = path.join(tmp, "host");
     const recordsRoot = path.join(tmp, "records");
     await writeDemoArtifact(artifactDir);
-    await ensureNixosSharedHostStageBranch(tmp, $, deployment);
+    await ensureNixosSharedHostReviewedSourceRef(tmp, $, deployment);
     const server = await startNixosSharedHostPublicServer({ deployment, hostRoot });
     try {
       const result = await submitNixosSharedHostControlPlaneRun({
@@ -74,7 +74,7 @@ test("nixos-shared-host publish failure runs failure_only release actions and ke
     const recordsRoot = path.join(tmp, "records");
     const backendDatabaseUrl = localHarnessControlPlaneDatabaseUrl(recordsRoot);
     await writeDemoArtifact(artifactDir);
-    await ensureNixosSharedHostStageBranch(tmp, $, deployment);
+    await ensureNixosSharedHostReviewedSourceRef(tmp, $, deployment);
     const sourceServer = await startNixosSharedHostPublicServer({ deployment, hostRoot });
     try {
       const source = await submitNixosSharedHostControlPlaneRun({
@@ -146,7 +146,7 @@ test("nixos-shared-host smoke failure runs failure_only post_smoke actions and p
     const recordsRoot = path.join(tmp, "records");
     await writeDemoArtifact(artifactDir, "expected");
     await writeDemoArtifact(wrongRoot, "wrong");
-    await ensureNixosSharedHostStageBranch(tmp, $, deployment);
+    await ensureNixosSharedHostReviewedSourceRef(tmp, $, deployment);
     const server = await startNixosSharedHostPublicServer({ deployment, fixedRoot: wrongRoot });
     try {
       await assert.rejects(

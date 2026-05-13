@@ -7,7 +7,7 @@ import { nixosSharedHostContainerRoot } from "../../deployments/nixos-shared-hos
 import { runInTemp } from "../lib/test-helpers";
 import { writeReviewedLaneAdmissionEvidenceJson } from "./deployment-lane-governance.fixture";
 import {
-  ensureNixosSharedHostStageBranch,
+  ensureNixosSharedHostReviewedSourceRef,
   nixosSharedHostDeploymentFixture,
 } from "./nixos-shared-host.fixture";
 import {
@@ -86,7 +86,7 @@ test("nixos-shared-host multi-component deploy publishes components in rollout o
     const apiArtifact = path.join(tmp, "artifacts", "api");
     await writeArtifact(frontendArtifact, "frontend");
     await writeArtifact(apiArtifact, "api");
-    await ensureNixosSharedHostStageBranch(tmp, $, deployment);
+    await ensureNixosSharedHostReviewedSourceRef(tmp, $, deployment);
     await fsp.writeFile(deploymentJson, JSON.stringify(deployment, null, 2) + "\n", "utf8");
     const admissionEvidenceJson = await writeReviewedLaneAdmissionEvidenceJson({
       tmp,
@@ -196,7 +196,7 @@ test("nixos-shared-host multi-component deploy stops after the first publish fai
     const apiArtifact = path.join(tmp, "artifacts", "api");
     await writeArtifact(frontendArtifact, "frontend");
     await fsp.mkdir(apiArtifact, { recursive: true });
-    await ensureNixosSharedHostStageBranch(tmp, $, deployment);
+    await ensureNixosSharedHostReviewedSourceRef(tmp, $, deployment);
     await fsp.writeFile(deploymentJson, JSON.stringify(deployment, null, 2) + "\n", "utf8");
     const admissionEvidenceJson = await writeReviewedLaneAdmissionEvidenceJson({
       tmp,

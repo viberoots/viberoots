@@ -6,7 +6,7 @@ import { test } from "node:test";
 import { submitNixosSharedHostControlPlaneRun } from "../../deployments/nixos-shared-host-control-plane";
 import { runInTemp } from "../lib/test-helpers";
 import {
-  ensureNixosSharedHostStageBranch,
+  ensureNixosSharedHostReviewedSourceRef,
   nixosSharedHostDeploymentFixture,
 } from "./nixos-shared-host.fixture";
 import { reviewedLaneAdmissionEvidenceFixture } from "./deployment-lane-governance.fixture";
@@ -29,7 +29,7 @@ test("nixos-shared-host deploy records smoke failure when the public health path
     const hostRoot = path.join(tmp, "host");
     const recordsRoot = path.join(tmp, "records");
     await writeArtifact(artifactDir, { "index.html": "<html>ok</html>\n" });
-    await ensureNixosSharedHostStageBranch(tmp, $, deployment);
+    await ensureNixosSharedHostReviewedSourceRef(tmp, $, deployment);
     const server = await startNixosSharedHostPublicServer({ deployment, hostRoot });
     try {
       await assert.rejects(
@@ -78,7 +78,7 @@ test("nixos-shared-host deploy rejects a reachable hostname serving the wrong ar
     const fixedRoot = path.join(tmp, "wrong-public-root");
     await writeArtifact(artifactDir, { "index.html": "<html>expected</html>\n" });
     await writeArtifact(fixedRoot, { "index.html": "<html>wrong</html>\n" });
-    await ensureNixosSharedHostStageBranch(tmp, $, deployment);
+    await ensureNixosSharedHostReviewedSourceRef(tmp, $, deployment);
     const server = await startNixosSharedHostPublicServer({ deployment, fixedRoot });
     try {
       await assert.rejects(

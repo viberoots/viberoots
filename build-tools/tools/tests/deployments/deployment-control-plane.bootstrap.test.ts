@@ -15,7 +15,7 @@ import {
   bootstrapDeploymentFixture,
 } from "./deployment-control-plane.bootstrap.helpers";
 import {
-  ensureNixosSharedHostStageBranch,
+  ensureNixosSharedHostReviewedSourceRef,
   nixosSharedHostDeploymentFixture,
 } from "./nixos-shared-host.fixture";
 import { startNixosSharedHostPublicServer } from "./nixos-shared-host.public-server";
@@ -23,7 +23,7 @@ import { startNixosSharedHostPublicServer } from "./nixos-shared-host.public-ser
 test("deployment control-plane bootstrap flows", async (t) => {
   await runInTemp("deployment-control-plane-bootstrap", async (tmp, $) => {
     const deployment = bootstrapDeploymentFixture();
-    await ensureNixosSharedHostStageBranch(tmp, $, deployment);
+    await ensureNixosSharedHostReviewedSourceRef(tmp, $, deployment);
 
     await t.test(
       "rejects non-bootstrap targets, ordinary authority, and missing proofs",

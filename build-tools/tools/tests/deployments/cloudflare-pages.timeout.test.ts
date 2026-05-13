@@ -14,7 +14,7 @@ import {
   installCloudflarePagesTargets,
 } from "./cloudflare-pages.fixture";
 import { installFakeCloudflarePagesWrangler } from "./cloudflare-pages.fake-wrangler";
-import { ensureNixosSharedHostStageBranch } from "./nixos-shared-host.fixture";
+import { ensureNixosSharedHostReviewedSourceRef } from "./nixos-shared-host.fixture";
 import {
   writeCloudflareServiceArtifact,
   writeWranglerConfig,
@@ -72,7 +72,7 @@ test("cloudflare-pages publish timeout records the failed step and reports progr
       path.join(tmp, "projects", "deployments", "pleomino-staging", "wrangler.jsonc"),
     );
     await installCloudflarePagesTargets(tmp, [deployment]);
-    await ensureNixosSharedHostStageBranch(tmp, $, deployment);
+    await ensureNixosSharedHostReviewedSourceRef(tmp, $, deployment);
     const artifact = await admitStaticWebappArtifact({
       recordsRoot,
       artifactDir,

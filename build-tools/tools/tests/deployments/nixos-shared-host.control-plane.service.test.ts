@@ -15,7 +15,7 @@ import {
 } from "./deployment-lane-governance.fixture";
 import { startNixosSharedHostPublicServer } from "./nixos-shared-host.public-server";
 import {
-  ensureNixosSharedHostStageBranch,
+  ensureNixosSharedHostReviewedSourceRef,
   nixosSharedHostDeploymentFixture,
 } from "./nixos-shared-host.fixture";
 import {
@@ -42,7 +42,7 @@ test("control-plane service persists queued submissions across restart and a sep
     };
     const backendDatabaseUrl = localHarnessControlPlaneDatabaseUrl(paths.recordsRoot);
     await writeDemoArtifact(artifactDir);
-    await ensureNixosSharedHostStageBranch(tmp, $, deployment);
+    await ensureNixosSharedHostReviewedSourceRef(tmp, $, deployment);
     const server = await startNixosSharedHostPublicServer({ deployment, hostRoot: paths.hostRoot });
     const controlPlane = await startNixosSharedHostControlPlaneServer({
       workspaceRoot: tmp,
@@ -144,7 +144,7 @@ test("control-plane run-action API cancels a queued submission and keeps the sta
     };
     const backendDatabaseUrl = localHarnessControlPlaneDatabaseUrl(paths.recordsRoot);
     await writeDemoArtifact(artifactDir);
-    await ensureNixosSharedHostStageBranch(tmp, $, deployment);
+    await ensureNixosSharedHostReviewedSourceRef(tmp, $, deployment);
     const controlPlane = await startNixosSharedHostControlPlaneServer({
       workspaceRoot: tmp,
       paths,
@@ -196,7 +196,7 @@ test("repo-level deploy submits shared-host mutation through the configured cont
     await writeTempListedDeploymentWorkspace(tmp);
     await writeDemoArtifact(artifactDir);
     const deployment = await resolveDeploymentFromTarget(tmp, deploymentLabel);
-    await ensureNixosSharedHostStageBranch(tmp, $, deployment as any);
+    await ensureNixosSharedHostReviewedSourceRef(tmp, $, deployment as any);
     const admissionEvidenceJson = await writeReviewedLaneAdmissionEvidenceJson({
       tmp,
       $,

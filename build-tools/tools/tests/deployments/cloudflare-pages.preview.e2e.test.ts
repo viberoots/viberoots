@@ -17,7 +17,7 @@ import {
 import { installFakeCloudflarePagesWrangler } from "./cloudflare-pages.fake-wrangler";
 import { startCloudflarePagesPublicServer } from "./cloudflare-pages.public-server";
 import { writeReviewedLaneAdmissionEvidenceJson } from "./deployment-lane-governance.fixture";
-import { ensureNixosSharedHostStageBranch } from "./nixos-shared-host.fixture";
+import { ensureNixosSharedHostReviewedSourceRef } from "./nixos-shared-host.fixture";
 import { runInTemp } from "../lib/test-helpers";
 
 async function writeArtifact(root: string, html: string): Promise<void> {
@@ -86,7 +86,7 @@ test("cloudflare-pages preview publish and explicit preview cleanup run end to e
       path.join(tmp, "projects", "deployments", "pleomino-staging", "wrangler.jsonc"),
     );
     await installCloudflarePagesTargets(tmp, [deployment]);
-    await ensureNixosSharedHostStageBranch(tmp, $, deployment);
+    await ensureNixosSharedHostReviewedSourceRef(tmp, $, deployment);
     await writeDeploymentJson(deploymentJson, deployment);
     const admissionEvidenceJson = await writeReviewedLaneAdmissionEvidenceJson({
       tmp,

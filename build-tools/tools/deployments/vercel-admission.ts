@@ -28,7 +28,7 @@ export type VercelAdmittedContext = {
   targetExceptionRefs: string[];
   policyEvaluation?: DeploymentAdmissionPolicyEvaluation;
   source: {
-    mode: "stage_branch_head";
+    mode: "reviewed_source_ref";
     sourceRef: string;
     sourceRevision: string;
     artifactIdentity: string;
@@ -36,7 +36,7 @@ export type VercelAdmittedContext = {
     sourceRunId?: string;
   };
   targetEnvironment: {
-    mode: "stage_branch_snapshot";
+    mode: "reviewed_source_snapshot";
     targetRef: string;
     targetRevision: string;
     providerTargetIdentity: string;
@@ -50,6 +50,7 @@ export async function resolveInitialVercelAdmittedContext(opts: {
   artifactIdentity: string;
   sourceRunId?: string;
   expectedSourceRevision?: string;
+  requestedSourceRef?: string;
 }): Promise<VercelAdmittedContext> {
   const target = await resolveDeploymentReviewedTargetEnvironment(opts);
   const admittedSecretReferences = await resolveInitialAdmittedSecretReferences({
@@ -87,7 +88,7 @@ function vercelAdmittedContext(opts: {
     },
     targetExceptionRefs: opts.deployment.targetExceptions.map((entry) => entry.ref).sort(),
     source: {
-      mode: "stage_branch_head",
+      mode: "reviewed_source_ref",
       sourceRef: opts.target.targetRef,
       sourceRevision: opts.target.targetRevision,
       artifactIdentity: opts.artifactIdentity,
@@ -104,6 +105,7 @@ export async function resolveSourceRunVercelAdmittedContext(opts: {
   artifactIdentity: string;
   sourceRecord: { deployRunId: string; admittedContext?: any };
   expectedSourceRevision?: string;
+  requestedSourceRef?: string;
 }): Promise<VercelAdmittedContext> {
   const source = opts.sourceRecord.admittedContext?.source;
   if (!source?.sourceRef || !source?.sourceRevision) {
@@ -113,6 +115,7 @@ export async function resolveSourceRunVercelAdmittedContext(opts: {
     workspaceRoot: opts.workspaceRoot,
     deployment: opts.deployment,
     ...(opts.expectedSourceRevision ? { expectedSourceRevision: opts.expectedSourceRevision } : {}),
+    ...(opts.requestedSourceRef ? { requestedSourceRef: opts.requestedSourceRef } : {}),
   });
   const admittedSecretReferences = await resolveSourceRunAdmittedSecretReferences({
     sourceAdmittedContext: opts.sourceRecord.admittedContext,

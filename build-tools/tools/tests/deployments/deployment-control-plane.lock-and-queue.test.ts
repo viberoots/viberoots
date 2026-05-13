@@ -7,7 +7,7 @@ import { acquireControlPlaneLock } from "../../deployments/nixos-shared-host-con
 import { submitNixosSharedHostControlPlaneRun } from "../../deployments/nixos-shared-host-control-plane";
 import { runInTemp } from "../lib/test-helpers";
 import {
-  ensureNixosSharedHostStageBranch,
+  ensureNixosSharedHostReviewedSourceRef,
   nixosSharedHostDeploymentFixture,
 } from "./nixos-shared-host.fixture";
 import {
@@ -109,7 +109,7 @@ test(
           const hostRoot = path.join(tmp, "host");
           const recordsRoot = path.join(tmp, "records");
           await writeDemoArtifact(artifactDir);
-          await ensureNixosSharedHostStageBranch(tmp, $, deployment);
+          await ensureNixosSharedHostReviewedSourceRef(tmp, $, deployment);
           const server = await startNixosSharedHostPublicServer({ deployment, hostRoot });
           const blocker = await acquireControlPlaneLock(
             recordsRoot,
@@ -197,7 +197,7 @@ test(
           const artifactDir = path.join(tmp, "artifact");
           const recordsRoot = path.join(tmp, "records");
           await writeDemoArtifact(artifactDir);
-          await ensureNixosSharedHostStageBranch(tmp, $, deployment);
+          await ensureNixosSharedHostReviewedSourceRef(tmp, $, deployment);
           const blocker = await acquireControlPlaneLock(
             recordsRoot,
             deployment.providerTarget.deploymentTargetIdentity,
@@ -221,7 +221,7 @@ test(
               cwd: tmp,
               stdio: "pipe",
             })`git -c user.name=Test -c user.email=test@example.com commit --allow-empty -m queued-drift`;
-            await ensureNixosSharedHostStageBranch(tmp, $, deployment);
+            await ensureNixosSharedHostReviewedSourceRef(tmp, $, deployment);
             await blocker.release();
             await assert.rejects(run, (error: any) => {
               assert.equal(error.submission.terminationReason, "no_longer_admitted");

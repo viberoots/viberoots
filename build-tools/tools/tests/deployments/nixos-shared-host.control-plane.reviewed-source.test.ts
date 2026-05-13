@@ -14,7 +14,7 @@ import { smokeConnectOverride, writeDemoArtifact } from "./nixos-shared-host.con
 import { reviewedLaneAdmissionEvidenceFixture } from "./deployment-lane-governance.fixture";
 import {
   deploymentSourceRef,
-  ensureNixosSharedHostStageBranch,
+  ensureNixosSharedHostReviewedSourceRef,
   nixosSharedHostDeploymentFixture,
 } from "./nixos-shared-host.fixture";
 import { startNixosSharedHostPublicServer } from "./nixos-shared-host.public-server";
@@ -44,7 +44,7 @@ test("backend snapshots the reviewed ref from the remote instead of ambient loca
     const deployment = nixosSharedHostDeploymentFixture();
     const artifactDir = path.join(tmp, "artifact");
     await writeDemoArtifact(artifactDir);
-    await ensureNixosSharedHostStageBranch(tmp, $, deployment);
+    await ensureNixosSharedHostReviewedSourceRef(tmp, $, deployment);
     await $({
       cwd: tmp,
       stdio: "pipe",
@@ -95,7 +95,7 @@ test("service-backed deploy fails closed when the client and service disagree on
     const paths = submissionPaths(tmp);
     const artifactDir = path.join(tmp, "artifact");
     await writeDemoArtifact(artifactDir);
-    await ensureNixosSharedHostStageBranch(tmp, $, deployment);
+    await ensureNixosSharedHostReviewedSourceRef(tmp, $, deployment);
     const sourceRef = deploymentSourceRef(deployment);
     const serviceRevision = await gitStdout(tmp, $, "rev-parse", sourceRef);
     await commitLocalChange(tmp, $, "client-drift");
@@ -138,7 +138,7 @@ test("same-ref submissions snapshot different reviewed commits without clobberin
     const artifactDir = path.join(tmp, "artifact");
     const paths = submissionPaths(tmp);
     await writeDemoArtifact(artifactDir);
-    await ensureNixosSharedHostStageBranch(tmp, $, deployment);
+    await ensureNixosSharedHostReviewedSourceRef(tmp, $, deployment);
     const sourceRef = deploymentSourceRef(deployment);
     const firstRevision = await gitStdout(tmp, $, "rev-parse", sourceRef);
     const first = await prepareBackendNixosSharedHostControlPlaneRun({
@@ -158,7 +158,7 @@ test("same-ref submissions snapshot different reviewed commits without clobberin
     const server = await startNixosSharedHostPublicServer({ deployment, hostRoot: paths.hostRoot });
     try {
       await commitLocalChange(tmp, $, "remote-advance");
-      await ensureNixosSharedHostStageBranch(tmp, $, deployment);
+      await ensureNixosSharedHostReviewedSourceRef(tmp, $, deployment);
       const secondRevision = await gitStdout(tmp, $, "rev-parse", sourceRef);
       const second = await prepareBackendNixosSharedHostControlPlaneRun({
         workspaceRoot: tmp,

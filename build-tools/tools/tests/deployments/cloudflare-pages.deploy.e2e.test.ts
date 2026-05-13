@@ -16,7 +16,7 @@ import {
 } from "./deployment-lane-governance.fixture";
 import { installFakeCloudflarePagesWrangler } from "./cloudflare-pages.fake-wrangler";
 import { startCloudflarePagesPublicServer } from "./cloudflare-pages.public-server";
-import { ensureNixosSharedHostStageBranch } from "./nixos-shared-host.fixture";
+import { ensureNixosSharedHostReviewedSourceRef } from "./nixos-shared-host.fixture";
 import { startStaticWebappHttpsServer } from "./static-webapp.https-server";
 
 async function writeArtifact(root: string, html: string): Promise<void> {
@@ -51,7 +51,7 @@ test("cloudflare-pages deploy CLI completes the static-webapp flow end to end", 
       path.join(tmp, "projects", "deployments", "pleomino-staging", "wrangler.jsonc"),
     );
     await installCloudflarePagesTargets(tmp, [deployment]);
-    await ensureNixosSharedHostStageBranch(tmp, $, deployment);
+    await ensureNixosSharedHostReviewedSourceRef(tmp, $, deployment);
     await fsp.writeFile(deploymentJson, JSON.stringify(deployment, null, 2) + "\n", "utf8");
     const admissionEvidenceJson = await writeReviewedLaneAdmissionEvidenceJson({
       tmp,
@@ -126,7 +126,7 @@ test("cloudflare-pages smoke failure blocks success after publish", async () => 
       path.join(tmp, "projects", "deployments", "pleomino-staging", "wrangler.jsonc"),
     );
     await installCloudflarePagesTargets(tmp, [deployment]);
-    await ensureNixosSharedHostStageBranch(tmp, $, deployment);
+    await ensureNixosSharedHostReviewedSourceRef(tmp, $, deployment);
     const server = await startCloudflarePagesPublicServer({
       deployment,
       publishRoot: wrongPublishRoot,
@@ -186,7 +186,7 @@ test("cloudflare-pages smoke retries transient readiness failures within the sha
       path.join(tmp, "projects", "deployments", "pleomino-staging", "wrangler.jsonc"),
     );
     await installCloudflarePagesTargets(tmp, [deployment]);
-    await ensureNixosSharedHostStageBranch(tmp, $, deployment);
+    await ensureNixosSharedHostReviewedSourceRef(tmp, $, deployment);
     await fsp.writeFile(deploymentJson, JSON.stringify(deployment, null, 2) + "\n", "utf8");
     const admissionEvidenceJson = await writeReviewedLaneAdmissionEvidenceJson({
       tmp,

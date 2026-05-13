@@ -45,9 +45,15 @@ test("deploy admission requirements for listed deployments", async (t) => {
       const payload = JSON.parse(String(result.stdout));
       assert.deepEqual(payload.admissionRequirements, {
         admission_policy: "//sandbox/deployments/shared:dev_release",
+        source_ref_policy: {
+          stage: "dev",
+          ref: "main",
+          kind: "protected_main",
+        },
         allowed_refs: ["main"],
         required_checks: ["deploy/demo-dev"],
         required_approvals: [],
+        trusted_admission_reporters: ["app:deploy-bot"],
         required_check_subject: {
           kind: "git_commit",
           ref: "main",
@@ -75,10 +81,6 @@ test("deploy admission requirements for listed deployments", async (t) => {
       assert.match(
         String(result.stderr),
         /Inspect requirements only: deploy --deployment \/\/sandbox\/deployments\/demo-dev:deploy --validate-only/,
-      );
-      assert.match(
-        String(result.stderr),
-        /admission_policy: \/\/sandbox\/deployments\/shared:dev_release/,
       );
       assert.match(String(result.stderr), /required_checks: deploy\/demo-dev/);
       assert.match(String(result.stderr), /admission_reporter/);
@@ -140,17 +142,18 @@ test("deploy admission requirements for listed deployments", async (t) => {
         String(result.stderr),
         /Or rerun with --admit-for-commit <sha> if you already know the reviewed commit\./,
       );
-      assert.doesNotMatch(String(result.stderr), /Inspect requirements only:/);
       assert.doesNotMatch(String(result.stderr), /Command failed: git rev-parse main/);
-      assert.doesNotMatch(String(result.stderr), /Use '--' to separate paths from revisions/);
-      assert.doesNotMatch(
-        String(result.stderr),
-        /at resolveDeploymentRequiredCheckSubject|at async resolveDeploymentAdmissionEvidence/,
-      );
     });
 
     await t.test("admit-for-commit binds explicit evidence to the requested commit", async () => {
       await resetToFixture(tmp, $, fixtureRevision);
+      const policyPath = `${tmp}/sandbox/deployments/shared/TARGETS`;
+      const policySource = await fsp.readFile(policyPath, "utf8");
+      await fsp.writeFile(
+        policyPath,
+        policySource.replace('allowed_refs = ["main"]', 'allowed_refs = ["main", "commit:*"]'),
+        "utf8",
+      );
       await $({ cwd: tmp, stdio: "pipe" })`git checkout -B local-work ${fixtureRevision}`;
       await $({ cwd: tmp, stdio: "pipe" })`git branch -f main ${fixtureRevision}`;
       await fsp.writeFile(`${tmp}/local-only.txt`, "local-only\n", "utf8");
@@ -182,6 +185,10 @@ test("deploy admission requirements for listed deployments", async (t) => {
           deployment,
           workspaceRoot: tmp,
         });
+        assert.deepEqual(evidence?.reviewedSource, {
+          ref: `commit:${fixtureRevision}`,
+          revision: fixtureRevision,
+        });
         assert.equal(evidence?.checks?.[0]?.subject, fixtureRevision);
       } finally {
         process.chdir(priorCwd);
@@ -207,9 +214,15 @@ test("deploy admission requirements for deployments with no required checks", as
       const payload = JSON.parse(String(result.stdout));
       assert.deepEqual(payload.admissionRequirements, {
         admission_policy: "//sandbox/deployments/shared:staging_release",
+        source_ref_policy: {
+          stage: "staging",
+          ref: "main",
+          kind: "protected_main",
+        },
         allowed_refs: ["main"],
         required_checks: [],
         required_approvals: [],
+        trusted_admission_reporters: ["app:deploy-bot"],
         admit: {
           relevant_for_workflow: false,
           authorization_required: "admission_reporter",

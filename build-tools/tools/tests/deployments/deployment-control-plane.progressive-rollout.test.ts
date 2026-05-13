@@ -17,14 +17,14 @@ import {
   progressiveHosts,
   writeProgressiveArtifacts,
 } from "./deployment-control-plane.progressive-rollout.helpers";
-import { ensureNixosSharedHostStageBranch } from "./nixos-shared-host.fixture";
+import { ensureNixosSharedHostReviewedSourceRef } from "./nixos-shared-host.fixture";
 import { expectPausedSubmission } from "./nixos-shared-host.control-plane.helpers";
 import { startStaticWebappHttpsMultiServer } from "./static-webapp.https-server";
 
 test("deployment control-plane progressive rollout flows", async (t) => {
   await runInTemp("deployment-control-plane-progressive-rollout", async (tmp, $) => {
     const deployment = progressiveFixture();
-    await ensureNixosSharedHostStageBranch(tmp, $, deployment);
+    await ensureNixosSharedHostReviewedSourceRef(tmp, $, deployment);
 
     await t.test("can pause and resume on the same deploy_run_id", async () => {
       const paths = progressiveCasePaths(tmp, "resume");

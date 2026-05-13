@@ -11,7 +11,7 @@ import { submitNixosSharedHostControlPlaneRun } from "../../deployments/nixos-sh
 import { runInTemp } from "../lib/test-helpers";
 import { deploymentAdmissionEvidenceFixture } from "./deployment-admission.fixture";
 import {
-  ensureNixosSharedHostStageBranch,
+  ensureNixosSharedHostReviewedSourceRef,
   nixosSharedHostDeploymentFixture,
 } from "./nixos-shared-host.fixture";
 import { startNixosSharedHostPublicServer } from "./nixos-shared-host.public-server";
@@ -29,7 +29,7 @@ test("control-plane restore test persists operator-visible resilience state", as
     const hostRoot = path.join(tmp, "host");
     const recordsRoot = path.join(tmp, "records");
     await writeArtifact(artifactDir);
-    await ensureNixosSharedHostStageBranch(tmp, $, deployment);
+    await ensureNixosSharedHostReviewedSourceRef(tmp, $, deployment);
     const admissionEvidence = deploymentAdmissionEvidenceFixture({
       deployment,
       operationKind: "deploy",

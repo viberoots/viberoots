@@ -18,6 +18,7 @@ import {
   type AdmittedStaticWebappArtifact,
 } from "./static-webapp-artifacts";
 import { workerVaultRuntimeMetadata } from "./deployment-vault-runtime-worker";
+import { requestedReviewedSourceFromEvidence } from "./deployment-source-revision";
 
 export type CloudflarePagesPromotionSourceSelection = {
   record: DeploymentRunRecordLike;
@@ -47,6 +48,7 @@ export async function createCloudflarePagesControlPlaneSnapshot(
     smokeConnectOverride?: CloudflarePagesSmokeConnectOverride;
     deferSecretReferenceResolution?: boolean;
     expectedSourceRevision?: string;
+    admissionEvidence?: unknown;
   },
   submissionId: string,
 ): Promise<CloudflarePagesControlPlaneSnapshot> {
@@ -64,6 +66,9 @@ export async function createCloudflarePagesControlPlaneSnapshot(
       recordsRoot: opts.recordsRoot,
       artifactDir: path.resolve(opts.artifactDir || ""),
     }));
+  const requestedReviewedSource = requestedReviewedSourceFromEvidence(
+    opts.admissionEvidence as any,
+  );
   const admittedContext = opts.source
     ? await resolvePromotionCloudflarePagesAdmittedContext({
         workspaceRoot: opts.workspaceRoot,
@@ -79,6 +84,9 @@ export async function createCloudflarePagesControlPlaneSnapshot(
         submissionId,
         ...(opts.expectedSourceRevision
           ? { expectedSourceRevision: opts.expectedSourceRevision }
+          : {}),
+        ...(requestedReviewedSource?.ref
+          ? { requestedSourceRef: requestedReviewedSource.ref }
           : {}),
         ...(opts.deferSecretReferenceResolution ? { deferSecretReferenceResolution: true } : {}),
       });

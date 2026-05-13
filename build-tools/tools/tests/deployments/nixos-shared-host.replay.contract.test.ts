@@ -12,7 +12,7 @@ import { runInTemp } from "../lib/test-helpers";
 import { deploymentAdmissionEvidenceFixture } from "./deployment-admission.fixture";
 import {
   deploymentSourceRef,
-  ensureNixosSharedHostStageBranch,
+  ensureNixosSharedHostReviewedSourceRef,
   nixosSharedHostDeploymentFixture,
 } from "./nixos-shared-host.fixture";
 import { writeSsrArtifact } from "./nixos-shared-host.control-plane.helpers";
@@ -32,7 +32,7 @@ test("nixos-shared-host replay snapshots preserve exact artifact refs and admitt
     const recordsRoot = path.join(tmp, "records");
     const backendDatabaseUrl = localHarnessControlPlaneDatabaseUrl(recordsRoot);
     await writeReplayArtifact(artifactDir, "demoapp");
-    await ensureNixosSharedHostStageBranch(tmp, $, deployment);
+    await ensureNixosSharedHostReviewedSourceRef(tmp, $, deployment);
     const sourceRef = deploymentSourceRef(deployment);
     const admissionEvidence = deploymentAdmissionEvidenceFixture({
       deployment,
@@ -125,7 +125,7 @@ test("nixos-shared-host replay resolution fails closed when the stored exact art
     const recordsRoot = path.join(tmp, "records");
     const backendDatabaseUrl = localHarnessControlPlaneDatabaseUrl(recordsRoot);
     await writeReplayArtifact(artifactDir, "demoapp");
-    await ensureNixosSharedHostStageBranch(tmp, $, deployment);
+    await ensureNixosSharedHostReviewedSourceRef(tmp, $, deployment);
     const admissionEvidence = deploymentAdmissionEvidenceFixture({
       deployment,
       operationKind: "deploy",
@@ -203,7 +203,7 @@ test("nixos-shared-host replay snapshots preserve SSR runtime-contract provenanc
     const recordsRoot = path.join(tmp, "records");
     const backendDatabaseUrl = localHarnessControlPlaneDatabaseUrl(recordsRoot);
     await writeSsrArtifact(artifactDir, "<html>ok</html>\n");
-    await ensureNixosSharedHostStageBranch(tmp, $, deployment);
+    await ensureNixosSharedHostReviewedSourceRef(tmp, $, deployment);
     const admissionEvidence = deploymentAdmissionEvidenceFixture({
       deployment,
       operationKind: "deploy",

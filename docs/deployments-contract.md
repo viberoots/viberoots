@@ -130,7 +130,7 @@ Current reviewed central control-plane implementation note:
 - `operation_kind` uses the canonical set: `deploy`, `retry`, `promotion`, `rollback`, `preview_cleanup`.
 - `--list` is the canonical non-mutating repo-level deployment discovery entry point and must keep one stable machine-readable output shape.
 - `--validate-only` is the canonical non-mutating repo-level deployment validation entry point and must not build, publish, or mutate external state.
-- `--validate-only` must reject reviewed provider-native config parse or semantic drift and reviewed target-kind mismatches before any mutating path can run, and it must surface metadata-derived `admission_policy`, `allowed_refs`, `required_checks`, and `required_approvals` for the selected deployment.
+- `--validate-only` must reject reviewed provider-native config parse or semantic drift and reviewed target-kind mismatches before any mutating path can run, and it must surface metadata-derived `admission_policy`, `source_ref_policy`, `allowed_refs`, `required_checks`, `required_approvals`, and trusted admission reporters for the selected deployment.
 - Public repo-level deploy, list, and validate flows must resolve authoritative deployment metadata from Buck / `TARGETS`, not from hand-authored deployment JSON documents.
 - `publish_mode` is a separate field from `operation_kind`.
 - `preview_cleanup` is a destructive housekeeping run against preview resources; it should preserve preview context in records rather than being treated as a normal publish.

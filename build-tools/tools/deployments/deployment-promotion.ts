@@ -1,6 +1,6 @@
 #!/usr/bin/env zx-wrapper
 import type { DeploymentTarget } from "./contract";
-import { requiredDeploymentStageBranch } from "./contract";
+import { requiredDeploymentSourceRef } from "./contract";
 import {
   resolveDeploymentPromotionSource,
   resolveDeploymentPromotionSourceRecordPath,
@@ -32,7 +32,7 @@ async function eligibilityErrors(
   deployment: DeploymentTarget,
   source: DeploymentPromotionSource,
 ): Promise<string[]> {
-  const targetRef = requiredDeploymentStageBranch(deployment);
+  const targetRef = requiredDeploymentSourceRef(deployment);
   const errors: string[] = [];
   if (!sourceRefAllowed(targetRef, deployment.admissionPolicy.allowedRefs)) {
     errors.push(

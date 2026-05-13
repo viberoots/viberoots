@@ -1660,7 +1660,7 @@ deployment design requires for protected/shared deployments.
 
 - Implement `lane_policy` resolution for protected/shared deployments.
 - Implement source admission:
-  - admissible revision selection
+  - admissible revision selection from the lane's reviewed source-ref policy, including protected `main`, release tags, or explicit reviewed `commit:<sha>` references
   - trusted artifact input selection
 - Implement target-environment run admission:
   - freeze target-environment execution snapshot before mutation

@@ -16,7 +16,7 @@ import { installFakeCloudflarePagesWrangler } from "./cloudflare-pages.fake-wran
 import { startCloudflarePagesPublicServer } from "./cloudflare-pages.public-server";
 import { writeReviewedLaneAdmissionEvidenceJson } from "./deployment-lane-governance.fixture";
 import {
-  ensureNixosSharedHostStageBranch,
+  ensureNixosSharedHostReviewedSourceRef,
   installNixosSharedHostTargets,
   nixosSharedHostDeploymentFixture,
 } from "./nixos-shared-host.fixture";
@@ -78,7 +78,7 @@ async function createSuccessfulDevRun(
   const statePath = path.join(tmp, "platform-state.json");
   await writeArtifact(artifactDir, "<html>source</html>\n");
   await installNixosSharedHostTargets(tmp, [deployment]);
-  await ensureNixosSharedHostStageBranch(tmp, $, deployment);
+  await ensureNixosSharedHostReviewedSourceRef(tmp, $, deployment);
   await writeDeploymentJson(deploymentJson, deployment);
   const admissionEvidenceJson = await writeReviewedLaneAdmissionEvidenceJson({
     tmp,
@@ -117,7 +117,7 @@ test("promotion rejects source runs from an incompatible current lane policy", a
       },
     });
     await installCloudflarePagesTargets(tmp, [incompatibleTarget]);
-    await ensureNixosSharedHostStageBranch(tmp, $, incompatibleTarget);
+    await ensureNixosSharedHostReviewedSourceRef(tmp, $, incompatibleTarget);
     await assert.rejects(
       resolveCloudflarePagesPromotionSelection({
         workspaceRoot: tmp,
@@ -141,7 +141,7 @@ test("promotion rejects retained source runs that no longer match the current pr
       lanePolicyRef: source.lanePolicyRef,
     });
     await installCloudflarePagesTargets(tmp, [staging]);
-    await ensureNixosSharedHostStageBranch(tmp, $, staging);
+    await ensureNixosSharedHostReviewedSourceRef(tmp, $, staging);
     const sourceRunId = await createSuccessfulDevRun(tmp, $, recordsRoot, backendDatabaseUrl);
     await $({ cwd: tmp, stdio: "pipe" })`git config user.email test@example.com`;
     await $({ cwd: tmp, stdio: "pipe" })`git config user.name Test`;
@@ -174,7 +174,7 @@ test("promotion rejects attempts to reuse one deployment id instead of promoting
       path.join(tmp, "projects", "deployments", "pleomino-staging", "wrangler.jsonc"),
     );
     await installCloudflarePagesTargets(tmp, [deployment]);
-    await ensureNixosSharedHostStageBranch(tmp, $, deployment);
+    await ensureNixosSharedHostReviewedSourceRef(tmp, $, deployment);
     const server = await startCloudflarePagesPublicServer({
       deployment,
       publishRoot: fake.publishRoot,

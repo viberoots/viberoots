@@ -7,7 +7,7 @@ import { nixosSharedHostContainerRoot } from "../../deployments/nixos-shared-hos
 import { runInTemp } from "../lib/test-helpers";
 import { writeReviewedLaneAdmissionEvidenceJson } from "./deployment-lane-governance.fixture";
 import {
-  ensureNixosSharedHostStageBranch,
+  ensureNixosSharedHostReviewedSourceRef,
   nixosSharedHostAdmissionPolicyFixture,
   nixosSharedHostDeploymentFixture,
 } from "./nixos-shared-host.fixture";
@@ -126,8 +126,8 @@ test("nixos-shared-host multi-component promotion reuses recorded per-component 
     await writeArtifact(bootstrapApi, "bootstrap-api");
     await writeArtifact(sourceFrontend, "promoted-frontend");
     await writeArtifact(sourceApi, "promoted-api");
-    await ensureNixosSharedHostStageBranch(tmp, $, source);
-    await ensureNixosSharedHostStageBranch(tmp, $, target);
+    await ensureNixosSharedHostReviewedSourceRef(tmp, $, source);
+    await ensureNixosSharedHostReviewedSourceRef(tmp, $, target);
     await writeDeploymentJson(sourceJson, source);
     await writeDeploymentJson(targetJson, target);
     const sourceEvidenceJson = await writeReviewedLaneAdmissionEvidenceJson({

@@ -189,11 +189,10 @@ export async function buildCloudflarePagesBackendSnapshot(
         workspaceRoot: opts.workspaceRoot,
         deployment: resolved.request.deployment,
         recordsRoot: opts.recordsRoot,
-        ...(resolved.request.deployBatchId
-          ? { deployBatchId: resolved.request.deployBatchId }
-          : {}),
+        ...(resolved.request.deployBatchId && { deployBatchId: resolved.request.deployBatchId }),
         artifact: await resolveCloudflarePagesArtifactForSubmission(resolved, opts),
         expectedSourceRevision: resolved.request.expectedSourceRevision,
+        admissionEvidence: resolved.request.admissionEvidence,
         ...(resolved.request.smokeConnectOverride
           ? { smokeConnectOverride: resolved.request.smokeConnectOverride }
           : {}),
@@ -208,9 +207,7 @@ export async function buildCloudflarePagesBackendSnapshot(
         workspaceRoot: opts.workspaceRoot,
         deployment: resolved.request.deployment,
         recordsRoot: opts.recordsRoot,
-        ...(resolved.request.deployBatchId
-          ? { deployBatchId: resolved.request.deployBatchId }
-          : {}),
+        ...(resolved.request.deployBatchId && { deployBatchId: resolved.request.deployBatchId }),
         ...(resolved.artifactInput
           ? { artifact: await resolveCloudflarePagesArtifactForSubmission(resolved, opts) }
           : {}),
@@ -221,6 +218,7 @@ export async function buildCloudflarePagesBackendSnapshot(
         releaseLineageId: resolved.releaseLineageId,
         artifactLineageId: resolved.artifactLineageId,
         source: resolved.source,
+        admissionEvidence: resolved.request.admissionEvidence,
         ...(resolved.request.smokeConnectOverride
           ? { smokeConnectOverride: resolved.request.smokeConnectOverride }
           : {}),

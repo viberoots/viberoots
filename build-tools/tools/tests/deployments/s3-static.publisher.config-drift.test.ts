@@ -7,7 +7,7 @@ import { submitS3StaticDeploy } from "../../deployments/s3-static-deploy";
 import { runInTemp } from "../lib/test-helpers";
 import { deploymentAdmissionEvidenceFixture } from "./deployment-admission.fixture";
 import { s3StaticDeploymentFixture } from "./s3-static.fixture";
-import { ensureNixosSharedHostStageBranch } from "./nixos-shared-host.fixture";
+import { ensureNixosSharedHostReviewedSourceRef } from "./nixos-shared-host.fixture";
 
 async function writeArtifact(root: string): Promise<void> {
   await fsp.mkdir(root, { recursive: true });
@@ -19,7 +19,7 @@ test("s3-static rejects provider config drift before publish begins", async () =
     const deployment = s3StaticDeploymentFixture();
     const artifactDir = path.join(tmp, "artifact");
     await writeArtifact(artifactDir);
-    await ensureNixosSharedHostStageBranch(tmp, $, deployment as any);
+    await ensureNixosSharedHostReviewedSourceRef(tmp, $, deployment as any);
     const admissionEvidence = deploymentAdmissionEvidenceFixture({
       deployment,
       operationKind: "deploy",

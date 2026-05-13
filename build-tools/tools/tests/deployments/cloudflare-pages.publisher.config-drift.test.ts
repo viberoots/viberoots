@@ -7,7 +7,7 @@ import { submitCloudflarePagesControlPlaneDeploy } from "../../deployments/cloud
 import { runInTemp } from "../lib/test-helpers";
 import { cloudflarePagesDeploymentFixture } from "./cloudflare-pages.fixture";
 import { deploymentAdmissionEvidenceFixture } from "./deployment-admission.fixture";
-import { ensureNixosSharedHostStageBranch } from "./nixos-shared-host.fixture";
+import { ensureNixosSharedHostReviewedSourceRef } from "./nixos-shared-host.fixture";
 
 async function writeArtifact(root: string): Promise<void> {
   await fsp.mkdir(root, { recursive: true });
@@ -19,7 +19,7 @@ test("cloudflare-pages rejects wrangler config drift before publish begins", asy
     const deployment = cloudflarePagesDeploymentFixture();
     const artifactDir = path.join(tmp, "artifact");
     await writeArtifact(artifactDir);
-    await ensureNixosSharedHostStageBranch(tmp, $, deployment);
+    await ensureNixosSharedHostReviewedSourceRef(tmp, $, deployment);
     const admissionEvidence = deploymentAdmissionEvidenceFixture({
       deployment,
       operationKind: "deploy",
@@ -60,7 +60,7 @@ test("cloudflare-pages rejects wrangler account_id drift before omitting it for 
     deployment.providerTarget.accountId = "1b911846f80a89272c0dbaf44f5c810f";
     const artifactDir = path.join(tmp, "artifact");
     await writeArtifact(artifactDir);
-    await ensureNixosSharedHostStageBranch(tmp, $, deployment);
+    await ensureNixosSharedHostReviewedSourceRef(tmp, $, deployment);
     const admissionEvidence = deploymentAdmissionEvidenceFixture({
       deployment,
       operationKind: "deploy",

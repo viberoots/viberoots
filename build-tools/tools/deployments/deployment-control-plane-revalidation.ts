@@ -5,11 +5,13 @@ import {
   approvalSummaryFromGrant,
   readApprovalGrantRecord,
 } from "./deployment-control-plane-approval";
-import { requiredDeploymentStageBranch, type DeploymentTarget } from "./contract";
+import type { DeploymentTarget } from "./contract";
 import type { DeploymentAdmissionPolicyEvaluation } from "./deployment-admission-evidence";
 import type { DeploymentRunRecordLike } from "./deployment-admission-records";
 import { readBackendDeployRecordByDeployRunId } from "./nixos-shared-host-control-plane-backend";
 import { resolveDeploymentGitCommit } from "./deployment-git-ref";
+import { requiredDeploymentReviewedSourceRef } from "./deployment-reviewed-source-ref";
+import { explicitReviewedCommitSha } from "./deployment-source-ref-policy";
 
 type RevalidationContext = {
   targetEnvironment?: {
@@ -77,12 +79,14 @@ export async function revalidateControlPlaneAdmission(opts: {
   const targetRef =
     opts.admittedContext.targetEnvironment?.reviewedSourceSnapshot?.snapshotRef ||
     opts.admittedContext.targetEnvironment?.targetRef ||
-    requiredDeploymentStageBranch(opts.deployment);
-  const currentRevision = await resolveDeploymentGitCommit({
-    workspaceRoot: opts.workspaceRoot,
-    revision: targetRef,
-    purpose: "control-plane revalidation target ref",
-  });
+    requiredDeploymentReviewedSourceRef(opts.deployment).ref;
+  const currentRevision =
+    explicitReviewedCommitSha(targetRef) ||
+    (await resolveDeploymentGitCommit({
+      workspaceRoot: opts.workspaceRoot,
+      revision: targetRef,
+      purpose: "control-plane revalidation target ref",
+    }));
   if (
     opts.admittedContext.targetEnvironment?.targetRevision &&
     currentRevision !== opts.admittedContext.targetEnvironment.targetRevision

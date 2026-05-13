@@ -14,7 +14,7 @@ import {
 import { runInTemp } from "../lib/test-helpers";
 import { deploymentAdmissionEvidenceFixture } from "./deployment-admission.fixture";
 import {
-  ensureNixosSharedHostStageBranch,
+  ensureNixosSharedHostReviewedSourceRef,
   nixosSharedHostDeploymentFixture,
 } from "./nixos-shared-host.fixture";
 import { startNixosSharedHostPublicServer } from "./nixos-shared-host.public-server";
@@ -58,13 +58,13 @@ test("nixos-shared-host replay snapshot reader migrates the prior schema and bac
             admissionPolicyFingerprint: deployment.admissionPolicy.fingerprint,
             environmentStage: deployment.environmentStage,
             source: {
-              mode: "stage_branch_head",
-              sourceRef: "env/pleomino/dev",
+              mode: "reviewed_source_ref",
+              sourceRef: "main",
               sourceRevision: "rev-123",
             },
             targetEnvironment: {
-              mode: "stage_branch_snapshot",
-              targetRef: "env/pleomino/dev",
+              mode: "reviewed_source_snapshot",
+              targetRef: "main",
               targetRevision: "rev-123",
               providerTargetIdentity: deployment.providerTarget.providerTargetIdentity,
               lockScope: deployment.providerTarget.providerTargetIdentity,
@@ -97,7 +97,7 @@ test("nixos-shared-host replay fails closed when stored runner provenance no lon
     const recordsRoot = path.join(tmp, "records");
     const backendDatabaseUrl = localHarnessControlPlaneDatabaseUrl(recordsRoot);
     await writeArtifact(artifactDir);
-    await ensureNixosSharedHostStageBranch(tmp, $, deployment);
+    await ensureNixosSharedHostReviewedSourceRef(tmp, $, deployment);
     const server = await startNixosSharedHostPublicServer({
       deployment,
       hostRoot,
@@ -159,7 +159,7 @@ test("nixos-shared-host replay fails closed when a source snapshot omits the rec
     const recordsRoot = path.join(tmp, "records");
     const backendDatabaseUrl = localHarnessControlPlaneDatabaseUrl(recordsRoot);
     await writeArtifact(artifactDir);
-    await ensureNixosSharedHostStageBranch(tmp, $, deployment);
+    await ensureNixosSharedHostReviewedSourceRef(tmp, $, deployment);
     const server = await startNixosSharedHostPublicServer({
       deployment,
       hostRoot,

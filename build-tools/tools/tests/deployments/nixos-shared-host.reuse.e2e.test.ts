@@ -5,7 +5,7 @@ import path from "node:path";
 import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
 import {
-  ensureNixosSharedHostStageBranch,
+  ensureNixosSharedHostReviewedSourceRef,
   nixosSharedHostDeploymentFixture,
 } from "./nixos-shared-host.fixture";
 import {
@@ -27,7 +27,7 @@ test("nixos-shared-host publish-only reuse flows", async (t) => {
   await runInTemp("nixos-shared-host-reuse-e2e", async (tmp, $) => {
     const deployment = nixosSharedHostDeploymentFixture();
     const deploymentJson = path.join(tmp, "deployment.json");
-    await ensureNixosSharedHostStageBranch(tmp, $, deployment);
+    await ensureNixosSharedHostReviewedSourceRef(tmp, $, deployment);
     await writeDeploymentJson(deploymentJson, deployment);
     const admissionEvidenceJson = await writeAdmissionEvidenceJson({
       tmp,

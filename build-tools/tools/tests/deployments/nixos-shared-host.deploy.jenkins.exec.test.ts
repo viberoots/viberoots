@@ -9,7 +9,7 @@ import { startNixosSharedHostControlPlaneWorkerLoop } from "../../deployments/ni
 import { nixosSharedHostContainerRoot } from "../../deployments/nixos-shared-host-runtime";
 import { runInTemp } from "../lib/test-helpers";
 import { startNixosSharedHostPublicServer } from "./nixos-shared-host.public-server";
-import { ensureNixosSharedHostStageBranch } from "./nixos-shared-host.fixture";
+import { ensureNixosSharedHostReviewedSourceRef } from "./nixos-shared-host.fixture";
 import { installFakeRemoteTransport } from "./nixos-shared-host.remote-transport.fake";
 import {
   installClientProfile,
@@ -35,7 +35,7 @@ test("jenkins wrapper stages the Pleomino artifact, submits through the control 
     const remoteRecordsRoot = path.join(tmp, "remote-records");
     const remoteStatePath = path.join(tmp, "remote-state", "platform-state.json");
     await installReviewedPleominoTargets(tmp);
-    await ensureNixosSharedHostStageBranch(tmp, $, deployment);
+    await ensureNixosSharedHostReviewedSourceRef(tmp, $, deployment);
     await prepareReviewedRemoteHostPaths({
       remoteStatePath,
       remoteRuntimeRoot,
@@ -129,7 +129,7 @@ test("jenkins wrapper forwards admit-and-deploy so bootstrap deploys can avoid h
         .replace("    required_checks = [],", '    required_checks = ["deploy/pleomino-dev"],'),
       "utf8",
     );
-    await ensureNixosSharedHostStageBranch(tmp, $, deployment);
+    await ensureNixosSharedHostReviewedSourceRef(tmp, $, deployment);
     await prepareReviewedRemoteHostPaths({
       remoteStatePath,
       remoteRuntimeRoot,

@@ -8,7 +8,7 @@ import { startNixosSharedHostControlPlaneServer } from "../../deployments/nixos-
 import { runInTemp } from "../lib/test-helpers";
 import { writeReviewedLaneAdmissionEvidenceJson } from "./deployment-lane-governance.fixture";
 import {
-  ensureNixosSharedHostStageBranch,
+  ensureNixosSharedHostReviewedSourceRef,
   installNixosSharedHostTargets,
   nixosSharedHostDeploymentFixture,
 } from "./nixos-shared-host.fixture";
@@ -25,7 +25,7 @@ async function prepareSameHostFixture(tmp: string, $: any) {
     recordsRoot: path.join(tmp, "records"),
   };
   await installNixosSharedHostTargets(tmp, [deployment]);
-  await ensureNixosSharedHostStageBranch(tmp, $, deployment);
+  await ensureNixosSharedHostReviewedSourceRef(tmp, $, deployment);
   await writeDemoArtifact(artifactDir);
   const admissionEvidenceJson = await writeReviewedLaneAdmissionEvidenceJson({
     tmp,

@@ -7,7 +7,7 @@ import { localHarnessControlPlaneDatabaseUrl } from "../../deployments/nixos-sha
 import { runInTemp } from "../lib/test-helpers";
 import { writeReviewedLaneAdmissionEvidenceJson } from "./deployment-lane-governance.fixture";
 import {
-  ensureNixosSharedHostStageBranch,
+  ensureNixosSharedHostReviewedSourceRef,
   nixosSharedHostDeploymentFixture,
 } from "./nixos-shared-host.fixture";
 import { startControlPlaneHarness } from "./nixos-shared-host.control-plane.helpers";
@@ -36,7 +36,7 @@ test("nixos-shared-host rollback fails closed for a successful retry source run"
       VBR_DEPLOY_CONTROL_PLANE_DATABASE_URL: localHarnessControlPlaneDatabaseUrl(recordsRoot),
     };
     await writeArtifact(artifactDir, "v1");
-    await ensureNixosSharedHostStageBranch(tmp, $, deployment);
+    await ensureNixosSharedHostReviewedSourceRef(tmp, $, deployment);
     await writeDeploymentJson(deploymentJson, deployment);
     const admissionEvidenceJson = await writeReviewedLaneAdmissionEvidenceJson({
       tmp,

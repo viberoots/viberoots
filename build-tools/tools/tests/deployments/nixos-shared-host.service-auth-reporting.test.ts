@@ -9,7 +9,7 @@ import { createNixosSharedHostSubmissionId } from "../../deployments/nixos-share
 import { runInTemp } from "../lib/test-helpers";
 import { deploymentAdmissionEvidenceFixture } from "./deployment-admission.fixture";
 import {
-  ensureNixosSharedHostStageBranch,
+  ensureNixosSharedHostReviewedSourceRef,
   nixosSharedHostAdmissionPolicyFixture,
 } from "./nixos-shared-host.fixture";
 import {
@@ -95,7 +95,7 @@ async function postCheckedSubmission(opts: {
 test("submitter-only sessions cannot submit client-supplied admission checks", async () => {
   await runInTemp("nixos-service-auth-reporter-required", async (tmp, $) => {
     const deployment = authRequiredDeployment();
-    await ensureNixosSharedHostStageBranch(tmp, $, deployment);
+    await ensureNixosSharedHostReviewedSourceRef(tmp, $, deployment);
     const { artifactDir, controlPlane, paths } = await startHarness(tmp, deployment, "artifact");
     try {
       const authSessionId = await writeAuthSession({
@@ -126,7 +126,7 @@ test("submitter-only sessions cannot submit client-supplied admission checks", a
 test("admission_reporter-only sessions still cannot submit a deploy", async () => {
   await runInTemp("nixos-service-auth-submitter-required", async (tmp, $) => {
     const deployment = authRequiredDeployment();
-    await ensureNixosSharedHostStageBranch(tmp, $, deployment);
+    await ensureNixosSharedHostReviewedSourceRef(tmp, $, deployment);
     const { artifactDir, controlPlane, paths } = await startHarness(tmp, deployment, "artifact");
     try {
       const authSessionId = await writeAuthSession({
@@ -161,7 +161,7 @@ test("human submitters with submitter and admission_reporter grants persist manu
         requiredChecks: ["deploy/pleomino-dev"],
       }),
     });
-    await ensureNixosSharedHostStageBranch(tmp, $, deployment);
+    await ensureNixosSharedHostReviewedSourceRef(tmp, $, deployment);
     const subject = String(
       (await $({ cwd: tmp, stdio: "pipe" })`git rev-parse HEAD`).stdout,
     ).trim();
@@ -201,7 +201,7 @@ test("automation principals can submit structured evidence only when they also h
         requiredChecks: ["deploy/pleomino-dev"],
       }),
     });
-    await ensureNixosSharedHostStageBranch(tmp, $, deployment);
+    await ensureNixosSharedHostReviewedSourceRef(tmp, $, deployment);
     const subject = String(
       (await $({ cwd: tmp, stdio: "pipe" })`git rev-parse HEAD`).stdout,
     ).trim();

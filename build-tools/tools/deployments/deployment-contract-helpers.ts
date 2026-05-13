@@ -2,6 +2,7 @@
 import path from "node:path";
 import { packagePathFromLabel } from "../lib/labels";
 import type { DeploymentLanePolicy } from "./deployment-policy";
+import { isStaleEnvironmentBranchRef } from "./deployment-source-ref-policy";
 
 function packageBaseName(label: string): string {
   return path.posix.basename(packagePathFromLabel(label));
@@ -16,7 +17,7 @@ export function deploymentIdFromLabel(label: string): string {
   return packageBaseName(label);
 }
 
-export function requiredDeploymentStageBranch(deployment: {
+export function requiredDeploymentSourceRef(deployment: {
   lanePolicy: DeploymentLanePolicy;
   environmentStage: string;
   admissionPolicy?: { allowedRefs: string[] };
@@ -26,6 +27,9 @@ export function requiredDeploymentStageBranch(deployment: {
     throw new Error(
       `lane policy ${deployment.lanePolicy.ref} does not define source ref for ${deployment.environmentStage}`,
     );
+  }
+  if (isStaleEnvironmentBranchRef(sourceRef)) {
+    throw new Error(`source_ref_policy must not use environment branch ${sourceRef}`);
   }
   return sourceRef;
 }

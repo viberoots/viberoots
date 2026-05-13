@@ -14,7 +14,7 @@ import {
 import { runInTemp } from "../lib/test-helpers";
 import { deploymentAdmissionEvidenceFixture } from "./deployment-admission.fixture";
 import {
-  ensureNixosSharedHostStageBranch,
+  ensureNixosSharedHostReviewedSourceRef,
   nixosSharedHostDeploymentFixture,
 } from "./nixos-shared-host.fixture";
 import { startNixosSharedHostPublicServer } from "./nixos-shared-host.public-server";
@@ -37,7 +37,7 @@ test("break-glass deploy captures evidence and records exact admitted-artifact r
     const emergencyArtifact = path.join(tmp, "artifact-emergency");
     await writeArtifact(originalArtifact, "original");
     await writeArtifact(emergencyArtifact, "emergency");
-    await ensureNixosSharedHostStageBranch(tmp, $, deployment);
+    await ensureNixosSharedHostReviewedSourceRef(tmp, $, deployment);
     const admissionEvidence = deploymentAdmissionEvidenceFixture({
       deployment,
       operationKind: "deploy",
@@ -107,7 +107,7 @@ test("break-glass freezes block simultaneous normal-path mutation and reject und
   await runInTemp("deployment-control-plane-break-glass-freeze", async (tmp, $) => {
     const deployment = nixosSharedHostDeploymentFixture();
     const recordsRoot = path.join(tmp, "records");
-    await ensureNixosSharedHostStageBranch(tmp, $, deployment);
+    await ensureNixosSharedHostReviewedSourceRef(tmp, $, deployment);
     const freeze = await acquireBreakGlassFreeze(
       recordsRoot,
       deployment.providerTarget.sharedDevTargetIdentity,

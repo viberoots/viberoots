@@ -13,7 +13,7 @@ import {
 } from "./google-play.e2e.helpers";
 import { mobileReviewedLanePolicy, writeMobileArtifact } from "./mobile-release.e2e.helpers";
 import { writeDeploymentJson } from "./nixos-shared-host.reuse.e2e.helpers";
-import { ensureNixosSharedHostStageBranch } from "./nixos-shared-host.fixture";
+import { ensureNixosSharedHostReviewedSourceRef } from "./nixos-shared-host.fixture";
 
 test("google-play deploy and promotion preserve release-health evidence", async () => {
   await runInTemp("google-play-promotion", async (tmp, $) => {
@@ -63,8 +63,8 @@ test("google-play deploy and promotion preserve release-health evidence", async 
     await installGooglePlayTargets(tmp, [dev, staging]);
     await writeDeploymentJson(devJson, dev);
     await writeDeploymentJson(stagingJson, staging);
-    await ensureNixosSharedHostStageBranch(tmp, $, dev);
-    await ensureNixosSharedHostStageBranch(tmp, $, staging);
+    await ensureNixosSharedHostReviewedSourceRef(tmp, $, dev);
+    await ensureNixosSharedHostReviewedSourceRef(tmp, $, staging);
     const devEvidenceJson = await writeReviewedLaneAdmissionEvidenceJson({
       tmp,
       $,
@@ -130,7 +130,7 @@ test("google-play rollback reuses a prior successful exact artifact", async () =
     await writeGooglePlayConfig(tmp, staging);
     await installGooglePlayTargets(tmp, [staging]);
     await writeDeploymentJson(stagingJson, staging);
-    await ensureNixosSharedHostStageBranch(tmp, $, staging);
+    await ensureNixosSharedHostReviewedSourceRef(tmp, $, staging);
     const stagingEvidenceJson = await writeReviewedLaneAdmissionEvidenceJson({
       tmp,
       $,

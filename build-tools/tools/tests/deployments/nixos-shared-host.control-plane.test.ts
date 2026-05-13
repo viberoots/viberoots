@@ -12,7 +12,7 @@ import { createNixosSharedHostPlatformState } from "../../deployments/nixos-shar
 import { resolveNixosSharedHostReplaySelection } from "../../deployments/nixos-shared-host-replay";
 import { runInTemp } from "../lib/test-helpers";
 import {
-  ensureNixosSharedHostStageBranch,
+  ensureNixosSharedHostReviewedSourceRef,
   nixosSharedHostDeploymentFixture,
 } from "./nixos-shared-host.fixture";
 import {
@@ -32,7 +32,7 @@ test("shared control plane admits shared_nonprod deploys and executes from the f
     const artifactDir = path.join(tmp, "artifact");
     const hostRoot = path.join(tmp, "host");
     await writeDemoArtifact(artifactDir);
-    await ensureNixosSharedHostStageBranch(tmp, $, deployment);
+    await ensureNixosSharedHostReviewedSourceRef(tmp, $, deployment);
     const server = await startNixosSharedHostPublicServer({ deployment, hostRoot });
     try {
       const result = await submitNixosSharedHostControlPlaneRun({
@@ -82,7 +82,7 @@ test("shared control plane rejects routine deploys whose provisioner plan would 
       JSON.stringify(createNixosSharedHostPlatformState([existing]), null, 2) + "\n",
       "utf8",
     );
-    await ensureNixosSharedHostStageBranch(tmp, $, deployment);
+    await ensureNixosSharedHostReviewedSourceRef(tmp, $, deployment);
     await assert.rejects(
       submitNixosSharedHostControlPlaneRun({
         workspaceRoot: tmp,
@@ -117,7 +117,7 @@ test("shared control plane rejects replay when the current lane policy no longer
     };
     const backendDatabaseUrl = localHarnessControlPlaneDatabaseUrl(paths.recordsRoot);
     await writeDemoArtifact(artifactDir);
-    await ensureNixosSharedHostStageBranch(tmp, $, deployment);
+    await ensureNixosSharedHostReviewedSourceRef(tmp, $, deployment);
     const server = await startNixosSharedHostPublicServer({ deployment, hostRoot: paths.hostRoot });
     try {
       const initial = await submitNixosSharedHostControlPlaneRun({

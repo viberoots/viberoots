@@ -4,8 +4,11 @@ import os from "node:os";
 import path from "node:path";
 import { shSingleQuote } from "../lib/shell-quote";
 import type { DeploymentTarget } from "./contract";
-import { requiredDeploymentStageBranch } from "./contract";
 import { DeploymentAdmissionError } from "./deployment-control-plane-errors";
+import { deploymentGitStdout } from "./deployment-git-stdout";
+import { requestedDeploymentReviewedSourceRef } from "./deployment-reviewed-source-ref";
+import { explicitReviewedCommitSha } from "./deployment-source-ref-policy";
+import { explicitReviewedCommitSnapshot } from "./deployment-reviewed-source-snapshot-explicit";
 
 const GITHUB_KNOWN_HOSTS = [
   "github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl",
@@ -24,9 +27,6 @@ export type DeploymentReviewedSourceSnapshot = {
   repository: string;
   snapshottedAt: string;
 };
-
-export type NixosSharedHostReviewedSourceSnapshot = DeploymentReviewedSourceSnapshot;
-
 type ReviewedSourceCarrier =
   | DeploymentReviewedSourceSnapshot
   | {
@@ -43,18 +43,6 @@ type ReviewedSourceCarrier =
 
 function trim(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
-}
-
-async function gitStdout(
-  workspaceRoot: string,
-  args: string[],
-  env?: NodeJS.ProcessEnv,
-): Promise<string> {
-  const out = await $({ cwd: workspaceRoot, stdio: "pipe", env })`git ${args}`.nothrow();
-  if ((out as any).exitCode !== 0) {
-    throw new Error(String((out as any).stderr || "").trim() || `git ${args.join(" ")} failed`);
-  }
-  return String((out as any).stdout || "").trim();
 }
 
 function repositorySlug(remoteUrl: string): string {
@@ -75,9 +63,7 @@ function githubSshRemoteForRepository(repository: string): string {
 function reviewedFetchTargetFor(deployment: DeploymentTarget, remoteName: string): string {
   const scmBackend = trim(deployment.lanePolicy.governance.scmBackend).toLowerCase();
   const repository = trim(deployment.lanePolicy.governance.repository);
-  if (scmBackend === "github" && repository) {
-    return githubSshRemoteForRepository(repository);
-  }
+  if (scmBackend === "github" && repository) return githubSshRemoteForRepository(repository);
   return remoteName;
 }
 
@@ -86,7 +72,7 @@ async function resolveReviewedRemoteName(
   deployment: DeploymentTarget,
 ): Promise<string> {
   const remotes = (
-    await gitStdout(workspaceRoot, ["remote"])
+    await deploymentGitStdout(workspaceRoot, ["remote"])
       .then((value) =>
         value
           .split("\n")
@@ -97,15 +83,17 @@ async function resolveReviewedRemoteName(
   ).filter(Boolean);
   if (remotes.length === 0) {
     throw new Error(
-      `control-plane repo is missing a git remote for reviewed source ${requiredDeploymentStageBranch(deployment)}`,
+      `control-plane repo is missing a git remote for reviewed source ${requestedDeploymentReviewedSourceRef({ deployment }).ref}`,
     );
   }
   const expectedRepository = trim(deployment.lanePolicy.governance.repository);
   if (expectedRepository) {
     for (const remoteName of remotes) {
-      const remoteUrl = await gitStdout(workspaceRoot, ["remote", "get-url", remoteName]).catch(
-        () => "",
-      );
+      const remoteUrl = await deploymentGitStdout(workspaceRoot, [
+        "remote",
+        "get-url",
+        remoteName,
+      ]).catch(() => "");
       if (repositorySlug(remoteUrl) === expectedRepository) {
         return remoteName;
       }
@@ -143,7 +131,7 @@ export async function gitFetchEnvForReviewedRemote(
   }
   const remoteUrl = isRemoteUrl(fetchTarget)
     ? fetchTarget
-    : await gitStdout(workspaceRoot, ["remote", "get-url", fetchTarget]).catch(() => "");
+    : await deploymentGitStdout(workspaceRoot, ["remote", "get-url", fetchTarget]).catch(() => "");
   if (!isGithubSshRemote(remoteUrl)) return { cleanup: async () => {} };
   const configuredKnownHostsFile = trim(process.env[REVIEWED_SOURCE_SSH_KNOWN_HOSTS_FILE_ENV]);
   const tmpDir = configuredKnownHostsFile
@@ -166,9 +154,7 @@ export async function gitFetchEnvForReviewedRemote(
       ].join(" "),
     },
     cleanup: async () => {
-      if (tmpDir) {
-        await fsp.rm(tmpDir, { recursive: true, force: true });
-      }
+      if (tmpDir) await fsp.rm(tmpDir, { recursive: true, force: true });
     },
   };
 }
@@ -178,14 +164,29 @@ export async function snapshotReviewedSourceForSubmission(opts: {
   deployment: DeploymentTarget;
   submissionId: string;
   expectedSourceRevision?: string;
+  requestedSourceRef?: string;
 }): Promise<DeploymentReviewedSourceSnapshot> {
-  const reviewedRef = requiredDeploymentStageBranch(opts.deployment);
+  const reviewedRef = requestedDeploymentReviewedSourceRef({
+    deployment: opts.deployment,
+    requestedSourceRef: opts.requestedSourceRef,
+  }).ref;
+  const explicitCommitSha = explicitReviewedCommitSha(reviewedRef);
+  if (explicitCommitSha) {
+    return explicitReviewedCommitSnapshot({
+      deployment: opts.deployment,
+      reviewedRef,
+      sourceRevision: explicitCommitSha,
+      ...(opts.expectedSourceRevision
+        ? { expectedSourceRevision: opts.expectedSourceRevision }
+        : {}),
+    });
+  }
   const remoteName = await resolveReviewedRemoteName(opts.workspaceRoot, opts.deployment);
   const snapshotRef = snapshotRefFor(opts.submissionId, reviewedRef);
   const fetchTarget = reviewedFetchTargetFor(opts.deployment, remoteName);
   const fetchEnv = await gitFetchEnvForReviewedRemote(opts.workspaceRoot, fetchTarget);
   try {
-    await gitStdout(
+    await deploymentGitStdout(
       opts.workspaceRoot,
       ["fetch", "--no-tags", "--no-write-fetch-head", fetchTarget, `${reviewedRef}:${snapshotRef}`],
       fetchEnv.env,
@@ -193,7 +194,7 @@ export async function snapshotReviewedSourceForSubmission(opts: {
   } finally {
     await fetchEnv.cleanup();
   }
-  const sourceRevision = await gitStdout(opts.workspaceRoot, [
+  const sourceRevision = await deploymentGitStdout(opts.workspaceRoot, [
     "rev-parse",
     `${snapshotRef}^{commit}`,
   ]);

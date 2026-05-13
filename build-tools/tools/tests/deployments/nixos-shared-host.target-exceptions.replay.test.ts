@@ -12,7 +12,7 @@ import { resolveNixosSharedHostReplaySelection } from "../../deployments/nixos-s
 import { runInTemp } from "../lib/test-helpers";
 import { deploymentAdmissionEvidenceFixture } from "./deployment-admission.fixture";
 import {
-  ensureNixosSharedHostStageBranch,
+  ensureNixosSharedHostReviewedSourceRef,
   nixosSharedHostDeploymentFixture,
 } from "./nixos-shared-host.fixture";
 import { deploymentTargetExceptionFixture } from "./deployment-metadata.fixture";
@@ -45,7 +45,7 @@ test("replay fails closed when an active migration exception invalidates the rec
     const recordsRoot = path.join(tmp, "records");
     const backendDatabaseUrl = localHarnessControlPlaneDatabaseUrl(recordsRoot);
     await writeArtifact(artifactDir);
-    await ensureNixosSharedHostStageBranch(tmp, $, sourceDeployment);
+    await ensureNixosSharedHostReviewedSourceRef(tmp, $, sourceDeployment);
     const admissionEvidence = deploymentAdmissionEvidenceFixture({
       deployment: sourceDeployment,
       operationKind: "deploy",

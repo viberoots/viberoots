@@ -24,8 +24,8 @@ import { nixosSharedHostLaneGovernanceFixture } from "./deployment-lane-governan
 export { installNixosSharedHostTargets } from "./deployment-targets.install.helpers";
 export {
   deploymentSourceRef,
-  ensureNixosSharedHostStageBranch,
-} from "./nixos-shared-host.stage-branch.fixture";
+  ensureNixosSharedHostReviewedSourceRef,
+} from "./nixos-shared-host.reviewed-source.fixture";
 
 export function nixosSharedHostSsrRuntimeContractFixture(
   overrides: Partial<NixosSharedHostSsrRuntimeContract> = {},

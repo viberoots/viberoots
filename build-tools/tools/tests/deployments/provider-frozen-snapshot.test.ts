@@ -15,7 +15,7 @@ import {
 import { localHarnessControlPlaneDatabaseUrl } from "../../deployments/nixos-shared-host-control-plane-backend";
 import { fingerprintValue } from "../../deployments/nixos-shared-host-deployment-fingerprint";
 import { runInTemp } from "../lib/test-helpers";
-import { ensureNixosSharedHostStageBranch } from "./nixos-shared-host.fixture";
+import { ensureNixosSharedHostReviewedSourceRef } from "./nixos-shared-host.fixture";
 import { kubernetesDeploymentFixture } from "./kubernetes.fixture";
 import { s3StaticDeploymentFixture } from "./s3-static.fixture";
 import { vercelDeploymentFixture } from "./vercel.fixture";
@@ -74,7 +74,7 @@ test("provider control-plane preparation freezes shared admission and admitted a
               }
             : policy,
         );
-      await ensureNixosSharedHostStageBranch(tmp, $, deployment as any);
+      await ensureNixosSharedHostReviewedSourceRef(tmp, $, deployment as any);
     }
     const sourceRevision = String(
       (await $({ cwd: tmp, stdio: "pipe" })`git rev-parse main`).stdout,
@@ -154,7 +154,7 @@ test("provider snapshot preparation rejects denied admission and queues admitted
   await runInTemp("provider-frozen-admission-outcomes", async (tmp, $) => {
     const recordsRoot = path.join(tmp, "records");
     const s3 = s3StaticDeploymentFixture();
-    await ensureNixosSharedHostStageBranch(tmp, $, s3);
+    await ensureNixosSharedHostReviewedSourceRef(tmp, $, s3);
     await assert.rejects(
       buildS3StaticControlPlaneSnapshot({
         workspaceRoot: tmp,
@@ -180,7 +180,7 @@ test("provider snapshot preparation rejects denied admission and queues admitted
         requiredChecks: [],
       },
     });
-    await ensureNixosSharedHostStageBranch(tmp, $, vercel);
+    await ensureNixosSharedHostReviewedSourceRef(tmp, $, vercel);
     await withVercelFixtureSecrets(
       {
         "vercel/api-token": {

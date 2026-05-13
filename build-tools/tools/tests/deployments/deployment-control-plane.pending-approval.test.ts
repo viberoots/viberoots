@@ -10,7 +10,7 @@ import { submitNixosSharedHostControlPlaneRun } from "../../deployments/nixos-sh
 import { readControlPlaneJson } from "../../deployments/nixos-shared-host-control-plane-store";
 import { runInTemp } from "../lib/test-helpers";
 import {
-  ensureNixosSharedHostStageBranch,
+  ensureNixosSharedHostReviewedSourceRef,
   nixosSharedHostDeploymentFixture,
 } from "./nixos-shared-host.fixture";
 
@@ -31,7 +31,7 @@ test("pending approval submissions are observable and cancel idempotently before
     const artifactDir = path.join(tmp, "artifact");
     const recordsRoot = path.join(tmp, "records");
     await writeArtifact(artifactDir);
-    await ensureNixosSharedHostStageBranch(tmp, $, deployment);
+    await ensureNixosSharedHostReviewedSourceRef(tmp, $, deployment);
     let submissionPath = "";
     await assert.rejects(
       submitNixosSharedHostControlPlaneRun({

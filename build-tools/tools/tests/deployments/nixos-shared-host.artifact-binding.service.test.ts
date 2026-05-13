@@ -16,7 +16,7 @@ import { startNixosSharedHostControlPlaneServer } from "../../deployments/nixos-
 import { createNixosSharedHostSubmissionId } from "../../deployments/nixos-shared-host-control-plane-snapshot";
 import { runInTemp } from "../lib/test-helpers";
 import {
-  ensureNixosSharedHostStageBranch,
+  ensureNixosSharedHostReviewedSourceRef,
   nixosSharedHostDeploymentFixture,
 } from "./nixos-shared-host.fixture";
 import { multiComponentDeployment } from "./nixos-shared-host.multi-component.fixture";
@@ -66,7 +66,7 @@ test("protected/shared service uploads require challenge-bound artifact proofs",
       recordsRoot: path.join(tmp, "records"),
     };
     await writeDemoArtifact(artifactDir);
-    await ensureNixosSharedHostStageBranch(tmp, $, deployment);
+    await ensureNixosSharedHostReviewedSourceRef(tmp, $, deployment);
     const controlPlane = await startNixosSharedHostControlPlaneServer({
       workspaceRoot: tmp,
       paths,
@@ -162,7 +162,7 @@ test("challenge issuance rejects missing required expected artifact identities b
       const singleDeployment = nixosSharedHostDeploymentFixture();
       const singleArtifact = path.join(tmp, "artifact-single");
       await writeDemoArtifact(singleArtifact);
-      await ensureNixosSharedHostStageBranch(tmp, $, singleDeployment);
+      await ensureNixosSharedHostReviewedSourceRef(tmp, $, singleDeployment);
       const singleRequest = {
         schemaVersion: NIXOS_SHARED_HOST_CONTROL_PLANE_SUBMIT_REQUEST_SCHEMA,
         submissionId: createNixosSharedHostSubmissionId(),
@@ -195,7 +195,7 @@ test("challenge issuance rejects missing required expected artifact identities b
       const api = path.join(tmp, "artifact-api");
       await writeDemoArtifact(frontend, "frontend");
       await writeDemoArtifact(api, "api");
-      await ensureNixosSharedHostStageBranch(tmp, $, multiDeployment);
+      await ensureNixosSharedHostReviewedSourceRef(tmp, $, multiDeployment);
       const multiRequest = {
         schemaVersion: NIXOS_SHARED_HOST_CONTROL_PLANE_SUBMIT_REQUEST_SCHEMA,
         submissionId: createNixosSharedHostSubmissionId(),

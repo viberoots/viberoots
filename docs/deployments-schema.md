@@ -644,14 +644,14 @@ Minimum gate-evidence record for each evaluated phase gate:
 
 Minimum fields:
 
-| Field                               | Required                | Notes                                                      |
-| ----------------------------------- | ----------------------- | ---------------------------------------------------------- |
-| `name` or stable id                 | yes                     | Versioned policy identity.                                 |
-| `allowed_refs` or equivalent        | yes                     | Allowed branches/refs.                                     |
-| `required_checks`                   | yes                     | Required CI or validation checks.                          |
-| `required_approvals`                | yes                     | Human/policy approval requirements, possibly empty.        |
-| `readiness_gates`                   | no                      | Live or staging-only evidence gates required by admission. |
-| `artifact_attestation_requirements` | yes for publishing runs | Build trust requirements.                                  |
+| Field                               | Required                | Notes                                                                                                                      |
+| ----------------------------------- | ----------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| `name` or stable id                 | yes                     | Versioned policy identity.                                                                                                 |
+| `allowed_refs` or equivalent        | yes                     | Closed reviewed source-ref classes such as protected `main`, `refs/tags/release/*`, or explicit `commit:<sha>` references. |
+| `required_checks`                   | yes                     | Required CI or validation checks.                                                                                          |
+| `required_approvals`                | yes                     | Human/policy approval requirements, possibly empty.                                                                        |
+| `readiness_gates`                   | no                      | Live or staging-only evidence gates required by admission.                                                                 |
+| `artifact_attestation_requirements` | yes for publishing runs | Build trust requirements.                                                                                                  |
 
 Optional fields:
 

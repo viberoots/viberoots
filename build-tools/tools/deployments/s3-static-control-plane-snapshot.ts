@@ -15,6 +15,7 @@ import {
   type AdmittedStaticWebappArtifact,
 } from "./static-webapp-artifacts";
 import type { S3StaticControlPlaneSubmitRequest } from "./s3-static-control-plane";
+import { requestedReviewedSourceFromEvidence } from "./deployment-source-revision";
 
 export type S3StaticControlPlaneSnapshot = FrozenProviderSnapshotFields & {
   schemaVersion: "s3-static-control-plane-snapshot@1";
@@ -126,6 +127,9 @@ async function admittedContextFor(opts: {
   artifact?: AdmittedStaticWebappArtifact;
   replay: Record<string, any>;
 }) {
+  const requestedReviewedSource = requestedReviewedSourceFromEvidence(
+    opts.request.admissionEvidence,
+  );
   const common = {
     workspaceRoot: opts.workspaceRoot,
     deployment: opts.request.deployment,
@@ -136,6 +140,7 @@ async function admittedContextFor(opts: {
     ...(opts.request.expectedSourceRevision
       ? { expectedSourceRevision: opts.request.expectedSourceRevision }
       : {}),
+    ...(requestedReviewedSource?.ref ? { requestedSourceRef: requestedReviewedSource.ref } : {}),
   };
   if (opts.request.operationKind === "promotion") {
     return await resolvePromotionS3StaticAdmittedContext({

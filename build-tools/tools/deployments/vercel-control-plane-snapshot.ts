@@ -14,6 +14,7 @@ import {
 } from "./vercel-artifacts";
 import { resolveVercelReplaySource, type VercelReplaySnapshot } from "./vercel-replay";
 import type { VercelControlPlaneSubmitRequest } from "./vercel-control-plane";
+import { requestedReviewedSourceFromEvidence } from "./deployment-source-revision";
 
 export type VercelControlPlaneSnapshot = FrozenProviderSnapshotFields & {
   schemaVersion: "vercel-control-plane-snapshot@1";
@@ -130,6 +131,9 @@ async function admittedContextFor(opts: {
   replay: Record<string, any>;
   artifact?: AdmittedVercelPrebuiltArtifact;
 }) {
+  const requestedReviewedSource = requestedReviewedSourceFromEvidence(
+    opts.request.admissionEvidence,
+  );
   const artifactIdentity =
     opts.replay.artifactLineageId || opts.artifact?.identity || "preview-cleanup";
   if (needsReplay(opts.request)) {
@@ -141,6 +145,7 @@ async function admittedContextFor(opts: {
       ...(opts.request.expectedSourceRevision
         ? { expectedSourceRevision: opts.request.expectedSourceRevision }
         : {}),
+      ...(requestedReviewedSource?.ref ? { requestedSourceRef: requestedReviewedSource.ref } : {}),
     });
   }
   return await resolveInitialVercelAdmittedContext({
@@ -151,6 +156,7 @@ async function admittedContextFor(opts: {
     ...(opts.request.expectedSourceRevision
       ? { expectedSourceRevision: opts.request.expectedSourceRevision }
       : {}),
+    ...(requestedReviewedSource?.ref ? { requestedSourceRef: requestedReviewedSource.ref } : {}),
   });
 }
 

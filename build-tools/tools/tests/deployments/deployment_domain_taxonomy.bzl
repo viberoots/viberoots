@@ -89,7 +89,7 @@ REVIEWED_DEPLOYMENT_TEST_OWNERSHIP = {
     "build-tools/tools/tests/deployments/deployment-retry-policy.test.ts": True,
     "build-tools/tools/tests/deployments/deployment-runner-identities.replay.provenance.test.ts": True,
     "build-tools/tools/tests/deployments/deployment-smoke-exception.validation.test.ts": True,
-    "build-tools/tools/tests/deployments/deployment-target-exceptions.validation.test.ts": True,
+    "build-tools/tools/tests/deployments/deployment-reviewed-source-provider-wiring.test.ts": True, "build-tools/tools/tests/deployments/deployment-source-ref-policy.test.ts": True, "build-tools/tools/tests/deployments/deployment-target-exceptions.validation.test.ts": True,
     "build-tools/tools/tests/deployments/deployment-verify-scope.boundary.test.ts": True,
     "build-tools/tools/tests/deployments/deployment-git-ref.fetch.test.ts": True,
     "build-tools/tools/tests/deployments/app-store-connect.e2e.test.ts": True,

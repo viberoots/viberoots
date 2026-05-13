@@ -6,7 +6,7 @@ import { localHarnessControlPlaneDatabaseUrl } from "../../deployments/nixos-sha
 import { submitNixosSharedHostControlPlaneRun } from "../../deployments/nixos-shared-host-control-plane";
 import { runInTemp } from "../lib/test-helpers";
 import { reviewedLaneAdmissionEvidenceFixture } from "./deployment-lane-governance.fixture";
-import { ensureNixosSharedHostStageBranch } from "./nixos-shared-host.fixture";
+import { ensureNixosSharedHostReviewedSourceRef } from "./nixos-shared-host.fixture";
 import { startNixosSharedHostPublicServer } from "./nixos-shared-host.public-server";
 import {
   replayDeploymentFixture,
@@ -26,7 +26,7 @@ test("rollback rejects a successful retry source while retry reuse stays availab
     const paths = replayPaths(tmp);
     const backendDatabaseUrl = localHarnessControlPlaneDatabaseUrl(paths.recordsRoot);
     await writeReplayArtifact(artifactDir, "retry-source");
-    await ensureNixosSharedHostStageBranch(tmp, $, deployment);
+    await ensureNixosSharedHostReviewedSourceRef(tmp, $, deployment);
     const server = await startNixosSharedHostPublicServer({ deployment, hostRoot: paths.hostRoot });
     try {
       const initial = await submitReplaySourceRun({
@@ -88,7 +88,7 @@ test("rollback rejects a successful rollback source while retry reuse stays avai
     const paths = replayPaths(tmp);
     const backendDatabaseUrl = localHarnessControlPlaneDatabaseUrl(paths.recordsRoot);
     await writeReplayArtifact(artifactDir, "rollback-source");
-    await ensureNixosSharedHostStageBranch(tmp, $, deployment);
+    await ensureNixosSharedHostReviewedSourceRef(tmp, $, deployment);
     const server = await startNixosSharedHostPublicServer({
       deployment,
       hostRoot: paths.hostRoot,
@@ -152,7 +152,7 @@ test("rollback rejects explicit-removal source runs with actionable diagnostics"
     const paths = replayPaths(tmp);
     const backendDatabaseUrl = localHarnessControlPlaneDatabaseUrl(paths.recordsRoot);
     await writeReplayArtifact(artifactDir, "explicit-removal");
-    await ensureNixosSharedHostStageBranch(tmp, $, deployment);
+    await ensureNixosSharedHostReviewedSourceRef(tmp, $, deployment);
     const server = await startNixosSharedHostPublicServer({ deployment, hostRoot: paths.hostRoot });
     try {
       await submitReplaySourceRun({
@@ -196,7 +196,7 @@ test("rollback rejects non-successful runs while retry reuse stays available", a
     const paths = replayPaths(tmp);
     const backendDatabaseUrl = localHarnessControlPlaneDatabaseUrl(paths.recordsRoot);
     await writeReplayArtifact(artifactDir, "failed-source", false);
-    await ensureNixosSharedHostStageBranch(tmp, $, deployment);
+    await ensureNixosSharedHostReviewedSourceRef(tmp, $, deployment);
     const server = await startNixosSharedHostPublicServer({ deployment, hostRoot: paths.hostRoot });
     try {
       const failedRunId = await submitNixosSharedHostControlPlaneRun({

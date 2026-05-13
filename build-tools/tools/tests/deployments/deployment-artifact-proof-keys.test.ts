@@ -21,7 +21,7 @@ import {
   challengedSubmitRequest,
   countBackendRows,
 } from "./nixos-shared-host.challenged-submit.helpers";
-import { ensureNixosSharedHostStageBranch } from "./nixos-shared-host.fixture";
+import { ensureNixosSharedHostReviewedSourceRef } from "./nixos-shared-host.fixture";
 import { writeDemoArtifact } from "./nixos-shared-host.control-plane.helpers";
 
 const TOKEN = "proof-key-token";
@@ -84,7 +84,7 @@ test("final submit rechecks proof-key registry state before accepting artifacts"
     const artifactDir = path.join(tmp, "artifact");
     await writeDemoArtifact(artifactDir);
     const request = await challengedSubmitRequest(artifactDir, "proof-key-final");
-    await ensureNixosSharedHostStageBranch(tmp, $, request.deployment);
+    await ensureNixosSharedHostReviewedSourceRef(tmp, $, request.deployment);
     const backend = {
       recordsRoot: path.join(tmp, "records"),
       databaseUrl: localHarnessControlPlaneDatabaseUrl(path.join(tmp, "records")),

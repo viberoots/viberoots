@@ -10,7 +10,7 @@ import { runInTemp } from "../lib/test-helpers";
 import { writeReviewedLaneAdmissionEvidenceJson } from "./deployment-lane-governance.fixture";
 import {
   deploymentSourceRef,
-  ensureNixosSharedHostStageBranch,
+  ensureNixosSharedHostReviewedSourceRef,
   nixosSharedHostDeploymentFixture,
 } from "./nixos-shared-host.fixture";
 import {
@@ -35,7 +35,7 @@ test("nixos-shared-host deploy CLI completes the shared-dev static-webapp flow e
     const hostConfigPath = path.join(tmp, "rendered-host.json");
     const backendDatabaseUrl = localHarnessControlPlaneDatabaseUrl(recordsRoot);
     await writeDemoArtifact(artifactDir);
-    await ensureNixosSharedHostStageBranch(tmp, $, deployment);
+    await ensureNixosSharedHostReviewedSourceRef(tmp, $, deployment);
     const sourceRef = deploymentSourceRef(deployment);
     await fsp.writeFile(deploymentJson, JSON.stringify(deployment, null, 2) + "\n", "utf8");
     const admissionEvidenceJson = await writeReviewedLaneAdmissionEvidenceJson({
@@ -160,7 +160,7 @@ test("nixos-shared-host deploy CLI completes the reviewed ssr-webapp flow end to
     const recordsRoot = path.join(tmp, "records");
     const hostConfigPath = path.join(tmp, "rendered-host.json");
     await writeSsrArtifact(artifactDir);
-    await ensureNixosSharedHostStageBranch(tmp, $, deployment);
+    await ensureNixosSharedHostReviewedSourceRef(tmp, $, deployment);
     await fsp.writeFile(deploymentJson, JSON.stringify(deployment, null, 2) + "\n", "utf8");
     const admissionEvidenceJson = await writeReviewedLaneAdmissionEvidenceJson({
       tmp,

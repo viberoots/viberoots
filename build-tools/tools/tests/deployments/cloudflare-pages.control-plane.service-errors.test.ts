@@ -9,7 +9,10 @@ import {
 } from "./cloudflare-pages.fixture";
 import { writeReviewedLaneAdmissionEvidenceJson } from "./deployment-lane-governance.fixture";
 import { startControlPlaneHarness } from "./nixos-shared-host.control-plane.helpers";
-import { deploymentSourceRef, ensureNixosSharedHostStageBranch } from "./nixos-shared-host.fixture";
+import {
+  deploymentSourceRef,
+  ensureNixosSharedHostReviewedSourceRef,
+} from "./nixos-shared-host.fixture";
 import { runInTemp } from "../lib/test-helpers";
 import {
   writeCloudflareServiceArtifact,
@@ -38,7 +41,7 @@ test("public cloudflare-pages deploy requires a control-plane URL for protected/
       path.join(tmp, "projects", "deployments", "pleomino-staging", "wrangler.jsonc"),
     );
     await installCloudflarePagesTargets(tmp, [deployment]);
-    await ensureNixosSharedHostStageBranch(tmp, $, deployment);
+    await ensureNixosSharedHostReviewedSourceRef(tmp, $, deployment);
     const admissionEvidenceJson = await writeReviewedLaneAdmissionEvidenceJson({
       tmp,
       $,
@@ -65,7 +68,7 @@ test("public cloudflare-pages deploy rejects mixed service and local records fla
       path.join(tmp, "projects", "deployments", "pleomino-staging", "wrangler.jsonc"),
     );
     await installCloudflarePagesTargets(tmp, [deployment]);
-    await ensureNixosSharedHostStageBranch(tmp, $, deployment);
+    await ensureNixosSharedHostReviewedSourceRef(tmp, $, deployment);
     const admissionEvidenceJson = await writeReviewedLaneAdmissionEvidenceJson({
       tmp,
       $,
@@ -99,7 +102,7 @@ test("service-backed cloudflare-pages deploy fails closed when client source dif
     const recordsRoot = path.join(tmp, "records");
     await writeCloudflareServiceArtifact(artifactDir, "<html>source-mismatch</html>\n");
     await installCloudflarePagesTargets(tmp, [deployment]);
-    await ensureNixosSharedHostStageBranch(tmp, $, deployment);
+    await ensureNixosSharedHostReviewedSourceRef(tmp, $, deployment);
     const sourceRef = deploymentSourceRef(deployment as any);
     const serviceRevision = await gitStdout(tmp, $, "rev-parse", sourceRef);
     const clientRevision = await commitLocalChange(tmp, $, "client-drift");

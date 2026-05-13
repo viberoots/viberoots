@@ -12,7 +12,7 @@ import {
 import { localHarnessControlPlaneDatabaseUrl } from "../../deployments/nixos-shared-host-control-plane-backend";
 import { runInTemp } from "../lib/test-helpers";
 import { reviewedLaneAdmissionEvidenceFixture } from "./deployment-lane-governance.fixture";
-import { ensureNixosSharedHostStageBranch } from "./nixos-shared-host.fixture";
+import { ensureNixosSharedHostReviewedSourceRef } from "./nixos-shared-host.fixture";
 import { vercelDeploymentFixture } from "./vercel.fixture";
 import {
   deploymentWithVercelCleanupSecret,
@@ -89,7 +89,7 @@ test("vercel worker retry rollback and preview cleanup replay frozen snapshots",
     const deployment = vercelReplayDeployment();
     const apiClient = createFakeVercelApiClient();
     await writeVercelPublisherConfig(tmp);
-    await ensureNixosSharedHostStageBranch(tmp, $, deployment);
+    await ensureNixosSharedHostReviewedSourceRef(tmp, $, deployment);
     await withVercelFixtureSecrets(
       {
         "vercel/api-token": {

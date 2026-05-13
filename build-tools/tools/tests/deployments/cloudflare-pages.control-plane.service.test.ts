@@ -20,7 +20,7 @@ import {
   withEnvOverrides,
 } from "./nixos-shared-host.control-plane.helpers";
 import {
-  ensureNixosSharedHostStageBranch,
+  ensureNixosSharedHostReviewedSourceRef,
   nixosSharedHostLanePolicyFixture,
 } from "./nixos-shared-host.fixture";
 import { installHarnessClientProfile } from "./nixos-shared-host.remote-exec.install.helpers";
@@ -78,7 +78,7 @@ test("public cloudflare-pages deploy routes deploy, preview, cleanup, and rollba
       path.join(tmp, "projects", "deployments", "pleomino-staging", "wrangler.jsonc"),
     );
     await installCloudflarePagesTargets(tmp, [deployment]);
-    await ensureNixosSharedHostStageBranch(tmp, $, deployment);
+    await ensureNixosSharedHostReviewedSourceRef(tmp, $, deployment);
     const admissionEvidenceJson = await writeReviewedLaneAdmissionEvidenceJson({
       tmp,
       $,

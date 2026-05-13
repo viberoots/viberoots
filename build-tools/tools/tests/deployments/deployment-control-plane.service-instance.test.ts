@@ -23,7 +23,7 @@ test("control-plane submit and status responses preserve public service-instance
       hostname: "mini",
       workspaceRoot: "/srv/viberoots",
       gitHead: "8f00f5cd723bed179a48847d2daeea3e0c2dcce1",
-      reviewedRef: "env/pleomino/dev",
+      reviewedRef: "main",
       reviewedRepository: "viberoots/viberoots",
       reviewedRemoteName: "origin",
       reviewedRemoteUrl: "git@github.com:viberoots/viberoots.git",

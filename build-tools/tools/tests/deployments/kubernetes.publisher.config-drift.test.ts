@@ -9,14 +9,14 @@ import { runInTemp } from "../lib/test-helpers";
 import { deploymentAdmissionEvidenceFixture } from "./deployment-admission.fixture";
 import { kubernetesDeploymentFixture } from "./kubernetes.fixture";
 import { writeServiceArtifact } from "./kubernetes.service-artifact.fixture";
-import { ensureNixosSharedHostStageBranch } from "./nixos-shared-host.fixture";
+import { ensureNixosSharedHostReviewedSourceRef } from "./nixos-shared-host.fixture";
 
 test("kubernetes rejects provider config drift before publish begins", async () => {
   await runInTemp("kubernetes-config-drift", async (tmp, $) => {
     const deployment = kubernetesDeploymentFixture();
     const artifactDir = path.join(tmp, "artifact");
     await writeServiceArtifact(artifactDir, "drift\n");
-    await ensureNixosSharedHostStageBranch(tmp, $, deployment as any);
+    await ensureNixosSharedHostReviewedSourceRef(tmp, $, deployment as any);
     const admissionEvidence = deploymentAdmissionEvidenceFixture({
       deployment,
       operationKind: "deploy",

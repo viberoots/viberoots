@@ -9,7 +9,7 @@ import { writeReviewedLaneAdmissionEvidenceJson } from "./deployment-lane-govern
 import { installS3StaticTargets, s3StaticDeploymentFixture } from "./s3-static.fixture";
 import { installFakeS3StaticAwsCli } from "./s3-static.fake-aws";
 import { startS3StaticPublicServer } from "./s3-static.public-server";
-import { ensureNixosSharedHostStageBranch } from "./nixos-shared-host.fixture";
+import { ensureNixosSharedHostReviewedSourceRef } from "./nixos-shared-host.fixture";
 
 async function writeArtifact(root: string, html: string): Promise<void> {
   await fsp.mkdir(root, { recursive: true });
@@ -25,7 +25,7 @@ test("s3-static deploy CLI completes the static-webapp flow end to end", async (
     const fake = await installFakeS3StaticAwsCli(tmp);
     await writeArtifact(artifactDir, "<html>pleomino s3 staging</html>\n");
     await installS3StaticTargets(tmp, [deployment]);
-    await ensureNixosSharedHostStageBranch(tmp, $, deployment as any);
+    await ensureNixosSharedHostReviewedSourceRef(tmp, $, deployment as any);
     await fsp.mkdir(path.join(tmp, "projects", "deployments", "pleomino-staging-s3"), {
       recursive: true,
     });
@@ -82,7 +82,7 @@ test("s3-static fails closed on ambiguous publish results", async () => {
     const fake = await installFakeS3StaticAwsCli(tmp);
     await writeArtifact(artifactDir, "<html>ambiguous</html>\n");
     await installS3StaticTargets(tmp, [deployment]);
-    await ensureNixosSharedHostStageBranch(tmp, $, deployment as any);
+    await ensureNixosSharedHostReviewedSourceRef(tmp, $, deployment as any);
     await fsp.mkdir(path.join(tmp, "projects", "deployments", "pleomino-staging-s3"), {
       recursive: true,
     });

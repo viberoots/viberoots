@@ -21,10 +21,10 @@ import {
 } from "./nixos-shared-host-admission-helpers";
 import type { NixosSharedHostDeployRecord } from "./nixos-shared-host-records";
 import type { NixosSharedHostReplaySnapshot } from "./nixos-shared-host-replay";
-import type { NixosSharedHostReviewedSourceSnapshot } from "./nixos-shared-host-reviewed-source-snapshot";
+import type { DeploymentReviewedSourceSnapshot } from "./nixos-shared-host-reviewed-source-snapshot";
 
 export type NixosSharedHostSourceAdmission = {
-  mode: "stage_branch_head" | "source_run_reuse" | "promotion_source_run";
+  mode: "reviewed_source_ref" | "source_run_reuse" | "promotion_source_run";
   sourceRef: string;
   sourceRevision: string;
   artifactIdentity?: string;
@@ -103,7 +103,7 @@ export async function resolveInitialNixosSharedHostAdmittedContext(opts: {
   artifactIdentity?: string;
   secretContext?: DeploymentSecretContext;
   deferSecretReferenceResolution?: boolean;
-  reviewedSourceSnapshot?: NixosSharedHostReviewedSourceSnapshot;
+  reviewedSourceSnapshot?: DeploymentReviewedSourceSnapshot;
 }): Promise<NixosSharedHostAdmittedContext> {
   const target = await targetEnvironmentAdmission(
     opts.workspaceRoot,
@@ -113,7 +113,7 @@ export async function resolveInitialNixosSharedHostAdmittedContext(opts: {
   return {
     ...(await baseContext(opts.deployment, target.lockScope, undefined, opts)),
     source: {
-      mode: "stage_branch_head",
+      mode: "reviewed_source_ref",
       sourceRef: target.targetRef,
       sourceRevision: target.targetRevision,
       artifactIdentity: opts.artifactIdentity,
@@ -132,7 +132,7 @@ export async function resolveReplayNixosSharedHostAdmittedContext(opts: {
   rollback: boolean;
   secretContext?: DeploymentSecretContext;
   deferSecretReferenceResolution?: boolean;
-  reviewedSourceSnapshot?: NixosSharedHostReviewedSourceSnapshot;
+  reviewedSourceSnapshot?: DeploymentReviewedSourceSnapshot;
 }): Promise<NixosSharedHostAdmittedContext> {
   const source = opts.sourceReplaySnapshot.admittedContext;
   const target = await targetEnvironmentAdmission(
@@ -223,7 +223,7 @@ export async function resolvePromotionNixosSharedHostAdmittedContext(opts: {
   sourceRecord: { deployRunId: string; deploymentId: string };
   secretContext?: DeploymentSecretContext;
   deferSecretReferenceResolution?: boolean;
-  reviewedSourceSnapshot?: NixosSharedHostReviewedSourceSnapshot;
+  reviewedSourceSnapshot?: DeploymentReviewedSourceSnapshot;
 }): Promise<NixosSharedHostAdmittedContext> {
   const target = await targetEnvironmentAdmission(
     opts.workspaceRoot,

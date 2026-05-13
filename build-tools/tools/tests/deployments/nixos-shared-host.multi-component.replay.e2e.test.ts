@@ -5,7 +5,7 @@ import path from "node:path";
 import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
 import { writeReviewedLaneAdmissionEvidenceJson } from "./deployment-lane-governance.fixture";
-import { ensureNixosSharedHostStageBranch } from "./nixos-shared-host.fixture";
+import { ensureNixosSharedHostReviewedSourceRef } from "./nixos-shared-host.fixture";
 import { multiComponentDeployment } from "./nixos-shared-host.multi-component.fixture";
 import {
   readRecord,
@@ -34,7 +34,7 @@ test("nixos-shared-host multi-component retry reuses a live proven component and
     const apiArtifact = path.join(tmp, "artifacts", "api");
     await writeArtifact(frontendArtifact, "frontend-v1");
     await writeArtifact(apiArtifact, "api-v1");
-    await ensureNixosSharedHostStageBranch(tmp, $, deployment);
+    await ensureNixosSharedHostReviewedSourceRef(tmp, $, deployment);
     await writeDeploymentJson(deploymentJson, deployment);
     const admissionEvidenceJson = await writeReviewedLaneAdmissionEvidenceJson({
       tmp,
@@ -136,7 +136,7 @@ test("nixos-shared-host multi-component rollback replays recorded per-component 
     await writeArtifact(firstApiArtifact, "api-v1");
     await writeArtifact(secondFrontendArtifact, "frontend-v2");
     await writeArtifact(secondApiArtifact, "api-v2");
-    await ensureNixosSharedHostStageBranch(tmp, $, deployment);
+    await ensureNixosSharedHostReviewedSourceRef(tmp, $, deployment);
     await writeDeploymentJson(deploymentJson, deployment);
     const admissionEvidenceJson = await writeReviewedLaneAdmissionEvidenceJson({
       tmp,

@@ -24,7 +24,7 @@ import {
   startControlPlaneHarness,
   withEnvOverrides,
 } from "./nixos-shared-host.control-plane.helpers";
-import { ensureNixosSharedHostStageBranch } from "./nixos-shared-host.fixture";
+import { ensureNixosSharedHostReviewedSourceRef } from "./nixos-shared-host.fixture";
 import { runInTemp } from "../lib/test-helpers";
 
 let buckQueryNonce = 0;
@@ -157,7 +157,7 @@ test("deploy front door runs a cloudflare-pages deploy from Buck-backed metadata
     await writeTempCloudflareValidationWorkspace(tmp);
     await writeArtifact(artifactDir, "<html>demo staging</html>\n");
     const deployment = await resolveDeploymentFromTarget(tmp, deploymentLabel);
-    await ensureNixosSharedHostStageBranch(tmp, $, deployment as any);
+    await ensureNixosSharedHostReviewedSourceRef(tmp, $, deployment as any);
     const admissionEvidenceJson = await writeReviewedLaneAdmissionEvidenceJson({
       tmp,
       $,

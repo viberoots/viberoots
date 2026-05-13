@@ -9,7 +9,7 @@ import { startNixosSharedHostControlPlaneServer } from "../../deployments/nixos-
 import { startNixosSharedHostControlPlaneWorkerLoop } from "../../deployments/nixos-shared-host-control-plane-worker-loop";
 import { writeTempListedDeploymentWorkspace } from "./deploy.front-door.fixture";
 import { readRecord, waitFor, writeDemoArtifact } from "./nixos-shared-host.control-plane.helpers";
-import { ensureNixosSharedHostStageBranch } from "./nixos-shared-host.fixture";
+import { ensureNixosSharedHostReviewedSourceRef } from "./nixos-shared-host.fixture";
 import { startNixosSharedHostPublicServer } from "./nixos-shared-host.public-server";
 import { runInTemp } from "../lib/test-helpers";
 
@@ -30,13 +30,12 @@ async function deployWithChecks(opts: {
   artifactDir: string;
   controlPlaneUrl: string;
   serverPort: number;
-  stageRevision: string;
 }) {
   const result = await opts.$({
     cwd: opts.tmp,
     env: { ...process.env, [LOCAL_FIXTURE_SERVICE_ENV]: "1" },
     stdio: "pipe",
-  })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment ${opts.deploymentLabel} --artifact-dir ${opts.artifactDir} --admit-and-deploy deploy/demo-dev --admit-for-commit ${opts.stageRevision} --control-plane-url ${opts.controlPlaneUrl} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(opts.serverPort)} --smoke-connect-protocol https:`;
+  })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment ${opts.deploymentLabel} --artifact-dir ${opts.artifactDir} --admit-and-deploy deploy/demo-dev --control-plane-url ${opts.controlPlaneUrl} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(opts.serverPort)} --smoke-connect-protocol https:`;
   return JSON.parse(String(result.stdout));
 }
 
@@ -52,11 +51,7 @@ test("service-backed shared-host deploy synthesizes service-owned governance evi
     await writeTempListedDeploymentWorkspace(tmp);
     await writeDemoArtifact(artifactDir);
     const deployment = await resolveDeploymentFromTarget(tmp, deploymentLabel);
-    await ensureNixosSharedHostStageBranch(tmp, $, deployment as any);
-    const sourceRef = deployment.lanePolicy.sourceRefPolicy[deployment.environmentStage];
-    const stageRevision = String(
-      (await $({ cwd: tmp, stdio: "pipe" })`git rev-parse ${sourceRef}`).stdout,
-    ).trim();
+    await ensureNixosSharedHostReviewedSourceRef(tmp, $, deployment as any);
     const server = await startNixosSharedHostPublicServer({
       deployment: deployment as any,
       hostRoot: paths.hostRoot,
@@ -84,7 +79,6 @@ test("service-backed shared-host deploy synthesizes service-owned governance evi
         artifactDir,
         controlPlaneUrl: controlPlane.url,
         serverPort: server.port,
-        stageRevision,
       });
       const record = await waitFor(async () => {
         try {
@@ -117,11 +111,7 @@ test("service-backed shared-host deploy fails closed when automatic governance d
     await writeTempListedDeploymentWorkspace(tmp);
     await writeDemoArtifact(artifactDir);
     const deployment = await resolveDeploymentFromTarget(tmp, deploymentLabel);
-    await ensureNixosSharedHostStageBranch(tmp, $, deployment as any);
-    const sourceRef = deployment.lanePolicy.sourceRefPolicy[deployment.environmentStage];
-    const stageRevision = String(
-      (await $({ cwd: tmp, stdio: "pipe" })`git rev-parse ${sourceRef}`).stdout,
-    ).trim();
+    await ensureNixosSharedHostReviewedSourceRef(tmp, $, deployment as any);
     const server = await startNixosSharedHostPublicServer({
       deployment: deployment as any,
       hostRoot: paths.hostRoot,
@@ -150,7 +140,6 @@ test("service-backed shared-host deploy fails closed when automatic governance d
           artifactDir,
           controlPlaneUrl: controlPlane.url,
           serverPort: server.port,
-          stageRevision,
         }),
         /lane governance verification failed[\s\S]*required checks drift/,
       );

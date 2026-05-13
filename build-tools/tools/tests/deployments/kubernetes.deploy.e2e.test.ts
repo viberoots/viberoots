@@ -15,7 +15,7 @@ import {
 } from "./kubernetes.publish-credentials.fixture";
 import { startKubernetesPublicServer } from "./kubernetes.public-server";
 import { writeServiceArtifact } from "./kubernetes.service-artifact.fixture";
-import { ensureNixosSharedHostStageBranch } from "./nixos-shared-host.fixture";
+import { ensureNixosSharedHostReviewedSourceRef } from "./nixos-shared-host.fixture";
 
 async function writeKubernetesPublishSecretFixture(tmp: string): Promise<string> {
   const fixturePath = path.join(tmp, "kubernetes-publish-secrets.json");
@@ -62,7 +62,7 @@ test("kubernetes deploy CLI completes single-service publish with reviewed provi
     const fake = await installFakeKubernetesHelm(tmp);
     await writeServiceArtifact(artifactDir, "api-service\n");
     await installKubernetesTargets(tmp, [deployment]);
-    await ensureNixosSharedHostStageBranch(tmp, $, deployment as any);
+    await ensureNixosSharedHostReviewedSourceRef(tmp, $, deployment as any);
     await writeHelmValues(
       tmp,
       deployment.deploymentId,
@@ -146,7 +146,7 @@ test("kubernetes deploy preserves ordered multi-component publish state", async 
     await writeServiceArtifact(apiArtifact, "api-service\n");
     await writeServiceArtifact(sidecarArtifact, "otel-sidecar\n");
     await installKubernetesTargets(tmp, [deployment]);
-    await ensureNixosSharedHostStageBranch(tmp, $, deployment as any);
+    await ensureNixosSharedHostReviewedSourceRef(tmp, $, deployment as any);
     await writeHelmValues(
       tmp,
       deployment.deploymentId,

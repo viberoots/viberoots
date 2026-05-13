@@ -13,7 +13,7 @@ import { installFakeCloudflarePagesWrangler } from "./cloudflare-pages.fake-wran
 import { writeReviewedLaneAdmissionEvidenceJson } from "./deployment-lane-governance.fixture";
 import { startCloudflarePagesPublicServer } from "./cloudflare-pages.public-server";
 import {
-  ensureNixosSharedHostStageBranch,
+  ensureNixosSharedHostReviewedSourceRef,
   installNixosSharedHostTargets,
   nixosSharedHostAdmissionPolicyFixture,
   nixosSharedHostDeploymentFixture,
@@ -122,8 +122,8 @@ test("nixos-shared-host allows reviewed cross-provider same-artifact promotion o
     );
     await installCloudflarePagesTargets(tmp, [source]);
     await installNixosSharedHostTargets(tmp, [target]);
-    await ensureNixosSharedHostStageBranch(tmp, $, source);
-    await ensureNixosSharedHostStageBranch(tmp, $, target);
+    await ensureNixosSharedHostReviewedSourceRef(tmp, $, source);
+    await ensureNixosSharedHostReviewedSourceRef(tmp, $, target);
     await writeDeploymentJson(sourceJson, source);
     await writeDeploymentJson(targetJson, target);
     const sourceEvidenceJson = await writeReviewedLaneAdmissionEvidenceJson({
@@ -190,8 +190,8 @@ test("nixos-shared-host promotion rejects retained source runs that drift out of
     );
     await installCloudflarePagesTargets(tmp, [source]);
     await installNixosSharedHostTargets(tmp, [target]);
-    await ensureNixosSharedHostStageBranch(tmp, $, source);
-    await ensureNixosSharedHostStageBranch(tmp, $, target);
+    await ensureNixosSharedHostReviewedSourceRef(tmp, $, source);
+    await ensureNixosSharedHostReviewedSourceRef(tmp, $, target);
     await writeDeploymentJson(sourceJson, source);
     const sourceEvidenceJson = await writeReviewedLaneAdmissionEvidenceJson({
       tmp,
@@ -213,7 +213,6 @@ test("nixos-shared-host promotion rejects retained source runs that drift out of
       await $({ cwd: tmp, stdio: "pipe" })`git config user.email test@example.com`;
       await $({ cwd: tmp, stdio: "pipe" })`git config user.name Test`;
       await $({ cwd: tmp, stdio: "pipe" })`git commit --allow-empty -m drift`;
-      await $({ cwd: tmp, stdio: "pipe" })`git branch -f env/pleomino/staging HEAD`;
       await assert.rejects(
         resolveCrossDeploymentPromotionSelection({
           workspaceRoot: tmp,

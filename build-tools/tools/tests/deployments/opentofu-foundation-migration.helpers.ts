@@ -136,19 +136,19 @@ export function openTofuAdmittedContextFixture(target: OpenTofuDeployment) {
     },
     targetExceptionRefs: [],
     source: {
-      mode: "stage_branch_head" as const,
+      mode: "reviewed_source_ref" as const,
       sourceRef: "refs/heads/main",
       sourceRevision: "rev-schema",
       artifactIdentity: "migration-bundle:test",
       artifactTrustMode: "recorded_exact_artifact" as const,
     },
     targetEnvironment: {
-      mode: "stage_branch_snapshot" as const,
+      mode: "reviewed_source_snapshot" as const,
       targetRef: "refs/heads/main",
       targetRevision: "rev-schema",
       providerTargetIdentity: target.providerTarget.providerTargetIdentity,
       lockScope: target.providerTarget.providerTargetIdentity,
-      reviewedSourceSnapshot: { mode: "stage_branch", ref: "refs/heads/main" } as any,
+      reviewedSourceSnapshot: { mode: "reviewed_source_ref", ref: "refs/heads/main" } as any,
     },
   };
 }

@@ -6,7 +6,7 @@ import { test } from "node:test";
 import { resolveDeploymentReviewedTargetEnvironment } from "../../deployments/deployment-reviewed-target-environment";
 import { runInTemp } from "../lib/test-helpers";
 import {
-  ensureNixosSharedHostStageBranch,
+  ensureNixosSharedHostReviewedSourceRef,
   nixosSharedHostAdmissionPolicyFixture,
 } from "./nixos-shared-host.fixture";
 import { installS3StaticTargets, s3StaticDeploymentFixture } from "./s3-static.fixture";
@@ -34,7 +34,7 @@ test("service-backed s3-static deploy fails closed when client source differs fr
       }),
     });
     await installS3StaticTargets(tmp, [deployment]);
-    await ensureNixosSharedHostStageBranch(tmp, $, deployment as any);
+    await ensureNixosSharedHostReviewedSourceRef(tmp, $, deployment as any);
     const serviceRevision = await gitStdout(tmp, $, "rev-parse", "main");
     const clientRevision = await commitLocalChange(tmp, $, "client-drift");
     assert.notEqual(clientRevision, serviceRevision);

@@ -15,6 +15,7 @@ import {
   type DeploymentAdmissionEvidence,
   type DeploymentCheckEvidence,
   type DeploymentCheckReportingKind,
+  type DeploymentReviewedSourceEvidence,
 } from "./deployment-admission-evidence";
 
 const execFileAsync = promisify(execFile);
@@ -100,6 +101,23 @@ async function resolveMarkedPassedCheckSubject(
   }
 }
 
+function commitRefForSha(value: string): string {
+  return `commit:${value.toLowerCase()}`;
+}
+
+async function resolveAdmitReviewedSource(
+  workspaceRoot: string,
+  revision: string,
+): Promise<DeploymentReviewedSourceEvidence> {
+  const resolved = await resolveMarkedPassedCheckSubject(workspaceRoot, revision);
+  const ref = /^commit:[0-9a-f]{40}$/i.test(revision)
+    ? commitRefForSha(revision.slice("commit:".length))
+    : /^[0-9a-f]{40}$/i.test(revision)
+      ? commitRefForSha(resolved)
+      : revision;
+  return { ref, revision: resolved };
+}
+
 function mergeCheckEvidence(
   existing: DeploymentCheckEvidence[] = [],
   inferred: DeploymentCheckEvidence[],
@@ -170,11 +188,17 @@ export async function resolveDeploymentAdmissionEvidence(
     throw new Error(`invalid --admission-evidence-json payload: ${evidenceJson}`);
   }
   if (admittedChecks.length === 0) return baseEvidence;
-  const subject = await resolveMarkedPassedCheckSubject(workspaceRoot, admitCommitOverride);
+  const reviewedSource = admitCommitOverride
+    ? await resolveAdmitReviewedSource(workspaceRoot, admitCommitOverride)
+    : undefined;
+  const subject =
+    reviewedSource?.revision || (await resolveMarkedPassedCheckSubject(workspaceRoot, undefined));
   if (opts.deployment && opts.deployment.admissionPolicy.requiredChecks.length > 0) {
     const required = await resolveDeploymentRequiredCheckSubject({
       workspaceRoot,
       deployment: opts.deployment,
+      ...(reviewedSource?.ref ? { requestedSourceRef: reviewedSource.ref } : {}),
+      ...(reviewedSource?.revision ? { requestedSourceRevision: reviewedSource.revision } : {}),
     });
     if (required.sha !== subject) {
       throw new Error(
@@ -209,6 +233,7 @@ export async function resolveDeploymentAdmissionEvidence(
   );
   return {
     ...(baseEvidence || {}),
+    ...(reviewedSource ? { reviewedSource } : {}),
     checks: mergeCheckEvidence(baseEvidence?.checks, inferredChecks),
   };
 }

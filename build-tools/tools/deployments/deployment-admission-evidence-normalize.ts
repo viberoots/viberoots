@@ -75,6 +75,7 @@ export function normalizeAdmissionEvidence(
   const prerequisiteHealth = normalizeList(raw.prerequisiteHealth, normalizeHealthEvidence);
   const requestedBy = normalizePrincipal(raw.requestedBy);
   const submittedBy = normalizePrincipal(raw.submittedBy);
+  const reviewedSource = normalizeReviewedSourceEvidence(raw.reviewedSource);
   const laneGovernance = normalizeLaneGovernanceEvidence(raw.laneGovernance);
   const provisionerPlanFingerprint = readText(raw, "provisionerPlanFingerprint");
   const buildInputsFingerprint = readText(raw, "buildInputsFingerprint");
@@ -89,6 +90,7 @@ export function normalizeAdmissionEvidence(
     ...(accessMode ? { accessMode: accessMode as DeploymentAdmissionEvidence["accessMode"] } : {}),
     ...(requestedBy ? { requestedBy } : {}),
     ...(submittedBy ? { submittedBy } : {}),
+    ...(reviewedSource ? { reviewedSource } : {}),
     ...(checks.length > 0 ? { checks } : {}),
     ...(approvals.length > 0 ? { approvals } : {}),
     ...(prerequisiteHealth.length > 0 ? { prerequisiteHealth } : {}),
@@ -101,6 +103,15 @@ export function normalizeAdmissionEvidence(
     ...(readinessGates.length > 0 ? { readinessGates } : {}),
     ...(phase0CompatibilityException ? { phase0CompatibilityException } : {}),
   };
+}
+
+function normalizeReviewedSourceEvidence(entry: unknown) {
+  if (!entry || typeof entry !== "object" || Array.isArray(entry)) return undefined;
+  const rawEntry = entry as Record<string, unknown>;
+  const ref = readText(rawEntry, "ref");
+  if (!ref) return undefined;
+  const revision = readText(rawEntry, "revision");
+  return revision ? { ref, revision } : { ref };
 }
 
 function normalizeApprovalEvidence(entry: unknown) {

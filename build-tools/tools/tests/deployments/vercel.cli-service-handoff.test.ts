@@ -34,7 +34,7 @@ import {
 } from "./vercel.control-plane.helpers";
 import { readBackendSnapshot } from "./nixos-shared-host.control-plane.helpers";
 import {
-  ensureNixosSharedHostStageBranch,
+  ensureNixosSharedHostReviewedSourceRef,
   nixosSharedHostAdmissionPolicyFixture,
   nixosSharedHostLanePolicyFixture,
 } from "./nixos-shared-host.fixture";
@@ -130,7 +130,7 @@ function sourceAdmittedContext(tmp: string, deployment: VercelDeployment, target
     },
     targetExceptionRefs: [],
     source: {
-      mode: "stage_branch_head",
+      mode: "reviewed_source_ref",
       sourceRef: target.targetRef,
       sourceRevision: target.targetRevision,
       artifactIdentity,
@@ -201,7 +201,7 @@ test("protected Vercel CLI queues deploy preview cleanup retry and rollback thro
     const initial = protectedVercelDeployment();
     await installVercelTargets(tmp, initial);
     const deployment = (await resolveDeploymentFromTarget(tmp, initial.label)) as VercelDeployment;
-    await ensureNixosSharedHostStageBranch(tmp, $, deployment as any);
+    await ensureNixosSharedHostReviewedSourceRef(tmp, $, deployment as any);
     const evidence = await writeReviewedLaneAdmissionEvidenceJson({ tmp, $, deployment });
     const sourceRunId = await seedReplaySource(tmp, recordsRoot, deployment);
     const service = await startVercelQueueOnlyService(tmp, recordsRoot);

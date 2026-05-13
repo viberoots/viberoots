@@ -14,7 +14,7 @@ import { NIXOS_SHARED_HOST_CONTROL_PLANE_SUBMIT_REQUEST_SCHEMA } from "../../dep
 import { startNixosSharedHostControlPlaneServer } from "../../deployments/nixos-shared-host-control-plane-server";
 import { createNixosSharedHostSubmissionId } from "../../deployments/nixos-shared-host-control-plane-snapshot";
 import { runInTemp } from "../lib/test-helpers";
-import { ensureNixosSharedHostStageBranch } from "./nixos-shared-host.fixture";
+import { ensureNixosSharedHostReviewedSourceRef } from "./nixos-shared-host.fixture";
 import { readJson, writeDemoArtifact } from "./nixos-shared-host.control-plane.helpers";
 import {
   authRequiredDeployment,
@@ -64,7 +64,7 @@ test("challenge issuance rejects unauthorized auth-required requests before pers
       databaseUrl: localHarnessControlPlaneDatabaseUrl(paths.recordsRoot),
     };
     await writeDemoArtifact(artifactDir);
-    await ensureNixosSharedHostStageBranch(tmp, $, deployment);
+    await ensureNixosSharedHostReviewedSourceRef(tmp, $, deployment);
     const controlPlane = await startNixosSharedHostControlPlaneServer({
       workspaceRoot: tmp,
       paths,
@@ -119,7 +119,7 @@ test("final submit rejects auth principal drift without consuming the challenge"
       databaseUrl: localHarnessControlPlaneDatabaseUrl(paths.recordsRoot),
     };
     await writeDemoArtifact(artifactDir);
-    await ensureNixosSharedHostStageBranch(tmp, $, deployment);
+    await ensureNixosSharedHostReviewedSourceRef(tmp, $, deployment);
     const controlPlane = await startNixosSharedHostControlPlaneServer({
       workspaceRoot: tmp,
       paths,

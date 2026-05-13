@@ -12,7 +12,7 @@ import {
 } from "../../deployments/vercel-control-plane";
 import { createFakeVercelApiClient } from "../../deployments/vercel-api";
 import { runInTemp } from "../lib/test-helpers";
-import { ensureNixosSharedHostStageBranch } from "./nixos-shared-host.fixture";
+import { ensureNixosSharedHostReviewedSourceRef } from "./nixos-shared-host.fixture";
 import { kubernetesDeploymentFixture } from "./kubernetes.fixture";
 import { s3StaticDeploymentFixture } from "./s3-static.fixture";
 import { vercelDeploymentFixture } from "./vercel.fixture";
@@ -36,7 +36,7 @@ test("provider workers execute from frozen snapshot artifact and secret referenc
     await writeVercelPublisherConfig(tmp);
     const vercel = vercelDeploymentWithSecrets();
     const apiClient = createFakeVercelApiClient();
-    await ensureNixosSharedHostStageBranch(tmp, $, vercel);
+    await ensureNixosSharedHostReviewedSourceRef(tmp, $, vercel);
     await withVercelFixtureSecrets(
       {
         "vercel/api-token": {

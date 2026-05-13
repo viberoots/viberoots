@@ -8,7 +8,7 @@ import { artifactIdentityForStaticWebappDir } from "../../deployments/nixos-shar
 import { deploymentAdmissionEvidenceFixture } from "./deployment-admission.fixture";
 import {
   deploymentSourceRef,
-  ensureNixosSharedHostStageBranch,
+  ensureNixosSharedHostReviewedSourceRef,
   nixosSharedHostDeploymentFixture,
 } from "./nixos-shared-host.fixture";
 import { startNixosSharedHostPublicServer } from "./nixos-shared-host.public-server";
@@ -46,7 +46,7 @@ test("control-plane records and replay snapshots preserve supply-chain admission
     const hostRoot = path.join(tmp, "host");
     const recordsRoot = path.join(tmp, "records");
     await writeArtifact(artifactDir);
-    await ensureNixosSharedHostStageBranch(tmp, $, deployment);
+    await ensureNixosSharedHostReviewedSourceRef(tmp, $, deployment);
     const sourceRevision = String(
       (await $({ cwd: tmp, stdio: "pipe" })`git rev-parse ${deploymentSourceRef(deployment)}`)
         .stdout,

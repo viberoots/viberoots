@@ -4,7 +4,7 @@ import path from "node:path";
 import { submitDeploymentControlPlaneRunAction } from "../../deployments/deployment-control-plane-run-action";
 import { submitNixosSharedHostControlPlaneRun } from "../../deployments/nixos-shared-host-control-plane";
 import {
-  ensureNixosSharedHostStageBranch,
+  ensureNixosSharedHostReviewedSourceRef,
   nixosSharedHostDeploymentFixture,
 } from "./nixos-shared-host.fixture";
 import { writeDemoArtifact } from "./nixos-shared-host.control-plane.helpers";
@@ -24,7 +24,7 @@ export async function pendingApprovalRun(
     recordsRoot,
   };
   await writeDemoArtifact(artifactDir);
-  await ensureNixosSharedHostStageBranch(tmp, $, deployment);
+  await ensureNixosSharedHostReviewedSourceRef(tmp, $, deployment);
   try {
     await submitNixosSharedHostControlPlaneRun({
       workspaceRoot: tmp,

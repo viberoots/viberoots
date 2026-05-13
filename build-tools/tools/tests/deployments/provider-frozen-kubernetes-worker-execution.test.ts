@@ -21,7 +21,7 @@ import {
 } from "./kubernetes.publish-credentials.fixture";
 import { writeServiceArtifact } from "./kubernetes.service-artifact.fixture";
 import { withEnvOverrides } from "./nixos-shared-host.control-plane.helpers";
-import { ensureNixosSharedHostStageBranch } from "./nixos-shared-host.fixture";
+import { ensureNixosSharedHostReviewedSourceRef } from "./nixos-shared-host.fixture";
 
 async function writeJson(filePath: string, value: Record<string, unknown>) {
   await fsp.mkdir(path.dirname(filePath), { recursive: true });
@@ -90,7 +90,7 @@ test("kubernetes worker deploy and retry execute from frozen snapshots", async (
     });
     const fake = await installFakeKubernetesHelm(tmp);
     const secretFixturePath = await writeKubernetesPublishSecretFixture(tmp);
-    await ensureNixosSharedHostStageBranch(tmp, $, deployment as any);
+    await ensureNixosSharedHostReviewedSourceRef(tmp, $, deployment as any);
     await writeValues(tmp, deployment.deploymentId);
     const server = await startKubernetesPublicServer({ deployment, publishRoot: fake.publishRoot });
     const smokeConnectOverride = {

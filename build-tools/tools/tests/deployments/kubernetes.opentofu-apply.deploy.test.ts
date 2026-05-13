@@ -17,7 +17,7 @@ import {
 } from "./kubernetes.publish-credentials.fixture";
 import { startKubernetesPublicServer } from "./kubernetes.public-server";
 import { writeServiceArtifact } from "./kubernetes.service-artifact.fixture";
-import { ensureNixosSharedHostStageBranch } from "./nixos-shared-host.fixture";
+import { ensureNixosSharedHostReviewedSourceRef } from "./nixos-shared-host.fixture";
 import {
   INTEGRATION_SECRET_VALUE,
   installFakeOpenTofu,
@@ -63,7 +63,7 @@ test("kubernetes app-attached deploy attaches OpenTofu apply outcome with replay
     });
     await writeServiceArtifact(artifactDir, "api-service\n");
     await installKubernetesTargets(tmp, [deployment]);
-    await ensureNixosSharedHostStageBranch(tmp, $, deployment as any);
+    await ensureNixosSharedHostReviewedSourceRef(tmp, $, deployment as any);
     await writeOpenTofuStackFixture({
       workspaceRoot: tmp,
       deploymentId: deployment.deploymentId,

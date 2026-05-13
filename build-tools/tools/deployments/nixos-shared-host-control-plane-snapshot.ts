@@ -38,7 +38,7 @@ import {
   recordedComponentResults,
 } from "./nixos-shared-host-control-plane-snapshot-helpers";
 import type { DeploymentAdmissionEvidence } from "./deployment-admission-evidence";
-import type { NixosSharedHostReviewedSourceSnapshot } from "./nixos-shared-host-reviewed-source-snapshot";
+import type { DeploymentReviewedSourceSnapshot } from "./nixos-shared-host-reviewed-source-snapshot";
 import { workerVaultRuntimeMetadata } from "./deployment-vault-runtime-worker";
 export type NixosSharedHostControlPlaneSourceSelection = {
   record: NixosSharedHostDeployRecord | { deployRunId: string; deploymentId: string };
@@ -64,7 +64,7 @@ export type NixosSharedHostControlPlaneSnapshotOpts = {
   source?: NixosSharedHostControlPlaneSourceSelection;
   admissionEvidence?: DeploymentAdmissionEvidence;
   deferSecretReferenceResolution?: boolean;
-  reviewedSourceSnapshot?: NixosSharedHostReviewedSourceSnapshot;
+  reviewedSourceSnapshot?: DeploymentReviewedSourceSnapshot;
 };
 
 function admittedContextOptions(opts: NixosSharedHostControlPlaneSnapshotOpts) {

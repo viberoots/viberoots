@@ -7,7 +7,7 @@ import { DEPLOYMENT_SECRET_FIXTURE_SCHEMA } from "../../deployments/deployment-s
 import { submitNixosSharedHostControlPlaneRun } from "../../deployments/nixos-shared-host-control-plane";
 import { runInTemp } from "../lib/test-helpers";
 import {
-  ensureNixosSharedHostStageBranch,
+  ensureNixosSharedHostReviewedSourceRef,
   nixosSharedHostDeploymentFixture,
 } from "./nixos-shared-host.fixture";
 import { withEnvOverrides } from "./nixos-shared-host.control-plane.helpers";
@@ -61,7 +61,7 @@ test("routine deploy rejects destructive schema-migration release actions", asyn
     const artifactDir = path.join(tmp, "artifact-v2");
     const fixturePath = path.join(tmp, "secret-fixture.json");
     await writeArtifact(artifactDir, "<html>v2</html>");
-    await ensureNixosSharedHostStageBranch(tmp, $, deployment);
+    await ensureNixosSharedHostReviewedSourceRef(tmp, $, deployment);
     await writeSecretFixture(fixturePath, {
       "secret://deployments/demoapp/database_url": {
         value: "postgres://demoapp:test@db.internal/demoapp",

@@ -2,7 +2,12 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { getArgvTokens, getFlagStr, hasFlag } from "../lib/cli";
-import { requiredDeploymentStageBranch, type DeploymentTarget } from "./contract";
+import type { DeploymentTarget } from "./contract";
+import {
+  localGitRevision,
+  requiredDeploymentReviewedSourceRef,
+  resolveReviewedSourceRevision,
+} from "./deployment-reviewed-source-ref";
 
 const execFileAsync = promisify(execFile);
 
@@ -26,9 +31,15 @@ function firstGitErrorLine(detail: string): string {
 
 export type DeploymentAdmissionRequirementsForCli = {
   admission_policy: string;
+  source_ref_policy: {
+    stage: string;
+    ref: string;
+    kind: string;
+  };
   allowed_refs: string[];
   required_checks: string[];
   required_approvals: string[];
+  trusted_admission_reporters: string[];
   required_check_subject?: {
     kind: "git_commit";
     ref: string;
@@ -41,13 +52,6 @@ export type DeploymentAdmissionRequirementsForCli = {
     evidence_only_flag: "--admit-only";
   };
 };
-
-async function resolveGitRevision(workspaceRoot: string, revision: string): Promise<string> {
-  const { stdout } = await execFileAsync("git", ["rev-parse", revision], { cwd: workspaceRoot });
-  const resolved = String(stdout || "").trim();
-  if (!resolved) throw new Error(`empty git revision for ${revision}`);
-  return resolved;
-}
 
 async function listGitRemotes(workspaceRoot: string): Promise<string[]> {
   try {
@@ -79,15 +83,29 @@ function currentDeployCommandArgs(deployment: DeploymentTarget): string[] {
 export async function resolveDeploymentRequiredCheckSubject(opts: {
   workspaceRoot: string;
   deployment: DeploymentTarget;
+  requestedSourceRef?: string;
+  requestedSourceRevision?: string;
 }) {
-  const ref = requiredDeploymentStageBranch(opts.deployment);
   try {
+    const source = await resolveReviewedSourceRevision({
+      workspaceRoot: opts.workspaceRoot,
+      deployment: opts.deployment,
+      resolveGitRevision: localGitRevision,
+      ...(opts.requestedSourceRef ? { requestedSourceRef: opts.requestedSourceRef } : {}),
+      ...(opts.requestedSourceRevision
+        ? { requestedSourceRevision: opts.requestedSourceRevision }
+        : {}),
+    });
     return {
       kind: "git_commit" as const,
-      ref,
-      sha: await resolveGitRevision(opts.workspaceRoot, ref),
+      ref: source.ref,
+      sha: source.sha,
     };
   } catch (error) {
+    const ref =
+      opts.requestedSourceRef ||
+      opts.deployment.lanePolicy.sourceRefPolicy[opts.deployment.environmentStage] ||
+      "";
     const detail = firstGitErrorLine(gitErrorDetail(error));
     throw new Error(
       [
@@ -105,18 +123,36 @@ export async function deploymentAdmissionRequirementsForCli(
   workspaceRoot: string,
   deployment: DeploymentTarget,
 ): Promise<DeploymentAdmissionRequirementsForCli> {
+  const policySource = requiredDeploymentReviewedSourceRef(deployment);
+  const source = resolveReviewedSourceRevision({
+    workspaceRoot,
+    deployment,
+    resolveGitRevision: localGitRevision,
+  }).catch(() => undefined);
   const requiredCheckSubject =
     deployment.admissionPolicy.requiredChecks.length > 0
-      ? await resolveDeploymentRequiredCheckSubject({
-          workspaceRoot,
-          deployment,
-        })
+      ? await source.then((entry) =>
+          entry
+            ? {
+                kind: "git_commit" as const,
+                ref: entry.ref,
+                sha: entry.sha,
+              }
+            : undefined,
+        )
       : undefined;
+  const sourceRef = (await source) || policySource;
   return {
     admission_policy: deployment.admissionPolicyRef,
+    source_ref_policy: {
+      stage: deployment.environmentStage,
+      ref: sourceRef.ref,
+      kind: sourceRef.kind,
+    },
     allowed_refs: [...deployment.admissionPolicy.allowedRefs],
     required_checks: [...deployment.admissionPolicy.requiredChecks],
     required_approvals: [...deployment.admissionPolicy.requiredApprovals],
+    trusted_admission_reporters: [...deployment.lanePolicy.governance.trustedReporterIdentities],
     ...(requiredCheckSubject ? { required_check_subject: requiredCheckSubject } : {}),
     admit: {
       relevant_for_workflow: deployment.admissionPolicy.requiredChecks.length > 0,

@@ -312,9 +312,10 @@ deploying, and `--admit-and-deploy` when you want to submit that evidence and
 deploy in one command.
 To discover the reviewed check names before you use either admission shortcut, run
 `deploy --deployment <label> --validate-only` and inspect
-`admissionRequirements.admission_policy`, `allowed_refs`, `required_checks`,
-and `required_approvals` in the JSON response. That read-only output tells you
-which names the deployment expects; it does not grant `admission_reporter`.
+`admissionRequirements.admission_policy`, `source_ref_policy`, `allowed_refs`,
+`required_checks`, `required_approvals`, and `trusted_admission_reporters` in
+the JSON response. That read-only output tells you which reviewed source policy
+and check names the deployment expects; it does not grant `admission_reporter`.
 For reviewed identity diagnostics, keep group shape and membership separate:
 `deploy auth print-groups --deployment <label>` prints the deployment-derived
 group shape, and `deploy auth explain-groups --deployment <label> --action

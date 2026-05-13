@@ -9,7 +9,7 @@ import { startCloudflarePagesPublicServer } from "./cloudflare-pages.public-serv
 import { writeReviewedLaneAdmissionEvidenceJson } from "./deployment-lane-governance.fixture";
 import { writeDeploymentJson } from "./nixos-shared-host.reuse.e2e.helpers";
 import {
-  ensureNixosSharedHostStageBranch,
+  ensureNixosSharedHostReviewedSourceRef,
   nixosSharedHostAdmissionPolicyFixture,
   nixosSharedHostLanePolicyFixture,
 } from "./nixos-shared-host.fixture";
@@ -114,7 +114,7 @@ export async function createSourceRun(
     path.join(tmp, "projects", "deployments", "pleomino-rebuild-dev-pages", "wrangler.jsonc"),
   );
   await installCloudflarePagesTargets(tmp, [deployment]);
-  await ensureNixosSharedHostStageBranch(tmp, $, deployment);
+  await ensureNixosSharedHostReviewedSourceRef(tmp, $, deployment);
   await writeDeploymentJson(deploymentJson, deployment);
   const admissionEvidenceJson = await writeReviewedLaneAdmissionEvidenceJson({
     tmp,

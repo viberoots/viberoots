@@ -180,7 +180,7 @@ export async function assertFrozenSnapshotExecution(result: any): Promise<void> 
   assert.equal(snapshot.admittedContext.policyEvaluation.binding.targetIdentity, result.lockScope);
   assert.equal(snapshot.action.publishInput.artifact.identity, result.record.artifact?.identity);
   assert.equal(result.record.providerTargetIdentity, "nixos-shared-host:default:demoapp");
-  assert.equal(result.record.admittedContext.source.mode, "stage_branch_head");
+  assert.equal(result.record.admittedContext.source.mode, "reviewed_source_ref");
   assert.equal(result.record.provisionerPlan?.fingerprint, snapshot.provisionerPlan?.fingerprint);
   assert.equal(
     result.record.admittedContext.policyEvaluation.binding.targetIdentity,

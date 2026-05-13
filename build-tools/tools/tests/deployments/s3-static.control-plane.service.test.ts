@@ -13,7 +13,7 @@ import {
   withEnvOverrides,
 } from "./nixos-shared-host.control-plane.helpers";
 import {
-  ensureNixosSharedHostStageBranch,
+  ensureNixosSharedHostReviewedSourceRef,
   nixosSharedHostLanePolicyFixture,
 } from "./nixos-shared-host.fixture";
 import { installHarnessClientProfile } from "./nixos-shared-host.remote-exec.install.helpers";
@@ -50,7 +50,7 @@ test("public s3-static deploy requires a control-plane URL for protected/shared 
     const artifactDir = path.join(tmp, "artifact");
     await writeArtifact(artifactDir, "<html>service-required</html>\n");
     await installS3StaticTargets(tmp, [deployment]);
-    await ensureNixosSharedHostStageBranch(tmp, $, deployment as any);
+    await ensureNixosSharedHostReviewedSourceRef(tmp, $, deployment as any);
     const evidence = await writeReviewedLaneAdmissionEvidenceJson({
       tmp,
       $,
@@ -79,7 +79,7 @@ test("public s3-static deploy routes deploy, provision-only, retry, and rollback
     await writeArtifact(artifactA, "<html>a</html>\n");
     await writeArtifact(artifactB, "<html>b</html>\n");
     await installS3StaticTargets(tmp, [deployment]);
-    await ensureNixosSharedHostStageBranch(tmp, $, deployment as any);
+    await ensureNixosSharedHostReviewedSourceRef(tmp, $, deployment as any);
     await fsp.mkdir(path.join(tmp, "projects", "deployments", "pleomino-staging-s3"), {
       recursive: true,
     });

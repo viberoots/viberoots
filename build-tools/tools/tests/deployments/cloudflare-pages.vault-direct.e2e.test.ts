@@ -11,7 +11,7 @@ import { cloudflarePagesDeploymentFixture } from "./cloudflare-pages.fixture";
 import { deploymentAdmissionEvidenceFixture } from "./deployment-admission.fixture";
 import { installFakeCloudflarePagesWrangler } from "./cloudflare-pages.fake-wrangler";
 import { startCloudflarePagesPublicServer } from "./cloudflare-pages.public-server";
-import { ensureNixosSharedHostStageBranch } from "./nixos-shared-host.fixture";
+import { ensureNixosSharedHostReviewedSourceRef } from "./nixos-shared-host.fixture";
 import { startFakeVaultServer } from "./vault.test-server";
 
 async function writeArtifact(root: string, html: string): Promise<void> {
@@ -51,7 +51,7 @@ test("cloudflare-pages deploy reads Vault directly on the reviewed runtime path"
     await writeWranglerConfig(
       path.join(tmp, "projects", "deployments", "pleomino-staging", "wrangler.jsonc"),
     );
-    await ensureNixosSharedHostStageBranch(tmp, $, deployment);
+    await ensureNixosSharedHostReviewedSourceRef(tmp, $, deployment);
     const admissionEvidence = deploymentAdmissionEvidenceFixture({
       deployment,
       operationKind: "deploy",

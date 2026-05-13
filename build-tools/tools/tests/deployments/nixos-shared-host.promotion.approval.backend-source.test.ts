@@ -13,7 +13,7 @@ import { submitNixosSharedHostPublishOnlyRun } from "../../deployments/nixos-sha
 import { runInTemp } from "../lib/test-helpers";
 import { reviewedLaneAdmissionEvidenceFixture } from "./deployment-lane-governance.fixture";
 import {
-  ensureNixosSharedHostStageBranch,
+  ensureNixosSharedHostReviewedSourceRef,
   nixosSharedHostAdmissionPolicyFixture,
   nixosSharedHostDeploymentFixture,
   nixosSharedHostLanePolicyFixture,
@@ -79,8 +79,8 @@ test("shared-host promotion approval rehydrates backend source state when the so
     const recordsRoot = path.join(tmp, "records");
     const backendDatabaseUrl = localHarnessControlPlaneDatabaseUrl(recordsRoot);
     await writeDemoArtifact(sourceArtifactDir, "promoted release");
-    await ensureNixosSharedHostStageBranch(tmp, $, source);
-    await ensureNixosSharedHostStageBranch(tmp, $, target);
+    await ensureNixosSharedHostReviewedSourceRef(tmp, $, source);
+    await ensureNixosSharedHostReviewedSourceRef(tmp, $, target);
     const sourceServer = await startNixosSharedHostPublicServer({
       deployment: source,
       hostRoot: sourceHostRoot,

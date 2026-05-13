@@ -22,6 +22,7 @@ import type { GooglePlayDeployment } from "./contract";
 import type { DeploymentExecutionPolicyFacts } from "./deployment-execution-policy";
 import { evaluateDeploymentAdmission } from "./deployment-admission-evaluator";
 import type { DeploymentAdmissionEvidence } from "./deployment-admission-evidence";
+import { requestedReviewedSourceFromEvidence } from "./deployment-source-revision";
 import { resolveDeploymentSmokeExecutionMode } from "./deployment-smoke-policy";
 import {
   mergeExecutionPolicyFacts,
@@ -156,10 +157,12 @@ export async function submitGooglePlayDeploy(opts: {
     recordsRoot: opts.recordsRoot,
     artifactPath: path.resolve(opts.artifactPath),
   });
+  const requestedReviewedSource = requestedReviewedSourceFromEvidence(opts.admissionEvidence);
   const admittedContext = await resolveInitialGooglePlayAdmittedContext({
     workspaceRoot: opts.workspaceRoot,
     deployment: opts.deployment,
     artifactIdentity: artifact.identity,
+    ...(requestedReviewedSource?.ref ? { requestedSourceRef: requestedReviewedSource.ref } : {}),
   });
   admittedContext.policyEvaluation = await evaluateDeploymentAdmission({
     workspaceRoot: opts.workspaceRoot,

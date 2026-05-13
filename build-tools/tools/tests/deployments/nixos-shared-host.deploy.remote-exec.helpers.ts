@@ -5,7 +5,7 @@ import type { NixosSharedHostDeployment } from "../../deployments/contract";
 import { resolveDeploymentFromTarget } from "../../deployments/deployment-query";
 import { stableBuckIsolation } from "../../lib/buck-command-env";
 import {
-  ensureNixosSharedHostStageBranch,
+  ensureNixosSharedHostReviewedSourceRef,
   nixosSharedHostDeploymentFixture,
   nixosSharedHostLanePolicyFixture,
 } from "./nixos-shared-host.fixture";
@@ -175,7 +175,7 @@ export async function prepareRemoteExecFixture(opts: {
     REVIEWED_PLEOMINO_DEPLOYMENT_LABEL,
     { env: freshBuckQueryEnv(opts.tmp) },
   )) as NixosSharedHostDeployment;
-  await ensureNixosSharedHostStageBranch(opts.tmp, opts.$, deployment);
+  await ensureNixosSharedHostReviewedSourceRef(opts.tmp, opts.$, deployment);
   await prepareReviewedRemoteHostPaths({
     remoteStatePath,
     remoteRuntimeRoot,

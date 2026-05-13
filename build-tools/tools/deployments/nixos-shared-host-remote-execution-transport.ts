@@ -1,7 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import { requiredDeploymentStageBranch, type DeploymentTarget } from "./contract";
+import { requiredDeploymentSourceRef, type DeploymentTarget } from "./contract";
 import type { DeploymentAdmissionEvidence } from "./deployment-admission-evidence";
 import { deploymentAuthMissingGrantHint, type DeploymentAuthRole } from "./deployment-auth-groups";
 import { scrubDeploymentSecretEnv } from "./deployment-secret-env";
@@ -92,7 +92,7 @@ function augmentRemoteAdmissionMismatchMessage(
   const mismatchedSubjects = submittedSubjects.filter((subject) => subject !== requiredSubject);
   if (mismatchedSubjects.length === 0) return baseMessage;
   const deploymentSourceRef = opts?.deployment
-    ? requiredDeploymentStageBranch(opts.deployment)
+    ? requiredDeploymentSourceRef(opts.deployment)
     : undefined;
   const submittedLine =
     mismatchedSubjects.length === 1

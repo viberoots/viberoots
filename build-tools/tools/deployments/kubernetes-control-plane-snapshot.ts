@@ -16,6 +16,7 @@ import { requiredArtifactPaths } from "./kubernetes-deploy-helpers";
 import { resolveKubernetesReplaySource, type KubernetesReplaySnapshot } from "./kubernetes-replay";
 import type { KubernetesControlPlaneSubmitRequest } from "./kubernetes-control-plane";
 import { writeKubernetesProvisionerPlan } from "./kubernetes-provisioner-plan";
+import { requestedReviewedSourceFromEvidence } from "./deployment-source-revision";
 
 export type KubernetesControlPlaneSnapshot = FrozenProviderSnapshotFields & {
   schemaVersion: "kubernetes-control-plane-snapshot@1";
@@ -173,6 +174,9 @@ async function admittedContextFor(opts: {
   replay: Record<string, any>;
   artifactLineageId: string;
 }) {
+  const requestedReviewedSource = requestedReviewedSourceFromEvidence(
+    opts.request.admissionEvidence,
+  );
   const common = {
     workspaceRoot: opts.workspaceRoot,
     deployment: opts.request.deployment,
@@ -180,6 +184,7 @@ async function admittedContextFor(opts: {
     ...(opts.request.expectedSourceRevision
       ? { expectedSourceRevision: opts.request.expectedSourceRevision }
       : {}),
+    ...(requestedReviewedSource?.ref ? { requestedSourceRef: requestedReviewedSource.ref } : {}),
   };
   if (opts.request.operationKind === "promotion") {
     return await resolvePromotionKubernetesAdmittedContext({

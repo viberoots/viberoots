@@ -2,8 +2,12 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import type { DeploymentTarget } from "./contract";
-import { requiredDeploymentStageBranch } from "./contract";
-import type { DeploymentAdmissionEvidence } from "./deployment-admission-evidence";
+import type {
+  DeploymentAdmissionEvidence,
+  DeploymentReviewedSourceEvidence,
+} from "./deployment-admission-evidence";
+import { requiredDeploymentReviewedSourceRef } from "./deployment-reviewed-source-ref";
+import { explicitReviewedCommitSha } from "./deployment-source-ref-policy";
 
 const execFileAsync = promisify(execFile);
 
@@ -46,8 +50,20 @@ export async function resolveExpectedDeploymentSourceRevision(opts: {
   deployment: DeploymentTarget;
   admissionEvidence?: DeploymentAdmissionEvidence;
 }): Promise<string | undefined> {
+  const selectedRevision = opts.admissionEvidence?.reviewedSource?.revision?.trim();
+  if (selectedRevision) return selectedRevision;
   const evidence = clientServiceAdmissionEvidence(opts.admissionEvidence);
   const fromChecks = expectedRevisionFromChecks(opts.deployment, evidence);
   if (fromChecks) return fromChecks;
-  return await gitRevision(opts.workspaceRoot, requiredDeploymentStageBranch(opts.deployment));
+  const sourceRef = requiredDeploymentReviewedSourceRef(opts.deployment).ref;
+  return explicitReviewedCommitSha(sourceRef) || (await gitRevision(opts.workspaceRoot, sourceRef));
+}
+
+export function requestedReviewedSourceFromEvidence(
+  admissionEvidence?: DeploymentAdmissionEvidence,
+): DeploymentReviewedSourceEvidence | undefined {
+  const ref = admissionEvidence?.reviewedSource?.ref?.trim();
+  if (!ref) return undefined;
+  const revision = admissionEvidence?.reviewedSource?.revision?.trim();
+  return revision ? { ref, revision } : { ref };
 }

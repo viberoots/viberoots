@@ -11,7 +11,7 @@ import {
   startControlPlaneHarness,
 } from "./nixos-shared-host.control-plane.helpers";
 import {
-  ensureNixosSharedHostStageBranch,
+  ensureNixosSharedHostReviewedSourceRef,
   installNixosSharedHostTargets,
   nixosSharedHostDeploymentFixture,
 } from "./nixos-shared-host.fixture";
@@ -26,7 +26,7 @@ test("nixos-shared-host --provision-only writes state and records without publis
     const statePath = path.join(tmp, "platform-state.json");
     const recordsRoot = path.join(tmp, "records");
     await installNixosSharedHostTargets(tmp, [deployment]);
-    await ensureNixosSharedHostStageBranch(tmp, $, deployment);
+    await ensureNixosSharedHostReviewedSourceRef(tmp, $, deployment);
     await fsp.writeFile(deploymentJson, JSON.stringify(deployment, null, 2) + "\n", "utf8");
     const admissionEvidenceJson = await writeReviewedLaneAdmissionEvidenceJson({
       tmp,

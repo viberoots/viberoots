@@ -19,7 +19,7 @@ import {
   challengedSubmitRequest,
   countBackendRows,
 } from "./nixos-shared-host.challenged-submit.helpers";
-import { ensureNixosSharedHostStageBranch } from "./nixos-shared-host.fixture";
+import { ensureNixosSharedHostReviewedSourceRef } from "./nixos-shared-host.fixture";
 import { readJson, writeDemoArtifact } from "./nixos-shared-host.control-plane.helpers";
 
 const TOKEN = "challenged-submit-token";
@@ -29,7 +29,7 @@ test("challenged submit retries reuse the accepted transaction and keep audit ou
     const artifactDir = path.join(tmp, "artifact");
     await writeDemoArtifact(artifactDir);
     const request = await challengedSubmitRequest(artifactDir, "retry-key");
-    await ensureNixosSharedHostStageBranch(tmp, $, request.deployment);
+    await ensureNixosSharedHostReviewedSourceRef(tmp, $, request.deployment);
     const paths = {
       statePath: path.join(tmp, "platform-state.json"),
       hostRoot: path.join(tmp, "host"),
@@ -132,7 +132,7 @@ test("failed challenged accept rolls back challenge consumption and idempotency 
     const artifactDir = path.join(tmp, "artifact");
     await writeDemoArtifact(artifactDir);
     const request = await challengedSubmitRequest(artifactDir, "crash-window-key");
-    await ensureNixosSharedHostStageBranch(tmp, $, request.deployment);
+    await ensureNixosSharedHostReviewedSourceRef(tmp, $, request.deployment);
     const paths = {
       statePath: path.join(tmp, "platform-state.json"),
       hostRoot: path.join(tmp, "host"),

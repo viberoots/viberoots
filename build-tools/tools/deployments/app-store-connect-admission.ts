@@ -13,7 +13,7 @@ import {
 } from "./deployment-reviewed-target-environment";
 
 type AppStoreConnectSourceAdmission = {
-  mode: "stage_branch_head" | "source_run_reuse" | "promotion_source_run";
+  mode: "reviewed_source_ref" | "source_run_reuse" | "promotion_source_run";
   sourceRef: string;
   sourceRevision: string;
   artifactIdentity: string;
@@ -39,7 +39,7 @@ export type AppStoreConnectAdmittedContext = {
   policyEvaluation?: DeploymentAdmissionPolicyEvaluation;
   source: AppStoreConnectSourceAdmission;
   targetEnvironment: {
-    mode: "stage_branch_snapshot";
+    mode: "reviewed_source_snapshot";
     targetRef: string;
     targetRevision: string;
     providerTargetIdentity: string;
@@ -89,6 +89,7 @@ async function admittedContextFor(opts: {
   sourceRecord?: { deployRunId: string; deploymentId: string; admittedContext?: any };
   submissionId?: string;
   expectedSourceRevision?: string;
+  requestedSourceRef?: string;
 }): Promise<AppStoreConnectAdmittedContext> {
   const target = await resolveDeploymentReviewedTargetEnvironment(opts);
   return {
@@ -117,8 +118,9 @@ export async function resolveInitialAppStoreConnectAdmittedContext(opts: {
   artifactIdentity: string;
   submissionId?: string;
   expectedSourceRevision?: string;
+  requestedSourceRef?: string;
 }) {
-  return await admittedContextFor({ ...opts, mode: "stage_branch_head" });
+  return await admittedContextFor({ ...opts, mode: "reviewed_source_ref" });
 }
 
 export async function resolvePromotionAppStoreConnectAdmittedContext(opts: {
