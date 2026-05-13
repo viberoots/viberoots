@@ -1,4 +1,5 @@
 #!/usr/bin/env zx-wrapper
+import type { DeploymentSecretBackendKind } from "./deployment-sprinkle-ref";
 
 export const DEPLOYMENT_CREDENTIAL_SOURCES = [
   "interactive_pkce",
@@ -10,10 +11,25 @@ export const DEPLOYMENT_CREDENTIAL_SOURCES = [
 ] as const;
 
 export type DeploymentCredentialSource = (typeof DEPLOYMENT_CREDENTIAL_SOURCES)[number];
+export const DEPLOYMENT_SECRET_CREDENTIAL_SOURCES = [
+  "vault_interactive_pkce",
+  "vault_interactive_device",
+  "vault_interactive_print_url",
+  "vault_jenkins_client_secret",
+  "vault_jenkins_oidc",
+  "vault_external_oidc_token",
+  "infisical_machine_identity_universal_auth",
+] as const;
+
+export type DeploymentSecretCredentialSource =
+  (typeof DEPLOYMENT_SECRET_CREDENTIAL_SOURCES)[number];
+export type SelectedDeploymentCredentialSource =
+  | DeploymentCredentialSource
+  | "infisical_machine_identity_universal_auth";
 export type LoginBrowserMode = "auto" | "open" | "print" | "device";
 
 export type CredentialSourceSelection = {
-  source: DeploymentCredentialSource;
+  source: SelectedDeploymentCredentialSource;
   browserMode: LoginBrowserMode;
   reason: string;
 };
@@ -28,6 +44,29 @@ export function normalizeCredentialSource(
   }
   throw new Error(
     `deployment credential source must be one of ${DEPLOYMENT_CREDENTIAL_SOURCES.join(", ")}`,
+  );
+}
+
+export function isDeploymentCredentialSource(value: string): value is DeploymentCredentialSource {
+  return DEPLOYMENT_CREDENTIAL_SOURCES.includes(value as DeploymentCredentialSource);
+}
+
+export function vaultSecretCredentialSource(
+  source: DeploymentCredentialSource,
+): DeploymentSecretCredentialSource {
+  return `vault_${source}`;
+}
+
+export function normalizeSecretCredentialSource(
+  value: string | undefined,
+): DeploymentSecretCredentialSource | undefined {
+  const trimmed = value?.trim();
+  if (!trimmed) return undefined;
+  if (DEPLOYMENT_SECRET_CREDENTIAL_SOURCES.includes(trimmed as DeploymentSecretCredentialSource)) {
+    return trimmed as DeploymentSecretCredentialSource;
+  }
+  throw new Error(
+    `deployment secret credential source must be one of ${DEPLOYMENT_SECRET_CREDENTIAL_SOURCES.join(", ")}`,
   );
 }
 
@@ -63,15 +102,33 @@ function sourceForBrowserOverride(mode: LoginBrowserMode): DeploymentCredentialS
 }
 
 export function selectDeploymentCredentialSource(opts: {
-  preferred?: DeploymentCredentialSource | undefined;
+  preferred?: SelectedDeploymentCredentialSource | undefined;
+  secretBackend?: DeploymentSecretBackendKind | undefined;
   loginBrowser?: LoginBrowserMode | undefined;
   env?: NodeJS.ProcessEnv | undefined;
   deviceAuthorizationSupported?: boolean | undefined;
 }): CredentialSourceSelection {
   const env = opts.env || process.env;
   const browserMode = opts.loginBrowser || "auto";
+  if (opts.secretBackend === "infisical") {
+    if (opts.preferred && opts.preferred !== "infisical_machine_identity_universal_auth") {
+      throw new Error(
+        "Infisical deployments require credential source infisical_machine_identity_universal_auth",
+      );
+    }
+    return {
+      source: "infisical_machine_identity_universal_auth",
+      browserMode,
+      reason: opts.preferred
+        ? "infisical_runtime preferred source"
+        : "infisical backend default source",
+    };
+  }
   const override = sourceForBrowserOverride(browserMode);
   if (override) return { source: override, browserMode, reason: `--login-browser=${browserMode}` };
+  if (opts.preferred === "infisical_machine_identity_universal_auth") {
+    throw new Error("Infisical credential source requires secret_backend infisical");
+  }
   if (opts.preferred) {
     return { source: opts.preferred, browserMode, reason: "vault_runtime preferred source" };
   }

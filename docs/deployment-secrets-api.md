@@ -729,6 +729,31 @@ The Vault-backed helpers are exported from:
   [deployment-secret-runtime-helpers.ts](/Users/kiltyj/Code/viberoots/build-tools/tools/deployments/deployment-secret-runtime-helpers.ts)
   remains a Vault compatibility helper for intentionally Vault-specific callers
 
+The Infisical credential helpers are exported from
+[deployment-secret-infisical-credentials.ts](/Users/kiltyj/Code/viberoots/build-tools/tools/deployments/deployment-secret-infisical-credentials.ts):
+
+- `InfisicalCredentialConfig`
+- `infisicalCredentialFromRuntime()`
+- `resolveInfisicalAccessToken()`
+- `normalizeInfisicalSiteUrl()`
+- `redactInfisicalCredentialText()` and `redactInfisicalCredentialJson()`
+
+`DeploymentSecretContext` is a typed in-memory context:
+
+```ts
+type DeploymentSecretContext =
+  | { kind: "fixture" }
+  | { kind: "vault"; credential: VaultCredentialConfig }
+  | { kind: "infisical"; credential: InfisicalCredentialConfig };
+```
+
+Infisical supports only Universal Auth as an operator-visible workload
+credential source in this release. The backend-qualified credential source name
+is `infisical_machine_identity_universal_auth`. In-memory `access_token`
+credentials are reserved for reviewed worker internals after Universal Auth
+login; they are not accepted from CLI flags, ambient Infisical CLI sessions, or
+client-submitted request payloads.
+
 ### Requirement Shape
 
 Secret requirements are declared as deployment requirements with a step and a

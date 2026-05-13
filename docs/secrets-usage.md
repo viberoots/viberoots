@@ -69,9 +69,11 @@ For production Vault bring-up and the optional local/test export bridge into
 - runtime secret values are resolved only when a lifecycle step actually needs
   them
 - Vault is the default backend, but callers use the stable `SprinkleRef` layer
-- Infisical metadata names Universal Auth credential environment variables;
-  tokens, client secrets, personal tokens, and secret values are not allowed in
-  deployment metadata
+- Infisical metadata names reviewed Universal Auth credential environment
+  variable names. The selected source is
+  `infisical_machine_identity_universal_auth`; Infisical CLI sessions, personal
+  tokens, client-submitted access tokens, client-submitted secret values, and
+  raw client secrets are not allowed in deployment metadata or request payloads.
 - external provider credentials are never satisfied from ambient provider
   environment variables such as local CLI tokens; they must be declared as
   `secret_requirements` and resolved by the secret runtime
@@ -327,6 +329,13 @@ flags, and session detection:
   SSH/headless flow.
 - Jenkins deploys use either a Jenkins Credentials-bound client secret to mint
   the workload JWT, or a Jenkins/external OIDC token trusted by Vault
+
+For Infisical-backed deployments, the human login path only authorizes the
+deploy request. It is not forwarded as the Infisical workload credential. The
+runtime reads `machine_identity_client_id_env` and
+`machine_identity_client_secret_env` from `infisical_runtime`, exchanges those
+values with Universal Auth in memory, caches the resulting access token only
+inside the process until expiry, and reacquires after expiry.
 
 Workload JWTs and Vault tokens are not written to `.local/deploy-vault` and are
 not communicated through `process.env`.

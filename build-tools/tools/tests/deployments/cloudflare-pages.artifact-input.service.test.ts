@@ -3,7 +3,10 @@ import assert from "node:assert/strict";
 import path from "node:path";
 import { test } from "node:test";
 import { CLOUDFLARE_PAGES_CONTROL_PLANE_SUBMIT_REQUEST_SCHEMA } from "../../deployments/cloudflare-pages-control-plane-api-contract";
-import { assertNoProtectedSharedClientCredentialInputs } from "../../deployments/deployment-service-client-contract";
+import {
+  assertNoProtectedSharedClientCredentialInputs,
+  assertNoProtectedSharedClientIdentityFields,
+} from "../../deployments/deployment-service-client-contract";
 import { runInTemp } from "../lib/test-helpers";
 import { cloudflarePagesDeploymentFixture } from "./cloudflare-pages.fixture";
 import { startControlPlaneHarness } from "./nixos-shared-host.control-plane.helpers";
@@ -82,9 +85,47 @@ test("protected service client rejects laptop Vault and fixture credential input
       assertNoProtectedSharedClientCredentialInputs({
         deployment,
         publicFrontDoor: true,
+        env: { INFISICAL_ACCESS_TOKEN: "client-token" },
+      }),
+    /must not use laptop credential input INFISICAL_ACCESS_TOKEN/,
+  );
+  assert.throws(
+    () =>
+      assertNoProtectedSharedClientCredentialInputs({
+        deployment,
+        publicFrontDoor: true,
+        env: { INFISICAL_PERSONAL_TOKEN: "personal-token" },
+      }),
+    /must not use laptop credential input INFISICAL_PERSONAL_TOKEN/,
+  );
+  assert.throws(
+    () =>
+      assertNoProtectedSharedClientCredentialInputs({
+        deployment,
+        publicFrontDoor: true,
         vaultRuntimeInputs: { credentialSource: "external_oidc_token" },
         env: {},
       }),
     /must not use client-side Vault credential source external_oidc_token/,
+  );
+});
+
+test("protected service client rejects submitted Infisical credential fields", () => {
+  const deployment = cloudflarePagesDeploymentFixture();
+  assert.throws(
+    () =>
+      assertNoProtectedSharedClientIdentityFields({
+        deployment,
+        request: { infisicalAccessToken: "client-token" },
+      }),
+    /client-submitted Infisical credential field infisicalAccessToken/,
+  );
+  assert.throws(
+    () =>
+      assertNoProtectedSharedClientIdentityFields({
+        deployment,
+        request: { credential: { secretValue: "secret-value" } },
+      }),
+    /client-submitted Infisical credential field credential.secretValue/,
   );
 });

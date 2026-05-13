@@ -19,11 +19,18 @@ type ClientIdentityFields = {
 
 const CLIENT_CREDENTIAL_ENVS = [
   DEPLOYMENT_SECRET_FIXTURE_PATH_ENV,
+  "INFISICAL_TOKEN",
+  "INFISICAL_ACCESS_TOKEN",
+  "INFISICAL_PERSONAL_TOKEN",
+  "INFISICAL_SERVICE_TOKEN",
   VAULT_TOKEN_ENV,
   VAULT_AUTH_METHOD_ENV,
   VAULT_JWT_ENV,
   VAULT_JWT_FILE_ENV,
 ] as const;
+
+const CLIENT_INFISICAL_CREDENTIAL_FIELD =
+  /^(accessToken|secretValue|infisicalAccessToken|infisicalToken|infisicalClientSecret|infisicalSecretValue)$/i;
 
 function isProtectedShared(deployment: DeploymentTarget): boolean {
   return deployment.protectionClass !== "local_only";
@@ -48,6 +55,16 @@ function hasEvidenceRequestedBy(evidence: unknown): boolean {
   );
 }
 
+function findClientSubmittedInfisicalCredentialField(value: unknown): string | undefined {
+  if (!value || typeof value !== "object") return undefined;
+  for (const [key, entry] of Object.entries(value)) {
+    if (CLIENT_INFISICAL_CREDENTIAL_FIELD.test(key)) return key;
+    const nested = findClientSubmittedInfisicalCredentialField(entry);
+    if (nested) return `${key}.${nested}`;
+  }
+  return undefined;
+}
+
 export function serviceSubmissionAdmissionEvidence(
   evidence: DeploymentAdmissionEvidence | undefined,
 ): DeploymentAdmissionEvidence | undefined {
@@ -68,6 +85,12 @@ export function assertNoProtectedSharedClientIdentityFields(opts: {
   ) {
     throw unauthorized(
       "protected/shared service submissions derive identity on the deployment service; client-supplied requestedBy or authorization grants are not trusted",
+    );
+  }
+  const field = findClientSubmittedInfisicalCredentialField(opts.request);
+  if (field) {
+    throw unauthorized(
+      `protected/shared service submissions must not include client-submitted Infisical credential field ${field}; authenticate through mini and let the worker use server-owned secrets`,
     );
   }
 }

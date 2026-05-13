@@ -4,7 +4,10 @@ import { deploymentAuthFailureDiagnostic } from "./deployment-auth-failure-diagn
 import { deploymentSecretFixturePath } from "./deployment-secret-fixture";
 import type { DeploymentSecretContext } from "./deployment-secret-context";
 import { resolveCredentialSourceVaultJwt } from "./deployment-credential-source-runtime";
-import type { DeploymentCredentialSource } from "./deployment-credential-source-selection";
+import {
+  isDeploymentCredentialSource,
+  type DeploymentCredentialSource,
+} from "./deployment-credential-source-selection";
 import type { DeploymentVaultRuntimeInputs } from "./deployment-vault-runtime-inputs";
 import { resolveDeploymentVaultRuntimePlan } from "./deployment-vault-runtime-plan";
 import { resolveDeploymentPkceCallbackProfile } from "./deployment-pkce-callback-profile";
@@ -61,9 +64,13 @@ export async function prepareDeploymentVaultRuntime(opts: {
   if (plan.selectionError) throw new Error(plan.selectionError);
   if (plan.credentialInputMissing.length > 0) throw new Error(plan.credentialInputMissing[0]);
   if (!plan.selection) throw new Error("deployment credential source selection failed");
+  if (!isDeploymentCredentialSource(plan.selection.source)) {
+    throw new Error(`Vault runtime cannot use credential source ${plan.selection.source}`);
+  }
+  const credentialSource = plan.selection.source;
 
   const credential = await resolveCredentialSourceVaultJwt({
-    source: plan.selection.source,
+    source: credentialSource,
     addr: plan.addr,
     roleName: plan.roleName,
     issuerUrl: plan.issuerUrl,
@@ -75,8 +82,8 @@ export async function prepareDeploymentVaultRuntime(opts: {
     deploymentEnvironment: plan.deploymentEnvironment,
     repository: plan.repository,
     env,
-    openBrowser: plan.selection.source === "interactive_pkce",
-    pkceCallback: plan.selection.source.startsWith("interactive")
+    openBrowser: credentialSource === "interactive_pkce",
+    pkceCallback: credentialSource.startsWith("interactive")
       ? resolveDeploymentPkceCallbackProfile({
           inputs: opts.inputs?.pkceCallback,
           env,
