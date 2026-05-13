@@ -63,10 +63,12 @@ export async function runNixosSharedHostRemoteDeploy(opts: {
   localArtifactDir: string;
   retainRemoteArtifact: boolean;
   vaultRuntimeInputs?: DeploymentVaultRuntimeInputs;
+  authSessionId?: string;
+  idempotencyKey?: string;
   admissionEvidence?: DeploymentAdmissionEvidence;
   smokeConnectOverride?: NixosSharedHostRemoteSmokeConnectOverride;
 }): Promise<NixosSharedHostRemoteDeploySummary> {
-  const executionId = createNixosSharedHostDeployRunId("remote");
+  const executionId = createRemoteExecutionId(opts.idempotencyKey);
   const stagedArtifactPath = createNixosSharedHostRemoteArtifactPath(opts.plan, executionId);
   const uploadPath = stagedUploadTempPath(stagedArtifactPath);
   const controlPlaneToken = requireServiceTokenFromEnv(
@@ -78,18 +80,20 @@ export async function runNixosSharedHostRemoteDeploy(opts: {
     deployment: opts.deployment,
     artifactDir: opts.localArtifactDir,
   });
-  const authSessionId = shouldUseServiceOwnedInteractiveAuth({
-    deployment: opts.deployment,
-    inputs: opts.vaultRuntimeInputs,
-  })
-    ? await createAndWaitForServiceOwnedAuthSession({
-        controlPlaneUrl: opts.plan.serviceClient.controlPlaneUrl,
-        ...(controlPlaneToken ? { controlPlaneToken } : {}),
-        deployment: opts.deployment,
-        operationKind: "deploy",
-        inputs: opts.vaultRuntimeInputs,
-      })
-    : undefined;
+  const authSessionId =
+    opts.authSessionId ||
+    (shouldUseServiceOwnedInteractiveAuth({
+      deployment: opts.deployment,
+      inputs: opts.vaultRuntimeInputs,
+    })
+      ? await createAndWaitForServiceOwnedAuthSession({
+          controlPlaneUrl: opts.plan.serviceClient.controlPlaneUrl,
+          ...(controlPlaneToken ? { controlPlaneToken } : {}),
+          deployment: opts.deployment,
+          operationKind: "deploy",
+          inputs: opts.vaultRuntimeInputs,
+        })
+      : undefined);
   let stagePrepared = false;
   let pendingError: Error | null = null;
   let controlPlane: NixosSharedHostRemoteDeploySummary["controlPlane"] | null = null;
@@ -147,6 +151,7 @@ export async function runNixosSharedHostRemoteDeploy(opts: {
         deployment: opts.deployment,
         operationKind: "deploy",
         ...(authSessionId ? { authSessionId } : {}),
+        ...(opts.idempotencyKey ? { idempotencyKey: opts.idempotencyKey } : {}),
         artifactDir: stagedArtifactPath,
         expectedArtifactIdentities,
         ...(opts.admissionEvidence ? { admissionEvidence: opts.admissionEvidence } : {}),
@@ -206,4 +211,14 @@ export async function runNixosSharedHostRemoteDeploy(opts: {
     retentionRequested: opts.retainRemoteArtifact,
     controlPlane,
   };
+}
+
+function createRemoteExecutionId(idempotencyKey?: string): string {
+  const key = String(idempotencyKey || "").trim();
+  if (!key) return createNixosSharedHostDeployRunId("remote");
+  const suffix = key
+    .replace(/[^A-Za-z0-9._-]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 96);
+  return `remote-${suffix || "idempotent"}`;
 }

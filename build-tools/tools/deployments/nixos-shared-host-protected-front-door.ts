@@ -1,5 +1,6 @@
 #!/usr/bin/env zx-wrapper
 import { summarizeDeploymentResult } from "./deployment-execution";
+import { getFlagStr } from "../lib/cli";
 import {
   resolveArtifactDirForCli,
   resolveComponentArtifactDirsForCli,
@@ -71,6 +72,7 @@ export async function runProtectedNixosSharedHostDeployFrontDoor(opts: {
     remote: opts.remote,
     context: `nixos-shared-host ${opts.deployment.protectionClass} mutation`,
   });
+  const idempotencyKey = getFlagStr("idempotency-key", "").trim();
   const result = opts.remove
     ? await runNixosSharedHostDirectServiceMutation({
         workspaceRoot: opts.workspaceRoot,
@@ -80,6 +82,7 @@ export async function runProtectedNixosSharedHostDeployFrontDoor(opts: {
           : {}),
         deployment: opts.deployment,
         operationKind: "explicit_removal",
+        ...(idempotencyKey ? { idempotencyKey } : {}),
         ...(await authSession(opts, serviceClient, "explicit_removal")),
         ...(opts.admissionEvidence ? { admissionEvidence: opts.admissionEvidence as any } : {}),
       })
@@ -92,6 +95,7 @@ export async function runProtectedNixosSharedHostDeployFrontDoor(opts: {
             : {}),
           deployment: opts.deployment,
           operationKind: "provision_only",
+          ...(idempotencyKey ? { idempotencyKey } : {}),
           ...(await authSession(opts, serviceClient, "provision_only")),
           publishBehavior: "provision-only",
           ...(opts.sourceRunId ? { sourceRunId: opts.sourceRunId } : {}),
@@ -109,6 +113,7 @@ export async function runProtectedNixosSharedHostDeployFrontDoor(opts: {
               : {}),
             deployment: opts.deployment,
             operationKind: opts.rollback ? "rollback" : "promotion",
+            ...(idempotencyKey ? { idempotencyKey } : {}),
             ...(await authSession(opts, serviceClient, opts.rollback ? "rollback" : "promotion")),
             publishBehavior: "publish-only",
             sourceRunId: opts.sourceRunId,
@@ -126,6 +131,7 @@ export async function runProtectedNixosSharedHostDeployFrontDoor(opts: {
               : {}),
             deployment: opts.deployment,
             operationKind: "deploy",
+            ...(idempotencyKey ? { idempotencyKey } : {}),
             ...(await authSession(opts, serviceClient, "deploy")),
             ...(isMultiComponentNixosSharedHostDeployment(opts.deployment)
               ? {
@@ -150,6 +156,8 @@ async function authSession(
   serviceClient: ReturnType<typeof resolveServiceClientFromFlags>,
   operationKind: string,
 ) {
+  const explicitAuthSessionId = getFlagStr("auth-session-id", "").trim();
+  if (explicitAuthSessionId) return { authSessionId: explicitAuthSessionId };
   if (
     !shouldUseServiceOwnedInteractiveAuth({
       deployment: opts.deployment,

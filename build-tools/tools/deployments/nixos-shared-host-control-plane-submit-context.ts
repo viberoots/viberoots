@@ -27,10 +27,7 @@ export async function resolveNixosSharedHostSubmitContext(opts: {
   serviceInstance?: DeploymentControlPlaneServiceInstance;
 }> {
   return {
-    requestFingerprint: fingerprintControlPlanePayload({
-      ...opts.request,
-      submittedAt: opts.request.submittedAt,
-    }),
+    requestFingerprint: fingerprintControlPlanePayload(stableSubmitPayload(opts.request)),
     idempotencyKey: opts.request.idempotencyKey || opts.request.submissionId,
     governanceResolver: createServiceOwnedLaneGovernanceResolver({
       env: opts.env,
@@ -42,4 +39,15 @@ export async function resolveNixosSharedHostSubmitContext(opts: {
       deployment: opts.resolvedRequest.deployment,
     }),
   };
+}
+
+function stableSubmitPayload(request: ServiceSubmitRequest): Record<string, unknown> {
+  const {
+    submissionId: _submissionId,
+    submittedAt: _submittedAt,
+    authSessionId: _authSessionId,
+    artifactBindingProof: _artifactBindingProof,
+    ...stable
+  } = request as Record<string, unknown>;
+  return stable;
 }

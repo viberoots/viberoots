@@ -101,12 +101,16 @@ test("challenged submit retries reuse the accepted transaction and keep audit ou
           body: JSON.stringify(request),
         }),
       );
+      const conflictRequest = {
+        ...request,
+        expectedArtifactIdentity: `${request.expectedArtifactIdentity}:changed`,
+      };
       const conflict = await fetch(new URL("/api/v1/submissions", controlPlane.url), {
         method: "POST",
         headers: { "content-type": "application/json", authorization: `Bearer ${TOKEN}` },
         body: JSON.stringify({
-          ...request,
-          artifactBindingProof: challengedSubmitProof(request, otherChallenge, TOKEN),
+          ...conflictRequest,
+          artifactBindingProof: challengedSubmitProof(conflictRequest, otherChallenge, TOKEN),
         }),
       });
       assert.equal(conflict.ok, false);

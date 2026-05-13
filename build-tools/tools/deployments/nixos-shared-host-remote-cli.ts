@@ -206,6 +206,12 @@ export async function maybeRunNixosSharedHostRemoteProfile(opts: {
         localArtifactDir: await resolveLocalArtifactDir(opts.workspaceRoot, opts.deployment),
         retainRemoteArtifact,
         ...(opts.vaultRuntimeInputs ? { vaultRuntimeInputs: opts.vaultRuntimeInputs } : {}),
+        ...(hasFlag("auth-session-id")
+          ? { authSessionId: requireNamedFlagValue("auth-session-id") }
+          : {}),
+        ...(hasFlag("idempotency-key")
+          ? { idempotencyKey: requireNamedFlagValue("idempotency-key") }
+          : {}),
         ...(opts.admissionEvidence ? { admissionEvidence: opts.admissionEvidence } : {}),
         ...(smokeConnectOverride ? { smokeConnectOverride } : {}),
       }),

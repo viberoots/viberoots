@@ -151,6 +151,27 @@ export async function installReviewedPleominoTargets(tmp: string): Promise<void>
   );
 }
 
+export async function requireServiceAuthForPleomino(tmp: string): Promise<void> {
+  const deployTargetsPath = path.join(tmp, "projects", "deployments", "pleomino-dev", "TARGETS");
+  await fsp.writeFile(
+    deployTargetsPath,
+    (await fsp.readFile(deployTargetsPath, "utf8")).replace(
+      '    health_path = "/healthz",',
+      [
+        '    health_path = "/healthz",',
+        "    vault_runtime = {",
+        '        "oidc_issuer": "https://identity.example.test",',
+        '        "audience": "deployments-vault",',
+        '        "cli_public_client_id": "deployment-cli",',
+        '        "deployment_environment": "mini",',
+        '        "preferred_credential_source": "interactive_pkce",',
+        "    },",
+      ].join("\n"),
+    ),
+    "utf8",
+  );
+}
+
 export async function writeReviewedPleominoAdmissionEvidence(
   tmp: string,
   $: any,

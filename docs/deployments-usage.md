@@ -344,6 +344,52 @@ group shape, and `deploy auth explain-groups --deployment <label> --action
 submit|approve|report_checks` explains which reviewed group is required for one
 action. Those commands describe the expected identity group shape; they do not
 add user or automation membership.
+
+For Jenkins-backed dev deploys, have Jenkins build the artifact, retain it under
+a CI artifact reference, then submit the request with explicit CI evidence and a
+stable idempotency key:
+
+```bash
+build-tools/tools/bin/nixos-shared-host-jenkins-deploy \
+  --deployment //projects/deployments/pleomino-dev:deploy \
+  --profile mini \
+  --artifact-dir "$WORKSPACE/dist" \
+  --admission-evidence-json "$WORKSPACE/deploy-admission.json" \
+  --idempotency-key "jenkins:${JOB_NAME}:${BUILD_TAG}:pleomino-dev" \
+  --ssh-identity-file "$JENKINS_SSH_KEY" \
+  --ssh-known-hosts "$JENKINS_KNOWN_HOSTS"
+```
+
+The evidence JSON must identify the reviewed source revision, Jenkins builder
+identity, CI check results, artifact digest or retained artifact reference, and
+any SBOM, signature, or provenance references. The Jenkins principal needs both
+`submitter` for the deploy request and `admission_reporter` for the reported CI
+evidence; the control plane rejects CI evidence reported by submitter-only
+sessions.
+
+For staging or production promotion requests from Jenkins, submit the promotion
+to the protected service control plane and keep the idempotency key stable for
+the Jenkins build or promotion attempt:
+
+```bash
+deploy --deployment //projects/deployments/pleomino-staging:deploy \
+  --publish-only \
+  --source-run-id "$DEV_DEPLOY_RUN_ID" \
+  --control-plane-url "$VBR_DEPLOY_CONTROL_PLANE_URL" \
+  --idempotency-key "jenkins:${JOB_NAME}:${BUILD_TAG}:promote-staging"
+```
+
+```bash
+deploy --deployment //projects/deployments/pleomino-prod:deploy \
+  --publish-only \
+  --source-run-id "$STAGING_DEPLOY_RUN_ID" \
+  --control-plane-url "$VBR_DEPLOY_CONTROL_PLANE_URL" \
+  --idempotency-key "jenkins:${JOB_NAME}:${BUILD_TAG}:promote-prod"
+```
+
+Promotion requests reuse the admitted upstream run identity. If a stage is
+configured for rebuild-per-stage, Jenkins must submit a stage-specific artifact
+with fresh CI evidence instead of promoting the prior stage's artifact.
 Keep the split explicit: read-only `deploy auth ...` explains the expected
 shape, while privileged `deploy admin ...` applies reviewed identity changes.
 Start with:

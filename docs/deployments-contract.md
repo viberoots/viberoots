@@ -37,6 +37,11 @@ Current reviewed central control-plane implementation note:
 - Protected/shared mutation runs only through the shared deployment control plane, except for an explicitly documented incident-bounded break-glass procedure for control-plane unavailability.
 - Bootstrap mutation for the deployment authority itself is allowed only through an explicit reviewed bootstrap path on deployment-system-owned infrastructure; it is not part of the ordinary protected/shared deploy path.
 - Trusted CI may build, attest, and submit, but it is not a peer mutating authority.
+- Jenkins and other CI submitters must provide admission evidence that binds the reviewed source
+  revision, trusted check results, builder identity, immutable artifact identity or retained
+  artifact reference, optional SBOM/signature/provenance references, and a stable idempotency key.
+  Mutable image tags and laptop-local artifact paths are not valid protected/shared CI artifact
+  identities.
 - Preview is `publish_mode = preview`, not a peer `operation_kind`.
 - Preview must publish only to an explicitly isolated preview target or be rejected.
 - Preview publication and cleanup must use explicit preview identity selectors; implementations must not infer preview identity from ambient git state, current branch, or provider defaults.
@@ -221,6 +226,9 @@ Current reviewed central control-plane implementation note:
 - Reviewed `submitter` and `approver` grants may use `deployment_id`, `project`, or `environment_stage` scope. Reviewed `admission_reporter` grants may use `deployment_id`, `project`, `environment_stage`, or closed `admission_domain` values such as `all_deployments`.
 - Protected/shared submit-time `admissionEvidence.checks` must fail closed unless the authenticated principal also holds a matching `admission_reporter` grant; `submitter` alone is insufficient to self-assert passed checks.
 - `--admit-and-deploy` is only a reviewed shortcut for constructing check evidence and deploying in one command. It must use the same `admission_reporter` authorization boundary as structured human or CI-reported evidence rather than creating a parallel bypass path.
+- CI-reported checks and structured CI submission evidence must be authorized by an authenticated
+  principal with `admission_reporter`; a `submitter` grant alone cannot report Jenkins check status,
+  artifact provenance, or supply-chain evidence.
 - Discovering required check names through reviewed read-only CLI output does not grant `admission_reporter`; discoverability and authorization remain separate.
 - Canonical `project`, `environment_stage`, and `admission_domain` scope values must come from reviewed repo-owned deployment metadata and closed reviewed contract values, not free-form IdP naming.
 - OIDC sessions may carry multiple reviewed grants at once, and repository / environment bound claims remain mandatory so claim-to-grant mapping stays tied to the reviewed deployment context.

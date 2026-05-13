@@ -25,6 +25,7 @@ import {
   evaluateSbomPolicy,
   evaluateSupplyChainGatePolicies,
 } from "./deployment-admission-supply-chain-evaluator";
+import { assertCiAdmissionEvidence } from "./deployment-ci-admission";
 import { evaluateReadinessGatePolicies } from "./deployment-readiness-gates";
 import { DeploymentAdmissionError } from "./deployment-control-plane-errors";
 import { validatePhase0CurrentAdmission } from "./deployment-phase0-admission";
@@ -55,6 +56,11 @@ export async function evaluateDeploymentAdmission(opts: {
     throw new DeploymentAdmissionError("no_longer_admitted", phase0CurrentErrors.join("\n"));
   }
   const requestedBy = opts.evidence?.requestedBy || defaultRequestedBy();
+  assertCiAdmissionEvidence({
+    deployment: opts.deployment,
+    admittedContext,
+    evidence: opts.evidence?.ciSubmission,
+  });
   const binding = createDeploymentAdmissionBinding({
     deployment: opts.deployment,
     sourceRevision: sourceRevisionFor(admittedContext, opts.sourceRecord),
@@ -134,5 +140,6 @@ export async function evaluateDeploymentAdmission(opts: {
     ...(sbom ? { sbom } : {}),
     supplyChainGates,
     readinessGates,
+    ...(opts.evidence?.ciSubmission ? { ciSubmission: opts.evidence.ciSubmission } : {}),
   };
 }

@@ -100,6 +100,7 @@ export async function runNixosSharedHostDirectServiceMutation(opts: {
   publishBehavior?: "publish-only" | "provision-only";
   sourceRunId?: string;
   rollback?: boolean;
+  idempotencyKey?: string;
   admissionEvidence?: DeploymentAdmissionEvidence;
   smokeConnectOverride?: {
     protocol: "http:" | "https:";
@@ -144,6 +145,7 @@ export async function runNixosSharedHostDirectServiceMutation(opts: {
     ...expected,
     ...(opts.publishBehavior ? { publishBehavior: opts.publishBehavior } : {}),
     ...(expectedSourceRevision ? { expectedSourceRevision } : {}),
+    ...(opts.idempotencyKey ? { idempotencyKey: opts.idempotencyKey } : {}),
     ...(opts.sourceRunId ? { sourceRunId: opts.sourceRunId } : {}),
     ...(opts.rollback ? { rollback: true } : {}),
     ...(admissionEvidence ? { admissionEvidence } : {}),

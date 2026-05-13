@@ -45,6 +45,7 @@ RESOURCE_LIMITED_DEPLOYMENT_TESTS = {
     "build-tools/tools/tests/deployments/deployment-cli-resolve.test.ts": True,
     "build-tools/tools/tests/deployments/deployment-control-plane.approval-grant.test.ts": True,
     "build-tools/tools/tests/deployments/deployment-control-plane.authz-idempotency.test.ts": True,
+    "build-tools/tools/tests/deployments/deployment-ci-admission.authz.test.ts": True,
     "build-tools/tools/tests/deployments/deployment-control-plane.bootstrap.test.ts": True,
     "build-tools/tools/tests/deployments/deployment-control-plane.break-glass.test.ts": True,
     "build-tools/tools/tests/deployments/deployment-control-plane.observability.test.ts": True,

@@ -45,16 +45,19 @@ function evidenceWithPrincipal(
   return { ...(evidence || {}), requestedBy: authorization.requestedBy };
 }
 
-function hasAdmissionCheckEvidence(evidence: DeploymentAdmissionEvidence | undefined): boolean {
-  return Array.isArray(evidence?.checks) && evidence.checks.length > 0;
+function hasAdmissionReportEvidence(evidence: DeploymentAdmissionEvidence | undefined): boolean {
+  return (
+    (Array.isArray(evidence?.checks) && evidence.checks.length > 0) || !!evidence?.ciSubmission
+  );
 }
 
-function assertAdmissionCheckEvidenceAuthorization(
+function assertAdmissionReportEvidenceAuthorization(
   deployment: DeploymentTarget,
   authorization: DeploymentControlPlaneAuthorization | undefined,
   evidence: DeploymentAdmissionEvidence | undefined,
 ) {
-  if (!authorization || !hasAdmissionCheckEvidence(evidence)) return;
+  if (!hasAdmissionReportEvidence(evidence)) return;
+  if (!authorization) return;
   authorizeControlPlaneAdmissionReport({ deployment, authorization });
 }
 
@@ -70,7 +73,7 @@ export async function resolveSubmitAuthorizationBoundary(opts: {
   consumeAuthSession?: boolean;
 }) {
   if (!requiresServerDerivedAuthorization(opts.deployment)) {
-    assertAdmissionCheckEvidenceAuthorization(
+    assertAdmissionReportEvidenceAuthorization(
       opts.deployment,
       opts.authorization,
       opts.admissionEvidence,
@@ -95,7 +98,11 @@ export async function resolveSubmitAuthorizationBoundary(opts: {
     deploymentId: opts.deployment.deploymentId,
     operationKind: opts.operationKind,
   });
-  assertAdmissionCheckEvidenceAuthorization(opts.deployment, authorization, opts.admissionEvidence);
+  assertAdmissionReportEvidenceAuthorization(
+    opts.deployment,
+    authorization,
+    opts.admissionEvidence,
+  );
   return {
     authorization,
     requestedBy: authorization.requestedBy,

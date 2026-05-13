@@ -18,6 +18,7 @@ import type {
   DeploymentReadinessGateEvidence,
   DeploymentReadinessGateFact,
 } from "./deployment-readiness-gates";
+import type { DeploymentCiAdmissionEvidence } from "./deployment-ci-admission";
 export { normalizeAdmissionEvidence } from "./deployment-admission-evidence-normalize";
 
 export type {
@@ -78,6 +79,7 @@ export type DeploymentAdmissionEvidence = {
   supplyChainGates?: DeploymentSupplyChainGateEvidence[];
   readinessGates?: DeploymentReadinessGateEvidence[];
   phase0CompatibilityException?: DeploymentCompatibilityExceptionEvidence;
+  ciSubmission?: DeploymentCiAdmissionEvidence;
 };
 
 export type DeploymentAdmissionBinding = {
@@ -124,6 +126,7 @@ export type DeploymentAdmissionPolicyEvaluation = {
   sbom?: DeploymentSbomFact;
   supplyChainGates: DeploymentSupplyChainGateFact[];
   readinessGates: DeploymentReadinessGateFact[];
+  ciSubmission?: DeploymentCiAdmissionEvidence;
 };
 
 export function defaultRequestedBy(): DeploymentPrincipal {

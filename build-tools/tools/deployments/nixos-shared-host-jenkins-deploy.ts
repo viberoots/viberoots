@@ -15,6 +15,10 @@ import {
   type JenkinsContext,
   createJenkinsEnvelope,
 } from "./nixos-shared-host-jenkins-contract";
+import {
+  jenkinsSmokeOverrideArgs,
+  requireJenkinsFlagValue,
+} from "./nixos-shared-host-jenkins-flags";
 import type { NixosSharedHostRemoteDeploySummary } from "./nixos-shared-host-remote-execution";
 import type { NixosSharedHostRemotePlan } from "./nixos-shared-host-remote-target";
 
@@ -35,12 +39,6 @@ const UNSUPPORTED_FLAGS = [
   "remove",
   "dry-run",
 ] as const;
-
-function requireFlagValue(name: string): string {
-  const value = getFlagStr(name, "").trim();
-  if (!value) throw new JenkinsDeployError("missing_required_flag", `missing required --${name}`);
-  return value;
-}
 
 function requireNoUnsupportedFlags() {
   const hit = UNSUPPORTED_FLAGS.filter((flag) => hasFlag(flag));
@@ -67,7 +65,7 @@ function assertNoHostApplyFlags() {
 }
 
 async function requireExistingPath(flagName: string, kind: "file" | "directory"): Promise<string> {
-  const abs = path.resolve(requireFlagValue(flagName));
+  const abs = path.resolve(requireJenkinsFlagValue(flagName));
   let stat;
   try {
     stat = await fsp.stat(abs);
@@ -84,28 +82,6 @@ async function requireExistingPath(flagName: string, kind: "file" | "directory")
     );
   }
   return abs;
-}
-
-function smokeOverrideArgs(): string[] {
-  const host = getFlagStr("smoke-connect-host", "").trim();
-  const port = getFlagStr("smoke-connect-port", "").trim();
-  const protocol = getFlagStr("smoke-connect-protocol", "https:").trim();
-  const anyOverride = host || port || hasFlag("smoke-connect-protocol");
-  if (!anyOverride) return [];
-  if (!host || !port) {
-    throw new JenkinsDeployError(
-      "invalid_smoke_override",
-      "--smoke-connect-host and --smoke-connect-port are required together",
-    );
-  }
-  return [
-    "--smoke-connect-host",
-    host,
-    "--smoke-connect-port",
-    port,
-    "--smoke-connect-protocol",
-    protocol === "http:" ? "http:" : "https:",
-  ];
 }
 
 async function parseJson<T>(stdout: string, source: string): Promise<T> {
@@ -153,7 +129,13 @@ function childArgs(ctx: JenkinsContext): string[] {
     "--deployment",
     ctx.deploymentLabel,
     ...(hasFlag("admission-evidence-json")
-      ? ["--admission-evidence-json", requireFlagValue("admission-evidence-json")]
+      ? ["--admission-evidence-json", requireJenkinsFlagValue("admission-evidence-json")]
+      : []),
+    ...(hasFlag("idempotency-key")
+      ? ["--idempotency-key", requireJenkinsFlagValue("idempotency-key")]
+      : []),
+    ...(hasFlag("auth-session-id")
+      ? ["--auth-session-id", requireJenkinsFlagValue("auth-session-id")]
       : []),
     ...(hasFlag("admit-and-deploy")
       ? ((value) => (value ? ["--admit-and-deploy", value] : ["--admit-and-deploy"]))(
@@ -161,15 +143,15 @@ function childArgs(ctx: JenkinsContext): string[] {
         )
       : []),
     ...(hasFlag("admit-for-commit")
-      ? ["--admit-for-commit", requireFlagValue("admit-for-commit")]
+      ? ["--admit-for-commit", requireJenkinsFlagValue("admit-for-commit")]
       : []),
     "--profile",
     ctx.profileName,
     "--artifact-dir",
     ctx.artifactDir,
-    ...(hasFlag("profile-root") ? ["--profile-root", requireFlagValue("profile-root")] : []),
+    ...(hasFlag("profile-root") ? ["--profile-root", requireJenkinsFlagValue("profile-root")] : []),
     ...(getFlagBool("retain-remote-artifact") ? ["--retain-remote-artifact"] : []),
-    ...smokeOverrideArgs(),
+    ...jenkinsSmokeOverrideArgs(),
   ];
 }
 
@@ -180,8 +162,8 @@ async function main() {
     requireNoUnsupportedFlags();
     assertNoHostApplyFlags();
     ctx = {
-      deploymentLabel: requireFlagValue("deployment"),
-      profileName: requireFlagValue("profile"),
+      deploymentLabel: requireJenkinsFlagValue("deployment"),
+      profileName: requireJenkinsFlagValue("profile"),
       artifactDir: await requireExistingPath("artifact-dir", "directory"),
       planOnly: getFlagBool("plan"),
       requestedHostApplyMode: "skip",

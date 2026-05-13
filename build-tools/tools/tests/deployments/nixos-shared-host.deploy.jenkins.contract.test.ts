@@ -42,6 +42,8 @@ test("jenkins wrapper contract", async (t) => {
       assert.equal(summary.jenkinsContract.transport.identityFile, auth.identityFile);
       assert.equal(summary.jenkinsContract.transport.knownHostsFile, auth.knownHostsFile);
       assert.equal(summary.jenkinsContract.serviceSubmission.mode, "control-plane-service");
+      assert.match(summary.jenkinsContract.commands.deploy, /--idempotency-key <stable-ci-key>/);
+      assert.match(summary.jenkinsContract.commands.deploy, /--admission-evidence-json/);
     });
 
     await t.test("fails closed on missing artifact input and still emits JSON", async () => {

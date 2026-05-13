@@ -4,6 +4,7 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
 import { localHarnessControlPlaneDatabaseUrl } from "../../deployments/nixos-shared-host-control-plane-backend";
+import { artifactIdentityForNixosSharedHostDir } from "../../deployments/nixos-shared-host-artifacts";
 import { startNixosSharedHostControlPlaneServer } from "../../deployments/nixos-shared-host-control-plane-server";
 import { startNixosSharedHostControlPlaneWorkerLoop } from "../../deployments/nixos-shared-host-control-plane-worker-loop";
 import { nixosSharedHostContainerRoot } from "../../deployments/nixos-shared-host-runtime";
@@ -17,11 +18,13 @@ import {
   jenkinsExecEnv,
   pleominoDeploymentFixture,
   prepareReviewedRemoteHostPaths,
+  requireServiceAuthForPleomino,
   writeArtifact,
   writeReviewedPleominoAdmissionEvidence,
   writeJenkinsAuthFiles,
 } from "./nixos-shared-host.jenkins.fixture";
 import { readBackendSnapshot } from "./nixos-shared-host.control-plane.helpers";
+import { writeAuthSession } from "./nixos-shared-host.service-auth-boundary.helpers";
 
 const CONTROL_PLANE_TOKEN = "test-control-plane-token";
 
@@ -35,6 +38,7 @@ test("jenkins wrapper stages the Pleomino artifact, submits through the control 
     const remoteRecordsRoot = path.join(tmp, "remote-records");
     const remoteStatePath = path.join(tmp, "remote-state", "platform-state.json");
     await installReviewedPleominoTargets(tmp);
+    await requireServiceAuthForPleomino(tmp);
     await ensureNixosSharedHostReviewedSourceRef(tmp, $, deployment);
     await prepareReviewedRemoteHostPaths({
       remoteStatePath,
@@ -67,16 +71,41 @@ test("jenkins wrapper stages the Pleomino artifact, submits through the control 
       controlPlane.url,
     );
     const { admissionEvidencePath } = await writeReviewedPleominoAdmissionEvidence(tmp, $);
+    const admissionEvidence = JSON.parse(await fsp.readFile(admissionEvidencePath, "utf8"));
+    const sourceRevision = String(
+      (await $({ cwd: tmp, stdio: "pipe" })`git rev-parse HEAD`).stdout,
+    ).trim();
+    admissionEvidence.ciSubmission = {
+      system: "jenkins",
+      sourceRevision,
+      builderIdentity: "jenkins:mini/pleomino",
+      artifactIdentity: await artifactIdentityForNixosSharedHostDir(artifactDir, "static-webapp"),
+      artifactRef: "retained-artifact://jenkins/pleomino-dev/1",
+      idempotencyKey: "jenkins-pleomino-dev-1",
+      sbomRefs: ["oci://sbom/pleomino@sha256:beef"],
+      signatureRefs: ["sigstore://pleomino/1"],
+      provenanceRefs: ["slsa://jenkins/pleomino/1"],
+    };
+    await fsp.writeFile(admissionEvidencePath, JSON.stringify(admissionEvidence, null, 2), "utf8");
     const auth = await writeJenkinsAuthFiles(tmp);
     const server = await startNixosSharedHostPublicServer({
       deployment,
       hostRoot: remoteRuntimeRoot,
     });
-    try {
-      const result = await $({
+    const authSessionId = await writeAuthSession({
+      recordsRoot: remoteRecordsRoot,
+      deployment,
+      operationKind: "deploy",
+      principalId: "oidc:service-account-jenkins",
+      roles: ["submitter", "admission_reporter"],
+    });
+    const jenkinsCommand = (sessionId: string) =>
+      $({
         cwd: tmp,
         env: jenkinsExecEnv(env),
-      })`build-tools/tools/bin/nixos-shared-host-jenkins-deploy --deployment //projects/deployments/pleomino-dev:deploy --admission-evidence-json ${admissionEvidencePath} --profile mini --profile-root ${profileRoot} --artifact-dir ${artifactDir} --ssh-identity-file ${auth.identityFile} --ssh-known-hosts ${auth.knownHostsFile} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(server.port)} --smoke-connect-protocol https:`;
+      })`build-tools/tools/bin/nixos-shared-host-jenkins-deploy --deployment //projects/deployments/pleomino-dev:deploy --admission-evidence-json ${admissionEvidencePath} --idempotency-key jenkins-pleomino-dev-1 --auth-session-id ${sessionId} --profile mini --profile-root ${profileRoot} --artifact-dir ${artifactDir} --ssh-identity-file ${auth.identityFile} --ssh-known-hosts ${auth.knownHostsFile} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(server.port)} --smoke-connect-protocol https:`;
+    try {
+      const result = await jenkinsCommand(authSessionId);
       const summary = JSON.parse(String(result.stdout));
       assert.equal(summary.ok, true);
       assert.equal(summary.schemaVersion, "nixos-shared-host-jenkins-deploy@1");
@@ -92,6 +121,33 @@ test("jenkins wrapper stages the Pleomino artifact, submits through the control 
       );
       assert.equal(snapshot.deploymentLabel, "//projects/deployments/pleomino-dev:deploy");
       assert.equal(snapshot.providerTargetIdentity, "nixos-shared-host:default:pleomino");
+      assert.equal(
+        snapshot.admittedContext.policyEvaluation.ciSubmission.idempotencyKey,
+        "jenkins-pleomino-dev-1",
+      );
+      const retryAuthSessionId = await writeAuthSession({
+        recordsRoot: remoteRecordsRoot,
+        deployment,
+        operationKind: "deploy",
+        principalId: "oidc:service-account-jenkins",
+        roles: ["submitter", "admission_reporter"],
+      });
+      const retried = JSON.parse(String((await jenkinsCommand(retryAuthSessionId)).stdout));
+      assert.equal(
+        retried.remoteExecution.controlPlane.submissionId,
+        record.controlPlane.submissionId,
+      );
+      await writeArtifact(artifactDir, { "index.html": "<html>changed</html>\n" });
+      const conflictAuthSessionId = await writeAuthSession({
+        recordsRoot: remoteRecordsRoot,
+        deployment,
+        operationKind: "deploy",
+        principalId: "oidc:service-account-jenkins",
+        roles: ["submitter", "admission_reporter"],
+      });
+      const conflict = await jenkinsCommand(conflictAuthSessionId).nothrow();
+      assert.notEqual(conflict.exitCode, 0);
+      assert.match(String(conflict.stdout), /idempotency/i);
       const liveIndex = path.join(
         nixosSharedHostContainerRoot(remoteRuntimeRoot, deployment.providerTarget.containerName),
         "srv/static-app/live/index.html",
@@ -115,13 +171,8 @@ test("jenkins wrapper forwards admit-and-deploy so bootstrap deploys can avoid h
     const remoteRecordsRoot = path.join(tmp, "remote-records");
     const remoteStatePath = path.join(tmp, "remote-state", "platform-state.json");
     await installReviewedPleominoTargets(tmp);
-    const sharedTargetsPath = path.join(
-      tmp,
-      "projects",
-      "deployments",
-      "pleomino-shared",
-      "TARGETS",
-    );
+    await requireServiceAuthForPleomino(tmp);
+    const sharedTargetsPath = path.join(tmp, "projects/deployments/pleomino-shared/TARGETS");
     await fsp.writeFile(
       sharedTargetsPath,
       (await fsp.readFile(sharedTargetsPath, "utf8"))
@@ -166,11 +217,18 @@ test("jenkins wrapper forwards admit-and-deploy so bootstrap deploys can avoid h
       deployment,
       hostRoot: remoteRuntimeRoot,
     });
+    const authSessionId = await writeAuthSession({
+      recordsRoot: remoteRecordsRoot,
+      deployment,
+      operationKind: "deploy",
+      principalId: "oidc:service-account-jenkins",
+      roles: ["submitter", "admission_reporter"],
+    });
     try {
       const result = await $({
         cwd: tmp,
         env: jenkinsExecEnv(env),
-      })`build-tools/tools/bin/nixos-shared-host-jenkins-deploy --deployment //projects/deployments/pleomino-dev:deploy --admission-evidence-json ${admissionEvidencePath} --admit-and-deploy deploy/pleomino-dev --profile mini --profile-root ${profileRoot} --artifact-dir ${artifactDir} --ssh-identity-file ${auth.identityFile} --ssh-known-hosts ${auth.knownHostsFile} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(server.port)} --smoke-connect-protocol https:`;
+      })`build-tools/tools/bin/nixos-shared-host-jenkins-deploy --deployment //projects/deployments/pleomino-dev:deploy --admission-evidence-json ${admissionEvidencePath} --admit-and-deploy deploy/pleomino-dev --auth-session-id ${authSessionId} --profile mini --profile-root ${profileRoot} --artifact-dir ${artifactDir} --ssh-identity-file ${auth.identityFile} --ssh-known-hosts ${auth.knownHostsFile} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(server.port)} --smoke-connect-protocol https:`;
       const summary = JSON.parse(String(result.stdout));
       assert.equal(summary.ok, true);
       assert.equal(summary.remoteExecution.controlPlane.finalOutcome, "succeeded");

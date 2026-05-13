@@ -59,6 +59,15 @@ export function createJenkinsEnvelope(ctx: JenkinsContext, plan?: NixosSharedHos
         supported: false,
         requestedMode: ctx.requestedHostApplyMode,
       },
+      commands: {
+        plan:
+          `nixos-shared-host-jenkins-deploy --deployment ${ctx.deploymentLabel} ` +
+          `--profile ${ctx.profileName} --artifact-dir <artifact-dir> --plan`,
+        deploy:
+          `nixos-shared-host-jenkins-deploy --deployment ${ctx.deploymentLabel} ` +
+          `--profile ${ctx.profileName} --artifact-dir <artifact-dir> ` +
+          "--admission-evidence-json <ci-evidence.json> --idempotency-key <stable-ci-key>",
+      },
       ...(plan
         ? {
             remoteRepoCheckout: {

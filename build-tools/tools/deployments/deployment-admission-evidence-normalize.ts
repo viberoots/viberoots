@@ -10,6 +10,7 @@ import {
   normalizeSbomEvidence,
   normalizeSupplyChainGateEvidence,
 } from "./deployment-admission-supply-chain";
+import { normalizeCiAdmissionEvidence } from "./deployment-ci-admission";
 import { normalizeReadinessGateEvidence } from "./deployment-readiness-gates";
 
 const ACCESS_MODES = ["direct_upload_pilot", "connector_demo", "connector_internal"];
@@ -83,6 +84,7 @@ export function normalizeAdmissionEvidence(
   const sboms = normalizeSbomEvidence(raw.sboms);
   const supplyChainGates = normalizeSupplyChainGateEvidence(raw.supplyChainGates);
   const readinessGates = normalizeReadinessGateEvidence(raw.readinessGates);
+  const ciSubmission = normalizeCiAdmissionEvidence(raw.ciSubmission);
   const phase0CompatibilityException = normalizePhase0CompatibilityException(
     raw.phase0CompatibilityException,
   );
@@ -101,6 +103,7 @@ export function normalizeAdmissionEvidence(
     ...(sboms.length > 0 ? { sboms } : {}),
     ...(supplyChainGates.length > 0 ? { supplyChainGates } : {}),
     ...(readinessGates.length > 0 ? { readinessGates } : {}),
+    ...(ciSubmission ? { ciSubmission } : {}),
     ...(phase0CompatibilityException ? { phase0CompatibilityException } : {}),
   };
 }
