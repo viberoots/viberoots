@@ -30,6 +30,24 @@ def kubernetes_service_deployment(
         visibility = ["PUBLIC"]):
     if protection_class != "local_only":
         require_shared_policy(lane_policy, environment_stage, admission_policy)
+    reserved_provider_target_keys = {
+        "cluster": cluster,
+        "namespace": namespace,
+        "release": release,
+        "id": "{}/{}/{}".format(cluster, namespace, release),
+        "provider_target_identity": "kubernetes:{}/{}/{}".format(cluster, namespace, release),
+        "service_kind": service_kind,
+        "ingress_mode": ingress_mode,
+        "health_path": health_path,
+    }
+    for key in reserved_provider_target_keys:
+        if key in provider_target:
+            fail(
+                (
+                    "kubernetes_service_deployment provider_target cannot override {}; set the " +
+                    "top-level Kubernetes deployment argument instead"
+                ).format(key),
+            )
     effective_ingress_mode = ingress_mode
     if not effective_ingress_mode:
         effective_ingress_mode = "none" if service_kind == "worker" else "public"

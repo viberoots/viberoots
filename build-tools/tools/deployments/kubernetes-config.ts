@@ -12,12 +12,22 @@ type KubernetesRenderedConfig = {
   cluster: string;
   namespace: string;
   release: string;
+  provider_target_identity: string;
   smoke_url: string;
   smoke_expect_contains?: string;
   service_kind?: string;
   ingress_mode?: string;
   health_path?: string;
   component_artifacts: Record<string, { path: string; identity: string }>;
+};
+
+export type PreparedKubernetesPublisherConfig = {
+  sourcePath: string;
+  renderedConfigPath: string;
+  fingerprint: string;
+  chart: string;
+  smokeUrl: string;
+  smokeExpectContains?: string;
 };
 
 function parseConfigObject(raw: string, sourcePath: string): Record<string, unknown> {
@@ -61,6 +71,12 @@ function requireOptionalDriftMatch(
   }
 }
 
+function requireAbsent(sourcePath: string, parsed: Record<string, unknown>, field: string): void {
+  if (parsed[field] !== undefined) {
+    throw new Error(`${sourcePath}: ${field} must come from Buck deployment metadata`);
+  }
+}
+
 export function resolveKubernetesPublisherConfigPath(
   workspaceRoot: string,
   deployment: KubernetesDeployment,
@@ -77,19 +93,21 @@ export async function prepareKubernetesPublisherConfig(opts: {
   deployment: KubernetesDeployment;
   componentArtifacts: Record<string, { path: string; identity: string }>;
   outputPath: string;
-}): Promise<{
-  sourcePath: string;
-  renderedConfigPath: string;
-  fingerprint: string;
-  chart: string;
-  smokeUrl: string;
-  smokeExpectContains?: string;
-}> {
+}): Promise<PreparedKubernetesPublisherConfig> {
   const sourcePath = resolveKubernetesPublisherConfigPath(opts.workspaceRoot, opts.deployment);
   const parsed = parseConfigObject(await fsp.readFile(sourcePath, "utf8"), sourcePath);
   const configuredCluster = readString(parsed.cluster);
   const configuredNamespace = readString(parsed.namespace);
   const configuredRelease = readString(parsed.release);
+  for (const field of [
+    "provider_target_identity",
+    "providerTargetIdentity",
+    "provider_target",
+    "target_identity",
+    "vbr",
+  ]) {
+    requireAbsent(sourcePath, parsed, field);
+  }
   requireDriftMatch(
     sourcePath,
     "cluster",
@@ -129,11 +147,18 @@ export async function prepareKubernetesPublisherConfig(opts: {
     ingressMode,
     opts.deployment.providerTarget.ingressMode || "",
   );
+  requireOptionalDriftMatch(
+    sourcePath,
+    "health_path",
+    healthPath,
+    opts.deployment.providerTarget.healthPath || "",
+  );
   const rendered: KubernetesRenderedConfig = {
     chart,
     cluster: opts.deployment.providerTarget.cluster,
     namespace: opts.deployment.providerTarget.namespace,
     release: opts.deployment.providerTarget.release,
+    provider_target_identity: opts.deployment.providerTarget.providerTargetIdentity,
     smoke_url: smokeUrl,
     ...(smokeExpectContains ? { smoke_expect_contains: smokeExpectContains } : {}),
     ...(serviceKind || opts.deployment.providerTarget.serviceKind
@@ -157,5 +182,25 @@ export async function prepareKubernetesPublisherConfig(opts: {
     chart,
     smokeUrl,
     ...(smokeExpectContains ? { smokeExpectContains } : {}),
+  };
+}
+
+export async function readPreparedKubernetesPublisherConfigSnapshot(
+  renderedConfigPath: string,
+): Promise<PreparedKubernetesPublisherConfig> {
+  const outputPath = path.resolve(renderedConfigPath);
+  const rendered = JSON.parse(await fsp.readFile(outputPath, "utf8")) as KubernetesRenderedConfig;
+  if (!readString(rendered.chart) || !readString(rendered.smoke_url)) {
+    throw new Error(`${outputPath}: invalid recorded kubernetes rendered provider config`);
+  }
+  return {
+    sourcePath: outputPath,
+    renderedConfigPath: outputPath,
+    fingerprint: fingerprintValue(rendered),
+    chart: rendered.chart,
+    smokeUrl: rendered.smoke_url,
+    ...(rendered.smoke_expect_contains
+      ? { smokeExpectContains: rendered.smoke_expect_contains }
+      : {}),
   };
 }

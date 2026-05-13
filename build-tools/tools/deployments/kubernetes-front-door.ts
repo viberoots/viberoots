@@ -12,6 +12,7 @@ import { printDeployJson } from "./deploy-front-door";
 import { submitKubernetesDeploy } from "./kubernetes-deploy";
 import { submitKubernetesExactArtifactRun } from "./kubernetes-exact-run";
 import { submitKubernetesProvisionOnly } from "./kubernetes-provision-only";
+import { readPreparedKubernetesPublisherConfigSnapshot } from "./kubernetes-config";
 import { runProtectedKubernetesDeployFrontDoor } from "./kubernetes-protected-front-door";
 import { resolveKubernetesReplaySource } from "./kubernetes-replay";
 
@@ -138,6 +139,13 @@ export async function runKubernetesDeployFrontDoor(opts: {
       parentRunId: source.record.deployRunId,
       releaseLineageId: source.record.releaseLineageId || source.record.deployRunId,
       artifactLineageId: source.record.artifactLineageId || source.replaySnapshot.artifactIdentity,
+      ...(source.replaySnapshot.deployment.deploymentId === opts.deployment.deploymentId
+        ? {
+            preparedPublisherConfig: await readPreparedKubernetesPublisherConfigSnapshot(
+              source.replaySnapshot.providerConfigSnapshotPath,
+            ),
+          }
+        : {}),
       ...(opts.admissionEvidence ? { admissionEvidence: opts.admissionEvidence as any } : {}),
       ...(opts.smokeConnectOverride
         ? { smokeConnectOverride: opts.smokeConnectOverride as any }

@@ -564,6 +564,17 @@ step instead of editing Keycloak by hand.
   ingress plus a health path, while worker services must not declare public ingress
 - checked-in `helm/values.yaml` can carry chart, smoke URL, service kind, ingress mode, and health
   path; deploy injects admitted service artifacts into the rendered provider config
+- `helm/values.yaml` must not set cluster, namespace, release, provider target
+  identity, service kind, ingress mode, or health path differently from Buck
+  deployment metadata. Protected/shared workers freeze the rendered values in
+  the execution snapshot before any Helm mutation.
+- service artifacts must be admitted immutable references, `sha256:<digest>`
+  files, or image references pinned with `@sha256`. Mutable tag identities such
+  as `latest`, `dev`, `staging`, and `prod` are rejected; do not promote by
+  editing YAML image tags.
+- live Kubernetes release identity drift fails closed before publish. The
+  reviewed reconciliation path is the Helm publish step using the admitted
+  artifact identities from the execution snapshot.
 - app deployments can attach an `opentofu-stack` provisioner when stack files
   live under the deployment package `opentofu/` directory, with `plan_json`
   pointing at reviewed JSON evidence and `apply_plan` pointing at the saved plan

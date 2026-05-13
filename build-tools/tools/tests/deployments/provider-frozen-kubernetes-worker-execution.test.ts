@@ -13,7 +13,7 @@ import { DEPLOYMENT_SECRET_FIXTURE_PATH_ENV } from "../../deployments/deployment
 import { runInTemp } from "../lib/test-helpers";
 import { reviewedLaneAdmissionEvidenceFixture } from "./deployment-lane-governance.fixture";
 import { installFakeKubernetesHelm } from "./kubernetes.fake-helm";
-import { kubernetesDeploymentFixture } from "./kubernetes.fixture";
+import { kubernetesDeploymentFixture, writeKubernetesLiveStateFixture } from "./kubernetes.fixture";
 import { startKubernetesPublicServer } from "./kubernetes.public-server";
 import {
   reviewedKubernetesPublishRequirements,
@@ -90,6 +90,7 @@ test("kubernetes worker deploy and retry execute from frozen snapshots", async (
     });
     const fake = await installFakeKubernetesHelm(tmp);
     const secretFixturePath = await writeKubernetesPublishSecretFixture(tmp);
+    const liveStatePath = await writeKubernetesLiveStateFixture(tmp, deployment);
     await ensureNixosSharedHostReviewedSourceRef(tmp, $, deployment as any);
     await writeValues(tmp, deployment.deploymentId);
     const server = await startKubernetesPublicServer({ deployment, publishRoot: fake.publishRoot });
@@ -105,6 +106,7 @@ test("kubernetes worker deploy and retry execute from frozen snapshots", async (
           VBR_KUBERNETES_HELM_BIN: path.join(fake.binDir, "helm"),
           VBR_KUBERNETES_FAKE_PUBLISH_ROOT: fake.publishRoot,
           VBR_KUBERNETES_FAKE_HELM_LOG: fake.logPath,
+          VBR_KUBERNETES_LIVE_STATE_PATH: liveStatePath,
           [DEPLOYMENT_SECRET_FIXTURE_PATH_ENV]: secretFixturePath,
         },
         async () => {
@@ -124,6 +126,19 @@ test("kubernetes worker deploy and retry execute from frozen snapshots", async (
               smokeConnectOverride,
             },
           });
+          assert.match(deploy.preparedPublisherConfig?.fingerprint || "", /^sha256:/);
+          await fsp.writeFile(
+            path.join(
+              tmp,
+              "projects",
+              "deployments",
+              deployment.deploymentId,
+              "helm",
+              "values.yaml",
+            ),
+            "chart: ./charts/api\ncluster: drifted-cluster\n",
+            "utf8",
+          );
           await fsp.rm(artifactDir, { recursive: true, force: true });
           const deployed = await executeSnapshot({
             tmp,
@@ -132,6 +147,36 @@ test("kubernetes worker deploy and retry execute from frozen snapshots", async (
             snapshot: deploy,
           });
           assert.equal(deployed.finalOutcome, "succeeded");
+          const deployedRecord = JSON.parse(await fsp.readFile(deployed.resultRecordPath, "utf8"));
+          const replaySnapshot = JSON.parse(
+            await fsp.readFile(deployedRecord.replaySnapshotPath, "utf8"),
+          );
+          const renderedSnapshotPath = replaySnapshot.providerConfigSnapshotPath;
+          const renderedSnapshot = await fsp.readFile(renderedSnapshotPath, "utf8");
+          await fsp.writeFile(
+            renderedSnapshotPath,
+            renderedSnapshot.replace("shared-observability.example.test", "tampered.example.test"),
+            "utf8",
+          );
+          await assert.rejects(
+            buildKubernetesControlPlaneSnapshot({
+              workspaceRoot: tmp,
+              recordsRoot,
+              request: {
+                schemaVersion: KUBERNETES_CONTROL_PLANE_SUBMIT_REQUEST_SCHEMA,
+                submissionId: "kube-worker-retry-tampered",
+                submittedAt: new Date().toISOString(),
+                deployment,
+                operationKind: "retry",
+                sourceRunId: deployed.deployRunId,
+                admissionEvidence: reviewedLaneAdmissionEvidenceFixture({ deployment }),
+                smokeConnectOverride,
+              },
+            }),
+            /provider config snapshot drifted/,
+          );
+          await fsp.writeFile(renderedSnapshotPath, renderedSnapshot, "utf8");
+          await writeValues(tmp, deployment.deploymentId);
           const retry = await buildKubernetesControlPlaneSnapshot({
             workspaceRoot: tmp,
             recordsRoot,
@@ -146,6 +191,22 @@ test("kubernetes worker deploy and retry execute from frozen snapshots", async (
               smokeConnectOverride,
             },
           });
+          assert.equal(
+            retry.preparedPublisherConfig?.renderedConfigPath,
+            deploy.preparedPublisherConfig?.renderedConfigPath,
+          );
+          await fsp.writeFile(
+            path.join(
+              tmp,
+              "projects",
+              "deployments",
+              deployment.deploymentId,
+              "helm",
+              "values.yaml",
+            ),
+            "chart: ./charts/api\ncluster: retry-drift\n",
+            "utf8",
+          );
           const replayed = await executeSnapshot({
             tmp,
             recordsRoot,

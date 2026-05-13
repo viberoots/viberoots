@@ -8,17 +8,14 @@ import { reviewedRuntimeContractFor } from "../../deployments/provider-capabilit
 import { assertReviewedRuntimeParity } from "../../deployments/provider-capabilities/runtime-parity";
 import { runInTemp } from "../lib/test-helpers";
 import { writeReviewedLaneAdmissionEvidenceJson } from "./deployment-lane-governance.fixture";
-import {
-  startControlPlaneHarness,
-  withEnvOverrides,
-} from "./nixos-shared-host.control-plane.helpers";
-import {
-  ensureNixosSharedHostReviewedSourceRef,
-  nixosSharedHostLanePolicyFixture,
-} from "./nixos-shared-host.fixture";
+import { startControlPlaneHarness } from "./nixos-shared-host.control-plane.helpers";
+import { withEnvOverrides } from "./nixos-shared-host.control-plane.helpers";
+import { ensureNixosSharedHostReviewedSourceRef } from "./nixos-shared-host.fixture";
+import { nixosSharedHostLanePolicyFixture } from "./nixos-shared-host.fixture";
 import { installHarnessClientProfile } from "./nixos-shared-host.remote-exec.install.helpers";
 import { installFakeKubernetesHelm } from "./kubernetes.fake-helm";
 import { installKubernetesTargets, kubernetesDeploymentFixture } from "./kubernetes.fixture";
+import { writeKubernetesLiveStateFixture } from "./kubernetes.fixture";
 import { startKubernetesPublicServer } from "./kubernetes.public-server";
 import { writeServiceArtifact } from "./kubernetes.service-artifact.fixture";
 import { DEPLOYMENT_SECRET_FIXTURE_PATH_ENV } from "../../deployments/deployment-secret-fixture";
@@ -108,6 +105,7 @@ test("public kubernetes deploy routes deploy, provision-only, retry, and rollbac
     const artifactA = path.join(tmp, "artifact-a");
     const artifactB = path.join(tmp, "artifact-b");
     const fake = await installFakeKubernetesHelm(tmp);
+    const liveStatePath = await writeKubernetesLiveStateFixture(tmp, deployment);
     await writeServiceArtifact(artifactA, "api-a\n");
     await writeServiceArtifact(artifactB, "api-b\n");
     await installKubernetesTargets(tmp, [deployment]);
@@ -127,6 +125,7 @@ test("public kubernetes deploy routes deploy, provision-only, retry, and rollbac
       await withEnvOverrides(
         {
           ...fakeHelmOverrides(fake),
+          VBR_KUBERNETES_LIVE_STATE_PATH: liveStatePath,
           [DEPLOYMENT_SECRET_FIXTURE_PATH_ENV]: secretFixturePath,
         },
         async () => {

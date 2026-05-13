@@ -96,6 +96,9 @@ export async function executeKubernetesControlPlaneSubmission(opts: {
             ...(snapshot.expectedSourceRevision
               ? { expectedSourceRevision: snapshot.expectedSourceRevision }
               : {}),
+            ...(snapshot.preparedPublisherConfig
+              ? { preparedPublisherConfig: snapshot.preparedPublisherConfig as any }
+              : {}),
             artifactDir: "",
             ...(snapshot.smokeConnectOverride
               ? { smokeConnectOverride: snapshot.smokeConnectOverride as any }
@@ -146,6 +149,9 @@ export async function executeKubernetesControlPlaneSubmission(opts: {
                   : {}),
                 ...(snapshot.expectedSourceRevision
                   ? { expectedSourceRevision: snapshot.expectedSourceRevision }
+                  : {}),
+                ...(snapshot.preparedPublisherConfig
+                  ? { preparedPublisherConfig: snapshot.preparedPublisherConfig as any }
                   : {}),
                 ...(snapshot.smokeConnectOverride
                   ? { smokeConnectOverride: snapshot.smokeConnectOverride as any }

@@ -12,6 +12,8 @@ import {
 } from "./kubernetes-admission";
 import { admitKubernetesComponentArtifacts } from "./kubernetes-artifacts";
 import type { AdmittedKubernetesComponentArtifact } from "./kubernetes-artifacts";
+import type { PreparedKubernetesPublisherConfig } from "./kubernetes-config";
+import { prepareKubernetesControlPlaneRenderSnapshot } from "./kubernetes-control-plane-render-snapshot";
 import { requiredArtifactPaths } from "./kubernetes-deploy-helpers";
 import { resolveKubernetesReplaySource, type KubernetesReplaySnapshot } from "./kubernetes-replay";
 import type { KubernetesControlPlaneSubmitRequest } from "./kubernetes-control-plane";
@@ -31,6 +33,7 @@ export type KubernetesControlPlaneSnapshot = FrozenProviderSnapshotFields & {
   workspaceRoot: string;
   recordsRoot: string;
   componentArtifacts?: AdmittedKubernetesComponentArtifact[];
+  preparedPublisherConfig?: PreparedKubernetesPublisherConfig;
   replaySnapshot?: KubernetesReplaySnapshot;
   sourceRecord?: any;
   parentRunId?: string;
@@ -66,6 +69,11 @@ export async function buildKubernetesControlPlaneSnapshot(opts: {
       ? compositeIdentity(opts.request.deployment, componentArtifacts)
       : `provision-only:${opts.request.deployment.providerTarget.providerTargetIdentity}`);
   const provisionerPlan = await admissionProvisionerPlan(opts);
+  const preparedPublisherConfig = await prepareKubernetesControlPlaneRenderSnapshot({
+    ...opts,
+    replay,
+    componentArtifacts,
+  });
   const admittedContext = await admittedContextFor({
     ...opts,
     replay,
@@ -74,6 +82,7 @@ export async function buildKubernetesControlPlaneSnapshot(opts: {
   return {
     ...base,
     ...(componentArtifacts ? { componentArtifacts } : {}),
+    ...(preparedPublisherConfig ? { preparedPublisherConfig } : {}),
     ...replay,
     ...(await admitProviderControlPlaneSnapshot({
       workspaceRoot: opts.workspaceRoot,

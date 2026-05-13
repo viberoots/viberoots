@@ -59,13 +59,19 @@ export const KUBERNETES_PROVIDER_CAPABILITY: DeploymentProviderCapability = {
         "`helm/values.yaml` or equivalent release values remain provider-local publish configuration only",
       ),
       bullet(
-        "deployment metadata remains authoritative for cluster, namespace, and release identity; config drift must fail closed before publish",
+        "deployment metadata remains authoritative for cluster, namespace, release, ingress mode, health path, service kind, and provider target identity; config drift must fail closed before publish",
       ),
       bullet(
         "the reviewed initial slice requires a provider-local `chart` entry and may declare `smoke_url` plus optional `smoke_expect_contains` for service-health validation",
       ),
       bullet(
         "the rendered publish config injects the admitted per-component artifact paths and identities so the release step consumes exact resolved inputs instead of ambient workspace state",
+      ),
+      bullet(
+        "rendered publish config is frozen in protected/shared execution snapshots before worker mutation",
+      ),
+      bullet(
+        "live release identity drift is fail-closed; normal artifact reconciliation happens only through the reviewed Helm publish step",
       ),
     ],
   },
@@ -151,6 +157,9 @@ export const KUBERNETES_PROVIDER_CAPABILITY: DeploymentProviderCapability = {
     ),
     bullet(
       "protected/shared kubernetes service publish, retry, rollback, and promotion must declare `secret_requirements` at the `publish` step; ambient Helm or cluster credentials are rejected and the publisher process receives only the resolved reviewed credential env",
+    ),
+    bullet(
+      "Kubernetes service artifacts must be admitted immutable artifact references, `sha256:<digest>` files, or image references pinned with `@sha256`; mutable tag identities such as `latest`, `dev`, `staging`, and `prod` are rejected",
     ),
   ],
 };

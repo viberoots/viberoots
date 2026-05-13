@@ -51,3 +51,17 @@ test("kubernetes rejects missing or unreviewed service artifacts", async () => {
     );
   });
 });
+
+test("kubernetes rejects mutable image tag deployment identities", async () => {
+  await runInTemp("kubernetes-artifact-mutable-tags", async (tmp) => {
+    const mutable = path.join(tmp, "image.ref");
+    await fsp.writeFile(mutable, "registry.example.test/api:latest\n", "utf8");
+    await assert.rejects(
+      admitKubernetesComponentArtifacts({
+        recordsRoot: path.join(tmp, "records"),
+        artifactPathsByComponentId: { api: mutable },
+      }),
+      /mutable tag "latest"/,
+    );
+  });
+});

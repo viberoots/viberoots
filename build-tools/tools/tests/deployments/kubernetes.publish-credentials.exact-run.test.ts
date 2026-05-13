@@ -5,11 +5,16 @@ import path from "node:path";
 import { test } from "node:test";
 import { submitKubernetesDeploy } from "../../deployments/kubernetes-deploy";
 import { submitKubernetesExactArtifactRun } from "../../deployments/kubernetes-exact-run";
+import { prepareKubernetesPublisherConfig } from "../../deployments/kubernetes-config";
 import { runInTemp } from "../lib/test-helpers";
 import { deploymentAdmissionEvidenceFixture } from "./deployment-admission.fixture";
 import { writeReviewedLaneAdmissionEvidenceJson } from "./deployment-lane-governance.fixture";
 import { installFakeKubernetesHelm } from "./kubernetes.fake-helm";
-import { installKubernetesTargets, kubernetesDeploymentFixture } from "./kubernetes.fixture";
+import {
+  installKubernetesTargets,
+  kubernetesDeploymentFixture,
+  writeKubernetesLiveStateFixture,
+} from "./kubernetes.fixture";
 import {
   REVIEWED_KUBERNETES_PUBLISH_CONTRACT,
   fakeKubernetesPublishSecretRuntime,
@@ -40,6 +45,7 @@ test("deploy rejects protected/shared kubernetes service without publish secret_
     const recordsRoot = path.join(tmp, "records");
     const artifactDir = path.join(tmp, "artifact");
     const fake = await installFakeKubernetesHelm(tmp);
+    const liveStatePath = await writeKubernetesLiveStateFixture(tmp, deployment);
     await writeServiceArtifact(artifactDir, "api-service\n");
     await installKubernetesTargets(tmp, [deployment]);
     await ensureNixosSharedHostReviewedSourceRef(tmp, $, deployment as any);
@@ -64,6 +70,7 @@ test("deploy rejects protected/shared kubernetes service without publish secret_
     process.env.VBR_KUBERNETES_HELM_BIN = path.join(fake.binDir, "helm");
     process.env.VBR_KUBERNETES_FAKE_PUBLISH_ROOT = fake.publishRoot;
     process.env.VBR_KUBERNETES_FAKE_HELM_LOG = fake.logPath;
+    process.env.VBR_KUBERNETES_LIVE_STATE_PATH = liveStatePath;
     try {
       await assert.rejects(
         async () =>
@@ -81,6 +88,7 @@ test("deploy rejects protected/shared kubernetes service without publish secret_
       delete process.env.VBR_KUBERNETES_HELM_BIN;
       delete process.env.VBR_KUBERNETES_FAKE_PUBLISH_ROOT;
       delete process.env.VBR_KUBERNETES_FAKE_HELM_LOG;
+      delete process.env.VBR_KUBERNETES_LIVE_STATE_PATH;
     }
   });
 });
@@ -96,6 +104,7 @@ async function exerciseExactArtifactRun(operationKind: ExactRunOperationKind): P
     const fixtureEnv = setKubernetesPublishSecretFixtureEnv(secretFixturePath);
     const recordsRoot = path.join(tmp, "records");
     const fake = await installFakeKubernetesHelm(tmp);
+    const liveStatePath = await writeKubernetesLiveStateFixture(tmp, deployment);
     const componentId = "api";
     const artifactIdentity = "node-service:api";
     const storedArtifactPath = path.join(tmp, "artifact-store", componentId);
@@ -122,6 +131,7 @@ async function exerciseExactArtifactRun(operationKind: ExactRunOperationKind): P
     process.env.VBR_KUBERNETES_HELM_BIN = path.join(fake.binDir, "helm");
     process.env.VBR_KUBERNETES_FAKE_PUBLISH_ROOT = fake.publishRoot;
     process.env.VBR_KUBERNETES_FAKE_HELM_LOG = fake.logPath;
+    process.env.VBR_KUBERNETES_LIVE_STATE_PATH = liveStatePath;
     try {
       const sourceRevision = `rev-publish-creds-${operationKind}-1`;
       const sourceRecord = {
@@ -137,6 +147,24 @@ async function exerciseExactArtifactRun(operationKind: ExactRunOperationKind): P
       };
       const fakeRuntime = fakeKubernetesPublishSecretRuntime();
       const componentArtifacts = [{ componentId, identity: artifactIdentity, storedArtifactPath }];
+      const preparedPublisherConfig =
+        operationKind === "rollback" || operationKind === "promotion"
+          ? await prepareKubernetesPublisherConfig({
+              workspaceRoot: tmp,
+              deployment,
+              componentArtifacts: {
+                [componentId]: { path: storedArtifactPath, identity: artifactIdentity },
+              },
+              outputPath: path.join(recordsRoot, "provider-config", `frozen-${operationKind}.json`),
+            })
+          : undefined;
+      if (preparedPublisherConfig) {
+        await writeHelmValues(
+          tmp,
+          deployment.deploymentId,
+          "chart: ./charts/api\ncluster: drifted-current-values\n",
+        );
+      }
       const admissionEvidence = deploymentAdmissionEvidenceFixture({
         deployment,
         operationKind,
@@ -155,6 +183,7 @@ async function exerciseExactArtifactRun(operationKind: ExactRunOperationKind): P
         releaseLineageId: "lineage-1",
         artifactLineageId: artifactIdentity,
         admissionEvidence,
+        ...(preparedPublisherConfig ? { preparedPublisherConfig } : {}),
         publishCredentials: fakeRuntime.hooks,
         smokeConnectOverride: {
           protocol: "http:",
@@ -167,6 +196,9 @@ async function exerciseExactArtifactRun(operationKind: ExactRunOperationKind): P
       // Exact-artifact reuse: the recorded artifact identity matches the input.
       assert.equal(record.artifact?.identity, artifactIdentity);
       assert.equal(record.artifactLineageId, artifactIdentity);
+      if (preparedPublisherConfig) {
+        assert.equal(record.providerConfigFingerprint, preparedPublisherConfig.fingerprint);
+      }
       assert.equal(record.componentResults?.[0]?.artifactIdentity, artifactIdentity);
       // Publish credentials resolve through the target's reviewed publish-step
       // secret_requirements: only the env names and reviewed contract refs surface,
@@ -183,6 +215,7 @@ async function exerciseExactArtifactRun(operationKind: ExactRunOperationKind): P
       delete process.env.VBR_KUBERNETES_HELM_BIN;
       delete process.env.VBR_KUBERNETES_FAKE_PUBLISH_ROOT;
       delete process.env.VBR_KUBERNETES_FAKE_HELM_LOG;
+      delete process.env.VBR_KUBERNETES_LIVE_STATE_PATH;
       fixtureEnv.restore();
       await server.close();
     }

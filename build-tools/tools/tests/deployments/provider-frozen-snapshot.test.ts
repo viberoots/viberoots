@@ -33,6 +33,19 @@ async function writeStaticArtifact(root: string) {
   return root;
 }
 
+async function writeKubernetesValues(root: string, deploymentId: string) {
+  const configPath = path.join(
+    root,
+    "projects",
+    "deployments",
+    deploymentId,
+    "helm",
+    "values.yaml",
+  );
+  await fsp.mkdir(path.dirname(configPath), { recursive: true });
+  await fsp.writeFile(configPath, "chart: ./charts/api\n", "utf8");
+}
+
 function assertSharedAdmission(snapshot: Record<string, any>) {
   assert.equal(
     snapshot.frozenExecutionSchemaVersion,
@@ -101,6 +114,7 @@ test("provider control-plane preparation freezes shared admission and admitted a
 
     const serviceArtifact = path.join(tmp, "service-artifact");
     const serviceIdentity = await writeServiceArtifact(serviceArtifact, "service\n");
+    await writeKubernetesValues(tmp, kube.deploymentId);
     const kubeArtifactLineageId = fingerprintValue({
       providerTargetIdentity: kube.providerTarget.providerTargetIdentity,
       componentArtifacts: [{ componentId: "api", identity: serviceIdentity }],

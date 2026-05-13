@@ -7,7 +7,11 @@ import { submitKubernetesDeploy } from "../../deployments/kubernetes-deploy";
 import { runInTemp } from "../lib/test-helpers";
 import { writeReviewedLaneAdmissionEvidenceJson } from "./deployment-lane-governance.fixture";
 import { installFakeKubernetesHelm } from "./kubernetes.fake-helm";
-import { installKubernetesTargets, kubernetesDeploymentFixture } from "./kubernetes.fixture";
+import {
+  installKubernetesTargets,
+  kubernetesDeploymentFixture,
+  writeKubernetesLiveStateFixture,
+} from "./kubernetes.fixture";
 import {
   fakeKubernetesPublishSecretRuntime,
   reviewedKubernetesPublishRequirements,
@@ -42,6 +46,7 @@ test("kubernetes deploy records service-health smoke failure after publish", asy
     const artifactDir = path.join(tmp, "artifact");
     const recordsRoot = path.join(tmp, "records");
     const fake = await installFakeKubernetesHelm(tmp);
+    const liveStatePath = await writeKubernetesLiveStateFixture(tmp, deployment);
     await writeServiceArtifact(artifactDir, "api-service\n");
     await installKubernetesTargets(tmp, [deployment]);
     await ensureNixosSharedHostReviewedSourceRef(tmp, $, deployment as any);
@@ -65,6 +70,7 @@ test("kubernetes deploy records service-health smoke failure after publish", asy
     process.env.VBR_KUBERNETES_HELM_BIN = path.join(fake.binDir, "helm");
     process.env.VBR_KUBERNETES_FAKE_PUBLISH_ROOT = fake.publishRoot;
     process.env.VBR_KUBERNETES_FAKE_HELM_LOG = fake.logPath;
+    process.env.VBR_KUBERNETES_LIVE_STATE_PATH = liveStatePath;
     try {
       await assert.rejects(
         async () =>
@@ -92,6 +98,7 @@ test("kubernetes deploy records service-health smoke failure after publish", asy
       delete process.env.VBR_KUBERNETES_HELM_BIN;
       delete process.env.VBR_KUBERNETES_FAKE_PUBLISH_ROOT;
       delete process.env.VBR_KUBERNETES_FAKE_HELM_LOG;
+      delete process.env.VBR_KUBERNETES_LIVE_STATE_PATH;
       fixtureEnv.restore();
       await server.close();
     }

@@ -8,7 +8,11 @@ import { DEPLOYMENT_SECRET_FIXTURE_PATH_ENV } from "../../deployments/deployment
 import { runInTemp } from "../lib/test-helpers";
 import { writeReviewedLaneAdmissionEvidenceJson } from "./deployment-lane-governance.fixture";
 import { installFakeKubernetesHelm } from "./kubernetes.fake-helm";
-import { installKubernetesTargets, kubernetesDeploymentFixture } from "./kubernetes.fixture";
+import {
+  installKubernetesTargets,
+  kubernetesDeploymentFixture,
+  writeKubernetesLiveStateFixture,
+} from "./kubernetes.fixture";
 import {
   REVIEWED_KUBERNETES_PUBLISH_CONTRACT,
   reviewedKubernetesPublishRequirements,
@@ -60,6 +64,7 @@ test("kubernetes deploy CLI completes single-service publish with reviewed provi
     const artifactDir = path.join(tmp, "artifact");
     const recordsRoot = path.join(tmp, "records");
     const fake = await installFakeKubernetesHelm(tmp);
+    const liveStatePath = await writeKubernetesLiveStateFixture(tmp, deployment);
     await writeServiceArtifact(artifactDir, "api-service\n");
     await installKubernetesTargets(tmp, [deployment]);
     await ensureNixosSharedHostReviewedSourceRef(tmp, $, deployment as any);
@@ -93,6 +98,7 @@ test("kubernetes deploy CLI completes single-service publish with reviewed provi
           VBR_KUBERNETES_HELM_BIN: path.join(fake.binDir, "helm"),
           VBR_KUBERNETES_FAKE_PUBLISH_ROOT: fake.publishRoot,
           VBR_KUBERNETES_FAKE_HELM_LOG: fake.logPath,
+          VBR_KUBERNETES_LIVE_STATE_PATH: liveStatePath,
           [DEPLOYMENT_SECRET_FIXTURE_PATH_ENV]: secretFixturePath,
         },
       })`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment ${deployment.label} --admission-evidence-json ${admissionEvidenceJson} --artifact-dir ${artifactDir} --records-root ${recordsRoot} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(server.port)} --smoke-connect-protocol http:`;
@@ -142,6 +148,7 @@ test("kubernetes deploy preserves ordered multi-component publish state", async 
     const apiArtifact = path.join(tmp, "artifact-api");
     const sidecarArtifact = path.join(tmp, "artifact-sidecar");
     const fake = await installFakeKubernetesHelm(tmp);
+    const liveStatePath = await writeKubernetesLiveStateFixture(tmp, deployment);
     const secretFixturePath = await writeKubernetesPublishSecretFixture(tmp);
     await writeServiceArtifact(apiArtifact, "api-service\n");
     await writeServiceArtifact(sidecarArtifact, "otel-sidecar\n");
@@ -177,6 +184,7 @@ test("kubernetes deploy preserves ordered multi-component publish state", async 
           VBR_KUBERNETES_HELM_BIN: path.join(fake.binDir, "helm"),
           VBR_KUBERNETES_FAKE_PUBLISH_ROOT: fake.publishRoot,
           VBR_KUBERNETES_FAKE_HELM_LOG: fake.logPath,
+          VBR_KUBERNETES_LIVE_STATE_PATH: liveStatePath,
           [DEPLOYMENT_SECRET_FIXTURE_PATH_ENV]: secretFixturePath,
         },
       })`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment ${deployment.label} --component-artifacts api=${apiArtifact},otel-sidecar=${sidecarArtifact} --admission-evidence-json ${admissionEvidenceJson} --records-root ${recordsRoot} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(server.port)} --smoke-connect-protocol http:`;

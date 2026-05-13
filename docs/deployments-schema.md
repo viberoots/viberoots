@@ -212,6 +212,9 @@ Kubernetes single-service deployments should use `kubernetes_service_deployment(
 raw `deployment_target(...)` metadata. The macro emits `component_kind = "service"` and records
 reviewed posture in `provider_target`: web services require `ingress_mode = "public"` plus
 `health_path`, while worker services must use `ingress_mode = "none"` or `"private"`.
+The Helm values file remains provider-native render input only; deployment identity, ingress
+posture, health path, and immutable service artifact identities come from Buck metadata plus the
+admitted execution snapshot, not checked-in image tags.
 
 ```starlark
 kubernetes_service_deployment(

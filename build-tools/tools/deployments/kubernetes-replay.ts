@@ -16,6 +16,7 @@ import { deploymentMetadataFingerprintFor } from "./nixos-shared-host-deployment
 import { readKubernetesDeployRecord, type KubernetesDeployRecord } from "./kubernetes-records-read";
 import type { KubernetesAdmittedContext } from "./kubernetes-admission";
 import type { KubernetesDeployment } from "./contract";
+import { readPreparedKubernetesPublisherConfigSnapshot } from "./kubernetes-config";
 
 export const KUBERNETES_REPLAY_SNAPSHOT_SCHEMA = "kubernetes-replay-snapshot@1";
 
@@ -33,6 +34,7 @@ export type KubernetesReplaySnapshot = {
   admittedContext: KubernetesAdmittedContext;
   deployment: KubernetesDeployment;
   providerConfigSnapshotPath: string;
+  providerConfigFingerprint: string;
 };
 
 export function replaySnapshotPathFor(recordsRoot: string, deployRunId: string): string {
@@ -49,6 +51,9 @@ export async function writeKubernetesReplaySnapshot(opts: {
   providerConfigSnapshotPath: string;
 }) {
   const replaySnapshotPath = replaySnapshotPathFor(opts.recordsRoot, opts.deployRunId);
+  const providerConfigFingerprint = (
+    await readPreparedKubernetesPublisherConfigSnapshot(opts.providerConfigSnapshotPath)
+  ).fingerprint;
   const snapshot: KubernetesReplaySnapshot = {
     schemaVersion: KUBERNETES_REPLAY_SNAPSHOT_SCHEMA,
     deployRunId: opts.deployRunId,
@@ -63,6 +68,7 @@ export async function writeKubernetesReplaySnapshot(opts: {
     admittedContext: opts.admittedContext,
     deployment: opts.deployment,
     providerConfigSnapshotPath: path.resolve(opts.providerConfigSnapshotPath),
+    providerConfigFingerprint,
   };
   await fsp.mkdir(path.dirname(replaySnapshotPath), { recursive: true });
   await fsp.writeFile(replaySnapshotPath, JSON.stringify(snapshot, null, 2) + "\n", "utf8");
@@ -93,6 +99,7 @@ export async function resolveKubernetesReplaySource(opts: {
     record,
     replaySnapshot,
   });
+  await assertProviderConfigSnapshotIntegrity({ record, replaySnapshot });
   const expected = kubernetesRunnerIdentities(replaySnapshot.deployment);
   const compatibilityErrors = [
     ...runnerIdentityCompatibilityErrors(expected, record.runnerIdentities),
@@ -119,4 +126,27 @@ export async function resolveKubernetesReplaySource(opts: {
     evidence: replaySnapshot.admittedContext.policyEvaluation,
   });
   return { record, recordPath, replaySnapshot };
+}
+
+async function assertProviderConfigSnapshotIntegrity(opts: {
+  record: KubernetesDeployRecord;
+  replaySnapshot: KubernetesReplaySnapshot;
+}): Promise<void> {
+  const recorded = opts.record.providerConfigFingerprint;
+  const snapshotted = opts.replaySnapshot.providerConfigFingerprint;
+  if (!recorded || !snapshotted || recorded !== snapshotted) {
+    throw new Error(
+      `kubernetes replay provider config fingerprint mismatch: ${opts.record.deployRunId}`,
+    );
+  }
+  const current = (
+    await readPreparedKubernetesPublisherConfigSnapshot(
+      opts.replaySnapshot.providerConfigSnapshotPath,
+    )
+  ).fingerprint;
+  if (current !== snapshotted) {
+    throw new Error(
+      `kubernetes replay provider config snapshot drifted: ${opts.record.deployRunId}`,
+    );
+  }
 }

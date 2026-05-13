@@ -847,9 +847,11 @@ Normative-source note:
   - one or more admitted immutable service-style component artifacts
 - checked-in provider config:
   - `helm/values.yaml` or equivalent release values remain provider-local publish configuration only
-  - deployment metadata remains authoritative for cluster, namespace, and release identity; config drift must fail closed before publish
+  - deployment metadata remains authoritative for cluster, namespace, release, ingress mode, health path, service kind, and provider target identity; config drift must fail closed before publish
   - the reviewed initial slice requires a provider-local `chart` entry and may declare `smoke_url` plus optional `smoke_expect_contains` for service-health validation
   - the rendered publish config injects the admitted per-component artifact paths and identities so the release step consumes exact resolved inputs instead of ambient workspace state
+  - rendered publish config is frozen in protected/shared execution snapshots before worker mutation
+  - live release identity drift is fail-closed; normal artifact reconciliation happens only through the reviewed Helm publish step
 
 ### Retry / Idempotency
 
@@ -900,6 +902,7 @@ Normative-source note:
 - protected/shared mutation, exact-artifact retry or rollback reuse, and reviewed `--provision-only` execution must route through the reviewed control-plane service / worker front door
 - protected/shared execution must stay inside vetted built-in publisher, provisioner, and service-health smoke code
 - protected/shared kubernetes service publish, retry, rollback, and promotion must declare `secret_requirements` at the `publish` step; ambient Helm or cluster credentials are rejected and the publisher process receives only the resolved reviewed credential env
+- Kubernetes service artifacts must be admitted immutable artifact references, `sha256:<digest>` files, or image references pinned with `@sha256`; mutable tag identities such as `latest`, `dev`, `staging`, and `prod` are rejected
 
 ## Capability Entry: `vercel`
 

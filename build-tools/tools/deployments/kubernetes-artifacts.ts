@@ -9,7 +9,7 @@ export const KUBERNETES_ARTIFACT_PROVENANCE_SCHEMA = "kubernetes-component-artif
 export type AdmittedKubernetesComponentArtifact = {
   componentId: string;
   identity: string;
-  sourceKind: "directory" | "image-digest";
+  sourceKind: "directory" | "image-digest" | "image-ref";
   storedArtifactPath: string;
   provenancePath: string;
 };
@@ -17,6 +17,8 @@ export type AdmittedKubernetesComponentArtifact = {
 const NODE_SERVICE_IDENTITY_SCHEMA = "node-service-artifact-identity@1";
 const NODE_SERVICE_RUNTIME_SCHEMA = "node-service-runtime@1";
 const IMAGE_DIGEST_RE = /^sha256:[a-f0-9]{64}$/;
+const IMAGE_REF_WITH_DIGEST_RE = /^[a-zA-Z0-9][a-zA-Z0-9._/:@-]*@sha256:[a-f0-9]{64}$/;
+const MUTABLE_TAGS = new Set(["latest", "dev", "staging", "prod"]);
 
 async function pathExists(filePath: string): Promise<boolean> {
   try {
@@ -60,12 +62,37 @@ async function validateNodeServiceArtifactDir(artifactPath: string): Promise<str
   return identity.identity;
 }
 
-async function validateImageDigestFile(artifactPath: string): Promise<string> {
-  const digest = (await fsp.readFile(artifactPath, "utf8")).trim();
-  if (!IMAGE_DIGEST_RE.test(digest)) {
-    throw new Error("service artifact file must contain an OCI image digest sha256:<64 hex>");
+function tagFromImageReference(value: string): string {
+  const slash = value.lastIndexOf("/");
+  const colon = value.lastIndexOf(":");
+  return colon > slash ? value.slice(colon + 1).trim() : "";
+}
+
+async function validateImageDigestFile(artifactPath: string): Promise<{
+  identity: string;
+  sourceKind: "image-digest" | "image-ref";
+}> {
+  const value = (await fsp.readFile(artifactPath, "utf8")).trim();
+  if (IMAGE_DIGEST_RE.test(value)) {
+    return { identity: `image-digest:${value}`, sourceKind: "image-digest" };
   }
-  return `image-digest:${digest}`;
+  if (IMAGE_REF_WITH_DIGEST_RE.test(value)) {
+    return { identity: `image-ref:${value}`, sourceKind: "image-ref" };
+  }
+  const tag = tagFromImageReference(value);
+  if (MUTABLE_TAGS.has(tag)) {
+    throw new Error(
+      `service artifact image reference uses mutable tag "${tag}"; use an admitted artifact reference or image@sha256 digest`,
+    );
+  }
+  if (tag) {
+    throw new Error(
+      "service artifact image reference must be pinned with @sha256 digest, not a mutable tag",
+    );
+  }
+  throw new Error(
+    "service artifact file must contain an OCI image digest (sha256:<64 hex> or image@sha256:<64 hex>)",
+  );
 }
 
 function storedPathFor(recordsRoot: string, identity: string): string {
@@ -133,16 +160,18 @@ export async function admitKubernetesComponentArtifacts(opts: {
       if (error?.code === "ENOENT") throw new Error(`missing service artifact: ${artifactPath}`);
       throw error;
     });
-    const sourceKind = stat.isDirectory() ? "directory" : "image-digest";
-    const identity = stat.isDirectory()
-      ? await validateNodeServiceArtifactDir(artifactPath)
+    const validated = stat.isDirectory()
+      ? {
+          identity: await validateNodeServiceArtifactDir(artifactPath),
+          sourceKind: "directory" as const,
+        }
       : await validateImageDigestFile(artifactPath);
     const artifact: AdmittedKubernetesComponentArtifact = {
       componentId,
-      identity,
-      sourceKind,
-      storedArtifactPath: storedPathFor(opts.recordsRoot, identity),
-      provenancePath: provenancePathFor(opts.recordsRoot, identity),
+      identity: validated.identity,
+      sourceKind: validated.sourceKind,
+      storedArtifactPath: storedPathFor(opts.recordsRoot, validated.identity),
+      provenancePath: provenancePathFor(opts.recordsRoot, validated.identity),
     };
     await ensureStoredArtifact(artifactPath, artifact.storedArtifactPath);
     await ensureProvenance(artifact);

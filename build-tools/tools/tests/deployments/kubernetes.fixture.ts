@@ -1,4 +1,6 @@
 #!/usr/bin/env zx-wrapper
+import * as fsp from "node:fs/promises";
+import path from "node:path";
 import {
   KUBERNETES_PROVIDER,
   deriveKubernetesProviderTarget,
@@ -76,6 +78,30 @@ export function kubernetesDeploymentFixture(
     ...(overrides.vaultRuntime ? { vaultRuntime: overrides.vaultRuntime } : {}),
     providerTarget,
   };
+}
+
+export async function writeKubernetesLiveStateFixture(
+  root: string,
+  deployment: KubernetesDeployment,
+  overrides: Record<string, string> = {},
+): Promise<string> {
+  const liveStatePath = path.join(root, `${deployment.deploymentId}-live-state.json`);
+  await fsp.writeFile(
+    liveStatePath,
+    JSON.stringify(
+      {
+        cluster: deployment.providerTarget.cluster,
+        namespace: deployment.providerTarget.namespace,
+        release: deployment.providerTarget.release,
+        providerTargetIdentity: deployment.providerTarget.providerTargetIdentity,
+        ...overrides,
+      },
+      null,
+      2,
+    ) + "\n",
+    "utf8",
+  );
+  return liveStatePath;
 }
 
 export function kubernetesAdmissionPolicyNodeFixture(

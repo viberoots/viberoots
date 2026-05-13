@@ -9,7 +9,11 @@ import { OPENTOFU_STACK_PROVISIONER } from "../../deployments/opentofu-stack";
 import { runInTemp } from "../lib/test-helpers";
 import { deploymentAdmissionEvidenceFixture } from "./deployment-admission.fixture";
 import { installFakeKubernetesHelm } from "./kubernetes.fake-helm";
-import { installKubernetesTargets, kubernetesDeploymentFixture } from "./kubernetes.fixture";
+import {
+  installKubernetesTargets,
+  kubernetesDeploymentFixture,
+  writeKubernetesLiveStateFixture,
+} from "./kubernetes.fixture";
 import {
   REVIEWED_KUBERNETES_PUBLISH_CONTRACT,
   fakeKubernetesPublishSecretRuntime,
@@ -53,6 +57,7 @@ test("kubernetes app-attached deploy attaches OpenTofu apply outcome with replay
     const artifactDir = path.join(tmp, "artifact");
     const recordsRoot = path.join(tmp, "records");
     const fake = await installFakeKubernetesHelm(tmp);
+    const liveStatePath = await writeKubernetesLiveStateFixture(tmp, deployment);
     const fakeOpenTofu = await installFakeOpenTofu(tmp);
     const openTofuSecretFixturePath = await writeOpenTofuSecretFixture(tmp, {
       [REVIEWED_KUBERNETES_PUBLISH_CONTRACT]: {
@@ -94,6 +99,7 @@ test("kubernetes app-attached deploy attaches OpenTofu apply outcome with replay
     process.env.VBR_KUBERNETES_HELM_BIN = path.join(fake.binDir, "helm");
     process.env.VBR_KUBERNETES_FAKE_PUBLISH_ROOT = fake.publishRoot;
     process.env.VBR_KUBERNETES_FAKE_HELM_LOG = fake.logPath;
+    process.env.VBR_KUBERNETES_LIVE_STATE_PATH = liveStatePath;
     process.env.VBR_OPENTOFU_BIN = fakeOpenTofu.binPath;
     process.env.VBR_FAKE_OPENTOFU_LOG = fakeOpenTofu.logPath;
     process.env[DEPLOYMENT_SECRET_FIXTURE_PATH_ENV] = openTofuSecretFixturePath;
@@ -137,6 +143,7 @@ test("kubernetes app-attached deploy attaches OpenTofu apply outcome with replay
         "VBR_KUBERNETES_HELM_BIN",
         "VBR_KUBERNETES_FAKE_PUBLISH_ROOT",
         "VBR_KUBERNETES_FAKE_HELM_LOG",
+        "VBR_KUBERNETES_LIVE_STATE_PATH",
         "VBR_OPENTOFU_BIN",
         "VBR_FAKE_OPENTOFU_LOG",
         DEPLOYMENT_SECRET_FIXTURE_PATH_ENV,

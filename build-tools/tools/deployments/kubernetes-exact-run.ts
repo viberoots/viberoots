@@ -5,7 +5,10 @@ import {
   resolveSourceRunKubernetesAdmittedContext,
   type KubernetesAdmittedContext,
 } from "./kubernetes-admission";
-import { prepareKubernetesPublisherConfig } from "./kubernetes-config";
+import {
+  prepareKubernetesPublisherConfig,
+  type PreparedKubernetesPublisherConfig,
+} from "./kubernetes-config";
 import type { KubernetesDeployment } from "./contract";
 import type { DeploymentAdmissionEvidence } from "./deployment-admission-evidence";
 import { evaluateDeploymentAdmission } from "./deployment-admission-evaluator";
@@ -33,6 +36,7 @@ export async function submitKubernetesExactArtifactRun(opts: {
   expectedSourceRevision?: string;
   admissionEvidence?: DeploymentAdmissionEvidence;
   admittedContext?: KubernetesAdmittedContext;
+  preparedPublisherConfig?: PreparedKubernetesPublisherConfig;
   publishCredentials?: KubernetesPublishCredentialsHooks;
   smokeConnectOverride?: { protocol: "http:" | "https:"; hostname: string; port: number };
 }) {
@@ -54,24 +58,31 @@ export async function submitKubernetesExactArtifactRun(opts: {
     ReturnType<typeof resolveKubernetesPublishCredentialsForDeployment>
   > = { env: {}, envNames: [], contractRefs: [] };
   try {
-    const preparedConfig = await prepareKubernetesPublisherConfig({
-      workspaceRoot: opts.workspaceRoot,
-      deployment: opts.deployment,
-      componentArtifacts: Object.fromEntries(
-        opts.componentArtifacts.map((artifact) => [
-          artifact.componentId,
-          { path: artifact.storedArtifactPath, identity: artifact.identity },
-        ]),
-      ),
-      outputPath: path.join(opts.recordsRoot, "provider-config", `${deployRunId}.helm-values.json`),
-    });
+    const preparedConfig =
+      opts.preparedPublisherConfig ||
+      (await prepareKubernetesPublisherConfig({
+        workspaceRoot: opts.workspaceRoot,
+        deployment: opts.deployment,
+        componentArtifacts: Object.fromEntries(
+          opts.componentArtifacts.map((artifact) => [
+            artifact.componentId,
+            { path: artifact.storedArtifactPath, identity: artifact.identity },
+          ]),
+        ),
+        outputPath: path.join(
+          opts.recordsRoot,
+          "provider-config",
+          `${deployRunId}.helm-values.json`,
+        ),
+      }));
     publisherCredentials = await resolveKubernetesPublishCredentialsForDeployment({
       deployment: opts.deployment,
       admittedContext,
       hooks: opts.publishCredentials,
     });
+    const componentResults = [];
     for (const artifact of opts.componentArtifacts) {
-      await publishKubernetesComponent({
+      const published = await publishKubernetesComponent({
         workspaceRoot: opts.workspaceRoot,
         deployment: opts.deployment,
         chart: preparedConfig.chart,
@@ -79,6 +90,13 @@ export async function submitKubernetesExactArtifactRun(opts: {
         componentId: artifact.componentId,
         artifactPath: artifact.storedArtifactPath,
         publishCredentialEnv: publisherCredentials.env,
+      });
+      componentResults.push({
+        componentId: artifact.componentId,
+        artifactIdentity: artifact.identity,
+        providerTargetIdentity: opts.deployment.providerTarget.providerTargetIdentity,
+        liveDriftCheck: published.liveDriftCheck,
+        finalOutcome: "succeeded" as const,
       });
     }
     const smoke = await smokeKubernetesRelease({
@@ -107,12 +125,7 @@ export async function submitKubernetesExactArtifactRun(opts: {
       artifactLineageId: opts.artifactLineageId,
       artifact: { identity: opts.artifactLineageId },
       componentArtifacts: opts.componentArtifacts,
-      componentResults: opts.componentArtifacts.map((artifact) => ({
-        componentId: artifact.componentId,
-        artifactIdentity: artifact.identity,
-        providerTargetIdentity: opts.deployment.providerTarget.providerTargetIdentity,
-        finalOutcome: "succeeded",
-      })),
+      componentResults,
       admittedContext,
       smokeOutcome: "passed",
       deploymentMetadataFingerprint: deploymentMetadataFingerprintFor(opts.deployment),

@@ -12,7 +12,10 @@ import type { AdmittedKubernetesComponentArtifact } from "./kubernetes-artifacts
 import { orderedComponentIds } from "./kubernetes-deploy-helpers";
 import type { KubernetesAdmittedContext } from "./kubernetes-admission";
 import { resolveKubernetesDeployAdmission } from "./kubernetes-deploy-admission";
-import { prepareKubernetesPublisherConfig } from "./kubernetes-config";
+import {
+  prepareKubernetesPublisherConfig,
+  type PreparedKubernetesPublisherConfig,
+} from "./kubernetes-config";
 import { publishKubernetesComponent } from "./kubernetes-publisher";
 // prettier-ignore
 import { publisherCredentialFields, resolveKubernetesPublishCredentialsForDeployment, type KubernetesPublishCredentialsHooks } from "./kubernetes-publish-credentials-orchestration";
@@ -38,6 +41,7 @@ export async function submitKubernetesDeploy(opts: {
   admissionEvidence?: DeploymentAdmissionEvidence;
   openTofuApply?: OpenTofuApplyHooks;
   publishCredentials?: KubernetesPublishCredentialsHooks;
+  preparedPublisherConfig?: PreparedKubernetesPublisherConfig;
   smokeConnectOverride?: {
     protocol: "http:" | "https:";
     hostname: string;
@@ -77,17 +81,23 @@ export async function submitKubernetesDeploy(opts: {
     if (provisionerApplyOutcome?.status === "failed") {
       throw withFailedStep("publish", new Error("opentofu apply failed before kubernetes publish"));
     }
-    preparedConfig = await prepareKubernetesPublisherConfig({
-      workspaceRoot: opts.workspaceRoot,
-      deployment: opts.deployment,
-      componentArtifacts: Object.fromEntries(
-        admittedArtifacts.map((artifact) => [
-          artifact.componentId,
-          { path: artifact.storedArtifactPath, identity: artifact.identity },
-        ]),
-      ),
-      outputPath: path.join(opts.recordsRoot, "provider-config", `${deployRunId}.helm-values.json`),
-    });
+    preparedConfig =
+      opts.preparedPublisherConfig ||
+      (await prepareKubernetesPublisherConfig({
+        workspaceRoot: opts.workspaceRoot,
+        deployment: opts.deployment,
+        componentArtifacts: Object.fromEntries(
+          admittedArtifacts.map((artifact) => [
+            artifact.componentId,
+            { path: artifact.storedArtifactPath, identity: artifact.identity },
+          ]),
+        ),
+        outputPath: path.join(
+          opts.recordsRoot,
+          "provider-config",
+          `${deployRunId}.helm-values.json`,
+        ),
+      }));
     providerConfigFingerprint = preparedConfig.fingerprint;
     publisherCredentials = await resolveKubernetesPublishCredentialsForDeployment({
       deployment: opts.deployment,
@@ -127,6 +137,7 @@ export async function submitKubernetesDeploy(opts: {
         componentId,
         artifactIdentity: artifact.identity,
         providerTargetIdentity: opts.deployment.providerTarget.providerTargetIdentity,
+        liveDriftCheck: published.result.liveDriftCheck,
         finalOutcome: "succeeded",
       });
     }

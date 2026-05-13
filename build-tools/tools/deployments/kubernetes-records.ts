@@ -12,6 +12,7 @@ import {
 } from "./deployment-runner-identities";
 import type { KubernetesProvisionerPlanRef } from "./kubernetes-provisioner-plan";
 import type { OpenTofuApplyOutcome } from "./opentofu-apply";
+import type { KubernetesLiveDriftCheck } from "./kubernetes-live-drift";
 import { KUBERNETES_PROVIDER } from "./contract";
 import { operatorErrorFields } from "./deployment-control-plane-redaction";
 
@@ -47,6 +48,7 @@ export type KubernetesDeployRecord = {
     componentId: string;
     artifactIdentity: string;
     providerTargetIdentity: string;
+    liveDriftCheck?: KubernetesLiveDriftCheck;
     finalOutcome: "succeeded" | "publish_failed";
   }>;
   admittedContext: KubernetesAdmittedContext;

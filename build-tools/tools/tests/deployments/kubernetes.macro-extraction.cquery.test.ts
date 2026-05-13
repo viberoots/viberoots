@@ -93,3 +93,36 @@ test("kubernetes_service_deployment macro extracts web and private worker servic
     ]);
   });
 });
+
+test("kubernetes_service_deployment rejects provider_target metadata overrides", async () => {
+  await runInTemp("kubernetes-service-macro-provider-target-override", async (tmp, $) => {
+    await writeTargets(tmp);
+    await fsp.appendFile(
+      path.join(tmp, "projects", "deployments", "api-prod", "TARGETS"),
+      "\n" +
+        [
+          "kubernetes_service_deployment(",
+          '    name = "bad",',
+          '    component = "//projects/apps/api:image",',
+          '    cluster = "prod-us-west",',
+          '    namespace = "web",',
+          '    release = "api",',
+          '    provider_target = {"namespace": "drift"},',
+          '    lane_policy = "//projects/deployments/pleomino-shared:lane",',
+          '    environment_stage = "prod",',
+          '    admission_policy = "//projects/deployments/pleomino-shared:prod_release",',
+          ")",
+          "",
+        ].join("\n"),
+      "utf8",
+    );
+    await assert.rejects(
+      $({
+        cwd: tmp,
+        stdio: "pipe",
+        env: { ...process.env, HOME: process.env.BUCK2_REAL_HOME || process.env.HOME },
+      })`buck2 --isolation-dir ${inheritedBuckIsolation("kubernetes-service-macro-bad")} cquery --target-platforms prelude//platforms:default //projects/deployments/api-prod:bad`,
+      /provider_target cannot override namespace/,
+    );
+  });
+});
