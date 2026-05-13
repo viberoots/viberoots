@@ -65,6 +65,24 @@ test("deployment-impact: reviewed shared-host service modules stay deployment-on
   assert.equal(result.diagnostics.reason, "deployment-owned-build-system-path-changed");
 });
 
+test("deployment-impact: reviewed deployment scaffold contract tests stay deployment-only", () => {
+  const result = resolveDeploymentImpactSelection(
+    [
+      "build-tools/tools/tests/scaffolding/deployment.cloudflare-containers.scaffold-contract.test.ts",
+      "build-tools/tools/tests/scaffolding/deployment.scaffold-contract.test.ts",
+    ],
+    { deploymentTargetLabels },
+  );
+
+  assert.equal(result.mode, "deployment-only");
+  assert.deepEqual(result.diagnostics.deploymentOwnedPaths, [
+    "build-tools/tools/tests/scaffolding/deployment.cloudflare-containers.scaffold-contract.test.ts",
+    "build-tools/tools/tests/scaffolding/deployment.scaffold-contract.test.ts",
+  ]);
+  assert.deepEqual(result.diagnostics.fullBuildSystemTriggerPaths, []);
+  assert.equal(result.diagnostics.reason, "deployment-owned-build-system-path-changed");
+});
+
 test("deployment-impact: shared helpers and reviewed loader/root paths broaden to mixed mode", () => {
   const result = resolveDeploymentImpactSelection(
     [
@@ -93,13 +111,17 @@ test("deployment-impact: shared helpers and reviewed loader/root paths broaden t
 
 test("deployment-impact: unknown build-tools paths fail closed to mixed mode", () => {
   const result = resolveDeploymentImpactSelection(
-    ["build-tools/tools/tests/verify/project-impact-selector.policy.test.ts"],
+    [
+      "build-tools/tools/tests/verify/project-impact-selector.policy.test.ts",
+      "build-tools/tools/tests/scaffolding/template-taxonomy.contract.test.ts",
+    ],
     { deploymentTargetLabels },
   );
 
   assert.equal(result.mode, "mixed-build-system");
   assert.deepEqual(result.diagnostics.sharedBuildSystemPaths, []);
   assert.deepEqual(result.diagnostics.unknownBuildSystemPaths, [
+    "build-tools/tools/tests/scaffolding/template-taxonomy.contract.test.ts",
     "build-tools/tools/tests/verify/project-impact-selector.policy.test.ts",
   ]);
   assert.equal(result.diagnostics.reason, "unknown-build-system-path-changed");

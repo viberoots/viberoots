@@ -56,6 +56,7 @@ test("deployment verify scope keeps reviewed shared paths out of the deployment 
 test("deployment verify scope leaves unrelated paths unclassified", () => {
   const unrelatedPaths = [
     "build-tools/tools/nix/node-modules/store.nix",
+    "build-tools/tools/tests/scaffolding/template-taxonomy.contract.test.ts",
     "docs/deployment-plan.md",
     "projects/apps/pleomino/TARGETS",
     "projects/deployments/pleomino-dev/TARGETS",
