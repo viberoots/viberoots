@@ -753,7 +753,7 @@ What happens when a new shared-dev app is added:
 4. `mini` creates the container and ingress automatically
 5. the app becomes reachable at `https://${appName}.apps.kilty.io`
    - the first built-in deploy workflow is `build-tools/tools/bin/deploy`
-   - default deploy reconciles the single deployment into platform state, materializes the local/shared-dev host runtime contract, publishes the static artifact, runs blocking smoke, and writes a local durable run record
+   - default deploy reconciles the single deployment into platform state, materializes the local/shared-dev host runtime contract, publishes the static artifact, runs blocking smoke, records the run through the control plane, and updates current stage state
    - `deploy --remove` records the same deployment id as an explicit removal run, removes that deployment from authoritative platform state, and re-materializes the host without that target
 
 What happens for later updates:

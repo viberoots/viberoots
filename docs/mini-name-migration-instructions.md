@@ -21,9 +21,11 @@ the completed repo rename from `bucknix`/`bnx`/`kiltyj/common` to
 - any `/etc/nixos/flake.nix` / `configuration.nix` import paths or `deploymentModulesRoot` inputs pointing at `/srv/common`
 - the host-side `direnv` / `.envrc` cache for `/srv/common`
 
-Persistent host state under `/var/lib/deployment-host/{runtime,records}` and
-`/etc/nixos/deployment-host/platform-state.json` does **not** embed the repo
-path — it stays put across the rename. (See [docs/nixos-shared-host-setup.md:113](docs/nixos-shared-host-setup.md).)
+Persistent host state under `/var/lib/deployment-host/{runtime,records}`,
+retained artifact storage, the control-plane database, current-stage-state
+records, and `/etc/nixos/deployment-host/platform-state.json` do **not** embed
+the repo path — they stay put across the rename. (See
+[docs/nixos-shared-host-setup.md:113](docs/nixos-shared-host-setup.md).)
 
 ## Preconditions
 
@@ -34,9 +36,11 @@ path — it stays put across the rename. (See [docs/nixos-shared-host-setup.md:1
 - You have root SSH to `mini.home.kilty.io`.
 - No deploy run is currently in `pending_approval`. Drain or approve in-flight
   runs first so the service can be stopped cleanly.
-- A backup of `/var/lib/deployment-host/records` is available if you want one
-  before touching the host (the rename does not modify it, but state is
-  cheap to snapshot).
+- A backup or restore point exists for the control-plane database and
+  `/var/lib/deployment-host/records` before touching the host. The rename does
+  not modify either surface, but current-stage-state, retained artifact
+  references, submissions, and run records are the release-state authority and
+  are cheap to verify before a host migration.
 
 ## Migration order
 
@@ -57,8 +61,9 @@ All commands run as root on `mini` unless noted.
 Identify whichever launcher you are currently using (systemd unit, tmux
 session, or screen) and stop both the control-plane service
 (`nixos-shared-host-control-plane-service.ts`) and worker
-(`nixos-shared-host-control-plane-worker.ts`). The records dir keeps any
-in-flight admitted artifacts; you are stopping the processes, not the data.
+(`nixos-shared-host-control-plane-worker.ts`). The control-plane database,
+records root, retained artifacts, and current-stage-state files keep admitted
+release state; you are stopping the processes, not the data.
 
 ### A2. Move the repo checkout from `/srv/common` to `/srv/viberoots`
 
@@ -299,6 +304,7 @@ If A5 or A6 fails:
 --control-plane-token-env BNX_DEPLOY_CONTROL_PLANE_TOKEN` locally to put
    the stale profile back.
 
-The host's `/var/lib/deployment-host/{runtime,records}` and
-`platform-state.json` are untouched by either direction of this migration,
-so rollback does not lose deployment history.
+The host's `/var/lib/deployment-host/{runtime,records}`, retained artifact
+storage, control-plane database, current-stage-state records, and
+`platform-state.json` are untouched by either direction of this migration, so
+rollback does not lose deployment history.
