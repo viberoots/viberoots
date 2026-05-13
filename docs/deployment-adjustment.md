@@ -155,6 +155,9 @@ The Buck2-native equivalent of base/overlay should be:
 - validation that rejects drift when fields should come from shared family
   policy rather than per-stage copy-paste
 
+See [Deployment Family Composition](/docs/deployment-family-composition.md)
+for the concrete Starlark helper pattern.
+
 Provider-native files may still exist, but they are inputs below the Buck2
 deployment metadata layer. They must not become a second source of truth for core
 deployment facts.

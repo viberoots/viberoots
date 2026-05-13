@@ -13,6 +13,8 @@ def opentofu_foundation_deployment(
         secret_requirements = [],
         runtime_config_requirements = [],
         external_requirement_profiles = [],
+        ingress_hostnames = [],
+        resource_sizing = {},
         vault_runtime = {},
         migration_bundle = None,
         labels = [],
@@ -43,6 +45,8 @@ def opentofu_foundation_deployment(
         secret_requirements = secret_requirements,
         runtime_config_requirements = runtime_config_requirements,
         external_requirement_profiles = external_requirement_profiles,
+        ingress_hostnames = ingress_hostnames,
+        resource_sizing = resource_sizing,
         vault_runtime = vault_runtime,
         migration_bundle = bundle,
         labels = labels + [

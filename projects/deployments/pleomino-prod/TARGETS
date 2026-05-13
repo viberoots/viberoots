@@ -1,68 +1,12 @@
-load("//build-tools/deployments:defs.bzl", "cloudflare_pages_static_webapp_deployment")
+load("//projects/deployments/pleomino-shared:family.bzl", "pleomino_cloudflare_deployment")
 
-cloudflare_pages_static_webapp_deployment(
+pleomino_cloudflare_deployment(
     name = "deploy",
-    component = "//projects/apps/pleomino:app",
+    stage = "prod",
     account = "web-platform-prod",
-    account_id = "1b911846f80a89272c0dbaf44f5c810f",
-    custom_domain = "pleomino.com",
-    custom_domain_zone_id = "9411ac5903acb1c2e29b3d4c04ef7e6f",
     project = "pleomino-prod-pages",
-    lane_policy = "//projects/deployments/pleomino-shared:lane",
-    environment_stage = "prod",
-    admission_policy = "//projects/deployments/pleomino-shared:prod_release",
+    domain = "pleomino.com",
+    admission_policy = "prod_release",
     protection_class = "production_facing",
-    vault_runtime = {
-        "addr": "https://secrets.apps.kilty.io:8200",
-        "oidc_issuer": "https://identity.apps.kilty.io/realms/deployments",
-        "audience": "deployments-vault",
-        "deployment_client_id": "deployment-runner",
-        "service_account_client_id": "deployment-runner",
-        "cli_public_client_id": "deployment-cli",
-        "deployment_environment": "mini",
-        "jwt_role": "deploy-pleomino-read",
-        "pkce_callback_mode": "public_host",
-        "pkce_callback_external_scheme": "https",
-        "pkce_callback_external_host": "deploy-auth.apps.kilty.io",
-        "pkce_callback_external_path": "/oidc/callback",
-        "pkce_callback_bind_host": "127.0.0.1",
-        "pkce_callback_bind_port": "7780",
-        "pkce_callback_bind_path": "/oidc/callback",
-    },
-    secret_requirements = [
-        {
-            "name": "cloudflare_api_token",
-            "step": "provision",
-            "contract_id": "secret://deployments/pleomino/cloudflare_api_token",
-            "required": "true",
-        },
-        {
-            "name": "cloudflare_api_token",
-            "step": "publish",
-            "contract_id": "secret://deployments/pleomino/cloudflare_api_token",
-            "required": "true",
-        },
-        {
-            "name": "cloudflare_api_token",
-            "step": "preview_cleanup",
-            "contract_id": "secret://deployments/pleomino/cloudflare_api_token",
-            "required": "true",
-        },
-    ],
-    runtime_config_requirements = [],
-    external_requirement_profiles = ["cloudflare_provider"],
-    prerequisites = [
-        {
-            "deployment_id": "pleomino-staging",
-            "mode": "ordering_only",
-        },
-    ],
-    preview = {
-        "target_derivation": "provider_managed_source_run",
-        "isolation_class": "isolated",
-        "identity_selector": "source_run",
-        "cleanup_ttl": "7d",
-        "smoke_target": "preview_url",
-        "lock_scope": "shared",
-    },
+    prerequisite = "pleomino-staging",
 )

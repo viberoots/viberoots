@@ -22,6 +22,8 @@ export const DEPLOYMENT_CQUERY_ATTRS = [
   "health_path",
   "target_group",
   "provider_target",
+  "ingress_hostnames",
+  "resource_sizing",
   "vault_runtime",
   "smoke",
   "smoke_exception",

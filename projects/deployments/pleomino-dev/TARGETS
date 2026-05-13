@@ -1,31 +1,3 @@
-load("//build-tools/deployments:defs.bzl", "nixos_shared_host_static_webapp_deployment")
+load("//projects/deployments/pleomino-shared:family.bzl", "pleomino_dev_deployment")
 
-nixos_shared_host_static_webapp_deployment(
-    name = "deploy",
-    component = "//projects/apps/pleomino:app",
-    lane_policy = "//projects/deployments/pleomino-shared:lane",
-    environment_stage = "dev",
-    admission_policy = "//projects/deployments/pleomino-shared:dev_release",
-    vault_runtime = {
-        "addr": "https://secrets.apps.kilty.io:8200",
-        "oidc_issuer": "https://identity.apps.kilty.io/realms/deployments",
-        "audience": "deployments-vault",
-        "deployment_client_id": "deployment-runner",
-        "service_account_client_id": "deployment-runner",
-        "cli_public_client_id": "deployment-cli",
-        "deployment_environment": "mini",
-        "jwt_role": "deploy-pleomino-read",
-        "pkce_callback_mode": "public_host",
-        "pkce_callback_external_scheme": "https",
-        "pkce_callback_external_host": "deploy-auth.apps.kilty.io",
-        "pkce_callback_external_path": "/oidc/callback",
-        "pkce_callback_bind_host": "127.0.0.1",
-        "pkce_callback_bind_port": "7780",
-        "pkce_callback_bind_path": "/oidc/callback",
-    },
-    secret_requirements = [],
-    runtime_config_requirements = [],
-    app_name = "pleomino",
-    container_port = 3000,
-    health_path = "/healthz",
-)
+pleomino_dev_deployment(name = "deploy")

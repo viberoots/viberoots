@@ -43,6 +43,34 @@ function asStringList(value: unknown): string[] {
     : [];
 }
 
+function configString(config: Record<string, unknown>, snakeKey: string, camelKey: string): string {
+  return String(config[snakeKey] || config[camelKey] || "").trim();
+}
+
+export function validateOpenTofuStackConfigFacts(opts: {
+  configPath: string;
+  config: Record<string, unknown>;
+  stackIdentity: string;
+  stateBackendIdentity: string;
+}): void {
+  const stackIdentity = configString(opts.config, "stack_identity", "stackIdentity");
+  if (stackIdentity && stackIdentity !== opts.stackIdentity) {
+    throw new Error(
+      `${opts.configPath}: stack_identity ${stackIdentity} does not match deployment provider_target.stack_identity ${opts.stackIdentity}`,
+    );
+  }
+  const stateBackendIdentity = configString(
+    opts.config,
+    "state_backend_identity",
+    "stateBackendIdentity",
+  );
+  if (stateBackendIdentity && stateBackendIdentity !== opts.stateBackendIdentity) {
+    throw new Error(
+      `${opts.configPath}: state_backend_identity ${stateBackendIdentity} does not match deployment provider_target.state_backend_identity ${opts.stateBackendIdentity}`,
+    );
+  }
+}
+
 async function firstNonWhitespaceByte(filePath: string): Promise<string> {
   const handle = await fsp.open(filePath, "r");
   try {
@@ -87,6 +115,12 @@ export async function readOpenTofuResolvedPlan(opts: {
 }) {
   const configPath = path.join(opts.workspaceRoot, opts.packagePath, opts.provisioner.config);
   const config = JSON.parse(await fsp.readFile(configPath, "utf8")) as Record<string, unknown>;
+  validateOpenTofuStackConfigFacts({
+    configPath,
+    config,
+    stackIdentity: opts.provisioner.stackIdentity,
+    stateBackendIdentity: opts.provisioner.stateBackendIdentity,
+  });
   const planJson = String(config.plan_json || config.planJson || "").trim();
   if (!planJson) throw new Error(`opentofu stack config must declare plan_json: ${configPath}`);
   const applyPlan = String(config.apply_plan || config.applyPlan || "").trim();
