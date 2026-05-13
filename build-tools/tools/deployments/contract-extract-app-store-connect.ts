@@ -21,6 +21,7 @@ import {
   type DeploymentExtractionContext,
 } from "./contract-extract-shared";
 import { readVaultRuntimeConfig } from "./deployment-vault-runtime-metadata";
+import { deploymentSecretMetadata as secretMeta } from "./deployment-secret-metadata";
 import { resolveSharedDeploymentPolicies } from "./deployment-policy-binding";
 import {
   resolveDeploymentMetadataRefs,
@@ -75,6 +76,7 @@ export function extractAppStoreConnectDeploymentsFromContext(
     const platform = providerTarget.platform || "ios";
     const track = providerTarget.track || "";
     const signingModel = providerTarget.signing_model || "";
+    const secretMetadata = secretMeta(node, label, secretRequirements, deploymentErrors);
     if (!primaryComponent?.target) {
       deploymentErrors.push(deploymentError(label, "missing required component target"));
     }
@@ -216,6 +218,7 @@ export function extractAppStoreConnectDeploymentsFromContext(
       runtimeConfigRequirements,
       releaseActions,
       targetExceptions,
+      ...secretMetadata,
       ...(smoke ? { smoke } : {}),
       ...(rolloutPolicy ? { rolloutPolicy } : {}),
       ...(vaultRuntime ? { vaultRuntime } : {}),

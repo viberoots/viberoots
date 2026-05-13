@@ -31,6 +31,9 @@ def nixos_shared_host_static_webapp_deployment(
         ingress_hostnames = [],
         resource_sizing = {},
         vault_runtime = {},
+        secret_backend = "",
+        infisical_runtime = {},
+        infisical_secret_mappings = {},
         release_actions = [],
         target_exceptions = [],
         labels = [],
@@ -72,6 +75,9 @@ def nixos_shared_host_static_webapp_deployment(
         runtime_config_requirements = runtime_config_requirements,
         external_requirement_profiles = external_requirement_profiles,
         vault_runtime = vault_runtime,
+        secret_backend = secret_backend,
+        infisical_runtime = infisical_runtime,
+        infisical_secret_mappings = infisical_secret_mappings,
         release_actions = release_actions,
         target_exceptions = target_exceptions,
         labels = labels + [
@@ -81,7 +87,6 @@ def nixos_shared_host_static_webapp_deployment(
         ],
         visibility = visibility,
     )
-
 def nixos_shared_host_ssr_webapp_deployment(
         deployment_target,
         name,
@@ -105,6 +110,9 @@ def nixos_shared_host_ssr_webapp_deployment(
         runtime_config_requirements = [],
         external_requirement_profiles = [],
         vault_runtime = {},
+        secret_backend = "",
+        infisical_runtime = {},
+        infisical_secret_mappings = {},
         release_actions = [],
         target_exceptions = [],
         labels = [],
@@ -145,6 +153,9 @@ def nixos_shared_host_ssr_webapp_deployment(
         runtime_config_requirements = runtime_config_requirements,
         external_requirement_profiles = external_requirement_profiles,
         vault_runtime = vault_runtime,
+        secret_backend = secret_backend,
+        infisical_runtime = infisical_runtime,
+        infisical_secret_mappings = infisical_secret_mappings,
         release_actions = release_actions,
         target_exceptions = target_exceptions,
         labels = labels + [
@@ -154,7 +165,6 @@ def nixos_shared_host_ssr_webapp_deployment(
         ],
         visibility = visibility,
     )
-
 def nixos_shared_host_multi_static_webapp_deployment(
         deployment_target,
         name,
@@ -175,6 +185,9 @@ def nixos_shared_host_multi_static_webapp_deployment(
         runtime_config_requirements = [],
         external_requirement_profiles = [],
         vault_runtime = {},
+        secret_backend = "",
+        infisical_runtime = {},
+        infisical_secret_mappings = {},
         release_actions = [],
         target_exceptions = [],
         labels = [],
@@ -221,6 +234,9 @@ def nixos_shared_host_multi_static_webapp_deployment(
         runtime_config_requirements = runtime_config_requirements,
         external_requirement_profiles = external_requirement_profiles,
         vault_runtime = vault_runtime,
+        secret_backend = secret_backend,
+        infisical_runtime = infisical_runtime,
+        infisical_secret_mappings = infisical_secret_mappings,
         release_actions = release_actions,
         target_exceptions = target_exceptions,
         labels = labels + [

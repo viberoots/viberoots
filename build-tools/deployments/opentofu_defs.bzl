@@ -16,6 +16,9 @@ def opentofu_foundation_deployment(
         ingress_hostnames = [],
         resource_sizing = {},
         vault_runtime = {},
+        secret_backend = "",
+        infisical_runtime = {},
+        infisical_secret_mappings = {},
         migration_bundle = None,
         labels = [],
         visibility = ["PUBLIC"]):
@@ -48,6 +51,9 @@ def opentofu_foundation_deployment(
         ingress_hostnames = ingress_hostnames,
         resource_sizing = resource_sizing,
         vault_runtime = vault_runtime,
+        secret_backend = secret_backend,
+        infisical_runtime = infisical_runtime,
+        infisical_secret_mappings = infisical_secret_mappings,
         migration_bundle = bundle,
         labels = labels + [
             "kind:deployment",

@@ -23,6 +23,7 @@ import {
   type DeploymentExtractionContext,
 } from "./contract-extract-shared";
 import { readVaultRuntimeConfig } from "./deployment-vault-runtime-metadata";
+import { deploymentSecretMetadata as secretMeta } from "./deployment-secret-metadata";
 import { pushSmokePolicyErrors } from "./deployment-smoke-policy";
 import { resolveSharedDeploymentPolicies } from "./deployment-policy-binding";
 import {
@@ -35,11 +36,8 @@ import {
   pushCloudflarePreviewErrors,
   pushDuplicateCloudflareTargetIdentityErrors,
 } from "./cloudflare-pages-extract-helpers";
-
 const TARGET_TOKEN_RE = /^[a-z0-9](?:[a-z0-9-]{0,126}[a-z0-9])?$/;
-const SHARED_NONPROD = "shared_nonprod";
-const PRODUCTION_FACING = "production_facing";
-
+const [SHARED_NONPROD, PRODUCTION_FACING] = ["shared_nonprod", "production_facing"];
 export function extractCloudflarePagesDeploymentsFromContext(
   context: DeploymentExtractionContext,
 ): CloudflarePagesDeployment[] {
@@ -74,6 +72,7 @@ export function extractCloudflarePagesDeploymentsFromContext(
     const project = providerTarget.project || "";
     const customDomain = providerTarget.custom_domain || "";
     const deploymentErrors: string[] = [];
+    const secretMetadata = secretMeta(node, label, secretRequirements, deploymentErrors);
     if (!label) {
       context.errors.push("deployment target missing canonical label");
       continue;
@@ -222,6 +221,7 @@ export function extractCloudflarePagesDeploymentsFromContext(
       runtimeConfigRequirements,
       releaseActions,
       targetExceptions,
+      ...secretMetadata,
       ...(smoke ? { smoke } : {}),
       ...(rolloutPolicy ? { rolloutPolicy } : {}),
       ...(vaultRuntime ? { vaultRuntime } : {}),

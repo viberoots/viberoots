@@ -9,6 +9,7 @@ import type { DeploymentSmokePolicy } from "./deployment-smoke-policy";
 import type { DeploymentTargetException } from "./deployment-target-exceptions";
 import type { DeploymentVaultRuntimeConfig } from "./deployment-vault-runtime-types";
 import type { OpenTofuProvisionerMetadata } from "./opentofu-stack";
+import type { DeploymentSecretMetadata } from "./deployment-secret-metadata";
 import {
   MOBILE_APP_COMPONENT_KIND,
   SSR_WEBAPP_COMPONENT_KIND,
@@ -32,7 +33,6 @@ import {
 import type { OpenTofuProviderTarget } from "./opentofu-provider-target";
 import type { VercelDeployment } from "./vercel-contract-types";
 import type { CloudflareContainersDeployment } from "./cloudflare-containers-contract-types";
-
 export const STATIC_WEBAPP_COMPONENT = "static-webapp";
 export const SSR_WEBAPP_COMPONENT = "ssr-webapp";
 export { MOBILE_APP_COMPONENT_KIND };
@@ -95,7 +95,7 @@ export type DeploymentComponent = {
   target: string;
 };
 
-export type DeploymentBase = {
+export type DeploymentBase = DeploymentSecretMetadata & {
   deploymentId: string;
   label: string;
   name: string;

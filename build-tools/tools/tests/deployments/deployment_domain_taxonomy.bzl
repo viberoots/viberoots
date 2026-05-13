@@ -60,7 +60,7 @@ REVIEWED_DEPLOYMENT_TEST_OWNERSHIP = {
     "build-tools/tools/tests/deployments/deployment-browser-launch.test.ts": True,
     "build-tools/tools/tests/deployments/deployment-cli-resolve.test.ts": True,
     "build-tools/tools/tests/deployments/deployment-artifact-proof-keys.test.ts": True,
-    "build-tools/tools/tests/deployments/deployment-secret-runtime.test.ts": True,
+    "build-tools/tools/tests/deployments/deployment-secret-runtime.test.ts": True, "build-tools/tools/tests/deployments/deployment-secret-metadata.cquery.test.ts": True, "build-tools/tools/tests/deployments/deployment-secret-metadata.test.ts": True,
     "build-tools/tools/tests/deployments/deployment-secret-vault-auth.test.ts": True,
     "build-tools/tools/tests/deployments/deployment-secret-vault.test.ts": True,
     "build-tools/tools/tests/deployments/deployment-credential-source.device.test.ts": True,

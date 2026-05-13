@@ -766,6 +766,15 @@ Field meanings with example values:
   Use `false` only for optional behavior such as an authenticated smoke check
   that can be skipped.
 
+Deployment metadata also carries backend routing fields:
+
+- `secretBackend`: normalized from `secret_backend`; omitted TARGETS metadata
+  becomes `vault`
+- `infisicalRuntime`: normalized from `infisical_runtime`; contains non-secret
+  Infisical routing data and reviewed Universal Auth environment variable names
+- `infisicalSecretMappings`: normalized from `infisical_secret_mappings`; maps
+  declared contract IDs to non-secret `secretPath` and `secretName` overrides
+
 The binding helpers turn those requirements into a backend-independent list of
 secret bindings:
 
@@ -776,6 +785,7 @@ import {
 } from "./build-tools/tools/deployments/deployment-sprinkle-ref.ts";
 
 const bindings = deploymentSecretContractBindings(requirements);
+const infisicalBindings = deploymentSecretContractBindings(requirements, "infisical");
 const publishBindings = deploymentSecretBindingsForStep(bindings, "publish");
 const cleanupBindings = deploymentSecretBindingsForStep(bindings, "preview_cleanup");
 ```
@@ -783,7 +793,9 @@ const cleanupBindings = deploymentSecretBindingsForStep(bindings, "preview_clean
 In this example:
 
 - `deploymentSecretContractBindings(requirements)` converts the raw deployment
-  requirements into a normalized secret-binding list.
+  requirements into a normalized Vault secret-binding list.
+- `deploymentSecretContractBindings(requirements, "infisical")` uses the
+  Infisical backend kind without changing contract IDs or lifecycle steps.
 - `deploymentSecretBindingsForStep(bindings, "publish")` filters that list down
   to only the secrets allowed during the `publish` step.
 - `deploymentSecretBindingsForStep(bindings, "preview_cleanup")` filters that

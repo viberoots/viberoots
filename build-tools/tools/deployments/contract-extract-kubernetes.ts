@@ -20,6 +20,7 @@ import {
   type DeploymentExtractionContext,
 } from "./contract-extract-shared";
 import { readVaultRuntimeConfig } from "./deployment-vault-runtime-metadata";
+import { deploymentSecretMetadata as secretMeta } from "./deployment-secret-metadata";
 import { resolveSharedDeploymentPolicies } from "./deployment-policy-binding";
 import { resolveDeploymentMetadataRefs } from "./deployment-extract-metadata";
 import { pushKubernetesComponentKindErrors } from "./kubernetes-capability-validation";
@@ -75,6 +76,7 @@ export function extractKubernetesDeploymentsFromContext(
     const id = providerTarget.id || `${cluster}/${namespace}/${release}`;
     const expectedId = `${cluster}/${namespace}/${release}`;
     const deploymentErrors: string[] = [];
+    const secretMetadata = secretMeta(node, label, secretRequirements, deploymentErrors);
     if (!primaryComponent?.target) {
       deploymentErrors.push(deploymentError(label, "missing required component target"));
     }
@@ -220,6 +222,7 @@ export function extractKubernetesDeploymentsFromContext(
       runtimeConfigRequirements,
       releaseActions,
       targetExceptions,
+      ...secretMetadata,
       ...(migrationBundleRef ? { migrationBundleRef } : {}),
       ...(smoke ? { smoke } : {}),
       ...(rolloutPolicy ? { rolloutPolicy } : {}),

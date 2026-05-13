@@ -31,9 +31,9 @@ import {
 import { readDeploymentRequirements } from "./deployment-requirements";
 import { pushSmokePolicyErrors } from "./deployment-smoke-policy";
 import { readVaultRuntimeConfig } from "./deployment-vault-runtime-metadata";
+import { deploymentSecretMetadata as secretMeta } from "./deployment-secret-metadata";
 import { pushVercelComponentKindErrors } from "./vercel-capability-validation";
 import { readVercelProvisionerMetadata } from "./vercel-provisioner-extract";
-
 const TARGET_TOKEN_RE = /^[a-z0-9](?:[a-z0-9-]{0,126}[a-z0-9])?$/;
 const SHARED_NONPROD = "shared_nonprod";
 const PRODUCTION_FACING = "production_facing";
@@ -71,6 +71,7 @@ export function extractVercelDeploymentsFromContext(
     const preview = readPreviewPolicy(node, "preview");
     const smoke = readSmokePolicy(node);
     const vaultRuntime = readVaultRuntimeConfig(node);
+    const secretMetadata = secretMeta(node, label, secretRequirements, deploymentErrors);
     const declaredKind = primaryComponent?.kind || componentKind;
     const team = providerTarget.team || "";
     const project = providerTarget.project || "";
@@ -205,6 +206,7 @@ export function extractVercelDeploymentsFromContext(
       externalRequirementProfiles,
       releaseActions,
       targetExceptions,
+      ...secretMetadata,
       ...(migrationBundleRef ? { migrationBundleRef } : {}),
       ...(smoke ? { smoke } : {}),
       ...(preview ? { preview } : {}),

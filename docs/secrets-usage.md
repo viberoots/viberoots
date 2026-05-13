@@ -12,7 +12,8 @@ Use this guide when you want the shortest path to:
 
 - understand what `SprinkleRef` means
 - know when a deployment should declare `secret_requirements`
-- resolve secrets at runtime through the current Vault-backed helpers
+- resolve secrets at runtime through the current Vault-backed helpers and the
+  backend-neutral metadata contract
 - bootstrap Vault as the production source of truth and, when needed, export
   the reviewed local/test secret fixture format
 - find the right API reference or deeper design doc
@@ -43,7 +44,10 @@ For production Vault bring-up and the optional local/test export bridge into
   captured during admission for one resolved secret contract
 - secret fixture: the reviewed local/test override file format named by
   `deployment-secret-fixture@1`
-- Vault: the current backend that stores the real secret values
+- `secret_backend`: the deployment-wide backend for `secret_requirements`;
+  omitted means `vault`
+- Vault: the default backend that stores the real secret values
+- Infisical: an alternate backend selected with `secret_backend = "infisical"`
 
 ## How The Layers Fit Together
 
@@ -51,8 +55,10 @@ For production Vault bring-up and the optional local/test export bridge into
   metadata.
 - admitted secret references are the replay/runtime reference layer that freezes
   the exact non-secret resolution details for one run.
-- Vault is the current production backend that stores and serves the real secret
+- Vault is the default production backend that stores and serves the real secret
   values.
+- Infisical can be selected per deployment with reviewed non-secret
+  `infisical_runtime` routing metadata.
 - the secret fixture is the local/test/bootstrap override format for
   non-production flows that intentionally do not read Vault directly.
 
@@ -62,7 +68,10 @@ For production Vault bring-up and the optional local/test export bridge into
 - admission freezes admitted secret references, not secret values
 - runtime secret values are resolved only when a lifecycle step actually needs
   them
-- Vault is the current backend, but callers use the stable `SprinkleRef` layer
+- Vault is the default backend, but callers use the stable `SprinkleRef` layer
+- Infisical metadata names Universal Auth credential environment variables;
+  tokens, client secrets, personal tokens, and secret values are not allowed in
+  deployment metadata
 - external provider credentials are never satisfied from ambient provider
   environment variables such as local CLI tokens; they must be declared as
   `secret_requirements` and resolved by the secret runtime

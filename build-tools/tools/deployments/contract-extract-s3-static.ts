@@ -24,6 +24,7 @@ import {
   type DeploymentExtractionContext,
 } from "./contract-extract-shared";
 import { readVaultRuntimeConfig } from "./deployment-vault-runtime-metadata";
+import { deploymentSecretMetadata as secretMeta } from "./deployment-secret-metadata";
 import { pushSmokePolicyErrors } from "./deployment-smoke-policy";
 import { resolveSharedDeploymentPolicies } from "./deployment-policy-binding";
 import {
@@ -71,6 +72,7 @@ export function extractS3StaticDeploymentsFromContext(
     const preview = readPreviewPolicy(node, "preview");
     const smoke = readSmokePolicy(node);
     const vaultRuntime = readVaultRuntimeConfig(node);
+    const secretMetadata = secretMeta(node, label, secretRequirements, deploymentErrors);
     const rolloutPolicy = readRolloutPolicy(node);
     const account = providerTarget.account || "";
     const bucket = providerTarget.bucket || "";
@@ -212,6 +214,7 @@ export function extractS3StaticDeploymentsFromContext(
       runtimeConfigRequirements,
       releaseActions,
       targetExceptions,
+      ...secretMetadata,
       ...(smoke ? { smoke } : {}),
       ...(rolloutPolicy ? { rolloutPolicy } : {}),
       ...(vaultRuntime ? { vaultRuntime } : {}),

@@ -24,6 +24,7 @@ import {
   type DeploymentExtractionContext,
 } from "./contract-extract-shared";
 import { readVaultRuntimeConfig } from "./deployment-vault-runtime-metadata";
+import { deploymentSecretMetadata as secretMeta } from "./deployment-secret-metadata";
 import { readBootstrapPolicy } from "./deployment-bootstrap-policy";
 import {
   readExternalRequirementProfiles,
@@ -92,6 +93,7 @@ export function extractNixosSharedHostDeploymentsFromContext(
     const releaseActionRefs = readLabelList(node, "release_actions");
     const targetExceptionRefs = readLabelList(node, "target_exceptions");
     const deploymentErrors: string[] = [];
+    const secretMetadata = secretMeta(node, label, secretRequirements, deploymentErrors);
     const rawComponents = readRawNixosSharedHostComponents(node);
     if (!label) {
       context.errors.push("deployment target missing canonical label");
@@ -222,6 +224,7 @@ export function extractNixosSharedHostDeploymentsFromContext(
       externalRequirementProfiles,
       releaseActions,
       targetExceptions,
+      ...secretMetadata,
       ...(smoke ? { smoke } : {}),
       ...(rolloutPolicy ? { rolloutPolicy } : {}),
       ...(bootstrap ? { bootstrap } : {}),

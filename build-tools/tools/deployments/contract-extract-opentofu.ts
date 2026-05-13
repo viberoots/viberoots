@@ -16,6 +16,7 @@ import {
   type DeploymentExtractionContext,
 } from "./contract-extract-shared";
 import { readVaultRuntimeConfig } from "./deployment-vault-runtime-metadata";
+import { deploymentSecretMetadata as secretMeta } from "./deployment-secret-metadata";
 import { resolveSharedDeploymentPolicies } from "./deployment-policy-binding";
 import { resolveDeploymentMetadataRefs } from "./deployment-extract-metadata";
 import { readDeploymentRequirements } from "./deployment-requirements";
@@ -64,6 +65,7 @@ export function extractOpenTofuDeploymentsFromContext(
     const stackIdentity = providerTarget.stack_identity || "";
     const stateBackendIdentity = providerTarget.state_backend_identity || "";
     const deploymentErrors: string[] = [];
+    const secretMetadata = secretMeta(node, label, secretRequirements, deploymentErrors);
 
     if (!VALID_PROTECTION_CLASSES.has(protectionClass)) {
       deploymentErrors.push(
@@ -170,6 +172,7 @@ export function extractOpenTofuDeploymentsFromContext(
       runtimeConfigRequirements,
       releaseActions,
       targetExceptions,
+      ...secretMetadata,
       ...(migrationBundleRef ? { migrationBundleRef } : {}),
       ...(vaultRuntime ? { vaultRuntime } : {}),
       component: { kind: primaryComponent?.kind || componentKind, target: componentTarget },

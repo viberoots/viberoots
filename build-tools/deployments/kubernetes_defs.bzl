@@ -25,6 +25,9 @@ def kubernetes_service_deployment(
         runtime_config_requirements = [],
         external_requirement_profiles = [],
         vault_runtime = {},
+        secret_backend = "",
+        infisical_runtime = {},
+        infisical_secret_mappings = {},
         migration_bundle = None,
         labels = [],
         visibility = ["PUBLIC"]):
@@ -86,6 +89,9 @@ def kubernetes_service_deployment(
         runtime_config_requirements = runtime_config_requirements,
         external_requirement_profiles = external_requirement_profiles,
         vault_runtime = vault_runtime,
+        secret_backend = secret_backend,
+        infisical_runtime = infisical_runtime,
+        infisical_secret_mappings = infisical_secret_mappings,
         migration_bundle = migration_bundle,
         labels = labels + [
             "kind:deployment",

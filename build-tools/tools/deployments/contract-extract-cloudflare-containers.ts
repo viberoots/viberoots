@@ -26,6 +26,7 @@ import { resolveDeploymentMetadataRefs } from "./deployment-extract-metadata";
 import { readDeploymentRequirements } from "./deployment-requirements";
 import { pushSmokePolicyErrors } from "./deployment-smoke-policy";
 import { readVaultRuntimeConfig } from "./deployment-vault-runtime-metadata";
+import { deploymentSecretMetadata as secretMeta } from "./deployment-secret-metadata";
 import { resolveSharedDeploymentPolicies } from "./deployment-policy-binding";
 import { pushDuplicateProviderTargetIdentityErrors } from "./provider-target-identity-errors";
 import {
@@ -62,6 +63,8 @@ export function extractCloudflareContainersDeploymentsFromContext(
     const rolloutPolicy = readRolloutPolicy(node);
     const smoke = readSmokePolicy(node);
     const errors: string[] = [];
+    const secretRequirements = readDeploymentRequirements(node, "secret_requirements");
+    const secretMetadata = secretMeta(node, label, secretRequirements, errors);
     const ingressMode = providerTarget.ingress_mode || "";
     const containerPort = readPositivePort(providerTarget.container_port || "");
     if (!primaryComponent?.target) errors.push(deploymentError(label, "missing component target"));
@@ -166,10 +169,11 @@ export function extractCloudflareContainersDeploymentsFromContext(
       admissionPolicyRef: readLabel(node, "admission_policy"),
       admissionPolicy: admissionPolicy!,
       prerequisites: readPrerequisites(node, "prerequisites"),
-      secretRequirements: readDeploymentRequirements(node, "secret_requirements"),
+      secretRequirements,
       runtimeConfigRequirements: readDeploymentRequirements(node, "runtime_config_requirements"),
       releaseActions,
       targetExceptions,
+      ...secretMetadata,
       ...(smoke ? { smoke } : {}),
       ...(readVaultRuntimeConfig(node) ? { vaultRuntime: readVaultRuntimeConfig(node) } : {}),
       component: { kind: primaryComponent!.kind as any, target: primaryComponent!.target },

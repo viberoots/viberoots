@@ -29,7 +29,10 @@ Minimum fields:
 | `smoke`                         | yes for protected/shared                         | Optional for `local_only`.                                                                                                                                          |
 | `preview`                       | no                                               | Explicit opt-in only.                                                                                                                                               |
 | `prerequisites`                 | no                                               | Explicit direct-edge deployment prerequisites.                                                                                                                      |
+| `secret_backend`                | no                                               | Deployment-wide backend for `secret_requirements`; omitted means `vault`. Allowed values are `vault` and `infisical`.                                               |
 | `vault_runtime`                 | no                                               | Stable Vault/IdP runtime metadata for deployment-derived JWT auth. Secret values must not be stored here.                                                           |
+| `infisical_runtime`             | no                                               | Non-secret Infisical routing metadata such as `site_url`, `project_id`, `environment`, and reviewed Universal Auth environment variable names.                      |
+| `infisical_secret_mappings`     | no                                               | Optional map from declared `secret_requirements` contract IDs to non-secret `secret_path` and `secret_name` overrides.                                              |
 | `lane_policy`                   | yes for `shared_nonprod` and `production_facing` | Must resolve to authoritative policy object.                                                                                                                        |
 | `environment_stage`             | yes for `shared_nonprod` and `production_facing` | Must be defined by the lane policy.                                                                                                                                 |
 | `admission_policy`              | yes for `shared_nonprod` and `production_facing` | Repo-owned policy reference.                                                                                                                                        |
@@ -40,6 +43,15 @@ Single-provider invariant:
 - a deployment has exactly one `provider` and one authoritative `provider_target` model
 - multi-component deployments are allowed within that provider boundary
 - systems that span multiple provider families must be represented as multiple coordinated deployments
+
+Secret backend invariant:
+
+- `secret_requirements` remains the only secret declaration surface
+- `secret_backend` selects one backend for the whole deployment and defaults to
+  `vault`
+- Infisical metadata is routing data only; access tokens, client secrets,
+  personal tokens, secret values, and rendered secret-bearing configs are
+  rejected from reviewed metadata
 
 ### `provider_target`
 

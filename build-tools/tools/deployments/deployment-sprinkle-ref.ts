@@ -1,7 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import type { DeploymentRequirement, DeploymentRequirementStep } from "./deployment-requirements";
 
-export type DeploymentSecretBackendKind = "vault";
+export type DeploymentSecretBackendKind = "vault" | "infisical";
 export type DeploymentSecretRefreshMode = "renew" | "reacquire" | "none";
 export type DeploymentSecretCredentialClass = "routine" | "break_glass";
 
