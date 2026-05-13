@@ -6,7 +6,10 @@ import {
   resolveInitialAdmittedSecretReferences,
   resolveSourceRunAdmittedSecretReferences,
 } from "./deployment-secret-admission";
-import type { DeploymentSecretAdmittedReference } from "./deployment-sprinkle-ref";
+import type {
+  DeploymentSecretAdmittedReference,
+  DeploymentSecretBackendKind,
+} from "./deployment-sprinkle-ref";
 import {
   resolveDeploymentReviewedTargetEnvironment,
   type DeploymentReviewedTargetEnvironmentAdmission,
@@ -18,6 +21,7 @@ export type VercelAdmittedContext = {
   admissionPolicyRef: string;
   admissionPolicyFingerprint: string;
   environmentStage: string;
+  secretBackend?: DeploymentSecretBackendKind;
   secretRequirements: DeploymentRequirement[];
   admittedSecretReferences: DeploymentSecretAdmittedReference[];
   runtimeConfigRequirements: DeploymentRequirement[];
@@ -79,6 +83,7 @@ function vercelAdmittedContext(opts: {
     admissionPolicyRef: opts.deployment.admissionPolicyRef,
     admissionPolicyFingerprint: opts.deployment.admissionPolicy.fingerprint,
     environmentStage: opts.deployment.environmentStage,
+    secretBackend: opts.deployment.secretBackend || "vault",
     secretRequirements: opts.deployment.secretRequirements,
     admittedSecretReferences: opts.admittedSecretReferences,
     runtimeConfigRequirements: opts.deployment.runtimeConfigRequirements,

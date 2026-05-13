@@ -23,7 +23,7 @@ import { writeS3StaticReplaySnapshot } from "./s3-static-replay";
 import { smokeS3StaticWebapp } from "./s3-static-smoke";
 import { writeS3StaticProvisionerPlan } from "./s3-static-provisioner-plan";
 import { resolveInitialS3StaticAdmittedContext } from "./s3-static-admission";
-import { createVaultDeploymentSecretRuntime } from "./deployment-secret-runtime-helpers";
+import { createDeploymentSecretRuntimeForAdmittedContext } from "./deployment-secret-runtime-helpers";
 import {
   admitStaticWebappArtifact,
   type AdmittedStaticWebappArtifact,
@@ -86,8 +86,9 @@ export async function submitS3StaticDeploy(opts: {
       },
     }));
   const deploymentMetadataFingerprint = deploymentMetadataFingerprintFor(opts.deployment);
-  const secretRuntime = createVaultDeploymentSecretRuntime({
+  const secretRuntime = createDeploymentSecretRuntimeForAdmittedContext({
     admittedContext,
+    defaultBackend: opts.deployment.secretBackend || "vault",
   });
   let providerConfigFingerprint = "";
   let executionPolicy: DeploymentExecutionPolicyFacts | undefined;

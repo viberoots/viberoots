@@ -30,7 +30,7 @@ import {
   failNixosSharedHostStaticDeploy,
   writeSuccessfulNixosSharedHostStaticDeployRecord,
 } from "./nixos-shared-host-static-deploy-failure";
-import { createVaultDeploymentSecretRuntime } from "./deployment-secret-runtime-helpers";
+import { createDeploymentSecretRuntimeForAdmittedContext } from "./deployment-secret-runtime-helpers";
 
 type StaticOperationKind = "deploy" | "promotion" | "provision_only" | "retry" | "rollback";
 type StaticPublishBehavior = "deploy" | "publish-only" | "provision-only";
@@ -76,9 +76,10 @@ export async function runNixosSharedHostStaticDeploy(opts: {
     provisionerPlan: opts.provisionerPlan,
   };
   let replayState = { ...baseReplayState, deploymentMetadataFingerprint };
-  const secretRuntime = createVaultDeploymentSecretRuntime({
+  const secretRuntime = createDeploymentSecretRuntimeForAdmittedContext({
     authority,
     admittedContext: opts.admittedContext,
+    defaultBackend: opts.deployment.secretBackend || "vault",
     fallbackTargetScope: authority.kind,
   });
   try {

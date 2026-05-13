@@ -11,7 +11,10 @@ import {
   sameRequirementSet,
   type DeploymentRequirement,
 } from "./deployment-requirements";
-import type { DeploymentSecretAdmittedReference } from "./deployment-sprinkle-ref";
+import type {
+  DeploymentSecretAdmittedReference,
+  DeploymentSecretBackendKind,
+} from "./deployment-sprinkle-ref";
 import {
   replayMismatch,
   resolveNixosSharedHostAdmittedSecretReferences,
@@ -38,6 +41,7 @@ export type NixosSharedHostAdmittedContext = {
   admissionPolicyRef: string;
   admissionPolicyFingerprint: string;
   environmentStage: string;
+  secretBackend?: DeploymentSecretBackendKind;
   secretRequirements: DeploymentRequirement[];
   admittedSecretReferences: DeploymentSecretAdmittedReference[];
   runtimeConfigRequirements: DeploymentRequirement[];
@@ -72,6 +76,7 @@ async function baseContext(
     admissionPolicyRef: deployment.admissionPolicyRef,
     admissionPolicyFingerprint: deployment.admissionPolicy.fingerprint,
     environmentStage: deployment.environmentStage,
+    secretBackend: deployment.secretBackend || "vault",
     secretRequirements: deployment.secretRequirements,
     admittedSecretReferences: opts?.deferSecretReferenceResolution
       ? sourceAdmittedReferences

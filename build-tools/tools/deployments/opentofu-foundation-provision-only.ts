@@ -3,7 +3,7 @@ import type { DeploymentAdmissionEvidence } from "./deployment-admission-evidenc
 import type { OpenTofuDeployment } from "./contract";
 import { evaluateDeploymentAdmission } from "./deployment-admission-evaluator";
 import { requestedReviewedSourceFromEvidence } from "./deployment-source-revision";
-import { createVaultDeploymentSecretRuntime } from "./deployment-secret-runtime-helpers";
+import { createDeploymentSecretRuntimeForAdmittedContext } from "./deployment-secret-runtime-helpers";
 import {
   createProductionFoundationMigrationAdapter,
   runFoundationMigrationApply,
@@ -90,8 +90,9 @@ export async function submitOpenTofuFoundationProvisionOnly(opts: {
     }));
   const secretRuntime =
     opts.hooks?.secretRuntimeFactory?.({ deployment: opts.deployment, admittedContext }) ||
-    createVaultDeploymentSecretRuntime({
+    createDeploymentSecretRuntimeForAdmittedContext({
       admittedContext,
+      defaultBackend: opts.deployment.secretBackend || "vault",
       fallbackTargetScope: admittedContext.targetEnvironment.lockScope,
     });
   const provisionerApplyOutcome = await runOpenTofuReviewedApply({

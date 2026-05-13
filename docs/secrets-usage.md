@@ -101,7 +101,7 @@ Then use the runtime helper described in
 [Deployment And Secrets API](/Users/kiltyj/Code/viberoots/docs/deployment-secrets-api.md):
 
 ```ts
-const runtime = createVaultDeploymentSecretRuntime({
+const runtime = createDeploymentSecretRuntimeForAdmittedContext({
   admittedContext: {
     secretRequirements: requirements,
     targetEnvironment: {

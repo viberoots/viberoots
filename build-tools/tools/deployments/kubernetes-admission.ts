@@ -6,7 +6,10 @@ import {
   resolveInitialAdmittedSecretReferences,
   resolveSourceRunAdmittedSecretReferences,
 } from "./deployment-secret-admission";
-import type { DeploymentSecretAdmittedReference } from "./deployment-sprinkle-ref";
+import type {
+  DeploymentSecretAdmittedReference,
+  DeploymentSecretBackendKind,
+} from "./deployment-sprinkle-ref";
 import {
   resolveDeploymentReviewedTargetEnvironment,
   type DeploymentReviewedTargetEnvironmentAdmission,
@@ -18,6 +21,7 @@ export type KubernetesAdmittedContext = {
   admissionPolicyRef: string;
   admissionPolicyFingerprint: string;
   environmentStage: string;
+  secretBackend?: DeploymentSecretBackendKind;
   secretRequirements: DeploymentRequirement[];
   admittedSecretReferences: DeploymentSecretAdmittedReference[];
   runtimeConfigRequirements: DeploymentRequirement[];
@@ -58,6 +62,7 @@ export async function resolveInitialKubernetesAdmittedContext(opts: {
     admissionPolicyRef: opts.deployment.admissionPolicyRef,
     admissionPolicyFingerprint: opts.deployment.admissionPolicy.fingerprint,
     environmentStage: opts.deployment.environmentStage,
+    secretBackend: opts.deployment.secretBackend || "vault",
     secretRequirements: opts.deployment.secretRequirements,
     admittedSecretReferences: await resolveInitialAdmittedSecretReferences({
       requirements: opts.deployment.secretRequirements,

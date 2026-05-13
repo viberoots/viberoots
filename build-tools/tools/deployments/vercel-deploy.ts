@@ -1,5 +1,5 @@
 #!/usr/bin/env zx-wrapper
-import { createVaultDeploymentSecretRuntime } from "./deployment-secret-runtime-helpers";
+import { createDeploymentSecretRuntimeForAdmittedContext } from "./deployment-secret-runtime-helpers";
 import { resolveDeploymentSmokeExecutionMode } from "./deployment-smoke-policy";
 import type { DeploymentExecutionResult } from "./deployment-execution";
 import type { VercelDeployment } from "./contract";
@@ -83,13 +83,15 @@ export async function submitVercelDeploy(opts: {
   let secrets: string[] = [];
   try {
     artifact = opts.artifact || (await admitVercelPrebuiltArtifact(opts.artifactDir));
-    const secretRuntime = createVaultDeploymentSecretRuntime({
+    const secretRuntime = createDeploymentSecretRuntimeForAdmittedContext({
       admittedContext: opts.admittedContext || {
         secretRequirements: opts.deployment.secretRequirements,
+        secretBackend: opts.deployment.secretBackend || "vault",
         targetEnvironment: {
           lockScope: opts.deployment.providerTarget.providerTargetIdentity,
         },
       },
+      defaultBackend: opts.deployment.secretBackend || "vault",
       fallbackTargetScope: opts.deployment.providerTarget.providerTargetIdentity,
     });
     const publishSecrets = await secretRuntime.enterStep("publish");
@@ -179,13 +181,15 @@ export async function submitVercelPreviewCleanup(opts: {
   const runId = createVercelDeployRunId("vercel-preview-cleanup");
   let secrets: string[] = [];
   try {
-    const secretRuntime = createVaultDeploymentSecretRuntime({
+    const secretRuntime = createDeploymentSecretRuntimeForAdmittedContext({
       admittedContext: opts.admittedContext || {
         secretRequirements: opts.deployment.secretRequirements,
+        secretBackend: opts.deployment.secretBackend || "vault",
         targetEnvironment: {
           lockScope: opts.deployment.providerTarget.providerTargetIdentity,
         },
       },
+      defaultBackend: opts.deployment.secretBackend || "vault",
       fallbackTargetScope: opts.deployment.providerTarget.providerTargetIdentity,
     });
     const cleanupSecrets = await secretRuntime.enterStep("preview_cleanup");

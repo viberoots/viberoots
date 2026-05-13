@@ -7,7 +7,10 @@ import {
   resolveSourceRunAdmittedSecretReferences,
 } from "./deployment-secret-admission";
 import type { DeploymentSecretContext } from "./deployment-secret-context";
-import type { DeploymentSecretAdmittedReference } from "./deployment-sprinkle-ref";
+import type {
+  DeploymentSecretAdmittedReference,
+  DeploymentSecretBackendKind,
+} from "./deployment-sprinkle-ref";
 import {
   resolveDeploymentReviewedTargetEnvironment,
   type DeploymentReviewedTargetEnvironmentAdmission,
@@ -37,6 +40,7 @@ export type CloudflarePagesAdmittedContext = {
   admissionPolicyRef: string;
   admissionPolicyFingerprint: string;
   environmentStage: string;
+  secretBackend?: DeploymentSecretBackendKind;
   secretRequirements: DeploymentRequirement[];
   admittedSecretReferences: DeploymentSecretAdmittedReference[];
   runtimeConfigRequirements: DeploymentRequirement[];
@@ -71,6 +75,7 @@ async function baseContext(
     admissionPolicyRef: deployment.admissionPolicyRef,
     admissionPolicyFingerprint: deployment.admissionPolicy.fingerprint,
     environmentStage: deployment.environmentStage,
+    secretBackend: deployment.secretBackend || "vault",
     secretRequirements: deployment.secretRequirements,
     admittedSecretReferences: opts?.deferSecretReferenceResolution
       ? sourceAdmittedReferences

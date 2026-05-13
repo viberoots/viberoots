@@ -1,6 +1,6 @@
 #!/usr/bin/env zx-wrapper
 import type { VercelDeployment } from "./contract";
-import { createVaultDeploymentSecretRuntime } from "./deployment-secret-runtime-helpers";
+import { createDeploymentSecretRuntimeForAdmittedContext } from "./deployment-secret-runtime-helpers";
 import { resolveDeploymentSmokeExecutionMode } from "./deployment-smoke-policy";
 import type { VercelApiClient } from "./vercel-api";
 import { createFakeVercelApiClient, createLiveVercelApiClient } from "./vercel-api";
@@ -50,13 +50,15 @@ export async function submitVercelExactArtifactRun(opts: {
   const runId = createVercelDeployRunId(`vercel-${opts.operationKind}`);
   let secrets: string[] = [];
   try {
-    const secretRuntime = createVaultDeploymentSecretRuntime({
+    const secretRuntime = createDeploymentSecretRuntimeForAdmittedContext({
       admittedContext: opts.admittedContext || {
         secretRequirements: opts.deployment.secretRequirements,
+        secretBackend: opts.deployment.secretBackend || "vault",
         targetEnvironment: {
           lockScope: opts.deployment.providerTarget.providerTargetIdentity,
         },
       },
+      defaultBackend: opts.deployment.secretBackend || "vault",
       fallbackTargetScope: opts.deployment.providerTarget.providerTargetIdentity,
     });
     const publishSecrets = await secretRuntime.enterStep("publish");

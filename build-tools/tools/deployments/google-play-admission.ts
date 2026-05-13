@@ -6,7 +6,10 @@ import {
   resolveInitialAdmittedSecretReferences,
   resolveSourceRunAdmittedSecretReferences,
 } from "./deployment-secret-admission";
-import type { DeploymentSecretAdmittedReference } from "./deployment-sprinkle-ref";
+import type {
+  DeploymentSecretAdmittedReference,
+  DeploymentSecretBackendKind,
+} from "./deployment-sprinkle-ref";
 import {
   resolveDeploymentReviewedTargetEnvironment,
   type DeploymentReviewedTargetEnvironmentAdmission,
@@ -28,6 +31,7 @@ export type GooglePlayAdmittedContext = {
   admissionPolicyRef: string;
   admissionPolicyFingerprint: string;
   environmentStage: string;
+  secretBackend?: DeploymentSecretBackendKind;
   secretRequirements: DeploymentRequirement[];
   admittedSecretReferences: DeploymentSecretAdmittedReference[];
   runtimeConfigRequirements: DeploymentRequirement[];
@@ -61,6 +65,7 @@ async function baseContext(
     admissionPolicyRef: deployment.admissionPolicyRef,
     admissionPolicyFingerprint: deployment.admissionPolicy.fingerprint,
     environmentStage: deployment.environmentStage,
+    secretBackend: deployment.secretBackend || "vault",
     secretRequirements: deployment.secretRequirements,
     admittedSecretReferences: sourceAdmittedContext
       ? await resolveSourceRunAdmittedSecretReferences({

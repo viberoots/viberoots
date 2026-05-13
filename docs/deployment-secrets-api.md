@@ -723,8 +723,11 @@ The Vault-backed helpers are exported from:
 
 - `createDeploymentVaultSecretBackend()` in
   [deployment-secret-vault.ts](/Users/kiltyj/Code/viberoots/build-tools/tools/deployments/deployment-secret-vault.ts)
+- `createDeploymentSecretRuntimeForAdmittedContext()` in
+  [deployment-secret-runtime-helpers.ts](/Users/kiltyj/Code/viberoots/build-tools/tools/deployments/deployment-secret-runtime-helpers.ts)
 - `createVaultDeploymentSecretRuntime()` in
   [deployment-secret-runtime-helpers.ts](/Users/kiltyj/Code/viberoots/build-tools/tools/deployments/deployment-secret-runtime-helpers.ts)
+  remains a Vault compatibility helper for intentionally Vault-specific callers
 
 ### Requirement Shape
 
@@ -833,9 +836,9 @@ What the example values mean:
 Use the convenience helper when you already have deployment context available:
 
 ```ts
-import { createVaultDeploymentSecretRuntime } from "./build-tools/tools/deployments/deployment-secret-runtime-helpers.ts";
+import { createDeploymentSecretRuntimeForAdmittedContext } from "./build-tools/tools/deployments/deployment-secret-runtime-helpers.ts";
 
-const runtime = createVaultDeploymentSecretRuntime({
+const runtime = createDeploymentSecretRuntimeForAdmittedContext({
   secretContext,
   admittedContext: {
     secretRequirements: requirements,
@@ -848,11 +851,15 @@ const runtime = createVaultDeploymentSecretRuntime({
 
 Use the convenience helper when your code already has admitted deployment
 context and you do not want to wire the backend, requirements, and target scope
-by hand.
+by hand. It selects the backend from admitted secret references first, then
+`admittedContext.secretBackend`, then an explicit deployment metadata default,
+then the Vault default. Admission records created by current provider flows carry
+`secretBackend` as non-secret routing metadata. The helper rejects mixed backends
+in a single admitted context.
 
 Where the target scope comes from:
 
-- `createVaultDeploymentSecretRuntime()` reads
+- `createDeploymentSecretRuntimeForAdmittedContext()` reads
   `admittedContext.targetEnvironment.lockScope`
 - `createDeploymentSecretRuntime()` checks each secret's `targetScopes` against
   that runtime `targetScope`

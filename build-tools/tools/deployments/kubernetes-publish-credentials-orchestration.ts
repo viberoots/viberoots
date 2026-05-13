@@ -1,7 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import type { KubernetesDeployment } from "./contract";
 import type { KubernetesAdmittedContext } from "./kubernetes-admission";
-import { createVaultDeploymentSecretRuntime } from "./deployment-secret-runtime-helpers";
+import { createDeploymentSecretRuntimeForAdmittedContext } from "./deployment-secret-runtime-helpers";
 import {
   publishCredentialContractRefs,
   requiresKubernetesPublishCredentialReview,
@@ -48,8 +48,9 @@ export async function resolveKubernetesPublishCredentialsForDeployment(opts: {
   const factory =
     opts.hooks?.secretRuntimeFactory ||
     ((args) =>
-      createVaultDeploymentSecretRuntime({
+      createDeploymentSecretRuntimeForAdmittedContext({
         admittedContext: args.admittedContext,
+        defaultBackend: args.deployment.secretBackend || "vault",
         fallbackTargetScope: args.admittedContext.targetEnvironment.lockScope,
       }));
   const secretRuntime = factory({

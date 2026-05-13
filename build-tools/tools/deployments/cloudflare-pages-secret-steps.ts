@@ -2,7 +2,7 @@
 import type { CloudflarePagesControlPlaneWorkerAuthority } from "./cloudflare-pages-control-plane-contract";
 import type { CloudflarePagesAdmittedContext } from "./cloudflare-pages-admission";
 import type { DeploymentRequirement, DeploymentRequirementStep } from "./deployment-requirements";
-import { createVaultDeploymentSecretRuntime } from "./deployment-secret-runtime-helpers";
+import { createDeploymentSecretRuntimeForAdmittedContext } from "./deployment-secret-runtime-helpers";
 
 const CLOUDFLARE_API_TOKEN_SECRET = "cloudflare_api_token";
 
@@ -24,7 +24,7 @@ export async function cloudflarePagesApiTokenForStep(opts: {
   step: DeploymentRequirementStep;
   authority?: CloudflarePagesControlPlaneWorkerAuthority;
 }): Promise<string | undefined> {
-  const runtime = createVaultDeploymentSecretRuntime({
+  const runtime = createDeploymentSecretRuntimeForAdmittedContext({
     authority: opts.authority,
     admittedContext: opts.admittedContext,
   });

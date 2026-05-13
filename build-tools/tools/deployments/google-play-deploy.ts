@@ -28,7 +28,7 @@ import {
   mergeExecutionPolicyFacts,
   publishWithFailClosedRetry,
 } from "./mobile-store-deploy-shared";
-import { createVaultDeploymentSecretRuntime } from "./deployment-secret-runtime-helpers";
+import { createDeploymentSecretRuntimeForAdmittedContext } from "./deployment-secret-runtime-helpers";
 import { evaluateMobileStoreReleaseHealth } from "./mobile-store-secret-runtime";
 import { deploymentMetadataFingerprintFor } from "./nixos-shared-host-deployment-fingerprint";
 
@@ -48,8 +48,9 @@ export async function publishRecordedGooglePlayArtifact(opts: {
 }): Promise<{ record: GooglePlayDeployRecord; recordPath: string }> {
   const deployRunId = createGooglePlayDeployRunId(opts.operationKind);
   const deploymentMetadataFingerprint = deploymentMetadataFingerprintFor(opts.deployment);
-  const secretRuntime = createVaultDeploymentSecretRuntime({
+  const secretRuntime = createDeploymentSecretRuntimeForAdmittedContext({
     admittedContext: opts.admittedContext,
+    defaultBackend: opts.deployment.secretBackend || "vault",
   });
   let executionPolicy: DeploymentExecutionPolicyFacts | undefined;
   try {

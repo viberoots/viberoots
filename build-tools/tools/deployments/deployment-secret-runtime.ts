@@ -3,6 +3,7 @@ import type { NixosSharedHostMutationAuthority } from "./nixos-shared-host-contr
 import {
   deploymentSecretBindingsForStep,
   deploymentSecretContractBindings,
+  type DeploymentSecretBackendKind,
   type DeploymentSecretReference,
 } from "./deployment-sprinkle-ref";
 import type { DeploymentRequirement, DeploymentRequirementStep } from "./deployment-requirements";
@@ -26,6 +27,7 @@ export type DeploymentSecretBackend = {
 type DeploymentSecretRuntimeOpts = {
   authority?: NixosSharedHostMutationAuthority | { kind?: string };
   backend: DeploymentSecretBackend;
+  secretBackend?: DeploymentSecretBackendKind;
   requirements?: DeploymentRequirement[];
   admittedReferences?: DeploymentSecretReference[];
   targetScope: string;
@@ -80,7 +82,7 @@ export function createDeploymentSecretRuntime(opts: DeploymentSecretRuntimeOpts)
   const bindings =
     opts.admittedReferences && opts.admittedReferences.length > 0
       ? opts.admittedReferences
-      : deploymentSecretContractBindings(opts.requirements || []);
+      : deploymentSecretContractBindings(opts.requirements || [], opts.secretBackend || "vault");
   const cached = new Map<string, DeploymentSecretMaterial>();
   const now = opts.now || (() => new Date());
   const mode = authorityMode(opts.authority);

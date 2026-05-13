@@ -26,7 +26,7 @@ import {
 } from "./deployment-retry-policy";
 import { executionPolicyWithRetry, retryAuditFrom } from "./deployment-retry-records";
 import { deploymentMetadataFingerprintFor } from "./nixos-shared-host-deployment-fingerprint";
-import { createVaultDeploymentSecretRuntime } from "./deployment-secret-runtime-helpers";
+import { createDeploymentSecretRuntimeForAdmittedContext } from "./deployment-secret-runtime-helpers";
 import { requireAdmittedStaticWebappArtifactPath } from "./static-webapp-artifacts";
 import type {
   CloudflarePagesStaticDeployOptions,
@@ -46,8 +46,9 @@ export async function runCloudflarePagesStaticDeploy(
     deployment: opts.deployment,
     publishMode,
   });
-  const secretRuntime = createVaultDeploymentSecretRuntime({
+  const secretRuntime = createDeploymentSecretRuntimeForAdmittedContext({
     admittedContext: opts.admittedContext,
+    defaultBackend: opts.deployment.secretBackend || "vault",
   });
   let providerConfigFingerprint: string | undefined;
   let replaySnapshotPath: string | undefined;
@@ -205,10 +206,7 @@ export async function runCloudflarePagesStaticDeploy(
       publicUrl: smoke.publicUrl,
       ...(published.providerReleaseId ? { providerReleaseId: published.providerReleaseId } : {}),
     });
-    return {
-      record,
-      recordPath: await writeCloudflarePagesDeployRecord(opts.recordsRoot, record),
-    };
+    return { record, recordPath: await writeCloudflarePagesDeployRecord(opts.recordsRoot, record) };
   } catch (error) {
     const failedStep =
       error && typeof error === "object" && "failedStep" in error && error.failedStep === "smoke"
