@@ -81,7 +81,7 @@ export function rollbackSourceEligibilityErrors(record: NixosSharedHostDeployRec
   const errors: string[] = [];
   if (record.finalOutcome !== "succeeded")
     errors.push(`non-success final outcome: ${record.finalOutcome}`);
-  if (record.runClassification !== "deploy") {
+  if (record.runClassification !== "deploy" && record.runClassification !== "promotion") {
     errors.push(`wrong run classification: ${record.runClassification}`);
   }
   if (record.publishMode !== "normal") errors.push(`wrong publish mode: ${record.publishMode}`);

@@ -185,12 +185,22 @@ export function formatDeploymentControlPlaneRecordText(record: any): string {
 }
 
 export function formatDeploymentCurrentStageStateText(state: DeploymentCurrentStageState): string {
+  const rollbackCandidates = Array.isArray((state as any).rollbackCandidates)
+    ? (state as any).rollbackCandidates
+    : [];
   return [
     `current stage: ${state.deploymentId} ${state.environmentStage}`,
     `deployment: ${state.deploymentLabel}`,
     `target: ${state.providerTargetIdentity}`,
     `currentRunId: ${state.currentRunId}`,
+    `operationKind: ${state.operationKind}`,
     state.sourceRunId ? `sourceRunId: ${state.sourceRunId}` : undefined,
+    state.operationKind === "retry" && state.sourceRunId
+      ? `retryLineage: ${state.sourceRunId} -> ${state.currentRunId}`
+      : undefined,
+    state.operationKind === "rollback" && state.sourceRunId
+      ? `rollbackLineage: ${state.sourceRunId} -> ${state.currentRunId}`
+      : undefined,
     `sourceRevision: ${state.sourceRevision}`,
     `artifact: ${state.artifactIdentity}`,
     `artifactReuseMode: ${state.artifactReuseMode}`,
@@ -201,6 +211,9 @@ export function formatDeploymentCurrentStageStateText(state: DeploymentCurrentSt
     `updatedAt: ${state.updatedAt}`,
     state.approvalContext
       ? `approval: ${state.approvalContext.requiredApprovals.join(",") || "none"}`
+      : undefined,
+    rollbackCandidates.length > 0
+      ? `rollbackCandidates: ${rollbackCandidates.map((candidate: any) => candidate.deployRunId).join(",")}`
       : undefined,
   ]
     .filter(Boolean)

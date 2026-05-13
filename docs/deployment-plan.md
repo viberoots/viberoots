@@ -1485,6 +1485,9 @@ operator flows: retry, exact-artifact publish-only, and same-deployment rollback
 - Implement same-deployment rollback candidate selection for the implemented `mini` path.
 - Replay from the recorded snapshot rather than today's repo state.
 - Preserve parent-run and artifact-lineage relationships in deployment records.
+- Drive retry and rollback from explicit admitted run ids and retained replay snapshots; do not
+  recover by branch rewind, mutable tag reassignment, release-pointer edits, or current workspace
+  rebuilds.
 
 ### Tests (in this PR)
 
@@ -1503,6 +1506,8 @@ operator flows: retry, exact-artifact publish-only, and same-deployment rollback
 - Document operator semantics for retry, publish-only, and rollback on the implemented path.
 - Document rollback selection and exact-artifact requirements.
 - Document replay failure behavior when the recorded artifact is unavailable.
+- Document that operator-visible current stage state is the source for live run lineage and
+  rollback candidate inspection.
 
 ### Verification Commands
 
@@ -1563,6 +1568,7 @@ execution coverage without reducing the reviewed behavior surface.
   - the same deployment id
   - target-compatible under the existing replay checks
   - prior successful normal publish runs for the same normal live target
+  - visible through control-plane current stage state as a non-current rollback candidate
 - Reject rollback candidates sourced from runs classified as:
   - `retry`
   - `rollback`
@@ -1574,6 +1580,9 @@ execution coverage without reducing the reviewed behavior surface.
   - deployment or target incompatibility
 - Keep rollback selection derived from durable records and replay snapshots rather than recency or
   "latest known good" heuristics.
+- Use control-plane current stage state to reject rollback attempts that only move Git refs, edit
+  release-pointer JSON, retag mutable provider artifacts, or point at the current run instead of a
+  prior admitted run.
 - Split oversized deployment-owned remote-execution test coverage into smaller reviewed modules or
   helpers so the deployment test area stays within repo methodology file-size expectations without
   dropping coverage.
@@ -1600,6 +1609,8 @@ execution coverage without reducing the reviewed behavior surface.
   the same deployment.
 - Document explicitly that successful `retry` and `rollback` runs are not valid default rollback
   sources.
+- Document that current-stage-state reads expose retry/rollback lineage and the policy-filtered
+  rollback candidate list operators should choose from.
 - Document that this PR is a contract-hardening follow-up to PR-7 rather than a new deploy feature
   slice.
 
@@ -3804,6 +3815,9 @@ while also closing the remaining repo-level preview-policy and preview-identity 
     downstream submission
   - ambient git state, current branch, or provider-default inference is rejected as a mutating
     preview selector
+- For protected/shared preview cleanup, require the explicit admitted source-run selector to
+  resolve both the preview identity and the originating admitted lineage; cleanup must not infer the
+  preview from provider-default project state or a normal live target.
 - Require preview support to come only from:
   - an explicit deployment preview-policy block
   - or a documented reviewed provider-capability default preview policy that the deployment has
@@ -3819,6 +3833,8 @@ while also closing the remaining repo-level preview-policy and preview-identity 
   - cleanup ownership
 - Require preview cleanup selectors to identify the preview by the same derivation key or admitted
   source-run identity that created it.
+- Persist the structured preview identity selector and originating source-run lineage in cleanup
+  records so repeated cleanup and audit reads can prove the normal live target was not selected.
 - Make preview cleanup safe to repeat idempotently when the targeted preview is already gone.
 - Preserve preview cleanup reason, requesting identity, and effective preview target identity in the
   cleanup record shape.

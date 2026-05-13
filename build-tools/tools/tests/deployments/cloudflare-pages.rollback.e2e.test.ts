@@ -4,6 +4,7 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
 import { cloudflarePagesPublishedPath } from "../../deployments/cloudflare-pages-preview";
+import { submitCloudflarePagesRollback } from "../../deployments/cloudflare-pages-rollback";
 import { runInTemp } from "../lib/test-helpers";
 import {
   cloudflarePagesDeploymentFixture,
@@ -13,14 +14,13 @@ import { writeReviewedLaneAdmissionEvidenceJson } from "./deployment-lane-govern
 import { installFakeCloudflarePagesWrangler } from "./cloudflare-pages.fake-wrangler";
 import { startCloudflarePagesPublicServer } from "./cloudflare-pages.public-server";
 import { ensureNixosSharedHostReviewedSourceRef } from "./nixos-shared-host.fixture";
+import { seedCurrentStageState } from "./nixos-shared-host.promotion.stage-state.helpers";
+import { fakeCloudflareOverrides } from "./cloudflare-pages.service-flow.helpers";
+import { withEnvOverrides } from "./nixos-shared-host.control-plane.helpers";
 
 async function writeArtifact(root: string, html: string): Promise<void> {
   await fsp.mkdir(root, { recursive: true });
   await fsp.writeFile(path.join(root, "index.html"), html, "utf8");
-}
-
-async function writeDeploymentJson(filePath: string, deployment: unknown) {
-  await fsp.writeFile(filePath, JSON.stringify(deployment, null, 2) + "\n", "utf8");
 }
 
 async function writeWranglerConfig(root: string) {
@@ -41,7 +41,6 @@ function fakeCloudflareEnv(fake: Awaited<ReturnType<typeof installFakeCloudflare
 test("cloudflare-pages rollback re-publishes a prior admitted exact artifact", async () => {
   await runInTemp("cloudflare-pages-rollback-e2e", async (tmp, $) => {
     const deployment = cloudflarePagesDeploymentFixture();
-    const deploymentJson = path.join(tmp, "deployment.json");
     const recordsRoot = path.join(tmp, "records");
     const artifactA = path.join(tmp, "artifact-a");
     const artifactB = path.join(tmp, "artifact-b");
@@ -53,7 +52,6 @@ test("cloudflare-pages rollback re-publishes a prior admitted exact artifact", a
     );
     await installCloudflarePagesTargets(tmp, [deployment]);
     await ensureNixosSharedHostReviewedSourceRef(tmp, $, deployment);
-    await writeDeploymentJson(deploymentJson, deployment);
     const admissionEvidenceJson = await writeReviewedLaneAdmissionEvidenceJson({
       tmp,
       $,
@@ -71,18 +69,39 @@ test("cloudflare-pages rollback re-publishes a prior admitted exact artifact", a
         env: fakeCloudflareEnv(fake),
       })`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment ${deployment.label} --admission-evidence-json ${admissionEvidenceJson} --artifact-dir ${artifactA} --records-root ${recordsRoot} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(server.port)} --smoke-connect-protocol https:`;
       const firstSummary = JSON.parse(String(firstRun.stdout));
-      await $({
+      await seedCurrentStageState({ recordsRoot, recordPath: firstSummary.recordPath, deployment });
+      const secondRun = await $({
         cwd: tmp,
         env: fakeCloudflareEnv(fake),
       })`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment ${deployment.label} --admission-evidence-json ${admissionEvidenceJson} --artifact-dir ${artifactB} --records-root ${recordsRoot} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(server.port)} --smoke-connect-protocol https:`;
-      const rollbackRun = await $({
-        cwd: tmp,
-        env: fakeCloudflareEnv(fake),
-      })`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment ${deployment.label} --admission-evidence-json ${admissionEvidenceJson} --publish-only --rollback --source-run-id ${firstSummary.deployRunId} --records-root ${recordsRoot} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(server.port)} --smoke-connect-protocol https:`;
-      const rollbackSummary = JSON.parse(String(rollbackRun.stdout));
-      assert.equal(rollbackSummary.operationKind, "rollback");
-      assert.equal(rollbackSummary.runClassification, "rollback");
-      const record = JSON.parse(await fsp.readFile(rollbackSummary.recordPath, "utf8"));
+      const secondSummary = JSON.parse(String(secondRun.stdout));
+      const backendDatabaseUrl = await seedCurrentStageState({
+        recordsRoot,
+        recordPath: secondSummary.recordPath,
+        deployment,
+      });
+      const admissionEvidence = JSON.parse(await fsp.readFile(admissionEvidenceJson, "utf8"));
+      const rollback = await withEnvOverrides(
+        fakeCloudflareOverrides(fake),
+        async () =>
+          await submitCloudflarePagesRollback({
+            workspaceRoot: tmp,
+            deployment,
+            recordsRoot,
+            sourceRunId: firstSummary.deployRunId,
+            backendDatabaseUrl,
+            admissionEvidence,
+            smokeConnectOverride: {
+              protocol: "https:",
+              hostname: "127.0.0.1",
+              port: server.port,
+              rejectUnauthorized: false,
+            },
+          }),
+      );
+      assert.equal(rollback.record.operationKind, "rollback");
+      assert.equal(rollback.record.runClassification, "rollback");
+      const record = JSON.parse(await fsp.readFile(rollback.recordPath, "utf8"));
       assert.equal(record.parentRunId, firstSummary.deployRunId);
       assert.equal(record.effectiveRunTarget.providerTargetIdentity, record.providerTargetIdentity);
       assert.equal(

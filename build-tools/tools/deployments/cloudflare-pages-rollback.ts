@@ -13,6 +13,7 @@ import { runCloudflarePagesStaticDeploy } from "./cloudflare-pages-static-deploy
 import type { CloudflarePagesDeployment } from "./contract";
 import { evaluateDeploymentAdmission } from "./deployment-admission-evaluator";
 import type { DeploymentAdmissionEvidence } from "./deployment-admission-evidence";
+import { rollbackStageStateErrors } from "./deployment-rollback-candidates";
 import { invalidatingTargetException } from "./deployment-target-exceptions";
 import { resolveCloudflarePagesReplaySource } from "./cloudflare-pages-replay";
 
@@ -67,7 +68,7 @@ function rollbackSourceEligibilityErrors(
   if (record.finalOutcome !== "succeeded") {
     errors.push(`source run is not successful: ${record.finalOutcome}`);
   }
-  if (record.runClassification !== "deploy") {
+  if (record.runClassification !== "deploy" && record.runClassification !== "promotion") {
     errors.push(`wrong run classification: ${record.runClassification}`);
   }
   if (record.publishMode !== "normal") {
@@ -97,6 +98,22 @@ export async function resolveCloudflarePagesRollbackSelection(opts: {
     ...sameDeploymentRollbackErrors(opts.deployment, source.replaySnapshot.deployment),
     ...rollbackSourceEligibilityErrors(opts.deployment, source.record),
   ];
+  if (!opts.backendDatabaseUrl) {
+    errors.push(
+      "cloudflare-pages rollback requires backendDatabaseUrl or --control-plane-database-url for current stage state",
+    );
+  } else {
+    errors.push(
+      ...(await rollbackStageStateErrors({
+        backend: {
+          recordsRoot: opts.recordsRoot,
+          databaseUrl: opts.backendDatabaseUrl,
+        },
+        deployment: opts.deployment,
+        sourceRunId: source.record.deployRunId,
+      })),
+    );
+  }
   if (errors.length > 0) {
     throw new Error(`rollback source run is not eligible: ${source.record.deployRunId}
 ${errors.join("\n")}`);
@@ -117,6 +134,7 @@ export async function submitCloudflarePagesRollback(opts: {
   deployment: CloudflarePagesDeployment;
   recordsRoot: string;
   sourceRunId: string;
+  backendDatabaseUrl?: string;
   admissionEvidence?: DeploymentAdmissionEvidence;
   smokeConnectOverride?: CloudflarePagesSmokeConnectOverride;
 }) {

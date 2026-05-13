@@ -35,6 +35,10 @@ export {
   type DeploymentCurrentStageState,
 } from "./deployment-current-stage-state";
 export {
+  readBackendRollbackCandidates,
+  type DeploymentRollbackCandidate,
+} from "./deployment-rollback-candidates";
+export {
   acquireBackendControlPlaneLock,
   resolveBackendIdempotency,
   syncBackendRunAction,

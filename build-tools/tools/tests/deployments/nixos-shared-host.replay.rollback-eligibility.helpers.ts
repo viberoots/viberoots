@@ -2,7 +2,10 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import type { NixosSharedHostDeployment } from "../../deployments/contract";
-import { syncBackendDeployRecord } from "../../deployments/nixos-shared-host-control-plane-backend";
+import {
+  syncBackendDeployRecord,
+  syncBackendSnapshot,
+} from "../../deployments/nixos-shared-host-control-plane-backend";
 import { submitNixosSharedHostControlPlaneRun } from "../../deployments/nixos-shared-host-control-plane";
 import { resolveNixosSharedHostReplaySelection } from "../../deployments/nixos-shared-host-replay";
 import { nixosSharedHostDeploymentFixture } from "./nixos-shared-host.fixture";
@@ -64,6 +67,17 @@ export async function syncReplayRecord(
   );
 }
 
+async function syncReplaySnapshot(
+  paths: ReplayPaths,
+  backendDatabaseUrl: string,
+  executionSnapshotPath: string,
+) {
+  await syncBackendSnapshot(
+    { recordsRoot: paths.recordsRoot, databaseUrl: backendDatabaseUrl },
+    executionSnapshotPath,
+  );
+}
+
 export async function syncReplayRunId(
   paths: ReplayPaths,
   backendDatabaseUrl: string,
@@ -109,6 +123,7 @@ export async function submitReplaySourceRun(opts: {
     admissionEvidence: opts.admissionEvidence,
     ...(opts.smokeConnectOverride ? { smokeConnectOverride: opts.smokeConnectOverride } : {}),
   });
+  await syncReplaySnapshot(opts.paths, opts.backendDatabaseUrl, result.executionSnapshotPath);
   await syncReplayRecord(opts.paths, opts.backendDatabaseUrl, result.recordPath);
   return result;
 }

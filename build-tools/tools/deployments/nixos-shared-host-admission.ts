@@ -13,7 +13,6 @@ import {
 } from "./deployment-requirements";
 import type { DeploymentSecretAdmittedReference } from "./deployment-sprinkle-ref";
 import {
-  gitIsAncestor,
   replayMismatch,
   resolveNixosSharedHostAdmittedSecretReferences,
   targetEnvironmentAdmission,
@@ -180,15 +179,6 @@ export async function resolveReplayNixosSharedHostAdmittedContext(opts: {
   if (errors.length > 0) {
     throw new Error(`source run is outside current lane policy:
 ${errors.join("\n")}`);
-  }
-  if (
-    opts.rollback &&
-    !(await gitIsAncestor(opts.workspaceRoot, source.source.sourceRevision, target.targetRevision))
-  ) {
-    throw new Error(
-      `rollback source run is outside current lane state: ${opts.sourceRecord.deployRunId}
-source revision ${source.source.sourceRevision} is not reachable from ${target.targetRef}`,
-    );
   }
   if (
     !opts.rollback &&

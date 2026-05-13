@@ -24,6 +24,9 @@ Current reviewed central control-plane implementation note:
 - Operators inspect the current deployed stage through backend-native state surfaces such as
   `GET /api/v1/current-stage-state` and `GET /api/v1/stage-history`; Git release-pointer JSON is
   derived audit evidence only if it exists and must not be read as a runtime deployment input.
+- `GET /api/v1/current-stage-state` includes operator-visible retry/rollback lineage and the
+  policy-filtered rollback candidates derived from backend stage history, not from Git refs,
+  mutable provider tags, or release-pointer files.
 - Explicit `pgmem://...` backend URLs remain valid for isolated fixture tests and local harnesses; those harnesses should exercise the same backend-native contracts rather than rely on durable submission or deploy-record mirror files.
 - For public repo-level protected/shared `cloudflare-pages` mutation, missing `--control-plane-url` or `VBR_DEPLOY_CONTROL_PLANE_URL` is a fail-closed configuration error, and mixing that service-routed path with local-only flags such as `--records-root` or `--control-plane-database-url` is out of contract.
 - Protected/shared `cloudflare-pages` service submissions must carry a versioned `artifactInput` descriptor. The service rejects laptop-local `artifactDir` paths, admits uploaded, server-built, CI-attested, or previously admitted artifacts under control-plane storage, and publishes only the admitted artifact reference.
@@ -65,7 +68,11 @@ Current reviewed central control-plane implementation note:
 - Same-deployment source-run reuse with `publish_mode = normal` is classified by operator intent: delayed first publish remains `deploy`, re-publication is `retry`, and explicit restoration uses `--rollback`.
 - Same-deployment delayed first publish of an already admitted artifact or admitted run lineage remains `operation_kind = deploy`; same-deployment re-publication of an earlier attempted normal run is `retry`.
 - Rollback source selection must use a prior admitted run for the same deployment.
-- Default rollback candidates are prior successful `publish_mode = normal` runs against the same normal live target.
+- Default rollback candidates are prior successful `publish_mode = normal` deploy or promotion runs
+  against the same normal live target.
+- Rollback must select a non-current candidate admitted by control-plane current stage state; moving
+  a branch backward, editing release-pointer JSON, retagging a mutable provider artifact, or
+  rebuilding from the current workspace is not a rollback mechanism.
 - Successful same-deployment `retry`, `rollback`, and `explicit_removal` runs are not default rollback candidates.
 - Default rollback candidates are usable only when any already-applied stateful `release_actions` remain rollback-compatible under their declared data-compatibility posture.
 - Protected/shared immutable-reuse flows must replay the recorded execution snapshot rather than reinterpret current repo state.

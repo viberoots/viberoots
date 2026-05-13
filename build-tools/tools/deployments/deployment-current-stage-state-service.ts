@@ -2,6 +2,7 @@
 import type { NixosSharedHostControlPlaneBackendTarget } from "./nixos-shared-host-control-plane-backend";
 import {
   readControlPlaneCurrentStageState,
+  readControlPlaneRollbackCandidates,
   readControlPlaneStageHistory,
 } from "./nixos-shared-host-control-plane-service-read";
 
@@ -23,7 +24,17 @@ export async function handleCurrentStageStateReadRoute(opts: {
         ? await readControlPlaneCurrentStageState(opts.backend, { deploymentId, environmentStage })
         : null;
     return state
-      ? { handled: true, statusCode: 200, body: state }
+      ? {
+          handled: true,
+          statusCode: 200,
+          body: {
+            ...state,
+            rollbackCandidates: await readControlPlaneRollbackCandidates(opts.backend, {
+              deploymentId,
+              environmentStage,
+            }),
+          },
+        }
       : { handled: true, statusCode: 404, body: { error: "current stage state not found" } };
   }
   if (opts.method === "GET" && opts.pathname === "/api/v1/stage-history") {

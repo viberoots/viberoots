@@ -61,6 +61,7 @@ export async function runCloudflarePagesCli(opts: {
         deployment: opts.deployment,
         recordsRoot: opts.recordsRoot,
         sourceRunId: opts.sourceRunId,
+        backendDatabaseUrl: opts.backendDatabaseUrl,
         ...(opts.admissionEvidence ? { admissionEvidence: opts.admissionEvidence } : {}),
         ...(opts.smokeConnectOverride ? { smokeConnectOverride: opts.smokeConnectOverride } : {}),
       });

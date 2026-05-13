@@ -104,6 +104,17 @@ test("rollback rejects a successful rollback source while retry reuse stays avai
         smokeConnectOverride: replaySmokeConnect(server.port),
         backendDatabaseUrl,
       });
+      await writeReplayArtifact(artifactDir, "rollback-current");
+      await submitReplaySourceRun({
+        workspaceRoot: tmp,
+        operationKind: "deploy",
+        deployment,
+        artifactDir,
+        paths,
+        admissionEvidence: reviewedLaneAdmissionEvidenceFixture({ deployment }),
+        smokeConnectOverride: replaySmokeConnect(server.port),
+        backendDatabaseUrl,
+      });
       const rollbackSource = await resolveReplaySelection({
         deployment,
         recordsRoot: paths.recordsRoot,
@@ -188,7 +199,6 @@ test("rollback rejects explicit-removal source runs with actionable diagnostics"
     }
   });
 });
-
 test("rollback rejects non-successful runs while retry reuse stays available", async () => {
   await runInTemp("nixos-shared-host-replay-failed-source", async (tmp, $) => {
     const deployment = replayDeploymentFixture();

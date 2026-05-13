@@ -14,6 +14,7 @@ import {
   rollbackSourceEligibilityErrors,
   sameDeploymentReplayErrors,
 } from "./nixos-shared-host-replay-guardrails";
+import { rollbackStageStateErrors } from "./deployment-rollback-candidates";
 import { type NixosSharedHostDeployRecord } from "./nixos-shared-host-records";
 import {
   nixosSharedHostReplayArtifactIdentity,
@@ -202,6 +203,20 @@ ${rollbackErrors.join("\n")}`);
   if (liveCompatibilityErrors.length > 0) {
     throw new Error(`rollback source run is blocked by current release-action posture:
 ${liveCompatibilityErrors.join("\n")}`);
+  }
+  const stageStateErrors = opts.rollback
+    ? await rollbackStageStateErrors({
+        backend: {
+          recordsRoot: opts.recordsRoot,
+          databaseUrl: opts.backendDatabaseUrl,
+        },
+        deployment: opts.deployment,
+        sourceRunId: source.record.deployRunId,
+      })
+    : [];
+  if (stageStateErrors.length > 0) {
+    throw new Error(`rollback source run is not admitted by current stage state:
+${stageStateErrors.join("\n")}`);
   }
   const replaySource =
     source.replaySnapshot.publishInput.kind === "component-artifacts"

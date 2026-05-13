@@ -98,6 +98,7 @@ test("current stage state updates from successful deploy and ignores release-poi
   assert.equal(state?.artifactReuseMode, "same_artifact");
   assert.equal(state?.approvalContext?.requiredApprovals[0], "release-owner");
   assert.match(formatDeploymentCurrentStageStateText(state!), /currentRunId: deploy-1/);
+  assert.match(formatDeploymentCurrentStageStateText(state!), /operationKind: deploy/);
   const route = await handleControlPlaneReadRoute({
     method: "GET",
     pathname: "/api/v1/current-stage-state",
@@ -109,11 +110,13 @@ test("current stage state updates from successful deploy and ignores release-poi
   });
   assert.equal(route.handled, true);
   assert.equal(route.handled ? (route.body as any).currentRunId : "", "deploy-1");
+  assert.deepEqual(route.handled ? (route.body as any).rollbackCandidates : [], []);
 });
 
 test("promotion retry and rollback replace current state and preserve history", async () => {
   const backend = await backendFixture();
   for (const [operationKind, runId, parentRunId] of [
+    ["deploy", "deploy-1", undefined],
     ["promotion", "deploy-promotion", "deploy-1"],
     ["retry", "deploy-retry", "deploy-promotion"],
     ["rollback", "deploy-rollback", "deploy-1"],
@@ -132,11 +135,30 @@ test("promotion retry and rollback replace current state and preserve history", 
     deploymentId: "demoapp-staging",
     environmentStage: "staging",
   });
+  const route = await handleControlPlaneReadRoute({
+    method: "GET",
+    pathname: "/api/v1/current-stage-state",
+    searchParams: new URLSearchParams({
+      deploymentId: "demoapp-staging",
+      environmentStage: "staging",
+    }),
+    backend,
+  });
   assert.equal(state?.currentRunId, "deploy-rollback");
   assert.equal(state?.parentRunId, "deploy-1");
   assert.deepEqual(
+    route.handled
+      ? (route.body as any).rollbackCandidates.map((candidate: any) => candidate.deployRunId).sort()
+      : [],
+    ["deploy-1", "deploy-promotion"].sort(),
+  );
+  assert.match(
+    formatDeploymentCurrentStageStateText(route.handled ? (route.body as any) : state!),
+    /rollbackLineage: deploy-1 -> deploy-rollback/,
+  );
+  assert.deepEqual(
     history.map((entry) => entry.currentRunId).sort(),
-    ["deploy-promotion", "deploy-retry", "deploy-rollback"].sort(),
+    ["deploy-1", "deploy-promotion", "deploy-retry", "deploy-rollback"].sort(),
   );
 });
 
