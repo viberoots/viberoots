@@ -325,7 +325,7 @@ Admitted reference example:
   "selectorRef": "proj_123/staging/deployments/pleomino/cloudflare_api_token@17",
   "resolvedVersion": "17",
   "resolvedAt": "2026-05-11T12:00:00.000Z",
-  "refreshMode": "reacquire",
+  "refreshMode": "none",
   "credentialClass": "routine"
 }
 ```
@@ -474,7 +474,8 @@ Rules:
 - initial admission resolves fresh references against the target deployment's
   selected backend
 - retry and rollback reuse the source run's recorded admitted references
-- promotion resolves new admitted references for the target deployment
+- promotion selects a control-plane admitted source run and artifact, then
+  resolves new admitted references from the target deployment's current metadata
 - replay fails closed if an admitted reference cannot be resolved exactly
 - replay must not silently substitute latest Infisical values after rotation
 - a replay that recorded `backend: "vault"` continues using Vault, even if the
@@ -655,7 +656,10 @@ These should be answered before implementation planning:
 - Do we need admin `sync`, or is read-only `plan` and `check` enough for the
   initial integration?
 - Which Infisical auth modes beyond Universal Auth are required later for
-  `mini`, Jenkins, or cloud-native workers?
+  `mini` or cloud-native workers? Jenkins should normally submit artifacts and
+  provenance to the control plane rather than hold Infisical workload
+  credentials, unless a future Jenkins-hosted worker mode is explicitly
+  designed.
 
 The conservative recommendation is deployment-wide backend selection, direct
 shared secrets only, deterministic snake_case default names from contract ids,

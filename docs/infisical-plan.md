@@ -41,6 +41,7 @@ Verify-scope organization:
   - `build-tools/deployments/**`
   - `build-tools/tools/deployments/**`
   - `build-tools/tools/tests/deployments/**`
+  - exact reviewed support paths listed in that document
 - Backend dispatch, redaction helpers, fake Infisical servers, CLI/admin commands, and runtime
   helper wiring should live in deployment-owned modules, not in shared `build-tools/tools/lib/**`,
   `build-tools/lang/**`, root Buck/Nix config, or shared test-loader files, when that is the clean
@@ -410,7 +411,8 @@ not the meaning of recorded runs.
 - Update `resolveInitialAdmittedSecretReferences(...)` to dispatch by selected backend and receive
   `vaultRuntime` and `infisicalRuntime` inputs.
 - Keep retry and rollback using the source run's recorded admitted references.
-- Ensure promotion resolves new admitted references for the target deployment's selected backend.
+- Ensure promotion selects a control-plane admitted source run and artifact, then resolves new
+  admitted secret references from the target deployment's current metadata and selected backend.
 - Preserve exact replay semantics:
   - a recorded Vault reference continues using Vault even if current metadata now selects Infisical
   - a recorded Infisical reference continues using Infisical even if current metadata changes later
@@ -433,7 +435,8 @@ not the meaning of recorded runs.
 - Add replay tests proving Infisical-admitted retry/rollback reads the recorded Infisical selector
   exactly and does not substitute latest values after rotation.
 - Add promotion tests proving the target deployment resolves fresh admitted references from its
-  current selected backend.
+  current metadata and selected backend while artifact/source selection comes from the admitted
+  source run.
 - Add protected/shared worker tests rejecting fixture use outside local fixture mode and rejecting
   client-supplied Infisical tokens or secret values.
 - Add record/snapshot tests proving admitted secret references contain backend-qualified non-secret
@@ -455,13 +458,14 @@ not the meaning of recorded runs.
 
 - Initial admission uses the deployment's selected backend.
 - Retry and rollback use recorded admitted references.
-- Promotion resolves target-backend references under lane policy.
+- Promotion resolves target-backend references under lane policy from target deployment metadata
+  after selecting the control-plane admitted source run and artifact.
 - Backend migration is per deployment and does not mutate historical run meaning.
 
 ### 7. Risks
 
 - Migration behavior can be subtle because current metadata and historical records may disagree.
-- Promotion could accidentally reuse source-environment secret selectors.
+- Promotion could accidentally reuse source-stage or source-run secret selectors.
 
 ### 8. Mitigations
 
