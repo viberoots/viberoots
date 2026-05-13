@@ -225,10 +225,10 @@ What should not be required:
 
 For this provider family, those are derived from `appName`.
 
-## Branch-Backed Admission Slice
+## Source-Ref Admission Slice
 
 The first protected/shared lane-policy slice for this provider binds the current shared-dev path to
-an explicit branch-backed lane and two-stage admission flow.
+an explicit source-ref-backed lane and two-stage admission flow.
 
 Current reviewed repo-owned policy refs:
 
@@ -238,36 +238,36 @@ Current reviewed repo-owned policy refs:
 
 For the current `mini` shared-dev deployment path, that means:
 
-- source admission resolves the authoritative stage branch for the deployment's lane stage
-  - today that is `env/pleomino/dev` for the concrete `pleomino-dev` deployment
-  - the control plane fetches that reviewed ref from the configured SCM remote into a
-    submission-scoped snapshot ref instead of trusting one ambient long-lived local branch
+- source admission resolves the reviewed source-ref policy for the deployment's lane stage
+  - today that is the protected `main` source line for the concrete `pleomino-dev` deployment
+  - the control plane fetches the reviewed source ref from the configured SCM remote into a
+    submission-scoped snapshot ref instead of trusting an ambient local checkout
   - source admission records the fetched commit as the admitted source revision and the exact
     artifact identity selected for that revision
   - submit-time required checks bind to that fetched commit SHA, and client-supplied expected
     revisions fail closed when they do not match the service-owned snapshot
 - target-environment run admission freezes the mutating execution snapshot before lock acquisition
   - this snapshot records the current lane-policy fingerprint, admission-policy fingerprint,
-    environment stage, target branch head revision, canonical provider-target identity, and the
+    environment stage, admitted source revision, canonical provider-target identity, and the
     reviewed-source snapshot ref used for that submission
 - durable run records and replay snapshots preserve that admitted context so retry and rollback do
   not silently reinterpret current repo metadata as if it had been part of the original run
-- the lane also resolves one reviewed governance object for `env/pleomino/dev`,
-  `env/pleomino/staging`, and `env/pleomino/prod`
-  - verification compares that contract against the current SCM branch-protection state
-  - admission records the verified governance facts so operators can inspect which protected-branch
+- the lane also resolves one reviewed governance object for the `dev`, `staging`, and `prod` stages
+  - verification compares that contract against the current source-ref checks, trusted reporters,
+    and approval boundaries
+  - admission records the verified governance facts so operators can inspect which source-governance
     guarantees were actually proven for the run
 
 Operationally, this keeps the current shared-dev provider narrow while still enforcing the core
 protected/shared model:
 
-- normal deploys use the service-owned reviewed snapshot of the lane stage branch instead of the
+- normal deploys use the service-owned reviewed snapshot of the lane stage source ref instead of the
   operator's ambient checkout
-- concurrent submissions can snapshot different commits of `env/pleomino/dev` without clobbering
+- concurrent submissions can snapshot different commits of the reviewed source ref without clobbering
   one another's admission subject
 - `retry` reuses the recorded admitted source snapshot and exact artifact without rebuilding
 - `rollback` still reuses a prior admitted run, but only while that run remains authorized by the
-  current branch-backed lane state
+  current lane policy and control-plane stage state
 - replay is rejected when the current deployment no longer resolves to the same authoritative lane
   policy that admitted the source run
 

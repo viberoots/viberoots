@@ -13,6 +13,7 @@ import { cleanupReviewedSourceSnapshot } from "../../deployments/nixos-shared-ho
 import { smokeConnectOverride, writeDemoArtifact } from "./nixos-shared-host.control-plane.helpers";
 import { reviewedLaneAdmissionEvidenceFixture } from "./deployment-lane-governance.fixture";
 import {
+  deploymentSourceRef,
   ensureNixosSharedHostStageBranch,
   nixosSharedHostDeploymentFixture,
 } from "./nixos-shared-host.fixture";
@@ -48,10 +49,10 @@ test("backend snapshots the reviewed ref from the remote instead of ambient loca
       cwd: tmp,
       stdio: "pipe",
     })`git remote set-url origin git@github.com:viberoots/viberoots.git`;
-    const remoteRevision = await gitStdout(tmp, $, "rev-parse", "env/pleomino/dev");
+    const sourceRef = deploymentSourceRef(deployment);
+    const remoteRevision = await gitStdout(tmp, $, "rev-parse", sourceRef);
     await commitLocalChange(tmp, $, "local-drift");
-    await $({ cwd: tmp, stdio: "pipe" })`git branch -f env/pleomino/dev HEAD`;
-    const ambientRevision = await gitStdout(tmp, $, "rev-parse", "env/pleomino/dev");
+    const ambientRevision = await gitStdout(tmp, $, "rev-parse", sourceRef);
     assert.notEqual(ambientRevision, remoteRevision);
     const fetchHeadPath = path.join(tmp, ".git", "FETCH_HEAD");
     await fsp.writeFile(fetchHeadPath, "read-only fetch head\n", "utf8");
@@ -75,7 +76,7 @@ test("backend snapshots the reviewed ref from the remote instead of ambient loca
       assert.equal(prepared.snapshot.admittedContext?.source.sourceRevision, remoteRevision);
       assert.equal(reviewed?.sourceRevision, remoteRevision);
       assert.ok(reviewed?.snapshotRef);
-      assert.notEqual(reviewed?.snapshotRef, "env/pleomino/dev");
+      assert.notEqual(reviewed?.snapshotRef, sourceRef);
       assert.equal(await fsp.readFile(fetchHeadPath, "utf8"), "read-only fetch head\n");
       assert.equal(
         await gitStdout(tmp, $, "rev-parse", reviewed?.snapshotRef || ""),
@@ -95,10 +96,10 @@ test("service-backed deploy fails closed when the client and service disagree on
     const artifactDir = path.join(tmp, "artifact");
     await writeDemoArtifact(artifactDir);
     await ensureNixosSharedHostStageBranch(tmp, $, deployment);
-    const serviceRevision = await gitStdout(tmp, $, "rev-parse", "env/pleomino/dev");
+    const sourceRef = deploymentSourceRef(deployment);
+    const serviceRevision = await gitStdout(tmp, $, "rev-parse", sourceRef);
     await commitLocalChange(tmp, $, "client-drift");
-    await $({ cwd: tmp, stdio: "pipe" })`git branch -f env/pleomino/dev HEAD`;
-    const clientRevision = await gitStdout(tmp, $, "rev-parse", "env/pleomino/dev");
+    const clientRevision = await gitStdout(tmp, $, "rev-parse", sourceRef);
     assert.notEqual(clientRevision, serviceRevision);
     const controlPlane = await startNixosSharedHostControlPlaneServer({
       workspaceRoot: tmp,
@@ -117,11 +118,11 @@ test("service-backed deploy fails closed when the client and service disagree on
         }),
         new RegExp(
           [
-            "reviewed source mismatch for env/pleomino/dev",
+            `reviewed source mismatch for ${sourceRef}`,
             `clientExpectedSourceRevision=${clientRevision}`,
             `serviceReviewedSourceRevision=${serviceRevision}`,
-            "service fetched the reviewed deployment branch before admission",
-            "that branch is up to date and pushed before retrying",
+            "service fetched the reviewed deployment source ref before admission",
+            "that source ref is up to date and pushed before retrying",
           ].join("[\\s\\S]*"),
         ),
       );
@@ -138,7 +139,8 @@ test("same-ref submissions snapshot different reviewed commits without clobberin
     const paths = submissionPaths(tmp);
     await writeDemoArtifact(artifactDir);
     await ensureNixosSharedHostStageBranch(tmp, $, deployment);
-    const firstRevision = await gitStdout(tmp, $, "rev-parse", "env/pleomino/dev");
+    const sourceRef = deploymentSourceRef(deployment);
+    const firstRevision = await gitStdout(tmp, $, "rev-parse", sourceRef);
     const first = await prepareBackendNixosSharedHostControlPlaneRun({
       workspaceRoot: tmp,
       operationKind: "deploy",
@@ -157,7 +159,7 @@ test("same-ref submissions snapshot different reviewed commits without clobberin
     try {
       await commitLocalChange(tmp, $, "remote-advance");
       await ensureNixosSharedHostStageBranch(tmp, $, deployment);
-      const secondRevision = await gitStdout(tmp, $, "rev-parse", "env/pleomino/dev");
+      const secondRevision = await gitStdout(tmp, $, "rev-parse", sourceRef);
       const second = await prepareBackendNixosSharedHostControlPlaneRun({
         workspaceRoot: tmp,
         operationKind: "deploy",

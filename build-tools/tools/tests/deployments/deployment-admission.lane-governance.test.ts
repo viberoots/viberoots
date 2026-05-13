@@ -64,13 +64,15 @@ test("admission rejects lane-governance drift", async () => {
           verificationSource: "client_supplied",
           scmBackend: governance.scmBackend,
           repository: governance.repository,
-          branchProtections: governance.branchProtections.map((entry) =>
-            entry.stage === "dev" ? { ...entry, fastForwardOnly: false as never } : entry,
+          sourceRefPolicies: governance.sourceRefPolicies.map((entry) =>
+            entry.stage === "dev" ? { ...entry, allowedRefs: ["refs/heads/drift"] } : entry,
           ),
+          trustedReporterIdentities: governance.trustedReporterIdentities,
+          requiredApprovalBoundaries: governance.requiredApprovalBoundaries,
         },
       },
     }),
-    /fast-forward-only enforcement is missing/,
+    /allowed source refs drift/,
   );
 });
 
@@ -93,12 +95,14 @@ test("admission preserves successful lane-governance facts in policy evaluation"
         verificationSource: "client_supplied",
         scmBackend: governance.scmBackend,
         repository: governance.repository,
-        branchProtections: governance.branchProtections,
+        sourceRefPolicies: governance.sourceRefPolicies,
+        trustedReporterIdentities: governance.trustedReporterIdentities,
+        requiredApprovalBoundaries: governance.requiredApprovalBoundaries,
       },
     },
   });
   assert.equal(evaluation.laneGovernance?.governanceRef, deployment.lanePolicy.governanceRef);
-  assert.equal(evaluation.laneGovernance?.branchProtections[0]?.branch, "env/pleomino/dev");
+  assert.equal(evaluation.laneGovernance?.sourceRefPolicies[0]?.allowedRefs[0], "main");
   assert.equal(evaluation.laneGovernance?.verificationSource, "client_supplied");
 });
 
@@ -126,7 +130,9 @@ test("admission can synthesize service-owned lane-governance facts", async () =>
         VBR_DEPLOY_GITHUB_GOVERNANCE_FIXTURE_JSON: JSON.stringify({
           scmBackend: "github",
           repository: deployment.lanePolicy.governance.repository,
-          branchProtections: deployment.lanePolicy.governance.branchProtections,
+          sourceRefPolicies: deployment.lanePolicy.governance.sourceRefPolicies,
+          trustedReporterIdentities: deployment.lanePolicy.governance.trustedReporterIdentities,
+          requiredApprovalBoundaries: deployment.lanePolicy.governance.requiredApprovalBoundaries,
         }),
       } as NodeJS.ProcessEnv,
     }),

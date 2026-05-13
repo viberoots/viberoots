@@ -9,7 +9,7 @@ import {
 } from "./cloudflare-pages.fixture";
 import { writeReviewedLaneAdmissionEvidenceJson } from "./deployment-lane-governance.fixture";
 import { startControlPlaneHarness } from "./nixos-shared-host.control-plane.helpers";
-import { ensureNixosSharedHostStageBranch } from "./nixos-shared-host.fixture";
+import { deploymentSourceRef, ensureNixosSharedHostStageBranch } from "./nixos-shared-host.fixture";
 import { runInTemp } from "../lib/test-helpers";
 import {
   writeCloudflareServiceArtifact,
@@ -100,7 +100,8 @@ test("service-backed cloudflare-pages deploy fails closed when client source dif
     await writeCloudflareServiceArtifact(artifactDir, "<html>source-mismatch</html>\n");
     await installCloudflarePagesTargets(tmp, [deployment]);
     await ensureNixosSharedHostStageBranch(tmp, $, deployment);
-    const serviceRevision = await gitStdout(tmp, $, "rev-parse", "env/pleomino/staging");
+    const sourceRef = deploymentSourceRef(deployment as any);
+    const serviceRevision = await gitStdout(tmp, $, "rev-parse", sourceRef);
     const clientRevision = await commitLocalChange(tmp, $, "client-drift");
     assert.notEqual(clientRevision, serviceRevision);
     const harness = await startControlPlaneHarness({
@@ -117,11 +118,11 @@ test("service-backed cloudflare-pages deploy fails closed when client source dif
         })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment ${deployment.label} --artifact-dir ${artifactDir} --control-plane-url ${harness.controlPlane.url}`,
         new RegExp(
           [
-            "reviewed source mismatch for env/pleomino/staging",
+            `reviewed source mismatch for ${sourceRef}`,
             `clientExpectedSourceRevision=${clientRevision}`,
             `serviceReviewedSourceRevision=${serviceRevision}`,
-            "service fetched the reviewed deployment branch before admission",
-            "that branch is up to date and pushed before retrying",
+            "service fetched the reviewed deployment source ref before admission",
+            "that source ref is up to date and pushed before retrying",
           ].join("[\\s\\S]*"),
         ),
       );

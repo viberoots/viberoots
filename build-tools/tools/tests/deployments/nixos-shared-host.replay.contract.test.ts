@@ -11,6 +11,7 @@ import {
 import { runInTemp } from "../lib/test-helpers";
 import { deploymentAdmissionEvidenceFixture } from "./deployment-admission.fixture";
 import {
+  deploymentSourceRef,
   ensureNixosSharedHostStageBranch,
   nixosSharedHostDeploymentFixture,
 } from "./nixos-shared-host.fixture";
@@ -32,6 +33,7 @@ test("nixos-shared-host replay snapshots preserve exact artifact refs and admitt
     const backendDatabaseUrl = localHarnessControlPlaneDatabaseUrl(recordsRoot);
     await writeReplayArtifact(artifactDir, "demoapp");
     await ensureNixosSharedHostStageBranch(tmp, $, deployment);
+    const sourceRef = deploymentSourceRef(deployment);
     const admissionEvidence = deploymentAdmissionEvidenceFixture({
       deployment,
       operationKind: "deploy",
@@ -99,10 +101,7 @@ test("nixos-shared-host replay snapshots preserve exact artifact refs and admitt
         result.record.provisionerPlan?.fingerprint,
       );
       assert.equal(replay.replaySnapshot.admittedContext.environmentStage, "dev");
-      assert.equal(
-        replay.replaySnapshot.admittedContext.targetEnvironment.targetRef,
-        "env/pleomino/dev",
-      );
+      assert.equal(replay.replaySnapshot.admittedContext.targetEnvironment.targetRef, sourceRef);
       assert.equal(
         Object.values(replay.componentArtifactDirs)[0],
         result.record.artifact?.storedArtifactPath,

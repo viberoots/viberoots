@@ -99,7 +99,7 @@ export function vercelDeploymentWithSecrets() {
     secretRequirements: secretful.secretRequirements,
     admissionPolicy: {
       ...secretful.admissionPolicy,
-      allowedRefs: ["env/pleomino/staging"],
+      allowedRefs: ["main"],
       requiredChecks: [],
     },
   });

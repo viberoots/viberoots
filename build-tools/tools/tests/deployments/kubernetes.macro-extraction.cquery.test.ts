@@ -6,14 +6,9 @@ import { test } from "node:test";
 import { nodesFromCqueryJson } from "../../buck/exporter/cquery/nodes";
 import { extractKubernetesDeployments } from "../../deployments/contract";
 import { inheritedBuckIsolation, runInTemp } from "../lib/test-helpers";
-import { nixosSharedHostLaneGovernanceNodeFixture } from "./deployment-lane-governance.fixture";
-import {
-  kubernetesAdmissionPolicyNodeFixture,
-  kubernetesLanePolicyNodeFixture,
-} from "./kubernetes.fixture";
 
 const ATTRS =
-  "name,provider,component,component_kind,publisher,publisher_config,protection_class,lane_policy,environment_stage,admission_policy,provider_target,components,prerequisites,secret_requirements,runtime_config_requirements,governance_policy,defaults,default_client_profile,scm_backend,repository,branch_protections,stages,stage_branches,allowed_promotion_edges,promotion_compatibility,allowed_refs,required_checks,labels".split(
+  "name,rule_type,buck.type,provider,component,component_kind,publisher,publisher_config,protection_class,lane_policy,environment_stage,admission_policy,provider_target,components,prerequisites,secret_requirements,runtime_config_requirements,governance_policy,defaults,default_client_profile,scm_backend,repository,source_ref_policies,trusted_reporter_identities,required_approval_boundaries,stages,source_ref_policy,stage_branches,stage_branches_required,allowed_promotion_edges,promotion_compatibility,allowed_refs,required_checks,required_approvals,labels".split(
     ",",
   );
 
@@ -33,9 +28,9 @@ async function writeTargets(tmp: string): Promise<void> {
     [
       'load("//build-tools/deployments:defs.bzl", "deployment_admission_policy", "deployment_defaults", "deployment_lane_governance", "deployment_lane_policy")',
       'deployment_defaults(name = "defaults", visibility = ["PUBLIC"])',
-      'deployment_lane_governance(name = "lane_governance", scm_backend = "github", repository = "viberoots/viberoots", branch_protections = [{"stage": "prod", "branch": "env/pleomino/prod", "required_checks": "deploy/pleomino-prod", "fast_forward_only": "true", "normal_advance_principals": "app:deploy-bot", "emergency_direct_push_principals": "team:sre-break-glass"}], visibility = ["PUBLIC"])',
-      'deployment_lane_policy(name = "lane", defaults = ":defaults", stages = ["prod"], stage_branches = {"prod": "env/pleomino/prod"}, allowed_promotion_edges = [], governance_policy = ":lane_governance", visibility = ["PUBLIC"])',
-      'deployment_admission_policy(name = "prod_release", allowed_refs = ["env/pleomino/prod"], required_checks = ["deploy/pleomino-prod"], visibility = ["PUBLIC"])',
+      'deployment_lane_governance(name = "lane_governance", scm_backend = "github", repository = "viberoots/viberoots", source_ref_policies = [{"stage": "prod", "allowed_refs": "refs/tags/release/*", "required_checks": "deploy/pleomino-prod"}], trusted_reporter_identities = ["app:deploy-bot"], required_approval_boundaries = [{"stage": "prod", "required_approvals": "release-owner"}], visibility = ["PUBLIC"])',
+      'deployment_lane_policy(name = "lane", defaults = ":defaults", stages = ["prod"], source_ref_policy = {"prod": "refs/tags/release/*"}, allowed_promotion_edges = [], governance_policy = ":lane_governance", visibility = ["PUBLIC"])',
+      'deployment_admission_policy(name = "prod_release", allowed_refs = ["refs/tags/release/*"], required_checks = ["deploy/pleomino-prod"], required_approvals = ["release-owner"], visibility = ["PUBLIC"])',
     ].join("\n"),
   );
   await fsp.writeFile(
@@ -79,15 +74,7 @@ test("kubernetes_service_deployment macro extracts web and private worker servic
       env: { ...process.env, HOME: process.env.BUCK2_REAL_HOME || process.env.HOME },
     })`buck2 --isolation-dir ${inheritedBuckIsolation("kubernetes-service-macro")} cquery --target-platforms prelude//platforms:default ${query} --json ${attrFlags}`.quiet();
     const merged = JSON.parse(String(cquery.stdout || "{}")) as Record<string, unknown>;
-    const { deployments, errors } = extractKubernetesDeployments([
-      ...nodesFromCqueryJson(merged),
-      kubernetesLanePolicyNodeFixture(),
-      nixosSharedHostLaneGovernanceNodeFixture(),
-      kubernetesAdmissionPolicyNodeFixture({
-        name: "//projects/deployments/pleomino-shared:prod_release",
-        required_checks: ["deploy/pleomino-prod"],
-      }),
-    ]);
+    const { deployments, errors } = extractKubernetesDeployments(nodesFromCqueryJson(merged));
     assert.deepEqual(errors, []);
     assert.equal(deployments.length, 2);
     const worker = deployments.find((deployment) => deployment.name === "worker");
@@ -96,5 +83,13 @@ test("kubernetes_service_deployment macro extracts web and private worker servic
     assert.equal(web?.providerTarget.healthPath, "/healthz");
     assert.equal(worker?.providerTarget.serviceKind, "worker");
     assert.equal(worker?.providerTarget.ingressMode, "none");
+    assert.deepEqual(web?.lanePolicy.sourceRefPolicy, { prod: "refs/tags/release/*" });
+    assert.deepEqual(web?.lanePolicy.governance.sourceRefPolicies, [
+      {
+        stage: "prod",
+        allowedRefs: ["refs/tags/release/*"],
+        requiredChecks: ["deploy/pleomino-prod"],
+      },
+    ]);
   });
 });

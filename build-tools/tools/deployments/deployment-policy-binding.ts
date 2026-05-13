@@ -1,9 +1,15 @@
 #!/usr/bin/env zx-wrapper
 import type { DeploymentAdmissionPolicy, DeploymentLanePolicy } from "./deployment-policy";
 import type { DeploymentExtractionContext } from "./contract-extract-shared";
+import { isStaleEnvironmentBranchRef, sourceRefAllowed } from "./deployment-source-ref-policy";
 
 function deploymentError(label: string, message: string): string {
   return `${label}: ${message}`;
+}
+
+function missingRequiredValues(required: string[], actual: string[]): string[] {
+  const actualValues = new Set(actual);
+  return required.filter((entry) => !actualValues.has(entry));
 }
 
 export function resolveSharedDeploymentPolicies(opts: {
@@ -46,27 +52,39 @@ export function resolveSharedDeploymentPolicies(opts: {
         ),
       );
     }
-    const stageBranch = lanePolicy.stageBranches[opts.environmentStage];
-    const governanceProtection = lanePolicy.governance.branchProtections.find(
+    const sourceRef = lanePolicy.sourceRefPolicy[opts.environmentStage];
+    if (sourceRef && isStaleEnvironmentBranchRef(sourceRef)) {
+      opts.errors.push(
+        deploymentError(
+          opts.label,
+          `source_ref_policy must not use environment branch ${sourceRef}`,
+        ),
+      );
+    }
+    const sourceGovernance = lanePolicy.governance.sourceRefPolicies.find(
       (entry) => entry.stage === opts.environmentStage,
     );
-    if (!governanceProtection) {
+    if (!sourceGovernance) {
       opts.errors.push(
         deploymentError(
           opts.label,
           `lane governance ${lanePolicy.governanceRef} does not define stage ${opts.environmentStage}`,
         ),
       );
-    } else if (governanceProtection.branch !== stageBranch) {
+    } else if (
+      sourceGovernance &&
+      sourceRef &&
+      !sourceRefAllowed(sourceRef, sourceGovernance.allowedRefs)
+    ) {
       opts.errors.push(
         deploymentError(
           opts.label,
-          `lane governance ${lanePolicy.governanceRef} branch mismatch for ${opts.environmentStage}`,
+          `lane governance ${lanePolicy.governanceRef} source ref mismatch for ${opts.environmentStage}`,
         ),
       );
     } else if (
       admissionPolicy &&
-      governanceProtection.requiredChecks.join("\n") !== admissionPolicy.requiredChecks.join("\n")
+      sourceGovernance.requiredChecks.join("\n") !== admissionPolicy.requiredChecks.join("\n")
     ) {
       opts.errors.push(
         deploymentError(
@@ -74,14 +92,41 @@ export function resolveSharedDeploymentPolicies(opts: {
           `admission_policy ${opts.admissionPolicyRef} required_checks must match governance for ${opts.environmentStage}`,
         ),
       );
-    }
-    if (admissionPolicy && stageBranch && !admissionPolicy.allowedRefs.includes(stageBranch)) {
+    } else if (
+      sourceGovernance.requiredChecks.length > 0 &&
+      lanePolicy.governance.trustedReporterIdentities.length === 0
+    ) {
       opts.errors.push(
         deploymentError(
           opts.label,
-          `admission_policy ${opts.admissionPolicyRef} must allow stage branch ${stageBranch}`,
+          `lane governance ${lanePolicy.governanceRef} must define trusted reporters for required checks`,
         ),
       );
+    }
+    if (admissionPolicy && sourceRef && !sourceRefAllowed(sourceRef, admissionPolicy.allowedRefs)) {
+      opts.errors.push(
+        deploymentError(
+          opts.label,
+          `admission_policy ${opts.admissionPolicyRef} must allow source ref ${sourceRef}`,
+        ),
+      );
+    }
+    const approvalBoundary = lanePolicy.governance.requiredApprovalBoundaries.find(
+      (entry) => entry.stage === opts.environmentStage,
+    );
+    if (admissionPolicy && approvalBoundary) {
+      const missingApprovals = missingRequiredValues(
+        approvalBoundary.requiredApprovals,
+        admissionPolicy.requiredApprovals,
+      );
+      if (missingApprovals.length > 0) {
+        opts.errors.push(
+          deploymentError(
+            opts.label,
+            `admission_policy ${opts.admissionPolicyRef} required_approvals must include governance boundary for ${opts.environmentStage}: ${missingApprovals.join(", ")}`,
+          ),
+        );
+      }
     }
   }
   return { lanePolicy, admissionPolicy };

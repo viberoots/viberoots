@@ -19,12 +19,13 @@ export function deploymentIdFromLabel(label: string): string {
 export function requiredDeploymentStageBranch(deployment: {
   lanePolicy: DeploymentLanePolicy;
   environmentStage: string;
+  admissionPolicy?: { allowedRefs: string[] };
 }): string {
-  const stageBranch = deployment.lanePolicy.stageBranches[deployment.environmentStage];
-  if (!stageBranch) {
+  const sourceRef = deployment.lanePolicy.sourceRefPolicy[deployment.environmentStage];
+  if (!sourceRef) {
     throw new Error(
-      `lane policy ${deployment.lanePolicy.ref} does not define stage branch for ${deployment.environmentStage}`,
+      `lane policy ${deployment.lanePolicy.ref} does not define source ref for ${deployment.environmentStage}`,
     );
   }
-  return stageBranch;
+  return sourceRef;
 }

@@ -388,16 +388,16 @@ principal/group flags for intentionally local or non-remote workflows only.
 For protected/shared service-backed runs, `--admit-and-deploy` and
 `--admit-for-commit` only describe the commit the client believes it is
 submitting. Final admission still binds to the service-owned reviewed source
-snapshot for the deployment's authoritative stage ref. If the service returns a
+snapshot selected by the deployment's source-ref policy. If the service returns a
 reviewed source mismatch, compare `clientExpectedSourceRevision` with
-`serviceReviewedSourceRevision`: either sync the service-side reviewed ref or
+`serviceReviewedSourceRevision`: either sync the service-side reviewed source or
 rerun with `--admit-for-commit <serviceReviewedSourceRevision>` only when
 that fetched service revision is intentionally the reviewed commit to deploy.
 For supported SCM backends, protected/shared service-backed runs also use
 service-owned lane governance verification. The normal reviewed flow does not
-need client-supplied `laneGovernance` JSON; the service verifies live branch
-protection, required checks, and reviewed branch-advance identities before it
-admits the run, then stores the resulting fact with
+need client-supplied `laneGovernance` JSON; the service verifies reviewed
+source-ref policy, required checks, trusted reporter identities, and approval
+boundaries before it admits the run, then stores the resulting fact with
 `verificationSource = "service_verified"`. If the hosted service is verifying a
 GitHub-backed lane, configure `VBR_DEPLOY_GITHUB_TOKEN` on the service host so
 it can read the live governance state. Unsupported SCM backends still fail

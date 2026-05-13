@@ -169,8 +169,14 @@ export async function assertFrozenSnapshotExecution(result: any): Promise<void> 
     snapshot.admittedContext.policyEvaluation.binding.provisionerPlanFingerprint,
     snapshot.provisionerPlan?.fingerprint,
   );
-  assert.equal(snapshot.admittedContext.source.sourceRef, "env/pleomino/dev");
-  assert.equal(snapshot.admittedContext.targetEnvironment.targetRef, "env/pleomino/dev");
+  assert.equal(
+    snapshot.admittedContext.source.sourceRef,
+    result.record.admittedContext.source.sourceRef,
+  );
+  assert.equal(
+    snapshot.admittedContext.targetEnvironment.targetRef,
+    result.record.admittedContext.targetEnvironment.targetRef,
+  );
   assert.equal(snapshot.admittedContext.policyEvaluation.binding.targetIdentity, result.lockScope);
   assert.equal(snapshot.action.publishInput.artifact.identity, result.record.artifact?.identity);
   assert.equal(result.record.providerTargetIdentity, "nixos-shared-host:default:demoapp");

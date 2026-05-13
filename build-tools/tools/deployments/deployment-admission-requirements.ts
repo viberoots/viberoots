@@ -170,7 +170,7 @@ export function admitSubjectMismatchMessage(opts: {
     actualSourceLine,
     `But this deploy currently requires checks for: ${opts.required.sha}`,
     `deployment_source_ref: ${opts.required.ref}`,
-    "Make sure the deployment branch is up to date and pushed before retrying.",
+    "Make sure the deployment source ref is up to date and pushed before retrying.",
     `Run this instead: ${renderDeployCommand([
       ...currentArgs,
       "--admit-for-commit",

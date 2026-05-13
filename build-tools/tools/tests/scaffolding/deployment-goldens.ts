@@ -2,11 +2,10 @@ export const DEPLOYMENT_GOLDENS: Record<string, Record<string, string>> = {
   "demo-shared": {
     "README.md": `# demo Shared Deployment Lane
 
-This package owns reviewed lane governance and admission policy for the \`demo\` deployment
-family.
+This package owns reviewed lane governance and admission policy for the \`demo\` deployment family.
 
-Fill in branch protection principals, required checks, and production approval groups before using
-the generated policies for protected or shared environments.
+Fill in source-ref policies, trusted check reporters, and production approval groups before using the
+generated policies for protected or shared environments.
 `,
     TARGETS: `load(
     "//build-tools/deployments:defs.bzl",
@@ -19,10 +18,14 @@ deployment_lane_governance(
     name = "lane_governance",
     scm_backend = "github",
     repository = "example/platform",
-    branch_protections = [
-        {"stage": "dev", "branch": "env/demo/dev", "required_checks": "deploy/admission", "fast_forward_only": "true", "normal_advance_principals": "repository-role:admin", "emergency_direct_push_principals": "repository-role:admin"},
-        {"stage": "staging", "branch": "env/demo/staging", "required_checks": "deploy/admission", "fast_forward_only": "true", "normal_advance_principals": "repository-role:admin", "emergency_direct_push_principals": "repository-role:admin"},
-        {"stage": "prod", "branch": "env/demo/prod", "required_checks": "deploy/admission", "fast_forward_only": "true", "normal_advance_principals": "repository-role:admin", "emergency_direct_push_principals": "repository-role:admin"},
+    source_ref_policies = [
+        {"stage": "dev", "allowed_refs": "main", "required_checks": "deploy/admission"},
+        {"stage": "staging", "allowed_refs": "main,refs/tags/release/*", "required_checks": "deploy/admission"},
+        {"stage": "prod", "allowed_refs": "refs/tags/release/*", "required_checks": "deploy/admission"},
+    ],
+    trusted_reporter_identities = ["repository-role:admin"],
+    required_approval_boundaries = [
+        {"stage": "prod", "required_approvals": "release-owner"},
     ],
     visibility = ["PUBLIC"],
 )
@@ -31,10 +34,10 @@ deployment_lane_policy(
     name = "lane",
     defaults = "//projects/deployments:defaults",
     stages = ["dev", "staging", "prod"],
-    stage_branches = {
-        "dev": "env/demo/dev",
-        "staging": "env/demo/staging",
-        "prod": "env/demo/prod",
+    source_ref_policy = {
+        "dev": "main",
+        "staging": "main",
+        "prod": "refs/tags/release/*",
     },
     allowed_promotion_edges = ["dev->staging", "staging->prod"],
     artifact_reuse_mode = "same_artifact",
@@ -45,7 +48,7 @@ deployment_lane_policy(
 
 deployment_admission_policy(
     name = "dev_release",
-    allowed_refs = ["env/demo/dev"],
+    allowed_refs = ["main"],
     required_checks = ["deploy/admission"],
     artifact_attestation_mode = "recorded_exact_artifact",
     visibility = ["PUBLIC"],
@@ -53,7 +56,7 @@ deployment_admission_policy(
 
 deployment_admission_policy(
     name = "staging_release",
-    allowed_refs = ["env/demo/staging"],
+    allowed_refs = ["main", "refs/tags/release/*"],
     required_checks = ["deploy/admission"],
     artifact_attestation_mode = "recorded_exact_artifact",
     visibility = ["PUBLIC"],
@@ -61,7 +64,7 @@ deployment_admission_policy(
 
 deployment_admission_policy(
     name = "prod_release",
-    allowed_refs = ["env/demo/prod"],
+    allowed_refs = ["refs/tags/release/*"],
     required_checks = ["deploy/admission"],
     required_approvals = ["release-owner"],
     artifact_attestation_mode = "recorded_exact_artifact",

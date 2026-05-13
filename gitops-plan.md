@@ -46,6 +46,8 @@ Non-goals:
 - no hand-maintained Git release-pointer files as an authoritative input
 - no mutable image tags as release identity
 - no CI or Jenkins path that directly mutates protected/shared targets outside the control plane
+- no backwards-compatibility layer for the removed environment-branch model; the repository has no
+  deployment users yet, so new GitOps behavior should be clean and unburdened by legacy schema
 - no compatibility mode where environment branches and control-plane stage state are both
   authoritative
 - no rollback by branch rewind, tag reassignment, or pointer-file edit
@@ -106,6 +108,52 @@ Verify-scope sequencing:
   - PR-9: `deployment-only`.
   - PR-10: `deployment-only`, or `deployment-and-project-impact` only if final concrete deployment
     package cleanup is included.
+
+Scope-review handoff guidance:
+
+- Before asking for scope review, fix the class of issue, not only the exact lines from the prior
+  review. Use broad `rg` sweeps across docs, Buck templates, generated goldens, installers,
+  fixtures, concrete deployment packages, and deployment tests for stale model terms and generated
+  examples.
+- Treat review findings as evidence of a possible pattern. If a reviewer finds one stale
+  environment-branch phrase, one branch-backed fixture, or one inert governance field, audit nearby
+  surfaces that can express the same old contract.
+- PR-1 handoff checklist:
+  - no generated or concrete protected/shared lane uses `stage_branches` for normal promotion
+  - no normal protected/shared admission policy uses `env/<family>/<stage>` as the source ref
+  - no normative deployment doc says environment, stage, normal-branch, or stage-ref state is
+    mandatory or authoritative for normal promotion
+  - scaffolding templates, scaffolding goldens, fixture installers, cquery fixtures, and concrete
+    shared deployment `TARGETS` files all show source-ref lane governance
+  - `source_ref_policies`, `trusted_reporter_identities`, and `required_approval_boundaries` are
+    documented, extracted, validated, and enforced consistently enough to be meaningful policy
+    rather than inert metadata
+- If a PR changes generated examples or schema fields, focused validation should include the
+  relevant extraction, installer, scaffold, and concrete-package tests before the review handoff.
+
+Future PR churn-reduction notes:
+
+- Before implementation, derive a short removal-surface checklist from the PR acceptance criteria.
+  Apply it to production code, normative docs, Buck rules, templates, generated goldens, installer
+  helpers, provider fixtures, concrete deployment packages, and deployment tests before the first
+  scope-review handoff.
+- Treat fixture generators, scaffold templates, installer helpers, and golden examples as part of
+  the active contract. If they still emit removed deployment concepts, fix them in the same PR that
+  changes the schema or behavior.
+- For each removed concept, add both a happy-path test for the replacement behavior and a negative
+  semantic test proving the old model is rejected. Prefer deleting stale compatibility paths over
+  adding translation shims unless a later PR explicitly depends on a temporary bridge.
+- Keep a PR-boundary note when old runtime behavior is intentionally deferred to a later PR. The
+  note should distinguish accepted temporary runtime debt from stale schema, generated examples, or
+  normative docs that must be fixed in the current PR.
+- Validate every affected fixture family directly. Provider-specific paths such as NixOS, Jenkins,
+  front-door, mobile, App Store, Google Play, S3, Cloudflare, and Kubernetes should have focused
+  selectors when their generated deployment metadata or admission policy shape changes.
+- Before declaring ready for scope review, run targeted `rg` sweeps for the old terms named by that
+  PR. For this GitOps sequence, likely sweeps include model terms such as `stage_branches`,
+  `branch_protections`, `env/`, `authoritative stage`, `stage ref`, `branch-backed`,
+  `normal branch`, `target-environment branch`, release-pointer inputs, mutable image tags, and
+  provider-specific stale examples.
 
 ## PR-1: Lane policy schema without environment branches
 

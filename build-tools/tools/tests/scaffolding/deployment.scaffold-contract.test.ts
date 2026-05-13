@@ -9,7 +9,7 @@ import { DEPLOYMENT_GOLDENS } from "./deployment-goldens";
 import { inheritedBuckIsolation, runInTemp } from "../lib/test-helpers";
 
 const CQUERY_ATTRS =
-  "name,rule_type,buck.type,provider,component,component_kind,publisher,publisher_config,provisioner,provisioner_config,protection_class,lane_policy,environment_stage,admission_policy,provider_target,components,prerequisites,secret_requirements,runtime_config_requirements,governance_policy,defaults,default_client_profile,scm_backend,repository,branch_protections,stages,stage_branches,allowed_promotion_edges,promotion_compatibility,allowed_refs,required_checks,required_approvals,retry_branch_policy,retry_approval_reuse,artifact_attestation_mode,labels".split(
+  "name,rule_type,buck.type,provider,component,component_kind,publisher,publisher_config,provisioner,provisioner_config,protection_class,lane_policy,environment_stage,admission_policy,provider_target,components,prerequisites,secret_requirements,runtime_config_requirements,governance_policy,defaults,default_client_profile,scm_backend,repository,source_ref_policies,trusted_reporter_identities,required_approval_boundaries,stages,source_ref_policy,allowed_promotion_edges,promotion_compatibility,allowed_refs,required_checks,required_approvals,retry_branch_policy,retry_approval_reuse,artifact_attestation_mode,labels".split(
     ",",
   );
 

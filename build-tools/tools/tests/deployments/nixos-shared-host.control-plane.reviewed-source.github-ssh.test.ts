@@ -8,6 +8,7 @@ import { cleanupReviewedSourceSnapshot } from "../../deployments/nixos-shared-ho
 import { reviewedLaneAdmissionEvidenceFixture } from "./deployment-lane-governance.fixture";
 import { writeDemoArtifact } from "./nixos-shared-host.control-plane.helpers";
 import {
+  deploymentSourceRef,
   ensureNixosSharedHostStageBranch,
   nixosSharedHostDeploymentFixture,
 } from "./nixos-shared-host.fixture";
@@ -24,7 +25,8 @@ test("github reviewed-source snapshots fetch the declared repository over SSH", 
     const recordsRoot = path.join(tmp, "records");
     await writeDemoArtifact(artifactDir);
     await ensureNixosSharedHostStageBranch(tmp, $, deployment);
-    const expectedRevision = await gitStdout(tmp, $, "rev-parse", "env/pleomino/dev");
+    const sourceRef = deploymentSourceRef(deployment);
+    const expectedRevision = await gitStdout(tmp, $, "rev-parse", sourceRef);
     await $({ cwd: tmp, stdio: "pipe" })`git remote set-url origin ${path.join(tmp, "wrong.git")}`;
     const prepared = await prepareBackendNixosSharedHostControlPlaneRun({
       workspaceRoot: tmp,

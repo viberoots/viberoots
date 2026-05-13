@@ -74,14 +74,11 @@ test("deployment extraction rejects cross-lane prerequisites", () => {
     nixosSharedHostLaneGovernanceNodeFixture(),
     cloudflarePagesLaneGovernanceNodeFixture({
       name: "//build-tools/deployments/lanes:marketing_governance",
-      branch_protections: [
+      source_ref_policies: [
         {
           stage: "staging",
-          branch: "env/marketing/staging",
+          allowed_refs: "main",
           required_checks: "deploy/marketing-staging",
-          fast_forward_only: "true",
-          normal_advance_principals: "app:deploy-bot",
-          emergency_direct_push_principals: "team:sre-break-glass",
         },
       ],
     }),
@@ -89,7 +86,7 @@ test("deployment extraction rejects cross-lane prerequisites", () => {
     cloudflarePagesLanePolicyNodeFixture({
       name: "//build-tools/deployments/lanes:marketing",
       stages: ["staging"],
-      stage_branches: { staging: "env/marketing/staging" },
+      source_ref_policy: { staging: "main" },
       allowed_promotion_edges: [],
       governance_policy: "//build-tools/deployments/lanes:marketing_governance",
     }),
@@ -97,7 +94,7 @@ test("deployment extraction rejects cross-lane prerequisites", () => {
     cloudflarePagesAdmissionPolicyNodeFixture(),
     cloudflarePagesAdmissionPolicyNodeFixture({
       name: "//build-tools/deployments/policies:marketing_staging_release",
-      allowed_refs: ["env/marketing/staging"],
+      allowed_refs: ["main"],
       required_checks: ["deploy/marketing-staging"],
     }),
     {
@@ -145,7 +142,7 @@ test("deployment extraction rejects cyclic prerequisite graphs", () => {
     nixosSharedHostAdmissionPolicyNodeFixture(),
     nixosSharedHostAdmissionPolicyNodeFixture({
       name: "//projects/deployments/pleomino-shared:staging_release",
-      allowed_refs: ["env/pleomino/staging"],
+      allowed_refs: ["main"],
       required_checks: ["deploy/pleomino-staging"],
     }),
     {

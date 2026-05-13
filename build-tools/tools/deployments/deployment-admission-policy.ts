@@ -22,6 +22,7 @@ import {
   type RetryApprovalReuse,
   type RetryBranchPolicy,
 } from "./deployment-policy";
+import { staleEnvironmentRefErrors } from "./deployment-source-ref-policy";
 
 const DEPLOYMENT_ADMISSION_POLICY_RULE = "deployment_admission_policy";
 
@@ -113,6 +114,13 @@ function policyErrors(
   if (policy.allowedRefs.length === 0) {
     errors.push(policyError(ref, "admission policy must define allowed_refs"));
   }
+  errors.push(
+    ...staleEnvironmentRefErrors({
+      label: ref,
+      field: "allowed_refs",
+      refs: policy.allowedRefs,
+    }),
+  );
   if (
     policy.retryBranchPolicy !== "branch_independent" &&
     policy.retryBranchPolicy !== "branch_coupled"

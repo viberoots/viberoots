@@ -75,7 +75,6 @@ test("admit-and-deploy scopes synthesized check evidence to the selected deploym
     await $({ cwd: tmp })`git add .`;
     await $({ cwd: tmp })`git commit -m initial`;
     const head = String((await $({ cwd: tmp, stdio: "pipe" })`git rev-parse HEAD`).stdout).trim();
-    await $({ cwd: tmp })`git branch env/demo/dev ${head}`;
     const oldCwd = process.cwd();
     try {
       process.chdir(tmp);
@@ -152,7 +151,7 @@ test("admit-and-deploy fails closed when local HEAD does not match the deploymen
     const requiredSha = String(
       (await $({ cwd: tmp, stdio: "pipe" })`git rev-parse HEAD`).stdout,
     ).trim();
-    await $({ cwd: tmp })`git branch env/demo/dev ${requiredSha}`;
+    await $({ cwd: tmp })`git checkout -b local-work`;
     await fsp.writeFile(path.join(tmp, "local-only.txt"), "local-only\n", "utf8");
     await $({ cwd: tmp })`git add local-only.txt`;
     await $({ cwd: tmp })`git commit -m local-only`;

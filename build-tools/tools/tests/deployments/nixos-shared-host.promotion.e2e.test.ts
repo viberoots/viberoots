@@ -41,8 +41,8 @@ function cloudflareDevDeployment() {
   const lanePolicy = nixosSharedHostLanePolicyFixture({
     governance: {
       ...cloudflarePagesDeploymentFixture().lanePolicy.governance,
-      branchProtections:
-        cloudflarePagesDeploymentFixture().lanePolicy.governance.branchProtections.map((entry) => ({
+      sourceRefPolicies:
+        cloudflarePagesDeploymentFixture().lanePolicy.governance.sourceRefPolicies.map((entry) => ({
           ...entry,
           requiredChecks: entry.stage === "prod" ? ["deploy/pleomino-prod"] : [],
         })),
@@ -76,7 +76,7 @@ function nixosStagingDeployment(lanePolicy = cloudflareDevDeployment().lanePolic
   const admissionPolicy = nixosSharedHostAdmissionPolicyFixture({
     ref: "//projects/deployments/pleomino-shared:staging_release",
     name: "staging_release",
-    allowedRefs: ["env/pleomino/staging"],
+    allowedRefs: ["main"],
     requiredChecks: [],
     fingerprint: "sha256:admission-pleomino-staging",
   });

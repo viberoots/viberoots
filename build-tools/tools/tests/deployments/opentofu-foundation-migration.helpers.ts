@@ -5,30 +5,27 @@ import type { OpenTofuDeployment } from "../../deployments/contract";
 import type { FoundationMigrationAdapter } from "../../deployments/foundation-migration";
 import { OPENTOFU_STACK_PROVISIONER } from "../../deployments/opentofu-stack";
 
-const BRANCH_PROTECTIONS = [
-  {
-    stage: "dev",
-    branch: "main",
-    requiredChecks: [],
-    fastForwardOnly: true,
-    normalAdvancePrincipals: ["app:deploy-bot"],
-    emergencyDirectPushPrincipals: ["team:sre-break-glass"],
-  },
-];
+const SOURCE_REF_POLICIES = [{ stage: "dev", allowedRefs: ["main"], requiredChecks: [] }];
+const TRUSTED_REPORTER_IDENTITIES = ["app:deploy-bot"];
+const REQUIRED_APPROVAL_BOUNDARIES = [{ stage: "prod", requiredApprovals: ["release-owner"] }];
 
 export function foundationDeploymentFixture(): OpenTofuDeployment {
   const lanePolicy: any = {
     ref: "//projects/deployments/platform-shared:lane",
     name: "lane",
     stages: ["dev"],
-    stageBranches: { dev: "main" },
+    stageBranches: {},
+    stageBranchesRequired: false,
+    sourceRefPolicy: { dev: "main" },
     allowedPromotionEdges: [],
     artifactReuseMode: "same_artifact",
     governanceRef: "//projects/deployments/platform-shared:lane_governance",
     governance: {
       scmBackend: "github",
       repository: "viberoots/viberoots",
-      branchProtections: BRANCH_PROTECTIONS,
+      sourceRefPolicies: SOURCE_REF_POLICIES,
+      trustedReporterIdentities: TRUSTED_REPORTER_IDENTITIES,
+      requiredApprovalBoundaries: REQUIRED_APPROVAL_BOUNDARIES,
       fingerprint: "sha256:governance",
     },
     fingerprint: "sha256:lane",
@@ -36,7 +33,7 @@ export function foundationDeploymentFixture(): OpenTofuDeployment {
   const admissionPolicy: any = {
     ref: "//projects/deployments/platform-shared:dev_release",
     name: "dev_release",
-    allowedRefs: [],
+    allowedRefs: ["main"],
     requiredChecks: [],
     requiredApprovals: [],
     retryBranchPolicy: "branch_independent",
@@ -116,7 +113,9 @@ export function laneGovernanceEvidence(deployment: OpenTofuDeployment) {
       verificationSource: "client_supplied" as const,
       scmBackend: "github" as const,
       repository: "viberoots/viberoots",
-      branchProtections: BRANCH_PROTECTIONS,
+      sourceRefPolicies: SOURCE_REF_POLICIES,
+      trustedReporterIdentities: TRUSTED_REPORTER_IDENTITIES,
+      requiredApprovalBoundaries: REQUIRED_APPROVAL_BOUNDARIES,
     },
   };
 }
@@ -211,9 +210,7 @@ export async function writeFoundationRecord(opts: {
 }) {
   await fsp.mkdir(path.join(opts.recordsRoot, "runs"), { recursive: true });
   const deployment = foundationDeploymentFixture();
-  const outcome: Record<string, string> = {
-    status: opts.status || "succeeded",
-  };
+  const outcome: Record<string, string> = { status: opts.status || "succeeded" };
   if (opts.sourceRevision !== undefined) outcome.sourceRevision = opts.sourceRevision;
   await fsp.writeFile(
     path.join(opts.recordsRoot, "runs/foundation.json"),

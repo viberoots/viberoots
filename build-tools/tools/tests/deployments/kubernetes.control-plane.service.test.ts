@@ -88,8 +88,15 @@ test("public kubernetes deploy requires a control-plane URL for protected/shared
 
 test("public kubernetes deploy routes deploy, provision-only, retry, and rollback through the control-plane service", async () => {
   await runInTemp("kubernetes-public-service-flow", async (tmp, $) => {
+    const lanePolicy = nixosSharedHostLanePolicyFixture({ defaultClientProfile: "mini" });
     const deployment = kubernetesDeploymentFixture({
-      lanePolicy: nixosSharedHostLanePolicyFixture({ defaultClientProfile: "mini" }),
+      lanePolicy: {
+        ...lanePolicy,
+        governance: {
+          ...lanePolicy.governance,
+          requiredApprovalBoundaries: [{ stage: "staging", requiredApprovals: ["release-owner"] }],
+        },
+      },
       provisioner: { type: "terraform-stack", config: "terraform/main.tf.json" },
       secretRequirements: reviewedKubernetesPublishRequirements(),
       vaultRuntime: {

@@ -146,10 +146,10 @@ function rebuildLanePolicy() {
     name: "lane",
     governance: nixosSharedHostLaneGovernanceFixture({
       ref: "//projects/deployments/pleomino-rebuild-shared:lane_governance",
-      branchProtections: [
-        stageBranchProtection("dev", "env/pleomino/dev"),
-        stageBranchProtection("staging", "env/pleomino/staging"),
-        stageBranchProtection("prod", "env/pleomino/prod"),
+      sourceRefPolicies: [
+        sourceRefPolicy("dev", "main"),
+        sourceRefPolicy("staging", "main"),
+        sourceRefPolicy("prod", "refs/tags/release/*"),
       ],
     }),
     artifactReuseMode: "rebuild_per_stage",
@@ -169,19 +169,16 @@ function rebuildStagingAdmissionPolicy() {
   return nixosSharedHostAdmissionPolicyFixture({
     ref: "//projects/deployments/pleomino-rebuild-shared:staging_release",
     name: "staging_release",
-    allowedRefs: ["env/pleomino/staging"],
+    allowedRefs: ["main"],
     requiredChecks: [],
     fingerprint: "sha256:admission-pleomino-rebuild-staging",
   });
 }
 
-function stageBranchProtection(stage: string, branch: string) {
+function sourceRefPolicy(stage: string, ref: string) {
   return {
     stage,
-    branch,
+    allowedRefs: [ref],
     requiredChecks: [],
-    fastForwardOnly: true,
-    normalAdvancePrincipals: ["app:deploy-bot"],
-    emergencyDirectPushPrincipals: ["team:sre-break-glass"],
   };
 }

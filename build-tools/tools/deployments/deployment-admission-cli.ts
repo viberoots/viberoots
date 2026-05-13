@@ -122,6 +122,15 @@ function defaultCheckReportingKind(env: NodeJS.ProcessEnv): DeploymentCheckRepor
   return isCiSession(env) ? "ci_pipeline" : "human_manual";
 }
 
+function checkReporterIdentity(
+  env: NodeJS.ProcessEnv,
+  deployment: DeploymentTarget | undefined,
+): string {
+  const explicit = String(env.VBR_DEPLOY_CHECK_REPORTER_IDENTITY || "").trim();
+  if (explicit) return explicit;
+  return deployment?.lanePolicy.governance.trustedReporterIdentities[0] || "human:manual";
+}
+
 function annotateCheckReportingKind(
   evidence: DeploymentAdmissionEvidence | undefined,
   reportingKind: DeploymentCheckReportingKind,
@@ -150,6 +159,7 @@ export async function resolveDeploymentAdmissionEvidence(
     throw new Error("--admit-for-commit requires --admit-and-deploy or --admit-only");
   }
   const reportingKind = defaultCheckReportingKind(process.env);
+  const reporterIdentity = checkReporterIdentity(process.env, opts.deployment);
   const baseEvidence = annotateCheckReportingKind(
     evidenceJson
       ? normalizeAdmissionEvidence(JSON.parse(await fsp.readFile(evidenceJson, "utf8")))
@@ -194,6 +204,7 @@ export async function resolveDeploymentAdmissionEvidence(
       ...deploymentScope,
       recordRef: `manual-check://${name}`,
       reportingKind,
+      reporterIdentity,
     }),
   );
   return {

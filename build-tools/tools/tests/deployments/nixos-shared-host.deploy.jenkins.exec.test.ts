@@ -125,7 +125,7 @@ test("jenkins wrapper forwards admit-and-deploy so bootstrap deploys can avoid h
     await fsp.writeFile(
       sharedTargetsPath,
       (await fsp.readFile(sharedTargetsPath, "utf8"))
-        .replace('"required_checks": "",', '"required_checks": "deploy/pleomino-dev",')
+        .replace('"required_checks": ""}', '"required_checks": "deploy/pleomino-dev"}')
         .replace("    required_checks = [],", '    required_checks = ["deploy/pleomino-dev"],'),
       "utf8",
     );

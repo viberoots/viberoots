@@ -13,12 +13,12 @@ export function multiComponentDeployment(
       ? nixosSharedHostAdmissionPolicyFixture({
           ref: `//projects/deployments/${namePrefix}-shared:staging_release`,
           name: "staging_release",
-          allowedRefs: ["env/pleomino/staging"],
+          allowedRefs: ["main"],
           requiredChecks: [],
           fingerprint: `sha256:admission-${namePrefix}-staging`,
         })
       : nixosSharedHostAdmissionPolicyFixture({
-          allowedRefs: ["env/pleomino/dev"],
+          allowedRefs: ["main"],
           requiredChecks: [],
           fingerprint: `sha256:admission-${namePrefix}-dev`,
         });

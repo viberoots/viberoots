@@ -84,6 +84,9 @@ export function deploymentAdmissionEvidenceFixture(
             environmentStage: opts.deployment.environmentStage,
             admissionPolicyRef: opts.deployment.admissionPolicyRef,
             recordRef: `check://${name}`,
+            reporterIdentity:
+              opts.deployment.lanePolicy.governance.trustedReporterIdentities[0] ||
+              "app:deploy-bot",
           })),
         }
       : {}),

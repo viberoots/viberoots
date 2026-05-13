@@ -2153,7 +2153,7 @@ projects/
 
   deployments/                # First-class deployment metadata; one directory per
                               #   (component × environment) pair plus shared/foundation
-    platform-shared/          # Shared lane policy, stage branches, governance, admission
+    platform-shared/          # Shared lane policy, source-ref policies, governance, admission
     platform-foundation-{dev,staging,prod}/
                               # Shared environment infrastructure: DNS, Supabase project,
                               #   buckets, secret path scaffolding, OpenTofu state.

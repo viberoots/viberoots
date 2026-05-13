@@ -9,6 +9,7 @@ import { inspectNixosSharedHostReplay } from "../../deployments/nixos-shared-hos
 import { runInTemp } from "../lib/test-helpers";
 import { writeReviewedLaneAdmissionEvidenceJson } from "./deployment-lane-governance.fixture";
 import {
+  deploymentSourceRef,
   ensureNixosSharedHostStageBranch,
   nixosSharedHostDeploymentFixture,
 } from "./nixos-shared-host.fixture";
@@ -35,6 +36,7 @@ test("nixos-shared-host deploy CLI completes the shared-dev static-webapp flow e
     const backendDatabaseUrl = localHarnessControlPlaneDatabaseUrl(recordsRoot);
     await writeDemoArtifact(artifactDir);
     await ensureNixosSharedHostStageBranch(tmp, $, deployment);
+    const sourceRef = deploymentSourceRef(deployment);
     await fsp.writeFile(deploymentJson, JSON.stringify(deployment, null, 2) + "\n", "utf8");
     const admissionEvidenceJson = await writeReviewedLaneAdmissionEvidenceJson({
       tmp,
@@ -75,8 +77,8 @@ test("nixos-shared-host deploy CLI completes the shared-dev static-webapp flow e
       assert.equal(record.controlPlane.lockScope, "nixos-shared-host:default:demoapp");
       assert.equal("executionSnapshotPath" in record.controlPlane, false);
       assert.equal("executionSnapshotPath" in summary.controlPlane, false);
-      assert.equal(record.admittedContext.source.sourceRef, "env/pleomino/dev");
-      assert.equal(record.admittedContext.targetEnvironment.targetRef, "env/pleomino/dev");
+      assert.equal(record.admittedContext.source.sourceRef, sourceRef);
+      assert.equal(record.admittedContext.targetEnvironment.targetRef, sourceRef);
       assert.equal(record.artifact.identity, summary.artifactIdentity);
       assert.match(record.artifact.storedArtifactPath, /records\/artifacts\/blobs\//);
       assert.match(record.artifact.provenancePath, /records\/artifacts\/provenance\//);
@@ -91,7 +93,7 @@ test("nixos-shared-host deploy CLI completes the shared-dev static-webapp flow e
       assert.equal(snapshot.deploymentLabel, "//projects/deployments/demoapp-dev:deploy");
       assert.equal(snapshot.providerTargetIdentity, "nixos-shared-host:default:demoapp");
       assert.equal(snapshot.action.publishBehavior, "deploy");
-      assert.equal(snapshot.admittedContext.source.sourceRef, "env/pleomino/dev");
+      assert.equal(snapshot.admittedContext.source.sourceRef, sourceRef);
       await fsp.rm(artifactDir, { recursive: true, force: true });
       const replay = await inspectNixosSharedHostReplay({
         deployRunId: summary.deployRunId,
@@ -104,7 +106,7 @@ test("nixos-shared-host deploy CLI completes the shared-dev static-webapp flow e
       assert.equal(replay.publishInput.components[0].artifact.identity, summary.artifactIdentity);
       assert.equal(replay.replaySnapshotPath, record.replaySnapshotPath);
       assert.equal(replay.deploymentMetadataFingerprint, record.deploymentMetadataFingerprint);
-      assert.equal(replay.admittedContext.source.sourceRef, "env/pleomino/dev");
+      assert.equal(replay.admittedContext.source.sourceRef, sourceRef);
       assert.equal("recordPath" in replay, false);
       assert.equal("controlPlaneExecutionSnapshotPath" in replay, false);
       const admission = await inspectNixosSharedHostAdmission({
@@ -114,7 +116,7 @@ test("nixos-shared-host deploy CLI completes the shared-dev static-webapp flow e
       });
       assert.equal(admission.deployRunId, summary.deployRunId);
       assert.equal(admission.admittedContext.environmentStage, "dev");
-      assert.equal(admission.admittedContext.targetEnvironment.targetRef, "env/pleomino/dev");
+      assert.equal(admission.admittedContext.targetEnvironment.targetRef, sourceRef);
       assert.equal(
         admission.admittedContext.policyEvaluation.laneGovernance.governanceRef,
         deployment.lanePolicy.governanceRef,

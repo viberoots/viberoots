@@ -468,16 +468,57 @@ Minimum fields:
 | ------------------------- | -------- | --------------------------------------- |
 | `name`                    | yes      | Stable lane identifier.                 |
 | `stages`                  | yes      | Ordered stage list.                     |
-| `stage_branches`          | yes      | Stage-to-branch mapping.                |
+| `source_ref_policy`       | yes      | Stage-to-reviewed-source-ref mapping.   |
 | `allowed_promotion_edges` | yes      | Explicit forward promotion edges.       |
 | `artifact_reuse_mode`     | yes      | `same_artifact` or `rebuild_per_stage`. |
 
 Optional fields:
 
 - `promotion_compatibility`
+- stale `stage_branches` declarations are rejected for protected/shared lane policy; normal
+  promotion must use reviewed source-ref policy and control-plane stage state
 - stricter rollback-candidate policy
 - additional lane-specific admission constraints
 - versioned interface bindings or schema refs used by Buck extraction, CLI submission, and control-plane admission
+
+## 3. Lane Governance Object
+
+Minimum fields:
+
+| Field                          | Required | Notes                                                   |
+| ------------------------------ | -------- | ------------------------------------------------------- |
+| `name`                         | yes      | Stable governance identifier referenced by lane policy. |
+| `scm_backend`                  | yes      | SCM provider that reports source-ref and check state.   |
+| `repository`                   | yes      | Repository identity whose refs and checks are reviewed. |
+| `source_ref_policies`          | yes      | Reviewed source refs and required checks per stage.     |
+| `trusted_reporter_identities`  | yes      | Identities trusted to report required checks.           |
+| `required_approval_boundaries` | yes      | Stage-specific approval boundaries for mutation.        |
+
+Optional fields:
+
+- `labels`
+
+Buck rule example:
+
+```python
+deployment_lane_governance(
+    name = "lane_governance",
+    scm_backend = "github",
+    repository = "viberoots/viberoots",
+    source_ref_policies = [
+        {"stage": "dev", "allowed_refs": "main", "required_checks": "deploy/admission"},
+        {"stage": "staging", "allowed_refs": "main,refs/tags/release/*", "required_checks": "deploy/admission"},
+        {"stage": "prod", "allowed_refs": "refs/tags/release/*", "required_checks": "deploy/admission"},
+    ],
+    trusted_reporter_identities = ["repository-role:admin"],
+    required_approval_boundaries = [
+        {"stage": "prod", "required_approvals": "repository-role:admin"},
+    ],
+)
+```
+
+For any deployment stage with a `required_approval_boundaries` entry, the bound
+`deployment_admission_policy.required_approvals` must include every approval named by that boundary.
 
 ### `promotion_compatibility`
 
@@ -507,7 +548,7 @@ Contract rule:
 - protected/shared promotion must evaluate this closed compatibility contract rather than adapter-local heuristics
 - if a lane omits `promotion_compatibility`, the reviewed lane default compatibility contract must still resolve to one explicit closed set before promotion is allowed
 
-## 3. Rollout Policy Object
+## 4. Rollout Policy Object
 
 Required fields when `rollout_policy` is present:
 
@@ -599,7 +640,7 @@ Minimum gate-evidence record for each evaluated phase gate:
 - evaluation time
 - terminal decision
 
-## 4. Admission Policy Object
+## 5. Admission Policy Object
 
 Minimum fields:
 
@@ -685,7 +726,7 @@ Minimum authorization-scope contract when scoped protected/shared permissions ar
 - which actions each scope may authorize, such as `submit`, `approve`, `operate`, `administer_policy`, or `break_glass`
 - inheritance or narrowing rule, including whether lane scope applies to all deployments in that lane unless a stricter deployment-level policy narrows it
 
-## 5. Migration / Alias Exception Object
+## 6. Migration / Alias Exception Object
 
 Used when target ownership or target naming is temporarily in transition.
 
@@ -710,7 +751,7 @@ Validation expectations:
 - an expired or completed exception must no longer authorize replay against a stale binding
 - the steady-state goal remains one deployment id owning one normal mutable live target
 
-## 6. Replay Snapshot
+## 7. Replay Snapshot
 
 Used for protected/shared immutable-artifact reuse.
 
@@ -782,7 +823,7 @@ Minimum `rollout runtime state snapshot` fields when present:
 - latest observed exposure, slot, or track state when applicable
 - whether later phases still require fresh approval
 
-## 7. Deployment Record
+## 8. Deployment Record
 
 Minimum required fields for every run:
 
@@ -933,7 +974,7 @@ Minimum fields:
 - resulting lifecycle-state or rollout-state transition
 - machine-readable action rejection code when the latest action attempt was rejected and the implementation chooses to surface that in the record or read model
 
-## 8. Retention Expectations
+## 9. Retention Expectations
 
 Minimum operator-facing retention windows:
 
@@ -981,7 +1022,7 @@ Notes:
 - The schema keeps a compact `final_outcome` enum; step-level failure location belongs in `failed_step` rather than expanding `final_outcome` for every phase.
 - `termination_reason` is intentionally separate from `final_outcome`; it explains non-canonical terminal exits rather than publish/provision/smoke success or failure.
 
-## 9. Validation Expectations
+## 10. Validation Expectations
 
 Repo validation should reject:
 

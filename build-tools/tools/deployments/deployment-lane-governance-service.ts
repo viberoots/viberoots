@@ -13,7 +13,7 @@ function fixtureSnapshotFor(repository: string, env: NodeJS.ProcessEnv | undefin
   if (!raw) return undefined;
   const parsed = JSON.parse(raw) as Record<string, unknown>;
   return normalizeLaneGovernanceSnapshot(
-    "branchProtections" in parsed ? parsed : (parsed[repository] as unknown),
+    "sourceRefPolicies" in parsed ? parsed : (parsed[repository] as unknown),
   );
 }
 

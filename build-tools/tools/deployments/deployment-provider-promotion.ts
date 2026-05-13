@@ -7,6 +7,7 @@ import {
   sourcePromotionRevision,
 } from "./deployment-promotion-compatibility";
 import { resolveDeploymentGitCommit } from "./deployment-git-ref";
+import { sourceRefAllowed } from "./deployment-source-ref-policy";
 
 export async function assertCrossDeploymentExactPromotionEligible(opts: {
   workspaceRoot: string;
@@ -21,7 +22,7 @@ export async function assertCrossDeploymentExactPromotionEligible(opts: {
 }) {
   const targetRef = requiredDeploymentStageBranch(opts.deployment);
   const errors = [...promotionCompatibilityErrors(opts.deployment, opts.source)];
-  if (!opts.deployment.admissionPolicy.allowedRefs.includes(targetRef)) {
+  if (!sourceRefAllowed(targetRef, opts.deployment.admissionPolicy.allowedRefs)) {
     errors.push(
       `deployment admission policy ${opts.deployment.admissionPolicyRef} does not allow source ref ${targetRef}`,
     );

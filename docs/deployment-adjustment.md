@@ -267,11 +267,11 @@ For staging and production:
 
 Suggested policy shape:
 
-| Stage | Trigger | Approval | Artifact behavior |
-| --- | --- | --- | --- |
-| Dev | Auto on protected `main` merge | Usually none | Build and admit from the `main` SHA |
-| Staging | Auto or manual promotion from a dev run | Optional or release-owner | Reuse the admitted dev artifact when the lane is `same_artifact` |
-| Prod | Manual promotion from a staging run | Required | Reuse the admitted staging artifact when the lane is `same_artifact` |
+| Stage   | Trigger                                 | Approval                  | Artifact behavior                                                    |
+| ------- | --------------------------------------- | ------------------------- | -------------------------------------------------------------------- |
+| Dev     | Auto on protected `main` merge          | Usually none              | Build and admit from the `main` SHA                                  |
+| Staging | Auto or manual promotion from a dev run | Optional or release-owner | Reuse the admitted dev artifact when the lane is `same_artifact`     |
+| Prod    | Manual promotion from a staging run     | Required                  | Reuse the admitted staging artifact when the lane is `same_artifact` |
 
 This is Git-driven delivery intent, not Git as the deployment-state database.
 That distinction avoids the common footgun where CI writes tags, YAML, or

@@ -48,7 +48,7 @@ function targetDeployment() {
   const admissionPolicy = nixosSharedHostAdmissionPolicyFixture({
     ref: "//projects/deployments/demoapp-shared:staging_release",
     name: "staging_release",
-    allowedRefs: ["env/pleomino/staging"],
+    allowedRefs: ["main"],
     requiredChecks: [],
     requiredApprovals: ["human/staging"],
     fingerprint: "sha256:admission-demoapp-staging",

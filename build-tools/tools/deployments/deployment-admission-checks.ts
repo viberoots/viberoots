@@ -12,6 +12,7 @@ export type DeploymentCheckEvidence = {
   admissionPolicyRef?: string;
   recordRef?: string;
   reportingKind?: DeploymentCheckReportingKind;
+  reporterIdentity?: string;
 };
 
 export type DeploymentAdmissionCheckFact = {
@@ -23,6 +24,7 @@ export type DeploymentAdmissionCheckFact = {
   admissionPolicyRef?: string;
   recordRef?: string;
   reportingKind?: DeploymentCheckReportingKind;
+  reporterIdentity?: string;
 };
 
 export function normalizeCheckReportingKind(

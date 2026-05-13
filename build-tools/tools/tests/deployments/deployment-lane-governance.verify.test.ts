@@ -14,7 +14,7 @@ async function writeJson(filePath: string, value: unknown) {
   await fsp.writeFile(filePath, JSON.stringify(value, null, 2) + "\n", "utf8");
 }
 
-test("lane-governance verify command rejects branch-protection drift and emits verified facts", async () => {
+test("lane-governance verify command rejects source-ref drift and emits verified facts", async () => {
   await runInTemp("lane-governance-verify", async (tmp, $) => {
     const deployment = nixosSharedHostDeploymentFixture();
     await installNixosSharedHostTargets(tmp, [deployment]);
@@ -23,14 +23,18 @@ test("lane-governance verify command rejects branch-protection drift and emits v
     await writeJson(validSnapshot, {
       scmBackend: deployment.lanePolicy.governance.scmBackend,
       repository: deployment.lanePolicy.governance.repository,
-      branchProtections: deployment.lanePolicy.governance.branchProtections,
+      sourceRefPolicies: deployment.lanePolicy.governance.sourceRefPolicies,
+      trustedReporterIdentities: deployment.lanePolicy.governance.trustedReporterIdentities,
+      requiredApprovalBoundaries: deployment.lanePolicy.governance.requiredApprovalBoundaries,
     });
     await writeJson(invalidSnapshot, {
       scmBackend: deployment.lanePolicy.governance.scmBackend,
       repository: deployment.lanePolicy.governance.repository,
-      branchProtections: deployment.lanePolicy.governance.branchProtections.filter(
+      sourceRefPolicies: deployment.lanePolicy.governance.sourceRefPolicies.filter(
         (entry) => entry.stage !== "prod",
       ),
+      trustedReporterIdentities: deployment.lanePolicy.governance.trustedReporterIdentities,
+      requiredApprovalBoundaries: deployment.lanePolicy.governance.requiredApprovalBoundaries,
     });
     const result = await $({
       cwd: tmp,
@@ -38,14 +42,14 @@ test("lane-governance verify command rejects branch-protection drift and emits v
     })`zx-wrapper build-tools/tools/deployments/deployment-lane-governance-verify.ts --deployment ${deployment.label} --scm-policy-json ${validSnapshot}`;
     const verified = JSON.parse(String(result.stdout));
     assert.equal(verified.governanceRef, deployment.lanePolicy.governanceRef);
-    assert.equal(verified.branchProtections[2].stage, "prod");
+    assert.equal(verified.sourceRefPolicies[2].stage, "prod");
     await assert.rejects(
       async () =>
         await $({
           cwd: tmp,
           stdio: "pipe",
         })`zx-wrapper build-tools/tools/deployments/deployment-lane-governance-verify.ts --deployment ${deployment.label} --scm-policy-json ${invalidSnapshot}`,
-      /missing required protected branch/,
+      /missing required source-ref policy/,
     );
   });
 });

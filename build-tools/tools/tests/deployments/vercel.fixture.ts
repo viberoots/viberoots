@@ -66,7 +66,7 @@ export function vercelPolicyNodes(): GraphNode[] {
     nixosSharedHostLanePolicyNodeFixture(),
     nixosSharedHostAdmissionPolicyNodeFixture({
       name: "//projects/deployments/pleomino-shared:staging_release",
-      allowed_refs: ["env/pleomino/staging"],
+      allowed_refs: ["main"],
       required_checks: ["deploy/pleomino-staging"],
     }),
   ];

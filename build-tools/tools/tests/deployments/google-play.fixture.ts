@@ -23,7 +23,7 @@ export function googlePlayDeploymentFixture(
       ref: `//projects/deployments/pleomino-shared:${environmentStage}_release`,
       name: `${environmentStage}_release`,
       requiredChecks: [],
-      allowedRefs: [`env/mobile/${environmentStage}`],
+      allowedRefs: environmentStage === "prod" ? ["refs/tags/release/*"] : ["main"],
       fingerprint: `sha256:admission-mobile-${environmentStage}`,
     });
   const providerTarget = {
@@ -103,19 +103,12 @@ export function googlePlayAdmissionPolicyNodeFixture(
 ): GraphNode {
   return nixosSharedHostAdmissionPolicyNodeFixture({
     name: "//projects/deployments/pleomino-shared:dev_release",
-    allowed_refs: ["env/mobile/dev"],
+    allowed_refs: ["main"],
     required_checks: [],
     ...overrides,
   });
 }
 
 export function googlePlayLanePolicyNodeFixture(overrides: Partial<GraphNode> = {}): GraphNode {
-  return nixosSharedHostLanePolicyNodeFixture({
-    stage_branches: {
-      dev: "env/mobile/dev",
-      staging: "env/mobile/staging",
-      prod: "env/mobile/prod",
-    },
-    ...overrides,
-  });
+  return nixosSharedHostLanePolicyNodeFixture(overrides);
 }

@@ -121,24 +121,37 @@ test("cloudflare-pages rollback rejects preview source runs and missing exact ar
 
 test("cloudflare-pages production rollback requires fresh approval evidence", async () => {
   await runInTemp("cloudflare-pages-rollback-prod-approval", async (tmp, $) => {
+    const baseLanePolicy = cloudflarePagesDeploymentFixture().lanePolicy;
     const deployment = cloudflarePagesDeploymentFixture({
       deploymentId: "pleomino-prod",
       label: "//projects/deployments/pleomino-prod:deploy",
       protectionClass: "production_facing",
       environmentStage: "prod",
       lanePolicy: {
-        ...cloudflarePagesDeploymentFixture().lanePolicy,
-        stageBranches: {
-          dev: "env/pleomino/dev",
-          staging: "env/pleomino/staging",
-          prod: "env/pleomino/prod",
+        ...baseLanePolicy,
+        sourceRefPolicy: {
+          dev: "main",
+          staging: "main",
+          prod: "main",
+        },
+        governance: {
+          ...baseLanePolicy.governance,
+          sourceRefPolicies: baseLanePolicy.governance.sourceRefPolicies.map((policy) =>
+            policy.stage === "prod"
+              ? {
+                  ...policy,
+                  allowedRefs: ["main"],
+                  requiredChecks: [],
+                }
+              : policy,
+          ),
         },
       },
       admissionPolicy: {
         ...cloudflarePagesDeploymentFixture().admissionPolicy,
         ref: "//projects/deployments/pleomino-prod:prod_release",
-        allowedRefs: ["env/pleomino/prod"],
-        requiredApprovals: ["prod-approval"],
+        allowedRefs: ["main"],
+        requiredApprovals: ["prod-approval", "release-owner"],
       },
       admissionPolicyRef: "//projects/deployments/pleomino-prod:prod_release",
       providerTarget: {
@@ -175,9 +188,7 @@ test("cloudflare-pages production rollback requires fresh approval evidence", as
       const deployEvidence = deploymentAdmissionEvidenceFixture({
         deployment: resolvedDeployment,
         operationKind: "deploy",
-        sourceRevision: (
-          await $({ cwd: tmp, stdio: "pipe" })`git rev-parse env/pleomino/prod`
-        ).stdout.trim(),
+        sourceRevision: (await $({ cwd: tmp, stdio: "pipe" })`git rev-parse main`).stdout.trim(),
         artifactIdentity: await artifactIdentityForStaticWebappDir(artifactDir),
       });
       await fsp.writeFile(evidenceJson, JSON.stringify(deployEvidence, null, 2) + "\n", "utf8");

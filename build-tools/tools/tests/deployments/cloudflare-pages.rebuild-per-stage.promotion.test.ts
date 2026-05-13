@@ -105,7 +105,7 @@ test("cloudflare-pages rebuild-per-stage promotion admits a new stage artifact b
       assert.equal(record.admittedContext.source.mode, "promotion_source_run");
       assert.equal(record.admittedContext.source.sourceRunId, sourceSummary.deployRunId);
       assert.equal(record.admittedContext.source.sourceDeploymentId, sourceDeployment.deploymentId);
-      assert.equal(record.admittedContext.targetEnvironment.targetRef, "env/pleomino/staging");
+      assert.equal(record.admittedContext.targetEnvironment.targetRef, "main");
       assert.equal(snapshot.operationKind, "promotion");
       assert.equal(snapshot.action.publishBehavior, "deploy");
       assert.equal(snapshot.action.sourceRecordPath, sourceSummary.recordPath);

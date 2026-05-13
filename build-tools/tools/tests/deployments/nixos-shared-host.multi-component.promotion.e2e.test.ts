@@ -43,12 +43,12 @@ function deploymentFor(environmentStage: "dev" | "staging", prefix: string) {
       ? nixosSharedHostAdmissionPolicyFixture({
           ref: `//projects/deployments/${prefix}:staging_release`,
           name: "staging_release",
-          allowedRefs: ["env/pleomino/staging"],
+          allowedRefs: ["main"],
           requiredChecks: ["deploy/pleomino-staging"],
           fingerprint: `sha256:${prefix}-staging`,
         })
       : nixosSharedHostAdmissionPolicyFixture({
-          allowedRefs: ["env/pleomino/dev"],
+          allowedRefs: ["main"],
           requiredChecks: ["deploy/pleomino-dev"],
           fingerprint: `sha256:${prefix}-dev`,
         });

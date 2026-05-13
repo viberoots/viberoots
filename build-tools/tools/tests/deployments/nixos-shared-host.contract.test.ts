@@ -138,7 +138,7 @@ test("extractNixosSharedHostDeployments preserves valid prerequisite metadata", 
     nixosSharedHostAdmissionPolicyNodeFixture(),
     nixosSharedHostAdmissionPolicyNodeFixture({
       name: "//projects/deployments/pleomino-shared:staging_release",
-      allowed_refs: ["env/pleomino/staging"],
+      allowed_refs: ["main"],
       required_checks: ["deploy/pleomino-staging"],
       artifact_attestation_mode: "recorded_exact_artifact",
     }),

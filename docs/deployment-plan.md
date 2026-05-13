@@ -1649,11 +1649,11 @@ contract instead of preserving an overly permissive replay precedent.
 
 ---
 
-## PR-8: Branch-backed `lane_policy` + source admission + target-environment run admission
+## PR-8: Reviewed `lane_policy` + source admission + target-environment run admission
 
 ### Description
 
-I will add the core branch-backed lane model and explicit two-stage admission flow that the main
+I will add the core reviewed-source lane model and explicit two-stage admission flow that the main
 deployment design requires for protected/shared deployments.
 
 ### Scope & Changes
@@ -1714,7 +1714,7 @@ Land explicit frozen-snapshot and lane-policy references before promotion broade
 
 ### Consequence of Not Implementing
 
-The shared deployment flow would still lack the design's intended branch-backed admission guarantees.
+The shared deployment flow would still lack the design's intended reviewed-source admission guarantees.
 
 ### Downsides for Implementing
 
@@ -1828,7 +1828,8 @@ through `staging` and `prod` using the repository's default `same_artifact` mode
 - Implement promotion classification for Pleomino across distinct deployment ids in compatible lanes.
 - Reuse the exact admitted artifact across Pleomino deployments where lane policy allows
   `same_artifact`.
-- Add promotion eligibility checks against current branch-backed lane state.
+- Add promotion eligibility checks against current control-plane lane state and reviewed
+  source-ref policy.
 - Record:
   - `parent_run_id`
   - `release_lineage_id`
@@ -1911,7 +1912,8 @@ promotion support for all compatible lanes using the repository's default `same_
 
 - Implement promotion classification for distinct deployment ids in compatible lanes.
 - Reuse the exact admitted artifact across deployments where lane policy allows `same_artifact`.
-- Add promotion eligibility checks against current branch-backed lane state.
+- Add promotion eligibility checks against current control-plane lane state and reviewed
+  source-ref policy.
 - Record:
   - `parent_run_id`
   - `release_lineage_id`
@@ -4511,7 +4513,7 @@ without being collapsed into the generic service path.
 
 I will add the first reviewed mobile-store provider family so the design's `mobile-app` model is no
 longer theoretical. This PR covers App Store Connect style release publishing, exact-artifact
-promotion through branch-backed lanes, staged rollout or release-health evaluation, and the
+promotion through reviewed source-ref lanes, staged rollout or release-health evaluation, and the
 reviewed record shape for store-distributed releases.
 
 ### Scope & Changes
@@ -4552,7 +4554,7 @@ reviewed record shape for store-distributed releases.
 ### Docs (in this PR)
 
 - Document the `app-store-connect` provider capability entry and built-in publisher contract.
-- Document branch-backed mobile lane behavior, track identity, staged release-health semantics, and
+- Document reviewed source-ref mobile lane behavior, track identity, staged release-health semantics, and
   the mobile-specific promotion-compatibility inputs.
 - Document the reviewed mobile record, replay, and operator workflow for this provider family.
 - Update the mobile-store fit section so App Store Connect is an implemented provider slice.
@@ -4573,7 +4575,7 @@ reviewed record shape for store-distributed releases.
 ### Acceptance Criteria
 
 - The repo has one reviewed built-in mobile-store provider family for signed iOS releases.
-- Mobile branch-backed promotion, store processing, and staged release-health are explicit and
+- Mobile source-ref promotion, store processing, and staged release-health are explicit and
   test-covered.
 - Promotion-safe mobile lanes have explicit reviewed compatibility inputs rather than implied store
   similarity.
@@ -4612,7 +4614,7 @@ mobile release models before the final mobile-store family lands.
 
 I will complete the mobile-store provider-family coverage by adding the reviewed Google Play slice.
 This PR covers Android signed-artifact upload, staged rollout or track progression, exact-artifact
-promotion through branch-backed lanes, and the authoritative record model for Google Play style
+promotion through reviewed source-ref lanes, and the authoritative record model for Google Play style
 release state.
 
 ### Scope & Changes
@@ -4651,7 +4653,7 @@ release state.
 ### Docs (in this PR)
 
 - Document the `google-play` provider capability entry and built-in publisher contract.
-- Document Android branch-backed lane behavior, track identity, staged rollout, and release-health
+- Document Android source-ref lane behavior, track identity, staged rollout, and release-health
   semantics, and the Android-specific promotion-compatibility inputs.
 - Document the reviewed operator workflow and record expectations for this provider family.
 - Update the mobile-store fit section so Google Play is an implemented provider slice alongside App
@@ -5150,41 +5152,40 @@ execution-input model.
 
 ---
 
-## PR-39: Environment-branch governance + lane-protection validation closeout
+## PR-39: Source-ref governance + lane-protection validation closeout
 
 ### Description
 
-I will close the remaining branch-governance gap by turning the design's protected environment
-branch assumptions into one reviewed, testable contract instead of leaving them as prose-only repo
-policy. This PR adds the lane-governance model, branch-protection expectations, and verification
-surface that prove protected/shared lane branches are actually safe sources of promotion authority.
+I will close the remaining source-governance gap by turning the design's reviewed source-ref
+assumptions into one reviewed, testable contract instead of leaving them as prose-only repo policy.
+This PR adds the lane-governance model, source-ref policy expectations, and verification surface
+that prove protected/shared source refs are actually safe sources of admission authority.
 
 ### Scope & Changes
 
 - Define the reviewed lane-governance contract for protected/shared lanes, including:
-  - environment branch naming and stage mapping
-  - fast-forward-only advancement rules
-  - disallowed direct pushes to later environment branches except reviewed emergency procedures
-  - required checks that must pass before branch advancement
-  - reviewed automation identities or equivalent normal-path branch-advance authority
+  - reviewed source-ref classes and stage mapping
+  - required checks that must pass before source admission
+  - trusted reporter identities or equivalent normal-path admission authority
+  - required approval boundaries for later stages
 - Require protected/shared lane policies to reference or resolve one authoritative governance object
   rather than relying on undocumented SCM defaults.
 - Implement validation or verification commands that compare the declared governance contract with
-  actual server-side branch protection or equivalent SCM policy for supported repo backends, failing
+  actual server-side source protection or equivalent SCM policy for supported repo backends, failing
   closed on drift or missing required protection.
 - Preserve governance verification facts in operator-visible inspection output so deployment
   admission is not silently trusting unverified lane governance assumptions.
-- Keep emergency branch-mutation exceptions explicit and tied to the same reviewed break-glass
+- Keep emergency direct-mutation exceptions explicit and tied to the same reviewed break-glass
   posture used elsewhere in the deployment design.
 
 ### Tests (in this PR)
 
-- Add lane-governance schema and validation tests for the new branch-protection contract.
+- Add lane-governance schema and validation tests for the new source-ref protection contract.
 - Add verification tests rejecting:
-  - missing required protected branches
-  - missing fast-forward-only enforcement
+  - missing required source-ref policy
   - missing required checks
-  - direct-push-permitted later-environment branches outside the emergency path
+  - missing trusted reporter identities
+  - missing required approval boundaries
   - drift between declared governance policy and the actual SCM protection state
 - Add admission-path tests proving protected/shared lane validation fails closed when the reviewed
   governance contract cannot be satisfied or verified.
@@ -5193,11 +5194,10 @@ surface that prove protected/shared lane branches are actually safe sources of p
 
 ### Docs (in this PR)
 
-- Document the reviewed lane-governance and environment-branch protection contract.
-- Document how direct pushes, fast-forward promotion, required checks, and automation-driven branch
-  advancement are enforced or verified.
-- Document emergency exceptions for branch mutation and how they relate to the break-glass path.
-- Update operator docs so branch-governance verification is part of the normal protected/shared
+- Document the reviewed lane-governance and source-ref protection contract.
+- Document how required checks, trusted reporters, and approval boundaries are enforced or verified.
+- Document emergency exceptions for direct mutation and how they relate to the break-glass path.
+- Update operator docs so source-governance verification is part of the normal protected/shared
   deployment posture.
 
 ### Verification Commands
@@ -5214,10 +5214,10 @@ surface that prove protected/shared lane branches are actually safe sources of p
 
 ### Acceptance Criteria
 
-- Protected/shared lane branches have one explicit reviewed governance contract instead of prose-only
+- Protected/shared lane source-ref policy has one explicit reviewed governance contract instead of prose-only
   assumptions.
-- Missing or drifted branch protection fails closed for the protected/shared path.
-- Operators can inspect whether branch-governance requirements are actually satisfied.
+- Missing or drifted source-ref protection fails closed for the protected/shared path.
+- Operators can inspect whether source-governance requirements are actually satisfied.
 - Tests and docs in this PR describe the same lane-governance contract.
 
 ### Risks
@@ -5232,7 +5232,7 @@ required protection cannot be proven.
 
 ### Consequence of Not Implementing
 
-The design would still rely on unverified branch-governance assumptions for promotion authority and
+The design would still rely on unverified source-governance assumptions for promotion authority and
 required-check enforcement.
 
 ### Downsides for Implementing
@@ -12603,15 +12603,15 @@ but also tells operators how to discover the valid requirement names that bounda
 
 I will close the remaining protected/shared admission gap where the client and the control plane can
 disagree about the reviewed deployment source revision. Today the client may construct
-`--admit-and-deploy` evidence against its local view of the stage ref while the control plane
+`--admit-and-deploy` evidence against its local view of the reviewed source ref while the control plane
 admits the deploy against a different commit in its own repo state. This PR makes the control plane
 authoritative for the reviewed source snapshot while keeping that authority explicit, auditable, and
 safe for concurrent submissions.
 
 The reviewed model should become:
 
-- the deployment metadata still determines which stage ref is authoritative
-- the control plane snapshots that reviewed ref for each submission instead of relying on ambient
+- the deployment metadata still determines which source-ref policy applies to the target stage
+- the control plane snapshots the reviewed source ref for each submission instead of relying on ambient
   long-lived local branch state
 - admission binds required checks to the snapshotted commit SHA for that submission
 - clients may provide an expected source revision, but the service must fail closed if the fetched
@@ -12620,7 +12620,7 @@ The reviewed model should become:
 ### Scope & Changes
 
 - Add a reviewed control-plane source snapshot step for protected/shared submissions:
-  - derive the authoritative stage ref from deployment metadata
+  - derive the reviewed source ref from deployment metadata and lane source-ref policy
   - fetch only that reviewed ref from the configured SCM remote
   - store it in a submission-scoped namespace instead of mutating shared long-lived refs or the
     checked-out worktree
@@ -12637,7 +12637,7 @@ The reviewed model should become:
 - Add explicit client/service source-parity support:
   - allow the client to send the expected reviewed source revision it believes it is deploying
   - require the service to compare that expectation against the freshly snapshotted reviewed ref
-  - reject when they differ, with diagnostics that show both SHAs and the reviewed stage ref
+  - reject when they differ, with diagnostics that show both SHAs and the reviewed source ref
 - Make remote-profile and direct service submissions converge on the same source-of-truth model so
   `--admit-and-deploy`, artifact provenance, retry, and rollback all refer to the same reviewed
   source snapshot.
@@ -12649,7 +12649,7 @@ The reviewed model should become:
 
 ### Tests (in this PR)
 
-- Add control-plane tests proving the service snapshots the reviewed stage ref into a
+- Add control-plane tests proving the service snapshots the reviewed source ref into a
   submission-scoped namespace and binds admission to that fetched commit SHA.
 - Add concurrency tests proving multiple submissions can snapshot:
   - different reviewed refs concurrently
@@ -12672,7 +12672,7 @@ The reviewed model should become:
   describe the control-plane-side reviewed-ref snapshot model and why protected/shared admission is
   bound to that snapshotted commit rather than a human operator's ambient checkout.
 - Update [Mini Shared-Dev Deployment Design](/Users/kiltyj/Code/viberoots/docs/mini-deployment.md)
-  with the reviewed `env/pleomino/dev` snapshot flow for `mini`, including how concurrent
+  with the reviewed source-ref snapshot flow for `mini`, including how concurrent
   submissions remain isolated.
 - Update [Deployments Usage](/Users/kiltyj/Code/viberoots/docs/deployments-usage.md) with
   operator guidance for diagnosing client/service source-revision mismatch and when
@@ -12712,7 +12712,7 @@ The reviewed model should become:
 - Concurrent submissions can safely snapshot different reviewed refs or different commits of the
   same reviewed ref without mutating each other's admission source.
 - Client/service source-revision mismatches fail closed with diagnostics that clearly explain the
-  reviewed stage ref, the service-required commit, and the client-submitted commit.
+  reviewed source ref, the service-required commit, and the client-submitted commit.
 - Retry, rollback, replay, and stored provenance all continue to use the same authoritative
   snapshotted source revision.
 
@@ -12806,7 +12806,7 @@ The reviewed model should become:
 - Add control-plane tests proving protected/shared service-backed submissions succeed without a
   client-supplied `laneGovernance` evidence payload when the service can verify governance itself.
 - Add failure tests proving submissions still fail closed when:
-  - branch protections drift from reviewed policy
+  - source protections drift from reviewed policy
   - the SCM backend is unsupported for automatic verification
   - the service cannot fetch the live governance snapshot
 - Add status/record tests proving the stored policy evaluation still contains the verified

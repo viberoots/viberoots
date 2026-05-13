@@ -96,7 +96,7 @@ test("policy extraction rejects live gate credentials outside secret runtime", (
     {
       name: "//projects/deployments/shared:prod_release",
       rule_type: "deployment_admission_policy",
-      allowed_refs: ["env/prod"],
+      allowed_refs: ["refs/tags/release/*"],
       readiness_gates: [
         {
           name: "bad/live-gate",
@@ -120,7 +120,7 @@ test("policy extraction accepts reviewed secret-runtime gate credentials", () =>
     {
       name: "//projects/deployments/shared:prod_release",
       rule_type: "deployment_admission_policy",
-      allowed_refs: ["env/prod"],
+      allowed_refs: ["refs/tags/release/*"],
       readiness_gates: [
         {
           name: "phase0/github-refresh",

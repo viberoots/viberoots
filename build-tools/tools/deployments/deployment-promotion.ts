@@ -18,6 +18,7 @@ import type {
   DeploymentPromotionSource,
 } from "./deployment-promotion-types";
 import { resolveDeploymentGitCommit } from "./deployment-git-ref";
+import { sourceRefAllowed } from "./deployment-source-ref-policy";
 export type {
   CrossDeploymentPromotionSelection,
   CrossDeploymentPromotionSourceSelection,
@@ -33,7 +34,7 @@ async function eligibilityErrors(
 ): Promise<string[]> {
   const targetRef = requiredDeploymentStageBranch(deployment);
   const errors: string[] = [];
-  if (!deployment.admissionPolicy.allowedRefs.includes(targetRef)) {
+  if (!sourceRefAllowed(targetRef, deployment.admissionPolicy.allowedRefs)) {
     errors.push(
       `deployment admission policy ${deployment.admissionPolicyRef} does not allow source ref ${targetRef}`,
     );

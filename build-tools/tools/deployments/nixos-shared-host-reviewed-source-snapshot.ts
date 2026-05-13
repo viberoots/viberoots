@@ -207,8 +207,8 @@ export async function snapshotReviewedSourceForSubmission(opts: {
         `clientExpectedSourceRevision=${expectedSourceRevision}`,
         `serviceReviewedSourceRevision=${sourceRevision}`,
         `serviceRemote=${remoteName}`,
-        "The service fetched the reviewed deployment branch before admission.",
-        "Make sure that branch is up to date and pushed before retrying.",
+        "The service fetched the reviewed deployment source ref before admission.",
+        "Make sure that source ref is up to date and pushed before retrying.",
         `Rerun with --admit-for-commit ${sourceRevision} if ${sourceRevision} is intentionally the reviewed commit to deploy.`,
       ].join("\n"),
     );

@@ -8,7 +8,7 @@ import {
   labelName,
   uniqueBy,
 } from "./deployment-targets.install.fragments";
-import { renderStringList } from "./deployment-targets.install.render";
+import { renderStringList, renderStringRecordList } from "./deployment-targets.install.render";
 import {
   renderAdmissionPolicy,
   renderPromotionCompatibility,
@@ -18,15 +18,15 @@ import {
 
 export function synchronizeGovernanceChecks(deployments: ReviewedDeployment[]): void {
   for (const deployment of deployments) {
-    const branchProtection = deployment.lanePolicy.governance.branchProtections.find(
+    const sourceRefPolicy = deployment.lanePolicy.governance.sourceRefPolicies.find(
       (entry) => entry.stage === deployment.environmentStage,
     );
-    if (!branchProtection) continue;
-    branchProtection.requiredChecks = [...deployment.admissionPolicy.requiredChecks];
+    if (!sourceRefPolicy) continue;
+    sourceRefPolicy.requiredChecks = [...deployment.admissionPolicy.requiredChecks];
   }
 }
 
-function effectiveBranchProtectionChecks(opts: {
+function effectiveSourceRefPolicyChecks(opts: {
   deployments: ReviewedDeployment[];
   governanceRef: string;
   stage: string;
@@ -93,17 +93,30 @@ export function sharedPolicyTargetsByDir(
             `    name = ${JSON.stringify(labelName(ref))},`,
             `    scm_backend = ${JSON.stringify(governance.scmBackend)},`,
             `    repository = ${JSON.stringify(governance.repository)},`,
-            "    branch_protections = [",
-            ...governance.branchProtections.map((entry) => {
-              const requiredChecks = effectiveBranchProtectionChecks({
-                deployments,
-                governanceRef: ref,
+            "    source_ref_policies =",
+            ...renderStringRecordList(
+              governance.sourceRefPolicies.map((entry) => {
+                const requiredChecks = effectiveSourceRefPolicyChecks({
+                  deployments,
+                  governanceRef: ref,
+                  stage: entry.stage,
+                  fallback: entry.requiredChecks,
+                });
+                return {
+                  stage: entry.stage,
+                  allowed_refs: entry.allowedRefs.join(","),
+                  required_checks: requiredChecks.join(","),
+                };
+              }),
+            ),
+            `    trusted_reporter_identities = ${renderStringList(governance.trustedReporterIdentities)},`,
+            "    required_approval_boundaries =",
+            ...renderStringRecordList(
+              governance.requiredApprovalBoundaries.map((entry) => ({
                 stage: entry.stage,
-                fallback: entry.requiredChecks,
-              });
-              return `        {"stage": ${JSON.stringify(entry.stage)}, "branch": ${JSON.stringify(entry.branch)}, "required_checks": ${JSON.stringify(requiredChecks.join(","))}, "fast_forward_only": ${JSON.stringify(entry.fastForwardOnly ? "true" : "false")}, "normal_advance_principals": ${JSON.stringify(entry.normalAdvancePrincipals.join(","))}, "emergency_direct_push_principals": ${JSON.stringify(entry.emergencyDirectPushPrincipals.join(","))}},`;
-            }),
-            "    ],",
+                required_approvals: entry.requiredApprovals.join(","),
+              })),
+            ),
             '    visibility = ["PUBLIC"],',
             ")",
             "",
@@ -116,9 +129,12 @@ export function sharedPolicyTargetsByDir(
               "deployment_lane_policy(",
               `    name = ${JSON.stringify(labelName(ref))},`,
               `    stages = ${renderStringList(policy.stages)},`,
-              `    stage_branches = {${Object.entries(policy.stageBranches)
-                .map(([stage, branch]) => `${JSON.stringify(stage)}: ${JSON.stringify(branch)}`)
-                .join(", ")}},`,
+              "    source_ref_policy = {",
+              ...Object.entries(policy.sourceRefPolicy).map(
+                ([stage, sourceRef]) =>
+                  `        ${JSON.stringify(stage)}: ${JSON.stringify(sourceRef)},`,
+              ),
+              "    },",
               `    allowed_promotion_edges = ${renderStringList(policy.allowedPromotionEdges)},`,
               `    artifact_reuse_mode = ${JSON.stringify(policy.artifactReuseMode)},`,
               ...(promotionCompatibility

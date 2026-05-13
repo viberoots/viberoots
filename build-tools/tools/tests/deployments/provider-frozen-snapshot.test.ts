@@ -13,18 +13,19 @@ import {
   VERCEL_CONTROL_PLANE_SUBMIT_REQUEST_SCHEMA,
 } from "../../deployments/vercel-control-plane";
 import { localHarnessControlPlaneDatabaseUrl } from "../../deployments/nixos-shared-host-control-plane-backend";
+import { fingerprintValue } from "../../deployments/nixos-shared-host-deployment-fingerprint";
 import { runInTemp } from "../lib/test-helpers";
 import { ensureNixosSharedHostStageBranch } from "./nixos-shared-host.fixture";
 import { kubernetesDeploymentFixture } from "./kubernetes.fixture";
 import { s3StaticDeploymentFixture } from "./s3-static.fixture";
 import { vercelDeploymentFixture } from "./vercel.fixture";
 import { writeServiceArtifact } from "./kubernetes.service-artifact.fixture";
+import { deploymentAdmissionEvidenceFixture } from "./deployment-admission.fixture";
 import {
   deploymentWithVercelSecret,
   withVercelFixtureSecrets,
   writeVercelArtifact,
 } from "./vercel.control-plane.helpers";
-import { reviewedLaneAdmissionEvidenceFixture } from "./deployment-lane-governance.fixture";
 
 async function writeStaticArtifact(root: string) {
   await fsp.mkdir(root, { recursive: true });
@@ -48,16 +49,36 @@ test("provider control-plane preparation freezes shared admission and admitted a
     const recordsRoot = path.join(tmp, "records");
     const s3 = s3StaticDeploymentFixture();
     const kube = kubernetesDeploymentFixture();
+    kube.admissionPolicy.requiredApprovals = [];
+    kube.lanePolicy.governance.requiredApprovalBoundaries =
+      kube.lanePolicy.governance.requiredApprovalBoundaries.filter(
+        (boundary) => boundary.stage !== kube.environmentStage,
+      );
     const vercel = vercelDeploymentFixture({
       admissionPolicy: {
         ...vercelDeploymentFixture().admissionPolicy,
-        allowedRefs: ["env/pleomino/staging"],
+        allowedRefs: ["main"],
         requiredChecks: [],
       },
     });
     for (const deployment of [s3, kube, vercel]) {
+      deployment.lanePolicy.sourceRefPolicy[deployment.environmentStage] = "main";
+      deployment.admissionPolicy.allowedRefs = ["main"];
+      deployment.lanePolicy.governance.sourceRefPolicies =
+        deployment.lanePolicy.governance.sourceRefPolicies.map((policy) =>
+          policy.stage === deployment.environmentStage
+            ? {
+                ...policy,
+                allowedRefs: ["main"],
+                requiredChecks: deployment.admissionPolicy.requiredChecks,
+              }
+            : policy,
+        );
       await ensureNixosSharedHostStageBranch(tmp, $, deployment as any);
     }
+    const sourceRevision = String(
+      (await $({ cwd: tmp, stdio: "pipe" })`git rev-parse main`).stdout,
+    ).trim();
     const s3Snapshot = await buildS3StaticControlPlaneSnapshot({
       workspaceRoot: tmp,
       recordsRoot,
@@ -68,14 +89,22 @@ test("provider control-plane preparation freezes shared admission and admitted a
         deployment: s3,
         operationKind: "deploy",
         artifactDir: await writeStaticArtifact(path.join(tmp, "s3-artifact")),
-        admissionEvidence: reviewedLaneAdmissionEvidenceFixture({ deployment: s3 }),
+        admissionEvidence: deploymentAdmissionEvidenceFixture({
+          deployment: s3,
+          operationKind: "deploy",
+          sourceRevision,
+        }),
       },
     });
     assertSharedAdmission(s3Snapshot);
     assert.ok(s3Snapshot.artifact?.identity.startsWith("static-webapp:"));
 
     const serviceArtifact = path.join(tmp, "service-artifact");
-    await writeServiceArtifact(serviceArtifact, "service\n");
+    const serviceIdentity = await writeServiceArtifact(serviceArtifact, "service\n");
+    const kubeArtifactLineageId = fingerprintValue({
+      providerTargetIdentity: kube.providerTarget.providerTargetIdentity,
+      componentArtifacts: [{ componentId: "api", identity: serviceIdentity }],
+    });
     const kubeSnapshot = await buildKubernetesControlPlaneSnapshot({
       workspaceRoot: tmp,
       recordsRoot,
@@ -86,7 +115,12 @@ test("provider control-plane preparation freezes shared admission and admitted a
         deployment: kube,
         operationKind: "deploy",
         artifactDir: serviceArtifact,
-        admissionEvidence: reviewedLaneAdmissionEvidenceFixture({ deployment: kube }),
+        admissionEvidence: deploymentAdmissionEvidenceFixture({
+          deployment: kube,
+          operationKind: "deploy",
+          sourceRevision,
+          artifactLineageId: kubeArtifactLineageId,
+        }),
       },
     });
     assertSharedAdmission(kubeSnapshot);
@@ -103,7 +137,11 @@ test("provider control-plane preparation freezes shared admission and admitted a
         deployment: vercel,
         operationKind: "deploy",
         artifactDir: vercelArtifact,
-        admissionEvidence: reviewedLaneAdmissionEvidenceFixture({ deployment: vercel }),
+        admissionEvidence: deploymentAdmissionEvidenceFixture({
+          deployment: vercel,
+          operationKind: "deploy",
+          sourceRevision,
+        }),
       },
     });
     assertSharedAdmission(vercelSnapshot);
@@ -138,7 +176,7 @@ test("provider snapshot preparation rejects denied admission and queues admitted
       secretRequirements: secretful.secretRequirements,
       admissionPolicy: {
         ...secretful.admissionPolicy,
-        allowedRefs: ["env/pleomino/staging"],
+        allowedRefs: ["main"],
         requiredChecks: [],
       },
     });
@@ -163,7 +201,13 @@ test("provider snapshot preparation rejects denied admission and queues admitted
             deployment: vercel,
             operationKind: "deploy",
             artifactDir: await writeVercelArtifact(path.join(tmp, "vercel-queued-artifact")),
-            admissionEvidence: reviewedLaneAdmissionEvidenceFixture({ deployment: vercel }),
+            admissionEvidence: deploymentAdmissionEvidenceFixture({
+              deployment: vercel,
+              operationKind: "deploy",
+              sourceRevision: String(
+                (await $({ cwd: tmp, stdio: "pipe" })`git rev-parse main`).stdout,
+              ).trim(),
+            }),
           },
         });
         assert.equal(queued.lifecycleState, "queued");

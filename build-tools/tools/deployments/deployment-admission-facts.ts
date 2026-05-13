@@ -1,6 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import type { DeploymentTarget } from "./contract";
 import { DeploymentAdmissionError } from "./deployment-control-plane-errors";
+import { sourceRevisionFor, type AdmittedContextLike } from "./deployment-admitted-context";
 import {
   createDeploymentAdmissionBinding,
   requiredCheckSubjectsFor,
@@ -10,7 +11,6 @@ import type {
   DeploymentAdmissionCheckFact,
   DeploymentAdmissionEvidence,
   DeploymentCheckEvidence,
-  DeploymentCompatibilityExceptionEvidence,
   DeploymentPolicyBinding,
   DeploymentPrerequisiteFact,
 } from "./deployment-admission-evidence";
@@ -27,28 +27,7 @@ import {
   deploymentsForWorkspace,
   prerequisiteProvidersForWorkspace,
 } from "./deployment-prerequisite-workspace";
-
-export type AdmittedContextLike = {
-  source: {
-    sourceRevision: string;
-    artifactIdentity?: string;
-    sourceRunId?: string;
-  };
-  targetEnvironment: {
-    providerTargetIdentity: string;
-  };
-  phase0CompatibilityException?: DeploymentCompatibilityExceptionEvidence;
-};
-
-export function sourceRevisionFor(
-  admittedContext: AdmittedContextLike,
-  sourceRecord?: DeploymentRunRecordLike,
-) {
-  const replayRevision = (sourceRecord as any)?.admittedContext?.source?.sourceRevision;
-  return typeof replayRevision === "string" && replayRevision.trim()
-    ? replayRevision.trim()
-    : admittedContext.source.sourceRevision;
-}
+import { trustedCheck } from "./deployment-check-trust";
 
 export function requiredCheckFacts(opts: {
   deployment: DeploymentTarget;
@@ -72,6 +51,7 @@ export function requiredCheckFacts(opts: {
       ...(check.admissionPolicyRef ? { admissionPolicyRef: check.admissionPolicyRef } : {}),
       ...(check.recordRef ? { recordRef: check.recordRef } : {}),
       ...(check.reportingKind ? { reportingKind: check.reportingKind } : {}),
+      ...(check.reporterIdentity ? { reporterIdentity: check.reporterIdentity } : {}),
     }));
   const carriedEvidence = sourceAdmissionChecks(opts.sourceRecord);
   const carried = carriedEvidence.filter(
@@ -79,7 +59,7 @@ export function requiredCheckFacts(opts: {
   );
   return opts.deployment.admissionPolicy.requiredChecks.map((name) => {
     const hit =
-      current.find((check) => check.name === name) || carried.find((check) => check.name === name);
+      trustedCheck(current, opts.deployment, name) || trustedCheck(carried, opts.deployment, name);
     if (!hit) {
       const mismatchedSubjects = Array.from(
         new Set(

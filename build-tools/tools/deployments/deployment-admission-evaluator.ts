@@ -14,12 +14,8 @@ import {
   type DeploymentAdmissionPolicyEvaluation,
 } from "./deployment-admission-evidence";
 import { type DeploymentRunRecordLike } from "./deployment-admission-records";
-import {
-  prerequisiteFacts,
-  requiredCheckFacts,
-  sourceRevisionFor,
-  type AdmittedContextLike,
-} from "./deployment-admission-facts";
+import { prerequisiteFacts, requiredCheckFacts } from "./deployment-admission-facts";
+import { sourceRevisionFor, type AdmittedContextLike } from "./deployment-admitted-context";
 import {
   resolveLaneGovernanceFact,
   type DeploymentLaneGovernanceResolver,

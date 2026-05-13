@@ -1,8 +1,14 @@
 #!/usr/bin/env zx-wrapper
 import { DeploymentAdmissionError } from "./deployment-control-plane-errors";
+import {
+  normalizeApprovalBoundaries,
+  normalizeSourceRefPolicies,
+  normalizeTrustedReporterIdentities,
+} from "./deployment-admission-governance-normalize";
 import type {
-  DeploymentLaneBranchGovernance,
+  DeploymentApprovalBoundary,
   DeploymentLaneGovernance,
+  DeploymentSourceRefPolicy,
 } from "./deployment-lane-governance";
 import type { DeploymentLanePolicy } from "./deployment-policy";
 
@@ -14,50 +20,20 @@ export type DeploymentLaneGovernanceFact = {
   verificationSource: "client_supplied" | "service_verified";
   scmBackend: DeploymentLaneGovernance["scmBackend"];
   repository: string;
-  branchProtections: DeploymentLaneBranchGovernance[];
+  sourceRefPolicies: DeploymentSourceRefPolicy[];
+  trustedReporterIdentities: string[];
+  requiredApprovalBoundaries: DeploymentApprovalBoundary[];
   recordRef?: string;
 };
 
 export type DeploymentLaneGovernanceSnapshot = Pick<
   DeploymentLaneGovernanceFact,
-  "scmBackend" | "repository" | "branchProtections"
+  | "scmBackend"
+  | "repository"
+  | "sourceRefPolicies"
+  | "trustedReporterIdentities"
+  | "requiredApprovalBoundaries"
 >;
-
-function normalizeBranchProtections(value: unknown): DeploymentLaneBranchGovernance[] {
-  if (!Array.isArray(value)) return [];
-  return value
-    .map((entry) => {
-      if (!entry || typeof entry !== "object" || Array.isArray(entry)) return undefined;
-      const raw = entry as Record<string, unknown>;
-      const stage = typeof raw.stage === "string" ? raw.stage.trim() : "";
-      const branch = typeof raw.branch === "string" ? raw.branch.trim() : "";
-      const requiredChecks = Array.isArray(raw.requiredChecks)
-        ? raw.requiredChecks.filter(
-            (item): item is string => typeof item === "string" && item.trim() !== "",
-          )
-        : [];
-      const normalAdvancePrincipals = Array.isArray(raw.normalAdvancePrincipals)
-        ? raw.normalAdvancePrincipals.filter(
-            (item): item is string => typeof item === "string" && item.trim() !== "",
-          )
-        : [];
-      const emergencyDirectPushPrincipals = Array.isArray(raw.emergencyDirectPushPrincipals)
-        ? raw.emergencyDirectPushPrincipals.filter(
-            (item): item is string => typeof item === "string" && item.trim() !== "",
-          )
-        : [];
-      if (raw.fastForwardOnly !== true || !stage || !branch) return undefined;
-      return {
-        stage,
-        branch,
-        requiredChecks,
-        fastForwardOnly: true,
-        normalAdvancePrincipals,
-        emergencyDirectPushPrincipals,
-      };
-    })
-    .filter((entry): entry is DeploymentLaneBranchGovernance => !!entry);
-}
 
 export function normalizeLaneGovernanceEvidence(
   value: unknown,
@@ -74,7 +50,11 @@ export function normalizeLaneGovernanceEvidence(
   const scmBackend =
     raw.scmBackend === "github" || raw.scmBackend === "gitlab" ? raw.scmBackend : "";
   const repository = typeof raw.repository === "string" ? raw.repository.trim() : "";
-  const branchProtections = normalizeBranchProtections(raw.branchProtections);
+  const sourceRefPolicies = normalizeSourceRefPolicies(raw.sourceRefPolicies);
+  const trustedReporterIdentities = normalizeTrustedReporterIdentities(
+    raw.trustedReporterIdentities,
+  );
+  const requiredApprovalBoundaries = normalizeApprovalBoundaries(raw.requiredApprovalBoundaries);
   const recordRef = typeof raw.recordRef === "string" ? raw.recordRef.trim() : "";
   if (
     !lanePolicyRef ||
@@ -83,7 +63,9 @@ export function normalizeLaneGovernanceEvidence(
     !verifiedAt ||
     !scmBackend ||
     !repository ||
-    branchProtections.length === 0
+    sourceRefPolicies.length === 0 ||
+    trustedReporterIdentities.length === 0 ||
+    requiredApprovalBoundaries.length === 0
   ) {
     return undefined;
   }
@@ -95,7 +77,9 @@ export function normalizeLaneGovernanceEvidence(
     verificationSource,
     scmBackend,
     repository,
-    branchProtections,
+    sourceRefPolicies,
+    trustedReporterIdentities,
+    requiredApprovalBoundaries,
     ...(recordRef ? { recordRef } : {}),
   };
 }
@@ -108,9 +92,27 @@ export function normalizeLaneGovernanceSnapshot(
   const scmBackend =
     raw.scmBackend === "github" || raw.scmBackend === "gitlab" ? raw.scmBackend : "";
   const repository = typeof raw.repository === "string" ? raw.repository.trim() : "";
-  const branchProtections = normalizeBranchProtections(raw.branchProtections);
-  if (!scmBackend || !repository || branchProtections.length === 0) return undefined;
-  return { scmBackend, repository, branchProtections };
+  const sourceRefPolicies = normalizeSourceRefPolicies(raw.sourceRefPolicies);
+  const trustedReporterIdentities = normalizeTrustedReporterIdentities(
+    raw.trustedReporterIdentities,
+  );
+  const requiredApprovalBoundaries = normalizeApprovalBoundaries(raw.requiredApprovalBoundaries);
+  if (
+    !scmBackend ||
+    !repository ||
+    sourceRefPolicies.length === 0 ||
+    trustedReporterIdentities.length === 0 ||
+    requiredApprovalBoundaries.length === 0
+  ) {
+    return undefined;
+  }
+  return {
+    scmBackend,
+    repository,
+    sourceRefPolicies,
+    trustedReporterIdentities,
+    requiredApprovalBoundaries,
+  };
 }
 
 function sorted(value: string[]): string[] {
@@ -151,29 +153,42 @@ export function evaluateLaneGovernanceFact(opts: {
   if (evidence.governanceFingerprint !== opts.deployment.lanePolicy.governance.fingerprint) {
     branchMismatch(opts.deployment, "governance fingerprint drift");
   }
-  const declared = opts.deployment.lanePolicy.governance.branchProtections.find(
+  const declared = opts.deployment.lanePolicy.governance.sourceRefPolicies.find(
     (entry) => entry.stage === opts.deployment.environmentStage,
   );
-  const actual = evidence.branchProtections.find(
+  const actual = evidence.sourceRefPolicies.find(
     (entry) => entry.stage === opts.deployment.environmentStage,
   );
   if (!declared || !actual) {
-    branchMismatch(opts.deployment, "missing stage protection");
+    branchMismatch(opts.deployment, "missing stage source-ref policy");
   }
-  if (declared.branch !== actual.branch) {
-    branchMismatch(opts.deployment, `branch mismatch: ${actual.branch}`);
-  }
-  if (!actual.fastForwardOnly) {
-    branchMismatch(opts.deployment, "fast-forward-only enforcement is missing");
+  if (!sameList(declared.allowedRefs, actual.allowedRefs)) {
+    branchMismatch(opts.deployment, "allowed source refs drift");
   }
   if (!sameList(declared.requiredChecks, actual.requiredChecks)) {
     branchMismatch(opts.deployment, "required checks drift");
   }
-  if (!sameList(declared.normalAdvancePrincipals, actual.normalAdvancePrincipals)) {
-    branchMismatch(opts.deployment, "normal advance principals drift");
+  if (
+    !sameList(
+      opts.deployment.lanePolicy.governance.trustedReporterIdentities,
+      evidence.trustedReporterIdentities,
+    )
+  ) {
+    branchMismatch(opts.deployment, "trusted reporter identities drift");
   }
-  if (!sameList(declared.emergencyDirectPushPrincipals, actual.emergencyDirectPushPrincipals)) {
-    branchMismatch(opts.deployment, "emergency direct-push principals drift");
+  const declaredBoundary = opts.deployment.lanePolicy.governance.requiredApprovalBoundaries.find(
+    (entry) => entry.stage === opts.deployment.environmentStage,
+  );
+  const actualBoundary = evidence.requiredApprovalBoundaries.find(
+    (entry) => entry.stage === opts.deployment.environmentStage,
+  );
+  if (declaredBoundary || actualBoundary) {
+    if (!declaredBoundary || !actualBoundary) {
+      branchMismatch(opts.deployment, "required approval boundary drift");
+    }
+    if (!sameList(declaredBoundary.requiredApprovals, actualBoundary.requiredApprovals)) {
+      branchMismatch(opts.deployment, "required approval boundary drift");
+    }
   }
   return evidence;
 }
@@ -190,23 +205,31 @@ export function verifyLaneGovernanceSnapshot(opts: {
   if (opts.snapshot.repository !== opts.lanePolicy.governance.repository) {
     throw new Error(`lane governance repository mismatch: ${opts.snapshot.repository}`);
   }
-  for (const declared of opts.lanePolicy.governance.branchProtections) {
-    const actual = opts.snapshot.branchProtections.find((entry) => entry.stage === declared.stage);
-    if (!actual) throw new Error(`missing required protected branch for ${declared.stage}`);
-    if (actual.branch !== declared.branch) {
-      throw new Error(`branch protection drift for ${declared.stage}: ${actual.branch}`);
-    }
-    if (!actual.fastForwardOnly) {
-      throw new Error(`missing fast-forward-only enforcement for ${declared.stage}`);
+  for (const declared of opts.lanePolicy.governance.sourceRefPolicies) {
+    const actual = opts.snapshot.sourceRefPolicies.find((entry) => entry.stage === declared.stage);
+    if (!actual) throw new Error(`missing required source-ref policy for ${declared.stage}`);
+    if (!sameList(actual.allowedRefs, declared.allowedRefs)) {
+      throw new Error(`allowed source refs drift for ${declared.stage}`);
     }
     if (!sameList(actual.requiredChecks, declared.requiredChecks)) {
       throw new Error(`required checks drift for ${declared.stage}`);
     }
-    if (!sameList(actual.normalAdvancePrincipals, declared.normalAdvancePrincipals)) {
-      throw new Error(`normal advance principals drift for ${declared.stage}`);
-    }
-    if (!sameList(actual.emergencyDirectPushPrincipals, declared.emergencyDirectPushPrincipals)) {
-      throw new Error(`emergency direct-push principals drift for ${declared.stage}`);
+  }
+  if (
+    !sameList(
+      opts.snapshot.trustedReporterIdentities,
+      opts.lanePolicy.governance.trustedReporterIdentities,
+    )
+  ) {
+    throw new Error("trusted reporter identities drift");
+  }
+  for (const declared of opts.lanePolicy.governance.requiredApprovalBoundaries) {
+    const actual = opts.snapshot.requiredApprovalBoundaries.find(
+      (entry) => entry.stage === declared.stage,
+    );
+    if (!actual) throw new Error(`missing required approval boundary for ${declared.stage}`);
+    if (!sameList(actual.requiredApprovals, declared.requiredApprovals)) {
+      throw new Error(`required approval boundary drift for ${declared.stage}`);
     }
   }
   return {
@@ -217,6 +240,8 @@ export function verifyLaneGovernanceSnapshot(opts: {
     verificationSource: opts.verificationSource || "client_supplied",
     scmBackend: opts.snapshot.scmBackend,
     repository: opts.snapshot.repository,
-    branchProtections: opts.snapshot.branchProtections,
+    sourceRefPolicies: opts.snapshot.sourceRefPolicies,
+    trustedReporterIdentities: opts.snapshot.trustedReporterIdentities,
+    requiredApprovalBoundaries: opts.snapshot.requiredApprovalBoundaries,
   };
 }

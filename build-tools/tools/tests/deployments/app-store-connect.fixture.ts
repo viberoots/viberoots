@@ -23,7 +23,7 @@ export function appStoreConnectDeploymentFixture(
       ref: `//projects/deployments/pleomino-shared:${environmentStage}_release`,
       name: `${environmentStage}_release`,
       requiredChecks: [],
-      allowedRefs: [`env/mobile/${environmentStage}`],
+      allowedRefs: environmentStage === "prod" ? ["refs/tags/release/*"] : ["main"],
       fingerprint: `sha256:admission-mobile-${environmentStage}`,
     });
   const providerTarget = {
@@ -105,7 +105,7 @@ export function appStoreConnectAdmissionPolicyNodeFixture(
 ): GraphNode {
   return nixosSharedHostAdmissionPolicyNodeFixture({
     name: "//projects/deployments/pleomino-shared:dev_release",
-    allowed_refs: ["env/mobile/dev"],
+    allowed_refs: ["main"],
     required_checks: [],
     ...overrides,
   });
@@ -114,12 +114,5 @@ export function appStoreConnectAdmissionPolicyNodeFixture(
 export function appStoreConnectLanePolicyNodeFixture(
   overrides: Partial<GraphNode> = {},
 ): GraphNode {
-  return nixosSharedHostLanePolicyNodeFixture({
-    stage_branches: {
-      dev: "env/mobile/dev",
-      staging: "env/mobile/staging",
-      prod: "env/mobile/prod",
-    },
-    ...overrides,
-  });
+  return nixosSharedHostLanePolicyNodeFixture(overrides);
 }

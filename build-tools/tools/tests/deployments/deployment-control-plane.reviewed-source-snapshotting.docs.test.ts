@@ -25,7 +25,7 @@ test("deployment control plane docs keep reviewed-source snapshotting and mismat
   );
   assert.match(
     miniDoc,
-    /env\/pleomino\/dev[\s\S]*submission-scoped snapshot ref[\s\S]*service-owned snapshot/i,
+    /source-ref-backed lane[\s\S]*submission-scoped snapshot ref[\s\S]*service-owned snapshot/i,
   );
   assert.match(miniDoc, /concurrent submissions[\s\S]*without clobbering/i);
   for (const doc of [usageDoc, sharedHostUsageDoc]) {

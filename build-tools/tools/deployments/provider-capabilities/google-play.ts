@@ -70,7 +70,7 @@ export const GOOGLE_PLAY_PROVIDER_CAPABILITY: DeploymentProviderCapability = {
       "same-deployment rollback is reviewed only for prior successful normal runs on the same canonical store target identity",
     ),
     bullet(
-      "cross-deployment promotion is reviewed only for exact-artifact reuse through the branch-backed lane contract",
+      "cross-deployment promotion is reviewed only for exact-artifact reuse through the source-ref lane contract",
     ),
   ],
   replaySnapshotBaseline: [

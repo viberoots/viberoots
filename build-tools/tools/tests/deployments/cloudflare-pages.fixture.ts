@@ -57,7 +57,7 @@ export function cloudflarePagesDeploymentFixture(
     nixosSharedHostAdmissionPolicyFixture({
       ref: "//projects/deployments/pleomino-shared:staging_release",
       name: "staging_release",
-      allowedRefs: ["env/pleomino/staging"],
+      allowedRefs: ["main", "refs/tags/release/*"],
       requiredChecks: [],
       fingerprint: "sha256:admission-pleomino-staging",
     });
@@ -109,7 +109,7 @@ export function cloudflarePagesAdmissionPolicyNodeFixture(
 ): GraphNode {
   return nixosSharedHostAdmissionPolicyNodeFixture({
     name: "//projects/deployments/pleomino-shared:staging_release",
-    allowed_refs: ["env/pleomino/staging"],
+    allowed_refs: ["main", "refs/tags/release/*"],
     required_checks: ["deploy/pleomino-staging"],
     ...overrides,
   });

@@ -64,7 +64,7 @@ async function withFakeCloudflareApi<T>(
   }
 }
 
-test("cloudflare-pages project provisioning creates missing project with stage branch", async () => {
+test("cloudflare-pages project provisioning creates missing project with source ref", async () => {
   await withFakeCloudflareApi(async ({ requests }) => {
     const deployment = cloudflarePagesDeploymentFixture({
       providerTarget: {
@@ -81,13 +81,13 @@ test("cloudflare-pages project provisioning creates missing project with stage b
       kind: "ready",
       project: "pleomino-staging-pages",
       created: true,
-      productionBranch: "env/pleomino/staging",
+      productionBranch: "main",
     });
     const createBody = JSON.parse(
       requests.find((request) => request.method === "POST")?.body || "{}",
     );
     assert.equal(createBody.name, "pleomino-staging-pages");
-    assert.equal(createBody.production_branch, "env/pleomino/staging");
+    assert.equal(createBody.production_branch, "main");
   });
 });
 

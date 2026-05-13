@@ -89,7 +89,7 @@ Situation:
 Expected behavior:
 
 - the operator submits `deploy --deployment //projects/deployments/pleomino-staging-s3:deploy`
-- the control plane admits one exact static artifact for the reviewed stage branch
+- the control plane admits one exact static artifact for the reviewed source-ref policy
 - the deploy path materializes one reviewed non-destructive provisioner plan artifact for the
   bucket/CDN identity owned by deployment metadata
 - checked-in provider config may add local publish flags, but it must not retarget `bucket`,
@@ -134,8 +134,8 @@ Expected behavior:
 
 - the operator submits `deploy --deployment //projects/deployments/pleomino-prod:deploy --publish-only --source-run-id <known-good-run-id> --rollback`
 - the run is classified as `rollback`
-- the current branch/lane policy must authorize rollback
-- the selected rollback source run may be older than the current branch head
+- the current lane policy and control-plane stage state must authorize rollback
+- the selected rollback source run may be older than the currently admitted stage revision
 - the control plane replays the recorded snapshot for the selected run
 - no rebuild occurs
 
@@ -169,7 +169,7 @@ Expected behavior:
 - the operator or automation submits `deploy --deployment //projects/deployments/pleomino-prod:deploy --preview --source-run-id <admitted-run-id>`
 - preview is recorded as `publish_mode = preview`
 - for same-deployment preview publication, the default `operation_kind` remains `deploy`
-- unless the deployment's `admission_policy` explicitly defines a stricter preview posture, the preview run uses the same target-environment branch and required-check requirements as a normal protected/shared publish for `pleomino-prod`
+- unless the deployment's `admission_policy` explicitly defines a stricter preview posture, the preview run uses the same target-environment source-ref policy and required-check requirements as a normal protected/shared publish for `pleomino-prod`
 - by default, previewing that already-admitted artifact does not require a second manual approval
 - the effective target identity is the isolated preview target
 - the shared/protected preview selector is the admitted source run id, not an ambient branch or commit

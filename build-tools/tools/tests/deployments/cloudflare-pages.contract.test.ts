@@ -60,7 +60,7 @@ test("extractCloudflarePagesDeployments reads provider target and publisher conf
     cloudflarePagesAdmissionPolicyNodeFixture(),
     cloudflarePagesAdmissionPolicyNodeFixture({
       name: "//projects/deployments/pleomino-shared:dev_release",
-      allowed_refs: ["env/pleomino/dev"],
+      allowed_refs: ["main"],
       required_checks: ["deploy/pleomino-dev"],
     }),
     {

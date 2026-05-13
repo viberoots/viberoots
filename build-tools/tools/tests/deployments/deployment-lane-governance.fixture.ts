@@ -26,6 +26,10 @@ import {
   installNixosSharedHostTargets,
   installS3StaticTargets,
 } from "./deployment-targets.install.helpers";
+import {
+  defaultApprovalBoundaries,
+  defaultSourceRefPolicies,
+} from "./deployment-lane-governance-defaults.fixture";
 
 let buckQueryNonce = 0;
 
@@ -47,32 +51,9 @@ export function nixosSharedHostLaneGovernanceFixture(
     name: overrides.name || "lane_governance",
     scmBackend: (overrides.scmBackend || "github") as DeploymentScmBackend,
     repository: overrides.repository || "viberoots/viberoots",
-    branchProtections: overrides.branchProtections || [
-      {
-        stage: "dev",
-        branch: "env/pleomino/dev",
-        requiredChecks: ["deploy/pleomino-dev"],
-        fastForwardOnly: true,
-        normalAdvancePrincipals: ["app:deploy-bot"],
-        emergencyDirectPushPrincipals: ["team:sre-break-glass"],
-      },
-      {
-        stage: "staging",
-        branch: "env/pleomino/staging",
-        requiredChecks: ["deploy/pleomino-staging"],
-        fastForwardOnly: true,
-        normalAdvancePrincipals: ["app:deploy-bot"],
-        emergencyDirectPushPrincipals: ["team:sre-break-glass"],
-      },
-      {
-        stage: "prod",
-        branch: "env/pleomino/prod",
-        requiredChecks: ["deploy/pleomino-prod"],
-        fastForwardOnly: true,
-        normalAdvancePrincipals: ["app:deploy-bot"],
-        emergencyDirectPushPrincipals: ["team:sre-break-glass"],
-      },
-    ],
+    sourceRefPolicies: overrides.sourceRefPolicies || defaultSourceRefPolicies(),
+    trustedReporterIdentities: overrides.trustedReporterIdentities || ["app:deploy-bot"],
+    requiredApprovalBoundaries: overrides.requiredApprovalBoundaries || defaultApprovalBoundaries(),
     fingerprint: overrides.fingerprint || "sha256:lane-governance-pleomino",
   };
 }
@@ -86,13 +67,15 @@ export function nixosSharedHostLaneGovernanceNodeFixture(
     rule_type: DEPLOYMENT_LANE_GOVERNANCE_RULE,
     scm_backend: governance.scmBackend,
     repository: governance.repository,
-    branch_protections: governance.branchProtections.map((entry) => ({
+    source_ref_policies: governance.sourceRefPolicies.map((entry) => ({
       stage: entry.stage,
-      branch: entry.branch,
+      allowed_refs: entry.allowedRefs.join(","),
       required_checks: entry.requiredChecks.join(","),
-      fast_forward_only: "true",
-      normal_advance_principals: entry.normalAdvancePrincipals.join(","),
-      emergency_direct_push_principals: entry.emergencyDirectPushPrincipals.join(","),
+    })),
+    trusted_reporter_identities: governance.trustedReporterIdentities,
+    required_approval_boundaries: governance.requiredApprovalBoundaries.map((entry) => ({
+      stage: entry.stage,
+      required_approvals: entry.requiredApprovals.join(","),
     })),
     ...overrides,
   };
@@ -119,7 +102,9 @@ export function reviewedLaneAdmissionEvidenceFixture(opts: {
       verificationSource: "client_supplied",
       scmBackend: opts.deployment.lanePolicy.governance.scmBackend,
       repository: opts.deployment.lanePolicy.governance.repository,
-      branchProtections: opts.deployment.lanePolicy.governance.branchProtections,
+      sourceRefPolicies: opts.deployment.lanePolicy.governance.sourceRefPolicies,
+      trustedReporterIdentities: opts.deployment.lanePolicy.governance.trustedReporterIdentities,
+      requiredApprovalBoundaries: opts.deployment.lanePolicy.governance.requiredApprovalBoundaries,
       ...(opts.recordRef ? { recordRef: opts.recordRef } : {}),
     },
   };
@@ -137,7 +122,7 @@ export async function writeReviewedLaneAdmissionEvidenceJson(opts: {
     environmentStage: string;
     label: string;
     lanePolicy: {
-      stageBranches: Record<string, string>;
+      sourceRefPolicy: Record<string, string>;
       governance: DeploymentLaneGovernance;
     };
     provider?: string;
@@ -154,7 +139,7 @@ export async function writeReviewedLaneAdmissionEvidenceJson(opts: {
   const resolvedDeployment = await resolveDeploymentFromTarget(opts.tmp, deploymentLabel, {
     env: freshBuckQueryEnv(opts.tmp),
   });
-  const sourceRef = opts.deployment.lanePolicy.stageBranches[opts.deployment.environmentStage];
+  const sourceRef = opts.deployment.lanePolicy.sourceRefPolicy[opts.deployment.environmentStage];
   const sourceRevision = opts.includeRequiredChecks
     ? String(
         (
@@ -172,7 +157,11 @@ export async function writeReviewedLaneAdmissionEvidenceJson(opts: {
       {
         scmBackend: resolvedDeployment.lanePolicy.governance.scmBackend,
         repository: resolvedDeployment.lanePolicy.governance.repository,
-        branchProtections: resolvedDeployment.lanePolicy.governance.branchProtections,
+        sourceRefPolicies: resolvedDeployment.lanePolicy.governance.sourceRefPolicies,
+        trustedReporterIdentities:
+          resolvedDeployment.lanePolicy.governance.trustedReporterIdentities,
+        requiredApprovalBoundaries:
+          resolvedDeployment.lanePolicy.governance.requiredApprovalBoundaries,
       },
       null,
       2,
@@ -201,6 +190,9 @@ export async function writeReviewedLaneAdmissionEvidenceJson(opts: {
                 environmentStage: opts.deployment.environmentStage,
                 admissionPolicyRef: opts.deployment.admissionPolicyRef,
                 recordRef: `check://${name}`,
+                reporterIdentity:
+                  resolvedDeployment.lanePolicy.governance.trustedReporterIdentities[0] ||
+                  "app:deploy-bot",
               })),
             }
           : {}),

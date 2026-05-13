@@ -31,17 +31,13 @@ export async function writePublisherConfig(
 export function mobileReviewedLanePolicy() {
   return nixosSharedHostLanePolicyFixture({
     governance: nixosSharedHostLaneGovernanceFixture({
-      branchProtections: [
-        stageBranchProtection("dev", "env/mobile/dev"),
-        stageBranchProtection("staging", "env/mobile/staging"),
-        stageBranchProtection("prod", "env/mobile/prod"),
+      sourceRefPolicies: [
+        { stage: "dev", allowedRefs: ["main"], requiredChecks: [] },
+        { stage: "staging", allowedRefs: ["main", "refs/tags/release/*"], requiredChecks: [] },
+        { stage: "prod", allowedRefs: ["refs/tags/release/*"], requiredChecks: [] },
       ],
     }),
-    stageBranches: {
-      dev: "env/mobile/dev",
-      staging: "env/mobile/staging",
-      prod: "env/mobile/prod",
-    },
+    sourceRefPolicy: { dev: "main", staging: "main", prod: "refs/tags/release/*" },
   });
 }
 
@@ -84,17 +80,6 @@ export function labelName(label: string): string {
   return label.split(":")[1] || "";
 }
 
-function stageBranchProtection(stage: string, branch: string) {
-  return {
-    stage,
-    branch,
-    requiredChecks: [],
-    fastForwardOnly: true,
-    normalAdvancePrincipals: ["app:deploy-bot"],
-    emergencyDirectPushPrincipals: ["team:sre-break-glass"],
-  };
-}
-
 function renderAppTargets(opts: {
   appTargetLabel: string;
   appArtifactName: string;
@@ -121,10 +106,17 @@ function renderSharedTargets(primary: MobileDeployment, deployments: MobileDeplo
     `    name = ${JSON.stringify(labelName(primary.lanePolicy.governanceRef))},`,
     `    scm_backend = ${JSON.stringify(primary.lanePolicy.governance.scmBackend)},`,
     `    repository = ${JSON.stringify(primary.lanePolicy.governance.repository)},`,
-    "    branch_protections = [",
-    ...primary.lanePolicy.governance.branchProtections.map(
+    "    source_ref_policies = [",
+    ...primary.lanePolicy.governance.sourceRefPolicies.map(
       (entry) =>
-        `        {"stage": ${JSON.stringify(entry.stage)}, "branch": ${JSON.stringify(entry.branch)}, "required_checks": ${JSON.stringify(entry.requiredChecks.join(","))}, "fast_forward_only": ${JSON.stringify(entry.fastForwardOnly ? "true" : "false")}, "normal_advance_principals": ${JSON.stringify(entry.normalAdvancePrincipals.join(","))}, "emergency_direct_push_principals": ${JSON.stringify(entry.emergencyDirectPushPrincipals.join(","))}},`,
+        `        {"stage": ${JSON.stringify(entry.stage)}, "allowed_refs": ${JSON.stringify(entry.allowedRefs.join(","))}, "required_checks": ${JSON.stringify(entry.requiredChecks.join(","))}},`,
+    ),
+    "    ],",
+    `    trusted_reporter_identities = [${primary.lanePolicy.governance.trustedReporterIdentities.map((identity) => JSON.stringify(identity)).join(", ")}],`,
+    "    required_approval_boundaries = [",
+    ...primary.lanePolicy.governance.requiredApprovalBoundaries.map(
+      (entry) =>
+        `        {"stage": ${JSON.stringify(entry.stage)}, "required_approvals": ${JSON.stringify(entry.requiredApprovals.join(","))}},`,
     ),
     "    ],",
     '    visibility = ["PUBLIC"],',
@@ -133,8 +125,8 @@ function renderSharedTargets(primary: MobileDeployment, deployments: MobileDeplo
     "deployment_lane_policy(",
     `    name = ${JSON.stringify(labelName(primary.lanePolicyRef))},`,
     `    stages = [${primary.lanePolicy.stages.map((stage) => JSON.stringify(stage)).join(", ")}],`,
-    `    stage_branches = {${Object.entries(primary.lanePolicy.stageBranches)
-      .map(([stage, branch]) => `${JSON.stringify(stage)}: ${JSON.stringify(branch)}`)
+    `    source_ref_policy = {${Object.entries(primary.lanePolicy.sourceRefPolicy)
+      .map(([stage, sourceRef]) => `${JSON.stringify(stage)}: ${JSON.stringify(sourceRef)}`)
       .join(", ")}},`,
     `    allowed_promotion_edges = [${primary.lanePolicy.allowedPromotionEdges
       .map((edge) => JSON.stringify(edge))
@@ -153,6 +145,9 @@ function renderSharedTargets(primary: MobileDeployment, deployments: MobileDeplo
               .join(", ")}],`,
             `    required_checks = [${deployment.admissionPolicy.requiredChecks
               .map((check) => JSON.stringify(check))
+              .join(", ")}],`,
+            `    required_approvals = [${deployment.admissionPolicy.requiredApprovals
+              .map((approval) => JSON.stringify(approval))
               .join(", ")}],`,
             '    visibility = ["PUBLIC"],',
             ")",

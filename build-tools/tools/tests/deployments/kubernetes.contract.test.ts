@@ -10,10 +10,7 @@ import {
   kubernetesAdmissionPolicyNodeFixture,
   kubernetesLanePolicyNodeFixture,
 } from "./kubernetes.fixture";
-import {
-  nixosSharedHostLaneGovernanceFixture,
-  nixosSharedHostLaneGovernanceNodeFixture,
-} from "./deployment-lane-governance.fixture";
+import { nixosSharedHostLaneGovernanceNodeFixture } from "./deployment-lane-governance.fixture";
 
 function serviceComponent(label: string): GraphNode {
   return { name: label, labels: ["kind:app"] };
@@ -42,41 +39,15 @@ test("extractKubernetesDeployments reads shared-platform provider target and rol
     serviceComponent("//projects/observability/metrics-agent:image"),
     kubernetesLanePolicyNodeFixture(),
     nixosSharedHostLaneGovernanceNodeFixture({
-      branch_protections: nixosSharedHostLaneGovernanceFixture({
-        branchProtections: [
-          {
-            stage: "dev",
-            branch: "env/pleomino/dev",
-            requiredChecks: ["deploy/pleomino-dev"],
-            fastForwardOnly: true,
-            normalAdvancePrincipals: ["app:deploy-bot"],
-            emergencyDirectPushPrincipals: ["team:sre-break-glass"],
-          },
-          {
-            stage: "staging",
-            branch: "env/pleomino/staging",
-            requiredChecks: ["deploy/pleomino-staging"],
-            fastForwardOnly: true,
-            normalAdvancePrincipals: ["app:deploy-bot"],
-            emergencyDirectPushPrincipals: ["team:sre-break-glass"],
-          },
-          {
-            stage: "prod",
-            branch: "env/pleomino/prod",
-            requiredChecks: ["deploy/shared-observability-prod"],
-            fastForwardOnly: true,
-            normalAdvancePrincipals: ["app:deploy-bot"],
-            emergencyDirectPushPrincipals: ["team:sre-break-glass"],
-          },
-        ],
-      }).branchProtections.map((entry) => ({
-        stage: entry.stage,
-        branch: entry.branch,
-        required_checks: entry.requiredChecks.join(","),
-        fast_forward_only: "true",
-        normal_advance_principals: entry.normalAdvancePrincipals.join(","),
-        emergency_direct_push_principals: entry.emergencyDirectPushPrincipals.join(","),
-      })),
+      source_ref_policies: [
+        { stage: "dev", allowed_refs: "main", required_checks: "deploy/pleomino-dev" },
+        { stage: "staging", allowed_refs: "main", required_checks: "deploy/pleomino-staging" },
+        {
+          stage: "prod",
+          allowed_refs: "main,refs/tags/release/*",
+          required_checks: "deploy/shared-observability-prod",
+        },
+      ],
     }),
     kubernetesAdmissionPolicyNodeFixture(),
     {

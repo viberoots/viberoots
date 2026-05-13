@@ -84,6 +84,8 @@ test("front-door admission enforces resolved readiness gates", async () => {
             environmentStage: deployment.environmentStage,
             admissionPolicyRef: deployment.admissionPolicyRef,
             recordRef: "check://deploy/console-staging",
+            reporterIdentity:
+              deployment.lanePolicy.governance.trustedReporterIdentities[0] || "app:deploy-bot",
           },
         ],
       },

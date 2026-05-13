@@ -413,8 +413,8 @@ and inspect `admissionRequirements.admission_policy`, `allowed_refs`,
 `required_checks`, and `required_approvals`. That read-only output tells you
 which names the deployment expects; it does not grant `admission_reporter`.
 For protected/shared `mini` runs, submit-time evidence is finalized against the
-service-owned reviewed snapshot of the deployment's authoritative stage ref, not
-against your laptop checkout. If a submit returns a reviewed source mismatch,
+service-owned reviewed source-ref snapshot selected by lane policy, not against
+your laptop checkout. If a submit returns a reviewed source mismatch,
 compare `clientExpectedSourceRevision` with `serviceReviewedSourceRevision`.
 Either sync the service-side reviewed ref or rerun with
 `--admit-for-commit <serviceReviewedSourceRevision>` only when that

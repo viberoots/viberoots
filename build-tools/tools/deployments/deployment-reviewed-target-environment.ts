@@ -7,6 +7,7 @@ import {
   type DeploymentReviewedSourceSnapshot,
 } from "./nixos-shared-host-reviewed-source-snapshot";
 import { resolveDeploymentGitCommit } from "./deployment-git-ref";
+import { sourceRefAllowed } from "./deployment-source-ref-policy";
 
 export type DeploymentReviewedTargetEnvironmentAdmission = {
   mode: "stage_branch_snapshot";
@@ -19,7 +20,7 @@ export type DeploymentReviewedTargetEnvironmentAdmission = {
 
 function requiredPolicyRef(deployment: DeploymentTarget): string {
   const sourceRef = requiredDeploymentStageBranch(deployment);
-  if (!deployment.admissionPolicy.allowedRefs.includes(sourceRef)) {
+  if (!sourceRefAllowed(sourceRef, deployment.admissionPolicy.allowedRefs)) {
     throw new Error(
       `deployment admission policy ${deployment.admissionPolicyRef} does not allow source ref ${sourceRef}`,
     );
@@ -36,8 +37,8 @@ function reviewedSourceMismatchMessage(opts: {
     `protected/shared reviewed source mismatch for ${opts.targetRef}`,
     `clientExpectedSourceRevision=${opts.expectedSourceRevision}`,
     `serviceReviewedSourceRevision=${opts.targetRevision}`,
-    "The service fetched the reviewed deployment branch before admission.",
-    "Make sure that branch is up to date and pushed before retrying.",
+    "The service fetched the reviewed deployment source ref before admission.",
+    "Make sure that source ref is up to date and pushed before retrying.",
     `Rerun with --admit-for-commit ${opts.targetRevision} if ${opts.targetRevision} is intentionally the reviewed commit to deploy.`,
   ].join("\n");
 }

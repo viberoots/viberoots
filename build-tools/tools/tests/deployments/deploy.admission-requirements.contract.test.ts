@@ -34,11 +34,9 @@ async function resetToFixture(tmp: string, $: any, fixtureRevision: string): Pro
 test("deploy admission requirements for listed deployments", async (t) => {
   await runInTemp("deploy-admission-requirements-listed", async (tmp, $) => {
     await writeTempListedDeploymentWorkspace(tmp);
-    await $({ cwd: tmp, stdio: "pipe" })`git branch -f env/demo/dev HEAD`;
-
     await t.test("validate-only prints metadata-derived admission requirements", async () => {
       const requiredSha = String(
-        (await $({ cwd: tmp, stdio: "pipe" })`git rev-parse env/demo/dev`).stdout,
+        (await $({ cwd: tmp, stdio: "pipe" })`git rev-parse main`).stdout,
       ).trim();
       const result = await $({
         cwd: tmp,
@@ -47,12 +45,12 @@ test("deploy admission requirements for listed deployments", async (t) => {
       const payload = JSON.parse(String(result.stdout));
       assert.deepEqual(payload.admissionRequirements, {
         admission_policy: "//sandbox/deployments/shared:dev_release",
-        allowed_refs: ["env/demo/dev"],
+        allowed_refs: ["main"],
         required_checks: ["deploy/demo-dev"],
         required_approvals: [],
         required_check_subject: {
           kind: "git_commit",
-          ref: "env/demo/dev",
+          ref: "main",
           sha: requiredSha,
         },
         admit: {
@@ -90,7 +88,8 @@ test("deploy admission requirements for listed deployments", async (t) => {
 
     await t.test("defaults to HEAD and fails closed when another commit is required", async () => {
       await resetToFixture(tmp, $, fixtureRevision);
-      await $({ cwd: tmp, stdio: "pipe" })`git branch -f env/demo/dev ${fixtureRevision}`;
+      await $({ cwd: tmp, stdio: "pipe" })`git checkout -B local-work ${fixtureRevision}`;
+      await $({ cwd: tmp, stdio: "pipe" })`git branch -f main ${fixtureRevision}`;
       await fsp.writeFile(`${tmp}/local-only.txt`, "local-only\n", "utf8");
       await $({ cwd: tmp, stdio: "pipe" })`git add local-only.txt`;
       await $({ cwd: tmp, stdio: "pipe" })`git commit -m local-only`;
@@ -105,10 +104,10 @@ test("deploy admission requirements for listed deployments", async (t) => {
       assert.notEqual(result.exitCode, 0);
       assert.match(String(result.stderr), /defaulted to local HEAD:/);
       assert.match(String(result.stderr), new RegExp(`requires checks for: ${fixtureRevision}`));
-      assert.match(String(result.stderr), /deployment_source_ref: env\/demo\/dev/);
+      assert.match(String(result.stderr), /deployment_source_ref: main/);
       assert.match(
         String(result.stderr),
-        /deployment branch is up to date and pushed before retrying/,
+        /deployment source ref is up to date and pushed before retrying/,
       );
       assert.match(
         String(result.stderr),
@@ -118,7 +117,8 @@ test("deploy admission requirements for listed deployments", async (t) => {
 
     await t.test("explains when the deployment source ref is unavailable locally", async () => {
       await resetToFixture(tmp, $, fixtureRevision);
-      await $({ cwd: tmp, stdio: "pipe" })`git branch -D env/demo/dev`.nothrow();
+      await $({ cwd: tmp, stdio: "pipe" })`git checkout -B local-work`;
+      await $({ cwd: tmp, stdio: "pipe" })`git branch -D main`.nothrow();
       const result = await $({
         cwd: tmp,
         stdio: "pipe",
@@ -126,11 +126,11 @@ test("deploy admission requirements for listed deployments", async (t) => {
       assert.notEqual(result.exitCode, 0);
       assert.match(
         String(result.stderr),
-        /deployment source ref env\/demo\/dev is not available in this git workspace/,
+        /deployment source ref main is not available in this git workspace/,
       );
       assert.match(
         String(result.stderr),
-        /Run this first \(replace <remote> with your git remote\): git fetch <remote> env\/demo\/dev:env\/demo\/dev/,
+        /Run this first \(replace <remote> with your git remote\): git fetch <remote> main:main/,
       );
       assert.match(
         String(result.stderr),
@@ -141,7 +141,7 @@ test("deploy admission requirements for listed deployments", async (t) => {
         /Or rerun with --admit-for-commit <sha> if you already know the reviewed commit\./,
       );
       assert.doesNotMatch(String(result.stderr), /Inspect requirements only:/);
-      assert.doesNotMatch(String(result.stderr), /Command failed: git rev-parse env\/demo\/dev/);
+      assert.doesNotMatch(String(result.stderr), /Command failed: git rev-parse main/);
       assert.doesNotMatch(String(result.stderr), /Use '--' to separate paths from revisions/);
       assert.doesNotMatch(
         String(result.stderr),
@@ -151,7 +151,8 @@ test("deploy admission requirements for listed deployments", async (t) => {
 
     await t.test("admit-for-commit binds explicit evidence to the requested commit", async () => {
       await resetToFixture(tmp, $, fixtureRevision);
-      await $({ cwd: tmp, stdio: "pipe" })`git branch -f env/demo/dev ${fixtureRevision}`;
+      await $({ cwd: tmp, stdio: "pipe" })`git checkout -B local-work ${fixtureRevision}`;
+      await $({ cwd: tmp, stdio: "pipe" })`git branch -f main ${fixtureRevision}`;
       await fsp.writeFile(`${tmp}/local-only.txt`, "local-only\n", "utf8");
       await $({ cwd: tmp, stdio: "pipe" })`git add local-only.txt`;
       await $({ cwd: tmp, stdio: "pipe" })`git commit -m local-only`;
@@ -197,7 +198,6 @@ test("deploy admission requirements for listed deployments", async (t) => {
 test("deploy admission requirements for deployments with no required checks", async (t) => {
   await runInTemp("deploy-admission-requirements-no-required-checks", async (tmp, $) => {
     await writeTempCloudflareValidationWorkspace(tmp);
-    await $({ cwd: tmp, stdio: "pipe" })`git branch -f env/demo/staging HEAD`;
 
     await t.test("validate-only makes zero required checks explicit", async () => {
       const result = await $({
@@ -207,7 +207,7 @@ test("deploy admission requirements for deployments with no required checks", as
       const payload = JSON.parse(String(result.stdout));
       assert.deepEqual(payload.admissionRequirements, {
         admission_policy: "//sandbox/deployments/shared:staging_release",
-        allowed_refs: ["env/demo/staging"],
+        allowed_refs: ["main"],
         required_checks: [],
         required_approvals: [],
         admit: {

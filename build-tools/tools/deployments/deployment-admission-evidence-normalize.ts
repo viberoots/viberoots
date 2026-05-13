@@ -56,6 +56,7 @@ export function normalizeAdmissionEvidence(
     const environmentStage = readText(rawEntry, "environmentStage");
     const admissionPolicyRef = readText(rawEntry, "admissionPolicyRef");
     const recordRef = readText(rawEntry, "recordRef");
+    const reporterIdentity = readText(rawEntry, "reporterIdentity");
     const reportingKind = normalizeCheckReportingKind(entry.reportingKind);
     return {
       name,
@@ -67,6 +68,7 @@ export function normalizeAdmissionEvidence(
       ...(admissionPolicyRef ? { admissionPolicyRef } : {}),
       ...(recordRef ? { recordRef } : {}),
       ...(reportingKind ? { reportingKind } : {}),
+      ...(reporterIdentity ? { reporterIdentity } : {}),
     };
   });
   const approvals = normalizeList(raw.approvals, normalizeApprovalEvidence);

@@ -16,6 +16,7 @@ import {
 } from "./deployment-lane-promotion-compatibility";
 import { extractDeploymentDefaults } from "./deployment-defaults";
 import { fingerprintPolicy } from "./deployment-policy-fingerprint";
+import { sourceRefAllowed, staleEnvironmentRefErrors } from "./deployment-source-ref-policy";
 export { extractDeploymentAdmissionPolicies } from "./deployment-admission-policy";
 
 export const DEPLOYMENT_LANE_POLICY_RULE = "deployment_lane_policy";
@@ -30,7 +31,9 @@ export type DeploymentLanePolicy = {
   name: string;
   defaultsRef?: string;
   stages: string[];
+  sourceRefPolicy: Record<string, string>;
   stageBranches: Record<string, string>;
+  stageBranchesRequired: boolean;
   allowedPromotionEdges: string[];
   artifactReuseMode: ArtifactReuseMode;
   promotionCompatibility?: DeploymentLanePromotionCompatibility;
@@ -60,6 +63,28 @@ function policyError(ref: string, message: string): string {
   return `${normalizeTargetLabel(ref)}: ${message}`;
 }
 
+function readBoolean(node: GraphNode, key: string): boolean {
+  return node[key] === true || node[key] === "true";
+}
+
+function rejectStaleStageBranches(
+  ref: string,
+  stageBranches: Record<string, string>,
+  stageBranchesRequired: boolean,
+) {
+  const entries = Object.entries(stageBranches);
+  const errors = entries.map(([stage, branch]) =>
+    policyError(
+      ref,
+      `stage_branches is not supported; use source_ref_policy for ${stage} (${branch})`,
+    ),
+  );
+  if (stageBranchesRequired && entries.length === 0) {
+    errors.push(policyError(ref, "stage_branches_required is not supported"));
+  }
+  return errors;
+}
+
 export function extractDeploymentLanePoliciesWithGovernance(
   nodes: GraphNode[],
   governancePolicies: Map<string, DeploymentLaneGovernance>,
@@ -81,6 +106,8 @@ export function extractDeploymentLanePoliciesWithGovernance(
       readString(node, "default_client_profile") || defaults?.defaultClientProfile || "";
     const stages = readStringArray(node, "stages");
     const stageBranches = readStringRecord(node, "stage_branches");
+    const sourceRefPolicy = readStringRecord(node, "source_ref_policy");
+    const stageBranchesRequired = readBoolean(node, "stage_branches_required");
     const allowedPromotionEdges = readStringArray(node, "allowed_promotion_edges");
     const artifactReuseMode = (readString(node, "artifact_reuse_mode") ||
       "same_artifact") as ArtifactReuseMode;
@@ -97,10 +124,20 @@ export function extractDeploymentLanePoliciesWithGovernance(
     }
     if (stages.length === 0) errors.push(policyError(ref, "lane policy must define stages"));
     for (const stage of stages) {
-      if (!stageBranches[stage]) {
-        errors.push(policyError(ref, `lane policy missing stage_branches entry for ${stage}`));
+      if (!sourceRefPolicy[stage]) {
+        errors.push(policyError(ref, `lane policy missing source_ref_policy entry for ${stage}`));
       }
     }
+    if (Object.keys(stageBranches).length > 0 || stageBranchesRequired) {
+      errors.push(...rejectStaleStageBranches(ref, stageBranches, stageBranchesRequired));
+    }
+    errors.push(
+      ...staleEnvironmentRefErrors({
+        label: ref,
+        field: "source_ref_policy",
+        refs: Object.values(sourceRefPolicy),
+      }),
+    );
     for (const edge of allowedPromotionEdges) {
       const [from = "", to = ""] = edge.split("->").map((part) => part.trim());
       if (!from || !to) {
@@ -121,16 +158,19 @@ export function extractDeploymentLanePoliciesWithGovernance(
       errors.push(policyError(ref, `governance_policy target not found: ${governanceRef}`));
     } else {
       for (const stage of stages) {
-        const protection = governance.branchProtections.find((entry) => entry.stage === stage);
-        if (!protection) {
+        const sourcePolicy = governance.sourceRefPolicies.find((entry) => entry.stage === stage);
+        const sourceRef = sourceRefPolicy[stage];
+        if (!sourcePolicy) {
           errors.push(
             policyError(ref, `governance_policy ${governanceRef} is missing stage ${stage}`),
           );
-        } else if (protection.branch !== stageBranches[stage]) {
+        } else if (!sourceRef) {
+          continue;
+        } else if (!sourceRefAllowed(sourceRef, sourcePolicy.allowedRefs)) {
           errors.push(
             policyError(
               ref,
-              `governance_policy ${governanceRef} branch mismatch for ${stage}: ${protection.branch}`,
+              `governance_policy ${governanceRef} source ref mismatch for ${stage}: ${sourceRef}`,
             ),
           );
         }
@@ -140,7 +180,7 @@ export function extractDeploymentLanePoliciesWithGovernance(
     const fingerprint = fingerprintPolicy({
       name,
       stages,
-      stageBranches,
+      sourceRefPolicy,
       allowedPromotionEdges,
       artifactReuseMode,
       ...lanePromotionCompatibilityFingerprintPart(promotionCompatibility.value),
@@ -152,7 +192,9 @@ export function extractDeploymentLanePoliciesWithGovernance(
       name,
       ...(defaultsRef ? { defaultsRef } : {}),
       stages,
+      sourceRefPolicy,
       stageBranches,
+      stageBranchesRequired,
       allowedPromotionEdges,
       artifactReuseMode,
       ...(promotionCompatibility.value

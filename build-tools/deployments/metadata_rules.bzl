@@ -95,7 +95,9 @@ deployment_lane_policy = rule(
     attrs = {
         "defaults": attrs.option(attrs.dep(), default = None),
         "stages": attrs.list(attrs.string()),
-        "stage_branches": attrs.dict(key = attrs.string(), value = attrs.string()),
+        "stage_branches": attrs.dict(key = attrs.string(), value = attrs.string(), default = {}),
+        "stage_branches_required": attrs.bool(default = False),
+        "source_ref_policy": attrs.dict(key = attrs.string(), value = attrs.string(), default = {}),
         "allowed_promotion_edges": attrs.list(attrs.string(), default = []),
         "artifact_reuse_mode": attrs.string(default = "same_artifact"),
         "promotion_compatibility": attrs.string(default = ""),
@@ -118,7 +120,9 @@ deployment_lane_governance = rule(
     attrs = {
         "scm_backend": attrs.string(),
         "repository": attrs.string(),
-        "branch_protections": attrs.list(attrs.dict(key = attrs.string(), value = attrs.string()), default = []),
+        "source_ref_policies": attrs.list(attrs.dict(key = attrs.string(), value = attrs.string()), default = []),
+        "trusted_reporter_identities": attrs.list(attrs.string(), default = []),
+        "required_approval_boundaries": attrs.list(attrs.dict(key = attrs.string(), value = attrs.string()), default = []),
         "labels": attrs.list(attrs.string(), default = []),
     },
 )

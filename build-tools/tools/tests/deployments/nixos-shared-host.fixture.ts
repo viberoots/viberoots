@@ -22,7 +22,10 @@ import type {
 } from "../../deployments/deployment-admission-supply-chain";
 import { nixosSharedHostLaneGovernanceFixture } from "./deployment-lane-governance.fixture";
 export { installNixosSharedHostTargets } from "./deployment-targets.install.helpers";
-export { ensureNixosSharedHostStageBranch } from "./nixos-shared-host.stage-branch.fixture";
+export {
+  deploymentSourceRef,
+  ensureNixosSharedHostStageBranch,
+} from "./nixos-shared-host.stage-branch.fixture";
 
 export function nixosSharedHostSsrRuntimeContractFixture(
   overrides: Partial<NixosSharedHostSsrRuntimeContract> = {},
@@ -48,11 +51,13 @@ export function nixosSharedHostLanePolicyFixture(overrides: Partial<DeploymentLa
     ref: overrides.ref || "//projects/deployments/pleomino-shared:lane",
     name: overrides.name || "lane",
     stages: overrides.stages || ["dev", "staging", "prod"],
-    stageBranches: overrides.stageBranches || {
-      dev: "env/pleomino/dev",
-      staging: "env/pleomino/staging",
-      prod: "env/pleomino/prod",
+    sourceRefPolicy: overrides.sourceRefPolicy || {
+      dev: "main",
+      staging: "main",
+      prod: "refs/tags/release/fixture",
     },
+    stageBranches: overrides.stageBranches || {},
+    stageBranchesRequired: overrides.stageBranchesRequired || false,
     allowedPromotionEdges: overrides.allowedPromotionEdges || ["dev->staging", "staging->prod"],
     artifactReuseMode: overrides.artifactReuseMode || "same_artifact",
     ...(promotionCompatibility ? { promotionCompatibility } : {}),
@@ -72,7 +77,7 @@ export function nixosSharedHostAdmissionPolicyFixture(
   return {
     ref: overrides.ref || "//projects/deployments/pleomino-shared:dev_release",
     name: overrides.name || "dev_release",
-    allowedRefs: overrides.allowedRefs || ["env/pleomino/dev"],
+    allowedRefs: overrides.allowedRefs || ["main"],
     requiredChecks: overrides.requiredChecks || ["deploy/pleomino-dev"],
     requiredApprovals: overrides.requiredApprovals || [],
     retryBranchPolicy: overrides.retryBranchPolicy || "branch_independent",
@@ -93,7 +98,9 @@ export function nixosSharedHostLanePolicyNodeFixture(overrides: Partial<GraphNod
     name: policy.ref,
     rule_type: DEPLOYMENT_LANE_POLICY_RULE,
     stages: policy.stages,
+    source_ref_policy: policy.sourceRefPolicy,
     stage_branches: policy.stageBranches,
+    stage_branches_required: policy.stageBranchesRequired,
     allowed_promotion_edges: policy.allowedPromotionEdges,
     artifact_reuse_mode: policy.artifactReuseMode,
     promotion_compatibility: policy.promotionCompatibility

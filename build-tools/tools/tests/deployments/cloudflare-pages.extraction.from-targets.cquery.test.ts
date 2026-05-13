@@ -8,7 +8,7 @@ import { extractCloudflarePagesDeployments } from "../../deployments/contract";
 import { inheritedBuckIsolation, runInTemp } from "../lib/test-helpers";
 
 const ATTRS =
-  "name,rule_type,buck.type,provider,component,component_kind,publisher,publisher_config,protection_class,lane_policy,environment_stage,admission_policy,provider_target,vault_runtime,preview,prerequisites,secret_requirements,runtime_config_requirements,release_actions,target_exceptions,governance_policy,defaults,default_client_profile,scm_backend,repository,branch_protections,stages,stage_branches,allowed_promotion_edges,artifact_reuse_mode,promotion_compatibility,allowed_refs,required_checks,required_approvals,retry_branch_policy,retry_approval_reuse,artifact_attestation_mode,labels".split(
+  "name,rule_type,buck.type,provider,component,component_kind,publisher,publisher_config,protection_class,lane_policy,environment_stage,admission_policy,provider_target,vault_runtime,preview,prerequisites,secret_requirements,runtime_config_requirements,release_actions,target_exceptions,governance_policy,defaults,default_client_profile,scm_backend,repository,source_ref_policies,trusted_reporter_identities,required_approval_boundaries,stages,source_ref_policy,stage_branches,stage_branches_required,allowed_promotion_edges,artifact_reuse_mode,promotion_compatibility,allowed_refs,required_checks,required_approvals,retry_branch_policy,retry_approval_reuse,artifact_attestation_mode,labels".split(
     ",",
   );
 
@@ -35,25 +35,6 @@ function assertCloudflareApiTokenSteps(
   );
 }
 
-const EXPECTED_MINI_VAULT_RUNTIME_BASE = {
-  addr: "https://secrets.apps.kilty.io:8200",
-  oidcIssuer: "https://identity.apps.kilty.io/realms/deployments",
-  audience: "deployments-vault",
-  deploymentClientId: "deployment-runner",
-  cliPublicClientId: "deployment-cli",
-  serviceAccountClientId: "deployment-runner",
-  deploymentEnvironment: "mini",
-  roleName: "deploy-pleomino-read",
-  pkceCallback: {
-    mode: "public_host",
-    externalScheme: "https",
-    externalHost: "deploy-auth.apps.kilty.io",
-    externalPath: "/oidc/callback",
-    bindHost: "127.0.0.1",
-    bindPort: "7780",
-    bindPath: "/oidc/callback",
-  },
-};
 test("cloudflare-pages deployment extraction reads canonical metadata from TARGETS via cquery", async () => {
   await runInTemp("cloudflare-pages-cquery-extraction", async (tmp, _$) => {
     const appTargetsPath = path.join(tmp, "projects/apps/pleomino/TARGETS");
@@ -93,11 +74,13 @@ test("cloudflare-pages deployment extraction reads canonical metadata from TARGE
         '    name = "lane_governance",',
         '    scm_backend = "github",',
         '    repository = "viberoots/viberoots",',
-        "    branch_protections = [",
-        '        {"stage": "dev", "branch": "env/pleomino/dev", "required_checks": "deploy/pleomino-dev", "fast_forward_only": "true", "normal_advance_principals": "app:deploy-bot", "emergency_direct_push_principals": "team:sre-break-glass"},',
-        '        {"stage": "staging", "branch": "env/pleomino/staging", "required_checks": "deploy/pleomino-staging", "fast_forward_only": "true", "normal_advance_principals": "app:deploy-bot", "emergency_direct_push_principals": "team:sre-break-glass"},',
-        '        {"stage": "prod", "branch": "env/pleomino/prod", "required_checks": "deploy/pleomino-prod", "fast_forward_only": "true", "normal_advance_principals": "app:deploy-bot", "emergency_direct_push_principals": "team:sre-break-glass"},',
+        "    source_ref_policies = [",
+        '        {"stage": "dev", "allowed_refs": "main", "required_checks": "deploy/pleomino-dev"},',
+        '        {"stage": "staging", "allowed_refs": "main,refs/tags/release/*", "required_checks": "deploy/pleomino-staging"},',
+        '        {"stage": "prod", "allowed_refs": "refs/tags/release/*", "required_checks": "deploy/pleomino-prod"},',
         "    ],",
+        '    trusted_reporter_identities = ["app:deploy-bot", "ci:jenkins"],',
+        '    required_approval_boundaries = [{"stage": "prod", "required_approvals": "release-owner"}],',
         '    visibility = ["PUBLIC"],',
         ")",
         "",
@@ -105,7 +88,7 @@ test("cloudflare-pages deployment extraction reads canonical metadata from TARGE
         '    name = "lane",',
         '    defaults = ":defaults",',
         '    stages = ["dev", "staging", "prod"],',
-        '    stage_branches = {"dev": "env/pleomino/dev", "staging": "env/pleomino/staging", "prod": "env/pleomino/prod"},',
+        '    source_ref_policy = {"dev": "main", "staging": "main", "prod": "refs/tags/release/*"},',
         '    allowed_promotion_edges = ["dev->staging", "staging->prod"],',
         '    promotion_compatibility = """{"cross_provider_promotion_edges":["dev->staging"]}""",',
         '    governance_policy = ":lane_governance",',
@@ -114,7 +97,7 @@ test("cloudflare-pages deployment extraction reads canonical metadata from TARGE
         "",
         "deployment_admission_policy(",
         '    name = "staging_release",',
-        '    allowed_refs = ["env/pleomino/staging"],',
+        '    allowed_refs = ["main", "refs/tags/release/*"],',
         '    required_checks = ["deploy/pleomino-staging"],',
         '    visibility = ["PUBLIC"],',
         ")",
@@ -190,6 +173,24 @@ test("cloudflare-pages deployment extraction reads canonical metadata from TARGE
     assert.equal(deployments.length, 1);
     assert.equal(deployments[0]?.label, "//projects/deployments/pleomino-staging:deploy");
     assert.equal(deployments[0]?.lanePolicy.defaultClientProfile, "mini");
+    assert.deepEqual(deployments[0]?.lanePolicy.stageBranches, {});
+    assert.deepEqual(deployments[0]?.lanePolicy.sourceRefPolicy, {
+      dev: "main",
+      staging: "main",
+      prod: "refs/tags/release/*",
+    });
+    const stagingSourcePolicy = deployments[0]?.lanePolicy.governance.sourceRefPolicies.find(
+      (policy) => policy.stage === "staging",
+    );
+    assert.deepEqual(stagingSourcePolicy?.allowedRefs, ["main", "refs/tags/release/*"]);
+    assert.deepEqual(stagingSourcePolicy?.requiredChecks, ["deploy/pleomino-staging"]);
+    assert.deepEqual(deployments[0]?.lanePolicy.governance.trustedReporterIdentities, [
+      "app:deploy-bot",
+      "ci:jenkins",
+    ]);
+    assert.deepEqual(deployments[0]?.lanePolicy.governance.requiredApprovalBoundaries, [
+      { stage: "prod", requiredApprovals: ["release-owner"] },
+    ]);
     assert.equal(deployments[0]?.publisher.config, "wrangler.jsonc");
     assert.equal(deployments[0]?.providerTarget.account, "web-platform-staging");
     assert.equal(deployments[0]?.providerTarget.project, "pleomino-staging-pages");
@@ -236,10 +237,4 @@ test("concrete Pleomino Cloudflare TARGETS emit publish and cleanup token requir
   assert.equal(prod?.providerTarget.canonicalUrl, "https://pleomino.com/");
   assertCloudflareApiTokenSteps(staging!, ["preview_cleanup", "provision", "publish"]);
   assertCloudflareApiTokenSteps(prod!, ["preview_cleanup", "provision", "publish"]);
-  assert.deepEqual(
-    deployments
-      .map((deployment) => deployment.vaultRuntime)
-      .sort((a, b) => String(a?.roleName || "").localeCompare(String(b?.roleName || ""))),
-    [EXPECTED_MINI_VAULT_RUNTIME_BASE, EXPECTED_MINI_VAULT_RUNTIME_BASE],
-  );
 });

@@ -38,6 +38,21 @@ function humanCheckEvidence(deployment: any, subject: string) {
   };
 }
 
+function trustedReporter(deployment: any): string {
+  return deployment.lanePolicy.governance.trustedReporterIdentities[0] || "app:deploy-bot";
+}
+
+function manualCheck(deployment: any) {
+  return {
+    name: "deploy/pleomino-dev",
+    subject: "sha256:manual",
+    status: "passed",
+    checkedAt: "2026-04-23T00:00:00.000Z",
+    reportingKind: "human_manual",
+    reporterIdentity: trustedReporter(deployment),
+  };
+}
+
 async function startHarness(tmp: string, deployment: any, artifactName: string) {
   const artifactDir = path.join(tmp, artifactName);
   const paths = {
@@ -97,15 +112,7 @@ test("submitter-only sessions cannot submit client-supplied admission checks", a
         authSessionId,
         admissionEvidence: {
           ...evidenceWithoutPrincipal(deployment),
-          checks: [
-            {
-              name: "deploy/pleomino-dev",
-              subject: "sha256:manual",
-              status: "passed",
-              checkedAt: "2026-04-23T00:00:00.000Z",
-              reportingKind: "human_manual",
-            },
-          ],
+          checks: [manualCheck(deployment)],
         },
       });
       assert.equal(response.status, 403);
@@ -136,15 +143,7 @@ test("admission_reporter-only sessions still cannot submit a deploy", async () =
         authSessionId,
         admissionEvidence: {
           ...evidenceWithoutPrincipal(deployment),
-          checks: [
-            {
-              name: "deploy/pleomino-dev",
-              subject: "sha256:manual",
-              status: "passed",
-              checkedAt: "2026-04-23T00:00:00.000Z",
-              reportingKind: "human_manual",
-            },
-          ],
+          checks: [manualCheck(deployment)],
         },
       });
       assert.equal(response.status, 403);
@@ -226,10 +225,9 @@ test("automation principals can submit structured evidence only when they also h
             ...admissionEvidence,
             checks: admissionEvidence.checks.map((check) => ({
               ...check,
-              status: "passed",
-              checkedAt: "2026-04-23T00:00:00.000Z",
               recordRef: "check://deploy/pleomino-dev",
               reportingKind: "ci_pipeline",
+              reporterIdentity: trustedReporter(deployment),
             })),
           },
         }),

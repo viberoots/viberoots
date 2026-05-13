@@ -16,14 +16,23 @@ export { installKubernetesTargets } from "./deployment-targets.install.helpers";
 export function kubernetesDeploymentFixture(
   overrides: Partial<KubernetesDeployment> = {},
 ): KubernetesDeployment {
-  const lanePolicy = overrides.lanePolicy || nixosSharedHostLanePolicyFixture();
+  const defaultLanePolicy = nixosSharedHostLanePolicyFixture();
+  const lanePolicy =
+    overrides.lanePolicy ||
+    nixosSharedHostLanePolicyFixture({
+      governance: {
+        ...defaultLanePolicy.governance,
+        requiredApprovalBoundaries: [{ stage: "staging", requiredApprovals: ["release-owner"] }],
+      },
+    });
   const admissionPolicy =
     overrides.admissionPolicy ||
     nixosSharedHostAdmissionPolicyFixture({
       ref: "//projects/deployments/platform-shared:prod_release",
       name: "prod_release",
-      allowedRefs: ["env/pleomino/prod"],
+      allowedRefs: ["refs/tags/release/*"],
       requiredChecks: [],
+      requiredApprovals: [],
       fingerprint: "sha256:admission-platform-prod",
     });
   const providerTarget = {
@@ -74,8 +83,9 @@ export function kubernetesAdmissionPolicyNodeFixture(
 ): GraphNode {
   return nixosSharedHostAdmissionPolicyNodeFixture({
     name: "//projects/deployments/platform-shared:prod_release",
-    allowed_refs: ["env/pleomino/prod"],
+    allowed_refs: ["refs/tags/release/*"],
     required_checks: ["deploy/shared-observability-prod"],
+    required_approvals: ["release-owner"],
     ...overrides,
   });
 }

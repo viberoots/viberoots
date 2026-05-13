@@ -22,7 +22,7 @@ test("remote service submission error explains when the service requires a diffe
             hostname: "mini",
             workspaceRoot: "/srv/viberoots",
             gitHead: "8f00f5cd723bed179a48847d2daeea3e0c2dcce1",
-            reviewedRef: "env/pleomino/dev",
+            reviewedRef: "main",
             reviewedRepository: "viberoots/viberoots",
             reviewedRemoteName: "origin",
             reviewedRemoteUrl: "git@github.com:viberoots/viberoots.git",
@@ -39,6 +39,8 @@ test("remote service submission error explains when the service requires a diffe
             subject: "a6df216710fa35b28fa24475eac69fb24cfa6de7",
             status: "passed",
             checkedAt: "2026-04-25T00:00:00.000Z",
+            reporterIdentity:
+              deployment.lanePolicy.governance.trustedReporterIdentities[0] || "app:deploy-bot",
           },
         ],
       },
@@ -48,12 +50,15 @@ test("remote service submission error explains when the service requires a diffe
     String(error.message),
     /requires check deploy\/pleomino-dev for commit 85e2c9ee8dd909fc041f693fe8e937e34e7b36ef, but this client submitted passed deploy\/pleomino-dev for commit a6df216710fa35b28fa24475eac69fb24cfa6de7/,
   );
-  assert.match(String(error.message), /deployment_source_ref: env\/pleomino\/dev/);
+  assert.match(String(error.message), /deployment_source_ref: main/);
   assert.match(
     String(error.message),
     /remote control-plane repo state does not match your local git workspace/,
   );
-  assert.match(String(error.message), /deployment branch is up to date and pushed before retrying/);
+  assert.match(
+    String(error.message),
+    /deployment source ref is up to date and pushed before retrying/,
+  );
   assert.match(
     String(error.message),
     /--admit-for-commit 85e2c9ee8dd909fc041f693fe8e937e34e7b36ef/,

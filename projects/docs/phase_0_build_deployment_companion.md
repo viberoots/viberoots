@@ -218,7 +218,7 @@ projects/deployments/platform-foundation-staging/
 projects/deployments/platform-foundation-prod/
 ```
 
-`platform-shared` should hold the shared lane policy, stage branches, governance, and admission policies. The console, web, and worker deployments can then share the same `dev -> staging -> prod` promotion model while remaining separate provider-specific deployments.
+`platform-shared` should hold the shared lane policy, source-ref policies, governance, and admission policies. The console, web, and worker deployments can then share the same `dev -> staging -> prod` promotion model while remaining separate provider-specific deployments.
 
 `platform-foundation-*` should hold shared environment infrastructure that is not naturally owned by only the console, web, or worker deployment. Examples include base DNS zones, Supabase project resources, shared object buckets, deployment secret path scaffolding, and OpenTofu state configuration. Component-specific infrastructure should stay with the component deployment that owns it.
 

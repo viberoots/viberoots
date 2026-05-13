@@ -6,7 +6,7 @@ import type {
   DeploymentAdmissionPolicyEvaluation,
 } from "./deployment-admission-evidence";
 import { evaluateDeploymentAdmission } from "./deployment-admission-evaluator";
-import type { AdmittedContextLike } from "./deployment-admission-facts";
+import type { AdmittedContextLike } from "./deployment-admitted-context";
 import {
   enqueueBackendSubmission,
   readBackendSubmissionBySubmissionId,

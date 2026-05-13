@@ -68,30 +68,17 @@ export function pleominoDeploymentFixture(): NixosSharedHostDeployment {
     lanePolicy: nixosSharedHostLanePolicyFixture({
       governance: {
         ...nixosSharedHostDeploymentFixture().lanePolicy.governance,
-        branchProtections: [
-          {
-            stage: "dev",
-            branch: "env/pleomino/dev",
-            requiredChecks: [],
-            fastForwardOnly: true,
-            normalAdvancePrincipals: ["app:deploy-bot"],
-            emergencyDirectPushPrincipals: ["team:sre-break-glass"],
-          },
+        sourceRefPolicies: [
+          { stage: "dev", allowedRefs: ["main"], requiredChecks: [] },
           {
             stage: "staging",
-            branch: "env/pleomino/staging",
+            allowedRefs: ["main"],
             requiredChecks: ["deploy/pleomino-staging"],
-            fastForwardOnly: true,
-            normalAdvancePrincipals: ["app:deploy-bot"],
-            emergencyDirectPushPrincipals: ["team:sre-break-glass"],
           },
           {
             stage: "prod",
-            branch: "env/pleomino/prod",
+            allowedRefs: ["refs/tags/release/*"],
             requiredChecks: ["deploy/pleomino-prod"],
-            fastForwardOnly: true,
-            normalAdvancePrincipals: ["app:deploy-bot"],
-            emergencyDirectPushPrincipals: ["team:sre-break-glass"],
           },
         ],
       },
@@ -130,14 +117,23 @@ export async function requirePleominoDevCheck(tmp: string): Promise<void> {
   const sharedTargetsPath = path.join(tmp, "projects", "deployments", "pleomino-shared", "TARGETS");
   const source = await fsp.readFile(sharedTargetsPath, "utf8");
   const nextSource = source
-    .replace('"required_checks": "",', '"required_checks": "deploy/pleomino-dev",')
-    .replace("    required_checks = [],", '    required_checks = ["deploy/pleomino-dev"],');
+    .replace(
+      /("stage": "dev", "allowed_refs": "main", "required_checks": ")[^"]*(")/,
+      "$1deploy/pleomino-dev$2",
+    )
+    .replace(
+      /(\s+name = "dev_release",[\s\S]*?\s+allowed_refs = \["main"\],[\s\S]*?\s+required_checks = )\[[^\]]*\](,)/,
+      '$1["deploy/pleomino-dev"]$2',
+    );
   if (nextSource === source) {
     throw new Error("required checks fixture update did not match pleomino-shared TARGETS");
   }
   await fsp.writeFile(sharedTargetsPath, nextSource, "utf8");
   const written = await fsp.readFile(sharedTargetsPath, "utf8");
-  if (!written.includes('required_checks = ["deploy/pleomino-dev"]')) {
+  if (
+    !written.includes('"required_checks": "deploy/pleomino-dev"') ||
+    !written.includes('required_checks = ["deploy/pleomino-dev"]')
+  ) {
     throw new Error("required checks fixture update did not persist to pleomino-shared TARGETS");
   }
   await waitFor(

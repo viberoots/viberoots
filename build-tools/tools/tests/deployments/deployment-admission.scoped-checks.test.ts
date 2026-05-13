@@ -32,6 +32,8 @@ function scopedCheck(
     environmentStage: deployment.environmentStage,
     admissionPolicyRef: deployment.admissionPolicyRef,
     recordRef: `check://${CHECK_NAME}`,
+    reporterIdentity:
+      deployment.lanePolicy.governance.trustedReporterIdentities[0] || "app:deploy-bot",
   };
 }
 
@@ -44,7 +46,7 @@ function stagedDeployment(stage: "staging" | "prod") {
     admissionPolicy: {
       ref: `//projects/deployments/pleomino-shared:${stage}_release`,
       name: `${stage}_release`,
-      allowedRefs: [`env/pleomino/${stage}`],
+      allowedRefs: [stage === "prod" ? "refs/tags/release/*" : "main"],
     },
   });
 }

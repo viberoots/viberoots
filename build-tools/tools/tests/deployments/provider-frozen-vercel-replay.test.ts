@@ -77,7 +77,7 @@ function vercelReplayDeployment() {
     secretRequirements: [...publish.secretRequirements, ...cleanup.secretRequirements],
     admissionPolicy: {
       ...publish.admissionPolicy,
-      allowedRefs: ["env/pleomino/staging"],
+      allowedRefs: ["main"],
       requiredChecks: [],
     },
   });

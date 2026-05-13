@@ -46,7 +46,7 @@ function planForBatch(): DeploymentFromChangesPlan {
       ...cloudflarePagesDeploymentFixture().admissionPolicy,
       ref: "//projects/deployments/pleomino-shared:prod_release",
       name: "prod_release",
-      allowedRefs: ["env/pleomino/prod"],
+      allowedRefs: ["refs/tags/release/*"],
     },
     prerequisites: [{ deploymentId: "pleomino-staging", mode: "health_gated" }],
   });

@@ -43,7 +43,7 @@ function policyNodes(): GraphNode[] {
     kubernetesLanePolicyNodeFixture(),
     nixosSharedHostLaneGovernanceNodeFixture(),
     kubernetesAdmissionPolicyNodeFixture({
-      allowed_refs: ["env/pleomino/staging"],
+      allowed_refs: ["main"],
       required_checks: ["deploy/pleomino-staging"],
     }),
   ];

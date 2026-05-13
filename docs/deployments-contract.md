@@ -34,7 +34,10 @@ Current reviewed central control-plane implementation note:
 - Deployments are single-provider by design; systems that span multiple provider families must be represented as multiple coordinated deployments.
 - Every deployment must declare explicit provider-target identity in authoritative metadata.
 - `shared_nonprod` and `production_facing` deployments must declare explicit `lane_policy`, `environment_stage`, and `admission_policy` metadata.
-- Protected/shared `lane_policy` is branch-backed and must define explicit stage-to-branch mappings that govern promotion for that lane.
+- Protected/shared `lane_policy` is sourced from reviewed `main` metadata and must define explicit
+  stage source-ref policy, allowed promotion edges, artifact reuse mode, trusted reporter
+  identities, and approval boundaries. Long-lived `env/<family>/<stage>` branches are not
+  authoritative normal-promotion inputs.
 - Provider config is provider-native input, not a second source of truth for core deployment facts.
 - One deployment id owns one normal mutable live target by default.
 - Reviewed migration or alias exceptions must be first-class control-plane objects with explicit scope, lock sharing, and expiry or completion semantics.
@@ -78,7 +81,7 @@ Current reviewed central control-plane implementation note:
 - `promotion` always requires target-environment approval under the target deployment's admission policy.
 - `rollback` requires fresh target-environment approval by default for `production_facing`, unless an explicit emergency policy says otherwise.
 - `retry` may reuse approval only when the admission policy explicitly allows same-lineage retry reuse and the original approval remains valid.
-- Protected/shared preview reuses the target deployment's normal branch and required-check gates by default, but should not require a second manual approval by default when previewing an already-admitted artifact or run lineage.
+- Protected/shared preview reuses the target deployment's source-ref policy and required-check gates by default, but should not require a second manual approval by default when previewing an already-admitted artifact or run lineage.
 - An admission policy may still require manual preview approval for especially sensitive targets.
 - `retry` is branch-independent replay of an earlier admitted run for the same deployment by default; later branch movement does not invalidate it unless the admission policy explicitly sets `retry_branch_policy = branch_coupled`.
 - Supported protected/shared artifact-reuse paths must retain retrievable immutable artifacts for at least the documented minimum retention window.
@@ -148,7 +151,7 @@ Current reviewed central control-plane implementation note:
 - Preview-safe local or isolated-preview flows must expose one explicit preview identity selector such as branch name or commit SHA; those selectors identify both preview publication and preview cleanup.
 - Supported explicit local preview identity selectors are branch name and commit SHA.
 - Same-deployment preview publication defaults to `operation_kind = deploy` plus `publish_mode = preview`, not `retry`.
-- Unless `admission_policy` explicitly defines a stricter preview posture, protected/shared preview uses the target deployment's normal branch and required-check requirements, while manual preview approval remains optional by default for already-admitted artifacts or run lineage.
+- Unless `admission_policy` explicitly defines a stricter preview posture, protected/shared preview uses the target deployment's source-ref policy and required-check requirements, while manual preview approval remains optional by default for already-admitted artifacts or run lineage.
 - Separate preview lock scope is allowed only when the preview meets the stronger independent-execution isolation bar; otherwise preview shares the normal deployment lock even when preview publication itself is in policy.
 - `--from-changes` selection may over-select for safety, but it must not under-select a deployment whose reviewed metadata or component project was impacted.
 - `--from-changes` prerequisite widening is driven only by explicit direct prerequisite edges from authoritative deployment metadata; the selector must not invent transitive or cross-lane fan-out heuristics.
@@ -194,7 +197,7 @@ Current reviewed central control-plane implementation note:
 - Artifact attestation verification must enforce the admission policy's reviewed trust contract for accepted builder identities, provenance format, and artifact-to-source binding.
 - When protected/shared `admission_policy` requires signatures, SBOMs, or supply-chain gates, mutating admission must fail closed on missing evidence, untrusted builder or signer identity, expired or revoked attestation material, invalid SBOM format, or failed vulnerability or license gate.
 - Protected/shared records and replay snapshots must preserve secret-safe attestation, SBOM, and supply-chain evaluation facts, including durable references to any retained evidence artifacts when those references exist.
-- Rollback may use an earlier retained admitted run even when the branch head has moved forward, but the current branch/lane state must still authorize performing rollback.
+- Rollback may use an earlier retained admitted run even when the current admitted stage revision has moved forward, but the current lane policy and control-plane stage state must still authorize performing rollback.
 - Rollback must also honor the recorded data-compatibility posture of any already-applied stateful `release_actions`; unsafe rollback must fail closed rather than re-publish an older artifact by default.
 - Admission must preserve enough approval evidence to explain why the run was authorized.
 - Protected/shared admission and execution must preserve enough payload-binding evidence to prove that the approved payload, admitted payload, and executed payload were the same reviewed unit.

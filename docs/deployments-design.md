@@ -68,8 +68,8 @@ This document defines the final deployment model for this repository.
 - a deployment may contain multiple components, but they all publish within one provider family and one authoritative provider-target model
 - systems that span multiple provider families must be modeled as multiple coordinated deployments rather than one cross-provider deployment object
 - `lane_policy` is the authoritative lane object for protected/shared deployments
-- every protected/shared lane is branch-backed, with explicit stage-to-branch mappings that govern promotion for all deployment families, including mobile/store releases
-  - this is a repository policy choice for consistency and auditability, not a claim that branch-backed promotion is the only viable industry model
+- every protected/shared lane is source-ref backed from `main` metadata, with explicit stage source-ref policy and control-plane stage state governing promotion for all deployment families, including mobile/store releases
+  - this is a repository policy choice for consistency and auditability, not a claim that this is the only viable industry model
 - implementation-planning documents may describe rollout order or work breakdown, but they do not define or narrow this design
 
 ## Design Invariants
@@ -85,8 +85,8 @@ Future edits should not weaken or silently contradict the following invariants w
 - preview is a publish mode, not a deployment identity and not a peer `operation_kind`; preview must publish only to an explicitly isolated preview target or be rejected.
 - protected/shared mutation must go through the shared control plane; trusted CI may build, attest, and trigger submissions, but it is not a peer mutating authority. Direct local mutation of `shared_nonprod` and `production_facing` targets is out of policy except for explicitly controlled emergency procedures.
 - every `shared_nonprod` and `production_facing` mutating run must freeze an immutable execution snapshot at admission before waiting, locking, or mutation; later execution revalidates only narrow current invariants instead of silently consuming drifted repo or provider config state.
-- for first-run protected/shared mutation, source admission must snapshot the authoritative reviewed stage ref from the configured SCM remote into a submission-scoped ref and bind the admitted `sourceRevision` to that fetched commit rather than to an operator workstation checkout or one mutable long-lived local branch
-- when a protected/shared client supplies the reviewed commit it expects, the service must compare that expectation against its freshly snapshotted reviewed ref and fail closed if they differ
+- for first-run protected/shared mutation, source admission must snapshot the reviewed source ref selected by lane source-ref policy from the configured SCM remote into a submission-scoped ref and bind the admitted `sourceRevision` to that fetched commit rather than to an operator workstation checkout or one mutable long-lived local branch
+- when a protected/shared client supplies the reviewed commit it expects, the service must compare that expectation against its freshly snapshotted source ref and fail closed if they differ
 - for `shared_nonprod` and `production_facing`, the mutating publish phase must consume an admitted immutable artifact; a `--source-run-id` selector may nominate the earlier admitted run that provides the artifact or promoted source revision for that operation kind, but it does not authorize workstation builds or ad hoc mutating rebuilds.
 - protected/shared first-run deploys use two admission stages:
   - source admission determines the admissible revision and trusted artifact inputs
@@ -94,10 +94,10 @@ Future edits should not weaken or silently contradict the following invariants w
 - promotion across distinct deployment ids that resolve to the same authoritative compatible `lane_policy` must follow that lane's declared `artifact_reuse_mode`; it must not retarget one deployment dynamically across environments.
 - lanes with `artifact_reuse_mode = "same_artifact"` promote by reusing the same admitted artifact across environments.
 - lanes with `artifact_reuse_mode = "rebuild_per_stage"` promote by advancing the same admitted source revision across environments, producing a new admitted stage-specific artifact before each protected/shared publish.
-- for promotion, the lane policy and environment-branch state are authoritative for what is currently promotable; `--source-run-id` is a selector within that admitted policy boundary, not an override around it.
+- for promotion, the lane policy and control-plane stage state are authoritative for what is currently promotable; `--source-run-id` is a selector within that admitted policy boundary, not an override around it.
   - the operator may select any earlier admitted source run that is still eligible under the lane's current promotion policy
   - the system must reject source runs that are no longer promotable under current lane policy, even if they remain retained in history
-- rollback is a new run classified by `operation_kind = rollback`; it should prefer redeploying a prior known-good artifact rather than rebuilding or moving environment branches backward.
+- rollback is a new run classified by `operation_kind = rollback`; it should prefer redeploying a prior known-good artifact rather than rebuilding or rewinding Git refs or release pointers.
   - default meaning of "known good" is: a prior run for the same deployment, against the same normal live target and `publish_mode = normal`, with `final_outcome = succeeded` and all required blocking smoke or release-health checks passed for that run
   - stricter lane-specific rollback-candidate policy, such as soak windows or manual pinning, is allowed only when declared explicitly by the authoritative lane policy rather than inferred by convention
 - destructive cleanup of isolated preview targets must be a first-class audited control-plane operation rather than an implicit side effect with no lifecycle or authorization model.
@@ -804,15 +804,14 @@ treated as settled policy, not open brainstorming:
 - reusable artifact attestation should be environment-agnostic
   - it should bind artifact identity to source revision plus build inputs
   - deployment-specific metadata, provider config, approvals, and publish results belong to the deployment-run record rather than the reusable artifact attestation
-- promotion should use one-way fast-forward environment branches
-  - this document treats branch-backed promotion as a repo-level governance standard rather than a universal requirement for all deployment systems
-  - later environments advance only after required checks pass for earlier environments within the same independently promoted lane
+- promotion should use admitted run IDs, immutable artifact identities, and control-plane stage state
+  - later environments advance only after required checks and approval boundaries pass for earlier environments within the same independently promoted lane
 - rollback for bad app releases should prefer redeploying a prior known-good artifact
   - default meaning of "known good" is a prior run for the same deployment, against the same normal live target and `publish_mode = normal`, with `final_outcome = succeeded` and all required blocking smoke or release-health checks passed for that run
   - that default also assumes any already-applied stateful `release_actions` remain rollback-compatible under their declared data-compatibility posture; otherwise artifact redeploy is not automatically safe
 - a lane may add stricter rollback-candidate policy such as soak-time requirements or manual pinning, but that is an explicit lane policy extension rather than the default rule
-  - if that is not available or not appropriate, rollback should use a new revert commit promoted forward through the same branch flow
-  - moving environment branches backward should not be the normal rollback mechanism
+  - if that is not available or not appropriate, rollback should use a new revert commit admitted and promoted through the normal control-plane stage flow
+  - rewinding Git refs or release pointers should not be the normal rollback mechanism
 - provider-native rollback should be treated as an emergency stabilization path, followed by control-plane and Git reconciliation
 - the shared deployment control plane should use one central authoritative transactional backend
   - it should back deployment-record storage
@@ -927,7 +926,7 @@ treated as settled policy, not open brainstorming:
   - that emergency path may bypass the normal online control-plane workflow only through an explicitly documented offline-capable break-glass procedure with separate credentials, explicit fencing or equivalent concurrency protection, and mandatory post-incident reconciliation
   - they must record the requesting identity, the executing identity, reason, affected target, approval source, artifact-selection path, and reconciliation owner
   - they must be incident-bounded rather than a standing alternate workflow
-  - they must require post-incident reconciliation back to the normal branch, admission, and deployment path
+  - they must require post-incident reconciliation back to the normal source-ref policy, admission, and deployment path
 - local-only fallback should be explicitly limited
   - shared environments must use the central authoritative shared control plane
   - personal local/dev workflows may use a local filesystem lock plus a local structured deployment record
@@ -1215,7 +1214,7 @@ Control-plane worker responsibilities for protected/shared mutation:
 
 1. resolve source admission for the requested protected/shared operation
    - for first-run deploy, source admission determines the admissible revision and trusted artifact path
-   - it must fetch the reviewed stage ref from the configured SCM remote into a submission-scoped snapshot ref so concurrent submissions do not overwrite one another's admission subject
+   - it must fetch the reviewed source ref selected by lane source-ref policy from the configured SCM remote into a submission-scoped snapshot ref so concurrent submissions do not overwrite one another's admission subject
    - the fetched commit becomes the authoritative admitted `sourceRevision` for submit-time checks, stored provenance, replay, and any later promotion flow that depends on that run's admitted source
    - for immutable-reuse flows, source admission validates the selected prior admitted run and its replay eligibility
 2. resolve target-environment run admission and freeze one immutable execution snapshot for that mutating run before any waiting or mutation begins
@@ -1227,7 +1226,7 @@ Control-plane worker responsibilities for protected/shared mutation:
    - protected/shared provider snapshots must not persist laptop-local
      `artifactDir` paths as execution inputs; workers load admitted artifact
      references from the frozen snapshot
-   - when first-run source admission used a reviewed-ref snapshot, the frozen target-environment snapshot should preserve that submission-scoped snapshot reference so later revalidation continues to check the same reviewed source rather than silently following a newer branch head
+   - when first-run source admission used a reviewed-ref snapshot, the frozen target-environment snapshot should preserve that submission-scoped snapshot reference so later revalidation continues to check the same reviewed source rather than silently following a newer source ref
    - for secret or runtime-config dependencies, the snapshot should preserve non-secret contract references, versions, selectors, or fingerprints rather than secret values
    - replay-sensitive secret or runtime-config references must resolve exactly to the admitted reference set for the run kind being executed; implementations must not silently substitute "latest", auto-rotated, or ambient defaults during retry or rollback
 3. when the run includes an infra-affecting protected/shared provisioner, generate the reviewable provisioner plan or diff from that frozen execution snapshot before any mutating step begins
@@ -1784,8 +1783,8 @@ Protected/shared preview admission policy:
 - preview on `shared_nonprod` and `production_facing` deployments is allowed only from an already-admitted revision or admitted artifact lineage
 - preview on those deployments should therefore require `--source-run-id` or an equivalent explicit admitted source-run selector
 - preview for those deployments must still publish to an explicitly isolated preview target class
-- preview for those deployments must not be used to preview unadmitted PR code or to bypass the lane's normal branch, check, or approval policy
-- unless the target deployment's `admission_policy` explicitly defines a stricter preview posture, protected/shared preview should inherit the target deployment's normal branch and required-check requirements
+- preview for those deployments must not be used to preview unadmitted PR code or to bypass the lane's source-ref, check, or approval policy
+- unless the target deployment's `admission_policy` explicitly defines a stricter preview posture, protected/shared preview should inherit the target deployment's source-ref policy and required-check requirements
 - default approval posture for protected/shared preview should be lighter than normal publish:
   - preview of an already-admitted artifact or run lineage should not require a second manual approval by default
   - a deployment's `admission_policy` may still require manual preview approval for especially sensitive targets
@@ -1859,7 +1858,7 @@ Default diff-base policy:
 
 - local use should compare against `git merge-base HEAD @{upstream}`
 - CI pull-request use should compare against the merge-base with the PR target branch
-- post-merge automation should compare against the previous successful deploy baseline for the relevant environment branch, or the narrower per-deployment target baseline when that data is available
+- post-merge automation should compare against the previous successful deploy baseline for the relevant deployment stage, or the narrower per-deployment target baseline when that data is available
 - if no upstream or baseline can be determined, the tool should fail explicitly and ask for an override instead of silently choosing an unsafe diff base
 
 Baseline advancement rule:
@@ -1880,7 +1879,7 @@ Operator default summary:
 
 - `deploy --from-changes` on a developer machine means "compare my current `HEAD` against `git merge-base HEAD @{upstream}`"
 - `deploy --from-changes` in pull-request CI means "compare against the PR target branch merge-base"
-- environment-mutating automation should not diff against an arbitrary Git merge-base when an environment-branch or per-target last-successful deploy baseline exists; that recorded baseline is the authoritative default
+- environment-mutating automation should not diff against an arbitrary Git merge-base when a stage or per-target last-successful deploy baseline exists; that recorded baseline is the authoritative default
 - when automation cannot determine the authoritative baseline, it should stop and ask for an explicit override rather than mutating from a guessed change set
 
 Environment-lane policy:
@@ -1891,9 +1890,9 @@ Environment-lane policy:
 - the base contract does not require whole-lane atomic advancement
 - coordinated multi-deployment release sets are not part of this design; if a repo needs them, they should be introduced only through a separate design that defines their admission, promotion, rollback, and record semantics explicitly
 - `environment_stage` should be explicit deployment metadata for protected/shared deployments rather than inferred only from deployment id naming
-- a family lane may own branches such as `env/<family>/dev -> env/<family>/staging -> env/<family>/prod`
-- the authoritative stage ordering, branch mapping, and allowed promotion edges should come from the lane's central `lane_policy`, not from CI convention alone
-- the authoritative baseline for an environment-mutating `--from-changes` run is the last successful deploy baseline recorded for the specific environment branch being mutated, or the narrower per-deployment target baseline when tracked
+- a family lane may own stages such as `dev -> staging -> prod`
+- the authoritative stage ordering, source-ref policy, and allowed promotion edges should come from the lane's central `lane_policy`, not from CI convention alone
+- the authoritative baseline for an environment-mutating `--from-changes` run is the last successful deploy baseline recorded for the specific deployment stage being mutated, or the narrower per-deployment target baseline when tracked
 - one mutating `--from-changes` invocation for protected or shared environments should stay within one environment lane
 - if the changed set affects deployments in multiple environment lanes, the selector should require explicit lane selection or split the result into separate non-mutating result sets rather than mutating all lanes at once
 - local or non-mutating inspection flows may still report deployments across multiple lanes when that is useful for visibility
@@ -1901,24 +1900,24 @@ Environment-lane policy:
 
 Monorepo clarification:
 
-- this branch model is lane-scoped, not repo-global
-- a fast-forward on one lane branch must not be interpreted as "deploy the whole monorepo"
-- the lane branch controls which revision is eligible for promotion in that lane
+- this lane model is family-scoped, not repo-global
+- a control-plane stage transition in one lane must not be interpreted as "deploy the whole monorepo"
+- the lane's source-ref policy and admitted stage state control which revision is eligible for promotion in that lane
 - Buck metadata plus change selection still control which deployments within that lane actually run
 
 Concrete examples:
 
-- `env/pleomino/dev -> env/pleomino/staging -> env/pleomino/prod`
+- `pleomino: dev -> staging -> prod`
   - governs only deployments whose `lane_policy` resolves to the `pleomino` lane
-- `env/shared-observability/dev -> env/shared-observability/staging -> env/shared-observability/prod`
+- `shared-observability: dev -> staging -> prod`
   - governs only deployments whose `lane_policy` resolves to the `shared-observability` lane
-- `env/customer-a-portal/dev -> env/customer-a-portal/staging -> env/customer-a-portal/prod`
+- `customer-a-portal: dev -> staging -> prod`
   - governs only deployments whose `lane_policy` resolves to the `customer-a-portal` lane
 
 What that means in practice:
 
 - a monorepo revision may be admitted for one lane without being promoted for unrelated lanes
-- if a change only affects `pleomino`, promotion of `env/pleomino/staging` should not trigger deployment of unrelated lanes such as `shared-observability`
+- if a change only affects `pleomino`, promotion of the `pleomino` staging stage should not trigger deployment of unrelated lanes such as `shared-observability`
 - a lane may still contain more than one deployment id, but the actual deploy set for that lane is selected from authoritative metadata plus change impact, not from "everything in the repo"
 - within one lane, promotion eligibility is evaluated per deployment id by default; coordinated release-set semantics are outside this design
 
@@ -2085,7 +2084,7 @@ Typed policy-object minimums:
 
 - `lane_policy` should resolve to one authoritative typed policy object with at least:
   - ordered stage list
-  - stage-to-branch mapping
+  - stage source-ref policy
   - allowed promotion edges
   - artifact reuse mode for the lane, with `same_artifact` as the sensible default unless the lane explicitly declares `rebuild_per_stage`
   - any stricter lane-specific compatibility rules
@@ -2117,19 +2116,39 @@ Common-case note:
 Illustrative lane-policy example:
 
 ```python
-lane_policy(
+deployment_lane_policy(
     name = "pleomino",
     stages = ["dev", "staging", "prod"],
-    stage_branches = {
-        "dev": "env/pleomino/dev",
-        "staging": "env/pleomino/staging",
-        "prod": "env/pleomino/prod",
+    source_ref_policy = {
+        "dev": "main",
+        "staging": "main",
+        "prod": "refs/tags/release/*",
     },
     allowed_promotion_edges = [
-        ("dev", "staging"),
-        ("staging", "prod"),
+        "dev->staging",
+        "staging->prod",
     ],
     artifact_reuse_mode = "same_artifact",
+    governance_policy = ":lane_governance",
+)
+```
+
+Illustrative lane-governance Buck rule example:
+
+```python
+deployment_lane_governance(
+    name = "lane_governance",
+    scm_backend = "github",
+    repository = "viberoots/viberoots",
+    source_ref_policies = [
+        {"stage": "dev", "allowed_refs": "main", "required_checks": "deploy/admission"},
+        {"stage": "staging", "allowed_refs": "main,refs/tags/release/*", "required_checks": "deploy/admission"},
+        {"stage": "prod", "allowed_refs": "refs/tags/release/*", "required_checks": "deploy/admission"},
+    ],
+    trusted_reporter_identities = ["repository-role:admin"],
+    required_approval_boundaries = [
+        {"stage": "prod", "required_approvals": "repository-role:admin"},
+    ],
 )
 ```
 
@@ -2138,7 +2157,9 @@ How to read this:
 - this is the common-case lane shape the document is optimizing for
 - most repos should keep `artifact_reuse_mode = "same_artifact"` and never need to mention it outside the lane definition
 - a lane that genuinely requires environment-specific build-time substitution would change only that field to `rebuild_per_stage` and keep the rest of the promotion model explicit
-- the exact Starlark helper signature is still an implementation detail; the important contract is that one authoritative lane-policy object exposes these semantics
+- the governance object supplies the reviewed source-ref rules, trusted check reporters, and approval boundaries consumed by the lane policy
+- protected/shared normal promotion is not driven by long-lived `env/<family>/<stage>` branches; reviewed source refs and control-plane stage state are authoritative
+- the exact Starlark helper signature may evolve, but the important contract is that Buck exposes explicit lane-policy and lane-governance objects with these semantics
 
 Policy evaluation order:
 
@@ -2146,10 +2167,10 @@ Policy evaluation order:
 - validate that the deployment's `environment_stage` is allowed by that `lane_policy`
 - resolve the deployment's `admission_policy`
 - validate the requested operation against both policy objects in that order:
-  - `lane_policy` governs stage ordering, branch mapping, allowed promotion edges, artifact reuse mode, and any lane-specific compatibility rules that affect promotion behavior
+  - `lane_policy` governs stage ordering, source-ref policy, allowed promotion edges, artifact reuse mode, and any lane-specific compatibility rules that affect promotion behavior
   - `admission_policy` governs allowed refs, required checks, approvals, and attestation requirements for the requested run kind
 - the shared control plane is the final mutating-policy gate and must not silently reinterpret these referenced policy objects differently from repo validation
-- unless `admission_policy` explicitly defines a stricter preview posture, protected/shared preview runs should inherit the same target-environment branch and required-check requirements as normal publishes for that deployment
+- unless `admission_policy` explicitly defines a stricter preview posture, protected/shared preview runs should inherit the same target-environment source-ref policy and required-check requirements as normal publishes for that deployment
 - recommended conventions for the low-level deployment shape are:
   - illustrative snippets later in this document may omit `runtime_config_requirements = {}` when the example is focused on another concept, but the schema and contract still treat that explicit empty object as the normal no-runtime-config value
   - `provider_target`
@@ -2163,7 +2184,7 @@ Policy evaluation order:
   - `lane_policy`
     - required for `shared_nonprod` and `production_facing`
     - should be a Buck-visible, repo-owned reference to the authoritative lane-policy object for that deployment family
-    - should define ordered stages, branch mapping, allowed promotion edges, artifact reuse mode, one explicit closed promotion-compatibility contract, and any stricter lane-specific admission rules
+    - should define ordered stages, source-ref policy, allowed promotion edges, artifact reuse mode, one explicit closed promotion-compatibility contract, and any stricter lane-specific admission rules
     - is the authoritative lane identity for protected/shared deployments
     - the sensible common-case default is `artifact_reuse_mode = "same_artifact"`
     - lanes that require environment-specific build-time substitution must declare `artifact_reuse_mode = "rebuild_per_stage"` explicitly rather than inheriting same-artifact semantics by accident
@@ -2173,10 +2194,10 @@ Policy evaluation order:
     - is not a repo-global closed enum
     - must be a stage label defined by that deployment's authoritative `lane_policy`
     - common lanes will often use values such as `dev`, `staging`, and `prod`, but lanes may define other ordered stages such as `internal` or `beta`
-    - should drive default environment-branch selection and promotion ordering together with `lane_policy`
+    - should drive default control-plane stage selection and promotion ordering together with `lane_policy`
   - `admission_policy`
     - required for `shared_nonprod` and `production_facing`
-    - should be an explicit reference to a centrally defined stable branch/check/approval policy object for that deployment
+    - should be an explicit reference to a centrally defined stable source-ref/check/approval policy object for that deployment
     - should be Buck-visible and repo-owned rather than an opaque free-form string
     - should normally be represented as a Buck label or equivalent structured repo-owned policy reference, for example `//projects/deployments/pleomino-shared:prod_release`
     - keeps the deploy rule authoritative for which admission policy applies, even if the policy definition itself lives outside the deployment package
@@ -4217,9 +4238,9 @@ Release-admission contract for protected/shared environments:
 - a run is eligible to mutate a protected or shared environment only when all of the following are true:
   - one immutable execution snapshot has been frozen for that admitted run before any waiting or mutating step begins
     - the snapshot should preserve the admitted deployment metadata, immutable provider-config content or immutable provider-config references, resolved policy contents, admitted secret/runtime-config contract references, and any selected artifact inputs needed for execution
-  - for `deploy`, `promotion`, and protected/shared `metadata_only` `--provision-only`, the admitted source revision comes from the allowed environment branch for that deployment lane
-  - for `retry`, the selected source run is an earlier admitted run for the same deployment and target environment, and replay remains branch-independent unless the admission policy explicitly sets `retry_branch_policy = branch_coupled`
-  - for `rollback`, the current lane policy and environment-branch state must authorize performing a rollback for that deployment, but the selected rollback source run may be an earlier retained admitted run for the same deployment rather than the current branch head revision
+  - for `deploy`, `promotion`, and protected/shared `metadata_only` `--provision-only`, the admitted source revision comes from the reviewed source-ref policy for that deployment lane
+  - for `retry`, the selected source run is an earlier admitted run for the same deployment and target environment, and replay remains source-independent unless the admission policy explicitly requires a current-policy recheck
+  - for `rollback`, the current lane policy and control-plane stage state must authorize performing a rollback for that deployment, but the selected rollback source run may be an earlier retained admitted run for the same deployment rather than the current source-ref revision
 - required checks for that environment have passed for the admitted revision or admitted reusable artifact, as applicable to the run kind
   - any required human or policy approval has been granted
   - the deployment's explicit `lane_policy`, `protection_class`, and `admission_policy` metadata are present, valid, and match the intended target and admission path
@@ -4232,10 +4253,10 @@ Release-admission contract for protected/shared environments:
     - the selected artifact or revision still matches the environment's promotion and admission policy
     - for protected/shared `--publish-only`, retry, rollback, and other immutable-artifact reuse paths, the control plane should replay the recorded deployment snapshot for the selected source run rather than silently re-reading current repo metadata or provider config as if it were the original deployment state
     - for source-run reuse across deployments, the source run must come from another deployment in the same authoritative compatible `lane_policy`, and the requested operation kind must be valid for that source/target pairing
-    - for `promotion`, the target lane policy and environment-branch state are authoritative for what is currently promotable; `--source-run-id` is valid only when it names an earlier admitted run that remains eligible under the lane's current promotion policy
+    - for `promotion`, the target lane policy and control-plane stage state are authoritative for what is currently promotable; `--source-run-id` is valid only when it names an earlier admitted run that remains eligible under the lane's current promotion policy
   - for `--provision-only` and other non-publishing mutating runs:
     - artifact attestation is not required
-    - admission still requires branch, approval, lane, target, locking policy, and admitted runtime-config/secret contract completeness to pass before mutation
+    - admission still requires source-ref policy, approval, lane, target, locking policy, and admitted runtime-config/secret contract completeness to pass before mutation
     - even in `metadata_only`, the run must carry one admitted source revision and one frozen execution snapshot for that specific provision-only mutation
     - if a reviewed provisioner input class uses `immutable_resolved_inputs`, the run must carry an explicit admitted source-run selector such as `--source-run-id <deploy-run-id>`
       - that selector must identify an admitted run that remains valid for the current lane/admission state of the target deployment
@@ -4247,9 +4268,9 @@ Release-admission contract for protected/shared environments:
   - `rollback` should require fresh target-environment approval by default for `production_facing`, even when the reused artifact came from a previously approved successful run
   - `promotion` always requires target-environment approval under the target deployment's admission policy
 - after waiting in queue and revalidating, "still allowed" means at least:
-  - for `deploy` and `promotion`, the environment branch still points to an allowed revision for this run
-  - for `retry`, the selected earlier admitted run is still valid for same-deployment replay under current admission policy, even if the environment branch has advanced since that run was first admitted
-  - for `rollback`, the current branch and lane state still authorize rollback for this deployment even though the selected rollback source run may remain an earlier admitted run
+  - for `deploy` and `promotion`, the selected source revision still satisfies the lane's reviewed source-ref policy for this run
+  - for `retry`, the selected earlier admitted run is still valid for same-deployment replay under current admission policy, even if lane stage state has advanced since that run was first admitted
+  - for `rollback`, the current lane policy and control-plane stage state still authorize rollback for this deployment even though the selected rollback source run may remain an earlier admitted run
   - for publishing runs, the artifact identity still matches the approved revision or approved prior run
   - the run has not been superseded under the explicit supersedence policy for its run class
   - any required approval has not been revoked, expired, or invalidated by newer policy state
@@ -4377,7 +4398,7 @@ Sensible default:
 
 `rebuild_per_stage` end-state contract:
 
-- the lane still promotes one admitted source revision forward through explicit deployment ids and one-way environment branches
+- the lane still promotes one admitted source revision forward through explicit deployment ids and control-plane stage state
 - the source selector for promotion identifies the admitted source revision or parent run being promoted, not a source artifact to reuse verbatim
 - for a protected/shared stage using `rebuild_per_stage`, trusted CI must build a new stage-specific immutable artifact from that exact promoted revision under the target stage's declared build inputs and policy
 - the shared control plane must admit that target-stage artifact before publish, just as it would for any other protected/shared mutating run
@@ -4544,43 +4565,43 @@ Mobile-store and SSR compatibility note:
 
 Promotion model:
 
-- repo policy choice: use one-way fast-forward environment branches
-- other organizations can build comparable promotion safety around immutable tags or signed release manifests, but this repository intentionally standardizes on branch-backed lanes so promotion authority, required checks, and operator ergonomics all resolve through one consistent Git-backed control surface
-- each independently promoted deployment family should have its own lane such as `env/<family>/dev -> env/<family>/staging -> env/<family>/prod`
-- additional environment branches for that family may extend the lane when needed, but should follow the same fast-forward-only policy
+- repo policy choice: use reviewed source-ref policy, admitted run IDs, immutable artifacts, and control-plane stage state
+- other organizations can build comparable promotion safety around mutable branches, but this repository intentionally standardizes on control-plane lane state so promotion authority, required checks, and operator ergonomics resolve through one consistent service-backed control surface
+- each independently promoted deployment family should have its own lane such as `dev -> staging -> prod`
+- additional stages for that family may extend the lane when needed, but should follow the same admitted-run and approval-boundary policy
 - a later environment should advance only after required checks pass for the earlier environment
 - promotion should preserve artifact identity across environments whenever the workflow is "prove once, promote forward"
 - promotion should operate across distinct deployment ids such as `pleomino-staging` and `pleomino-prod`, not by having one deployment dynamically retarget itself
 
 Plain-language version:
 
-- later environments should receive code and artifacts that were already proven earlier, starting with the earlier branch in the same family lane
-- promotion should move forward through the branch flow, not invent a second release path
+- later environments should receive code and artifacts that were already proven earlier, starting with an admitted run in the same family lane
+- promotion should move forward through control-plane lane state, not invent a second release path
 
 Monorepo release-scope clarification:
 
-- in a monorepo, these lane branches are not repo-wide release branches
-- a fast-forward of `env/pleomino/prod` means "the `pleomino` lane may now promote this admitted repo revision"
+- in a monorepo, lane stages are not repo-wide release branches
+- an admitted control-plane transition for `pleomino` prod means "the `pleomino` lane may now promote this admitted repo revision"
 - it does not mean "deploy every deployment defined anywhere in the repo"
 - deploy automation for that lane should still use authoritative deployment metadata plus impact selection to choose which `pleomino` deployments actually run
-- unrelated lanes such as `shared-observability` or `customer-a-portal` should remain untouched unless their own lane branches advance
+- unrelated lanes such as `shared-observability` or `customer-a-portal` should remain untouched unless their own lane state advances
 
-Minimum branch-policy assumptions:
+Minimum source-policy assumptions:
 
-- these are repository policy assumptions, not a claim that every mature deployment system must use branches specifically
-- each family lane should have protected environment branches such as `env/<family>/dev`, `env/<family>/staging`, and `env/<family>/prod`
-- promotion should happen by fast-forwarding the next environment branch, not by rebuilding from an unrelated revision
-- direct pushes to later environment branches should be disallowed except for controlled emergency procedures
-- protected environment branches should require branch protection or equivalent server-side policy that enforces reviewed changes, required checks, and fast-forward-only advancement for the lane
-- the normal path should be PR merge or automation-driven fast-forward, not ad hoc branch mutation from an operator workstation
-- required checks for each environment should run before that environment branch advances
-- deploy automation for a named environment should use the corresponding environment branch as its default source of truth
+- these are repository policy assumptions, not a claim that every mature deployment system must use this exact control-plane model
+- each family lane should declare reviewed source refs such as protected `main`, release tags, or explicit reviewed commits
+- promotion should happen by selecting an admitted prior run or separately admitted target-stage artifact, not by rebuilding from an unrelated revision
+- direct mutation of protected/shared live targets outside the control plane should be disallowed except for controlled emergency procedures
+- protected source refs should require provider-side policy that enforces reviewed changes and required checks
+- the normal path should be CI or automation requesting control-plane admission, not ad hoc mutation from an operator workstation
+- required checks for each environment should run before the control plane advances that stage state
+- deploy automation for a named environment should use the lane's reviewed source-ref policy and admitted stage state as its source of truth
 - every protected/shared lane should resolve one reviewed governance object that names:
   - the SCM backend and repository being verified
-  - the protected branch for each lane stage
-  - the required checks that must gate branch advancement for that stage
-  - the reviewed normal-path automation identities allowed to advance the branch
-  - the reviewed emergency identities allowed to bypass the normal path during break-glass
+  - the reviewed source-ref policy for each lane stage
+  - the required checks that must gate admission for that stage
+  - the trusted reporter identities allowed to report admission evidence
+  - the approval boundaries required for later-stage promotion
 - protected/shared admission should fail closed when the reviewed governance object cannot be verified against current server-side policy
 - operator inspection output should preserve the latest successful governance verification facts so promotion authority is never implicit or prose-only
 - for supported SCM backends, the shared control-plane service should verify
@@ -4591,8 +4612,8 @@ Minimum branch-policy assumptions:
 Rollback policy for bad app releases:
 
 - first choice is redeploying a prior known-good artifact
-- if that is not available or not appropriate, create a revert commit and promote it forward through the same branch flow
-- moving environment branches backward should not be the normal rollback mechanism
+- if that is not available or not appropriate, create a revert commit and admit it through the normal control-plane stage flow
+- rewinding Git refs or release pointers should not be the normal rollback mechanism
 
 Operational distinction:
 
@@ -5260,7 +5281,7 @@ For Apple App Store and Google Play style releases:
 - the built artifact should be a signed immutable mobile release artifact, typically an `.ipa` or `.aab`
 - the built-in publisher should own upload, processing, staged rollout, and release-track promotion semantics
 - `lane_policy` and lane-defined `environment_stage` labels should model track progression such as internal, beta, staging, or production-like release channels through explicit deployment ids rather than one deployment dynamically retargeting itself
-- those mobile/store lanes are still branch-backed like every other protected/shared lane because this repository standardizes on that policy choice; the stage branch authorizes which signed artifact may advance, while the publisher executes the store-specific release mechanics for that stage
+- those mobile/store lanes are source-ref backed like every other protected/shared lane because this repository standardizes on that policy choice; the control plane authorizes which signed artifact may advance, while the publisher executes the store-specific release mechanics for that stage
 - store credentials and signing-related secret requirements should be explicit through `secret_requirements`
 - smoke should usually mean store-processing validation, installability checks, staged-rollout health, or other release-health evidence rather than a simple URL check
 

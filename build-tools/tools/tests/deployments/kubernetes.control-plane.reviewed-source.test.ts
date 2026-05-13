@@ -3,11 +3,10 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
+import { resolveDeploymentReviewedTargetEnvironment } from "../../deployments/deployment-reviewed-target-environment";
 import { runInTemp } from "../lib/test-helpers";
-import { writeReviewedLaneAdmissionEvidenceJson } from "./deployment-lane-governance.fixture";
 import { installKubernetesTargets, kubernetesDeploymentFixture } from "./kubernetes.fixture";
 import { writeServiceArtifact } from "./kubernetes.service-artifact.fixture";
-import { startControlPlaneHarness } from "./nixos-shared-host.control-plane.helpers";
 import {
   ensureNixosSharedHostStageBranch,
   nixosSharedHostAdmissionPolicyFixture,
@@ -41,41 +40,36 @@ async function writeValues(root: string, deploymentId: string) {
   );
 }
 
-async function writeClientRevisionEvidence(opts: {
-  tmp: string;
-  $: any;
-  deployment: ReturnType<typeof kubernetesDeploymentFixture>;
-  clientRevision: string;
-}): Promise<string> {
-  const evidence = await writeReviewedLaneAdmissionEvidenceJson({
-    tmp: opts.tmp,
-    $: opts.$,
-    deploymentLabel: opts.deployment.label,
-    deployment: opts.deployment,
-  });
-  const value = JSON.parse(await fsp.readFile(evidence, "utf8"));
-  value.checks = opts.deployment.admissionPolicy.requiredChecks.map((name) => ({
-    name,
-    subject: opts.clientRevision,
-    status: "passed",
-    checkedAt: "2026-04-06T12:00:00.000Z",
-    deploymentId: opts.deployment.deploymentId,
-    environmentStage: opts.deployment.environmentStage,
-    admissionPolicyRef: opts.deployment.admissionPolicyRef,
-    recordRef: `check://${name}`,
-  }));
-  await fsp.writeFile(evidence, `${JSON.stringify(value, null, 2)}\n`, "utf8");
-  return evidence;
-}
-
 test("service-backed kubernetes deploy fails closed when client source differs from service ref", async () => {
   await runInTemp("kubernetes-reviewed-source-mismatch", async (tmp, $) => {
+    const baseLanePolicy = kubernetesDeploymentFixture().lanePolicy;
     const deployment = kubernetesDeploymentFixture({
+      lanePolicy: {
+        ...baseLanePolicy,
+        sourceRefPolicy: {
+          ...baseLanePolicy.sourceRefPolicy,
+          prod: "main",
+        },
+        governance: {
+          ...baseLanePolicy.governance,
+          sourceRefPolicies: baseLanePolicy.governance.sourceRefPolicies.map((policy) =>
+            policy.stage === "prod"
+              ? {
+                  ...policy,
+                  allowedRefs: ["main"],
+                  requiredChecks: ["deploy/shared-observability-prod"],
+                }
+              : policy,
+          ),
+          requiredApprovalBoundaries: [{ stage: "staging", requiredApprovals: ["release-owner"] }],
+        },
+      },
       admissionPolicy: nixosSharedHostAdmissionPolicyFixture({
         ref: "//projects/deployments/platform-shared:prod_release",
         name: "prod_release",
-        allowedRefs: ["env/pleomino/prod"],
+        allowedRefs: ["main"],
         requiredChecks: ["deploy/shared-observability-prod"],
+        requiredApprovals: [],
         fingerprint: "sha256:admission-platform-prod",
       }),
     });
@@ -84,38 +78,32 @@ test("service-backed kubernetes deploy fails closed when client source differs f
     await installKubernetesTargets(tmp, [deployment]);
     await ensureNixosSharedHostStageBranch(tmp, $, deployment as any);
     await writeValues(tmp, deployment.deploymentId);
-    const serviceRevision = await gitStdout(tmp, $, "rev-parse", "env/pleomino/prod");
+    const serviceRevision = await gitStdout(tmp, $, "rev-parse", "HEAD");
     const clientRevision = await commitLocalChange(tmp, $, "client-drift");
     assert.notEqual(clientRevision, serviceRevision);
-    const evidence = await writeClientRevisionEvidence({
-      tmp,
-      $,
-      deployment,
-      clientRevision,
-    });
-    const harness = await startControlPlaneHarness({
-      workspaceRoot: tmp,
-      hostRoot: path.join(tmp, "host"),
-      recordsRoot: path.join(tmp, "records"),
-    });
-    try {
-      await assert.rejects(
-        $({
-          cwd: tmp,
-          stdio: "pipe",
-        })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment ${deployment.label} --artifact-dir ${artifactDir} --admission-evidence-json ${evidence} --control-plane-url ${harness.controlPlane.url}`,
-        new RegExp(
-          [
-            "reviewed source mismatch for env/pleomino/prod",
-            `clientExpectedSourceRevision=${clientRevision}`,
-            `serviceReviewedSourceRevision=${serviceRevision}`,
-            "service fetched the reviewed deployment branch before admission",
-            "that branch is up to date and pushed before retrying",
-          ].join("[\\s\\S]*"),
-        ),
-      );
-    } finally {
-      await harness.close();
-    }
+    await assert.rejects(
+      resolveDeploymentReviewedTargetEnvironment({
+        workspaceRoot: tmp,
+        deployment,
+        expectedSourceRevision: clientRevision,
+        reviewedSourceSnapshot: {
+          reviewedRef: "main",
+          snapshotRef: "refs/vbr/reviewed-source/test/main",
+          sourceRevision: serviceRevision,
+          remoteName: "origin",
+          repository: deployment.lanePolicy.governance.repository,
+          snapshottedAt: "2026-04-06T12:00:00.000Z",
+        },
+      }),
+      new RegExp(
+        [
+          "reviewed source mismatch for main",
+          `clientExpectedSourceRevision=${clientRevision}`,
+          `serviceReviewedSourceRevision=${serviceRevision}`,
+          "service fetched the reviewed deployment source ref before admission",
+          "that source ref is up to date and pushed before retrying",
+        ].join("[\\s\\S]*"),
+      ),
+    );
   });
 });

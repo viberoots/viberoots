@@ -43,8 +43,9 @@ export function pleominoProdDeployment() {
   const admissionPolicy = nixosSharedHostAdmissionPolicyFixture({
     ref: "//projects/deployments/pleomino-shared:prod_release",
     name: "prod_release",
-    allowedRefs: ["env/pleomino/prod"],
+    allowedRefs: ["refs/tags/release/*"],
     requiredChecks: [],
+    requiredApprovals: ["release-owner"],
     fingerprint: "sha256:admission-pleomino-prod",
   });
   return cloudflarePagesDeploymentFixture({

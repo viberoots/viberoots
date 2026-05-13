@@ -17,7 +17,7 @@ test("promotion compatibility rejects provider and publisher drift", () => {
     admissionPolicy: nixosSharedHostAdmissionPolicyFixture({
       ref: "//projects/deployments/pleomino-shared:staging_release",
       name: "staging_release",
-      allowedRefs: ["env/pleomino/staging"],
+      allowedRefs: ["main"],
       requiredChecks: [],
     }),
   });
@@ -80,7 +80,7 @@ test("promotion compatibility rejects provisioner drift inside one lane", () => 
     admissionPolicy: nixosSharedHostAdmissionPolicyFixture({
       ref: "//projects/deployments/pleomino-shared:staging_release",
       name: "staging_release",
-      allowedRefs: ["env/pleomino/staging"],
+      allowedRefs: ["main"],
       requiredChecks: [],
     }),
     provisioner: { type: "custom-provisioner" },
@@ -106,7 +106,7 @@ test("promotion compatibility rejects SSR runtime-contract drift inside one lane
     admissionPolicy: nixosSharedHostAdmissionPolicyFixture({
       ref: "//projects/deployments/pleomino-shared:staging_release",
       name: "staging_release",
-      allowedRefs: ["env/pleomino/staging"],
+      allowedRefs: ["main"],
       requiredChecks: [],
     }),
   });

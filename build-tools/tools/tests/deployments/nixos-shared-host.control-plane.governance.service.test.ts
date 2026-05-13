@@ -13,6 +13,16 @@ import { ensureNixosSharedHostStageBranch } from "./nixos-shared-host.fixture";
 import { startNixosSharedHostPublicServer } from "./nixos-shared-host.public-server";
 import { runInTemp } from "../lib/test-helpers";
 
+function governanceSnapshot(deployment: { lanePolicy: any }) {
+  return {
+    scmBackend: "github",
+    repository: deployment.lanePolicy.governance.repository,
+    sourceRefPolicies: deployment.lanePolicy.governance.sourceRefPolicies,
+    trustedReporterIdentities: deployment.lanePolicy.governance.trustedReporterIdentities,
+    requiredApprovalBoundaries: deployment.lanePolicy.governance.requiredApprovalBoundaries,
+  };
+}
+
 async function deployWithChecks(opts: {
   tmp: string;
   $: any;
@@ -43,8 +53,9 @@ test("service-backed shared-host deploy synthesizes service-owned governance evi
     await writeDemoArtifact(artifactDir);
     const deployment = await resolveDeploymentFromTarget(tmp, deploymentLabel);
     await ensureNixosSharedHostStageBranch(tmp, $, deployment as any);
+    const sourceRef = deployment.lanePolicy.sourceRefPolicy[deployment.environmentStage];
     const stageRevision = String(
-      (await $({ cwd: tmp, stdio: "pipe" })`git rev-parse env/demo/dev`).stdout,
+      (await $({ cwd: tmp, stdio: "pipe" })`git rev-parse ${sourceRef}`).stdout,
     ).trim();
     const server = await startNixosSharedHostPublicServer({
       deployment: deployment as any,
@@ -57,11 +68,7 @@ test("service-backed shared-host deploy synthesizes service-owned governance evi
       localFixture: true,
       env: {
         ...process.env,
-        VBR_DEPLOY_GITHUB_GOVERNANCE_FIXTURE_JSON: JSON.stringify({
-          scmBackend: "github",
-          repository: deployment.lanePolicy.governance.repository,
-          branchProtections: deployment.lanePolicy.governance.branchProtections,
-        }),
+        VBR_DEPLOY_GITHUB_GOVERNANCE_FIXTURE_JSON: JSON.stringify(governanceSnapshot(deployment)),
       } as NodeJS.ProcessEnv,
     });
     const worker = startNixosSharedHostControlPlaneWorkerLoop({
@@ -111,8 +118,9 @@ test("service-backed shared-host deploy fails closed when automatic governance d
     await writeDemoArtifact(artifactDir);
     const deployment = await resolveDeploymentFromTarget(tmp, deploymentLabel);
     await ensureNixosSharedHostStageBranch(tmp, $, deployment as any);
+    const sourceRef = deployment.lanePolicy.sourceRefPolicy[deployment.environmentStage];
     const stageRevision = String(
-      (await $({ cwd: tmp, stdio: "pipe" })`git rev-parse env/demo/dev`).stdout,
+      (await $({ cwd: tmp, stdio: "pipe" })`git rev-parse ${sourceRef}`).stdout,
     ).trim();
     const server = await startNixosSharedHostPublicServer({
       deployment: deployment as any,
@@ -126,9 +134,8 @@ test("service-backed shared-host deploy fails closed when automatic governance d
       env: {
         ...process.env,
         VBR_DEPLOY_GITHUB_GOVERNANCE_FIXTURE_JSON: JSON.stringify({
-          scmBackend: "github",
-          repository: deployment.lanePolicy.governance.repository,
-          branchProtections: deployment.lanePolicy.governance.branchProtections.map((entry) =>
+          ...governanceSnapshot(deployment),
+          sourceRefPolicies: deployment.lanePolicy.governance.sourceRefPolicies.map((entry) =>
             entry.stage === "dev" ? { ...entry, requiredChecks: [] } : entry,
           ),
         }),

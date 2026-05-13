@@ -3,13 +3,45 @@ import * as fsp from "node:fs/promises";
 import { pathToFileURL } from "node:url";
 import type { NixosSharedHostDeployment } from "../../deployments/contract";
 
+export function deploymentSourceRef(
+  deployment: Pick<NixosSharedHostDeployment, "lanePolicy" | "environmentStage">,
+): string {
+  const sourceRef = deployment.lanePolicy.sourceRefPolicy[deployment.environmentStage];
+  if (!sourceRef) {
+    throw new Error(
+      `reviewed-source fixture missing source ref for ${deployment.environmentStage}`,
+    );
+  }
+  return sourceRef;
+}
+
+function materializedSourceRef(
+  deployment: Pick<NixosSharedHostDeployment, "lanePolicy" | "environmentStage">,
+): string {
+  const sourceRef = deploymentSourceRef(deployment);
+  if (!sourceRef.includes("*")) return sourceRef;
+  const concreteRef = sourceRef.replace(/\*/g, "fixture");
+  deployment.lanePolicy.sourceRefPolicy[deployment.environmentStage] = concreteRef;
+  return concreteRef;
+}
+
 export async function ensureNixosSharedHostStageBranch(
   cwd: string,
   $: any,
   deployment: Pick<NixosSharedHostDeployment, "lanePolicy" | "environmentStage">,
 ) {
-  const branch = deployment.lanePolicy.stageBranches[deployment.environmentStage];
-  await $({ cwd, stdio: "pipe" })`git branch -f ${branch} HEAD`;
+  const sourceRef = materializedSourceRef(deployment);
+  const remoteRef = sourceRef.startsWith("refs/") ? sourceRef : `refs/heads/${sourceRef}`;
+  const localBranch = remoteRef.startsWith("refs/heads/")
+    ? remoteRef.slice("refs/heads/".length)
+    : "";
+  const currentBranch = String(
+    (await $({ cwd, stdio: "pipe" })`git branch --show-current`).stdout || "",
+  ).trim();
+  if (localBranch && currentBranch !== localBranch) {
+    await $({ cwd, stdio: "pipe" })`git branch -f ${localBranch} HEAD`;
+  }
+  await $({ cwd, stdio: "pipe" })`git update-ref ${remoteRef} HEAD`;
   const remoteRoot = `${cwd}/.tmp-reviewed-origin.git`;
   const remotes = String((await $({ cwd, stdio: "pipe" })`git remote`).stdout || "")
     .split(/\r?\n/)
@@ -35,7 +67,7 @@ export async function ensureNixosSharedHostStageBranch(
   } else {
     await $({ cwd, stdio: "pipe" })`git remote add origin ${remoteRoot}`;
   }
-  await $({ cwd, stdio: "pipe" })`git push --force origin HEAD:${branch}`;
+  await $({ cwd, stdio: "pipe" })`git push --force origin HEAD:${remoteRef}`;
   const originUrl = String(
     (await $({ cwd, stdio: "pipe" })`git remote get-url origin`).stdout || "",
   ).trim();
@@ -43,9 +75,9 @@ export async function ensureNixosSharedHostStageBranch(
   const advertised = await $({
     cwd,
     stdio: "pipe",
-  })`git ls-remote --heads origin ${branch}`;
-  if (!String(advertised.stdout || "").includes(`refs/heads/${branch}`)) {
-    throw new Error(`reviewed-source fixture origin does not advertise ${branch}`);
+  })`git ls-remote origin ${remoteRef}`;
+  if (!String(advertised.stdout || "").includes(remoteRef)) {
+    throw new Error(`reviewed-source fixture origin does not advertise ${remoteRef}`);
   }
   const { repository = "", scmBackend = "" } = deployment.lanePolicy.governance || {};
   if (scmBackend.toLowerCase() === "github" && repository) {
