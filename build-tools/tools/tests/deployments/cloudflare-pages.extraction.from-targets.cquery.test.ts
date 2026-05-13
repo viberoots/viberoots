@@ -8,7 +8,7 @@ import { extractCloudflarePagesDeployments } from "../../deployments/contract";
 import { inheritedBuckIsolation, runInTemp } from "../lib/test-helpers";
 
 const ATTRS =
-  "name,rule_type,buck.type,provider,component,component_kind,publisher,publisher_config,protection_class,lane_policy,environment_stage,admission_policy,provider_target,vault_runtime,preview,prerequisites,secret_requirements,runtime_config_requirements,release_actions,target_exceptions,governance_policy,defaults,default_client_profile,scm_backend,repository,source_ref_policies,trusted_reporter_identities,required_approval_boundaries,stages,source_ref_policy,stage_branches,stage_branches_required,allowed_promotion_edges,artifact_reuse_mode,promotion_compatibility,allowed_refs,required_checks,required_approvals,retry_branch_policy,retry_approval_reuse,artifact_attestation_mode,labels".split(
+  "name,rule_type,buck.type,provider,component,component_kind,publisher,publisher_config,protection_class,lane_policy,environment_stage,admission_policy,provider_target,vault_runtime,preview,prerequisites,secret_requirements,runtime_config_requirements,release_actions,target_exceptions,governance_policy,defaults,default_client_profile,scm_backend,repository,source_ref_policies,trusted_reporter_identities,required_approval_boundaries,stages,source_ref_policy,allowed_promotion_edges,artifact_reuse_mode,promotion_compatibility,allowed_refs,required_checks,required_approvals,retry_branch_policy,retry_approval_reuse,artifact_attestation_mode,labels".split(
     ",",
   );
 
@@ -173,7 +173,6 @@ test("cloudflare-pages deployment extraction reads canonical metadata from TARGE
     assert.equal(deployments.length, 1);
     assert.equal(deployments[0]?.label, "//projects/deployments/pleomino-staging:deploy");
     assert.equal(deployments[0]?.lanePolicy.defaultClientProfile, "mini");
-    assert.deepEqual(deployments[0]?.lanePolicy.stageBranches, {});
     assert.deepEqual(deployments[0]?.lanePolicy.sourceRefPolicy, {
       dev: "main",
       staging: "main",

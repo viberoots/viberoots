@@ -14,8 +14,6 @@ export function foundationDeploymentFixture(): OpenTofuDeployment {
     ref: "//projects/deployments/platform-shared:lane",
     name: "lane",
     stages: ["dev"],
-    stageBranches: {},
-    stageBranchesRequired: false,
     sourceRefPolicy: { dev: "main" },
     allowedPromotionEdges: [],
     artifactReuseMode: "same_artifact",

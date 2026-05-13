@@ -40,6 +40,9 @@ Current reviewed central control-plane implementation note:
 - Versioned extracted-metadata documents are generated internal contracts between Buck extraction, the repo CLI, tests/tools, and the control plane; they are not a second public source of truth.
 - Live deployment side effects do not run as ordinary Buck actions.
 - Protected/shared mutation runs only through the shared deployment control plane, except for an explicitly documented incident-bounded break-glass procedure for control-plane unavailability.
+- Protected/shared deployments are "Git-triggered, CI-built, Buck2-defined,
+  control-plane-admitted deployments"; Git stores desired deployment metadata and policy, while the
+  control plane owns admitted release state.
 - Bootstrap mutation for the deployment authority itself is allowed only through an explicit reviewed bootstrap path on deployment-system-owned infrastructure; it is not part of the ordinary protected/shared deploy path.
 - Trusted CI may build, attest, and submit, but it is not a peer mutating authority.
 - Jenkins and other CI submitters must provide admission evidence that binds the reviewed source

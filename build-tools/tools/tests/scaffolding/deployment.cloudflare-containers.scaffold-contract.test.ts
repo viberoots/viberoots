@@ -164,7 +164,6 @@ test("deployment/cloudflare-containers default private scaffold validates throug
     assert.doesNotMatch(targets, /domain = /);
     assert.doesNotMatch(targets, /cloudflare_zone_id = /);
     assert.doesNotMatch(wrangler, /"routes"/);
-    await $`git branch env/demo/dev HEAD`;
     const result = await $({
       cwd: tmp,
       stdio: "pipe",

@@ -48,6 +48,16 @@ async function assertGoldenPackage(tmp: string, deploymentId: string): Promise<v
   assert.deepEqual(await actualFiles(root), DEPLOYMENT_GOLDENS[deploymentId]);
 }
 
+function assertNoEnvironmentBranchGuidance(files: Record<string, string>): void {
+  const combined = Object.values(files).join("\n");
+  assert.doesNotMatch(combined, /\bstage_branches(?:_required)?\b/);
+  assert.doesNotMatch(
+    combined,
+    /\benv\/(?:<family>|[A-Za-z0-9_.-]+)\/(?:<stage>|[A-Za-z0-9_.-]+)\b/,
+  );
+  assert.doesNotMatch(combined, /environment branch/i);
+}
+
 test("deployment scaffolds render exact golden outputs for every template", async () => {
   await runInTemp("deployment-scaffold-goldens", async (tmp, _$) => {
     const $ = _$({ cwd: tmp, stdio: "pipe" });
@@ -60,6 +70,7 @@ test("deployment scaffolds render exact golden outputs for every template", asyn
     await assertGoldenPackage(tmp, "demo-attached");
 
     await assert.rejects(read(tmp, "projects/deployments/demo-attached/TARGETS"));
+    assertNoEnvironmentBranchGuidance(await actualFiles(path.join(tmp, "projects/deployments")));
   });
 });
 

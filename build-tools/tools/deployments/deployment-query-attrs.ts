@@ -68,8 +68,6 @@ export const DEPLOYMENT_CQUERY_ATTRS = [
   "trusted_reporter_identities",
   "required_approval_boundaries",
   "stages",
-  "stage_branches",
-  "stage_branches_required",
   "source_ref_policy",
   "allowed_promotion_edges",
   "artifact_reuse_mode",

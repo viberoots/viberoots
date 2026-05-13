@@ -1,7 +1,9 @@
 #!/usr/bin/env zx-wrapper
 
 export function isStaleEnvironmentBranchRef(ref: string): boolean {
-  return ref === "env" || ref.startsWith("env/");
+  const value = ref.trim();
+  const branchRef = value.startsWith("refs/heads/") ? value.slice("refs/heads/".length) : value;
+  return branchRef === "env" || branchRef.startsWith("env/");
 }
 
 export function staleEnvironmentRefErrors(opts: {

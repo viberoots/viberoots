@@ -478,8 +478,6 @@ Minimum fields:
 Optional fields:
 
 - `promotion_compatibility`
-- stale `stage_branches` declarations are rejected for protected/shared lane policy; normal
-  promotion must use reviewed source-ref policy and control-plane stage state
 - stricter rollback-candidate policy
 - additional lane-specific admission constraints
 - versioned interface bindings or schema refs used by Buck extraction, CLI submission, and control-plane admission

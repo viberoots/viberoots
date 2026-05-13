@@ -8,7 +8,10 @@ import { test } from "node:test";
 import { promisify } from "node:util";
 import { evaluateDeploymentAdmission } from "../../deployments/deployment-admission-evaluator";
 import { resolveReviewedSourceRevision } from "../../deployments/deployment-reviewed-source-ref";
-import { sourceRefPolicyKind } from "../../deployments/deployment-source-ref-policy";
+import {
+  isStaleEnvironmentBranchRef,
+  sourceRefPolicyKind,
+} from "../../deployments/deployment-source-ref-policy";
 import { snapshotReviewedSourceForSubmission } from "../../deployments/nixos-shared-host-reviewed-source-snapshot";
 import { deploymentAdmissionEvidenceFixture } from "./deployment-admission.fixture";
 import { admissionEvalBase, admittedContextFixture } from "./deployment-admission.test-helpers";
@@ -49,6 +52,13 @@ test("reviewed source policy classifies main, release tags, and explicit commits
     sourceRefPolicyKind("commit:0123456789abcdef0123456789abcdef01234567"),
     "explicit_reviewed_commit",
   );
+});
+
+test("reviewed source policy identifies short and full environment branch refs as stale", () => {
+  assert.equal(isStaleEnvironmentBranchRef("env/demo/dev"), true);
+  assert.equal(isStaleEnvironmentBranchRef("refs/heads/env/demo/dev"), true);
+  assert.equal(isStaleEnvironmentBranchRef("refs/heads/main"), false);
+  assert.equal(isStaleEnvironmentBranchRef("refs/tags/env/demo/dev"), false);
 });
 
 test("reviewed source policy resolves an explicit reviewed commit without git ref lookup", async () => {
@@ -178,13 +188,29 @@ test("release-tag admitted source satisfies required checks and approvals", asyn
 });
 
 test("reviewed source policy rejects normal protected/shared env refs at runtime", async () => {
+  for (const sourceRef of ["env/demo/dev", "refs/heads/env/demo/dev"]) {
+    await assert.rejects(
+      resolveReviewedSourceRevision({
+        workspaceRoot: "/not-used",
+        deployment: deploymentForSourceRef(sourceRef, [sourceRef]),
+        resolveGitRevision: async () => "unused",
+      }),
+      new RegExp(
+        `source_ref_policy must not use environment branch ${sourceRef.replaceAll("/", "\\/")}`,
+      ),
+    );
+  }
+});
+
+test("reviewed source policy rejects requested full environment branch refs", async () => {
   await assert.rejects(
     resolveReviewedSourceRevision({
       workspaceRoot: "/not-used",
-      deployment: deploymentForSourceRef("env/demo/dev", ["env/demo/dev"]),
+      deployment: deploymentForSourceRef("refs/heads/*", ["refs/heads/*"]),
+      requestedSourceRef: "refs/heads/env/demo/dev",
       resolveGitRevision: async () => "unused",
     }),
-    /source_ref_policy must not use environment branch env\/demo\/dev/,
+    /requested reviewed source ref must not use environment branch refs\/heads\/env\/demo\/dev/,
   );
 });
 

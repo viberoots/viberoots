@@ -32,8 +32,6 @@ export type DeploymentLanePolicy = {
   defaultsRef?: string;
   stages: string[];
   sourceRefPolicy: Record<string, string>;
-  stageBranches: Record<string, string>;
-  stageBranchesRequired: boolean;
   allowedPromotionEdges: string[];
   artifactReuseMode: ArtifactReuseMode;
   promotionCompatibility?: DeploymentLanePromotionCompatibility;
@@ -63,28 +61,6 @@ function policyError(ref: string, message: string): string {
   return `${normalizeTargetLabel(ref)}: ${message}`;
 }
 
-function readBoolean(node: GraphNode, key: string): boolean {
-  return node[key] === true || node[key] === "true";
-}
-
-function rejectStaleStageBranches(
-  ref: string,
-  stageBranches: Record<string, string>,
-  stageBranchesRequired: boolean,
-) {
-  const entries = Object.entries(stageBranches);
-  const errors = entries.map(([stage, branch]) =>
-    policyError(
-      ref,
-      `stage_branches is not supported; use source_ref_policy for ${stage} (${branch})`,
-    ),
-  );
-  if (stageBranchesRequired && entries.length === 0) {
-    errors.push(policyError(ref, "stage_branches_required is not supported"));
-  }
-  return errors;
-}
-
 export function extractDeploymentLanePoliciesWithGovernance(
   nodes: GraphNode[],
   governancePolicies: Map<string, DeploymentLaneGovernance>,
@@ -105,9 +81,7 @@ export function extractDeploymentLanePoliciesWithGovernance(
     const defaultClientProfile =
       readString(node, "default_client_profile") || defaults?.defaultClientProfile || "";
     const stages = readStringArray(node, "stages");
-    const stageBranches = readStringRecord(node, "stage_branches");
     const sourceRefPolicy = readStringRecord(node, "source_ref_policy");
-    const stageBranchesRequired = readBoolean(node, "stage_branches_required");
     const allowedPromotionEdges = readStringArray(node, "allowed_promotion_edges");
     const artifactReuseMode = (readString(node, "artifact_reuse_mode") ||
       "same_artifact") as ArtifactReuseMode;
@@ -127,9 +101,6 @@ export function extractDeploymentLanePoliciesWithGovernance(
       if (!sourceRefPolicy[stage]) {
         errors.push(policyError(ref, `lane policy missing source_ref_policy entry for ${stage}`));
       }
-    }
-    if (Object.keys(stageBranches).length > 0 || stageBranchesRequired) {
-      errors.push(...rejectStaleStageBranches(ref, stageBranches, stageBranchesRequired));
     }
     errors.push(
       ...staleEnvironmentRefErrors({
@@ -193,8 +164,6 @@ export function extractDeploymentLanePoliciesWithGovernance(
       ...(defaultsRef ? { defaultsRef } : {}),
       stages,
       sourceRefPolicy,
-      stageBranches,
-      stageBranchesRequired,
       allowedPromotionEdges,
       artifactReuseMode,
       ...(promotionCompatibility.value

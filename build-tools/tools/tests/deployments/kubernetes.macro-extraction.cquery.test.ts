@@ -8,7 +8,7 @@ import { extractKubernetesDeployments } from "../../deployments/contract";
 import { inheritedBuckIsolation, runInTemp } from "../lib/test-helpers";
 
 const ATTRS =
-  "name,rule_type,buck.type,provider,component,component_kind,publisher,publisher_config,protection_class,lane_policy,environment_stage,admission_policy,provider_target,components,prerequisites,secret_requirements,runtime_config_requirements,governance_policy,defaults,default_client_profile,scm_backend,repository,source_ref_policies,trusted_reporter_identities,required_approval_boundaries,stages,source_ref_policy,stage_branches,stage_branches_required,allowed_promotion_edges,promotion_compatibility,allowed_refs,required_checks,required_approvals,labels".split(
+  "name,rule_type,buck.type,provider,component,component_kind,publisher,publisher_config,protection_class,lane_policy,environment_stage,admission_policy,provider_target,components,prerequisites,secret_requirements,runtime_config_requirements,governance_policy,defaults,default_client_profile,scm_backend,repository,source_ref_policies,trusted_reporter_identities,required_approval_boundaries,stages,source_ref_policy,allowed_promotion_edges,promotion_compatibility,allowed_refs,required_checks,required_approvals,labels".split(
     ",",
   );
 

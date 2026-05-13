@@ -56,8 +56,6 @@ export function nixosSharedHostLanePolicyFixture(overrides: Partial<DeploymentLa
       staging: "main",
       prod: "refs/tags/release/fixture",
     },
-    stageBranches: overrides.stageBranches || {},
-    stageBranchesRequired: overrides.stageBranchesRequired || false,
     allowedPromotionEdges: overrides.allowedPromotionEdges || ["dev->staging", "staging->prod"],
     artifactReuseMode: overrides.artifactReuseMode || "same_artifact",
     ...(promotionCompatibility ? { promotionCompatibility } : {}),
@@ -99,8 +97,6 @@ export function nixosSharedHostLanePolicyNodeFixture(overrides: Partial<GraphNod
     rule_type: DEPLOYMENT_LANE_POLICY_RULE,
     stages: policy.stages,
     source_ref_policy: policy.sourceRefPolicy,
-    stage_branches: policy.stageBranches,
-    stage_branches_required: policy.stageBranchesRequired,
     allowed_promotion_edges: policy.allowedPromotionEdges,
     artifact_reuse_mode: policy.artifactReuseMode,
     promotion_compatibility: policy.promotionCompatibility

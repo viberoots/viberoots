@@ -47,8 +47,6 @@ const DEPLOYMENT_CQUERY_ATTRS = [
   "required_approval_boundaries",
   "stages",
   "source_ref_policy",
-  "stage_branches",
-  "stage_branches_required",
   "allowed_promotion_edges",
   "artifact_reuse_mode",
   "promotion_compatibility",

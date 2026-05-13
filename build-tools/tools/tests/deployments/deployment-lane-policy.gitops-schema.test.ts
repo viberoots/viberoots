@@ -61,7 +61,6 @@ test("lane policies extract git-backed governance without stage branches", () =>
   const lane = result.policies.get("//projects/deployments/app-shared:lane");
   assert.ok(lane);
   assert.deepEqual(lane.stages, ["dev", "staging", "prod"]);
-  assert.deepEqual(lane.stageBranches, {});
   assert.deepEqual(lane.sourceRefPolicy, {
     dev: "main",
     staging: "main",
@@ -75,46 +74,40 @@ test("lane policies extract git-backed governance without stage branches", () =>
   ]);
 });
 
-test("lane policies reject stale stage branch promotion state", () => {
-  const governance = extractDeploymentLaneGovernancePolicies([governanceNode()]);
-  const result = extractDeploymentLanePoliciesWithGovernance(
-    [
-      laneNode({
-        source_ref_policy: { dev: "main" },
-        stage_branches: { dev: "env/app/dev" },
-        stage_branches_required: true,
-      }),
-    ],
-    governance.policies,
-  );
-  assert.match(result.errors.join("\n"), /stage_branches is not supported/);
-});
-
-test("lane policies reject required stage branches even without a branch mapping", () => {
-  const governance = extractDeploymentLaneGovernancePolicies([governanceNode()]);
-  const result = extractDeploymentLanePoliciesWithGovernance(
-    [laneNode({ source_ref_policy: { dev: "main" }, stage_branches_required: true })],
-    governance.policies,
-  );
-  assert.match(result.errors.join("\n"), /stage_branches_required is not supported/);
-});
-
 test("lane policies reject environment branches in source-ref policy", () => {
   const governance = extractDeploymentLaneGovernancePolicies([
     governanceNode({
       source_ref_policies: [
         { stage: "prod", allowed_refs: "env/app/prod", required_checks: "deploy/admission" },
+        {
+          stage: "staging",
+          allowed_refs: "refs/heads/env/app/staging",
+          required_checks: "deploy/admission",
+        },
       ],
     }),
   ]);
   assert.match(governance.errors.join("\n"), /must not use environment branch env\/app\/prod/);
+  assert.match(
+    governance.errors.join("\n"),
+    /must not use environment branch refs\/heads\/env\/app\/staging/,
+  );
 
   const validGovernance = extractDeploymentLaneGovernancePolicies([governanceNode()]);
   const lanes = extractDeploymentLanePoliciesWithGovernance(
-    [laneNode({ source_ref_policy: { dev: "main", staging: "main", prod: "env/app/prod" } })],
+    [
+      laneNode({
+        source_ref_policy: {
+          dev: "main",
+          staging: "refs/heads/env/app/staging",
+          prod: "env/app/prod",
+        },
+      }),
+    ],
     validGovernance.policies,
   );
   assert.match(lanes.errors.join("\n"), /source_ref_policy must not use environment branch/);
+  assert.match(lanes.errors.join("\n"), /refs\/heads\/env\/app\/staging/);
 });
 
 test("admission policies reject environment branches in allowed refs", () => {
@@ -122,11 +115,12 @@ test("admission policies reject environment branches in allowed refs", () => {
     {
       name: "//projects/deployments/app-shared:prod_release",
       rule_type: "deployment_admission_policy",
-      allowed_refs: ["env/app/prod"],
+      allowed_refs: ["env/app/prod", "refs/heads/env/app/prod"],
       required_checks: ["deploy/admission"],
     },
   ]);
   assert.match(policies.errors.join("\n"), /allowed_refs must not use environment branch/);
+  assert.match(policies.errors.join("\n"), /refs\/heads\/env\/app\/prod/);
 });
 
 test("lane governance rejects missing trusted reporters and approval boundaries", () => {

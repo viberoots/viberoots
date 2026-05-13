@@ -99,8 +99,6 @@ deployment_lane_policy = rule(
     attrs = {
         "defaults": attrs.option(attrs.dep(), default = None),
         "stages": attrs.list(attrs.string()),
-        "stage_branches": attrs.dict(key = attrs.string(), value = attrs.string(), default = {}),
-        "stage_branches_required": attrs.bool(default = False),
         "source_ref_policy": attrs.dict(key = attrs.string(), value = attrs.string(), default = {}),
         "allowed_promotion_edges": attrs.list(attrs.string(), default = []),
         "artifact_reuse_mode": attrs.string(default = "same_artifact"),
