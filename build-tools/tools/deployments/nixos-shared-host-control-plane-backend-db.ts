@@ -128,6 +128,21 @@ async function initializeBackendSchema(pool: BackendPool) {
       updated_at TIMESTAMPTZ NOT NULL,
       PRIMARY KEY(deployment_id, environment_stage, deploy_run_id)
     );
+    CREATE TABLE IF NOT EXISTS stage_state_audit_events (
+      event_id TEXT PRIMARY KEY,
+      deployment_id TEXT NOT NULL,
+      environment_stage TEXT NOT NULL,
+      deploy_run_id TEXT NOT NULL,
+      event_type TEXT NOT NULL,
+      content_hash TEXT,
+      event_hash TEXT,
+      audit_sequence INTEGER,
+      document_json JSONB NOT NULL,
+      occurred_at TIMESTAMPTZ NOT NULL
+    );
+    ALTER TABLE stage_state_audit_events ADD COLUMN IF NOT EXISTS content_hash TEXT;
+    ALTER TABLE stage_state_audit_events ADD COLUMN IF NOT EXISTS event_hash TEXT;
+    ALTER TABLE stage_state_audit_events ADD COLUMN IF NOT EXISTS audit_sequence INTEGER;
     CREATE TABLE IF NOT EXISTS artifact_cleanup_janitor_records (
       record_id TEXT PRIMARY KEY,
       submission_id TEXT,

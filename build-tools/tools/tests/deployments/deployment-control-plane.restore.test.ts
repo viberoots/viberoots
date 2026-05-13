@@ -57,6 +57,76 @@ test("control-plane restore test persists operator-visible resilience state", as
           rejectUnauthorized: false,
         },
       });
+      await fsp.mkdir(path.join(recordsRoot, "control-plane", "current-stage-state", "demoapp"), {
+        recursive: true,
+      });
+      const retainedEvidencePath = path.join(
+        recordsRoot,
+        "control-plane",
+        "render",
+        "restore.json",
+      );
+      await fsp.mkdir(path.dirname(retainedEvidencePath), { recursive: true });
+      await fsp.writeFile(retainedEvidencePath, JSON.stringify({ runId: "restore-current" }));
+      const artifactBlobRoot = path.join(recordsRoot, "artifacts", "blobs");
+      const artifactProvenanceRoot = path.join(recordsRoot, "artifacts", "provenance");
+      const artifactPath = path.join(artifactBlobRoot, "artifact-restore-1");
+      const provenancePath = path.join(artifactProvenanceRoot, "artifact-restore-1.json");
+      const componentArtifactPath = path.join(artifactBlobRoot, "oci-restore-1");
+      const componentProvenancePath = path.join(artifactProvenanceRoot, "oci-restore-1.json");
+      await fsp.mkdir(path.dirname(artifactPath), { recursive: true });
+      await fsp.mkdir(path.dirname(provenancePath), { recursive: true });
+      await fsp.writeFile(artifactPath, "artifact\n", "utf8");
+      await fsp.writeFile(
+        provenancePath,
+        JSON.stringify({ artifactIdentity: "artifact-restore-1" }),
+      );
+      await fsp.writeFile(componentArtifactPath, "oci artifact\n", "utf8");
+      await fsp.writeFile(
+        componentProvenancePath,
+        JSON.stringify({ artifactIdentity: "oci-restore-1" }),
+      );
+      await fsp.writeFile(
+        path.join(recordsRoot, "control-plane", "current-stage-state", "demoapp", "dev.json"),
+        JSON.stringify(
+          {
+            schemaVersion: "deployment-current-stage-state@1",
+            deploymentId: deployment.deploymentId,
+            deploymentLabel: deployment.label,
+            environmentStage: deployment.environmentStage,
+            providerTargetIdentity: "nixos-shared-host:default:demo",
+            currentRunId: "restore-current",
+            operationKind: "deploy",
+            sourceRevision: "rev-restore-1",
+            artifactIdentity: "artifact-restore-1",
+            artifactReuseMode: "same_artifact",
+            finalOutcome: "succeeded",
+            updatedAt: "2026-05-12T12:00:00.000Z",
+            requiredChecks: [],
+            retainedRenderEvidence: [
+              {
+                kind: "replay_snapshot",
+                referencePath: retainedEvidencePath,
+              },
+            ],
+            retainedArtifactEvidence: [
+              {
+                identity: "artifact-restore-1",
+                storedArtifactPath: artifactPath,
+                provenancePath,
+              },
+              {
+                identity: "oci-restore-1",
+                storedArtifactPath: componentArtifactPath,
+                provenancePath: componentProvenancePath,
+              },
+            ],
+            driftStatus: { state: "not_checked" },
+          },
+          null,
+          2,
+        ) + "\n",
+      );
       const status = await runDeploymentControlPlaneRestoreTest({
         recordsRoot,
         backupRoot: path.join(tmp, "backups"),
@@ -66,11 +136,108 @@ test("control-plane restore test persists operator-visible resilience state", as
       assert.equal(status.latestRestoreTest?.status, "passed");
       assert.ok((status.latestRestoreTest?.restoredRunCount || 0) >= 1);
       assert.ok((status.latestRestoreTest?.restoredSubmissionCount || 0) >= 1);
+      assert.ok((status.latestRestoreTest?.restoredCurrentStageStateCount || 0) >= 1);
+      assert.ok((status.latestRestoreTest?.retainedArtifactReferenceCount || 0) >= 5);
       const persisted = await readDeploymentControlPlaneResilienceStatus(recordsRoot);
       assert.equal(persisted?.schemaVersion, "deployment-control-plane-resilience-status@1");
       assert.equal(persisted?.latestRestoreTest?.status, "passed");
     } finally {
       await server.close();
     }
+  });
+});
+
+test("control-plane restore validation fails missing artifact provenance", async () => {
+  await runInTemp("deployment-control-plane-restore-artifact-provenance", async (tmp) => {
+    const recordsRoot = path.join(tmp, "records");
+    const evidencePath = path.join(recordsRoot, "control-plane", "render", "restore.json");
+    const artifactPath = path.join(recordsRoot, "artifacts", "blobs", "artifact-restore-1");
+    await fsp.mkdir(path.dirname(evidencePath), { recursive: true });
+    await fsp.mkdir(path.dirname(artifactPath), { recursive: true });
+    await fsp.writeFile(evidencePath, "{}\n", "utf8");
+    await fsp.writeFile(artifactPath, "artifact\n", "utf8");
+    await fsp.mkdir(path.join(recordsRoot, "control-plane", "current-stage-state", "demoapp"), {
+      recursive: true,
+    });
+    await fsp.writeFile(
+      path.join(recordsRoot, "control-plane", "current-stage-state", "demoapp", "dev.json"),
+      JSON.stringify(
+        {
+          schemaVersion: "deployment-current-stage-state@1",
+          deploymentId: "demoapp",
+          deploymentLabel: "//demo:deploy",
+          environmentStage: "dev",
+          providerTargetIdentity: "nixos-shared-host:default:demo",
+          currentRunId: "restore-current",
+          operationKind: "deploy",
+          sourceRevision: "rev-restore-1",
+          artifactIdentity: "artifact-restore-1",
+          artifactReuseMode: "same_artifact",
+          finalOutcome: "succeeded",
+          updatedAt: "2026-05-12T12:00:00.000Z",
+          requiredChecks: [],
+          retainedRenderEvidence: [{ kind: "replay_snapshot", referencePath: evidencePath }],
+          retainedArtifactEvidence: [
+            {
+              identity: "artifact-restore-1",
+              storedArtifactPath: artifactPath,
+              provenancePath: path.join(recordsRoot, "artifacts", "provenance", "missing.json"),
+            },
+          ],
+          driftStatus: { state: "not_checked" },
+        },
+        null,
+        2,
+      ) + "\n",
+    );
+    const status = await runDeploymentControlPlaneRestoreTest({
+      recordsRoot,
+      backupRoot: path.join(tmp, "backups"),
+      restoreRoot: path.join(tmp, "restore"),
+      protectionClass: "shared_nonprod",
+    });
+    assert.equal(status.latestRestoreTest?.status, "failed");
+    assert.match(status.latestRestoreTest?.error || "", /artifact provenance is not restorable/);
+  });
+});
+
+test("control-plane restore validation fails missing retained render evidence", async () => {
+  await runInTemp("deployment-control-plane-restore-retained-evidence", async (tmp) => {
+    const recordsRoot = path.join(tmp, "records");
+    await fsp.mkdir(path.join(recordsRoot, "control-plane", "current-stage-state", "demoapp"), {
+      recursive: true,
+    });
+    await fsp.writeFile(
+      path.join(recordsRoot, "control-plane", "current-stage-state", "demoapp", "dev.json"),
+      JSON.stringify(
+        {
+          schemaVersion: "deployment-current-stage-state@1",
+          deploymentId: "demoapp",
+          deploymentLabel: "//demo:deploy",
+          environmentStage: "dev",
+          providerTargetIdentity: "nixos-shared-host:default:demo",
+          currentRunId: "restore-current",
+          operationKind: "deploy",
+          sourceRevision: "rev-restore-1",
+          artifactIdentity: "artifact-restore-1",
+          artifactReuseMode: "same_artifact",
+          finalOutcome: "succeeded",
+          updatedAt: "2026-05-12T12:00:00.000Z",
+          requiredChecks: [],
+          retainedRenderEvidence: [],
+          driftStatus: { state: "not_checked" },
+        },
+        null,
+        2,
+      ) + "\n",
+    );
+    const status = await runDeploymentControlPlaneRestoreTest({
+      recordsRoot,
+      backupRoot: path.join(tmp, "backups"),
+      restoreRoot: path.join(tmp, "restore"),
+      protectionClass: "shared_nonprod",
+    });
+    assert.equal(status.latestRestoreTest?.status, "failed");
+    assert.match(status.latestRestoreTest?.error || "", /missing retainedRenderEvidence/);
   });
 });

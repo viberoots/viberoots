@@ -88,6 +88,20 @@ test("control-plane observability derives lifecycle events, metrics, alerts, and
         status: "failed",
       },
     });
+    await writeJson(
+      path.join(recordsRoot, "control-plane", "current-stage-state", "deploy-b", "prod.json"),
+      {
+        deploymentId: "deploy-b",
+        environmentStage: "prod",
+        currentRunId: "deploy-1",
+        sourceRevision: "token=source-secret",
+        artifactIdentity: "token=artifact-secret",
+        requiredChecks: [],
+        retainedRenderEvidence: [],
+        retainedArtifactEvidence: [],
+        driftStatus: { state: "drifted", summary: "password=drift-secret" },
+      },
+    );
 
     const observability = await readDeploymentControlPlaneObservability(
       recordsRoot,
@@ -101,6 +115,8 @@ test("control-plane observability derives lifecycle events, metrics, alerts, and
     assert.equal(observability.metrics.failureCountsByStep.preview_cleanup, 1);
     assert.equal(observability.metrics.inDoubtRunCount, 1);
     assert.equal(observability.metrics.recoveredRunCount, 1);
+    assert.equal(observability.metrics.currentStageStateCount, 1);
+    assert.equal(observability.metrics.driftedStageCount, 1);
     assert.deepEqual(observability.alerts.map((entry) => entry.code).sort(), [
       "in_doubt_runs_present",
       "lock_contention",
@@ -117,6 +133,11 @@ test("control-plane observability derives lifecycle events, metrics, alerts, and
       observability.views.runs[0]?.operatorArtifacts[0]?.classification,
       "reference_only",
     );
+    assert.equal(observability.views.currentStageState[0]?.driftStatus, "drifted");
+    const stageView = JSON.stringify(observability.views.currentStageState[0]);
+    assert.ok(!stageView.includes("source-secret"));
+    assert.ok(!stageView.includes("artifact-secret"));
+    assert.match(stageView, /sensitive payload redacted/);
     assert.equal(observability.views.resilience.latestRestoreTestStatus, "failed");
   });
 });

@@ -7,6 +7,8 @@ import {
 } from "./nixos-shared-host-control-plane-backend-db";
 import type { NixosSharedHostControlPlaneBackendTarget } from "./nixos-shared-host-control-plane-backend-db";
 import { writeCurrentStageStateForDeployRecord } from "./deployment-current-stage-state";
+import { writeBackendStageStateAuditEvents } from "./deployment-stage-state-audit";
+import { writeStageStateBackupFiles } from "./deployment-stage-state-backup";
 
 type DeployRecordDoc = {
   deployRunId: string;
@@ -39,7 +41,15 @@ export async function writeBackendDeployRecordDoc(
           updated_at = EXCLUDED.updated_at`,
         [doc.deployRunId, submissionId, recordPath, JSON.stringify(doc), updatedAt],
       );
-      await writeCurrentStageStateForDeployRecord({ client, record: doc as any, updatedAt });
+      const state = await writeCurrentStageStateForDeployRecord({
+        client,
+        record: doc as any,
+        updatedAt,
+      });
+      if (state) {
+        await writeBackendStageStateAuditEvents({ client, state });
+        await writeStageStateBackupFiles({ recordsRoot: backend.recordsRoot, state });
+      }
       await client.query("COMMIT");
     } catch (error) {
       await client.query("ROLLBACK");

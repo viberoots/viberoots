@@ -42,6 +42,7 @@ export function createKubernetesDeployFailureRecord(opts: {
       componentId: artifact.componentId,
       identity: artifact.identity,
       storedArtifactPath: artifact.storedArtifactPath,
+      provenancePath: artifact.provenancePath,
     })),
     ...(opts.componentResults.length > 0 ? { componentResults: opts.componentResults } : {}),
     admittedContext: opts.admittedContext,

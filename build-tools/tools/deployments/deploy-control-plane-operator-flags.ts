@@ -6,6 +6,7 @@ export type DeployControlPlaneOperatorAction =
   | "record"
   | "current-stage-state"
   | "stage-history"
+  | "stage-state-audit"
   | "print-run-lock-scope"
   | "approve"
   | "cancel-run"
@@ -21,6 +22,7 @@ export function selectedDeployControlPlaneOperatorAction():
       ["record", getFlagBool("record")],
       ["current-stage-state", getFlagBool("current-stage-state")],
       ["stage-history", getFlagBool("stage-history")],
+      ["stage-state-audit", getFlagBool("stage-state-audit")],
       ["print-run-lock-scope", getFlagBool("print-run-lock-scope")],
       ["approve", getFlagBool("approve")],
       ["cancel-run", getFlagBool("cancel-run")],

@@ -1,5 +1,6 @@
 #!/usr/bin/env zx-wrapper
 import type { DeploymentCurrentStageState } from "./deployment-current-stage-state";
+import type { DeploymentStageStateAuditEvent } from "./deployment-stage-state-audit";
 
 const CONTROL_PLANE_REQUEST_TIMEOUT_MS = 15_000;
 
@@ -36,13 +37,13 @@ async function readStageJson<T>(opts: {
 export async function readNixosSharedHostCurrentStageStateViaService(opts: {
   controlPlaneUrl: string;
   token?: string;
-  deploymentId: string;
-  environmentStage: string;
+  deploymentId?: string;
+  environmentStage?: string;
 }) {
   const url = new URL("/api/v1/current-stage-state", opts.controlPlaneUrl);
-  url.searchParams.set("deploymentId", opts.deploymentId);
-  url.searchParams.set("environmentStage", opts.environmentStage);
-  return await readStageJson<DeploymentCurrentStageState>({
+  if (opts.deploymentId) url.searchParams.set("deploymentId", opts.deploymentId);
+  if (opts.environmentStage) url.searchParams.set("environmentStage", opts.environmentStage);
+  return await readStageJson<DeploymentCurrentStageState | DeploymentCurrentStageState[]>({
     url,
     route: "/api/v1/current-stage-state",
     controlPlaneUrl: opts.controlPlaneUrl,
@@ -62,6 +63,23 @@ export async function readNixosSharedHostStageHistoryViaService(opts: {
   return await readStageJson<DeploymentCurrentStageState[]>({
     url,
     route: "/api/v1/stage-history",
+    controlPlaneUrl: opts.controlPlaneUrl,
+    ...(opts.token ? { token: opts.token } : {}),
+  });
+}
+
+export async function readNixosSharedHostStageStateAuditViaService(opts: {
+  controlPlaneUrl: string;
+  token?: string;
+  deploymentId: string;
+  environmentStage?: string;
+}) {
+  const url = new URL("/api/v1/stage-state-audit", opts.controlPlaneUrl);
+  url.searchParams.set("deploymentId", opts.deploymentId);
+  if (opts.environmentStage) url.searchParams.set("environmentStage", opts.environmentStage);
+  return await readStageJson<DeploymentStageStateAuditEvent[]>({
+    url,
+    route: "/api/v1/stage-state-audit",
     controlPlaneUrl: opts.controlPlaneUrl,
     ...(opts.token ? { token: opts.token } : {}),
   });

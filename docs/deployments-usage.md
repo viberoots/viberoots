@@ -327,6 +327,10 @@ metadata and call `GET /api/v1/current-stage-state` or
 `GET /api/v1/stage-history`. The current state includes the latest deployed
 source revision, artifact identity, parent/source run, lineage, outcome, and
 approval context.
+Add `--by-deployment` to list every current lane/stage state for the deployment
+or `--by-stage` to list every deployment currently recorded in the reviewed
+stage; those modes call the same API with only `deploymentId` or only
+`environmentStage`.
 
 If you are using the reviewed `nixos-shared-host` client profile workflow, use
 `--profile mini` instead of `--control-plane-url`.

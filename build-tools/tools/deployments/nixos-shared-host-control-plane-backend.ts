@@ -31,6 +31,7 @@ export {
 } from "./nixos-shared-host-control-plane-backend-records";
 export {
   readBackendCurrentStageState,
+  readBackendCurrentStageStates,
   readBackendStageHistory,
   type DeploymentCurrentStageState,
 } from "./deployment-current-stage-state";
@@ -38,6 +39,10 @@ export {
   readBackendRollbackCandidates,
   type DeploymentRollbackCandidate,
 } from "./deployment-rollback-candidates";
+export {
+  readBackendStageStateAuditEvents,
+  type DeploymentStageStateAuditEvent,
+} from "./deployment-stage-state-audit";
 export {
   acquireBackendControlPlaneLock,
   resolveBackendIdempotency,

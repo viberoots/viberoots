@@ -188,6 +188,11 @@ export function formatDeploymentCurrentStageStateText(state: DeploymentCurrentSt
   const rollbackCandidates = Array.isArray((state as any).rollbackCandidates)
     ? (state as any).rollbackCandidates
     : [];
+  const requiredChecks = Array.isArray(state.requiredChecks) ? state.requiredChecks : [];
+  const retainedRenderEvidence = Array.isArray(state.retainedRenderEvidence)
+    ? state.retainedRenderEvidence
+    : [];
+  const driftStatus = state.driftStatus || { state: "unknown" };
   return [
     `current stage: ${state.deploymentId} ${state.environmentStage}`,
     `deployment: ${state.deploymentLabel}`,
@@ -211,6 +216,13 @@ export function formatDeploymentCurrentStageStateText(state: DeploymentCurrentSt
     `updatedAt: ${state.updatedAt}`,
     state.approvalContext
       ? `approval: ${state.approvalContext.requiredApprovals.join(",") || "none"}`
+      : undefined,
+    requiredChecks.length > 0
+      ? `requiredChecks: ${requiredChecks.map((check) => check.name).join(",")}`
+      : undefined,
+    `drift: ${driftStatus.state}`,
+    retainedRenderEvidence.length > 0
+      ? `retainedRenderEvidence: ${retainedRenderEvidence.map((entry) => entry.kind).join(",")}`
       : undefined,
     rollbackCandidates.length > 0
       ? `rollbackCandidates: ${rollbackCandidates.map((candidate: any) => candidate.deployRunId).join(",")}`

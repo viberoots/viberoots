@@ -22,10 +22,12 @@ import {
   formatDeploymentControlPlaneRecordText,
   formatDeploymentControlPlaneStatusText,
 } from "./deployment-control-plane-status-format";
+import { formatDeploymentStageStateAuditEventText } from "./deployment-stage-state-audit-format";
 import { submitNixosSharedHostControlPlaneRunActionViaService } from "./nixos-shared-host-control-plane-client";
 import {
   readRecordForOperator,
   readCurrentStageStateForOperator,
+  readStageStateAuditForOperator,
   readStageHistoryForOperator,
   readStatusForOperator,
   requireLookupSelector,
@@ -66,6 +68,10 @@ function serviceAction(action: DeployControlPlaneOperatorAction): DeploymentCont
       : action === "resume-run"
         ? "resume"
         : "abort";
+}
+
+function operatorToken(controlPlaneToken?: string) {
+  return controlPlaneToken ? { controlPlaneToken } : {};
 }
 
 function buildRunActionRequest(
@@ -162,24 +168,25 @@ export async function maybeRunDeployControlPlaneOperatorCommand(opts: {
     actionLabel,
   });
   if (action === "current-stage-state") {
+    const byDeployment = getFlagBool("by-deployment");
+    const byStage = getFlagBool("by-stage");
+    if (byDeployment && byStage) throw new Error("--by-deployment and --by-stage are exclusive");
     const state = await readCurrentStageStateForOperator({
       controlPlaneUrl: serviceClient.controlPlaneUrl,
-      ...(serviceClient.controlPlaneToken
-        ? { controlPlaneToken: serviceClient.controlPlaneToken }
-        : {}),
-      deploymentId: opts.deployment.deploymentId,
-      environmentStage: opts.deployment.environmentStage,
+      ...operatorToken(serviceClient.controlPlaneToken),
+      ...(byStage ? {} : { deploymentId: opts.deployment.deploymentId }),
+      ...(byDeployment ? {} : { environmentStage: opts.deployment.environmentStage }),
     });
-    if (getFlagBool("text")) console.log(formatDeploymentCurrentStageStateText(state));
-    else printDeployJson(state);
+    if (getFlagBool("text")) {
+      const states = Array.isArray(state) ? state : [state];
+      console.log(states.map(formatDeploymentCurrentStageStateText).join("\n\n"));
+    } else printDeployJson(state);
     return true;
   }
   if (action === "stage-history") {
     const history = await readStageHistoryForOperator({
       controlPlaneUrl: serviceClient.controlPlaneUrl,
-      ...(serviceClient.controlPlaneToken
-        ? { controlPlaneToken: serviceClient.controlPlaneToken }
-        : {}),
+      ...operatorToken(serviceClient.controlPlaneToken),
       deploymentId: opts.deployment.deploymentId,
       environmentStage: opts.deployment.environmentStage,
     });
@@ -188,13 +195,23 @@ export async function maybeRunDeployControlPlaneOperatorCommand(opts: {
     } else printDeployJson(history);
     return true;
   }
+  if (action === "stage-state-audit") {
+    const events = await readStageStateAuditForOperator({
+      controlPlaneUrl: serviceClient.controlPlaneUrl,
+      ...operatorToken(serviceClient.controlPlaneToken),
+      deploymentId: opts.deployment.deploymentId,
+      environmentStage: opts.deployment.environmentStage,
+    });
+    if (getFlagBool("text")) {
+      console.log(events.map(formatDeploymentStageStateAuditEventText).join("\n\n"));
+    } else printDeployJson(events);
+    return true;
+  }
   const selector = requireLookupSelector(actionLabel);
   if (action === "record") {
     const record = await readRecordForOperator({
       controlPlaneUrl: serviceClient.controlPlaneUrl,
-      ...(serviceClient.controlPlaneToken
-        ? { controlPlaneToken: serviceClient.controlPlaneToken }
-        : {}),
+      ...operatorToken(serviceClient.controlPlaneToken),
       selector,
     });
     if (getFlagBool("text")) console.log(formatDeploymentControlPlaneRecordText(record));
@@ -203,9 +220,7 @@ export async function maybeRunDeployControlPlaneOperatorCommand(opts: {
   }
   const status = await readStatusForOperator({
     controlPlaneUrl: serviceClient.controlPlaneUrl,
-    ...(serviceClient.controlPlaneToken
-      ? { controlPlaneToken: serviceClient.controlPlaneToken }
-      : {}),
+    ...operatorToken(serviceClient.controlPlaneToken),
     selector,
   });
   if (action === "status") {
@@ -223,9 +238,7 @@ export async function maybeRunDeployControlPlaneOperatorCommand(opts: {
     controlPlaneUrl: serviceClient.controlPlaneUrl,
     deployment: opts.deployment,
     vaultRuntimeInputs: opts.vaultRuntimeInputs,
-    ...(serviceClient.controlPlaneToken
-      ? { controlPlaneToken: serviceClient.controlPlaneToken }
-      : {}),
+    ...operatorToken(serviceClient.controlPlaneToken),
   });
   return true;
 }

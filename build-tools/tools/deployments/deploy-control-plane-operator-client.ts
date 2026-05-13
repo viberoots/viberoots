@@ -7,6 +7,7 @@ import {
 } from "./nixos-shared-host-control-plane-client";
 import {
   readNixosSharedHostCurrentStageStateViaService,
+  readNixosSharedHostStageStateAuditViaService,
   readNixosSharedHostStageHistoryViaService,
 } from "./nixos-shared-host-control-plane-stage-client";
 import { readNixosSharedHostClientProfile } from "./nixos-shared-host-install-dev-machine";
@@ -126,14 +127,14 @@ export async function readRecordForOperator(opts: {
 export async function readCurrentStageStateForOperator(opts: {
   controlPlaneUrl: string;
   controlPlaneToken?: string;
-  deploymentId: string;
-  environmentStage: string;
+  deploymentId?: string;
+  environmentStage?: string;
 }) {
   return await readNixosSharedHostCurrentStageStateViaService({
     controlPlaneUrl: opts.controlPlaneUrl,
     ...(opts.controlPlaneToken ? { token: opts.controlPlaneToken } : {}),
-    deploymentId: opts.deploymentId,
-    environmentStage: opts.environmentStage,
+    ...(opts.deploymentId ? { deploymentId: opts.deploymentId } : {}),
+    ...(opts.environmentStage ? { environmentStage: opts.environmentStage } : {}),
   });
 }
 
@@ -144,6 +145,20 @@ export async function readStageHistoryForOperator(opts: {
   environmentStage: string;
 }) {
   return await readNixosSharedHostStageHistoryViaService({
+    controlPlaneUrl: opts.controlPlaneUrl,
+    ...(opts.controlPlaneToken ? { token: opts.controlPlaneToken } : {}),
+    deploymentId: opts.deploymentId,
+    environmentStage: opts.environmentStage,
+  });
+}
+
+export async function readStageStateAuditForOperator(opts: {
+  controlPlaneUrl: string;
+  controlPlaneToken?: string;
+  deploymentId: string;
+  environmentStage: string;
+}) {
+  return await readNixosSharedHostStageStateAuditViaService({
     controlPlaneUrl: opts.controlPlaneUrl,
     ...(opts.controlPlaneToken ? { token: opts.controlPlaneToken } : {}),
     deploymentId: opts.deploymentId,

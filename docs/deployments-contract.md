@@ -27,6 +27,8 @@ Current reviewed central control-plane implementation note:
 - `GET /api/v1/current-stage-state` includes operator-visible retry/rollback lineage and the
   policy-filtered rollback candidates derived from backend stage history, not from Git refs,
   mutable provider tags, or release-pointer files.
+- Supplying both `deploymentId` and `environmentStage` returns the exact current state plus
+  rollback candidates; supplying only one returns a secret-safe list for that deployment or stage.
 - Explicit `pgmem://...` backend URLs remain valid for isolated fixture tests and local harnesses; those harnesses should exercise the same backend-native contracts rather than rely on durable submission or deploy-record mirror files.
 - For public repo-level protected/shared `cloudflare-pages` mutation, missing `--control-plane-url` or `VBR_DEPLOY_CONTROL_PLANE_URL` is a fail-closed configuration error, and mixing that service-routed path with local-only flags such as `--records-root` or `--control-plane-database-url` is out of contract.
 - Protected/shared `cloudflare-pages` service submissions must carry a versioned `artifactInput` descriptor. The service rejects laptop-local `artifactDir` paths, admits uploaded, server-built, CI-attested, or previously admitted artifacts under control-plane storage, and publishes only the admitted artifact reference.

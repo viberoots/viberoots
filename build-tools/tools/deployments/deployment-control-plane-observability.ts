@@ -1,11 +1,13 @@
 #!/usr/bin/env zx-wrapper
 import path from "node:path";
 import { redactOperatorText } from "./deployment-control-plane-redaction";
+import { publicCurrentStageState } from "./deployment-current-stage-state-public";
 import {
   ageMs,
   increment,
   readJsonDir,
   readJsonFile,
+  readJsonTree,
   recordRefs,
 } from "./deployment-control-plane-observability-helpers";
 
@@ -40,6 +42,14 @@ type RunLike = {
 type ResilienceLike = {
   latestBackup?: { createdAt?: string };
   latestRestoreTest?: { testedAt?: string; status?: string };
+};
+type StageStateLike = {
+  deploymentId: string;
+  environmentStage: string;
+  currentRunId: string;
+  sourceRevision: string;
+  artifactIdentity: string;
+  driftStatus?: { state?: string };
 };
 function submissionEvents(submission: SubmissionLike) {
   const events = [
@@ -126,6 +136,9 @@ export async function readDeploymentControlPlaneObservability(
   const resilience = await readJsonFile<ResilienceLike>(
     path.join(resolvedRoot, "control-plane", "resilience", "latest.json"),
   );
+  const stageStates = await readJsonTree<StageStateLike>(
+    path.join(resolvedRoot, "control-plane", "current-stage-state"),
+  );
   const failureCountsByOutcome: Record<string, number> = {};
   const failureCountsByStep: Record<string, number> = {};
   for (const run of runs.filter((entry) => entry.finalOutcome !== "succeeded")) {
@@ -169,6 +182,9 @@ export async function readDeploymentControlPlaneObservability(
       failureCountsByStep,
       inDoubtRunCount: running.length,
       recoveredRunCount: submissions.filter((entry) => entry.recovery?.decision).length,
+      currentStageStateCount: stageStates.length,
+      driftedStageCount: stageStates.filter((entry) => entry.driftStatus?.state === "drifted")
+        .length,
       latestBackupAt: resilience?.latestBackup?.createdAt,
       latestRestoreTestAt: resilience?.latestRestoreTest?.testedAt,
       latestRestoreTestStatus: resilience?.latestRestoreTest?.status,
@@ -202,6 +218,10 @@ export async function readDeploymentControlPlaneObservability(
           operatorArtifacts: await recordRefs(run),
         })),
       ),
+      currentStageState: stageStates.map((state) => ({
+        ...publicCurrentStageState(state as any),
+        driftStatus: state.driftStatus?.state || "unknown",
+      })),
       resilience: {
         latestBackupAt: resilience?.latestBackup?.createdAt,
         latestRestoreTestAt: resilience?.latestRestoreTest?.testedAt,

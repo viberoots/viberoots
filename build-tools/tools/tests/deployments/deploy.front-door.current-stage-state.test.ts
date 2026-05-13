@@ -29,7 +29,12 @@ async function startStageStateServer() {
       updatedAt: "2026-05-12T12:00:00.000Z",
       approvalContext: { requiredApprovals: [] },
     };
-    response.end(JSON.stringify(url.pathname.endsWith("stage-history") ? [state] : state));
+    const isCurrentList =
+      url.pathname.endsWith("current-stage-state") &&
+      (!url.searchParams.get("deploymentId") || !url.searchParams.get("environmentStage"));
+    response.end(
+      JSON.stringify(url.pathname.endsWith("stage-history") || isCurrentList ? [state] : state),
+    );
   });
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
   const address = server.address();
@@ -63,9 +68,23 @@ test("deploy current-stage helpers read and render service-backed stage state", 
         stdio: "pipe",
       })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment ${deploymentLabel} --stage-history --control-plane-url ${mock.url}`;
       assert.equal(JSON.parse(String(history.stdout))[0].currentRunId, "deploy-current");
+      const byDeployment = await $({
+        cwd: tmp,
+        env: { ...process.env, [LOCAL_FIXTURE_SERVICE_ENV]: "1" },
+        stdio: "pipe",
+      })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment ${deploymentLabel} --current-stage-state --by-deployment --text --control-plane-url ${mock.url}`;
+      assert.match(String(byDeployment.stdout), /currentRunId: deploy-current/);
+      const byStage = await $({
+        cwd: tmp,
+        env: { ...process.env, [LOCAL_FIXTURE_SERVICE_ENV]: "1" },
+        stdio: "pipe",
+      })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment ${deploymentLabel} --current-stage-state --by-stage --text --control-plane-url ${mock.url}`;
+      assert.match(String(byStage.stdout), /currentRunId: deploy-current/);
       assert.deepEqual(mock.requests, [
         "GET /api/v1/current-stage-state?deploymentId=demo-dev&environmentStage=dev",
         "GET /api/v1/stage-history?deploymentId=demo-dev&environmentStage=dev",
+        "GET /api/v1/current-stage-state?deploymentId=demo-dev",
+        "GET /api/v1/current-stage-state?environmentStage=dev",
       ]);
     } finally {
       await mock.close();

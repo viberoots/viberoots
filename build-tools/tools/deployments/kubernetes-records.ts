@@ -43,7 +43,12 @@ export type KubernetesDeployRecord = {
   releaseLineageId?: string;
   artifactLineageId?: string;
   artifact?: { identity: string };
-  componentArtifacts: Array<{ componentId: string; identity: string; storedArtifactPath: string }>;
+  componentArtifacts: Array<{
+    componentId: string;
+    identity: string;
+    storedArtifactPath: string;
+    provenancePath?: string;
+  }>;
   componentResults?: Array<{
     componentId: string;
     artifactIdentity: string;

@@ -153,6 +153,35 @@ What success looks like:
 - the profile points at the reviewed remote state, runtime, and records paths
 - the profile stores the deployment service endpoint and token-env binding
 
+## Release State Inspection
+
+Use the control plane for release-state questions. Do not inspect environment
+branches or hand-maintained release pointers to decide what is live.
+
+```bash
+direnv exec . build-tools/tools/bin/deploy \
+  --deployment //projects/deployments/pleomino-prod:deploy \
+  --profile mini \
+  --current-stage-state \
+  --text
+```
+
+For audit and lineage, use the same deployment target:
+
+```bash
+direnv exec . build-tools/tools/bin/deploy \
+  --deployment //projects/deployments/pleomino-prod:deploy \
+  --profile mini \
+  --stage-state-audit \
+  --text
+```
+
+The status payload includes current run, source revision, artifact identity,
+approvals, checks, rollback candidates, drift, and retained render evidence.
+Audit payloads record stage-state updates and promotion, retry, and rollback
+lineage with secret-safe summaries only. Backup/restore checks must include
+current-stage-state files and retained artifact references before handoff.
+
 ## Approval SOP
 
 If a run enters `lifecycleState = pending_approval`, approve that same run

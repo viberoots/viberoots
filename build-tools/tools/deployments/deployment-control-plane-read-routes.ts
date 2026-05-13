@@ -27,6 +27,7 @@ export function isControlPlaneReadRoute(method: string, pathname: string): boole
       "/api/v1/records",
       "/api/v1/current-stage-state",
       "/api/v1/stage-history",
+      "/api/v1/stage-state-audit",
     ].includes(pathname)
   );
 }

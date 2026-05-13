@@ -27,7 +27,12 @@ export async function submitKubernetesExactArtifactRun(opts: {
   deployment: KubernetesDeployment;
   recordsRoot: string;
   operationKind: "promotion" | "retry" | "rollback";
-  componentArtifacts: Array<{ componentId: string; identity: string; storedArtifactPath: string }>;
+  componentArtifacts: Array<{
+    componentId: string;
+    identity: string;
+    storedArtifactPath: string;
+    provenancePath?: string;
+  }>;
   sourceRecord: SourceRecordLike;
   parentRunId: string;
   releaseLineageId: string;

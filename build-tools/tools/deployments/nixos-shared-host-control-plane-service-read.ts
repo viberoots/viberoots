@@ -3,7 +3,9 @@ import {
   readBackendDeployRecordByDeployRunId,
   readBackendDeployRecordBySubmissionId,
   readBackendCurrentStageState,
+  readBackendCurrentStageStates,
   readBackendRollbackCandidates,
+  readBackendStageStateAuditEvents,
   readBackendStageHistory,
   readBackendSubmissionByDeployRunId,
   readBackendSubmissionBySubmissionId,
@@ -47,6 +49,13 @@ export async function readControlPlaneCurrentStageState(
   return await readBackendCurrentStageState(backend, opts);
 }
 
+export async function readControlPlaneCurrentStageStates(
+  backend: NixosSharedHostControlPlaneBackendTarget,
+  opts: { deploymentId?: string; environmentStage?: string },
+) {
+  return await readBackendCurrentStageStates(backend, opts);
+}
+
 export async function readControlPlaneRollbackCandidates(
   backend: NixosSharedHostControlPlaneBackendTarget,
   opts: { deploymentId: string; environmentStage: string },
@@ -59,4 +68,11 @@ export async function readControlPlaneStageHistory(
   opts: { deploymentId: string; environmentStage?: string },
 ) {
   return await readBackendStageHistory(backend, opts);
+}
+
+export async function readControlPlaneStageStateAuditEvents(
+  backend: NixosSharedHostControlPlaneBackendTarget,
+  opts: { deploymentId: string; environmentStage?: string },
+) {
+  return await readBackendStageStateAuditEvents(backend, opts);
 }

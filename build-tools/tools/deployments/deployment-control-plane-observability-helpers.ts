@@ -24,6 +24,23 @@ export async function readJsonDir<T>(dir: string): Promise<T[]> {
   }
 }
 
+export async function readJsonTree<T>(dir: string): Promise<T[]> {
+  try {
+    const entries = await fsp.readdir(dir, { withFileTypes: true });
+    const nested = await Promise.all(
+      entries.map(async (entry) => {
+        const entryPath = path.join(dir, entry.name);
+        if (entry.isDirectory()) return await readJsonTree<T>(entryPath);
+        if (!entry.isFile() || !entry.name.endsWith(".json")) return [];
+        return [JSON.parse(await fsp.readFile(entryPath, "utf8")) as T];
+      }),
+    );
+    return nested.flat();
+  } catch {
+    return [];
+  }
+}
+
 export async function readJsonFile<T>(filePath: string): Promise<T | undefined> {
   try {
     return JSON.parse(await fsp.readFile(filePath, "utf8")) as T;

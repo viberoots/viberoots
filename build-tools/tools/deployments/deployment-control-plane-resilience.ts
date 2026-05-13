@@ -7,6 +7,7 @@ import {
   resiliencePolicyForProtectionClass,
   type ProtectedDeploymentClass,
 } from "./deployment-control-plane-resilience-policy";
+import { validateRestoredCurrentStageState } from "./deployment-control-plane-restore-validation";
 
 export const DEPLOYMENT_CONTROL_PLANE_RESILIENCE_STATUS_SCHEMA =
   "deployment-control-plane-resilience-status@1";
@@ -27,6 +28,8 @@ export type DeploymentControlPlaneResilienceStatus = {
     restoreRoot: string;
     restoredRunCount: number;
     restoredSubmissionCount: number;
+    restoredCurrentStageStateCount: number;
+    retainedArtifactReferenceCount: number;
     status: "passed" | "failed";
     error?: string;
   };
@@ -51,6 +54,19 @@ async function pathExists(filePath: string): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+async function countJsonFiles(dir: string): Promise<number> {
+  if (!(await pathExists(dir))) return 0;
+  const entries = await fsp.readdir(dir, { withFileTypes: true });
+  const counts = await Promise.all(
+    entries.map(async (entry) => {
+      const entryPath = path.join(dir, entry.name);
+      if (entry.isDirectory()) return await countJsonFiles(entryPath);
+      return entry.isFile() && entry.name.endsWith(".json") ? 1 : 0;
+    }),
+  );
+  return counts.reduce((sum, count) => sum + count, 0);
 }
 
 async function readStatus(
@@ -130,10 +146,13 @@ export async function runDeploymentControlPlaneRestoreTest(opts: {
   await copyTree(backupPath, restoreRoot, { cloneMode: "try", force: true });
   const runsDir = path.join(restoreRoot, "runs");
   const submissionsDir = path.join(restoreRoot, "control-plane", "submissions");
-  const restoredRunCount = (await pathExists(runsDir)) ? (await fsp.readdir(runsDir)).length : 0;
-  const restoredSubmissionCount = (await pathExists(submissionsDir))
-    ? (await fsp.readdir(submissionsDir)).length
-    : 0;
+  const restoredRunCount = await countJsonFiles(runsDir);
+  const restoredSubmissionCount = await countJsonFiles(submissionsDir);
+  const stageStateValidation = await validateRestoredCurrentStageState({
+    recordsRoot: opts.recordsRoot,
+    restoreRoot,
+  });
+  const restoreError = stageStateValidation.failures.join("; ");
   const status: DeploymentControlPlaneResilienceStatus = {
     ...backupStatus,
     updatedAt: new Date().toISOString(),
@@ -144,7 +163,10 @@ export async function runDeploymentControlPlaneRestoreTest(opts: {
       restoreRoot,
       restoredRunCount,
       restoredSubmissionCount,
-      status: "passed",
+      restoredCurrentStageStateCount: stageStateValidation.restoredCurrentStageStateCount,
+      retainedArtifactReferenceCount: stageStateValidation.retainedArtifactReferenceCount,
+      status: restoreError ? "failed" : "passed",
+      ...(restoreError ? { error: restoreError } : {}),
     },
   };
   await writeStatus(opts.recordsRoot, status);

@@ -30,7 +30,12 @@ export type KubernetesReplaySnapshot = {
   deploymentMetadataFingerprint: string;
   runnerIdentities: DeploymentRunnerIdentities;
   artifactIdentity: string;
-  componentArtifacts: Array<{ componentId: string; identity: string; storedArtifactPath: string }>;
+  componentArtifacts: Array<{
+    componentId: string;
+    identity: string;
+    storedArtifactPath: string;
+    provenancePath?: string;
+  }>;
   admittedContext: KubernetesAdmittedContext;
   deployment: KubernetesDeployment;
   providerConfigSnapshotPath: string;
@@ -121,6 +126,7 @@ export async function resolveKubernetesReplaySource(opts: {
     artifacts: replaySnapshot.componentArtifacts.map((artifact) => ({
       identity: artifact.identity,
       storedArtifactPath: artifact.storedArtifactPath,
+      provenancePath: artifact.provenancePath,
     })),
     replayBundlePaths: [replaySnapshot.providerConfigSnapshotPath],
     evidence: replaySnapshot.admittedContext.policyEvaluation,

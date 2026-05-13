@@ -1,35 +1,20 @@
 #!/usr/bin/env zx-wrapper
 import { decodeBackendJson } from "./nixos-shared-host-control-plane-backend-db";
-import type {
-  BackendQueryable,
-  NixosSharedHostControlPlaneBackendTarget,
-} from "./nixos-shared-host-control-plane-backend-db";
-
-export const DEPLOYMENT_CURRENT_STAGE_STATE_SCHEMA = "deployment-current-stage-state@1";
-
-export type DeploymentCurrentStageState = {
-  schemaVersion: typeof DEPLOYMENT_CURRENT_STAGE_STATE_SCHEMA;
-  deploymentId: string;
-  deploymentLabel: string;
-  environmentStage: string;
-  providerTargetIdentity: string;
-  currentRunId: string;
-  operationKind: string;
-  sourceRunId?: string;
-  sourceRevision: string;
-  artifactIdentity: string;
-  artifactReuseMode: string;
-  parentRunId?: string;
-  releaseLineageId?: string;
-  artifactLineageId?: string;
-  finalOutcome: string;
-  updatedAt: string;
-  approvalContext?: {
-    payloadFingerprint?: string;
-    requiredApprovals: string[];
-    requestedBy?: string;
-  };
-};
+import type { BackendQueryable } from "./nixos-shared-host-control-plane-backend-db";
+import {
+  currentStageStateExtras,
+  secretSafeStageStateValue,
+} from "./deployment-current-stage-state-extras";
+import {
+  DEPLOYMENT_CURRENT_STAGE_STATE_SCHEMA,
+  type DeploymentCurrentStageState,
+} from "./deployment-current-stage-state-types";
+export { DEPLOYMENT_CURRENT_STAGE_STATE_SCHEMA, type DeploymentCurrentStageState };
+export {
+  readBackendCurrentStageState,
+  readBackendCurrentStageStates,
+  readBackendStageHistory,
+} from "./deployment-current-stage-state-read";
 
 type DeployRecordDoc = {
   deployRunId: string;
@@ -42,9 +27,17 @@ type DeployRecordDoc = {
   parentRunId?: string;
   releaseLineageId?: string;
   artifactLineageId?: string;
-  artifact?: { identity?: string };
+  artifact?: { identity?: string; storedArtifactPath?: string; provenancePath?: string };
   artifactIdentity?: string;
-  componentArtifacts?: Array<{ identity?: string }>;
+  componentArtifacts?: Array<{
+    identity?: string;
+    storedArtifactPath?: string;
+    provenancePath?: string;
+  }>;
+  replaySnapshotPath?: string;
+  providerConfigSnapshotPath?: string;
+  provisionerPlan?: { artifactPath?: string; fingerprint?: string };
+  driftStatus?: DeploymentCurrentStageState["driftStatus"];
   admittedContext?: {
     environmentStage?: string;
     source?: {
@@ -55,10 +48,17 @@ type DeployRecordDoc = {
     policyEvaluation?: {
       requestedBy?: { principalId?: string };
       binding?: { payloadFingerprint?: string; artifactIdentity?: string; sourceRunId?: string };
+      requiredChecks?: Array<{
+        name?: string;
+        status?: string;
+        reporterIdentity?: string;
+        reportingKind?: string;
+        recordRef?: string;
+      }>;
       requiredApprovals?: Array<{ name?: string }>;
     };
   };
-  controlPlane?: { submissionId?: string };
+  controlPlane?: { submissionId?: string; executionSnapshotPath?: string };
 };
 
 type SnapshotDoc = {
@@ -137,8 +137,8 @@ function toCurrentStageState(opts: {
             record.parentRunId,
         }
       : {}),
-    sourceRevision,
-    artifactIdentity: identity,
+    sourceRevision: secretSafeStageStateValue(sourceRevision),
+    artifactIdentity: secretSafeStageStateValue(identity),
     artifactReuseMode,
     ...(record.parentRunId ? { parentRunId: record.parentRunId } : {}),
     ...(record.releaseLineageId ? { releaseLineageId: record.releaseLineageId } : {}),
@@ -154,6 +154,7 @@ function toCurrentStageState(opts: {
         ? { requestedBy: policyEvaluation.requestedBy.principalId }
         : {}),
     },
+    ...currentStageStateExtras(record),
   };
 }
 
@@ -202,49 +203,4 @@ export async function writeCurrentStageStateForDeployRecord(opts: {
     ],
   );
   return state;
-}
-
-export async function readBackendCurrentStageState(
-  backend: NixosSharedHostControlPlaneBackendTarget,
-  opts: { deploymentId: string; environmentStage: string },
-) {
-  const { queryBackend } = await import("./nixos-shared-host-control-plane-backend-db");
-  const row = (
-    await queryBackend<{ document_json?: unknown }>(
-      backend,
-      `SELECT document_json FROM current_stage_state
-       WHERE deployment_id = $1 AND environment_stage = $2`,
-      [opts.deploymentId, opts.environmentStage],
-    )
-  ).rows[0];
-  return row?.document_json
-    ? decodeBackendJson<DeploymentCurrentStageState>(row.document_json)
-    : null;
-}
-
-export async function readBackendStageHistory(
-  backend: NixosSharedHostControlPlaneBackendTarget,
-  opts: { deploymentId: string; environmentStage?: string },
-) {
-  const { queryBackend } = await import("./nixos-shared-host-control-plane-backend-db");
-  const params = opts.environmentStage
-    ? [opts.deploymentId, opts.environmentStage]
-    : [opts.deploymentId];
-  const where = opts.environmentStage
-    ? "deployment_id = $1 AND environment_stage = $2"
-    : "deployment_id = $1";
-  const rows = (
-    await queryBackend<{ document_json?: unknown }>(
-      backend,
-      `SELECT document_json FROM stage_state_history
-       WHERE ${where}
-       ORDER BY updated_at DESC`,
-      params,
-    )
-  ).rows;
-  return rows
-    .map((row) =>
-      row.document_json ? decodeBackendJson<DeploymentCurrentStageState>(row.document_json) : null,
-    )
-    .filter((row): row is DeploymentCurrentStageState => Boolean(row));
 }
