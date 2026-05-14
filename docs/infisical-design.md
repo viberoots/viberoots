@@ -233,8 +233,9 @@ Forbidden values:
 
 For deployments with `secret_backend = "infisical"` and non-empty
 `secret_requirements`, validation should require `infisical_runtime.site_url`,
-`project_id`, `environment`, and a reviewed credential source unless the
-local/test fixture override is active.
+`project_id`, `environment`, `machine_identity_client_id_env`,
+`machine_identity_client_secret_env`, and a reviewed credential source unless
+the local/test fixture override is active.
 
 ### Contract To Infisical Secret Mapping
 

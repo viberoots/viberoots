@@ -993,7 +993,9 @@ selected deployment and its `vault_runtime` metadata, then create a typed contex
 Vault address. Local/direct Infisical deploys instead create a typed context containing the
 Universal Auth runtime credential. They read the reviewed `machine_identity_client_id_env` and
 `machine_identity_client_secret_env` names from `infisical_runtime` and create
-an in-memory Universal Auth context.
+an in-memory Universal Auth context. Infisical deployments with non-empty
+`secret_requirements` must declare both env-name fields as valid environment
+variable names unless the provider-neutral fixture path below is active.
 Vault local/direct creates a typed context containing the Vault address.
 Protected service-backed deploys use a different boundary: the submitter's
 PKCE/device session authorizes the request, while the `mini` worker reads

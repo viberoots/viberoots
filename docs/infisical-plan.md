@@ -971,3 +971,95 @@ the wrong Infisical path.
 
 It adds another focused conformance pass and tightens selector behavior that may require refreshing
 tests that accidentally depended on ignored `secret_path_prefix` metadata.
+
+## PR-11: Infisical Universal Auth env-name metadata validation
+
+### 1. Intent
+
+Close the end-of-range validation gap where Infisical deployments with required secrets can pass
+metadata extraction without reviewed Universal Auth environment-variable names.
+
+### 2. Scope of changes
+
+- Require non-empty `infisical_runtime.machine_identity_client_id_env` and
+  `infisical_runtime.machine_identity_client_secret_env` whenever an Infisical deployment declares
+  non-empty `secret_requirements`.
+- Preserve fixture-mode behavior so deployments using provider-neutral fixture secrets do not need
+  live Universal Auth env-name metadata.
+- Validate the env-name fields during deployment metadata extraction alongside the existing
+  site URL, project, environment, and preferred credential-source checks.
+- Reject empty, missing, non-string, or syntactically invalid env-name metadata before admission,
+  provider mutation, worker setup, diagnostics, or runtime acquire can use the deployment.
+- Keep validation limited to reviewed environment-variable names and continue rejecting Universal
+  Auth client ids, client secrets, access tokens, personal tokens, and resolved secret values in
+  metadata.
+- Preserve Infisical deployments with no `secret_requirements` when they are used only for
+  metadata/query coverage and do not require runtime credential preparation.
+
+### 3. External prerequisites
+
+- None for ordinary validation. Tests must exercise extraction and validation without live
+  Infisical access.
+
+### 4. Tests to be added
+
+- Update the current test that accepts missing Infisical Universal Auth env-name metadata so it now
+  fails for deployments with non-empty `secret_requirements`.
+- Add validation tests rejecting missing, empty, non-string, and invalid
+  `machine_identity_client_id_env` and `machine_identity_client_secret_env` values for
+  secret-consuming Infisical deployments.
+- Add fixture-mode regression tests proving provider-neutral fixture deployments can still bypass
+  live Universal Auth env-name requirements only when fixture mode is explicitly active.
+- Add regression tests proving Infisical deployments with no `secret_requirements` continue to pass
+  metadata extraction without Universal Auth env-name metadata.
+- Add redaction tests proving validation failures name only metadata field paths and env-var names,
+  never Universal Auth credential values or resolved deployment secrets.
+
+### 5. Docs to be added or updated
+
+- Update deployment secrets API docs to state that secret-consuming Infisical deployments require
+  reviewed Universal Auth env-name metadata unless fixture mode is active.
+- Update secrets usage and local direct deploy docs so examples include both
+  `machine_identity_client_id_env` and `machine_identity_client_secret_env`.
+- Update testing or fixture docs, if present, to document the fixture-mode exception and make clear
+  that ordinary Infisical metadata validation still requires env-name fields.
+
+### 5.5. Expected regression scope
+
+- `deployment-only`
+- Keep changes in deployment-owned metadata extraction, validation, docs, and deployment tests.
+
+### 6. Acceptance criteria
+
+- Infisical deployments with non-empty `secret_requirements` fail extraction when either reviewed
+  Universal Auth env-name field is missing, empty, non-string, or syntactically invalid.
+- Explicit fixture mode remains the only path where secret-consuming Infisical deployments can omit
+  Universal Auth env-name metadata.
+- Infisical deployments with no `secret_requirements` remain valid without Universal Auth env-name
+  metadata.
+- Tests and docs agree on the required env-name metadata and the fixture-mode exception.
+
+### 7. Risks
+
+- Tightening extraction validation could fail existing test fixtures that omitted env-name metadata
+  while declaring secret requirements.
+- Env-name validation could accidentally require real credential values instead of reviewed
+  variable names.
+
+### 8. Mitigations
+
+- Update only the affected fixtures to include reviewed env-var names or to opt into explicit
+  fixture mode where that is the intended scenario.
+- Validate names with the existing environment-variable-name policy and keep credential values out
+  of deployment metadata entirely.
+
+### 9. Consequences of not implementing this PR
+
+Infisical deployments can continue passing extraction with incomplete Universal Auth routing data,
+causing failures later in admission, diagnostics, or runtime preparation instead of at metadata
+validation time.
+
+### 10. Downsides for implementing this PR
+
+It tightens metadata validation after earlier Infisical conformance work and requires refreshing
+tests or fixtures that accidentally relied on missing env-name metadata.

@@ -70,6 +70,12 @@ Optional keys:
 - `machine_identity_client_secret_env`: environment variable name containing the
   Universal Auth client secret.
 
+Infisical deployments with non-empty `secret_requirements` must provide both
+Universal Auth env-name fields as valid environment variable names unless
+`VBR_DEPLOYMENT_SECRET_FIXTURE_PATH` is active for a provider-neutral local/test
+fixture flow. Metadata-only Infisical deployments with no secret requirements
+may omit them.
+
 The runtime dictionary is non-secret routing metadata. It must not contain
 tokens, client secrets, secret values, personal tokens, service tokens, rendered
 config, or expanded secret references.

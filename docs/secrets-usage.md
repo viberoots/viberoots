@@ -166,7 +166,10 @@ a missing mapped secret as out of sync.
 
 The fixture override remains provider-neutral:
 `VBR_DEPLOYMENT_SECRET_FIXTURE_PATH` overrides both Vault and Infisical for
-explicit local/test flows. Protected/shared hosted services reject this fixture
+explicit local/test flows. Secret-consuming Infisical deployments otherwise
+require reviewed `machine_identity_client_id_env` and
+`machine_identity_client_secret_env` names in `infisical_runtime` during
+metadata extraction. Protected/shared hosted services reject this fixture
 override unless `VBR_DEPLOY_LOCAL_FIXTURE_SERVICE=1` marks an explicit local
 fixture service. Infisical fixture admissions use
 `infisical:fixture:` reference IDs and do not require an Infisical-specific
@@ -388,7 +391,9 @@ path only authorizes the deploy request. It is not forwarded as the Infisical
 workload credential. The runtime reads `machine_identity_client_id_env` and
 `machine_identity_client_secret_env` from `infisical_runtime`, exchanges those
 values with Universal Auth in memory, caches the resulting access token only
-inside the process until expiry, and reacquires after expiry.
+inside the process until expiry, and reacquires after expiry. Deployments with
+non-empty `secret_requirements` must provide both reviewed env-name fields
+unless the provider-neutral local/test fixture override is active.
 
 Workload JWTs and Vault tokens are not written to `.local/deploy-vault` and are
 not communicated through `process.env`.

@@ -2,6 +2,8 @@
 import type { GraphNode } from "../lib/graph";
 import { readString, readStringRecord } from "./deployment-graph-readers";
 import { deploymentError } from "./contract-extract-shared";
+import { pushInfisicalUniversalAuthEnvErrors } from "./deployment-infisical-env-validation";
+import { deploymentSecretFixturePath } from "./deployment-secret-fixture";
 import type { DeploymentRequirement } from "./deployment-requirements";
 import type { DeploymentSecretBackendKind } from "./deployment-sprinkle-ref";
 
@@ -34,7 +36,7 @@ export type DeploymentSecretMetadata = {
 
 const SUPPORTED_BACKENDS = new Set<DeploymentSecretBackendKind>(["vault", "infisical"]);
 const FORBIDDEN_RUNTIME_KEYS =
-  /(^|_)(token|secret_value|client_secret|access_token|personal_token|service_token)$/;
+  /(^|_)(token|secret_value|client_id|client_secret|access_token|personal_token|service_token)$/;
 
 function readStringRecordMap(node: GraphNode, key: string): Record<string, Record<string, string>> {
   const value = node[key];
@@ -57,6 +59,11 @@ function stringRecord(value: Record<string, unknown>): Record<string, string> {
       .map(([entryKey, entryValue]) => [entryKey.trim(), entryValue.trim()])
       .filter(([entryKey, entryValue]) => entryKey !== "" && entryValue !== ""),
   );
+}
+
+function readRawRecord(node: GraphNode, key: string): Record<string, unknown> {
+  const value = node[key];
+  return value && typeof value === "object" && !Array.isArray(value) ? value : {};
 }
 
 function readInfisicalRuntime(node: GraphNode): DeploymentInfisicalRuntimeConfig | undefined {
@@ -122,6 +129,7 @@ export function deploymentSecretMetadata(
   errors: string[],
 ): DeploymentSecretMetadata {
   const backend = (readString(node, "secret_backend") || "vault") as DeploymentSecretBackendKind;
+  const rawRuntimeNode = readRawRecord(node, "infisical_runtime");
   const rawRuntime = readStringRecord(node, "infisical_runtime");
   const runtime = readInfisicalRuntime(node);
   const mappings = readInfisicalMappings(node);
@@ -130,6 +138,7 @@ export function deploymentSecretMetadata(
     requirements,
     errors,
     backend,
+    rawRuntimeNode,
     rawRuntime,
     runtime,
     mappings,
@@ -146,6 +155,7 @@ function validateDeploymentSecretMetadata(opts: {
   requirements: DeploymentRequirement[];
   errors: string[];
   backend: DeploymentSecretBackendKind;
+  rawRuntimeNode: Record<string, unknown>;
   rawRuntime: Record<string, string>;
   runtime?: DeploymentInfisicalRuntimeConfig;
   mappings?: Record<string, DeploymentInfisicalSecretMapping>;
@@ -167,10 +177,11 @@ function validateInfisicalRuntime(opts: {
   requirements: DeploymentRequirement[];
   errors: string[];
   backend: DeploymentSecretBackendKind;
+  rawRuntimeNode: Record<string, unknown>;
   runtime?: DeploymentInfisicalRuntimeConfig;
 }) {
   if (opts.backend !== "infisical" || opts.requirements.length === 0) return;
-  if (process.env.VBR_DEPLOYMENT_SECRET_FIXTURE_PATH) return;
+  if (deploymentSecretFixturePath()) return;
   const runtime = opts.runtime;
   for (const [field, value] of [
     ["site_url", runtime?.siteUrl],
@@ -188,6 +199,7 @@ function validateInfisicalRuntime(opts: {
       ),
     );
   }
+  pushInfisicalUniversalAuthEnvErrors(opts);
 }
 
 function validateInfisicalMappings(opts: {

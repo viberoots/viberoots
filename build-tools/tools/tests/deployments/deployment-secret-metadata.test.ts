@@ -36,6 +36,18 @@ function requirement(overrides: Record<string, string> = {}) {
   };
 }
 
+function infisicalRuntime(overrides: Record<string, unknown> = {}) {
+  return {
+    site_url: "https://app.infisical.com",
+    project_id: "proj_123",
+    environment: "staging",
+    preferred_credential_source: "machine_identity_universal_auth",
+    machine_identity_client_id_env: "VBR_INFISICAL_CLIENT_ID",
+    machine_identity_client_secret_env: "VBR_INFISICAL_CLIENT_SECRET",
+    ...overrides,
+  };
+}
+
 function deploymentNode(overrides: Partial<GraphNode> = {}): GraphNode {
   return {
     name: "//projects/deployments/pleomino-staging:deploy",
@@ -90,15 +102,9 @@ test("infisical backend exposes only non-secret routing metadata", () => {
     deploymentNode({
       secret_backend: "infisical",
       secret_requirements: [requirement()],
-      infisical_runtime: {
-        site_url: "https://app.infisical.com",
-        project_id: "proj_123",
-        environment: "staging",
+      infisical_runtime: infisicalRuntime({
         secret_path: "/deployments/pleomino",
-        machine_identity_client_id_env: "VBR_INFISICAL_CLIENT_ID",
-        machine_identity_client_secret_env: "VBR_INFISICAL_CLIENT_SECRET",
-        preferred_credential_source: "machine_identity_universal_auth",
-      },
+      }),
       infisical_secret_mappings: {
         "secret://deployments/pleomino/cloudflare_api_token": {
           secret_path: "/cloudflare/pleomino",
@@ -125,14 +131,12 @@ test("infisical metadata validation rejects unsafe or stale metadata", () => {
   const errors = errorsFor({
     secret_backend: "infisical",
     secret_requirements: [requirement()],
-    infisical_runtime: {
-      site_url: "https://app.infisical.com",
-      project_id: "proj_123",
-      environment: "staging",
-      preferred_credential_source: "machine_identity_universal_auth",
+    infisical_runtime: infisicalRuntime({
       token: "not-reviewed",
+      client_id: "not-reviewed",
       client_secret: "not-reviewed",
-    },
+      machine_identity_client_id: "not-reviewed",
+    }),
     infisical_secret_mappings: {
       "secret://deployments/pleomino/stale": {
         secret_path: "relative",
@@ -141,7 +145,13 @@ test("infisical metadata validation rejects unsafe or stale metadata", () => {
     },
   });
   assert.ok(errors.some((entry) => entry.includes("infisical_runtime.token is forbidden")));
+  assert.ok(errors.some((entry) => entry.includes("infisical_runtime.client_id is forbidden")));
   assert.ok(errors.some((entry) => entry.includes("infisical_runtime.client_secret is forbidden")));
+  assert.ok(
+    errors.some((entry) =>
+      entry.includes("infisical_runtime.machine_identity_client_id is forbidden"),
+    ),
+  );
   assert.ok(
     errors.some((entry) => entry.includes("stale key secret://deployments/pleomino/stale")),
   );
@@ -155,6 +165,11 @@ test("infisical metadata validation rejects missing runtime for secret requireme
     secret_requirements: [requirement()],
   });
   assert.ok(errors.some((entry) => entry.includes("infisical_runtime.site_url is required")));
+  assert.ok(
+    errors.some((entry) =>
+      entry.includes("infisical_runtime.machine_identity_client_id_env is required"),
+    ),
+  );
   assert.ok(errors.some((entry) => entry.includes("preferred_credential_source")));
 });
 
@@ -178,6 +193,8 @@ test("deployment secret metadata extraction does not contact Infisical", () => {
           project_id: "proj_123",
           environment: "staging",
           preferred_credential_source: "machine_identity_universal_auth",
+          machine_identity_client_id_env: "VBR_INFISICAL_CLIENT_ID",
+          machine_identity_client_secret_env: "VBR_INFISICAL_CLIENT_SECRET",
         },
       }),
       [],
