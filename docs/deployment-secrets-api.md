@@ -143,6 +143,10 @@ Deployment-service routing:
 - `VBR_DEPLOY_MINI_CONTROL_PLANE_URL`: optional override for `--remote mini`
 - `VBR_DEPLOY_CONTROL_PLANE_TOKEN`: environment fallback used by reviewed
   service clients and hosted service processes
+- `VBR_DEPLOYMENT_SECRET_FIXTURE_PATH`: provider-neutral local/test secret
+  fixture path. Infisical protected/shared workers reject it by default and
+  accept it only when `VBR_DEPLOY_LOCAL_FIXTURE_SERVICE=1` explicitly marks the
+  run as a local fixture service.
 
 Common example values:
 

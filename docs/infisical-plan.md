@@ -867,3 +867,107 @@ deploys would still require Vault runtime preparation even when the deployment s
 
 It adds another correction pass after the end-to-end PRs and requires updating tests that currently
 assert the wrong API shape.
+
+## PR-10: Infisical fixture-service mode and secret path prefix conformance
+
+### 1. Intent
+
+Close the remaining end-of-range Infisical conformance gaps where protected/shared worker fixture
+handling and default selector derivation do not fully match the design.
+
+### 2. Scope of changes
+
+- Update Infisical protected/shared worker setup so `VBR_DEPLOYMENT_SECRET_FIXTURE_PATH` remains
+  rejected by default, but is accepted when `VBR_DEPLOY_LOCAL_FIXTURE_SERVICE=1` explicitly marks a
+  local fixture service.
+- Reuse the existing local fixture service marker and policy helpers where possible instead of
+  adding an Infisical-specific fixture-mode flag.
+- Keep Vault protected/shared worker fixture rejection behavior unchanged unless an existing
+  provider-neutral helper already carries the explicit local fixture service exception.
+- Apply extracted `infisical_runtime.secret_path_prefix` during Infisical selector derivation when a
+  contract has no explicit `infisical_secret_mappings` path override.
+- Preserve precedence so mapping `secretPath` wins first, then runtime `secret_path` plus optional
+  `secret_path_prefix`, then `/`.
+- Normalize joined Infisical paths so leading/trailing slashes do not create duplicate separators,
+  empty paths still resolve to `/`, and admitted references record the exact selector used.
+- If implementation determines the explicit local fixture service exception should be removed
+  instead of implemented, update `docs/infisical-design.md` and all public docs in the same PR to
+  make fixture rejection unconditional and remove the exception from the design contract.
+- Keep fixture paths, Universal Auth credentials, Infisical tokens, and resolved secret values out
+  of worker logs, records, snapshots, diagnostics, and test failure output.
+
+### 3. External prerequisites
+
+- None for ordinary validation. Local fixture service coverage must use checked-in fixtures and the
+  explicit `VBR_DEPLOY_LOCAL_FIXTURE_SERVICE=1` marker.
+
+### 4. Tests to be added
+
+- Add Infisical protected/shared worker tests proving `VBR_DEPLOYMENT_SECRET_FIXTURE_PATH` is
+  rejected when `VBR_DEPLOY_LOCAL_FIXTURE_SERVICE` is absent or false.
+- Add Infisical protected/shared worker tests proving fixture secrets are accepted only when
+  `VBR_DEPLOY_LOCAL_FIXTURE_SERVICE=1` explicitly marks local fixture service mode.
+- Add regression tests proving the fixture-service exception does not expose fixture paths or secret
+  values in worker logs, records, diagnostics, or thrown errors.
+- Add selector derivation tests proving `secret_path_prefix` is applied when no mapping path
+  override is present.
+- Add precedence tests proving explicit mapping `secretPath` overrides runtime
+  `secret_path_prefix`, and runtime `secret_path` still supplies the default base path.
+- Add path normalization tests for `/`, empty prefixes, leading/trailing slashes, and contract ids
+  whose derived secret names live under prefixed folders.
+- Add replay/admission tests proving admitted Infisical references preserve the prefixed
+  `secretPath` and exact selector used by runtime acquire.
+
+### 5. Docs to be added or updated
+
+- Update deployment secrets API docs to state exactly when
+  `VBR_DEPLOYMENT_SECRET_FIXTURE_PATH` is allowed for Infisical protected/shared workers and that
+  `VBR_DEPLOY_LOCAL_FIXTURE_SERVICE=1` is required for the local fixture service exception.
+- Update secrets usage docs with the `secret_path_prefix` derivation rule and the precedence order
+  between mappings, runtime path metadata, and `/`.
+- Update Infisical design docs only if the implementation intentionally removes the explicit local
+  fixture service exception instead of implementing it.
+
+### 5.5. Expected regression scope
+
+- `deployment-only`
+- Keep changes in deployment-owned Infisical worker setup, selector derivation, docs, and deployment
+  tests.
+
+### 6. Acceptance criteria
+
+- Infisical protected/shared workers still fail closed on fixture secrets by default.
+- `VBR_DEPLOYMENT_SECRET_FIXTURE_PATH` is accepted for Infisical protected/shared workers only when
+  `VBR_DEPLOY_LOCAL_FIXTURE_SERVICE=1` explicitly marks local fixture service mode, or the design
+  and docs are updated to remove that exception.
+- `infisical_runtime.secret_path_prefix` changes derived Infisical selectors when no mapping path
+  override is present.
+- Mapping `secretPath` remains the highest-precedence path override, runtime path metadata remains
+  deterministic, and admitted references preserve the exact prefixed selector.
+- New tests cover both fixture-service mode and `secret_path_prefix` behavior without live
+  Infisical access.
+
+### 7. Risks
+
+- Allowing a fixture-service exception in protected/shared worker setup could accidentally broaden
+  production fixture use if the marker is treated as implicit or inherited from unrelated flows.
+- Path prefix normalization could change admitted references for deployments that already rely on
+  the unprefixed selector behavior.
+
+### 8. Mitigations
+
+- Require the explicit `VBR_DEPLOY_LOCAL_FIXTURE_SERVICE=1` marker and keep all other
+  protected/shared worker fixture paths rejected.
+- Cover selector precedence and normalization directly so mapping overrides and existing
+  unprefixed deployments remain stable.
+
+### 9. Consequences of not implementing this PR
+
+Infisical protected/shared workers would continue rejecting a fixture flow that the design currently
+allows, and deployments using `secret_path_prefix` would keep admitting and acquiring secrets from
+the wrong Infisical path.
+
+### 10. Downsides for implementing this PR
+
+It adds another focused conformance pass and tightens selector behavior that may require refreshing
+tests that accidentally depended on ignored `secret_path_prefix` metadata.

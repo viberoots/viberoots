@@ -17,16 +17,35 @@ export type DeploymentInfisicalIdentity = {
   reference?: string;
 };
 
+function normalizeInfisicalSecretPath(value?: string): string {
+  const normalized = String(value || "")
+    .split("/")
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .join("/");
+  return normalized ? `/${normalized}` : "/";
+}
+
+function joinInfisicalSecretPath(base?: string, prefix?: string): string {
+  return normalizeInfisicalSecretPath([base, prefix].filter(Boolean).join("/"));
+}
+
 export function deploymentInfisicalSelector(opts: {
   binding: DeploymentSecretContractBinding;
   runtime: DeploymentInfisicalRuntimeConfig;
   mappings?: Record<string, DeploymentInfisicalSecretMapping>;
 }): DeploymentInfisicalSelector {
   const mapping = opts.mappings?.[opts.binding.contractId];
+  const runtimePath = joinInfisicalSecretPath(
+    opts.runtime.secretPath,
+    opts.runtime.secretPathPrefix,
+  );
   return {
     projectId: opts.runtime.projectId,
     environment: opts.runtime.environment,
-    secretPath: mapping?.secretPath || opts.runtime.secretPath || "/",
+    secretPath: mapping?.secretPath
+      ? normalizeInfisicalSecretPath(mapping.secretPath)
+      : runtimePath,
     secretName: mapping?.secretName || opts.binding.contractId.split("/").pop() || "",
   };
 }

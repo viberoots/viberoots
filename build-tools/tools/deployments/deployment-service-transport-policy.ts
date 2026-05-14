@@ -10,6 +10,10 @@ function envEnabled(env: NodeJS.ProcessEnv, name: string): boolean {
   return value === "1" || value === "true" || value === "yes";
 }
 
+export function localFixtureServiceEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
+  return env[LOCAL_FIXTURE_SERVICE_ENV] === "1";
+}
+
 function loopbackHost(hostname: string): boolean {
   const host = hostname.toLowerCase();
   return host === "localhost" || host === "::1" || /^127(?:\.\d{1,3}){0,3}$/.test(host);
@@ -40,7 +44,7 @@ export function validateProtectedSharedServiceTransport(opts: {
     throw new Error(`${opts.context} has invalid control-plane URL`);
   }
   if (url.protocol === "https:") return rawUrl;
-  const localFixture = opts.localFixture || envEnabled(env, LOCAL_FIXTURE_SERVICE_ENV);
+  const localFixture = opts.localFixture || localFixtureServiceEnabled(env);
   if (url.protocol === "http:" && loopbackHost(url.hostname) && localFixture) return rawUrl;
   if (url.protocol === "http:" && loopbackHost(url.hostname)) {
     throw new Error(

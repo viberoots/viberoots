@@ -1,6 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import type { DeploymentTarget } from "./contract";
 import { deploymentSecretFixturePath } from "./deployment-secret-fixture";
+import { localFixtureServiceEnabled } from "./deployment-service-transport-policy";
 import {
   activateDeploymentSecretContext,
   type DeploymentSecretContext,
@@ -20,8 +21,9 @@ export type PreparedWorkerDeploymentSecretRuntime = {
   secretContext?: DeploymentSecretContext;
 };
 
-function assertNoWorkerFixtureRuntime() {
+function assertNoWorkerFixtureRuntime(env: NodeJS.ProcessEnv) {
   if (!deploymentSecretFixturePath()) return;
+  if (localFixtureServiceEnabled(env)) return;
   throw new Error(
     "server-mode worker secret access must not use VBR_DEPLOYMENT_SECRET_FIXTURE_PATH",
   );
@@ -42,7 +44,9 @@ export async function prepareWorkerDeploymentSecretRuntime(opts: {
   const backend = opts.deployment.secretBackend || "vault";
   if (backend === "vault") return await prepareWorkerDeploymentVaultRuntime(opts);
   if (opts.deployment.secretRequirements.length === 0) return { minted: false };
-  assertNoWorkerFixtureRuntime();
+  const env = opts.env || process.env;
+  assertNoWorkerFixtureRuntime(env);
+  if (deploymentSecretFixturePath()) return { minted: false };
   if (!opts.deployment.infisicalRuntime) {
     throw new Error("Infisical-backed worker secret access requires infisical_runtime metadata");
   }
@@ -52,7 +56,7 @@ export async function prepareWorkerDeploymentSecretRuntime(opts: {
       kind: "infisical",
       credential: infisicalCredentialFromRuntime({
         runtime: opts.deployment.infisicalRuntime,
-        env: opts.env || process.env,
+        env,
       }),
     },
   };

@@ -140,8 +140,14 @@ infisical_runtime = {
 
 By default, `secret://deployments/pleomino/cloudflare_api_token` resolves to
 Infisical secret name `cloudflare_api_token` under the configured
-`secret_path`. Use `infisical_secret_mappings` only for reviewed non-secret path
-or name overrides:
+`secret_path`. When `infisical_runtime.secret_path_prefix` is set and no
+mapping path override exists, the runtime appends the normalized prefix to
+`secret_path` before admitting or acquiring the secret. Precedence is explicit:
+`infisical_secret_mappings[contract].secret_path` wins first, then
+`infisical_runtime.secret_path` plus optional `secret_path_prefix`, then `/`.
+Leading and trailing slashes are normalized so selectors do not contain duplicate
+path separators. Use `infisical_secret_mappings` only for reviewed non-secret
+path or name overrides:
 
 ```python
 infisical_secret_mappings = {
