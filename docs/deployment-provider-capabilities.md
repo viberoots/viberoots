@@ -19,6 +19,13 @@ Normative-source note:
   operator-facing front door for the day-to-day command surface that sits above
   these provider-specific capability details
 
+Secret backend note:
+
+- Vault and Infisical are deployment secret backends, not provider capability
+  variants. Providers continue to declare required credentials through
+  `secret_requirements`; choosing Infisical changes how admitted references are
+  resolved and replayed, not the provider-facing credential declaration.
+
 ## Required Capability Fields
 
 | Field                              | Purpose                                                                                                                                         |

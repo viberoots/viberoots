@@ -22,8 +22,8 @@ Use the deeper docs when needed:
 - [Deployment And Secrets API](/Users/kiltyj/Code/viberoots/docs/deployment-secrets-api.md)
   for the public CLI, control-plane, and `SprinkleRef` helper surface
 - [Secrets Usage](/Users/kiltyj/Code/viberoots/docs/secrets-usage.md)
-  for declaring deployment secret requirements and understanding the Vault
-  workflow
+  for declaring deployment secret requirements and choosing the Vault or
+  Infisical workflow per deployment
 - [Deployment Provider Capabilities](/Users/kiltyj/Code/viberoots/docs/deployment-provider-capabilities.md)
   for reviewed provider-specific support and constraints
 - [Deployment Scenarios](/Users/kiltyj/Code/viberoots/docs/deployment-scenarios.md)
@@ -610,6 +610,10 @@ step instead of editing Keycloak by hand.
 - protected/shared worker execution starts from a frozen admitted snapshot that
   carries component artifact identities, secret-contract references, and the
   shared admission evaluation result instead of raw client artifact paths
+- choose Vault or Infisical per deployment with `secret_backend` and the matching
+  runtime metadata. Keep provider credential contracts in `secret_requirements`;
+  the backend choice changes where admitted references resolve, not which
+  credentials the provider declares.
 - backend migration from Vault to Infisical affects only future admissions.
   Retry and rollback use the recorded admitted backend references from the
   source run, while promotion selects the reviewed source artifact and then

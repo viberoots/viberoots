@@ -87,7 +87,7 @@ export async function writeTempListedDeploymentWorkspace(tmp: string): Promise<v
 
 export async function writeTempCloudflareValidationWorkspace(
   tmp: string,
-  opts: { appLabels?: string[]; wranglerConfig?: string } = {},
+  opts: { appLabels?: string[]; infisicalSiteUrl?: string; wranglerConfig?: string } = {},
 ): Promise<void> {
   const appTargetsPath = path.join(tmp, "sandbox", "apps", "demo", "TARGETS");
   const sharedTargetsPath = path.join(tmp, "sandbox", "deployments", "shared", "TARGETS");
@@ -167,6 +167,28 @@ export async function writeTempCloudflareValidationWorkspace(
       '    environment_stage = "staging",',
       '    admission_policy = "//sandbox/deployments/shared:staging_release",',
       '    protection_class = "shared_nonprod",',
+      ...(opts.infisicalSiteUrl
+        ? [
+            '    secret_backend = "infisical",',
+            "    infisical_runtime = {",
+            `        "site_url": "${opts.infisicalSiteUrl}",`,
+            '        "project_id": "proj_123",',
+            '        "environment": "prod",',
+            '        "secret_path": "/deployments/pleomino",',
+            '        "preferred_credential_source": "machine_identity_universal_auth",',
+            '        "machine_identity_client_id_env": "VBR_MINI_INFISICAL_CLIENT_ID",',
+            '        "machine_identity_client_secret_env": "VBR_MINI_INFISICAL_CLIENT_SECRET",',
+            "    },",
+            "    secret_requirements = [",
+            "        {",
+            '            "name": "cloudflare_api_token",',
+            '            "step": "publish",',
+            '            "contract_id": "secret://deployments/pleomino/cloudflare_api_token",',
+            '            "required": "true",',
+            "        },",
+            "    ],",
+          ]
+        : []),
       ")",
       "",
     ].join("\n"),

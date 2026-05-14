@@ -63,6 +63,7 @@ RESOURCE_LIMITED_DEPLOYMENT_TESTS = {
     "build-tools/tools/tests/deployments/deployment-domain.taxonomy-drift.test.ts": True,
     "build-tools/tools/tests/deployments/deployment-family-composition.cquery.test.ts": True,
     "build-tools/tools/tests/deployments/deployment-git-ref.fetch.test.ts": True,
+    "build-tools/tools/tests/deployments/deployment-infisical-worker-fixture.test.ts": True,
     "build-tools/tools/tests/deployments/deployment-lane-governance.verify.test.ts": True,
     "build-tools/tools/tests/deployments/deployment-runner-identities.replay.provenance.test.ts": True,
     "build-tools/tools/tests/deployments/deployment-targets.install.cloudflare.test.ts": True,

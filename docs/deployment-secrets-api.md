@@ -13,7 +13,7 @@ Use this document when you need:
 
 - the public `deploy` CLI surface
 - the shared control-plane HTTP API and schema names
-- the TypeScript helpers for `SprinkleRef` and Vault-backed secret resolution
+- the TypeScript helpers for `SprinkleRef` and backend-neutral secret resolution
 - short examples you can copy without reading the implementation first
 
 Open the usage guides first when you want the shortest operator path:
@@ -719,7 +719,7 @@ The runtime helpers are exported from
 - `DeploymentSecretBackend`
 - `createDeploymentSecretRuntime()`
 
-The Vault-backed helpers are exported from:
+The backend and admitted-context helpers are exported from:
 
 - `createDeploymentVaultSecretBackend()` in
   [deployment-secret-vault.ts](/Users/kiltyj/Code/viberoots/build-tools/tools/deployments/deployment-secret-vault.ts)
