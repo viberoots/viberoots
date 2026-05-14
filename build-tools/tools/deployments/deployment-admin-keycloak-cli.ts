@@ -9,6 +9,7 @@ import {
   syncDeploymentAdminKeycloakRealm,
 } from "./deployment-admin-keycloak";
 import { handleDeploymentAdminVaultCli } from "./deployment-admin-vault-cli";
+import { handleDeploymentAdminInfisicalCli } from "./deployment-admin-infisical-cli";
 import {
   hasDeploymentAdminKeycloakRemoteProfileFlags,
   runDeploymentAdminKeycloakRemoteProfile,
@@ -31,9 +32,9 @@ function requireAction(): DeploymentAuthAction {
 
 function commandName(): string {
   const [, scope = "", command = ""] = getPositionals();
-  if (!["identity", "keycloak", "vault"].includes(scope)) {
+  if (!["identity", "keycloak", "vault", "infisical"].includes(scope)) {
     throw new Error(
-      'deploy admin currently supports the "identity" and "vault" namespaces (the deprecated "keycloak" alias still works)',
+      'deploy admin currently supports the "identity", "vault", and "infisical" namespaces (the deprecated "keycloak" alias still works)',
     );
   }
   return command;
@@ -62,6 +63,9 @@ export async function maybeHandleDeploymentAdminCli(workspaceRoot: string): Prom
   const command = commandName();
   if (adminScope() === "vault") {
     return await handleDeploymentAdminVaultCli({ command, deployment });
+  }
+  if (adminScope() === "infisical") {
+    return await handleDeploymentAdminInfisicalCli({ command, deployment });
   }
   if (command === "plan") {
     if (hasDeploymentAdminKeycloakRemoteProfileFlags()) {

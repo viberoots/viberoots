@@ -148,9 +148,15 @@ infisical_secret_mappings = {
     "secret://deployments/pleomino/cloudflare_api_token": {
         "secret_path": "/shared/cloudflare",
         "secret_name": "api-token",
+        "approved_placeholder": "true",
+        "placeholder_reason": "operator approved before first live value",
     },
 }
 ```
+
+Use `approved_placeholder` only for a reviewed setup gap before the first live
+value exists. Without that reviewed flag, `deploy admin infisical check` reports
+a missing mapped secret as out of sync.
 
 The fixture override remains provider-neutral:
 `VBR_DEPLOYMENT_SECRET_FIXTURE_PATH` overrides both Vault and Infisical for
@@ -714,6 +720,8 @@ Use the auth commands before a protected/shared deploy when setup is uncertain:
 ```bash
 deploy auth doctor --deployment //projects/deployments/pleomino-staging:deploy
 deploy auth explain-vault-role --deployment //projects/deployments/pleomino-staging:deploy
+deploy auth explain-secret-backend --deployment //projects/deployments/pleomino-staging:deploy
+deploy auth explain-infisical-identity --deployment //projects/deployments/pleomino-staging:deploy
 deploy auth print-login --deployment //projects/deployments/pleomino-staging:deploy
 deploy auth print-jenkins-help --deployment //projects/deployments/pleomino-staging:deploy
 ```
@@ -731,6 +739,9 @@ Jenkins-bound secret values.
 `deploy auth print-login` prints SSH-safe login guidance without launching a
 browser. `deploy auth print-jenkins-help` prints the Jenkins `withCredentials`
 shape and the selected deployment's credential environment variable names.
+`deploy auth explain-secret-backend` and
+`deploy auth explain-infisical-identity` print safe backend routing and
+Universal Auth env-name references without printing credential values.
 
 The default session policy is memory-only. There is no persistent token cache,
 no `deploy auth status`, and no `deploy auth logout` until a reviewed OS
@@ -752,6 +763,65 @@ non-zero when the JWT config, read policy, or JWT role differs from the
 deployment contract. `sync` applies the derived Vault JWT config, read policy,
 and role idempotently. The command reads a Vault admin token from `VAULT_TOKEN`
 by default, or from `--vault-admin-token-env` / `--vault-admin-token-file`.
+
+## Infisical Read-Only Checks
+
+Use the reviewed Infisical admin commands before the first live Infisical-backed
+deployment:
+
+```bash
+deploy auth explain-secret-backend --deployment //projects/deployments/pleomino-staging:deploy
+deploy admin infisical plan --deployment //projects/deployments/pleomino-staging:deploy
+deploy admin infisical check --deployment //projects/deployments/pleomino-staging:deploy
+```
+
+`plan` is local and read-only. `check` uses the reviewed
+`infisical_machine_identity_universal_auth` credential source to verify live
+project, environment, and mapped shared-secret metadata. It reports only safe
+routing data such as site URL, project id, environment, secret path, contract
+ids, secret names, credential source name, and missing env var names. There is
+no `deploy admin infisical sync` command.
+
+Typical `check` output includes:
+
+```json
+{
+  "schemaVersion": "deploy-admin-infisical-check@1",
+  "backendKind": "infisical",
+  "credentialSource": {
+    "name": "infisical_machine_identity_universal_auth",
+    "machineIdentityId": "identity_123",
+    "machineIdentityClientIdEnv": "INFISICAL_CLIENT_ID",
+    "machineIdentityClientSecretEnv": "INFISICAL_CLIENT_SECRET",
+    "missingEnvVarNames": []
+  },
+  "desiredSecrets": [
+    {
+      "contractId": "secret://deployments/pleomino/cloudflare_api_token",
+      "selector": {
+        "secretPath": "/deployments/pleomino",
+        "secretName": "cloudflare_api_token"
+      },
+      "approvedPlaceholder": false
+    }
+  ],
+  "diagnostics": [
+    { "kind": "project", "status": "ok" },
+    { "kind": "environment", "status": "ok" },
+    {
+      "kind": "machine_identity_project_access",
+      "status": "ok",
+      "permissionEvidence": { "access": true, "permissions": ["secrets:read"] }
+    },
+    { "kind": "secret", "status": "ok" }
+  ]
+}
+```
+
+When a first live value is intentionally deferred, the reviewed mapping can set
+`approved_placeholder = "true"` and `placeholder_reason = "<reason>"`. A missing
+secret then reports `placeholderApproved: true`; otherwise a missing mapped
+secret keeps the check out of sync.
 
 ## When To Open Which Doc
 

@@ -13,6 +13,10 @@ import {
   buildDeploymentAuthGroupSummary,
   buildDeploymentAuthKeycloakRealm,
 } from "./deployment-auth-readonly";
+import {
+  buildDeploymentInfisicalIdentityExplanation,
+  buildDeploymentSecretBackendExplanation,
+} from "./deployment-auth-infisical-diagnostics";
 import { resolveAllDeployments } from "./deployment-query";
 
 export const DEPLOYMENT_AUTH_DOCTOR_SCHEMA = "deployment-auth-doctor@1";
@@ -210,6 +214,14 @@ export async function maybeHandleDeploymentAuthCli(workspaceRoot: string): Promi
     printDeployJson(buildDeploymentVaultRoleExplanation(deployment));
     return true;
   }
+  if (command === "explain-secret-backend") {
+    printDeployJson(buildDeploymentSecretBackendExplanation(deployment));
+    return true;
+  }
+  if (command === "explain-infisical-identity") {
+    printDeployJson(buildDeploymentInfisicalIdentityExplanation(deployment));
+    return true;
+  }
   if (command === "print-login") {
     printDeployJson(buildDeploymentAuthLoginInstructions(deployment));
     return true;
@@ -227,6 +239,6 @@ export async function maybeHandleDeploymentAuthCli(workspaceRoot: string): Promi
     return true;
   }
   throw new Error(
-    "deploy auth command must be one of doctor, print-groups, explain-groups, print-keycloak-realm, explain-vault-role, print-login, print-jenkins-help, credential-source-matrix",
+    "deploy auth command must be one of doctor, print-groups, explain-groups, print-keycloak-realm, explain-vault-role, explain-secret-backend, explain-infisical-identity, print-login, print-jenkins-help, credential-source-matrix",
   );
 }

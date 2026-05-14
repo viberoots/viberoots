@@ -10,6 +10,7 @@ export type FakeInfisicalAuthLogin = {
   malformed?: boolean;
   missingAccessToken?: boolean;
   echoClientSecretOnFailure?: boolean;
+  failureBody?: Record<string, unknown>;
 };
 
 export type FakeInfisicalSecret = {
@@ -27,6 +28,15 @@ export type FakeInfisicalSecret = {
   response?: Partial<FakeInfisicalSecret> & Record<string, unknown>;
   status?: number;
   errorBody?: Record<string, unknown>;
+};
+
+export type FakeInfisicalServerOptions = {
+  missingProject?: boolean;
+  missingEnvironment?: boolean;
+  projectStatus?: number;
+  environmentStatus?: number;
+  machineIdentityAccess?: boolean;
+  machineIdentityAccessStatus?: number;
 };
 
 async function readBody(request: http.IncomingMessage): Promise<Record<string, unknown>> {
@@ -52,6 +62,7 @@ function handleUniversalAuthLoginBody(
     json(response, auth.status || 401, {
       error: "universal_auth_rejected",
       ...(auth.echoClientSecretOnFailure ? { clientSecret: body.clientSecret } : {}),
+      ...(auth.failureBody || {}),
     });
     return;
   }
@@ -79,6 +90,7 @@ function selectAuth(
 export async function startFakeInfisicalServer(
   auth: FakeInfisicalAuthLogin | FakeInfisicalAuthLogin[],
   secrets: FakeInfisicalSecret[] = [],
+  opts: FakeInfisicalServerOptions = {},
 ) {
   const calls: string[] = [];
   const secretCalls: string[] = [];
@@ -88,6 +100,60 @@ export async function startFakeInfisicalServer(
       const body = await readBody(request);
       calls.push(String(body.clientId || ""));
       await handleUniversalAuthLoginBody(response, selectAuth(auth, body), body);
+      return;
+    }
+    const projectMatch = url.pathname.match(/^\/api\/v1\/workspace\/([^/]+)$/);
+    if (projectMatch) {
+      const projectId = decodeURIComponent(projectMatch[1] || "");
+      if (opts.projectStatus) {
+        json(response, opts.projectStatus, { error: "project_access_failed" });
+        return;
+      }
+      if (opts.missingProject || projectId !== "proj_123") {
+        json(response, 404, { error: "missing_project" });
+        return;
+      }
+      json(response, 200, { workspace: { id: projectId, name: "Deployment Project" } });
+      return;
+    }
+    const environmentMatch = url.pathname.match(
+      /^\/api\/v1\/workspace\/([^/]+)\/environments\/([^/]+)$/,
+    );
+    if (environmentMatch) {
+      const projectId = decodeURIComponent(environmentMatch[1] || "");
+      const environment = decodeURIComponent(environmentMatch[2] || "");
+      if (opts.environmentStatus) {
+        json(response, opts.environmentStatus, { error: "environment_access_failed" });
+        return;
+      }
+      if (opts.missingEnvironment || projectId !== "proj_123" || environment !== "prod") {
+        json(response, 404, { error: "missing_environment" });
+        return;
+      }
+      json(response, 200, { environment: { slug: environment, name: "Production" } });
+      return;
+    }
+    const identityAccessMatch = url.pathname.match(
+      /^\/api\/v1\/workspace\/([^/]+)\/machine-identities\/([^/]+)\/project-access$/,
+    );
+    if (identityAccessMatch) {
+      const projectId = decodeURIComponent(identityAccessMatch[1] || "");
+      const identityId = decodeURIComponent(identityAccessMatch[2] || "");
+      if (opts.machineIdentityAccessStatus) {
+        json(response, opts.machineIdentityAccessStatus, { error: "identity_access_unavailable" });
+        return;
+      }
+      if (projectId !== "proj_123" || identityId !== "identity_123") {
+        json(response, 404, { error: "missing_identity_access" });
+        return;
+      }
+      json(response, 200, {
+        access: {
+          access: opts.machineIdentityAccess !== false,
+          permissions: ["secrets:read"],
+          evidence: "project-membership:member",
+        },
+      });
       return;
     }
     const secretMatch = url.pathname.match(/^\/api\/v3\/secrets\/raw\/([^/]+)$/);

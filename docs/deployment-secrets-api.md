@@ -822,8 +822,11 @@ Infisical admission derives the default selector from the contract and
 For
 `secret://deployments/pleomino/cloudflare_api_token`, the default Infisical
 secret name is `cloudflare_api_token`. A reviewed
-`infisical_secret_mappings` entry may override only the non-secret
-`secret_path` and `secret_name`.
+`infisical_secret_mappings` entry may override the non-secret `secret_path` and
+`secret_name`. It may also declare `approved_placeholder = "true"` with a
+non-secret `placeholder_reason` when an operator has reviewed that the live
+Infisical secret value will be created later; admin checks report that as an
+approved placeholder instead of silently treating every missing secret as ready.
 
 The binding helpers turn those requirements into a backend-independent list of
 secret bindings:
@@ -1157,6 +1160,13 @@ The public deploy front door exposes a read-only auth group:
 - `deploy auth explain-vault-role --deployment <label>`
   Reports issuer, audience, Vault address, role name, generated policy name,
   and bound claim keys for the deployment's Vault JWT role.
+- `deploy auth explain-secret-backend --deployment <label>`
+  Reports the selected backend kind, mapped contract IDs, and safe backend
+  routing metadata without contacting Vault or Infisical.
+- `deploy auth explain-infisical-identity --deployment <label>`
+  Reports the reviewed Infisical Universal Auth credential source name, safe
+  machine identity id or client id env-name reference, and missing credential
+  env var names without reading env var values.
 - `deploy auth print-login --deployment <label>`
   Prints browserless PKCE/device-flow guidance for SSH and headless operators.
 - `deploy auth print-jenkins-help --deployment <label>`
@@ -1169,11 +1179,106 @@ All auth diagnostic commands are non-mutating. They do not mint tokens, exchange
 Vault credentials, read deployment secret values, write repo-local cache files,
 or call provider mutation APIs.
 
+Infisical auth diagnostic example fields:
+
+```json
+{
+  "schemaVersion": "deployment-auth-infisical-identity@1",
+  "backendKind": "infisical",
+  "credentialSourceName": "infisical_machine_identity_universal_auth",
+  "runtime": {
+    "siteUrl": "https://app.infisical.com",
+    "projectId": "proj_123",
+    "environment": "prod",
+    "secretPath": "/deployments/pleomino",
+    "machineIdentityId": "identity_123",
+    "machineIdentityClientIdEnv": "INFISICAL_CLIENT_ID",
+    "machineIdentityClientSecretEnv": "INFISICAL_CLIENT_SECRET"
+  },
+  "missingEnvVarNames": []
+}
+```
+
 Auth diagnostic output uses the shared deployment auth redaction policy. It
 redacts OIDC access tokens, refresh tokens, auth codes, PKCE verifiers, device
 codes, client secrets, Vault JWTs, Vault tokens, and Jenkins-bound secret values.
 It may print non-secret routing metadata such as issuer URL, Vault address,
-audience, role name, policy name, claim names, and verification instructions.
+audience, role name, policy name, claim names, Infisical site URL, project id,
+environment, secret path, safe machine identity references, and verification
+instructions.
+
+### Infisical Admin Diagnostics
+
+The Infisical admin namespace is read-only in this release:
+
+- `deploy admin infisical plan --deployment <label>`
+  Builds a local desired-state plan from reviewed deployment metadata. It does
+  not call Infisical.
+- `deploy admin infisical check --deployment <label>`
+  Uses the reviewed Universal Auth credential source from `infisical_runtime` to
+  read live Infisical metadata and verify the project, environment, and mapped
+  shared secrets exist. It reads metadata only and requests secret reads with
+  `viewSecretValue=false`.
+
+Example output fields:
+
+```json
+{
+  "schemaVersion": "deploy-admin-infisical-check@1",
+  "backendKind": "infisical",
+  "runtime": {
+    "siteUrl": "https://app.infisical.com",
+    "projectId": "proj_123",
+    "environment": "prod",
+    "secretPath": "/deployments/pleomino"
+  },
+  "credentialSource": {
+    "name": "infisical_machine_identity_universal_auth",
+    "machineIdentityId": "identity_123",
+    "machineIdentityClientIdEnv": "INFISICAL_CLIENT_ID",
+    "machineIdentityClientSecretEnv": "INFISICAL_CLIENT_SECRET",
+    "missingEnvVarNames": []
+  },
+  "desiredSecrets": [
+    {
+      "contractId": "secret://deployments/pleomino/cloudflare_api_token",
+      "selector": {
+        "projectId": "proj_123",
+        "environment": "prod",
+        "secretPath": "/deployments/pleomino",
+        "secretName": "cloudflare_api_token"
+      },
+      "approvedPlaceholder": false
+    }
+  ],
+  "diagnostics": [
+    { "kind": "project", "status": "ok" },
+    { "kind": "environment", "status": "ok" },
+    {
+      "kind": "machine_identity_project_access",
+      "status": "ok",
+      "permissionEvidence": {
+        "access": true,
+        "permissions": ["secrets:read"],
+        "evidence": "project-membership:member"
+      }
+    },
+    { "kind": "secret", "status": "ok" }
+  ]
+}
+```
+
+If Infisical does not expose exact machine-identity permission evidence through
+the configured API, `diagnostics` includes
+`"kind": "machine_identity_project_access"` with `"status": "unsupported"` and
+an `evidenceUnavailableReason`. A missing secret may pass only when the reviewed
+`infisical_secret_mappings` entry includes `approved_placeholder = "true"`; that
+diagnostic includes `placeholderApproved: true` and the reviewed
+`placeholderReason` when present.
+
+There is intentionally no `deploy admin infisical sync` command. Infisical
+project, environment, machine identity, membership, role, and placeholder
+creation remains an operator-owned setup task outside this repo tooling.
 
 The current repo-level diagnostic session/cache product policy is explicit:
 interactive login material is memory-only for the deploy process. Shared

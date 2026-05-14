@@ -134,7 +134,7 @@ async function loginWithUniversalAuth(
   if (!response.ok) {
     throw new Error(
       `Infisical Universal Auth failed: ${response.status} ${redactInfisicalSecretText(
-        JSON.stringify(body),
+        JSON.stringify(redactInfisicalCredentialJson(body)),
         secrets,
       )}`,
     );
@@ -145,7 +145,7 @@ async function loginWithUniversalAuth(
   if (!accessToken || tokenType !== "Bearer" || !expiry.iso || !expiry.ms) {
     throw new Error(
       `Infisical Universal Auth response missing accessToken, Bearer tokenType, or expiresIn: ${redactInfisicalSecretText(
-        JSON.stringify(body),
+        JSON.stringify(redactInfisicalCredentialJson(body)),
         [config.clientSecret, accessToken],
       )}`,
     );

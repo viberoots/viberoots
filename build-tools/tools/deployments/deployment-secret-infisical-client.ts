@@ -17,6 +17,23 @@ export type InfisicalSecretRecord = DeploymentInfisicalSelector & {
   unavailable?: boolean;
 };
 
+export type InfisicalProjectRecord = {
+  id: string;
+  name?: string;
+};
+
+export type InfisicalEnvironmentRecord = {
+  slug: string;
+  name?: string;
+};
+
+export type InfisicalProjectAccessRecord = {
+  available: boolean;
+  access?: boolean;
+  permissions?: string[];
+  evidence?: string;
+};
+
 function secretUrl(
   siteUrl: string,
   selector: DeploymentInfisicalSelector,
@@ -39,6 +56,19 @@ function normalizedSecretBody(body: Record<string, unknown>): Record<string, unk
   const nested = body.secret;
   if (nested && typeof nested === "object" && !Array.isArray(nested)) {
     return nested as Record<string, unknown>;
+  }
+  return body;
+}
+
+function normalizedNestedBody(
+  body: Record<string, unknown>,
+  keys: string[],
+): Record<string, unknown> {
+  for (const key of keys) {
+    const nested = body[key];
+    if (nested && typeof nested === "object" && !Array.isArray(nested)) {
+      return nested as Record<string, unknown>;
+    }
   }
   return body;
 }
@@ -103,5 +133,92 @@ export async function readInfisicalSecret(opts: {
     deleted: secret.deleted === true,
     revoked: secret.revoked === true,
     unavailable: secret.unavailable === true,
+  };
+}
+
+export async function readInfisicalProject(opts: {
+  credential: InfisicalCredentialConfig;
+  projectId: string;
+  fetchImpl?: typeof fetch;
+}): Promise<InfisicalProjectRecord | undefined> {
+  const fetchImpl = opts.fetchImpl || fetch;
+  const token = await resolveInfisicalAccessToken(opts.credential, { fetchImpl });
+  const response = await fetchImpl(
+    new URL(`/api/v1/workspace/${encodeURIComponent(opts.projectId)}`, token.siteUrl),
+    { headers: { Accept: "application/json", Authorization: `Bearer ${token.accessToken}` } },
+  );
+  if (response.status === 404) return undefined;
+  const body = await readJson(response, [token.accessToken]);
+  if (!response.ok) throw new Error(`Infisical project read failed: ${response.status}`);
+  const project = normalizedNestedBody(body, ["workspace", "project"]);
+  return {
+    id: stringField(project, ["id", "_id", "workspaceId"]) || opts.projectId,
+    ...(stringField(project, ["name", "projectName"])
+      ? { name: stringField(project, ["name", "projectName"]) }
+      : {}),
+  };
+}
+
+export async function readInfisicalEnvironment(opts: {
+  credential: InfisicalCredentialConfig;
+  projectId: string;
+  environment: string;
+  fetchImpl?: typeof fetch;
+}): Promise<InfisicalEnvironmentRecord | undefined> {
+  const fetchImpl = opts.fetchImpl || fetch;
+  const token = await resolveInfisicalAccessToken(opts.credential, { fetchImpl });
+  const url = new URL(
+    `/api/v1/workspace/${encodeURIComponent(opts.projectId)}/environments/${encodeURIComponent(opts.environment)}`,
+    token.siteUrl,
+  );
+  const response = await fetchImpl(url, {
+    headers: { Accept: "application/json", Authorization: `Bearer ${token.accessToken}` },
+  });
+  if (response.status === 404) return undefined;
+  const body = await readJson(response, [token.accessToken]);
+  if (!response.ok) throw new Error(`Infisical environment read failed: ${response.status}`);
+  const environment = normalizedNestedBody(body, ["environment"]);
+  return {
+    slug: stringField(environment, ["slug", "environment", "name"]) || opts.environment,
+    ...(stringField(environment, ["name"]) ? { name: stringField(environment, ["name"]) } : {}),
+  };
+}
+
+export async function readInfisicalMachineIdentityProjectAccess(opts: {
+  credential: InfisicalCredentialConfig;
+  projectId: string;
+  machineIdentityId: string;
+  fetchImpl?: typeof fetch;
+}): Promise<InfisicalProjectAccessRecord | undefined> {
+  const fetchImpl = opts.fetchImpl || fetch;
+  const token = await resolveInfisicalAccessToken(opts.credential, { fetchImpl });
+  const url = new URL(
+    `/api/v1/workspace/${encodeURIComponent(opts.projectId)}/machine-identities/${encodeURIComponent(
+      opts.machineIdentityId,
+    )}/project-access`,
+    token.siteUrl,
+  );
+  const response = await fetchImpl(url, {
+    headers: { Accept: "application/json", Authorization: `Bearer ${token.accessToken}` },
+  });
+  if (response.status === 404) return undefined;
+  if (response.status === 501) {
+    return { available: false, evidence: "infisical project-access evidence API unsupported" };
+  }
+  const body = await readJson(response, [token.accessToken]);
+  if (!response.ok) {
+    throw new Error(`Infisical machine identity project access read failed: ${response.status}`);
+  }
+  const access = normalizedNestedBody(body, ["access", "projectAccess"]);
+  const permissions = Array.isArray(access.permissions)
+    ? access.permissions.filter((entry): entry is string => typeof entry === "string")
+    : undefined;
+  return {
+    available: true,
+    access: access.access === true || access.hasAccess === true,
+    ...(permissions ? { permissions } : {}),
+    ...(stringField(access, ["role", "membership", "evidence"])
+      ? { evidence: stringField(access, ["role", "membership", "evidence"]) }
+      : {}),
   };
 }

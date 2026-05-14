@@ -22,6 +22,8 @@ export type DeploymentInfisicalRuntimeConfig = {
 export type DeploymentInfisicalSecretMapping = {
   secretName: string;
   secretPath: string;
+  approvedPlaceholder?: boolean;
+  placeholderReason?: string;
 };
 
 export type DeploymentSecretMetadata = {
@@ -97,6 +99,8 @@ function readInfisicalMappings(
       {
         secretName: mapping.secret_name || "",
         secretPath: mapping.secret_path || "",
+        ...(mapping.approved_placeholder === "true" ? { approvedPlaceholder: true } : {}),
+        ...(mapping.placeholder_reason ? { placeholderReason: mapping.placeholder_reason } : {}),
       },
     ]),
   );

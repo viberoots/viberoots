@@ -6,9 +6,9 @@ const JWT_PATTERN = /\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\b/g;
 const VAULT_TOKEN_PATTERN = /\b(?:hvs|hvb|s)\.[A-Za-z0-9_-]{12,}\b/g;
 const BEARER_PATTERN = /\bBearer\s+[^,\s)]+/gi;
 const SECRET_ASSIGNMENT_PATTERN =
-  /\b(access_token|refresh_token|id_token|client_secret|code_verifier|device_code|user_code|code)=([^&\s"']+)/gi;
+  /\b(access_token|accessToken|refresh_token|refreshToken|id_token|idToken|client_secret|clientSecret|code_verifier|codeVerifier|device_code|deviceCode|user_code|userCode|personal_token|personalToken|service_token|serviceToken|secret_value|secretValue|expanded_reference|expandedReference|code)=([^&\s"']+)/gi;
 const SECRET_JSON_FIELD_PATTERN =
-  /"(access_token|refresh_token|id_token|client_secret|code_verifier|device_code|user_code|code|vault_token|vault_jwt|jenkins_secret)"\s*:\s*"[^"]*"/gi;
+  /"(access_token|accessToken|refresh_token|refreshToken|id_token|idToken|client_secret|clientSecret|code_verifier|codeVerifier|device_code|deviceCode|user_code|userCode|personal_token|personalToken|service_token|serviceToken|secret_value|secretValue|expanded_reference|expandedReference|code|vault_token|vaultToken|vault_jwt|vaultJwt|jenkins_secret|jenkinsSecret)"\s*:\s*"[^"]*"/gi;
 const STAGED_ARTIFACT_PATH_PATTERN = /\/[^\s"']*\.deploy-artifacts\/[^\s"']+/g;
 
 function escapeRegExp(value: string): string {

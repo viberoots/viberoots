@@ -55,7 +55,7 @@ REVIEWED_DEPLOYMENT_TEST_OWNERSHIP = {
     "build-tools/tools/tests/deployments/deployment-admin-keycloak.remote-profile.sync-reviewed-session.test.ts": True,
     "build-tools/tools/tests/deployments/deployment-admin-keycloak.remote-profile.grant-user-errors.test.ts": True,
     "build-tools/tools/tests/deployments/deployment-admin-keycloak.remote-ssh.command-assembly.test.ts": True,
-    "build-tools/tools/tests/deployments/deployment-auth-diagnostics.test.ts": True,
+    "build-tools/tools/tests/deployments/deployment-admin-infisical-check.test.ts": True, "build-tools/tools/tests/deployments/deployment-admin-infisical.fixture.ts": False, "build-tools/tools/tests/deployments/deployment-admin-infisical.test.ts": True, "build-tools/tools/tests/deployments/deployment-auth-diagnostics.test.ts": True,
     "build-tools/tools/tests/deployments/deployment-admin-vault.test.ts": True,
     "build-tools/tools/tests/deployments/deployment-browser-launch.test.ts": True,
     "build-tools/tools/tests/deployments/deployment-cli-resolve.test.ts": True,
