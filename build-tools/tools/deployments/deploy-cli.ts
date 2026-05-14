@@ -12,9 +12,9 @@ import {
 import { listDeploymentsForCli, printDeployJson } from "./deploy-front-door";
 import { resolveSmokeConnectOverride } from "./deployment-cli-smoke";
 import {
-  cleanupDeploymentVaultRuntime,
-  prepareDeploymentVaultRuntime,
-} from "./deployment-vault-runtime";
+  cleanupDeploymentSecretRuntime,
+  prepareDeploymentSecretRuntime,
+} from "./deployment-secret-runtime-prepare";
 import { activateDeploymentSecretContext } from "./deployment-secret-context";
 import { assertNoProtectedSharedClientCredentialInputs } from "./deployment-service-client-contract";
 import {
@@ -116,14 +116,14 @@ export async function runDeployCli(opts: {
     deployment,
     opts.publicFrontDoor,
   );
-  const vaultRuntime = serviceBackedWorkerRuntime
+  const secretRuntime = serviceBackedWorkerRuntime
     ? { minted: false }
-    : await prepareDeploymentVaultRuntime({
+    : await prepareDeploymentSecretRuntime({
         workspaceRoot: opts.workspaceRoot,
         deployment,
         inputs: flags.vaultRuntimeInputs,
       });
-  const restoreSecretContext = activateDeploymentSecretContext(vaultRuntime.secretContext);
+  const restoreSecretContext = activateDeploymentSecretContext(secretRuntime.secretContext);
   try {
     await runProviderDeployFrontDoor({
       workspaceRoot: opts.workspaceRoot,
@@ -136,7 +136,7 @@ export async function runDeployCli(opts: {
     });
   } finally {
     restoreSecretContext();
-    await cleanupDeploymentVaultRuntime(vaultRuntime);
+    await cleanupDeploymentSecretRuntime(secretRuntime);
   }
 }
 

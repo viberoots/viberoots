@@ -46,6 +46,7 @@ test("Infisical admission freezes non-secret selector and runtime reads admitted
       admitted[0]?.referenceId,
       "infisical:proj_123:prod:/deployments/pleomino:cloudflare_api_token#sec_1@3",
     );
+    assert.equal(server.secretCalls[0], "cloudflare_api_token:false:");
     assert.ok(!JSON.stringify(admitted).includes("token-v3"));
     server.secrets.unshift({
       id: "sec_1",
@@ -92,6 +93,23 @@ test("Infisical mapping overrides default path and secret name", async () => {
       secretContext: infisicalTestContext(server.siteUrl),
     });
     assert.equal(admitted[0]?.selectorRef, "proj_123:prod:/custom:api-token@9");
+  } finally {
+    await server.close();
+  }
+});
+
+test("fake Infisical server rejects the old v3 raw-secret read shape", async () => {
+  const server = await startFakeInfisicalServer(
+    { clientId: "id", clientSecret: "secret", accessToken: "token" },
+    [],
+  );
+  try {
+    const old = await fetch(`${server.siteUrl}/api/v3/secrets/raw/cloudflare_api_token`);
+    assert.equal(old.status, 410);
+    const invalidV4 = await fetch(
+      `${server.siteUrl}/api/v4/secrets/cloudflare_api_token?workspaceId=proj_123&secretVersion=3`,
+    );
+    assert.equal(invalidV4.status, 400);
   } finally {
     await server.close();
   }

@@ -156,21 +156,33 @@ export async function startFakeInfisicalServer(
       });
       return;
     }
-    const secretMatch = url.pathname.match(/^\/api\/v3\/secrets\/raw\/([^/]+)$/);
+    const oldSecretMatch = url.pathname.match(/^\/api\/v3\/secrets\/raw\/([^/]+)$/);
+    if (oldSecretMatch) {
+      json(response, 410, { error: "old_secret_read_path_rejected" });
+      return;
+    }
+    const secretMatch = url.pathname.match(/^\/api\/v4\/secrets\/([^/]+)$/);
     if (secretMatch) {
       const secretName = decodeURIComponent(secretMatch[1] || "");
+      if (
+        url.searchParams.has("workspaceId") ||
+        url.searchParams.has("secretVersion") ||
+        !url.searchParams.has("projectId") ||
+        !url.searchParams.has("viewSecretValue")
+      ) {
+        json(response, 400, { error: "invalid_v4_secret_read_contract" });
+        return;
+      }
       const viewSecretValue = url.searchParams.get("viewSecretValue") === "true";
-      secretCalls.push(
-        `${secretName}:${String(viewSecretValue)}:${url.searchParams.get("secretVersion") || ""}`,
-      );
+      const version = url.searchParams.get("version") || "";
+      secretCalls.push(`${secretName}:${String(viewSecretValue)}:${version}`);
       const found = secrets.find(
         (entry) =>
-          entry.projectId === url.searchParams.get("workspaceId") &&
+          entry.projectId === url.searchParams.get("projectId") &&
           entry.environment === url.searchParams.get("environment") &&
           entry.secretPath === url.searchParams.get("secretPath") &&
           entry.secretName === secretName &&
-          (!url.searchParams.get("secretVersion") ||
-            entry.version === url.searchParams.get("secretVersion")),
+          (!version || entry.version === version),
       );
       if (!found) {
         json(response, 404, { error: "missing_secret" });

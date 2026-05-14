@@ -97,19 +97,11 @@ async function readAdmittedSecret(opts: {
   credential: DeploymentSecretContext & { kind: "infisical" };
   selector: ReturnType<typeof deploymentInfisicalSelector>;
 }) {
-  const metadata = await readInfisicalSecret({
+  return await readInfisicalSecret({
     credential: opts.credential.credential,
     selector: opts.selector,
     viewSecretValue: false,
   });
-  if (!metadata?.version) {
-    return await readInfisicalSecret({
-      credential: opts.credential.credential,
-      selector: opts.selector,
-      viewSecretValue: true,
-    });
-  }
-  return metadata;
 }
 
 function assertUsable(record: InfisicalSecretRecord | undefined, contractId: string) {

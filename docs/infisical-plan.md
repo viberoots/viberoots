@@ -769,3 +769,101 @@ workflow satisfies the design end to end.
 
 It adds broad integration and guardrail coverage that may require maintaining a larger fake-backend
 fixture surface.
+
+## PR-9: Infisical API and local direct runtime conformance fixes
+
+### 1. Intent
+
+Close the end-of-range implementation gaps where Infisical secret reads and local direct deploy
+runtime setup diverge from the design contract.
+
+### 2. Scope of changes
+
+- Update the Infisical secret read client to use `GET /api/v4/secrets/{secretName}`.
+- Send `projectId`, optional `version`, and `viewSecretValue` as query params for admission,
+  runtime acquire, diagnostics, and any shared helper that reads an Infisical secret.
+- Remove the implemented `/api/v3/secrets/raw/{secretName}`, `workspaceId`, and `secretVersion`
+  read shape from Infisical deployment secret paths.
+- Update the fake Infisical server and fixtures so tests assert the v4 read contract required by
+  the design.
+- Ensure admission and diagnostics request non-secret reads with `viewSecretValue=false` whenever
+  the call does not need secret material.
+- Ensure runtime acquire requests exact admitted versions with `viewSecretValue=true` only when
+  secret material is required.
+- Route non-service-backed local direct deploys through backend-aware runtime preparation so an
+  Infisical-backed deployment uses the reviewed `infisical_runtime` Universal Auth env names instead
+  of unconditionally calling `prepareDeploymentVaultRuntime(...)`.
+- Preserve existing Vault local direct behavior and existing service-backed Infisical behavior.
+- Keep Universal Auth client ids, client secrets, access tokens, and resolved secret values out of
+  records, snapshots, logs, and diagnostics.
+
+### 3. External prerequisites
+
+- Local direct Infisical deploys require the reviewed Universal Auth env names from
+  `infisical_runtime` to be present in the operator environment.
+- No live Infisical access is required for ordinary validation; fake-server coverage must exercise
+  the v4 API shape.
+
+### 4. Tests to be added
+
+- Update fake Infisical server tests to reject the old v3 raw-secret path and require
+  `/api/v4/secrets/{secretName}` with `projectId`, optional `version`, and `viewSecretValue`.
+- Add admission and diagnostics tests proving Infisical metadata reads use `viewSecretValue=false`
+  and do not accept or expose secret values.
+- Add runtime acquire tests proving exact admitted versions are sent as `version` query params and
+  secret material is requested only with `viewSecretValue=true`.
+- Add regression tests for local direct Infisical deploys proving the non-service-backed CLI path
+  prepares an Infisical credential context from reviewed `infisical_runtime` env names and does not
+  invoke Vault runtime preparation.
+- Add Vault regression tests proving local direct Vault deploys still prepare the Vault runtime.
+- Add redaction tests covering errors from the corrected v4 read path and local direct Universal
+  Auth setup.
+
+### 5. Docs to be added or updated
+
+- Update deployment secrets API docs to name the Infisical v4 secret read endpoint and query params
+  used by deployment secret admission and runtime acquire.
+- Update secrets usage and local direct deploy docs with the reviewed Infisical Universal Auth env
+  names used by non-service-backed local direct deploys.
+- Update fake-backend or testing docs, if present, so the fake Infisical server is documented as
+  asserting the v4 API contract.
+
+### 5.5. Expected regression scope
+
+- `deployment-only`
+- Keep changes in deployment-owned Infisical backend, fake-server, CLI/runtime preparation, and
+  deployment test modules.
+
+### 6. Acceptance criteria
+
+- All Infisical deployment secret reads use `GET /api/v4/secrets/{secretName}` with `projectId`,
+  optional `version`, and `viewSecretValue` query params.
+- Fake Infisical tests fail if the implementation reintroduces the old v3 raw-secret path,
+  `workspaceId`, or `secretVersion`.
+- Local direct Infisical deploys prepare an Infisical Universal Auth runtime from reviewed
+  `infisical_runtime` env names and do not prepare a Vault runtime.
+- Existing Vault local direct deploys continue to work unchanged.
+
+### 7. Risks
+
+- API-shape correction could break existing fake-server expectations that accidentally codified the
+  wrong v3 endpoint.
+- Backend-aware local direct runtime preparation could weaken Vault behavior if the branch is not
+  covered explicitly.
+
+### 8. Mitigations
+
+- Make the fake server strict about the v4 path and query params while adding separate Vault
+  regression coverage for local direct deploys.
+- Keep backend selection centralized in the neutral runtime helper rather than adding provider-side
+  branches.
+
+### 9. Consequences of not implementing this PR
+
+Infisical-backed deployments would continue to target the wrong Infisical read API and local direct
+deploys would still require Vault runtime preparation even when the deployment selects Infisical.
+
+### 10. Downsides for implementing this PR
+
+It adds another correction pass after the end-to-end PRs and requires updating tests that currently
+assert the wrong API shape.

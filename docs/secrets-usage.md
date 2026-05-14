@@ -377,9 +377,9 @@ flags, and session detection:
 - Jenkins deploys use either a Jenkins Credentials-bound client secret to mint
   the workload JWT, or a Jenkins/external OIDC token trusted by Vault
 
-For Infisical-backed deployments, the human login path only authorizes the
-deploy request. It is not forwarded as the Infisical workload credential. The
-runtime reads `machine_identity_client_id_env` and
+For Infisical-backed local/direct and worker-backed deployments, the human login
+path only authorizes the deploy request. It is not forwarded as the Infisical
+workload credential. The runtime reads `machine_identity_client_id_env` and
 `machine_identity_client_secret_env` from `infisical_runtime`, exchanges those
 values with Universal Auth in memory, caches the resulting access token only
 inside the process until expiry, and reacquires after expiry.

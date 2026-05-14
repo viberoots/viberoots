@@ -819,6 +819,11 @@ Infisical admission derives the default selector from the contract and
 - `secretPath` comes from `infisical_runtime.secret_path`, defaulting to `/`
 - `secretName` defaults to the final path segment of the contract ID
 
+The adapter reads shared secrets with `GET /api/v4/secrets/{secretName}`. It
+sends `projectId`, `environment`, `secretPath`, `type=shared`,
+`viewSecretValue`, `expandSecretReferences=false`, `includeImports=false`, and,
+for runtime acquire, the admitted `version` query parameter.
+
 For
 `secret://deployments/pleomino/cloudflare_api_token`, the default Infisical
 secret name is `cloudflare_api_token`. A reviewed
@@ -922,10 +927,11 @@ An Infisical-admitted reference freezes non-secret replay data, for example:
 }
 ```
 
-Runtime acquire uses the admitted version and checks the returned project,
-environment, path, name, id when present, and version before returning a secret
-value. Imported secret/reference expansion is disabled in this first Infisical
-release.
+Admission and read-only diagnostics request metadata with
+`viewSecretValue=false`. Runtime acquire uses `viewSecretValue=true` only with
+the admitted `version`, then checks the returned project, environment, path,
+name, id when present, and version before returning a secret value. Imported
+secret/reference expansion is disabled in this first Infisical release.
 
 Replay authority comes from the recorded admitted references, not from current
 deployment metadata. A retry or rollback of a Vault-admitted run continues to
@@ -978,8 +984,13 @@ deploys, set `preferred_credential_source = "interactive_pkce"` or leave
 selection on auto so the CLI uses a public PKCE client on desktop terminals and
 device/print-only behavior on SSH/headless sessions.
 
-Local/direct deploys derive the Vault role and bound claims from the selected
-deployment and its `vault_runtime` metadata, then create a typed context containing the Vault address.
+Local/direct Vault deploys derive the Vault role and bound claims from the
+selected deployment and its `vault_runtime` metadata, then create a typed context containing the
+Vault address. Local/direct Infisical deploys instead create a typed context containing the
+Universal Auth runtime credential. They read the reviewed `machine_identity_client_id_env` and
+`machine_identity_client_secret_env` names from `infisical_runtime` and create
+an in-memory Universal Auth context.
+Vault local/direct creates a typed context containing the Vault address.
 Protected service-backed deploys use a different boundary: the submitter's
 PKCE/device session authorizes the request, while the `mini` worker reads
 non-secret Vault or Infisical runtime metadata from the execution snapshot and

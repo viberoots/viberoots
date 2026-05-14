@@ -40,15 +40,15 @@ function secretUrl(
   value: boolean,
   version?: string,
 ) {
-  const url = new URL(`/api/v3/secrets/raw/${encodeURIComponent(selector.secretName)}`, siteUrl);
-  url.searchParams.set("workspaceId", selector.projectId);
+  const url = new URL(`/api/v4/secrets/${encodeURIComponent(selector.secretName)}`, siteUrl);
+  url.searchParams.set("projectId", selector.projectId);
   url.searchParams.set("environment", selector.environment);
   url.searchParams.set("secretPath", selector.secretPath);
   url.searchParams.set("type", "shared");
   url.searchParams.set("viewSecretValue", value ? "true" : "false");
   url.searchParams.set("expandSecretReferences", "false");
   url.searchParams.set("includeImports", "false");
-  if (version) url.searchParams.set("secretVersion", version);
+  if (version) url.searchParams.set("version", version);
   return url;
 }
 

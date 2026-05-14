@@ -8,6 +8,7 @@ RESOURCE_LIMITED_DEPLOYMENT_TESTS = {
     "build-tools/tools/tests/deployments/cloudflare-pages.extraction.from-targets.cquery.test.ts": True,
     "build-tools/tools/tests/deployments/cloudflare-pages.infisical-admission-records.test.ts": True,
     "build-tools/tools/tests/deployments/deployment-secret-metadata.cquery.test.ts": True,
+    "build-tools/tools/tests/deployments/deployment-secret-runtime-prepare.test.ts": True,
     "build-tools/tools/tests/deployments/cloudflare-pages.preview.e2e.test.ts": True,
     "build-tools/tools/tests/deployments/cloudflare-pages.preview.guardrails.test.ts": True,
     "build-tools/tools/tests/deployments/cloudflare-pages.preview.smoke-exception.e2e.test.ts": True,
