@@ -99,6 +99,9 @@ The containerized runtime should accept a mounted config file plus narrow enviro
 non-secret bootstrap pointers. CLI flags remain useful for tests and local fixtures, but production
 container startup should not depend on long imperative command lines.
 
+The implemented runtime loader and credential-directory contract are documented in
+[Deployment Control Plane Runtime Configuration](./control-plane-runtime-configuration.md).
+
 Recommended config file path:
 
 ```text
@@ -600,7 +603,13 @@ Example shape:
 services:
   deployment-control-plane-service:
     image: registry.example.com/viberoots/deployment-control-plane@sha256:REVIEWED
-    command: ["deployment-control-plane", "service", "--config", "/etc/deployment-control-plane/config.yaml"]
+    command:
+      [
+        "deployment-control-plane",
+        "service",
+        "--config",
+        "/etc/deployment-control-plane/config.yaml",
+      ]
     ports:
       - "127.0.0.1:7780:7780"
     volumes:
@@ -612,7 +621,13 @@ services:
 
   deployment-control-plane-worker:
     image: registry.example.com/viberoots/deployment-control-plane@sha256:REVIEWED
-    command: ["deployment-control-plane", "worker", "--config", "/etc/deployment-control-plane/config.yaml"]
+    command:
+      [
+        "deployment-control-plane",
+        "worker",
+        "--config",
+        "/etc/deployment-control-plane/config.yaml",
+      ]
     volumes:
       - ./config.yaml:/etc/deployment-control-plane/config.yaml:ro
       - records:/var/lib/deployment-control-plane/records
@@ -622,7 +637,13 @@ services:
 
   deployment-control-plane-worker-2:
     image: registry.example.com/viberoots/deployment-control-plane@sha256:REVIEWED
-    command: ["deployment-control-plane", "worker", "--config", "/etc/deployment-control-plane/config.yaml"]
+    command:
+      [
+        "deployment-control-plane",
+        "worker",
+        "--config",
+        "/etc/deployment-control-plane/config.yaml",
+      ]
     volumes:
       - ./config.yaml:/etc/deployment-control-plane/config.yaml:ro
       - records:/var/lib/deployment-control-plane/records
@@ -738,7 +759,7 @@ Rationale:
 10. Add a Compose/Podman example for non-NixOS hosts with one service and two workers.
 11. Add tests proving startup fails closed when required credential files are absent.
 12. Add tests proving Infisical credential lookup is deployment-scoped and supports multiple
-   Infisical tenants on one control plane.
+    Infisical tenants on one control plane.
 13. Add tests proving two workers cannot execute the same submission or violate provider lock
     scopes under contention.
 14. Add browser or HTTP tests proving the web UI loads through the service origin and redacts

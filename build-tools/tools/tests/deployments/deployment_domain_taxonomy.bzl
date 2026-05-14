@@ -36,7 +36,7 @@ REVIEWED_DEPLOYMENT_TEST_OWNERSHIP = {
     "build-tools/tools/tests/deployments/deployment-control-plane.pending-approval.test.ts": True,
     "build-tools/tools/tests/deployments/deployment-control-plane.lock-and-queue.test.ts": True,
     "build-tools/tools/tests/deployments/deployment-control-plane.progressive-rollout.test.ts": True,
-    "build-tools/tools/tests/deployments/deployment-control-plane.redaction.test.ts": True,
+    "build-tools/tools/tests/deployments/deployment-control-plane.redaction.test.ts": True, "build-tools/tools/tests/deployments/control-plane-credentials.test.ts": True, "build-tools/tools/tests/deployments/control-plane-runtime-config.test.ts": True,
     "build-tools/tools/tests/deployments/deployment-control-plane.recovery.test.ts": True,
     "build-tools/tools/tests/deployments/deployment-control-plane.response-boundary.test.ts": True,
     "build-tools/tools/tests/deployments/deployment-control-plane.service-instance.test.ts": True,
