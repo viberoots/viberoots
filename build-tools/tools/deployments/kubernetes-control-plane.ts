@@ -10,6 +10,7 @@ import {
   type NixosSharedHostControlPlaneBackendTarget,
 } from "./nixos-shared-host-control-plane-backend";
 import { writeControlPlaneJson } from "./nixos-shared-host-control-plane-store";
+import { withFrozenProviderWorkerSecretRuntime } from "./deployment-provider-worker-secret-runtime";
 import { submitKubernetesDeploy } from "./kubernetes-deploy";
 import { submitKubernetesExactArtifactRun } from "./kubernetes-exact-run";
 import { submitKubernetesProvisionOnly } from "./kubernetes-provision-only";
@@ -80,69 +81,37 @@ export async function executeKubernetesControlPlaneSubmission(opts: {
   const runningSubmission = { ...submission, lifecycleState: "running", workerId: opts.workerId };
   try {
     await persistSubmissionStatus(runningSubmission);
-    const result =
-      snapshot.operationKind === "deploy"
-        ? await submitKubernetesDeploy({
-            workspaceRoot: snapshot.workspaceRoot,
-            deployment: snapshot.deployment,
-            recordsRoot: snapshot.recordsRoot,
-            submissionId: snapshot.submissionId,
-            ...(snapshot.componentArtifacts
-              ? { componentArtifacts: snapshot.componentArtifacts as any }
-              : {}),
-            ...(snapshot.admittedContext
-              ? { admittedContext: snapshot.admittedContext as any }
-              : {}),
-            ...(snapshot.expectedSourceRevision
-              ? { expectedSourceRevision: snapshot.expectedSourceRevision }
-              : {}),
-            ...(snapshot.preparedPublisherConfig
-              ? { preparedPublisherConfig: snapshot.preparedPublisherConfig as any }
-              : {}),
-            artifactDir: "",
-            ...(snapshot.smokeConnectOverride
-              ? { smokeConnectOverride: snapshot.smokeConnectOverride as any }
-              : {}),
-          })
-        : snapshot.operationKind === "provision_only"
-          ? await submitKubernetesProvisionOnly({
+    const result = await withFrozenProviderWorkerSecretRuntime(
+      { workspaceRoot: opts.workspaceRoot, deployment: snapshot.deployment },
+      async () =>
+        snapshot.operationKind === "deploy"
+          ? await submitKubernetesDeploy({
               workspaceRoot: snapshot.workspaceRoot,
               deployment: snapshot.deployment,
               recordsRoot: snapshot.recordsRoot,
               submissionId: snapshot.submissionId,
+              ...(snapshot.componentArtifacts
+                ? { componentArtifacts: snapshot.componentArtifacts as any }
+                : {}),
               ...(snapshot.admittedContext
                 ? { admittedContext: snapshot.admittedContext as any }
                 : {}),
               ...(snapshot.expectedSourceRevision
                 ? { expectedSourceRevision: snapshot.expectedSourceRevision }
                 : {}),
+              ...(snapshot.preparedPublisherConfig
+                ? { preparedPublisherConfig: snapshot.preparedPublisherConfig as any }
+                : {}),
+              artifactDir: "",
+              ...(snapshot.smokeConnectOverride
+                ? { smokeConnectOverride: snapshot.smokeConnectOverride as any }
+                : {}),
             })
-          : await (async () => {
-              const source = requireFrozenProviderReplaySource(snapshot, "kubernetes");
-              const operationKind =
-                snapshot.operationKind === "promotion" &&
-                source.replaySnapshot.deployment.deploymentId === snapshot.deployment.deploymentId
-                  ? "retry"
-                  : snapshot.operationKind;
-              if (operationKind === "promotion") {
-                await assertCrossDeploymentExactPromotionEligible({
-                  workspaceRoot: snapshot.workspaceRoot,
-                  deployment: snapshot.deployment,
-                  recordsRoot: snapshot.recordsRoot,
-                  backendDatabaseUrl: opts.backend.databaseUrl,
-                  source,
-                });
-              }
-              return await submitKubernetesExactArtifactRun({
+          : snapshot.operationKind === "provision_only"
+            ? await submitKubernetesProvisionOnly({
                 workspaceRoot: snapshot.workspaceRoot,
                 deployment: snapshot.deployment,
                 recordsRoot: snapshot.recordsRoot,
-                operationKind,
-                componentArtifacts: source.replaySnapshot.componentArtifacts,
-                sourceRecord: source.record,
-                parentRunId: snapshot.parentRunId as string,
-                releaseLineageId: snapshot.releaseLineageId as string,
-                artifactLineageId: snapshot.artifactLineageId as string,
                 submissionId: snapshot.submissionId,
                 ...(snapshot.admittedContext
                   ? { admittedContext: snapshot.admittedContext as any }
@@ -150,14 +119,49 @@ export async function executeKubernetesControlPlaneSubmission(opts: {
                 ...(snapshot.expectedSourceRevision
                   ? { expectedSourceRevision: snapshot.expectedSourceRevision }
                   : {}),
-                ...(snapshot.preparedPublisherConfig
-                  ? { preparedPublisherConfig: snapshot.preparedPublisherConfig as any }
-                  : {}),
-                ...(snapshot.smokeConnectOverride
-                  ? { smokeConnectOverride: snapshot.smokeConnectOverride as any }
-                  : {}),
-              });
-            })();
+              })
+            : await (async () => {
+                const source = requireFrozenProviderReplaySource(snapshot, "kubernetes");
+                const operationKind =
+                  snapshot.operationKind === "promotion" &&
+                  source.replaySnapshot.deployment.deploymentId === snapshot.deployment.deploymentId
+                    ? "retry"
+                    : snapshot.operationKind;
+                if (operationKind === "promotion") {
+                  await assertCrossDeploymentExactPromotionEligible({
+                    workspaceRoot: snapshot.workspaceRoot,
+                    deployment: snapshot.deployment,
+                    recordsRoot: snapshot.recordsRoot,
+                    backendDatabaseUrl: opts.backend.databaseUrl,
+                    source,
+                  });
+                }
+                return await submitKubernetesExactArtifactRun({
+                  workspaceRoot: snapshot.workspaceRoot,
+                  deployment: snapshot.deployment,
+                  recordsRoot: snapshot.recordsRoot,
+                  operationKind,
+                  componentArtifacts: source.replaySnapshot.componentArtifacts,
+                  sourceRecord: source.record,
+                  parentRunId: snapshot.parentRunId as string,
+                  releaseLineageId: snapshot.releaseLineageId as string,
+                  artifactLineageId: snapshot.artifactLineageId as string,
+                  submissionId: snapshot.submissionId,
+                  ...(snapshot.admittedContext
+                    ? { admittedContext: snapshot.admittedContext as any }
+                    : {}),
+                  ...(snapshot.expectedSourceRevision
+                    ? { expectedSourceRevision: snapshot.expectedSourceRevision }
+                    : {}),
+                  ...(snapshot.preparedPublisherConfig
+                    ? { preparedPublisherConfig: snapshot.preparedPublisherConfig as any }
+                    : {}),
+                  ...(snapshot.smokeConnectOverride
+                    ? { smokeConnectOverride: snapshot.smokeConnectOverride as any }
+                    : {}),
+                });
+              })(),
+    );
     result.record.controlPlane = {
       submissionId: snapshot.submissionId,
       workerId: opts.workerId,

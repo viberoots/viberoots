@@ -3,6 +3,8 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { resolveCloudflarePagesAdmittedSecretReferences } from "../../deployments/cloudflare-pages-admission";
 import type { CloudflarePagesDeployment } from "../../deployments/contract";
+import type { DeploymentSecretContext } from "../../deployments/deployment-secret-context";
+import { withWorkerDeploymentSecretRuntime } from "../../deployments/deployment-secret-runtime-worker";
 import type { DeploymentSecretAdmittedReference } from "../../deployments/deployment-sprinkle-ref";
 import { resolveNixosSharedHostAdmittedSecretReferences } from "../../deployments/nixos-shared-host-admission-helpers";
 import { cloudflarePagesDeploymentFixture } from "./cloudflare-pages.fixture";
@@ -22,6 +24,19 @@ function cloudflareDeployment(siteUrl: string): CloudflarePagesDeployment {
     ...cloudflarePagesDeploymentFixture({ secretRequirements: [infisicalRequirement] }),
     secretBackend: "infisical",
     infisicalRuntime: { ...infisicalRuntime, siteUrl },
+  };
+}
+
+function workerCloudflareDeployment(siteUrl: string): CloudflarePagesDeployment {
+  return {
+    ...cloudflareDeployment(siteUrl),
+    infisicalRuntime: {
+      ...infisicalRuntime,
+      siteUrl,
+      preferredCredentialSource: "machine_identity_universal_auth",
+      machineIdentityClientIdEnv: "VBR_TEST_INFISICAL_CLIENT_ID",
+      machineIdentityClientSecretEnv: "VBR_TEST_INFISICAL_CLIENT_SECRET",
+    },
   };
 }
 
@@ -77,6 +92,42 @@ test("cloudflare deferred worker initial and promotion admission resolves target
       assert.equal(admitted.length, 1);
       assert.equal(admitted[0]?.backend, "infisical");
       assert.match(admitted[0]?.referenceId || "", /^infisical:/);
+    }
+  } finally {
+    await server.close();
+  }
+});
+
+test("worker secret runtime activates server-local Infisical context only during execution", async () => {
+  const server = await startFakeInfisicalServer(
+    { clientId: "worker-id", clientSecret: "worker-secret", accessToken: "worker-token" },
+    [infisicalSecret()],
+  );
+  let activatedContext: DeploymentSecretContext | undefined;
+  try {
+    const admitted = await withWorkerDeploymentSecretRuntime(
+      {
+        workspaceRoot: process.cwd(),
+        deployment: workerCloudflareDeployment(server.siteUrl),
+        env: {
+          VBR_TEST_INFISICAL_CLIENT_ID: "worker-id",
+          VBR_TEST_INFISICAL_CLIENT_SECRET: "worker-secret",
+        },
+      },
+      async (runtime) => {
+        activatedContext = runtime.secretContext;
+        return await resolveCloudflarePagesAdmittedSecretReferences({
+          deployment: workerCloudflareDeployment(server.siteUrl),
+          admittedContext: deferredContext("reviewed_source_ref"),
+        });
+      },
+    );
+    assert.equal(admitted[0]?.backend, "infisical");
+    assert.match(admitted[0]?.referenceId || "", /^infisical:/);
+    assert.equal(activatedContext?.kind, "infisical");
+    if (activatedContext?.kind === "infisical") {
+      assert.equal(activatedContext.credential.kind, "universal_auth");
+      assert.equal(activatedContext.credential.clientSecret, "");
     }
   } finally {
     await server.close();

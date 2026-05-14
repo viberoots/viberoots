@@ -22,7 +22,10 @@ import { pushS3StaticComponentKindErrors } from "./s3-static-capability-validati
 import { prepareS3StaticPublisherConfig } from "./s3-static-config";
 import { pushVercelComponentKindErrors } from "./vercel-capability-validation";
 import { prepareVercelPublisherConfig } from "./vercel-config";
-import { appTargetBoundaryErrors } from "./deployment-boundary-checks";
+import {
+  appTargetBoundaryErrors,
+  providerInfisicalImportBoundaryErrors,
+} from "./deployment-boundary-checks";
 import { ambientProviderEnvBypassErrors } from "./external-deployment-requirements";
 import { protectedDeploymentPlaceholderErrors } from "./deployment-placeholder-validation";
 import { readOpenTofuResolvedPlan } from "./opentofu-stack";
@@ -227,6 +230,7 @@ export async function validateRepoFrontDoorDeployment(
     errors.push(`deployment target not found: ${deployment.label}`);
   }
   errors.push(...appTargetBoundaryErrors(Array.from(nodeMap.values())));
+  errors.push(...providerInfisicalImportBoundaryErrors(Array.from(nodeMap.values())));
   errors.push(
     ...ambientProviderEnvBypassErrors({
       label: deployment.label,

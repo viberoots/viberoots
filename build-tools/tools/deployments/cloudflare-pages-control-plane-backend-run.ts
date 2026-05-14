@@ -12,9 +12,9 @@ import { sanitizedBackendRecord } from "./cloudflare-pages-control-plane-backend
 // prettier-ignore
 import { persistCloudflareBackendStatus, type CloudflareBackendSubmissionLike } from "./cloudflare-pages-control-plane-backend-status";
 import { executeCloudflarePagesBackendPreviewCleanup } from "./cloudflare-pages-control-plane-backend-preview-cleanup";
-import { prepareWorkerDeploymentVaultRuntime } from "./deployment-vault-runtime-worker";
+// prettier-ignore
+import { cleanupWorkerDeploymentSecretRuntime, prepareWorkerDeploymentSecretRuntime } from "./deployment-secret-runtime-worker";
 import { activateDeploymentSecretContext } from "./deployment-secret-context";
-import { cleanupDeploymentVaultRuntime } from "./deployment-vault-runtime";
 import {
   cloudflareBackendTimeouts,
   persistCloudflareBackendStep,
@@ -79,7 +79,7 @@ export async function executeCloudflarePagesBackendSubmission(opts: {
         "vault",
         timeouts.vaultMs,
         async () =>
-          await prepareWorkerDeploymentVaultRuntime({
+          await prepareWorkerDeploymentSecretRuntime({
             workspaceRoot: opts.workspaceRoot,
             deployment: snapshot.deployment,
             timeoutMs: timeouts.vaultMs,
@@ -187,7 +187,7 @@ export async function executeCloudflarePagesBackendSubmission(opts: {
                 })();
         } finally {
           restoreSecretContext();
-          await cleanupDeploymentVaultRuntime(runtime);
+          await cleanupWorkerDeploymentSecretRuntime(runtime);
         }
       })();
       await writeBackendDeployRecordDoc(

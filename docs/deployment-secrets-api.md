@@ -977,13 +977,16 @@ device/print-only behavior on SSH/headless sessions.
 
 Local/direct deploys derive the Vault role and bound claims from the selected
 deployment and its `vault_runtime` metadata, then create a typed context containing the Vault address.
-Protected service-backed deploys use a different boundary: the submitter's PKCE/device session
-authorizes the request, while the `mini` worker reads non-secret Vault runtime metadata from the
-execution snapshot and obtains a server-local workload credential immediately
-before provider execution. The workload JWT and returned Vault token stay in
-worker memory for the deployment run; normal deploys do not write JWT files or
-set `VBR_VAULT_JWT`, `VBR_VAULT_JWT_FILE`, `VBR_VAULT_AUTH_METHOD`,
-`VBR_VAULT_JWT_ROLE`, or `VAULT_TOKEN` in `process.env`.
+Protected service-backed deploys use a different boundary: the submitter's
+PKCE/device session authorizes the request, while the `mini` worker reads
+non-secret Vault or Infisical runtime metadata from the execution snapshot and
+obtains a server-local workload credential immediately before provider
+execution. Vault workload JWTs, Vault tokens, Infisical Universal Auth client
+secrets, and Infisical access tokens stay in worker memory for the deployment
+run; normal deploys do not write JWT files, Infisical token files, or set
+`VBR_VAULT_JWT`, `VBR_VAULT_JWT_FILE`, `VBR_VAULT_AUTH_METHOD`,
+`VBR_VAULT_JWT_ROLE`, `VAULT_TOKEN`, `INFISICAL_TOKEN`, or
+`INFISICAL_ACCESS_TOKEN` in `process.env`.
 
 Local development, isolated tests, and explicit bootstrap-oriented workflows
 can intentionally override the local/direct runtime path with the reviewed

@@ -10,6 +10,7 @@ import {
   type NixosSharedHostControlPlaneBackendTarget,
 } from "./nixos-shared-host-control-plane-backend";
 import { writeControlPlaneJson } from "./nixos-shared-host-control-plane-store";
+import { withFrozenProviderWorkerSecretRuntime } from "./deployment-provider-worker-secret-runtime";
 import { submitS3StaticDeploy } from "./s3-static-deploy";
 import { submitS3StaticExactArtifactRun } from "./s3-static-exact-run";
 import { submitS3StaticProvisionOnly } from "./s3-static-provision-only";
@@ -79,64 +80,32 @@ export async function executeS3StaticControlPlaneSubmission(opts: {
   const runningSubmission = { ...submission, lifecycleState: "running", workerId: opts.workerId };
   try {
     await persistSubmissionStatus(runningSubmission);
-    const result =
-      snapshot.operationKind === "deploy"
-        ? await submitS3StaticDeploy({
-            workspaceRoot: snapshot.workspaceRoot,
-            deployment: snapshot.deployment,
-            artifactDir: "",
-            ...(snapshot.artifact ? { artifact: snapshot.artifact } : {}),
-            ...(snapshot.admittedContext
-              ? { admittedContext: snapshot.admittedContext as any }
-              : {}),
-            recordsRoot: snapshot.recordsRoot,
-            submissionId: snapshot.submissionId,
-            ...(snapshot.expectedSourceRevision
-              ? { expectedSourceRevision: snapshot.expectedSourceRevision }
-              : {}),
-            ...(snapshot.smokeConnectOverride
-              ? { smokeConnectOverride: snapshot.smokeConnectOverride as any }
-              : {}),
-          })
-        : snapshot.operationKind === "provision_only"
-          ? await submitS3StaticProvisionOnly({
+    const result = await withFrozenProviderWorkerSecretRuntime(
+      { workspaceRoot: opts.workspaceRoot, deployment: snapshot.deployment },
+      async () =>
+        snapshot.operationKind === "deploy"
+          ? await submitS3StaticDeploy({
               workspaceRoot: snapshot.workspaceRoot,
               deployment: snapshot.deployment,
-              recordsRoot: snapshot.recordsRoot,
-              submissionId: snapshot.submissionId,
+              artifactDir: "",
+              ...(snapshot.artifact ? { artifact: snapshot.artifact } : {}),
               ...(snapshot.admittedContext
                 ? { admittedContext: snapshot.admittedContext as any }
                 : {}),
+              recordsRoot: snapshot.recordsRoot,
+              submissionId: snapshot.submissionId,
               ...(snapshot.expectedSourceRevision
                 ? { expectedSourceRevision: snapshot.expectedSourceRevision }
                 : {}),
+              ...(snapshot.smokeConnectOverride
+                ? { smokeConnectOverride: snapshot.smokeConnectOverride as any }
+                : {}),
             })
-          : await (async () => {
-              const source = requireFrozenProviderReplaySource(snapshot, "s3-static");
-              const operationKind =
-                snapshot.operationKind === "promotion" &&
-                source.replaySnapshot.deployment.deploymentId === snapshot.deployment.deploymentId
-                  ? "retry"
-                  : snapshot.operationKind;
-              if (operationKind === "promotion") {
-                await assertCrossDeploymentExactPromotionEligible({
-                  workspaceRoot: snapshot.workspaceRoot,
-                  deployment: snapshot.deployment,
-                  recordsRoot: snapshot.recordsRoot,
-                  backendDatabaseUrl: opts.backend.databaseUrl,
-                  source,
-                });
-              }
-              return await submitS3StaticExactArtifactRun({
+          : snapshot.operationKind === "provision_only"
+            ? await submitS3StaticProvisionOnly({
                 workspaceRoot: snapshot.workspaceRoot,
                 deployment: snapshot.deployment,
                 recordsRoot: snapshot.recordsRoot,
-                operationKind,
-                artifact: source.replaySnapshot.artifact,
-                sourceRecord: source.record,
-                parentRunId: snapshot.parentRunId as string,
-                releaseLineageId: snapshot.releaseLineageId as string,
-                artifactLineageId: snapshot.artifactLineageId as string,
                 submissionId: snapshot.submissionId,
                 ...(snapshot.admittedContext
                   ? { admittedContext: snapshot.admittedContext as any }
@@ -144,11 +113,46 @@ export async function executeS3StaticControlPlaneSubmission(opts: {
                 ...(snapshot.expectedSourceRevision
                   ? { expectedSourceRevision: snapshot.expectedSourceRevision }
                   : {}),
-                ...(snapshot.smokeConnectOverride
-                  ? { smokeConnectOverride: snapshot.smokeConnectOverride as any }
-                  : {}),
-              });
-            })();
+              })
+            : await (async () => {
+                const source = requireFrozenProviderReplaySource(snapshot, "s3-static");
+                const operationKind =
+                  snapshot.operationKind === "promotion" &&
+                  source.replaySnapshot.deployment.deploymentId === snapshot.deployment.deploymentId
+                    ? "retry"
+                    : snapshot.operationKind;
+                if (operationKind === "promotion") {
+                  await assertCrossDeploymentExactPromotionEligible({
+                    workspaceRoot: snapshot.workspaceRoot,
+                    deployment: snapshot.deployment,
+                    recordsRoot: snapshot.recordsRoot,
+                    backendDatabaseUrl: opts.backend.databaseUrl,
+                    source,
+                  });
+                }
+                return await submitS3StaticExactArtifactRun({
+                  workspaceRoot: snapshot.workspaceRoot,
+                  deployment: snapshot.deployment,
+                  recordsRoot: snapshot.recordsRoot,
+                  operationKind,
+                  artifact: source.replaySnapshot.artifact,
+                  sourceRecord: source.record,
+                  parentRunId: snapshot.parentRunId as string,
+                  releaseLineageId: snapshot.releaseLineageId as string,
+                  artifactLineageId: snapshot.artifactLineageId as string,
+                  submissionId: snapshot.submissionId,
+                  ...(snapshot.admittedContext
+                    ? { admittedContext: snapshot.admittedContext as any }
+                    : {}),
+                  ...(snapshot.expectedSourceRevision
+                    ? { expectedSourceRevision: snapshot.expectedSourceRevision }
+                    : {}),
+                  ...(snapshot.smokeConnectOverride
+                    ? { smokeConnectOverride: snapshot.smokeConnectOverride as any }
+                    : {}),
+                });
+              })(),
+    );
     result.record.controlPlane = {
       submissionId: snapshot.submissionId,
       workerId: opts.workerId,

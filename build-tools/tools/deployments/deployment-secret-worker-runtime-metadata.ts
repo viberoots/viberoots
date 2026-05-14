@@ -4,8 +4,10 @@ import { workerInfisicalRuntimeMetadata } from "./deployment-secret-infisical-ru
 import { workerVaultRuntimeMetadata } from "./deployment-vault-runtime-worker";
 
 export function workerSecretRuntimeMetadata(opts: { deployment: DeploymentTarget }) {
-  const vaultRuntime = workerVaultRuntimeMetadata(opts);
-  const infisicalRuntime = workerInfisicalRuntimeMetadata(opts);
+  const backend = opts.deployment.secretBackend || "vault";
+  const vaultRuntime = backend === "vault" ? workerVaultRuntimeMetadata(opts) : undefined;
+  const infisicalRuntime =
+    backend === "infisical" ? workerInfisicalRuntimeMetadata(opts) : undefined;
   return {
     ...(vaultRuntime ? { vaultRuntime } : {}),
     ...(infisicalRuntime ? { infisicalRuntime } : {}),

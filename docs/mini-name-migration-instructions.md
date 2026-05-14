@@ -292,6 +292,42 @@ Success signals:
 - `server status` on `mini` continues to report `managed: true`,
   `wiringState: wired`
 
+### C1. Infisical-backed deployment readiness
+
+Before switching a protected/shared deployment to `secret_backend = "infisical"`,
+confirm the migrated control-plane path can carry Infisical worker metadata
+without moving secret material into the profile or records:
+
+1. keep `infisical_runtime` in `TARGETS` limited to non-secret routing data and
+   reviewed environment variable names
+2. set the matching Universal Auth values only in the worker's host-local
+   service environment, for example:
+
+   ```bash
+   export VBR_MINI_INFISICAL_CLIENT_ID='...'
+   export VBR_MINI_INFISICAL_CLIENT_SECRET='...'
+   ```
+
+3. restart the worker after changing the environment
+4. run a plan or admit-only check for the Infisical-backed target through the
+   regenerated profile:
+
+   ```bash
+   direnv exec . build-tools/tools/bin/deploy \
+     --deployment //projects/deployments/pleomino-dev:deploy \
+     --profile mini \
+     --admit-only
+   ```
+
+5. verify the execution snapshot contains `infisicalRuntime` with the reviewed
+   env variable names, but does not contain the Universal Auth client secret,
+   an Infisical access token, or `INFISICAL_TOKEN`
+
+This post-check proves the upgraded control-plane metadata points at
+`viberoots/viberoots`, the service identity is the current `viberoots` service
+path, and the worker secret-context wiring can activate Infisical from
+server-local credentials after the pre-`viberoots` migration.
+
 ## Rollback
 
 If A5 or A6 fails:

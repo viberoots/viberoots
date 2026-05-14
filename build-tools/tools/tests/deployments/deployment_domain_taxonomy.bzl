@@ -1,6 +1,6 @@
 REVIEWED_DEPLOYMENT_TEST_OWNERSHIP = {
     "build-tools/tools/tests/deployments/cloudflare-containers.contract.test.ts": True, "build-tools/tools/tests/deployments/cloudflare-containers.routing-smoke.test.ts": True, "build-tools/tools/tests/deployments/cloudflare-containers.validation.test.ts": True, "build-tools/tools/tests/deployments/deployment-domain.labels.cquery.test.ts": True, "build-tools/tools/tests/deployments/deployment-domain.file-size-lint.test.ts": True, "build-tools/tools/tests/deployments/deployment-domain.taxonomy-drift.test.ts": True, "build-tools/tools/tests/deployments/deployment-family-composition.cquery.test.ts": True,
-    "build-tools/tools/tests/deployments/deployment-query-helpers.test.ts": True, "build-tools/tools/tests/deployments/deployment-docs.front-door-parity.test.ts": True, "build-tools/tools/tests/deployments/stale-environment-branch.enforcement.test.ts": True,
+    "build-tools/tools/tests/deployments/deployment-query-helpers.test.ts": True, "build-tools/tools/tests/deployments/deployment-docs.front-door-parity.test.ts": True, "build-tools/tools/tests/deployments/deployment-docs.infisical-mini-parity.test.ts": True, "build-tools/tools/tests/deployments/stale-environment-branch.enforcement.test.ts": True,
     "build-tools/tools/tests/deployments/deployment-control-plane.separated-roles.docs.test.ts": True,
     "build-tools/tools/tests/deployments/deployment-auth-session.keycloak-claim-grant-mapping.docs.test.ts": True,
     "build-tools/tools/tests/deployments/deployment-control-plane.admission-requirement-discovery.docs.test.ts": True,
@@ -106,7 +106,7 @@ REVIEWED_DEPLOYMENT_TEST_OWNERSHIP = {
     "build-tools/tools/tests/deployments/cloudflare-pages.control-plane.service.test.ts": True,
     "build-tools/tools/tests/deployments/deployment-targets.install.cloudflare.test.ts": True,
     "build-tools/tools/tests/deployments/deployment-targets.install.fragments.no-inherited-kill.test.ts": True,
-    "build-tools/tools/tests/deployments/cloudflare-pages.deploy.e2e.test.ts": True, "build-tools/tools/tests/deployments/cloudflare-pages.infisical-admission-records.test.ts": True,
+    "build-tools/tools/tests/deployments/cloudflare-pages.deploy.e2e.test.ts": True, "build-tools/tools/tests/deployments/cloudflare-pages.infisical-admission-records.test.ts": True, "build-tools/tools/tests/deployments/cloudflare-pages.secret-runtime-lifecycle.helpers.ts": False, "build-tools/tools/tests/deployments/cloudflare-pages.secret-runtime-lifecycle.test.ts": True,
     "build-tools/tools/tests/deployments/cloudflare-pages-static-smoke.test.ts": True,
     "build-tools/tools/tests/deployments/cloudflare-pages.publisher-error.test.ts": True,
     "build-tools/tools/tests/deployments/cloudflare-pages.timeout.test.ts": True,

@@ -4,6 +4,7 @@ import { test } from "node:test";
 import {
   appTargetBoundaryErrors,
   mcpSourceResponseBoundaryErrors,
+  providerInfisicalImportBoundaryErrors,
 } from "../../deployments/deployment-boundary-checks";
 
 test("app target boundary rejects imports from another app target", () => {
@@ -37,4 +38,24 @@ test("MCP source response boundary rejects forbidden forensic fields", () => {
     metadata: { rawForensics: ["trace"], title: "redacted source" },
   });
   assert.deepEqual(errors, ["MCP source response exposes forbidden field metadata.rawForensics"]);
+});
+
+test("provider boundary rejects direct Infisical adapter imports", () => {
+  const errors = providerInfisicalImportBoundaryErrors([
+    {
+      name: "//build-tools/tools/deployments:cloudflare-pages-static-deploy",
+      deps: ["//build-tools/tools/deployments:deployment-secret-infisical"],
+    },
+    {
+      name: "//build-tools/tools/deployments:deployment-secret-backend-registry",
+      deps: ["//build-tools/tools/deployments:deployment-secret-infisical"],
+    },
+    {
+      name: "//build-tools/tools/deployments:kubernetes-publisher",
+      deps: ["//build-tools/tools/deployments:deployment-secret-runtime-helpers"],
+    },
+  ]);
+  assert.deepEqual(errors, [
+    "//build-tools/tools/deployments:cloudflare-pages-static-deploy: provider code must not import //build-tools/tools/deployments:deployment-secret-infisical directly",
+  ]);
 });

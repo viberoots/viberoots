@@ -9,6 +9,7 @@ import {
   type NixosSharedHostControlPlaneBackendTarget,
 } from "./nixos-shared-host-control-plane-backend";
 import { writeControlPlaneJson } from "./nixos-shared-host-control-plane-store";
+import { withFrozenProviderWorkerSecretRuntime } from "./deployment-provider-worker-secret-runtime";
 import { submitVercelDeploy, submitVercelPreviewCleanup } from "./vercel-deploy";
 import { submitVercelExactArtifactRun } from "./vercel-exact-run";
 import type { VercelApiClient } from "./vercel-api";
@@ -85,11 +86,15 @@ export async function executeVercelControlPlaneSubmission(opts: {
   const runningSubmission = { ...submission, lifecycleState: "running", workerId: opts.workerId };
   try {
     await persistSubmissionStatus(runningSubmission);
-    const result = await runVercelOperation({
-      workerId: opts.workerId,
-      snapshot,
-      ...(opts.apiClient ? { apiClient: opts.apiClient } : {}),
-    });
+    const result = await withFrozenProviderWorkerSecretRuntime(
+      { workspaceRoot: opts.workspaceRoot, deployment: snapshot.deployment },
+      async () =>
+        await runVercelOperation({
+          workerId: opts.workerId,
+          snapshot,
+          ...(opts.apiClient ? { apiClient: opts.apiClient } : {}),
+        }),
+    );
     result.record.controlPlane = {
       submissionId: snapshot.submissionId,
       workerId: opts.workerId,

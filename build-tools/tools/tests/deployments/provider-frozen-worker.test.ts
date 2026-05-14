@@ -4,6 +4,7 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
 import { buildVercelControlPlaneSnapshot } from "../../deployments/vercel-control-plane-snapshot";
+import { activateDeploymentSecretContext } from "../../deployments/deployment-secret-context";
 import { executeKubernetesControlPlaneSubmission } from "../../deployments/kubernetes-control-plane";
 import { executeS3StaticControlPlaneSubmission } from "../../deployments/s3-static-control-plane";
 import {
@@ -18,7 +19,12 @@ import { s3StaticDeploymentFixture } from "./s3-static.fixture";
 import { vercelDeploymentFixture } from "./vercel.fixture";
 import { reviewedLaneAdmissionEvidenceFixture } from "./deployment-lane-governance.fixture";
 import {
-  withVercelFixtureSecrets,
+  infisicalRuntime,
+  infisicalSecret,
+  infisicalTestContext,
+} from "./deployment-secret-infisical.fixture";
+import { startFakeInfisicalServer } from "./infisical.test-server";
+import {
   withVercelSmokeServer,
   writeVercelArtifact,
   writeVercelPublisherConfig,
@@ -34,21 +40,40 @@ test("provider workers execute from frozen snapshot artifact and secret referenc
   await runInTemp("provider-frozen-worker-executes", async (tmp, $) => {
     const recordsRoot = path.join(tmp, "records");
     await writeVercelPublisherConfig(tmp);
-    const vercel = vercelDeploymentWithSecrets();
+    const server = await startFakeInfisicalServer(
+      [
+        { clientId: "id", clientSecret: "server-local-secret", accessToken: "admission-token" },
+        { clientId: "vercel-worker", clientSecret: "server-local-secret", accessToken: "token" },
+      ],
+      [infisicalSecret({ secretName: "api-token", secretValue: "token" })],
+    );
+    const vercel = {
+      ...vercelDeploymentWithSecrets(),
+      secretBackend: "infisical" as const,
+      infisicalRuntime: {
+        ...infisicalRuntime,
+        siteUrl: server.siteUrl,
+        preferredCredentialSource: "machine_identity_universal_auth" as const,
+        machineIdentityClientIdEnv: "VBR_VERCEL_INFISICAL_CLIENT_ID",
+        machineIdentityClientSecretEnv: "VBR_VERCEL_INFISICAL_CLIENT_SECRET",
+      },
+    };
     const apiClient = createFakeVercelApiClient();
     await ensureNixosSharedHostReviewedSourceRef(tmp, $, vercel);
-    await withVercelFixtureSecrets(
-      {
-        "vercel/api-token": {
-          value: "token",
-          allowedSteps: ["publish", "smoke"],
-          targetScopes: ["*"],
-        },
-      },
-      async () =>
-        await withVercelSmokeServer(async (smokeConnectOverride) => {
-          const artifactDir = await writeVercelArtifact(path.join(tmp, "vercel-worker-artifact"));
-          const snapshot = await buildVercelControlPlaneSnapshot({
+    const originalEnv = { ...process.env };
+    Object.assign(process.env, {
+      VBR_VERCEL_INFISICAL_CLIENT_ID: "vercel-worker",
+      VBR_VERCEL_INFISICAL_CLIENT_SECRET: "server-local-secret",
+    });
+    try {
+      await withVercelSmokeServer(async (smokeConnectOverride) => {
+        const artifactDir = await writeVercelArtifact(path.join(tmp, "vercel-worker-artifact"));
+        const restoreAdmissionContext = activateDeploymentSecretContext(
+          infisicalTestContext(server.siteUrl, { clientSecret: "server-local-secret" }),
+        );
+        let snapshot: Awaited<ReturnType<typeof buildVercelControlPlaneSnapshot>>;
+        try {
+          snapshot = await buildVercelControlPlaneSnapshot({
             workspaceRoot: tmp,
             recordsRoot,
             request: {
@@ -62,17 +87,23 @@ test("provider workers execute from frozen snapshot artifact and secret referenc
               smokeConnectOverride,
             },
           });
-          await fsp.rm(artifactDir, { recursive: true, force: true });
-          await executeFrozenProviderSnapshot({
-            tmp,
-            recordsRoot,
-            provider: "vercel",
-            execute: executeVercelControlPlaneSubmission,
-            snapshot,
-            apiClient,
-          });
-        }),
-    );
+        } finally {
+          restoreAdmissionContext();
+        }
+        await fsp.rm(artifactDir, { recursive: true, force: true });
+        await executeFrozenProviderSnapshot({
+          tmp,
+          recordsRoot,
+          provider: "vercel",
+          execute: executeVercelControlPlaneSubmission,
+          snapshot,
+          apiClient,
+        });
+      });
+    } finally {
+      process.env = originalEnv;
+      await server.close();
+    }
   });
 });
 

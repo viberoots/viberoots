@@ -57,6 +57,15 @@ export async function executeFrozenProviderSnapshot(opts: {
   });
 }
 
+export async function executeFrozenProviderSnapshotAndReadSubmission(
+  opts: Parameters<typeof executeFrozenProviderSnapshot>[0],
+) {
+  await executeFrozenProviderSnapshot(opts);
+  return JSON.parse(
+    await fsp.readFile(path.join(opts.recordsRoot, `${opts.provider}-submission.json`), "utf8"),
+  );
+}
+
 export function frozenPolicy(fingerprint: string) {
   return { binding: { payloadFingerprint: fingerprint } };
 }

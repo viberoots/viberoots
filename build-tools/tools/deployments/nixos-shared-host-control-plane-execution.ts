@@ -10,7 +10,7 @@ import {
 } from "./nixos-shared-host-control-plane-store";
 import { nixosSharedHostLockScopes } from "./nixos-shared-host-components";
 import type { NixosSharedHostDeployRecord } from "./nixos-shared-host-records";
-import { withWorkerDeploymentVaultRuntime } from "./deployment-vault-runtime-worker";
+import { withWorkerDeploymentSecretRuntime } from "./deployment-secret-runtime-worker";
 import { resolveNixosSharedHostAdmittedSecretReferences } from "./nixos-shared-host-admission-helpers";
 import type { DeploymentSecretContext } from "./deployment-secret-context";
 
@@ -56,7 +56,7 @@ export async function runNixosSharedHostControlPlaneWorker(opts: {
     executionSnapshotPath: opts.recordExecutionSnapshotPath || opts.executionSnapshotPath,
   };
   return snapshot.action.kind === "deploy"
-    ? await withWorkerDeploymentVaultRuntime(
+    ? await withWorkerDeploymentSecretRuntime(
         { workspaceRoot: opts.workspaceRoot || process.cwd(), deployment: snapshot.deployment },
         async (runtime) => {
           await resolveWorkerAdmittedSecrets({

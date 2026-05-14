@@ -9,6 +9,19 @@ const FORBIDDEN_SOURCE_RESPONSE_FIELDS = new Set([
   "internalTrace",
 ]);
 
+const PROVIDER_DIRECT_INFISICAL_IMPORT =
+  /(^|\/)(cloudflare|kubernetes|nixos-shared-host|s3-static|vercel|opentofu|app-store-connect|google-play)(-|$)/;
+
+const INFISICAL_RUNTIME_ALLOWED = new Set([
+  "deployment-secret-admission",
+  "deployment-secret-backend-registry",
+  "deployment-secret-context",
+  "deployment-secret-infisical",
+  "deployment-secret-infisical-client",
+  "deployment-secret-runtime-worker",
+  "deployment-secret-worker-runtime-metadata",
+]);
+
 export function appTargetBoundaryErrors(nodes: GraphNode[]): string[] {
   const appNodes = nodes
     .map((node) => ({ node, label: normalizeTargetLabel(String(node.name || "")) }))
@@ -33,6 +46,21 @@ export function mcpSourceResponseBoundaryErrors(responseShape: unknown): string[
   return errors;
 }
 
+export function providerInfisicalImportBoundaryErrors(nodes: GraphNode[]): string[] {
+  const errors: string[] = [];
+  for (const node of nodes) {
+    const label = normalizeTargetLabel(String(node.name || ""));
+    if (!isProviderOwnedDeploymentModule(label)) continue;
+    for (const dep of dependencyLabels(node)) {
+      const normalizedDep = normalizeTargetLabel(dep);
+      if (isDirectInfisicalModule(normalizedDep)) {
+        errors.push(`${label}: provider code must not import ${normalizedDep} directly`);
+      }
+    }
+  }
+  return errors.sort();
+}
+
 function dependencyLabels(node: GraphNode): string[] {
   const deps = Array.isArray(node.deps) ? node.deps : [];
   return deps
@@ -55,6 +83,21 @@ function appRoot(label: string): string {
   return parts.length >= 5 && parts[0] === "" && parts[2] === "projects" && parts[3] === "apps"
     ? `//projects/apps/${parts[4].split(":")[0]}`
     : "";
+}
+
+function moduleName(label: string): string {
+  return label.split(":").pop() || "";
+}
+
+function isProviderOwnedDeploymentModule(label: string): boolean {
+  if (!label.startsWith("//build-tools/tools/deployments:")) return false;
+  if (!PROVIDER_DIRECT_INFISICAL_IMPORT.test(moduleName(label))) return false;
+  return !INFISICAL_RUNTIME_ALLOWED.has(moduleName(label));
+}
+
+function isDirectInfisicalModule(label: string): boolean {
+  if (!label.startsWith("//build-tools/tools/deployments:")) return false;
+  return moduleName(label).startsWith("deployment-secret-infisical");
 }
 
 function visitShape(value: unknown, path: string[], errors: string[]) {

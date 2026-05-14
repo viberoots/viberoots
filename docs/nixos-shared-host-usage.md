@@ -105,11 +105,16 @@ The current supported path includes:
 You do not need to read design docs, inspect internal JSON files, or pass
 deployment-service flags directly to the remote wrapper commands.
 
-## Vault For `mini`
+## Deployment Secrets For `mini`
 
-If your `mini` deployments use deployment secrets, the canonical Vault setup
-instructions live in
-[Vault Production Bootstrap Runbook](vault-production-bootstrap.md).
+If your `mini` deployments use deployment secrets, Vault remains the default
+backend and its canonical setup instructions live in
+[Vault Production Bootstrap Runbook](vault-production-bootstrap.md). Deployments
+may also select Infisical with `secret_backend = "infisical"` after the
+deployment service and worker are on the current `viberoots` control-plane
+shape. The worker reads only non-secret `infisical_runtime` routing metadata
+from the execution snapshot and resolves the Universal Auth client id and client
+secret from server-local environment variables on `mini`.
 
 If you want `mini` itself to run the local services, the reviewed importable
 starting modules live here:
@@ -162,9 +167,10 @@ Use that runbook when you need to:
 - write the deployment secrets themselves
 - export a reviewed secret fixture for local/test/bootstrap workflows
 
-This shared-host usage guide does not replace the Vault runbook. It tells you
-how to bring up and use `mini`; the Vault runbook tells you how to bring up the
-secret backend that `mini`-targeted deployments can consume.
+This shared-host usage guide does not replace the Vault runbook or the
+Infisical project setup done outside this repo. It tells you how to bring up and
+use `mini`; those backend-specific runbooks tell you how to bring up the secret
+backends that `mini`-targeted deployments can consume.
 
 ## Install The Reviewed Client Profile
 
@@ -396,9 +402,13 @@ same reviewed host-apply preflight and dry-run/switch helper the ordinary
 remote deploy path uses. Keep those files gitignored; the identity-provider
 module bootstraps missing files and reconciles the live persisted realm during
 host reconciliation instead of expecting flake-visible tracked paths. That
-reviewed migration path is the same for fresh installs and existing persisted
-realms, so `deploy admin identity ...` remains the steady-state human operator
-path after login is aligned. On this happy path, the reviewed login session
+reviewed migration path is the same for fresh installs, existing persisted
+realms, and hosts migrating from the pre-`viberoots` control-plane identity. Run
+it before enabling Infisical-backed protected/shared deployments through
+`--profile mini`, so the current deployment service identity owns the reviewed
+worker boundary and server-local Infisical credential references. After login is
+aligned, `deploy admin identity ...` remains the steady-state human operator
+path. On this happy path, the reviewed login session
 already supplies
 the acting principal and the deploy-admin identity group scope, so `--profile
 mini` no longer needs `--acting-principal`, `--admin-group`, `--realm-file`, or
@@ -407,6 +417,32 @@ capability; add `--user-email alice@example.com` only for a cross-user grant.
 The same reviewed login session must also carry an authoritative email for the
 current human, typically through the IdP's standard `email` claim. If it does
 not, update the reviewed identity mapper before retrying the self-service flow.
+
+### Mini Pre-`viberoots` Infisical Migration
+
+If `mini` is still on the pre-`viberoots` control-plane identity, run the
+checked migration procedure in [docs/mini-name-migration-instructions.md](mini-name-migration-instructions.md)
+before enabling `secret_backend = "infisical"` on protected/shared
+deployments. The required order is:
+
+1. complete the host checkout, reviewed Git remote, deployment-service
+   environment, and worker-environment rename steps in the checked runbook
+2. rerun `nixos-shared-host-install server install` from the migrated checkout,
+   then restart both the deployment service and worker
+3. reinstall the local `mini` client profile so its control-plane metadata uses
+   the migrated repository path, deployment token env name, and current tool
+   fingerprint
+4. run `deploy admin identity sync --profile mini --apply-host` so the current
+   `viberoots` service identity owns the reviewed submit and worker boundary
+5. only then add server-local Infisical Universal Auth env names referenced by
+   `infisical_runtime`, such as `VBR_MINI_INFISICAL_CLIENT_ID` and
+   `VBR_MINI_INFISICAL_CLIENT_SECRET`, to the worker's host-local environment
+
+The execution snapshot stores only non-secret Infisical routing metadata and
+the reviewed env variable names. The Universal Auth client secret remains a
+server-local worker input and must not be copied into the client profile,
+deployment metadata, records, or checked-in host config.
+
 To discover the reviewed check names for a target before you submit, run
 `direnv exec . build-tools/tools/bin/deploy --deployment <label> --validate-only`
 and inspect `admissionRequirements.admission_policy`, `allowed_refs`,
