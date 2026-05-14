@@ -102,13 +102,23 @@ test("admitted references choose Vault even when current metadata says Infisical
   });
 });
 
-test("neutral runtime fails clearly when Infisical is selected before its adapter exists", () => {
-  assert.throws(
-    () =>
-      createDeploymentSecretRuntimeForAdmittedContext({
-        admittedContext: { secretBackend: "infisical" },
-      }),
-    /deployment secret backend infisical is not registered/,
+test("neutral runtime selects Infisical and fails closed without its secret context", async () => {
+  const runtime = createDeploymentSecretRuntimeForAdmittedContext({
+    admittedContext: {
+      secretBackend: "infisical",
+      secretRequirements: [
+        deploymentRequirementFixture({
+          name: "cloudflare_api_token",
+          step: "publish",
+          contractId,
+        }),
+      ],
+      targetEnvironment: { lockScope: targetScope },
+    },
+  });
+  await assert.rejects(
+    async () => await runtime.enterStep("publish"),
+    /explicit deployment secret context/,
   );
 });
 

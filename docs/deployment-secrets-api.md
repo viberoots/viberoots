@@ -723,6 +723,9 @@ The Vault-backed helpers are exported from:
 
 - `createDeploymentVaultSecretBackend()` in
   [deployment-secret-vault.ts](/Users/kiltyj/Code/viberoots/build-tools/tools/deployments/deployment-secret-vault.ts)
+- `resolveDeploymentInfisicalAdmittedReferences()` and
+  `createDeploymentInfisicalSecretBackend()` in
+  [deployment-secret-infisical.ts](/Users/kiltyj/Code/viberoots/build-tools/tools/deployments/deployment-secret-infisical.ts)
 - `createDeploymentSecretRuntimeForAdmittedContext()` in
   [deployment-secret-runtime-helpers.ts](/Users/kiltyj/Code/viberoots/build-tools/tools/deployments/deployment-secret-runtime-helpers.ts)
 - `createVaultDeploymentSecretRuntime()` in
@@ -753,6 +756,11 @@ is `infisical_machine_identity_universal_auth`. In-memory `access_token`
 credentials are reserved for reviewed worker internals after Universal Auth
 login; they are not accepted from CLI flags, ambient Infisical CLI sessions, or
 client-submitted request payloads.
+
+The Infisical backend adapter is owned by the deployment secret runtime layer.
+Provider publishers, provisioners, smoke runners, and release actions should use
+`createDeploymentSecretRuntimeForAdmittedContext()` instead of importing the
+Infisical adapter directly.
 
 ### Requirement Shape
 
@@ -802,6 +810,20 @@ Deployment metadata also carries backend routing fields:
   Infisical routing data and reviewed Universal Auth environment variable names
 - `infisicalSecretMappings`: normalized from `infisical_secret_mappings`; maps
   declared contract IDs to non-secret `secretPath` and `secretName` overrides
+
+Infisical admission derives the default selector from the contract and
+`infisicalRuntime`:
+
+- `projectId` comes from `infisical_runtime.project_id`
+- `environment` comes from `infisical_runtime.environment`
+- `secretPath` comes from `infisical_runtime.secret_path`, defaulting to `/`
+- `secretName` defaults to the final path segment of the contract ID
+
+For
+`secret://deployments/pleomino/cloudflare_api_token`, the default Infisical
+secret name is `cloudflare_api_token`. A reviewed
+`infisical_secret_mappings` entry may override only the non-secret
+`secret_path` and `secret_name`.
 
 The binding helpers turn those requirements into a backend-independent list of
 secret bindings:
@@ -881,6 +903,25 @@ by hand. It selects the backend from admitted secret references first, then
 then the Vault default. Admission records created by current provider flows carry
 `secretBackend` as non-secret routing metadata. The helper rejects mixed backends
 in a single admitted context.
+
+An Infisical-admitted reference freezes non-secret replay data, for example:
+
+```json
+{
+  "backend": "infisical",
+  "backendRef": "proj_123:prod:/deployments/pleomino:cloudflare_api_token#sec_1",
+  "selectorRef": "proj_123:prod:/deployments/pleomino:cloudflare_api_token@3",
+  "referenceId": "infisical:proj_123:prod:/deployments/pleomino:cloudflare_api_token#sec_1@3",
+  "resolvedVersion": "3",
+  "refreshMode": "none",
+  "credentialClass": "routine"
+}
+```
+
+Runtime acquire uses the admitted version and checks the returned project,
+environment, path, name, id when present, and version before returning a secret
+value. Imported secret/reference expansion is disabled in this first Infisical
+release.
 
 Where the target scope comes from:
 

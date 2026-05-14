@@ -1,6 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import type { DeploymentSecretContext } from "./deployment-secret-context";
 import type { DeploymentSecretBackend } from "./deployment-secret-runtime";
+import { createDeploymentInfisicalSecretBackend } from "./deployment-secret-infisical";
 import { createDeploymentVaultSecretBackend } from "./deployment-secret-vault";
 import type { DeploymentSecretBackendKind } from "./deployment-sprinkle-ref";
 
@@ -11,7 +12,10 @@ type DeploymentSecretBackendFactory = (opts: {
 const DEPLOYMENT_SECRET_BACKENDS = new Map<
   DeploymentSecretBackendKind,
   DeploymentSecretBackendFactory
->([["vault", ({ secretContext }) => createDeploymentVaultSecretBackend(secretContext)]]);
+>([
+  ["vault", ({ secretContext }) => createDeploymentVaultSecretBackend(secretContext)],
+  ["infisical", ({ secretContext }) => createDeploymentInfisicalSecretBackend(secretContext)],
+]);
 
 export function createRegisteredDeploymentSecretBackend(opts: {
   backend: DeploymentSecretBackendKind;

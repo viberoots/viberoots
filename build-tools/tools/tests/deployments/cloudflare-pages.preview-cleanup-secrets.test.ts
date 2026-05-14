@@ -201,6 +201,6 @@ test("cloudflare secret step selects Infisical metadata before Vault default", a
         step: "publish",
         requirements: cloudflarePagesApiTokenRequirements(),
       }),
-    /deployment secret backend infisical is not registered/,
+    /explicit deployment secret context/,
   );
 });

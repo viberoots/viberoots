@@ -53,6 +53,40 @@ Secret backend invariant:
   personal tokens, secret values, and rendered secret-bearing configs are
   rejected from reviewed metadata
 
+### `infisical_runtime`
+
+Optional keys:
+
+- `site_url`: Infisical API site URL.
+- `project_id`: Infisical project/workspace id.
+- `environment`: Infisical environment slug or name.
+- `secret_path`: default Infisical secret path for declared contracts. Omit to
+  use `/`.
+- `preferred_credential_source`: must be
+  `machine_identity_universal_auth` for Infisical deployments with secret
+  requirements.
+- `machine_identity_client_id_env`: environment variable name containing the
+  Universal Auth client id.
+- `machine_identity_client_secret_env`: environment variable name containing the
+  Universal Auth client secret.
+
+The runtime dictionary is non-secret routing metadata. It must not contain
+tokens, client secrets, secret values, personal tokens, service tokens, rendered
+config, or expanded secret references.
+
+### `infisical_secret_mappings`
+
+Optional map keyed by declared `secret_requirements` contract id. Each value
+may override the non-secret Infisical selector:
+
+- `secret_path`: absolute Infisical path such as `/shared/cloudflare`.
+- `secret_name`: Infisical secret name such as `api-token`.
+
+When no mapping is present, the default secret name is the final path segment of
+the contract id. For
+`secret://deployments/pleomino/cloudflare_api_token`, the default name is
+`cloudflare_api_token`.
+
 ### `provider_target`
 
 Required shape:

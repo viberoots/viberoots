@@ -59,7 +59,7 @@ export function redactInfisicalCredentialJson<T>(
   return Object.fromEntries(
     Object.entries(value).map(([key, entry]) => [
       key,
-      /accessToken|clientSecret|secretValue|token/i.test(key)
+      /accessToken|clientSecret|secretValue|expandedReference|token/i.test(key)
         ? DEPLOYMENT_AUTH_REDACTION
         : redactInfisicalCredentialJson(entry, opts),
     ]),

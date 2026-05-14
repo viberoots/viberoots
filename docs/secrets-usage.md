@@ -74,6 +74,10 @@ For production Vault bring-up and the optional local/test export bridge into
   `infisical_machine_identity_universal_auth`; Infisical CLI sessions, personal
   tokens, client-submitted access tokens, client-submitted secret values, and
   raw client secrets are not allowed in deployment metadata or request payloads.
+- Infisical admission stores exact non-secret selectors and versions. Runtime
+  acquire reads the admitted version, verifies the returned project,
+  environment, path, name, id when present, and version, then returns the secret
+  value only through the deployment secret runtime.
 - external provider credentials are never satisfied from ambient provider
   environment variables such as local CLI tokens; they must be declared as
   `secret_requirements` and resolved by the secret runtime
@@ -118,6 +122,41 @@ const publishSecrets = await runtime.enterStep("publish");
 In this example, `targetEnvironment.lockScope` is the exact value the runtime
 checks against `targetScopes`. Operators should treat that `lockScope` value as
 the source of truth for the right target scope string.
+
+To select Infisical for a deployment, set `secret_backend = "infisical"` and
+provide non-secret `infisical_runtime` routing metadata:
+
+```python
+infisical_runtime = {
+    "site_url": "https://app.infisical.com",
+    "project_id": "proj_123",
+    "environment": "prod",
+    "secret_path": "/deployments/pleomino",
+    "preferred_credential_source": "machine_identity_universal_auth",
+    "machine_identity_client_id_env": "INFISICAL_CLIENT_ID",
+    "machine_identity_client_secret_env": "INFISICAL_CLIENT_SECRET",
+}
+```
+
+By default, `secret://deployments/pleomino/cloudflare_api_token` resolves to
+Infisical secret name `cloudflare_api_token` under the configured
+`secret_path`. Use `infisical_secret_mappings` only for reviewed non-secret path
+or name overrides:
+
+```python
+infisical_secret_mappings = {
+    "secret://deployments/pleomino/cloudflare_api_token": {
+        "secret_path": "/shared/cloudflare",
+        "secret_name": "api-token",
+    },
+}
+```
+
+The fixture override remains provider-neutral:
+`VBR_DEPLOYMENT_SECRET_FIXTURE_PATH` overrides both Vault and Infisical for
+explicit local/test flows. Infisical fixture admissions use
+`infisical:fixture:` reference IDs and do not require an Infisical-specific
+fixture environment variable.
 
 ## External Deployment Contract IDs
 
@@ -591,7 +630,7 @@ Use the shorter form without `--artifact-dir` when:
 When the deployment reaches the `publish` step, the runtime:
 
 1. reads the deployment's `secret_requirements`
-2. looks up `secret://deployments/pleomino/cloudflare_api_token` in the Vault
+2. looks up `secret://deployments/pleomino/cloudflare_api_token` in the selected
    backend
 3. checks that the secret is allowed for the `publish` step
 4. checks that the secret is allowed for the target scope
@@ -643,11 +682,13 @@ This repo now documents two distinct layers:
   [Vault Production Bootstrap Runbook](/Users/kiltyj/Code/viberoots/docs/vault-production-bootstrap.md)
 - JWT-first runtime Vault reads for the reviewed production path through
   deployment `vault_runtime` metadata and deployment-derived workload JWTs
+- Infisical runtime reads through Universal Auth and reviewed non-secret
+  `infisical_runtime` metadata
 - the local/test fixture override consumed through
   `VBR_DEPLOYMENT_SECRET_FIXTURE_PATH`
 
 Records and replay snapshots now keep admitted non-secret secret references so
-retry and rollback can fetch the same Vault version exactly while still never
+retry and rollback can fetch the same backend version exactly while still never
 persisting secret values.
 
 ## Auth Diagnostics
