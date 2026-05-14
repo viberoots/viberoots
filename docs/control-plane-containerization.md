@@ -651,13 +651,16 @@ This design is compatible with the Pleomino Infisical cutover plan:
 - The runtime must use each deployment's reviewed `infisical_runtime` metadata and credential-file
   names rather than ambient tenant defaults.
 - The containerization design goes beyond PR-12 by requiring S3-compatible artifact storage and two
-  worker replicas in v1. PR-12 does not need to implement those container runtime requirements.
+  worker replicas in v1. Those container runtime requirements land before PR-12 in the selected
+  sequence, so PR-12 consumes them rather than implementing them.
 
-PR-12 should implement or reuse the generic file-backed credential-directory abstraction needed for
-Infisical Universal Auth. Building the OCI image, NixOS container module, and Compose/Podman examples
-should land in a separate plan unless PR-12 is explicitly expanded. The important PR-12 contract is
-that no Infisical credential handling is NixOS-only, environment-file-only, or tied to one global
-Infisical account.
+The selected implementation sequence is containerization first, then the Pleomino PR-12 Infisical
+cutover. The containerization plan should provide the generic file-backed credential-directory
+abstraction, OCI image, NixOS container module, Compose/Podman profile, and multi-replica runtime
+foundation before PR-12 switches Pleomino staging and production. PR-12 should consume that
+credential and runtime contract rather than adding a second Infisical credential path. The important
+PR-12 contract remains that no Infisical credential handling is NixOS-only, environment-file-only, or
+tied to one global Infisical account.
 
 ## Self Review Against PR-12
 
@@ -678,9 +681,9 @@ Infisical account.
   `pleomino-prod-infisical-client-id`, and `pleomino-prod-infisical-client-secret`.
 - Deployment metadata source of truth: covered. Runtime prep uses reviewed `infisical_runtime`
   metadata rather than ambient control-plane defaults.
-- Remaining scope risk: the full container runtime should be planned as its own implementation slice
-  unless PR-12 is intentionally broadened. PR-12 can still proceed by implementing the portable
-  credential-directory abstraction first.
+- Remaining scope risk: the full container runtime is planned as its own implementation sequence and
+  should land before PR-12. PR-12 should consume the portable credential-directory abstraction from
+  that sequence rather than broadening the Pleomino cutover with container runtime work.
 - Horizontal scaling: covered as a v1 requirement for the containerization plan, not PR-12.
 - Artifact storage: covered. The containerized runtime requires S3-compatible artifact storage for
   production and does not rely on shared POSIX filesystems as artifact authority.
@@ -697,25 +700,25 @@ Infisical account.
 
 ## Sequencing With PR-12
 
-Recommended sequencing:
+Selected sequencing:
 
-1. Implement PR-12 first if the immediate goal is to move Pleomino staging and production to
-   Infisical. PR-12 should include the portable file-backed credential-directory abstraction and
-   should avoid systemd-only assumptions.
-2. Implement containerization as a separate plan immediately after PR-12, or before PR-12 only if
-   operators want the first Pleomino Infisical rollout to happen on the horizontally scalable
-   containerized control plane.
-3. Do not make Pleomino's Infisical backend switch wait on the full OCI/NixOS-container module
-   unless the current host cannot safely provide the generic file-backed credential contract.
+1. Implement [Deployment Control Plane Containerization Plan](control-plane-plan.md) first.
+2. Use that work to establish the portable credential-directory abstraction, S3-compatible artifact
+   storage, multi-replica service/worker runtime, OCI image, NixOS module, Compose/Podman profile,
+   minimal web UI, and read-only MCP endpoint.
+3. Implement PR-12 after the containerized control plane is validated. PR-12 should switch Pleomino
+   staging and production to Infisical on top of the containerized control-plane runtime and should
+   consume the already-reviewed portable credential contract.
 
 Rationale:
 
-- PR-12 has a narrow deployment outcome and can validate the credential abstraction with the
-  existing control-plane runtime.
 - Containerization changes packaging, host setup, service lifecycle, artifact storage, horizontal
-  scaling, and operational docs; it is larger than the Pleomino backend cutover.
-- Keeping the portable credential contract as the shared boundary prevents rework when the
-  containerized runtime lands.
+  scaling, and operational docs. Doing it first lets the first Pleomino Infisical rollout happen on
+  the target runtime instead of migrating shortly after the cutover.
+- PR-12 stays focused on Pleomino-specific Infisical IaC, metadata, fake-backend coverage, operator
+  rollout steps, and replay/rollback guarantees.
+- Keeping the portable credential contract as the shared boundary prevents PR-12 from adding a
+  second credential path.
 
 ## Implementation Slices
 
@@ -744,8 +747,8 @@ Rationale:
     does not require sticky sessions or a separate browser-only auth mechanism.
 16. Add MCP contract tests proving read-only tools require authorization, return redacted structured
     responses, include correlation ids, and do not expose mutation tools in v1.
-17. Update PR-12 implementation to consume the generic file-backed credential contract instead of a
-    NixOS-only credential path.
+17. Implement PR-12 after this plan, consuming the generic file-backed credential contract and
+    containerized runtime instead of adding a NixOS-only credential path.
 
 ## Open Risks
 

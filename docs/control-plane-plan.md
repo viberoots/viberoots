@@ -52,6 +52,33 @@ Verify-scope organization:
 - Each PR below must update this plan if implementation changes invalidate the remaining sequence,
   scope, or assumptions.
 
+Build-system scope minimization:
+
+- The only PR expected to require full mixed/build-system validation is the OCI image packaging PR.
+  That PR should be kept mostly mechanical: build target, image contents, image metadata, and image
+  smoke tests. Runtime behavior should land before it under deployment/control-plane-owned paths.
+- Host setup should stay outside full mixed/build-system scope. The NixOS module and non-NixOS
+  Compose/Podman profile should consume the reviewed image contract and test generated host wiring,
+  not modify shared build-system machinery.
+- Earlier runtime PRs should use existing database, service, auth, and test extension points where
+  they exist. If one of those PRs truly needs shared build-system changes, update this plan first
+  and split or reclassify only that unavoidable shared change.
+- Do not merge the OCI image packaging, NixOS module, Compose/Podman profile, or end-to-end fixture
+  into one large PR. Combining them would reduce PR count on paper but would make more host/runtime
+  work ride through full mixed/build-system validation.
+
+Sequencing with the Pleomino Infisical cutover:
+
+- Implement this containerization plan before PR-12 in
+  [Infisical Deployment Secrets Plan](/Users/kiltyj/Code/viberoots/docs/infisical-plan.md). The
+  first Pleomino staging and production Infisical rollout should use the containerized,
+  horizontally scalable control plane rather than the current shared-host runtime.
+- PR-1 owns the portable credential-directory abstraction that PR-12 needs for Infisical Universal
+  Auth. When PR-12 is implemented later, it should consume this abstraction instead of introducing a
+  second credential path.
+- PR-12 remains responsible for Pleomino-specific Infisical IaC, deployment metadata, fake-Infisical
+  Pleomino coverage, operator rollout steps, and replay/rollback guarantees.
+
 ## PR-1: Container runtime configuration and file-backed credential contract
 
 ### 1. Intent
@@ -73,8 +100,9 @@ containerized control-plane process will use.
   - local runtime scratch paths
 - Support a mounted YAML config file at `/etc/deployment-control-plane/config.yaml`, with an
   override flag for tests and local fixtures.
-- Reuse the PR-12 file-backed credential-directory abstraction if it already exists; otherwise add
-  it here in deployment/control-plane-owned tooling.
+- Add the portable deployment control-plane credential-directory abstraction in
+  deployment/control-plane-owned tooling. This is the credential foundation that the later Pleomino
+  PR-12 Infisical cutover will consume.
 - Resolve credentials only from reviewed file paths under the configured credential directory or
   explicit reviewed source paths.
 - Reject missing required credential files during startup validation, before accepting service or
@@ -205,8 +233,9 @@ the only supported coordination path for horizontally scaled service and worker 
 ### 5.5. Expected regression scope
 
 - `deployment-only`
-- If database primitives live outside deployment-owned tooling, mark this PR as `mixed-build-system`
-  before changing shared paths.
+- Use existing database and deployment-control-plane extension points where possible. If a missing
+  shared primitive is unavoidable, update this plan first and split or reclassify only that shared
+  primitive instead of broadening the whole PR by default.
 
 ### 6. Acceptance criteria
 
@@ -285,8 +314,9 @@ digests, and provenance in the database.
 ### 5.5. Expected regression scope
 
 - `deployment-only`
-- If artifact metadata schemas live in shared database migration paths, update this plan before
-  changing them and classify the PR accordingly.
+- Use existing deployment/control-plane metadata and migration extension points where possible. If a
+  shared database migration helper is genuinely required, update this plan first and isolate that
+  shared change instead of broadening the artifact-store implementation by default.
 
 ### 6. Acceptance criteria
 
@@ -451,8 +481,9 @@ status, queue state, and deployment detail without adding mutation controls.
 ### 5.5. Expected regression scope
 
 - `deployment-only`
-- If the service auth/session implementation requires shared auth-library changes, update this plan
-  first and classify the PR as `mixed-build-system`.
+- Use the existing service auth/session surface and deployment-owned read models. If a shared
+  auth-library change is genuinely required, update this plan first and isolate that shared change
+  instead of broadening the web UI implementation by default.
 
 ### 6. Acceptance criteria
 
@@ -611,8 +642,9 @@ image with no embedded secrets or host-specific state.
 ### 5.5. Expected regression scope
 
 - `mixed-build-system`
-- Image packaging may need build-system owned paths. Keep runtime behavior changes out of packaging
-  files unless directly required by image startup tests.
+- This is the only PR expected to trigger full mixed/build-system validation. Keep runtime behavior
+  changes out of this PR unless they are directly required by image startup tests and cannot be
+  landed cleanly in an earlier deployment-only PR.
 
 ### 6. Acceptance criteria
 
@@ -785,8 +817,9 @@ Docker-compatible Compose or Podman without changing control-plane behavior.
 ### 5.5. Expected regression scope
 
 - `deployment-only`
-- If repository build tooling must learn to run Compose smoke tests, update this plan before adding
-  shared build-system changes.
+- Prefer static validation plus existing local fixture smoke hooks. If repository build tooling must
+  learn to run Compose smoke tests, update this plan first and isolate that shared build-system
+  change instead of broadening the host-profile PR by default.
 
 ### 6. Acceptance criteria
 

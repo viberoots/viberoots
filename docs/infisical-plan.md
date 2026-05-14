@@ -1081,6 +1081,10 @@ contract ids, lane governance, provider behavior, and replay guarantees intact.
 - Refactor `projects/deployments/pleomino-shared/family.bzl` so the shared family defaults no
   longer force one Vault runtime onto every stage when staging and production need Infisical
   routing metadata.
+- Depend on the containerized control-plane runtime from
+  [Deployment Control Plane Containerization Plan](control-plane-plan.md). This PR is now sequenced
+  after that plan so Pleomino's first Infisical staging and production rollout uses the
+  horizontally scalable containerized control plane.
 - Add an IaC module for Pleomino's Infisical deployment-secret backend before changing deployment
   metadata.
   - Assume no suitable Infisical project exists yet.
@@ -1110,18 +1114,17 @@ contract ids, lane governance, provider behavior, and replay guarantees intact.
     `machine_identity_client_secret_env = "PLEOMINO_PROD_INFISICAL_CLIENT_SECRET"` for production
   - `machine_identity_id` for the stage-specific deployment identity when the IaC provider exposes
     it as non-secret output
-- Add or reuse the portable deployment control-plane credential-directory abstraction required for
-  Infisical Universal Auth. The worker secret-source contract must load credentials from
-  file-backed service credentials and expose them only as in-memory runtime bindings for the
-  reviewed env-var names. Do not require broad process environment injection for Infisical client
-  secrets. On systemd/NixOS hosts, the preferred implementation is `LoadCredential=` with worker
-  reads from `$CREDENTIALS_DIRECTORY`; equivalent file-backed service credential mechanisms are
-  acceptable on other hosts.
+- Reuse the portable deployment control-plane credential-directory abstraction from
+  [Deployment Control Plane Containerization Plan](control-plane-plan.md) for Infisical Universal
+  Auth. The worker secret-source contract must load credentials from file-backed service credentials
+  and expose them only as in-memory runtime bindings for the reviewed env-var names. Do not require
+  broad process environment injection for Infisical client secrets. On systemd/NixOS hosts, the
+  preferred implementation is `LoadCredential=` with worker reads from `$CREDENTIALS_DIRECTORY`;
+  equivalent file-backed service credential mechanisms are acceptable on other hosts.
   - Align this contract with
     [Deployment Control Plane Containerization](control-plane-containerization.md) so PR-12 does not
-    introduce a NixOS-only or environment-file-only Infisical credential path. The full OCI image
-    and NixOS container module may remain a separate implementation slice unless PR-12 is explicitly
-    broadened.
+    introduce a NixOS-only or environment-file-only Infisical credential path. The full OCI image,
+    NixOS container module, and non-NixOS host profile should already exist before PR-12 begins.
   - Keep credential-file lookup deployment-scoped. The control plane must be able to host multiple
     Infisical organizations/accounts and projects at the same time without assuming one global
     Infisical tenant, one global project, or one global pair of Universal Auth credentials.
@@ -1152,9 +1155,12 @@ contract ids, lane governance, provider behavior, and replay guarantees intact.
 
 Most of this work is not a prerequisite for completing the dev changes in this PR. It is operator
 work that can happen in parallel with implementation and must be complete before staging or
-production can successfully execute live Infisical-backed deploys. The only external setup needed
-before implementation starts is confirming that a `viberoots` Infisical organization administrator
-can bootstrap the IaC runner identity in the selected Infisical Cloud US organization.
+production can successfully execute live Infisical-backed deploys. Because the selected sequence is
+containerization first, this PR also assumes the containerized control plane from
+[Deployment Control Plane Containerization Plan](control-plane-plan.md) has already landed and is
+available for Pleomino rollout. The only external setup needed before PR-12 implementation starts is
+confirming that a `viberoots` Infisical organization administrator can bootstrap the IaC runner
+identity in the selected Infisical Cloud US organization.
 
 These instructions assume no Pleomino Infisical project exists yet. Do not manually create durable
 objects that the PR's IaC module is supposed to own; use manual work only for bootstrap access, real
@@ -1420,9 +1426,9 @@ documented by the implementation PR.
   are explicitly reviewed.
 - Fake-Infisical tests prove new Pleomino staging and production admissions and runtime acquire use
   Infisical without live network access.
-- The portable credential-directory abstraction exists or is reused, and Pleomino Infisical
-  credentials resolve through deployment-scoped credential files without a NixOS-only,
-  environment-file-only, or global-tenant credential path.
+- The portable credential-directory abstraction from the containerization plan is reused, and
+  Pleomino Infisical credentials resolve through deployment-scoped credential files without a
+  NixOS-only, environment-file-only, or global-tenant credential path.
 - Replay tests prove older Vault-admitted Pleomino runs continue to use recorded Vault references.
 - Docs and diagnostics describe the cutover without leaking any secret values or Infisical
   credentials.
