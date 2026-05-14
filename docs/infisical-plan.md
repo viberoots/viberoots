@@ -1110,12 +1110,18 @@ contract ids, lane governance, provider behavior, and replay guarantees intact.
     `machine_identity_client_secret_env = "PLEOMINO_PROD_INFISICAL_CLIENT_SECRET"` for production
   - `machine_identity_id` for the stage-specific deployment identity when the IaC provider exposes
     it as non-secret output
-- Update the deployment control-plane worker secret-source contract, if needed, so Infisical
-  Universal Auth credentials can be loaded from file-backed service credentials and exposed only as
-  in-memory runtime bindings for the reviewed env-var names. Do not require broad process
-  environment injection for Infisical client secrets. On systemd/NixOS hosts, the preferred
-  implementation is `LoadCredential=` with worker reads from `$CREDENTIALS_DIRECTORY`; equivalent
-  file-backed service credential mechanisms are acceptable on other hosts.
+- Add or reuse the portable deployment control-plane credential-directory abstraction required for
+  Infisical Universal Auth. The worker secret-source contract must load credentials from
+  file-backed service credentials and expose them only as in-memory runtime bindings for the
+  reviewed env-var names. Do not require broad process environment injection for Infisical client
+  secrets. On systemd/NixOS hosts, the preferred implementation is `LoadCredential=` with worker
+  reads from `$CREDENTIALS_DIRECTORY`; equivalent file-backed service credential mechanisms are
+  acceptable on other hosts.
+  - Align this contract with
+    [Deployment Control Plane Containerization](control-plane-containerization.md) so PR-12 does not
+    introduce a NixOS-only or environment-file-only Infisical credential path. The full OCI image
+    and NixOS container module may remain a separate implementation slice unless PR-12 is explicitly
+    broadened.
   - Keep credential-file lookup deployment-scoped. The control plane must be able to host multiple
     Infisical organizations/accounts and projects at the same time without assuming one global
     Infisical tenant, one global project, or one global pair of Universal Auth credentials.
@@ -1378,6 +1384,9 @@ documented by the implementation PR.
 - Add read-only admin diagnostic coverage proving Pleomino staging and production `plan` output is
   non-secret and `check` reports project/environment/secret readiness without exposing secret
   values or Universal Auth credentials.
+- Add portable credential-directory tests proving Pleomino Infisical Universal Auth credentials can
+  be read from deployment-scoped credential files, mapped to the reviewed runtime env-var names only
+  for the operation that needs them, and kept out of broad process environment injection.
 - Add docs parity or checked-in metadata guardrail tests proving no Pleomino deployment metadata,
   docs example, or fixture contains Infisical client secrets, personal tokens, access tokens, or
   Cloudflare API token values.
@@ -1411,6 +1420,9 @@ documented by the implementation PR.
   are explicitly reviewed.
 - Fake-Infisical tests prove new Pleomino staging and production admissions and runtime acquire use
   Infisical without live network access.
+- The portable credential-directory abstraction exists or is reused, and Pleomino Infisical
+  credentials resolve through deployment-scoped credential files without a NixOS-only,
+  environment-file-only, or global-tenant credential path.
 - Replay tests prove older Vault-admitted Pleomino runs continue to use recorded Vault references.
 - Docs and diagnostics describe the cutover without leaking any secret values or Infisical
   credentials.
