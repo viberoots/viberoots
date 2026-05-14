@@ -610,6 +610,11 @@ step instead of editing Keycloak by hand.
 - protected/shared worker execution starts from a frozen admitted snapshot that
   carries component artifact identities, secret-contract references, and the
   shared admission evaluation result instead of raw client artifact paths
+- backend migration from Vault to Infisical affects only future admissions.
+  Retry and rollback use the recorded admitted backend references from the
+  source run, while promotion selects the reviewed source artifact and then
+  admits fresh target-deployment secret references from the target's current
+  metadata.
 - use this guide plus [Deployment Provider Capabilities](/Users/kiltyj/Code/viberoots/docs/deployment-provider-capabilities.md)
 
 Scaffold-first examples:

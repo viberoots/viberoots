@@ -39,7 +39,7 @@ import {
 } from "./nixos-shared-host-control-plane-snapshot-helpers";
 import type { DeploymentAdmissionEvidence } from "./deployment-admission-evidence";
 import type { DeploymentReviewedSourceSnapshot } from "./nixos-shared-host-reviewed-source-snapshot";
-import { workerVaultRuntimeMetadata } from "./deployment-vault-runtime-worker";
+import { workerSecretRuntimeMetadata } from "./deployment-secret-worker-runtime-metadata";
 export type NixosSharedHostControlPlaneSourceSelection = {
   record: NixosSharedHostDeployRecord | { deployRunId: string; deploymentId: string };
   replaySnapshotPath?: string;
@@ -72,11 +72,6 @@ function admittedContextOptions(opts: NixosSharedHostControlPlaneSnapshotOpts) {
     ...(opts.reviewedSourceSnapshot ? { reviewedSourceSnapshot: opts.reviewedSourceSnapshot } : {}),
     ...(opts.deferSecretReferenceResolution ? { deferSecretReferenceResolution: true } : {}),
   };
-}
-
-function vaultRuntimeFor(deployment: NixosSharedHostDeployment) {
-  const vaultRuntime = workerVaultRuntimeMetadata({ deployment });
-  return vaultRuntime ? { vaultRuntime } : {};
 }
 
 export function createNixosSharedHostSubmissionId(): string {
@@ -217,7 +212,7 @@ export async function createNixosSharedHostControlPlaneSnapshot(
       : {}),
     ...(admittedContext ? { admittedContext } : {}),
     ...(opts.admissionEvidence ? { admissionEvidence: opts.admissionEvidence } : {}),
-    ...vaultRuntimeFor(opts.deployment),
+    ...workerSecretRuntimeMetadata({ deployment: opts.deployment }),
     paths: {
       statePath: path.resolve(opts.paths.statePath),
       hostRoot: path.resolve(opts.paths.hostRoot),

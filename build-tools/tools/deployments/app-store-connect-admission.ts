@@ -32,6 +32,8 @@ export type AppStoreConnectAdmittedContext = {
   admissionPolicyFingerprint: string;
   environmentStage: string;
   secretBackend?: DeploymentSecretBackendKind;
+  infisicalRuntime?: AppStoreConnectDeployment["infisicalRuntime"];
+  infisicalSecretMappings?: AppStoreConnectDeployment["infisicalSecretMappings"];
   secretRequirements: DeploymentRequirement[];
   admittedSecretReferences: DeploymentSecretAdmittedReference[];
   runtimeConfigRequirements: DeploymentRequirement[];
@@ -66,6 +68,10 @@ async function baseContext(
     admissionPolicyFingerprint: deployment.admissionPolicy.fingerprint,
     environmentStage: deployment.environmentStage,
     secretBackend: deployment.secretBackend || "vault",
+    ...(deployment.infisicalRuntime ? { infisicalRuntime: deployment.infisicalRuntime } : {}),
+    ...(deployment.infisicalSecretMappings
+      ? { infisicalSecretMappings: deployment.infisicalSecretMappings }
+      : {}),
     secretRequirements: deployment.secretRequirements,
     admittedSecretReferences: sourceAdmittedContext
       ? await resolveSourceRunAdmittedSecretReferences({
@@ -76,6 +82,10 @@ async function baseContext(
       : await resolveInitialAdmittedSecretReferences({
           requirements: deployment.secretRequirements,
           targetScope,
+          secretBackend: deployment.secretBackend,
+          vaultRuntime: deployment.vaultRuntime,
+          infisicalRuntime: deployment.infisicalRuntime,
+          infisicalSecretMappings: deployment.infisicalSecretMappings,
         }),
     runtimeConfigRequirements: deployment.runtimeConfigRequirements,
     referenceResolutionPolicy: {

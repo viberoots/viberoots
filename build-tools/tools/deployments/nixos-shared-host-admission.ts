@@ -11,10 +11,7 @@ import {
   sameRequirementSet,
   type DeploymentRequirement,
 } from "./deployment-requirements";
-import type {
-  DeploymentSecretAdmittedReference,
-  DeploymentSecretBackendKind,
-} from "./deployment-sprinkle-ref";
+import type * as Sprinkle from "./deployment-sprinkle-ref";
 import {
   replayMismatch,
   resolveNixosSharedHostAdmittedSecretReferences,
@@ -41,7 +38,9 @@ export type NixosSharedHostAdmittedContext = {
   admissionPolicyRef: string;
   admissionPolicyFingerprint: string;
   environmentStage: string;
-  secretBackend?: DeploymentSecretBackendKind;
+  secretBackend?: Sprinkle.DeploymentSecretBackendKind;
+  infisicalRuntime?: NixosSharedHostDeployment["infisicalRuntime"];
+  infisicalSecretMappings?: NixosSharedHostDeployment["infisicalSecretMappings"];
   secretRequirements: DeploymentRequirement[];
   admittedSecretReferences: DeploymentSecretAdmittedReference[];
   runtimeConfigRequirements: DeploymentRequirement[];
@@ -68,7 +67,7 @@ async function baseContext(
   },
 ) {
   const sourceAdmittedReferences = Array.isArray(sourceAdmittedContext?.admittedSecretReferences)
-    ? (sourceAdmittedContext.admittedSecretReferences as DeploymentSecretAdmittedReference[])
+    ? (sourceAdmittedContext.admittedSecretReferences as Sprinkle.DeploymentSecretAdmittedReference[])
     : [];
   return {
     lanePolicyRef: deployment.lanePolicyRef,
@@ -77,6 +76,10 @@ async function baseContext(
     admissionPolicyFingerprint: deployment.admissionPolicy.fingerprint,
     environmentStage: deployment.environmentStage,
     secretBackend: deployment.secretBackend || "vault",
+    ...(deployment.infisicalRuntime ? { infisicalRuntime: deployment.infisicalRuntime } : {}),
+    ...(deployment.infisicalSecretMappings
+      ? { infisicalSecretMappings: deployment.infisicalSecretMappings }
+      : {}),
     secretRequirements: deployment.secretRequirements,
     admittedSecretReferences: opts?.deferSecretReferenceResolution
       ? sourceAdmittedReferences
@@ -90,6 +93,10 @@ async function baseContext(
         : await resolveInitialAdmittedSecretReferences({
             requirements: deployment.secretRequirements,
             targetScope,
+            secretBackend: deployment.secretBackend,
+            vaultRuntime: deployment.vaultRuntime,
+            infisicalRuntime: deployment.infisicalRuntime,
+            infisicalSecretMappings: deployment.infisicalSecretMappings,
             secretContext: opts?.secretContext,
           }),
     runtimeConfigRequirements: deployment.runtimeConfigRequirements,

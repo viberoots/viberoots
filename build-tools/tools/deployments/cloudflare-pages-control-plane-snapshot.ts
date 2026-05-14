@@ -17,7 +17,7 @@ import {
   admitStaticWebappArtifact,
   type AdmittedStaticWebappArtifact,
 } from "./static-webapp-artifacts";
-import { workerVaultRuntimeMetadata } from "./deployment-vault-runtime-worker";
+import { workerSecretRuntimeMetadata } from "./deployment-secret-worker-runtime-metadata";
 import { requestedReviewedSourceFromEvidence } from "./deployment-source-revision";
 
 export type CloudflarePagesPromotionSourceSelection = {
@@ -25,11 +25,6 @@ export type CloudflarePagesPromotionSourceSelection = {
   recordPath?: string;
   replaySnapshotPath: string;
 };
-
-function vaultRuntimeFor(deployment: CloudflarePagesDeployment) {
-  const vaultRuntime = workerVaultRuntimeMetadata({ deployment });
-  return vaultRuntime ? { vaultRuntime } : {};
-}
 
 export async function createCloudflarePagesControlPlaneSnapshot(
   opts: {
@@ -103,7 +98,7 @@ export async function createCloudflarePagesControlPlaneSnapshot(
     lockScope,
     deployment: opts.deployment,
     admittedContext,
-    ...vaultRuntimeFor(opts.deployment),
+    ...workerSecretRuntimeMetadata({ deployment: opts.deployment }),
     paths: {
       workspaceRoot: path.resolve(opts.workspaceRoot),
       recordsRoot: path.resolve(opts.recordsRoot),

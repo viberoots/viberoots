@@ -1,13 +1,12 @@
 #!/usr/bin/env zx-wrapper
 import { resolveCloudflarePagesArtifactInput } from "./cloudflare-pages-artifact-input";
 import type { ResolvedCloudflarePagesServiceSubmitRequest } from "./cloudflare-pages-control-plane-service-submit";
-import { workerVaultRuntimeMetadata } from "./deployment-vault-runtime-worker";
+import { workerSecretRuntimeMetadata } from "./deployment-secret-worker-runtime-metadata";
 
-export function vaultRuntimeForCloudflareDeployment(
+export function secretRuntimeForCloudflareDeployment(
   deployment: ResolvedCloudflarePagesServiceSubmitRequest["request"]["deployment"],
 ) {
-  const vaultRuntime = workerVaultRuntimeMetadata({ deployment });
-  return vaultRuntime ? { vaultRuntime } : {};
+  return workerSecretRuntimeMetadata({ deployment });
 }
 
 export async function resolveCloudflarePagesArtifactForSubmission(

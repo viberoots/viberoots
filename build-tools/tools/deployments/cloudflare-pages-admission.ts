@@ -41,6 +41,8 @@ export type CloudflarePagesAdmittedContext = {
   admissionPolicyFingerprint: string;
   environmentStage: string;
   secretBackend?: DeploymentSecretBackendKind;
+  infisicalRuntime?: CloudflarePagesDeployment["infisicalRuntime"];
+  infisicalSecretMappings?: CloudflarePagesDeployment["infisicalSecretMappings"];
   secretRequirements: DeploymentRequirement[];
   admittedSecretReferences: DeploymentSecretAdmittedReference[];
   runtimeConfigRequirements: DeploymentRequirement[];
@@ -76,6 +78,10 @@ async function baseContext(
     admissionPolicyFingerprint: deployment.admissionPolicy.fingerprint,
     environmentStage: deployment.environmentStage,
     secretBackend: deployment.secretBackend || "vault",
+    ...(deployment.infisicalRuntime ? { infisicalRuntime: deployment.infisicalRuntime } : {}),
+    ...(deployment.infisicalSecretMappings
+      ? { infisicalSecretMappings: deployment.infisicalSecretMappings }
+      : {}),
     secretRequirements: deployment.secretRequirements,
     admittedSecretReferences: opts?.deferSecretReferenceResolution
       ? sourceAdmittedReferences
@@ -89,6 +95,10 @@ async function baseContext(
         : await resolveInitialAdmittedSecretReferences({
             requirements: deployment.secretRequirements,
             targetScope,
+            secretBackend: deployment.secretBackend,
+            vaultRuntime: deployment.vaultRuntime,
+            infisicalRuntime: deployment.infisicalRuntime,
+            infisicalSecretMappings: deployment.infisicalSecretMappings,
             secretContext: opts?.secretContext,
           }),
     runtimeConfigRequirements: deployment.runtimeConfigRequirements,
@@ -214,6 +224,17 @@ export async function resolveCloudflarePagesAdmittedSecretReferences(opts: {
   admittedContext: CloudflarePagesAdmittedContext;
   secretContext?: DeploymentSecretContext;
 }): Promise<DeploymentSecretAdmittedReference[]> {
+  if (opts.admittedContext.source.mode !== "source_run_reuse") {
+    return await resolveInitialAdmittedSecretReferences({
+      requirements: opts.deployment.secretRequirements,
+      targetScope: opts.admittedContext.targetEnvironment.lockScope,
+      secretBackend: opts.deployment.secretBackend,
+      vaultRuntime: opts.deployment.vaultRuntime,
+      infisicalRuntime: opts.deployment.infisicalRuntime,
+      infisicalSecretMappings: opts.deployment.infisicalSecretMappings,
+      secretContext: opts.secretContext,
+    });
+  }
   return await resolveSourceRunAdmittedSecretReferences({
     sourceAdmittedContext: opts.admittedContext,
     requirements: opts.deployment.secretRequirements,

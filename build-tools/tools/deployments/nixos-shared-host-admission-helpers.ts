@@ -1,7 +1,10 @@
 #!/usr/bin/env zx-wrapper
 import type { NixosSharedHostDeployment } from "./contract";
 import type { DeploymentSecretContext } from "./deployment-secret-context";
-import { resolveSourceRunAdmittedSecretReferences } from "./deployment-secret-admission";
+import {
+  resolveInitialAdmittedSecretReferences,
+  resolveSourceRunAdmittedSecretReferences,
+} from "./deployment-secret-admission";
 import type { DeploymentSecretAdmittedReference } from "./deployment-sprinkle-ref";
 import { nixosSharedHostDeploymentTargetIdentity } from "./nixos-shared-host-components";
 import type { NixosSharedHostAdmittedContext } from "./nixos-shared-host-admission";
@@ -52,6 +55,17 @@ export async function resolveNixosSharedHostAdmittedSecretReferences(opts: {
   admittedContext: NixosSharedHostAdmittedContext;
   secretContext?: DeploymentSecretContext;
 }): Promise<DeploymentSecretAdmittedReference[]> {
+  if (opts.admittedContext.source.mode !== "source_run_reuse") {
+    return await resolveInitialAdmittedSecretReferences({
+      requirements: opts.deployment.secretRequirements,
+      targetScope: opts.admittedContext.targetEnvironment.lockScope,
+      secretBackend: opts.deployment.secretBackend,
+      vaultRuntime: opts.deployment.vaultRuntime,
+      infisicalRuntime: opts.deployment.infisicalRuntime,
+      infisicalSecretMappings: opts.deployment.infisicalSecretMappings,
+      secretContext: opts.secretContext,
+    });
+  }
   return await resolveSourceRunAdmittedSecretReferences({
     sourceAdmittedContext: opts.admittedContext,
     requirements: opts.deployment.secretRequirements,

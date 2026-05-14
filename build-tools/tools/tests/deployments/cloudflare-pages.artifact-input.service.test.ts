@@ -80,6 +80,16 @@ test("protected service client rejects laptop Vault and fixture credential input
       }),
     /must not use laptop credential input VBR_DEPLOYMENT_SECRET_FIXTURE_PATH/,
   );
+  assert.doesNotThrow(() =>
+    assertNoProtectedSharedClientCredentialInputs({
+      deployment,
+      publicFrontDoor: true,
+      env: {
+        VBR_DEPLOYMENT_SECRET_FIXTURE_PATH: "/tmp/fixture.json",
+        VBR_DEPLOY_LOCAL_FIXTURE_SERVICE: "1",
+      },
+    }),
+  );
   assert.throws(
     () =>
       assertNoProtectedSharedClientCredentialInputs({

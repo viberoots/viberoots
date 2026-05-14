@@ -901,8 +901,9 @@ context and you do not want to wire the backend, requirements, and target scope
 by hand. It selects the backend from admitted secret references first, then
 `admittedContext.secretBackend`, then an explicit deployment metadata default,
 then the Vault default. Admission records created by current provider flows carry
-`secretBackend` as non-secret routing metadata. The helper rejects mixed backends
-in a single admitted context.
+`secretBackend` as non-secret routing metadata. Infisical-backed admissions also
+carry `infisicalRuntime` and `infisicalSecretMappings`, which are routing data
+only. The helper rejects mixed backends in a single admitted context.
 
 An Infisical-admitted reference freezes non-secret replay data, for example:
 
@@ -922,6 +923,19 @@ Runtime acquire uses the admitted version and checks the returned project,
 environment, path, name, id when present, and version before returning a secret
 value. Imported secret/reference expansion is disabled in this first Infisical
 release.
+
+Replay authority comes from the recorded admitted references, not from current
+deployment metadata. A retry or rollback of a Vault-admitted run continues to
+use Vault even if the deployment now selects Infisical. A retry or rollback of
+an Infisical-admitted run continues to use the recorded Infisical selector and
+version even if the secret has rotated. If the recorded backend selector cannot
+be resolved exactly, replay fails closed.
+
+Promotion is different from retry and rollback. Promotion first selects the
+reviewed source run and exact artifact from the control plane, then admits fresh
+secret references from the target deployment's current metadata and selected
+backend. Do not remove old Vault entries until retry and rollback retention
+windows for Vault-admitted runs have expired.
 
 Where the target scope comes from:
 

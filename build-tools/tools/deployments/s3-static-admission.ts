@@ -22,6 +22,8 @@ export type S3StaticAdmittedContext = {
   admissionPolicyFingerprint: string;
   environmentStage: string;
   secretBackend?: DeploymentSecretBackendKind;
+  infisicalRuntime?: S3StaticDeployment["infisicalRuntime"];
+  infisicalSecretMappings?: S3StaticDeployment["infisicalSecretMappings"];
   secretRequirements: DeploymentRequirement[];
   admittedSecretReferences: DeploymentSecretAdmittedReference[];
   runtimeConfigRequirements: DeploymentRequirement[];
@@ -63,10 +65,20 @@ export async function resolveInitialS3StaticAdmittedContext(opts: {
     admissionPolicyFingerprint: opts.deployment.admissionPolicy.fingerprint,
     environmentStage: opts.deployment.environmentStage,
     secretBackend: opts.deployment.secretBackend || "vault",
+    ...(opts.deployment.infisicalRuntime
+      ? { infisicalRuntime: opts.deployment.infisicalRuntime }
+      : {}),
+    ...(opts.deployment.infisicalSecretMappings
+      ? { infisicalSecretMappings: opts.deployment.infisicalSecretMappings }
+      : {}),
     secretRequirements: opts.deployment.secretRequirements,
     admittedSecretReferences: await resolveInitialAdmittedSecretReferences({
       requirements: opts.deployment.secretRequirements,
       targetScope: target.lockScope,
+      secretBackend: opts.deployment.secretBackend,
+      vaultRuntime: opts.deployment.vaultRuntime,
+      infisicalRuntime: opts.deployment.infisicalRuntime,
+      infisicalSecretMappings: opts.deployment.infisicalSecretMappings,
     }),
     runtimeConfigRequirements: opts.deployment.runtimeConfigRequirements,
     referenceResolutionPolicy: {

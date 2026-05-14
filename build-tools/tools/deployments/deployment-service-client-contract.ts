@@ -2,6 +2,7 @@
 import type { DeploymentTarget } from "./contract";
 import type { DeploymentAdmissionEvidence } from "./deployment-admission-evidence";
 import { DeploymentUnauthorizedError } from "./deployment-control-plane-errors";
+import { runsInLocalFixtureMode } from "./nixos-shared-host-control-plane-service-auth";
 import { DEPLOYMENT_SECRET_FIXTURE_PATH_ENV } from "./deployment-secret-fixture";
 import {
   VAULT_AUTH_METHOD_ENV,
@@ -98,6 +99,7 @@ export function assertNoProtectedSharedClientIdentityFields(opts: {
 export function assertNoProtectedSharedClientCredentialInputs(opts: {
   deployment: DeploymentTarget;
   publicFrontDoor: boolean;
+  localFixture?: boolean;
   vaultRuntimeInputs?: DeploymentVaultRuntimeInputs;
   env?: NodeJS.ProcessEnv;
 }) {
@@ -109,7 +111,15 @@ export function assertNoProtectedSharedClientCredentialInputs(opts: {
     return;
   }
   const env = opts.env || process.env;
-  const activeEnv = CLIENT_CREDENTIAL_ENVS.find((name) => String(env[name] || "").trim());
+  const activeEnv = CLIENT_CREDENTIAL_ENVS.find((name) => {
+    if (
+      name === DEPLOYMENT_SECRET_FIXTURE_PATH_ENV &&
+      runsInLocalFixtureMode({ localFixture: opts.localFixture, env })
+    ) {
+      return false;
+    }
+    return String(env[name] || "").trim();
+  });
   if (activeEnv) {
     throw new Error(
       `protected/shared service deployments must not use laptop credential input ${activeEnv}; authenticate through mini and let the worker use server-owned secrets`,

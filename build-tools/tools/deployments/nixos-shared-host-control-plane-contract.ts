@@ -72,6 +72,7 @@ export type NixosSharedHostControlPlaneSnapshot = {
   admittedContext?: NixosSharedHostAdmittedContext;
   admissionEvidence?: DeploymentAdmissionEvidence;
   vaultRuntime?: DeploymentWorkerVaultRuntimeMetadata;
+  infisicalRuntime?: NixosSharedHostDeployment["infisicalRuntime"];
   paths: NixosSharedHostControlPlanePaths;
   action:
     | {

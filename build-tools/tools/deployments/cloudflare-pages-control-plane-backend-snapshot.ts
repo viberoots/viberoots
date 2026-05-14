@@ -5,7 +5,7 @@ import { CLOUDFLARE_PAGES_CONTROL_PLANE_SNAPSHOT_SCHEMA } from "./cloudflare-pag
 import { createCloudflarePagesControlPlaneSnapshot } from "./cloudflare-pages-control-plane-snapshot";
 import {
   resolveCloudflarePagesArtifactForSubmission,
-  vaultRuntimeForCloudflareDeployment,
+  secretRuntimeForCloudflareDeployment,
 } from "./cloudflare-pages-control-plane-backend-support";
 import type { ResolvedCloudflarePagesServiceSubmitRequest } from "./cloudflare-pages-control-plane-service-submit";
 import {
@@ -58,7 +58,7 @@ async function previewSnapshot(
     lockScope: resolved.request.deployment.providerTarget.providerTargetIdentity,
     deployment: resolved.request.deployment,
     admittedContext,
-    ...vaultRuntimeForCloudflareDeployment(resolved.request.deployment),
+    ...secretRuntimeForCloudflareDeployment(resolved.request.deployment),
     paths: { workspaceRoot, recordsRoot },
     action: {
       kind: "deploy",
@@ -113,7 +113,7 @@ async function rollbackSnapshot(
     lockScope: resolved.request.deployment.providerTarget.providerTargetIdentity,
     deployment: resolved.request.deployment,
     admittedContext,
-    ...vaultRuntimeForCloudflareDeployment(resolved.request.deployment),
+    ...secretRuntimeForCloudflareDeployment(resolved.request.deployment),
     paths: { workspaceRoot, recordsRoot },
     action: {
       kind: "deploy",
@@ -151,7 +151,7 @@ function previewCleanupSnapshot(
     lockScope: resolved.request.deployment.providerTarget.providerTargetIdentity,
     deployment: resolved.request.deployment,
     admittedContext: resolved.selection.sourceRecord.admittedContext,
-    ...vaultRuntimeForCloudflareDeployment(resolved.request.deployment),
+    ...secretRuntimeForCloudflareDeployment(resolved.request.deployment),
     paths: { workspaceRoot, recordsRoot },
     action: {
       kind: "preview_cleanup",

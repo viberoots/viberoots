@@ -57,6 +57,7 @@ export type CloudflarePagesControlPlaneSnapshot = {
   deployment: CloudflarePagesDeployment;
   admittedContext: CloudflarePagesAdmittedContext;
   vaultRuntime?: DeploymentWorkerVaultRuntimeMetadata;
+  infisicalRuntime?: CloudflarePagesDeployment["infisicalRuntime"];
   paths: CloudflarePagesControlPlanePaths;
   action:
     | {

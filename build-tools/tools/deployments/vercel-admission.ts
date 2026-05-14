@@ -22,6 +22,8 @@ export type VercelAdmittedContext = {
   admissionPolicyFingerprint: string;
   environmentStage: string;
   secretBackend?: DeploymentSecretBackendKind;
+  infisicalRuntime?: VercelDeployment["infisicalRuntime"];
+  infisicalSecretMappings?: VercelDeployment["infisicalSecretMappings"];
   secretRequirements: DeploymentRequirement[];
   admittedSecretReferences: DeploymentSecretAdmittedReference[];
   runtimeConfigRequirements: DeploymentRequirement[];
@@ -60,6 +62,10 @@ export async function resolveInitialVercelAdmittedContext(opts: {
   const admittedSecretReferences = await resolveInitialAdmittedSecretReferences({
     requirements: opts.deployment.secretRequirements,
     targetScope: target.lockScope,
+    secretBackend: opts.deployment.secretBackend,
+    vaultRuntime: opts.deployment.vaultRuntime,
+    infisicalRuntime: opts.deployment.infisicalRuntime,
+    infisicalSecretMappings: opts.deployment.infisicalSecretMappings,
   });
   return vercelAdmittedContext({
     deployment: opts.deployment,
@@ -84,6 +90,12 @@ function vercelAdmittedContext(opts: {
     admissionPolicyFingerprint: opts.deployment.admissionPolicy.fingerprint,
     environmentStage: opts.deployment.environmentStage,
     secretBackend: opts.deployment.secretBackend || "vault",
+    ...(opts.deployment.infisicalRuntime
+      ? { infisicalRuntime: opts.deployment.infisicalRuntime }
+      : {}),
+    ...(opts.deployment.infisicalSecretMappings
+      ? { infisicalSecretMappings: opts.deployment.infisicalSecretMappings }
+      : {}),
     secretRequirements: opts.deployment.secretRequirements,
     admittedSecretReferences: opts.admittedSecretReferences,
     runtimeConfigRequirements: opts.deployment.runtimeConfigRequirements,

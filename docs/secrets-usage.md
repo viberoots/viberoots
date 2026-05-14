@@ -154,7 +154,9 @@ infisical_secret_mappings = {
 
 The fixture override remains provider-neutral:
 `VBR_DEPLOYMENT_SECRET_FIXTURE_PATH` overrides both Vault and Infisical for
-explicit local/test flows. Infisical fixture admissions use
+explicit local/test flows. Protected/shared hosted services reject this fixture
+override unless `VBR_DEPLOY_LOCAL_FIXTURE_SERVICE=1` marks an explicit local
+fixture service. Infisical fixture admissions use
 `infisical:fixture:` reference IDs and do not require an Infisical-specific
 fixture environment variable.
 
@@ -386,6 +388,20 @@ interactive client credential sources as worker Vault credentials, and
 client-submitted secret values. The interactive client session authenticates the
 human request to the service; it is not forwarded to the worker as Vault
 workload credential material.
+
+Backend migration is per deployment and affects only new admissions. To move a
+deployment from Vault to Infisical:
+
+- add `secret_backend = "infisical"` and reviewed non-secret
+  `infisical_runtime` metadata
+- create matching Infisical shared secrets for the existing contract IDs
+- run a fresh deploy or promotion so the target admits Infisical references
+- keep the old Vault entries until retry and rollback retention windows for
+  Vault-admitted runs expire
+
+Retry and rollback replay the recorded admitted references exactly. They do not
+reinterpret an old Vault-admitted run as Infisical, and they do not substitute a
+new Infisical value after rotation when a recorded version was admitted.
 
 For local development, isolated tests, or explicit bootstrap-oriented
 workflows, use the fixture override shown below.
