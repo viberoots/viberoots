@@ -5,6 +5,7 @@ import {
   readControlPlaneStatus,
 } from "./nixos-shared-host-control-plane-service-read";
 import { handleCurrentStageStateReadRoute } from "./deployment-current-stage-state-service";
+import { redactControlPlaneReadModel } from "./deployment-control-plane-read-redaction";
 
 export type ControlPlaneReadRouteResult =
   | { handled: false }
@@ -41,13 +42,13 @@ export async function handleControlPlaneReadRoute(opts: {
   if (opts.method === "GET" && opts.pathname === "/api/v1/status") {
     const status = await readControlPlaneStatus(opts.backend, selector(opts.searchParams));
     return status
-      ? { handled: true, statusCode: 200, body: status }
+      ? { handled: true, statusCode: 200, body: redactControlPlaneReadModel(status) }
       : { handled: true, statusCode: 404, body: { error: "submission not found" } };
   }
   if (opts.method === "GET" && opts.pathname === "/api/v1/records") {
     const record = await readControlPlaneRecord(opts.backend, selector(opts.searchParams));
     return record
-      ? { handled: true, statusCode: 200, body: record }
+      ? { handled: true, statusCode: 200, body: redactControlPlaneReadModel(record) }
       : { handled: true, statusCode: 404, body: { error: "record not found" } };
   }
   return await handleCurrentStageStateReadRoute(opts);

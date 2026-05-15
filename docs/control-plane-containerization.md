@@ -186,7 +186,8 @@ Useful defaults:
 
 The v1 web UI should be deliberately small. It should prove the control-plane service can serve a
 browser app and that the app can call read-only control-plane APIs through the same authenticated
-origin.
+origin. The implemented v1 read-only surface is documented in
+[Deployment Control Plane Web UI](/Users/kiltyj/Code/viberoots/docs/control-plane-web-ui.md).
 
 Required v1 screens:
 

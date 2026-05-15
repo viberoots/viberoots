@@ -23,26 +23,10 @@ import { createStaticWebappUploadSession } from "./static-webapp-upload-sessions
 import type { ControlPlaneArtifactStore } from "./control-plane-artifact-store-types";
 import { assertProductionArtifactStore } from "./control-plane-artifact-store";
 import { checkControlPlaneReadiness, readWorkerHeartbeats } from "./control-plane-process-health";
-import {
-  assertReviewedServiceTokenConfigured,
-  requestHasReviewedBearerToken,
-} from "./nixos-shared-host-control-plane-service-auth";
+import { assertReviewedServiceTokenConfigured } from "./nixos-shared-host-control-plane-service-auth";
 import { readJsonBody, readRawBody, writeJson } from "./control-plane-http";
-
-function requireReviewedBearerToken(
-  request: http.IncomingMessage,
-  response: http.ServerResponse,
-  opts: { token?: string; localFixture?: boolean; env?: NodeJS.ProcessEnv },
-): boolean {
-  const allowed = requestHasReviewedBearerToken({
-    authorizationHeader: request.headers.authorization,
-    serviceToken: opts.token,
-    localFixture: opts.localFixture,
-    env: opts.env,
-  });
-  if (!allowed) writeJson(response, 401, { error: "unauthorized" });
-  return allowed;
-}
+import { handleControlPlaneWebRoute } from "./deployment-control-plane-web-routes";
+import { requireReviewedBearerToken } from "./deployment-control-plane-service-token";
 
 export async function startNixosSharedHostControlPlaneServer(opts: {
   workspaceRoot: string;
@@ -55,6 +39,7 @@ export async function startNixosSharedHostControlPlaneServer(opts: {
   env?: NodeJS.ProcessEnv;
   objectStore?: ControlPlaneArtifactStore;
   instanceId?: string;
+  webUi?: { enabled: boolean; basePath: string };
 }) {
   assertReviewedServiceTokenConfigured({
     serviceToken: opts.token,
@@ -94,6 +79,25 @@ export async function startNixosSharedHostControlPlaneServer(opts: {
           objectStore: opts.objectStore,
         });
         writeJson(response, readiness.ok ? 200 : 503, readiness);
+        return;
+      }
+      if (
+        await handleControlPlaneWebRoute({
+          request,
+          response,
+          url,
+          web: {
+            enabled: opts.webUi?.enabled ?? true,
+            basePath: opts.webUi?.basePath ?? "/",
+            backend,
+            objectStore: opts.objectStore,
+            token: opts.token,
+            localFixture: opts.localFixture,
+            env: opts.env,
+            instanceId: opts.instanceId,
+          },
+        })
+      ) {
         return;
       }
       if (request.method === "GET" && url.pathname === "/api/v1/worker-heartbeats") {

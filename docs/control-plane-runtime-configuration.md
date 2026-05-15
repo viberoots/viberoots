@@ -83,6 +83,10 @@ artifact-store credential files, `database.urlFile`, `credentials.directory`, an
 SSH files. Defaults are the values shown above for `mode`, service host and port, local scratch
 roots, artifact-store kind and region, Infisical filename patterns, web UI, and MCP.
 
+`webUi.basePath` controls both the browser UI and the same-origin read APIs used by that UI. The
+base path can be `/` or a reverse-proxy prefix such as `/deploy-control-plane`; the service strips
+that prefix before routing UI assets and `/api/v1/read/*` requests.
+
 ## Startup Validation
 
 The loader validates shape, enum values, URL base paths, and credential path policy before service
