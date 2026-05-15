@@ -35,7 +35,7 @@ const LOCAL_BACKEND_URL_PREFIX = "pgmem://";
 const backendPools = new Map<string, Promise<BackendPool>>();
 const Pool = pg.Pool;
 
-function isLocalHarnessDatabaseUrl(databaseUrl: string): boolean {
+export function isLocalHarnessDatabaseUrl(databaseUrl: string): boolean {
   return databaseUrl.startsWith(LOCAL_BACKEND_URL_PREFIX);
 }
 
@@ -143,6 +143,20 @@ async function initializeBackendSchema(pool: BackendPool) {
     ALTER TABLE stage_state_audit_events ADD COLUMN IF NOT EXISTS content_hash TEXT;
     ALTER TABLE stage_state_audit_events ADD COLUMN IF NOT EXISTS event_hash TEXT;
     ALTER TABLE stage_state_audit_events ADD COLUMN IF NOT EXISTS audit_sequence INTEGER;
+    CREATE TABLE IF NOT EXISTS control_plane_audit_events (
+      event_id TEXT PRIMARY KEY,
+      request_id TEXT NOT NULL,
+      actor TEXT NOT NULL,
+      operation TEXT NOT NULL,
+      idempotency_key TEXT,
+      deployment_id TEXT NOT NULL,
+      result TEXT NOT NULL,
+      failure_summary TEXT,
+      document_json JSONB NOT NULL,
+      occurred_at TIMESTAMPTZ NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS control_plane_audit_by_deployment
+      ON control_plane_audit_events(deployment_id, occurred_at);
     CREATE TABLE IF NOT EXISTS artifact_cleanup_janitor_records (
       record_id TEXT PRIMARY KEY,
       submission_id TEXT,

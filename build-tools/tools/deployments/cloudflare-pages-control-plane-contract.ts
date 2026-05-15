@@ -53,6 +53,7 @@ export type CloudflarePagesControlPlaneSnapshot = {
   deploymentId: string;
   deploymentLabel: string;
   providerTargetIdentity: string;
+  expectedCurrentRunId?: string | null;
   lockScope: string;
   deployment: CloudflarePagesDeployment;
   admittedContext: CloudflarePagesAdmittedContext;

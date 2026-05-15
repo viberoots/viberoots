@@ -136,6 +136,7 @@ export async function acquireNixosSharedHostControlPlaneLocks(
   },
 ) {
   const releaseLocks: Array<() => Promise<void>> = [];
+  const assertions: Array<() => Promise<void>> = [];
   const fencingTokens: string[] = [];
   try {
     for (const lockScope of nixosSharedHostLockScopes(deployment)) {
@@ -143,6 +144,7 @@ export async function acquireNixosSharedHostControlPlaneLocks(
         ...(opts?.shouldAbort ? { shouldAbort: opts.shouldAbort } : {}),
       });
       releaseLocks.push(lock.release);
+      assertions.push(lock.assertCurrentAuthority);
       fencingTokens.push(lock.fencingToken);
     }
   } catch (error) {
@@ -151,6 +153,9 @@ export async function acquireNixosSharedHostControlPlaneLocks(
   }
   return {
     fencingToken: fencingTokens[0],
+    assertCurrentAuthority: async () => {
+      for (const assertCurrentAuthority of assertions) await assertCurrentAuthority();
+    },
     release: async () => {
       for (const release of releaseLocks.reverse()) await release();
     },

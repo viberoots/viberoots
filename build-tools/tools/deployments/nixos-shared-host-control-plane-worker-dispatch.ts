@@ -14,6 +14,7 @@ type ProviderDispatchInputs = {
   executionSnapshotPath: string;
   executionSnapshotRef: string;
   workerId: string;
+  assertCurrentAuthority?: () => Promise<void>;
 };
 
 const DISPATCH = {

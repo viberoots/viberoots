@@ -59,6 +59,9 @@ export function sanitizedBackendRecord<T extends { controlPlane?: Record<string,
   record: T,
 ): T {
   if (!record.controlPlane) return record;
-  const { submissionId, workerId, lockScope, admission } = record.controlPlane;
-  return { ...record, controlPlane: { submissionId, workerId, lockScope, admission } };
+  const { submissionId, workerId, lockScope, admission, fencingToken } = record.controlPlane;
+  return {
+    ...record,
+    controlPlane: { submissionId, workerId, lockScope, admission, fencingToken },
+  };
 }

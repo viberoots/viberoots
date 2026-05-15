@@ -101,6 +101,8 @@ container startup should not depend on long imperative command lines.
 
 The implemented runtime loader and credential-directory contract are documented in
 [Deployment Control Plane Runtime Configuration](./control-plane-runtime-configuration.md).
+The multi-replica database coordination contract is documented in
+[Deployment Control Plane Horizontal Scaling](./control-plane-horizontal-scaling.md).
 
 Recommended config file path:
 

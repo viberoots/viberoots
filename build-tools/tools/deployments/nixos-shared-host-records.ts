@@ -73,6 +73,7 @@ export type NixosSharedHostDeployRecord = {
     workerId: string;
     admission: "admitted";
     lockScope: string;
+    fencingToken?: string;
   };
   breakGlass?: {
     incidentRef: string;

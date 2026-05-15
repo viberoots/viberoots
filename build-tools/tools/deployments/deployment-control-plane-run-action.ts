@@ -1,5 +1,4 @@
 #!/usr/bin/env zx-wrapper
-import { randomUUID } from "node:crypto";
 import { defaultRequestedBy, type DeploymentPrincipal } from "./deployment-admission-evidence";
 import {
   DEPLOYMENT_CONTROL_PLANE_RUN_ACTION_REQUEST_SCHEMA,
@@ -8,10 +7,16 @@ import {
   type DeploymentControlPlaneRunAction,
 } from "./deployment-control-plane-contract";
 import { approvePendingSubmission } from "./deployment-control-plane-approve-action";
+import { fingerprintControlPlanePayload } from "./deployment-control-plane-idempotency";
+import { resolveDurableRunActionDedupe } from "./deployment-control-plane-run-action-dedupe";
 import {
-  resolveRunActionIdempotency,
-  fingerprintControlPlanePayload,
-} from "./deployment-control-plane-idempotency";
+  nextRunActionLifecycleState,
+  unsupportedBackendProgressiveRunAction,
+} from "./deployment-control-plane-run-action-state";
+import {
+  writeBackendRunActionDoc,
+  type NixosSharedHostControlPlaneBackendTarget,
+} from "./nixos-shared-host-control-plane-backend";
 import {
   runActionResponseFromSubmission,
   statusFromSubmission,
@@ -46,40 +51,10 @@ type SubmissionRecord = {
   };
 };
 
-function nextLifecycleState(lifecycleState: string, action: DeploymentControlPlaneRunAction) {
-  if (action === "approve") {
-    return { lifecycleState, rejectionCode: "no_longer_admitted" as const };
-  }
-  if (action === "resume") {
-    return lifecycleState === "paused"
-      ? { lifecycleState: "running" as const }
-      : { lifecycleState, rejectionCode: "not_resumable" as const };
-  }
-  if (action === "abort") {
-    return lifecycleState === "paused"
-      ? { lifecycleState: "finished" as const }
-      : { lifecycleState, rejectionCode: "not_paused" as const };
-  }
-  if (
-    lifecycleState === "pending_approval" ||
-    lifecycleState === "queued" ||
-    lifecycleState === "waiting_for_lock"
-  ) {
-    return {
-      lifecycleState: "cancelled" as const,
-      terminationReason: "cancelled" as const,
-      completedAt: new Date().toISOString(),
-    };
-  }
-  if (lifecycleState === "running" || lifecycleState === "cancelling") {
-    return { lifecycleState: "cancelling" as const };
-  }
-  return { lifecycleState, rejectionCode: "no_longer_admitted" as const };
-}
-
 export async function submitDeploymentControlPlaneRunAction(opts: {
   workspaceRoot?: string;
   recordsRoot: string;
+  backend?: NixosSharedHostControlPlaneBackendTarget;
   backendDatabaseUrl?: string;
   submissionPath: string;
   action: DeploymentControlPlaneRunAction;
@@ -105,15 +80,14 @@ export async function submitDeploymentControlPlaneRunAction(opts: {
     action: opts.action,
     ...(opts.approval ? { approval: opts.approval } : {}),
   });
-  const dedupe = await resolveRunActionIdempotency({
+  const dedupe = await resolveDurableRunActionDedupe({
     recordsRoot: opts.recordsRoot,
+    ...(opts.backend ? { backend: opts.backend } : {}),
     idempotencyKey: opts.idempotencyKey,
     requestFingerprint,
-    actionId: randomUUID(),
   });
   const actionId = dedupe.targetId;
-  const requestPath = runActionRequestPathFor(opts.recordsRoot, actionId);
-  await writeControlPlaneJson(requestPath, {
+  const requestDoc = {
     schemaVersion: DEPLOYMENT_CONTROL_PLANE_RUN_ACTION_REQUEST_SCHEMA,
     actionId,
     submittedAt,
@@ -121,7 +95,13 @@ export async function submitDeploymentControlPlaneRunAction(opts: {
     action: opts.action,
     ...(opts.idempotencyKey ? { idempotencyKey: opts.idempotencyKey } : {}),
     ...(opts.approval ? { approval: opts.approval } : {}),
-  });
+  };
+  if (opts.backend) {
+    await writeBackendRunActionDoc(opts.backend, requestDoc);
+  } else {
+    const requestPath = runActionRequestPathFor(opts.recordsRoot, actionId);
+    await writeControlPlaneJson(requestPath, requestDoc);
+  }
   if (dedupe.mode === "reused" && submission.latestAction?.actionId === actionId) {
     const status = statusFromSubmission(submission as any);
     return runActionResponseFromSubmission(
@@ -168,7 +148,15 @@ export async function submitDeploymentControlPlaneRunAction(opts: {
     const status = statusFromSubmission(approved as any);
     return runActionResponseFromSubmission(status, actionId, opts.action);
   }
-  const next = nextLifecycleState(submission.lifecycleState, opts.action);
+  if (opts.backend && submission.lifecycleState === "paused") {
+    if (opts.action === "abort") {
+      throw unsupportedBackendProgressiveRunAction(opts.action);
+    }
+    if (opts.action === "resume" && submission.progressiveRollout?.resumable) {
+      throw unsupportedBackendProgressiveRunAction(opts.action);
+    }
+  }
+  const next = nextRunActionLifecycleState(submission.lifecycleState, opts.action);
   if (opts.action === "abort" && submission.lifecycleState === "paused") {
     await abortPausedProgressiveRun({
       recordsRoot: opts.recordsRoot,

@@ -1,14 +1,9 @@
 #!/usr/bin/env zx-wrapper
 import { runCloudflarePagesStaticDeploy } from "./cloudflare-pages-static-deploy";
 import { lockWaitAbortReasonForSubmission } from "./deployment-control-plane-queue";
-import {
-  acquireBackendControlPlaneLock,
-  writeBackendDeployRecordDoc,
-  type NixosSharedHostControlPlaneBackendTarget,
-} from "./nixos-shared-host-control-plane-backend";
-import { removeMirrorFile } from "./nixos-shared-host-control-plane-backend-materialize";
+import { acquireBackendControlPlaneLock } from "./nixos-shared-host-control-plane-backend";
 import { readControlPlaneJson } from "./nixos-shared-host-control-plane-store";
-import { sanitizedBackendRecord } from "./cloudflare-pages-control-plane-backend-records";
+import { commitCloudflareBackendRecord } from "./cloudflare-pages-control-plane-backend-record-commit";
 // prettier-ignore
 import { persistCloudflareBackendStatus, type CloudflareBackendSubmissionLike } from "./cloudflare-pages-control-plane-backend-status";
 import { executeCloudflarePagesBackendPreviewCleanup } from "./cloudflare-pages-control-plane-backend-preview-cleanup";
@@ -25,17 +20,8 @@ import {
   type CloudflareBackendExecutionStep,
 } from "./cloudflare-pages-control-plane-backend-execution";
 import { executeCloudflarePagesBackendTargetTransition } from "./cloudflare-pages-control-plane-backend-transition";
-
-export async function executeCloudflarePagesBackendSubmission(opts: {
-  workspaceRoot: string;
-  recordsRoot: string;
-  backend: NixosSharedHostControlPlaneBackendTarget;
-  submissionPath: string;
-  submissionRef: string;
-  executionSnapshotPath: string;
-  executionSnapshotRef: string;
-  workerId: string;
-}) {
+import type { CloudflareBackendRunOpts } from "./cloudflare-pages-control-plane-backend-run-types";
+export async function executeCloudflarePagesBackendSubmission(opts: CloudflareBackendRunOpts) {
   const submission = await readControlPlaneJson<CloudflareBackendSubmissionLike>(
     opts.submissionPath,
   );
@@ -43,6 +29,10 @@ export async function executeCloudflarePagesBackendSubmission(opts: {
   const lock = await acquireBackendControlPlaneLock(opts.backend, snapshot.lockScope, {
     shouldAbort: async () => await lockWaitAbortReasonForSubmission(opts.submissionPath),
   });
+  const assertAuthority = async () => {
+    await lock.assertCurrentAuthority();
+    await opts.assertCurrentAuthority?.();
+  };
   try {
     const timeouts = cloudflareBackendTimeouts();
     let running: CloudflareBackendSubmissionLike = updateCloudflareBackendStep(
@@ -59,6 +49,7 @@ export async function executeCloudflarePagesBackendSubmission(opts: {
       metadata: { mutationStep?: boolean; timeoutMs?: number } = {},
     ) => {
       running = updateCloudflareBackendStep(running, step, metadata);
+      await assertAuthority();
       await persistCloudflareBackendStep({
         backend: opts.backend,
         submissionPath: opts.submissionPath,
@@ -67,6 +58,7 @@ export async function executeCloudflarePagesBackendSubmission(opts: {
         running,
       });
     };
+    await assertAuthority();
     await persistCloudflareBackendStatus({
       backend: opts.backend,
       submissionPath: opts.submissionPath,
@@ -103,6 +95,7 @@ export async function executeCloudflarePagesBackendSubmission(opts: {
                   mutationStep: true,
                   timeoutMs: timeouts.previewCleanupMs,
                 });
+                await assertAuthority();
                 return await withStepTimeout(
                   "preview_cleanup",
                   timeouts.previewCleanupMs,
@@ -117,6 +110,7 @@ export async function executeCloudflarePagesBackendSubmission(opts: {
             : snapshot.targetException
               ? await (async () => {
                   await persistStep("target_transition", { mutationStep: true });
+                  await assertAuthority();
                   return await executeCloudflarePagesBackendTargetTransition({
                     recordsRoot: opts.recordsRoot,
                     workerId: opts.workerId,
@@ -166,6 +160,7 @@ export async function executeCloudflarePagesBackendSubmission(opts: {
                       submissionPath: opts.submissionRef,
                       workerId: opts.workerId,
                       lockScope: snapshot.lockScope,
+                      fencingToken: lock.fencingToken,
                       executionSnapshotPath: opts.executionSnapshotPath,
                     },
                     ...(snapshot.smokeConnectOverride
@@ -177,6 +172,7 @@ export async function executeCloudflarePagesBackendSubmission(opts: {
                           mutationStep: true,
                           ...(metadata?.timeoutMs ? { timeoutMs: metadata.timeoutMs } : {}),
                         });
+                        await assertAuthority();
                       },
                     },
                     timeouts: {
@@ -190,12 +186,14 @@ export async function executeCloudflarePagesBackendSubmission(opts: {
           await cleanupWorkerDeploymentSecretRuntime(runtime);
         }
       })();
-      await writeBackendDeployRecordDoc(
-        opts.backend,
-        sanitizedBackendRecord(result.record),
-        result.recordPath,
-      );
-      await removeMirrorFile(result.recordPath);
+      await assertAuthority();
+      await commitCloudflareBackendRecord({
+        backend: opts.backend,
+        ...result,
+        fencingToken: lock.fencingToken,
+        expectedCurrentRunId: snapshot.expectedCurrentRunId,
+      });
+      await assertAuthority();
       await persistCloudflareBackendStatus({
         backend: opts.backend,
         submissionPath: opts.submissionPath,
@@ -223,12 +221,14 @@ export async function executeCloudflarePagesBackendSubmission(opts: {
               snapshot,
               error,
             });
-      await writeBackendDeployRecordDoc(
-        opts.backend,
-        sanitizedBackendRecord(failure.record),
-        failure.recordPath,
-      );
-      await removeMirrorFile(failure.recordPath);
+      await assertAuthority();
+      await commitCloudflareBackendRecord({
+        backend: opts.backend,
+        ...failure,
+        fencingToken: lock.fencingToken,
+        expectedCurrentRunId: snapshot.expectedCurrentRunId,
+      });
+      await assertAuthority();
       await persistCloudflareBackendStatus({
         backend: opts.backend,
         submissionPath: opts.submissionPath,

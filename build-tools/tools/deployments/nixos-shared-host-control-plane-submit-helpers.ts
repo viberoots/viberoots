@@ -12,6 +12,7 @@ import {
   runNixosSharedHostControlPlaneWorker,
 } from "./nixos-shared-host-control-plane-execution";
 import { lockWaitAbortReasonForSubmission } from "./deployment-control-plane-queue";
+import { lockErrorContext } from "./deployment-control-plane-lock-error";
 import {
   readControlPlaneJson,
   writeControlPlaneJson,
@@ -49,16 +50,25 @@ export async function executeSubmittedNixosSharedHostControlPlaneRun(opts: {
     recordsRoot: string;
     deployment: any;
     shouldAbort?: () => Promise<"cancelled" | "superseded" | "no_longer_admitted" | null>;
-  }) => Promise<{ fencingToken?: string; release: () => Promise<void> }>;
+  }) => Promise<{
+    fencingToken?: string;
+    assertCurrentAuthority?: () => Promise<void>;
+    release: () => Promise<void>;
+  }>;
 }) {
+  let lock: Awaited<ReturnType<typeof acquireNixosSharedHostControlPlaneLocks>> | undefined;
   const cleanupReviewedSource = async () => {
     await cleanupReviewedSourceSnapshot(opts.workspaceRoot, opts.snapshot);
   };
+  const assertAuthority = async () => {
+    await lock?.assertCurrentAuthority?.();
+    await opts.assertCurrentAuthority?.();
+  };
   const writeSubmission = async (value: NixosSharedHostControlPlaneSubmission) => {
+    await assertAuthority();
     await writeControlPlaneJson(opts.submissionPath, value);
     await opts.persistSubmission?.(value);
   };
-  let lock: Awaited<ReturnType<typeof acquireNixosSharedHostControlPlaneLocks>> | undefined;
   try {
     const acquireLocks =
       opts.acquireLocks ||
@@ -77,18 +87,7 @@ export async function executeSubmittedNixosSharedHostControlPlaneRun(opts: {
     });
   } catch (error) {
     throw Object.assign(error instanceof Error ? error : new Error(String(error)), {
-      lockRejected: (error as any)?.code !== "lock_timeout",
-      lockTimeout: (error as any)?.code === "lock_timeout",
-      waitAborted:
-        (error as any)?.code === "cancelled" ||
-        (error as any)?.code === "superseded" ||
-        (error as any)?.code === "no_longer_admitted",
-      waitAbortReason:
-        (error as any)?.code === "cancelled" ||
-        (error as any)?.code === "superseded" ||
-        (error as any)?.code === "no_longer_admitted"
-          ? (error as any).code
-          : undefined,
+      ...lockErrorContext(error),
     });
   }
   const workerId = createNixosSharedHostWorkerId(opts.snapshot.submissionId);
@@ -96,6 +95,7 @@ export async function executeSubmittedNixosSharedHostControlPlaneRun(opts: {
   await writeSubmission(submission);
   try {
     await opts.onLockAcquired?.();
+    await assertAuthority();
     const latestSubmission = await readControlPlaneJson<NixosSharedHostControlPlaneSubmission>(
       opts.submissionPath,
     );
@@ -177,6 +177,7 @@ export async function executeSubmittedNixosSharedHostControlPlaneRun(opts: {
       progressiveRollout: submission.progressiveRollout || opts.snapshot.progressiveRollout,
       ...(opts.gateEvaluator ? { gateEvaluator: opts.gateEvaluator } : {}),
     });
+    await assertAuthority();
     await opts.persistRecord?.(result.record, result.recordPath);
     const latestCompleted = await readControlPlaneJson<NixosSharedHostControlPlaneSubmission>(
       opts.submissionPath,
@@ -202,7 +203,7 @@ export async function executeSubmittedNixosSharedHostControlPlaneRun(opts: {
           };
     if (!finalized.recovery) {
       try {
-        await opts.assertCurrentAuthority?.();
+        await assertAuthority();
       } catch {
         return {
           submission: await recoverControlPlaneSubmission({
@@ -233,6 +234,7 @@ export async function executeSubmittedNixosSharedHostControlPlaneRun(opts: {
       });
     }
     if ((error as any)?.recordPath) {
+      await assertAuthority();
       await opts.persistRecord?.((error as any).record, (error as any).recordPath);
       const finalized = finalizeSubmissionFromRecordedError(submission, opts.deployRunId, error);
       await writeSubmission(finalized);

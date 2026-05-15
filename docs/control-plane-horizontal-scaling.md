@@ -1,0 +1,35 @@
+# Deployment Control Plane Horizontal Scaling
+
+The containerized control plane treats service and worker containers as stateless replicas. Durable
+coordination lives in the control-plane database; mounted volumes are only scratch, credential, and
+local fixture surfaces.
+
+## Coordination Contract
+
+- Service submit and run-action requests use durable idempotency keys. Duplicate requests with the
+  same payload return the original durable target; payload drift for the same key fails closed.
+- Worker queue claims are atomic database updates. Each claim receives a unique token and a lease
+  expiry.
+- Only the worker that still owns the current claim token can renew a lease or finalize state.
+  Expired leases, changed claim tokens, completed queue rows, and terminal/superseded submissions
+  revoke worker authority.
+- Provider locks are scoped by deployment/provider target and carry fencing tokens. A worker must
+  still own the fenced lock before mutating provider state and before committing final durable
+  records.
+- Stage-state updates support compare-and-swap expected-run guards for mutation paths that need to
+  prove they are updating the durable state they reviewed.
+- Retry and recovery read submission, snapshot, deploy-record, and stage-state facts from the
+  durable backend. Worker-local temporary directories are mirrors for execution, not authority.
+- Audit rows are database-backed and include request id, actor or service principal, operation,
+  idempotency key when present, deployment id, result, and a redacted non-secret failure summary.
+
+## Operator Notes
+
+Run at least two worker replicas only against the same database and artifact store. A dead worker is
+replaced after its queue lease expires; operators should inspect the queue row and audit events
+before forcing recovery. Stuck submissions should be recovered by durable submission id or deploy
+run id, not by deleting worker-local scratch files.
+
+If a host uses local fixture mode, file-backed mirrors and local locks are test conveniences only.
+Production container profiles must use the database-backed queue, locks, idempotency, stage-state,
+audit, and artifact records.

@@ -9,6 +9,7 @@ export function recordAuthorityFields(authority?: NixosSharedHostMutationAuthori
         workerId: authority.workerId,
         admission: "admitted" as const,
         lockScope: authority.lockScope,
+        ...(authority.fencingToken ? { fencingToken: authority.fencingToken } : {}),
       },
     };
   }

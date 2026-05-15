@@ -48,6 +48,7 @@ export async function buildKubernetesControlPlaneSnapshot(opts: {
   workspaceRoot: string;
   recordsRoot: string;
   request: KubernetesControlPlaneSubmitRequest;
+  expectedCurrentRunId?: string | null;
 }): Promise<KubernetesControlPlaneSnapshot> {
   const base = baseSnapshot(opts);
   const replay = isReplay(opts.request) ? await resolveReplay(opts) : {};
@@ -96,6 +97,7 @@ export async function buildKubernetesControlPlaneSnapshot(opts: {
         ...((opts.request.admissionEvidence as any) || {}),
         ...(provisionerPlan ? { provisionerPlanFingerprint: provisionerPlan.fingerprint } : {}),
       },
+      expectedCurrentRunId: opts.expectedCurrentRunId,
     })),
   };
 }

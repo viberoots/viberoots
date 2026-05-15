@@ -43,6 +43,7 @@ export async function buildVercelControlPlaneSnapshot(opts: {
   workspaceRoot: string;
   recordsRoot: string;
   request: VercelControlPlaneSubmitRequest;
+  expectedCurrentRunId?: string | null;
 }): Promise<VercelControlPlaneSnapshot> {
   const base = baseSnapshot(opts);
   const replay = needsReplay(opts.request) ? await resolveReplay(opts) : {};
@@ -70,6 +71,7 @@ export async function buildVercelControlPlaneSnapshot(opts: {
       sourceRecord: (replay as any).sourceRecord,
       artifactLineageId: (replay as any).artifactLineageId || artifact?.identity,
       evidence: opts.request.admissionEvidence as any,
+      expectedCurrentRunId: opts.expectedCurrentRunId,
     })),
   };
 }

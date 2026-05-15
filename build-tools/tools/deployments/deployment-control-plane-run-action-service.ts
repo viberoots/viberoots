@@ -1,11 +1,11 @@
 #!/usr/bin/env zx-wrapper
 import { submitDeploymentControlPlaneRunAction } from "./deployment-control-plane-run-action";
+import { writeBackendControlPlaneRunActionFailureAuditEvent } from "./deployment-control-plane-audit";
 import { resolveRunActionAuthorizationBoundary } from "./deployment-service-authorization-boundary";
 import {
   enqueueBackendSubmission,
   readBackendSubmissionEnvelopeByDeployRunId,
   readBackendSubmissionEnvelopeBySubmissionId,
-  syncBackendRunAction,
   type NixosSharedHostControlPlaneBackendTarget,
 } from "./nixos-shared-host-control-plane-backend";
 import {
@@ -14,11 +14,14 @@ import {
   persistMaterializedSubmission,
 } from "./nixos-shared-host-control-plane-backend-materialize";
 import type { NixosSharedHostControlPlaneSnapshot } from "./nixos-shared-host-control-plane-contract";
-import {
-  readControlPlaneJson,
-  runActionRequestPathFor,
-} from "./nixos-shared-host-control-plane-store";
+import { readControlPlaneJson } from "./nixos-shared-host-control-plane-store";
+import { queryBackend } from "./nixos-shared-host-control-plane-backend-db";
 import type { ServiceRunActionRequest } from "./nixos-shared-host-control-plane-service-api";
+
+function failureSummary(error: unknown) {
+  const err = error as { code?: unknown; message?: unknown };
+  return [err?.code, err?.message].filter(Boolean).join(": ") || "run action failed";
+}
 
 export async function handleControlPlaneRunActionService(
   request: ServiceRunActionRequest,
@@ -37,19 +40,21 @@ export async function handleControlPlaneRunActionService(
   const snapshot = await readControlPlaneJson<NixosSharedHostControlPlaneSnapshot>(
     materialized.executionSnapshotPath,
   );
-  const boundary = await resolveRunActionAuthorizationBoundary({
-    recordsRoot: opts.backend.recordsRoot,
-    deployment: snapshot.deployment,
-    action: request.action,
-    authSessionId: request.authSessionId,
-    request,
-    authorization: request.authorization,
-    requestedBy: request.requestedBy,
-  });
+  let boundary: Awaited<ReturnType<typeof resolveRunActionAuthorizationBoundary>> | undefined;
   try {
+    boundary = await resolveRunActionAuthorizationBoundary({
+      recordsRoot: opts.backend.recordsRoot,
+      deployment: snapshot.deployment,
+      action: request.action,
+      authSessionId: request.authSessionId,
+      request,
+      authorization: request.authorization,
+      requestedBy: request.requestedBy,
+    });
     const response = await submitDeploymentControlPlaneRunAction({
       workspaceRoot: opts.workspaceRoot,
       recordsRoot: opts.backend.recordsRoot,
+      backend: opts.backend,
       backendDatabaseUrl: opts.backend.databaseUrl,
       submissionPath: materialized.submissionPath,
       action: request.action,
@@ -72,11 +77,27 @@ export async function handleControlPlaneRunActionService(
     ) {
       await enqueueBackendSubmission(opts.backend, response.submissionId, response.submittedAt);
     }
-    await syncBackendRunAction(
-      opts.backend,
-      runActionRequestPathFor(opts.backend.recordsRoot, response.actionId),
-    );
     return { ...response, ...(boundary.decision ? { authorization: boundary.decision } : {}) };
+  } catch (error) {
+    await writeBackendControlPlaneRunActionFailureAuditEvent({
+      client: {
+        query: async <T extends Record<string, unknown> = Record<string, unknown>>(
+          sql: string,
+          params?: readonly unknown[],
+        ) => await queryBackend<T>(opts.backend, sql, params),
+      },
+      requestId: request.actionId,
+      actor:
+        boundary?.requestedBy?.principalId ||
+        request.requestedBy?.principalId ||
+        request.authorization?.requestedBy?.principalId,
+      operation: request.action,
+      idempotencyKey: request.idempotencyKey || request.actionId,
+      deploymentId: snapshot.deployment.deploymentId,
+      failureSummary: failureSummary(error),
+      occurredAt: request.submittedAt,
+    });
+    throw error;
   } finally {
     await persistMaterializedSnapshot({
       backend: opts.backend,

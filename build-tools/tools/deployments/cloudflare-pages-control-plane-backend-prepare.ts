@@ -28,6 +28,7 @@ import {
   buildCloudflarePagesBackendSnapshot,
   type CloudflarePagesBackendSnapshot,
 } from "./cloudflare-pages-control-plane-backend-snapshot";
+import { reviewedCurrentStageExpectation } from "./deployment-current-stage-state-expected";
 
 type RequestDedupe = {
   mode: "created" | "reused";
@@ -132,6 +133,12 @@ export async function prepareBackendCloudflarePagesControlPlaneRun(opts: {
     recordsRoot: opts.recordsRoot,
     governanceResolver: opts.governanceResolver,
   });
+  (snapshot as any).expectedCurrentRunId = (
+    await reviewedCurrentStageExpectation({
+      backend: opts.backend,
+      deployment: opts.request.deployment,
+    })
+  ).expectedCurrentRunId;
   const refs = submissionRefs(opts.recordsRoot, opts.request.submissionId);
   const requestedBy = requestedByFor(opts.request);
   await writeBackendSnapshotDoc(opts.backend, snapshot, refs.executionSnapshotPath);

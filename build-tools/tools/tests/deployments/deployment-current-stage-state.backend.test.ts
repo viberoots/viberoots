@@ -34,19 +34,16 @@ async function backendFixture() {
   return backend;
 }
 
-function record(operationKind: string, deployRunId: string, parentRunId?: string) {
+function record(kind: string, runId: string, parentRunId?: string) {
   return {
-    deployRunId,
-    operationKind,
-    runClassification: operationKind,
+    deployRunId: runId,
+    operationKind: kind,
+    runClassification: kind,
     publishMode: "normal",
     lifecycleState: "finished",
-    terminationReason: null,
     finalOutcome: "succeeded",
     deploymentId: "demoapp-staging",
     deploymentLabel: "//projects/deployments/demoapp-staging:deploy",
-    provider: "nixos-shared-host",
-    providerTargetIdentity: "nixos-shared-host:default:demoapp-staging",
     controlPlane: {
       submissionId: "cp-stage",
       workerId: "worker-1",
@@ -54,13 +51,13 @@ function record(operationKind: string, deployRunId: string, parentRunId?: string
       lockScope: "nixos-shared-host:default:demoapp-staging",
     },
     ...(parentRunId ? { parentRunId } : {}),
-    releaseLineageId: parentRunId || deployRunId,
+    releaseLineageId: parentRunId || runId,
     artifactLineageId: "static-webapp:abc123",
     artifact: { identity: "static-webapp:abc123" },
-    replaySnapshotPath: path.join("/retained", `${deployRunId}-replay.json`),
-    providerConfigSnapshotPath: path.join("/retained", `${deployRunId}-rendered.json`),
+    replaySnapshotPath: path.join("/retained", `${runId}-replay.json`),
+    providerConfigSnapshotPath: path.join("/retained", `${runId}-rendered.json`),
     provisionerPlan: {
-      artifactPath: path.join("/retained", `${deployRunId}-plan.json`),
+      artifactPath: path.join("/retained", `${runId}-plan.json`),
       fingerprint: "sha256:plan",
     },
     driftStatus: { state: "in_sync", checkedAt: "2026-04-01T00:00:00.000Z" },
@@ -144,16 +141,17 @@ test("current stage state updates from successful deploy and ignores release-poi
 
 test("promotion retry and rollback replace current state and preserve history", async () => {
   const backend = await backendFixture();
-  for (const [operationKind, runId, parentRunId] of [
-    ["deploy", "deploy-1", undefined],
-    ["promotion", "deploy-promotion", "deploy-1"],
-    ["retry", "deploy-retry", "deploy-promotion"],
-    ["rollback", "deploy-rollback", "deploy-1"],
+  for (const [operationKind, runId, parentRunId, expectedCurrentRunId] of [
+    ["deploy", "deploy-1", undefined, null],
+    ["promotion", "deploy-promotion", "deploy-1", "deploy-1"],
+    ["retry", "deploy-retry", "deploy-promotion", "deploy-promotion"],
+    ["rollback", "deploy-rollback", "deploy-1", "deploy-retry"],
   ]) {
     await writeBackendDeployRecordDoc(
       backend,
       record(operationKind, runId, parentRunId) as any,
       path.join(backend.recordsRoot, "runs", `${runId}.json`),
+      { expectedCurrentRunId },
     );
   }
   const state = await readBackendCurrentStageState(backend, {

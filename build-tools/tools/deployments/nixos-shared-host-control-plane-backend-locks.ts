@@ -54,6 +54,14 @@ export async function syncBackendRunAction(
   const doc = await readJson<{ actionId: string; submissionId: string; action: string }>(
     actionPath,
   );
+  await writeBackendRunActionDoc(backend, doc);
+  return doc;
+}
+
+export async function writeBackendRunActionDoc(
+  backend: NixosSharedHostControlPlaneBackendTarget,
+  doc: { actionId: string; submissionId: string; action: string },
+) {
   await queryBackend(
     backend,
     `INSERT INTO run_actions (action_id, submission_id, action, request_json, updated_at)
@@ -76,7 +84,11 @@ export async function acquireBackendControlPlaneLock(
     pollMs?: number;
     shouldAbort?: () => Promise<LockAbortReason | null>;
   },
-): Promise<{ fencingToken: string; release: () => Promise<void> }> {
+): Promise<{
+  fencingToken: string;
+  assertCurrentAuthority: () => Promise<void>;
+  release: () => Promise<void>;
+}> {
   const holderId = `holder-${sanitizeName(lockScope)}-${process.pid}-${Date.now()}`;
   const fencingToken = `fence-${Date.now()}-${crypto.randomBytes(8).toString("hex")}`;
   const deadline = Date.now() + (opts?.waitTimeoutMs ?? 30 * 60_000);
@@ -131,6 +143,28 @@ export async function acquireBackendControlPlaneLock(
   heartbeat.unref?.();
   return {
     fencingToken,
+    assertCurrentAuthority: async () => {
+      const now = Date.now();
+      const row = (
+        await queryBackend<{ lock_scope?: string }>(
+          backend,
+          `SELECT lock_scope FROM locks
+           WHERE lock_scope = $1
+             AND holder_id = $2
+             AND fencing_token = $3
+             AND lease_expires_at > $4`,
+          [lockScope, holderId, fencingToken, now],
+        )
+      ).rows[0];
+      if (row?.lock_scope !== lockScope) {
+        throw Object.assign(
+          new Error(`shared control-plane lock ownership lost for ${lockScope}`),
+          {
+            code: "lock_ownership_lost",
+          },
+        );
+      }
+    },
     release: async () => {
       clearInterval(heartbeat);
       await queryBackend(

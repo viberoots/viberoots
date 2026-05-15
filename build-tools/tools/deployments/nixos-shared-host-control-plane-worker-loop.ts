@@ -9,10 +9,10 @@ import {
 import type { NixosSharedHostControlPlaneBackendTarget } from "./nixos-shared-host-control-plane-backend";
 import {
   materializeBackendControlPlaneFiles,
-  persistMaterializedSnapshot,
   persistMaterializedSubmission,
   removeMirrorFile,
 } from "./nixos-shared-host-control-plane-backend-materialize";
+import { persistMaterializedControlPlaneFilesIfCurrent } from "./nixos-shared-host-control-plane-worker-authority";
 import {
   dispatchProviderControlPlaneSubmission,
   executeCloudflarePagesBackendSubmission,
@@ -33,6 +33,7 @@ async function acquireBackendNixosSharedHostLocks(opts: {
   shouldAbort?: () => Promise<"cancelled" | "superseded" | "no_longer_admitted" | null>;
 }) {
   const releases: Array<() => Promise<void>> = [];
+  const assertions: Array<() => Promise<void>> = [];
   let fencingToken: string | undefined;
   try {
     for (const lockScope of nixosSharedHostLockScopes(opts.deployment)) {
@@ -40,6 +41,7 @@ async function acquireBackendNixosSharedHostLocks(opts: {
         ...(opts.shouldAbort ? { shouldAbort: opts.shouldAbort } : {}),
       });
       if (!fencingToken) fencingToken = lock.fencingToken;
+      assertions.push(lock.assertCurrentAuthority);
       releases.push(lock.release);
     }
   } catch (error) {
@@ -48,6 +50,9 @@ async function acquireBackendNixosSharedHostLocks(opts: {
   }
   return {
     fencingToken,
+    assertCurrentAuthority: async () => {
+      for (const assertCurrentAuthority of assertions) await assertCurrentAuthority();
+    },
     release: async () => {
       for (const release of releases.reverse()) await release();
     },
@@ -85,6 +90,7 @@ export async function runNixosSharedHostControlPlaneWorkerOnce(opts: {
           recordsRoot: opts.recordsRoot,
           backend,
         });
+        await claimLease.assertCurrentAuthority();
         await persistMaterializedSubmission({ backend, ...materialized });
         return true;
       }
@@ -97,6 +103,7 @@ export async function runNixosSharedHostControlPlaneWorkerOnce(opts: {
         executionSnapshotPath: materialized.executionSnapshotPath,
         executionSnapshotRef: materialized.executionSnapshotRef,
         workerId: opts.workerId,
+        assertCurrentAuthority: async () => await claimLease.assertCurrentAuthority(),
       });
       return true;
     }
@@ -110,6 +117,7 @@ export async function runNixosSharedHostControlPlaneWorkerOnce(opts: {
         executionSnapshotPath: materialized.executionSnapshotPath,
         executionSnapshotRef: materialized.executionSnapshotRef,
         workerId: opts.workerId,
+        assertCurrentAuthority: async () => await claimLease.assertCurrentAuthority(),
       })
     ) {
       return true;
@@ -120,6 +128,7 @@ export async function runNixosSharedHostControlPlaneWorkerOnce(opts: {
         recordsRoot: opts.recordsRoot,
         backend,
       });
+      await claimLease.assertCurrentAuthority();
       await persistMaterializedSubmission({
         backend,
         submissionPath: materialized.submissionPath,
@@ -154,7 +163,9 @@ export async function runNixosSharedHostControlPlaneWorkerOnce(opts: {
           },
         ),
       persistRecord: async (record, recordPath) => {
-        await writeBackendDeployRecordDoc(backend, record, recordPath);
+        await writeBackendDeployRecordDoc(backend, record, recordPath, {
+          expectedCurrentRunId: snapshot.expectedCurrentRunId,
+        });
         await removeMirrorFile(recordPath);
       },
       assertCurrentAuthority: async () => await claimLease.assertCurrentAuthority(),
@@ -171,19 +182,16 @@ export async function runNixosSharedHostControlPlaneWorkerOnce(opts: {
         }),
     });
   } finally {
-    await claimLease.stop();
-    await persistMaterializedSnapshot({
-      backend,
-      executionSnapshotPath: materialized.executionSnapshotPath,
-      executionSnapshotRef: materialized.executionSnapshotRef,
-    });
-    await persistMaterializedSubmission({
-      backend,
-      submissionPath: materialized.submissionPath,
-      submissionRef: materialized.submissionRef,
-      executionSnapshotRef: materialized.executionSnapshotRef,
-    });
-    await materialized.cleanup();
+    try {
+      await persistMaterializedControlPlaneFilesIfCurrent({
+        backend,
+        materialized,
+        assertCurrentAuthority: async () => await claimLease.assertCurrentAuthority(),
+      });
+    } finally {
+      await claimLease.stop();
+      await materialized.cleanup();
+    }
   }
   return true;
 }

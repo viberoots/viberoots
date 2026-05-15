@@ -27,7 +27,7 @@ REVIEWED_DEPLOYMENT_TEST_OWNERSHIP = {
     "build-tools/tools/tests/deployments/deployment-lane-governance.verify.test.ts": True,
     "build-tools/tools/tests/deployments/deployment-component-kinds.contract.test.ts": True,
     "build-tools/tools/tests/deployments/deployment-control-plane.approval-grant.helpers.ts": False,
-    "build-tools/tools/tests/deployments/deployment-control-plane.authz-idempotency.test.ts": True, "build-tools/tools/tests/deployments/deployment-ci-admission.authz.test.ts": True, "build-tools/tools/tests/deployments/deployment-ci-admission.test.ts": True,
+    "build-tools/tools/tests/deployments/control-plane-coordination-audit.test.ts": True, "build-tools/tools/tests/deployments/control-plane-coordination-hardening.test.ts": True, "build-tools/tools/tests/deployments/control-plane-coordination-progressive-backend.test.ts": True, "build-tools/tools/tests/deployments/control-plane-coordination-review-fencing.test.ts": True, "build-tools/tools/tests/deployments/control-plane-coordination-review.test.ts": True, "build-tools/tools/tests/deployments/deployment-control-plane.authz-idempotency.test.ts": True, "build-tools/tools/tests/deployments/deployment-ci-admission.authz.test.ts": True, "build-tools/tools/tests/deployments/deployment-ci-admission.test.ts": True,
     "build-tools/tools/tests/deployments/deployment-control-plane.authz-diagnostics.test.ts": True,
     "build-tools/tools/tests/deployments/deployment-control-plane.approval-grant.test.ts": True,
     "build-tools/tools/tests/deployments/deployment-control-plane.bootstrap.test.ts": True,

@@ -44,7 +44,12 @@ export {
   type DeploymentStageStateAuditEvent,
 } from "./deployment-stage-state-audit";
 export {
+  readBackendControlPlaneAuditEvents,
+  type DeploymentControlPlaneAuditEvent,
+} from "./deployment-control-plane-audit";
+export {
   acquireBackendControlPlaneLock,
   resolveBackendIdempotency,
   syncBackendRunAction,
+  writeBackendRunActionDoc,
 } from "./nixos-shared-host-control-plane-backend-locks";

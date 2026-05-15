@@ -44,6 +44,7 @@ export async function buildS3StaticControlPlaneSnapshot(opts: {
   workspaceRoot: string;
   recordsRoot: string;
   request: S3StaticControlPlaneSubmitRequest;
+  expectedCurrentRunId?: string | null;
 }): Promise<S3StaticControlPlaneSnapshot> {
   const base = baseSnapshot(opts);
   const replay =
@@ -73,6 +74,7 @@ export async function buildS3StaticControlPlaneSnapshot(opts: {
       sourceRecord: (replay as any).sourceRecord,
       artifactLineageId: (replay as any).artifactLineageId || artifact?.identity,
       evidence: opts.request.admissionEvidence as any,
+      expectedCurrentRunId: opts.expectedCurrentRunId,
     })),
   };
 }

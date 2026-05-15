@@ -40,6 +40,7 @@ import {
 } from "./nixos-shared-host-control-plane-store";
 import { writeNixosSharedHostProvisionerPlan } from "./nixos-shared-host-provisioner-plan";
 import { createNixosSharedHostDeployRunId } from "./nixos-shared-host-records";
+import { reviewedCurrentStageExpectation } from "./deployment-current-stage-state-expected";
 import {
   cleanupReviewedSourceSnapshot,
   snapshotReviewedSourceForSubmission,
@@ -138,6 +139,9 @@ export async function prepareBackendNixosSharedHostControlPlaneRun(opts: {
     },
     submissionId,
   );
+  snapshot.expectedCurrentRunId = (
+    await reviewedCurrentStageExpectation({ backend: opts.backend, deployment: opts.deployment })
+  ).expectedCurrentRunId;
   const deployRunId = createNixosSharedHostDeployRunId();
   snapshot.provisionerPlan = await writeNixosSharedHostProvisionerPlan({ snapshot });
   const executionSnapshotPath = executionSnapshotPathFor(opts.paths.recordsRoot, submissionId);

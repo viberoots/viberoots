@@ -19,6 +19,7 @@ export async function writeBackendDeployRecordDoc(
   backend: NixosSharedHostControlPlaneBackendTarget,
   doc: DeployRecordDoc,
   recordPath: string,
+  opts: { expectedCurrentRunId?: string | null } = {},
 ) {
   const submissionId = doc.controlPlane?.submissionId;
   if (!doc.deployRunId || !submissionId) {
@@ -45,6 +46,9 @@ export async function writeBackendDeployRecordDoc(
         client,
         record: doc as any,
         updatedAt,
+        ...(opts.expectedCurrentRunId === undefined
+          ? {}
+          : { enforceCompareAndSwap: true, expectedCurrentRunId: opts.expectedCurrentRunId }),
       });
       if (state) {
         await writeBackendStageStateAuditEvents({ client, state });

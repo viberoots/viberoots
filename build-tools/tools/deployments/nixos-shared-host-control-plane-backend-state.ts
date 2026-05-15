@@ -6,6 +6,7 @@ import {
 } from "./nixos-shared-host-control-plane-backend-db";
 import type { NixosSharedHostControlPlaneBackendTarget } from "./nixos-shared-host-control-plane-backend-db";
 import { writeBackendSubmissionAuditEvents } from "./deployment-stage-state-audit";
+import { writeBackendControlPlaneAuditEvent } from "./deployment-control-plane-audit";
 
 type SubmissionDoc = {
   submissionId: string;
@@ -78,6 +79,15 @@ export async function writeBackendSubmissionDoc(
     await markQueueDone(backend, doc.submissionId);
   }
   await writeBackendSubmissionAuditEvents({
+    client: {
+      query: async <T extends Record<string, unknown> = Record<string, unknown>>(
+        sql: string,
+        params?: readonly unknown[],
+      ) => await queryBackend<T>(backend, sql, params),
+    },
+    submission: doc,
+  });
+  await writeBackendControlPlaneAuditEvent({
     client: {
       query: async <T extends Record<string, unknown> = Record<string, unknown>>(
         sql: string,

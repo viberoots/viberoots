@@ -24,6 +24,7 @@ import {
   assertReplayAdmissionMatchesRecord,
 } from "./deployment-replay-admission";
 import { resolveProviderSubmitIdempotency } from "./deployment-provider-submit-idempotency";
+import type { ReviewedCurrentStageExpectation } from "./deployment-current-stage-state-expected";
 
 export const DEPLOYMENT_PROVIDER_FROZEN_SNAPSHOT_SCHEMA =
   "deployment-provider-frozen-execution-snapshot@1";
@@ -34,7 +35,7 @@ export type FrozenProviderAdmission = {
   policyEvaluation: DeploymentAdmissionPolicyEvaluation;
 };
 
-export type FrozenProviderSnapshotFields = {
+export type FrozenProviderSnapshotFields = ReviewedCurrentStageExpectation & {
   frozenExecutionSchemaVersion: typeof DEPLOYMENT_PROVIDER_FROZEN_SNAPSHOT_SCHEMA;
   admittedContext: AdmittedContextLike & {
     policyEvaluation: DeploymentAdmissionPolicyEvaluation;
@@ -125,6 +126,7 @@ export async function admitProviderControlPlaneSnapshot(opts: {
   evidence?: DeploymentAdmissionEvidence;
   sourceRecord?: any;
   artifactLineageId?: string;
+  expectedCurrentRunId?: string | null;
 }): Promise<FrozenProviderSnapshotFields> {
   const policyEvaluation = await evaluateDeploymentAdmission({
     workspaceRoot: opts.workspaceRoot,
@@ -138,6 +140,7 @@ export async function admitProviderControlPlaneSnapshot(opts: {
   });
   return {
     frozenExecutionSchemaVersion: DEPLOYMENT_PROVIDER_FROZEN_SNAPSHOT_SCHEMA,
+    expectedCurrentRunId: opts.expectedCurrentRunId ?? null,
     admittedContext: { ...opts.admittedContext, policyEvaluation },
     admission: {
       decision: "admitted",

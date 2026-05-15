@@ -9,6 +9,7 @@ import type {
   DeploymentControlPlaneServiceInstance,
   DeploymentControlPlaneRequestDedupe,
 } from "./deployment-control-plane-contract";
+import { redactDeploymentAuthText } from "./deployment-auth-redaction";
 import { DeploymentAdmissionError } from "./deployment-control-plane-errors";
 import { pendingApprovalSummaryFor } from "./deployment-control-plane-approval";
 import { createNixosSharedHostControlPlaneSubmission } from "./nixos-shared-host-control-plane-submission";
@@ -46,7 +47,12 @@ export function createAdmissionFailureSubmission(opts: {
     authorization: opts.authorization,
     authorizationSnapshot: opts.authorizationSnapshot,
     ...(opts.serviceInstance ? { serviceInstance: opts.serviceInstance } : {}),
-    ...(pending ? { pendingReasonCode: opts.error.code } : { rejectionCode: opts.error.code }),
+    ...(pending
+      ? { pendingReasonCode: opts.error.code }
+      : {
+          rejectionCode: opts.error.code,
+          rejectionMessage: redactDeploymentAuthText(opts.error.message),
+        }),
     ...(pending
       ? {}
       : {

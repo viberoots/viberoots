@@ -23,12 +23,10 @@ import type {
 } from "./deployment-admission-evidence";
 import type { DeploymentWorkerVaultRuntimeMetadata } from "./deployment-vault-runtime-worker";
 import type { DeploymentArtifactBindingProvenance } from "./deployment-artifact-binding";
-
 export const NIXOS_SHARED_HOST_CONTROL_PLANE_SNAPSHOT_SCHEMA =
   "nixos-shared-host-control-plane-snapshot@4";
 export const NIXOS_SHARED_HOST_CONTROL_PLANE_SUBMISSION_SCHEMA =
   "nixos-shared-host-control-plane-submission@3";
-
 export type NixosSharedHostPublishBehavior = "deploy" | "publish-only" | "provision-only";
 export type NixosSharedHostBootstrapMode = "first_install" | "offline_recovery";
 
@@ -64,6 +62,7 @@ export type NixosSharedHostControlPlaneSnapshot = {
   deploymentId: string;
   deploymentLabel: string;
   providerTargetIdentity: string;
+  expectedCurrentRunId?: string | null;
   lockScope: string;
   deployment: NixosSharedHostDeployment;
   progressiveRollout?: NixosSharedHostProgressiveRollout;
@@ -120,6 +119,7 @@ export type NixosSharedHostControlPlaneSubmission = {
   authorization?: DeploymentControlPlaneAuthorizationDecision;
   authorizationSnapshot?: DeploymentControlPlaneAuthorization;
   rejectionCode?: DeploymentControlPlaneSubmitRejectionCode;
+  rejectionMessage?: string;
   pendingReasonCode?: "approval_required" | "approval_no_longer_valid";
   serviceInstance?: DeploymentControlPlaneServiceInstance;
   approval?: DeploymentControlPlaneApprovalSummary;

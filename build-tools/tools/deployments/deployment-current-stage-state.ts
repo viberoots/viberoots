@@ -9,6 +9,7 @@ import {
   DEPLOYMENT_CURRENT_STAGE_STATE_SCHEMA,
   type DeploymentCurrentStageState,
 } from "./deployment-current-stage-state-types";
+import { writeCurrentStageStateCas } from "./deployment-current-stage-state-cas";
 export { DEPLOYMENT_CURRENT_STAGE_STATE_SCHEMA, type DeploymentCurrentStageState };
 export {
   readBackendCurrentStageState,
@@ -58,7 +59,10 @@ type DeployRecordDoc = {
       requiredApprovals?: Array<{ name?: string }>;
     };
   };
-  controlPlane?: { submissionId?: string; executionSnapshotPath?: string };
+  controlPlane?: {
+    submissionId?: string;
+    executionSnapshotPath?: string;
+  };
 };
 
 type SnapshotDoc = {
@@ -162,6 +166,8 @@ export async function writeCurrentStageStateForDeployRecord(opts: {
   client: BackendQueryable;
   record: DeployRecordDoc;
   updatedAt: string;
+  expectedCurrentRunId?: string | null;
+  enforceCompareAndSwap?: boolean;
 }) {
   const submissionId = opts.record.controlPlane?.submissionId;
   if (!submissionId) return null;
@@ -171,22 +177,8 @@ export async function writeCurrentStageStateForDeployRecord(opts: {
     updatedAt: opts.updatedAt,
   });
   if (!state) return null;
-  await opts.client.query(
-    `INSERT INTO current_stage_state (
-      deployment_id, environment_stage, current_run_id, document_json, updated_at
-    ) VALUES ($1, $2, $3, $4::jsonb, $5)
-    ON CONFLICT(deployment_id, environment_stage) DO UPDATE SET
-      current_run_id = EXCLUDED.current_run_id,
-      document_json = EXCLUDED.document_json,
-      updated_at = EXCLUDED.updated_at`,
-    [
-      state.deploymentId,
-      state.environmentStage,
-      state.currentRunId,
-      JSON.stringify(state),
-      state.updatedAt,
-    ],
-  );
+  const stateJson = JSON.stringify(state);
+  await writeCurrentStageStateCas({ ...opts, state, stateJson });
   await opts.client.query(
     `INSERT INTO stage_state_history (
       deployment_id, environment_stage, deploy_run_id, document_json, updated_at

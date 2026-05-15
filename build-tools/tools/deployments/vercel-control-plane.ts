@@ -23,6 +23,7 @@ import {
   buildVercelControlPlaneSnapshot,
   type VercelControlPlaneSnapshot as Snapshot,
 } from "./vercel-control-plane-snapshot";
+import { reviewedCurrentStageExpectation } from "./deployment-current-stage-state-expected";
 
 export const VERCEL_CONTROL_PLANE_SUBMIT_REQUEST_SCHEMA = "vercel-control-plane-submit-request@1";
 
@@ -52,7 +53,15 @@ export async function queueVercelControlPlaneSubmission(opts: {
   backend: NixosSharedHostControlPlaneBackendTarget;
   request: VercelControlPlaneSubmitRequest;
 }) {
-  const snapshot = await buildVercelControlPlaneSnapshot(opts);
+  const snapshot = await buildVercelControlPlaneSnapshot({
+    ...opts,
+    expectedCurrentRunId: (
+      await reviewedCurrentStageExpectation({
+        backend: opts.backend,
+        deployment: opts.request.deployment,
+      })
+    ).expectedCurrentRunId,
+  });
   return await queueFrozenProviderSubmission({
     recordsRoot: opts.recordsRoot,
     backend: opts.backend,
@@ -69,20 +78,26 @@ export async function executeVercelControlPlaneSubmission(opts: {
   executionSnapshotPath: string;
   executionSnapshotRef: string;
   workerId: string;
+  assertCurrentAuthority?: () => Promise<void>;
   apiClient?: VercelApiClient;
 }) {
+  const submission = JSON.parse(await fs.readFile(opts.submissionPath, "utf8"));
+  const snapshot = JSON.parse(await fs.readFile(opts.executionSnapshotPath, "utf8")) as Snapshot;
+  requireFrozenProviderSnapshot(snapshot, "vercel");
+  requireFrozenProviderSubmissionAdmission({ provider: "vercel", submission, snapshot });
+  const lock = await acquireBackendControlPlaneLock(opts.backend, snapshot.lockScope);
+  const assertAuthority = async () => {
+    await lock.assertCurrentAuthority();
+    await opts.assertCurrentAuthority?.();
+  };
   const persistSubmissionStatus = async (nextSubmission: Record<string, unknown>) => {
+    await assertAuthority();
     await writeControlPlaneJson(opts.submissionPath, nextSubmission);
     await writeBackendSubmissionDoc(opts.backend, nextSubmission as any, {
       submissionPath: opts.submissionRef,
       executionSnapshotPath: opts.executionSnapshotRef,
     });
   };
-  const submission = JSON.parse(await fs.readFile(opts.submissionPath, "utf8"));
-  const snapshot = JSON.parse(await fs.readFile(opts.executionSnapshotPath, "utf8")) as Snapshot;
-  requireFrozenProviderSnapshot(snapshot, "vercel");
-  requireFrozenProviderSubmissionAdmission({ provider: "vercel", submission, snapshot });
-  const lock = await acquireBackendControlPlaneLock(opts.backend, snapshot.lockScope);
   const runningSubmission = { ...submission, lifecycleState: "running", workerId: opts.workerId };
   try {
     await persistSubmissionStatus(runningSubmission);
@@ -100,8 +115,12 @@ export async function executeVercelControlPlaneSubmission(opts: {
       workerId: opts.workerId,
       admission: "admitted",
       lockScope: snapshot.lockScope,
+      fencingToken: lock.fencingToken,
     };
-    await writeBackendDeployRecordDoc(opts.backend, result.record, result.recordPath);
+    await assertAuthority();
+    await writeBackendDeployRecordDoc(opts.backend, result.record, result.recordPath, {
+      expectedCurrentRunId: snapshot.expectedCurrentRunId,
+    });
     await persistSubmissionStatus({
       ...submission,
       lifecycleState: "finished",

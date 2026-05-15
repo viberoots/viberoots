@@ -1,6 +1,9 @@
 #!/usr/bin/env zx-wrapper
 import crypto from "node:crypto";
-import { queryBackend } from "./nixos-shared-host-control-plane-backend-db";
+import {
+  isLocalHarnessDatabaseUrl,
+  queryBackend,
+} from "./nixos-shared-host-control-plane-backend-db";
 import type { NixosSharedHostControlPlaneBackendTarget } from "./nixos-shared-host-control-plane-backend-db";
 
 type ClaimedQueueRow = {
@@ -10,6 +13,55 @@ type ClaimedQueueRow = {
   lifecycleState: string;
   claimToken: string;
 };
+
+export const CLAIM_BACKEND_QUEUED_SUBMISSION_SQL = `WITH candidate AS (
+         SELECT q.submission_id
+         FROM queue q
+         JOIN submissions s ON s.submission_id = q.submission_id
+         WHERE q.completed_at IS NULL
+           AND (q.claimed_by IS NULL OR q.claim_expires_at IS NULL OR q.claim_expires_at <= $1)
+           AND s.lifecycle_state IN ('queued', 'waiting_for_lock', 'running', 'cancelling')
+         ORDER BY q.enqueued_at ASC
+         LIMIT 1
+         FOR UPDATE SKIP LOCKED
+       ),
+       claimed AS (
+         UPDATE queue
+         SET claimed_by = $2,
+             claim_token = $3,
+             claim_expires_at = $4
+         FROM candidate
+         WHERE queue.submission_id = candidate.submission_id
+         RETURNING queue.submission_id, queue.claim_token
+       )
+       SELECT claimed.submission_id, claimed.claim_token, s.submission_path,
+              s.execution_snapshot_path, s.lifecycle_state
+       FROM claimed
+       JOIN submissions s ON s.submission_id = claimed.submission_id`;
+
+const CLAIM_BACKEND_QUEUED_SUBMISSION_LOCAL_HARNESS_SQL = `WITH candidate AS (
+         SELECT q.submission_id
+         FROM queue q
+         JOIN submissions s ON s.submission_id = q.submission_id
+         WHERE q.completed_at IS NULL
+           AND (q.claimed_by IS NULL OR q.claim_expires_at IS NULL OR q.claim_expires_at <= $1)
+           AND s.lifecycle_state IN ('queued', 'waiting_for_lock', 'running', 'cancelling')
+         ORDER BY q.enqueued_at ASC
+         LIMIT 1
+       ),
+       claimed AS (
+         UPDATE queue
+         SET claimed_by = $2,
+             claim_token = $3,
+             claim_expires_at = $4
+         WHERE submission_id = (SELECT submission_id FROM candidate)
+           AND (claimed_by IS NULL OR claim_expires_at IS NULL OR claim_expires_at <= $1)
+         RETURNING submission_id, claim_token
+       )
+       SELECT claimed.submission_id, claimed.claim_token, s.submission_path,
+              s.execution_snapshot_path, s.lifecycle_state
+       FROM claimed
+       JOIN submissions s ON s.submission_id = claimed.submission_id`;
 
 function envInt(name: string, fallback: number): number {
   const raw = String(process.env[name] || "").trim();
@@ -66,29 +118,9 @@ export async function claimBackendQueuedSubmission(
       claim_token?: string;
     }>(
       backend,
-      `WITH candidate AS (
-         SELECT q.submission_id
-         FROM queue q
-         JOIN submissions s ON s.submission_id = q.submission_id
-         WHERE q.completed_at IS NULL
-           AND (q.claimed_by IS NULL OR q.claim_expires_at IS NULL OR q.claim_expires_at <= $1)
-           AND s.lifecycle_state IN ('queued', 'waiting_for_lock', 'running', 'cancelling')
-         ORDER BY q.enqueued_at ASC
-         LIMIT 1
-       ),
-       claimed AS (
-         UPDATE queue
-         SET claimed_by = $2,
-             claim_token = $3,
-             claim_expires_at = $4
-         WHERE submission_id = (SELECT submission_id FROM candidate)
-           AND (claimed_by IS NULL OR claim_expires_at IS NULL OR claim_expires_at <= $1)
-         RETURNING submission_id, claim_token
-       )
-       SELECT claimed.submission_id, claimed.claim_token, s.submission_path,
-              s.execution_snapshot_path, s.lifecycle_state
-       FROM claimed
-       JOIN submissions s ON s.submission_id = claimed.submission_id`,
+      isLocalHarnessDatabaseUrl(backend.databaseUrl)
+        ? CLAIM_BACKEND_QUEUED_SUBMISSION_LOCAL_HARNESS_SQL
+        : CLAIM_BACKEND_QUEUED_SUBMISSION_SQL,
       [now, workerId, claimToken, now + claimMs],
     )
   ).rows[0];
@@ -107,6 +139,31 @@ export async function claimBackendQueuedSubmission(
     lifecycleState: row.lifecycle_state || "queued",
     claimToken: row.claim_token,
   };
+}
+
+async function currentSubmissionClaim(opts: {
+  backend: NixosSharedHostControlPlaneBackendTarget;
+  submissionId: string;
+  workerId: string;
+  claimToken: string;
+}) {
+  const now = Date.now();
+  const row = (
+    await queryBackend<{ submission_id?: string }>(
+      opts.backend,
+      `SELECT q.submission_id
+       FROM queue q
+       JOIN submissions s ON s.submission_id = q.submission_id
+       WHERE q.submission_id = $1
+         AND q.claimed_by = $2
+         AND q.claim_token = $3
+         AND q.completed_at IS NULL
+         AND q.claim_expires_at > $4
+         AND s.lifecycle_state IN ('queued', 'waiting_for_lock', 'running', 'cancelling')`,
+      [opts.submissionId, opts.workerId, opts.claimToken, now],
+    )
+  ).rows[0];
+  return row?.submission_id === opts.submissionId;
 }
 
 export function startBackendSubmissionClaimLease(opts: {
@@ -138,7 +195,13 @@ export function startBackendSubmissionClaimLease(opts: {
   heartbeat.unref?.();
   return {
     assertCurrentAuthority: async () => {
-      if (!(await refresh())) {
+      const current = await currentSubmissionClaim({
+        backend: opts.backend,
+        submissionId: opts.submissionId,
+        workerId: opts.workerId,
+        claimToken: opts.claimToken,
+      });
+      if (!current || !(await refresh())) {
         throw Object.assign(
           new Error(`shared control-plane worker ownership lost for ${opts.submissionId}`),
           { code: "worker_ownership_lost" },
