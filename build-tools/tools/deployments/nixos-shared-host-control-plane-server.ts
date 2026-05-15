@@ -25,7 +25,7 @@ import { assertProductionArtifactStore } from "./control-plane-artifact-store";
 import { checkControlPlaneReadiness, readWorkerHeartbeats } from "./control-plane-process-health";
 import { assertReviewedServiceTokenConfigured } from "./nixos-shared-host-control-plane-service-auth";
 import { readJsonBody, readRawBody, writeJson } from "./control-plane-http";
-import { handleControlPlaneWebRoute } from "./deployment-control-plane-web-routes";
+import { handleControlPlanePresentationRoutes } from "./nixos-shared-host-control-plane-presentation-routes";
 import { requireReviewedBearerToken } from "./deployment-control-plane-service-token";
 
 export async function startNixosSharedHostControlPlaneServer(opts: {
@@ -40,6 +40,7 @@ export async function startNixosSharedHostControlPlaneServer(opts: {
   objectStore?: ControlPlaneArtifactStore;
   instanceId?: string;
   webUi?: { enabled: boolean; basePath: string };
+  mcp?: { enabled: boolean; basePath: string };
 }) {
   assertReviewedServiceTokenConfigured({
     serviceToken: opts.token,
@@ -82,20 +83,18 @@ export async function startNixosSharedHostControlPlaneServer(opts: {
         return;
       }
       if (
-        await handleControlPlaneWebRoute({
+        await handleControlPlanePresentationRoutes({
           request,
           response,
           url,
-          web: {
-            enabled: opts.webUi?.enabled ?? true,
-            basePath: opts.webUi?.basePath ?? "/",
-            backend,
-            objectStore: opts.objectStore,
-            token: opts.token,
-            localFixture: opts.localFixture,
-            env: opts.env,
-            instanceId: opts.instanceId,
-          },
+          backend,
+          objectStore: opts.objectStore,
+          token: opts.token,
+          localFixture: opts.localFixture,
+          env: opts.env,
+          instanceId: opts.instanceId,
+          webUi: opts.webUi,
+          mcp: opts.mcp,
         })
       ) {
         return;

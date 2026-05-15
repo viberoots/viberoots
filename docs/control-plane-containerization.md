@@ -291,6 +291,9 @@ Architectural implication for v1: implement MCP as another presentation layer ov
 service-side authorization, query, redaction, idempotency, and audit primitives used by CLI and web.
 Avoid a separate agent-only control path.
 
+The implemented v1 endpoint and examples are documented in
+[Deployment Control Plane MCP](/Users/kiltyj/Code/viberoots/docs/control-plane-mcp.md).
+
 ## Volumes And State
 
 The container filesystem must be disposable. Durable state is mounted:

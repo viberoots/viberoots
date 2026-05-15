@@ -87,6 +87,12 @@ roots, artifact-store kind and region, Infisical filename patterns, web UI, and 
 base path can be `/` or a reverse-proxy prefix such as `/deploy-control-plane`; the service strips
 that prefix before routing UI assets and `/api/v1/read/*` requests.
 
+`mcp.basePath` controls the read-only HTTP MCP endpoint. The endpoint is enabled by default at
+`/mcp` and can be disabled with `mcp.enabled: false` when a host should not expose agent
+inspection. See [Deployment Control Plane MCP](/Users/kiltyj/Code/viberoots/docs/control-plane-mcp.md)
+for the v1 tool list, authentication requirements, audit behavior, and fixture-only unauthenticated
+mode.
+
 ## Startup Validation
 
 The loader validates shape, enum values, URL base paths, and credential path policy before service

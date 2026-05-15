@@ -142,6 +142,32 @@ export async function writeBackendControlPlaneRunActionFailureAuditEvent(opts: {
   });
 }
 
+export async function writeBackendControlPlaneMcpAuditEvent(opts: {
+  client: BackendQueryable;
+  requestId: string;
+  actor?: string;
+  operation: string;
+  deploymentId?: string;
+  result: "success" | "failed";
+  failureSummary?: string;
+  occurredAt?: string;
+}) {
+  return await insertBackendControlPlaneAuditEvent({
+    client: opts.client,
+    event: {
+      schemaVersion: DEPLOYMENT_CONTROL_PLANE_AUDIT_SCHEMA,
+      eventId: `audit-${opts.requestId}-${opts.result}`,
+      requestId: opts.requestId,
+      actor: opts.actor || "service:deployment-control-plane",
+      operation: opts.operation,
+      deploymentId: opts.deploymentId || "control-plane",
+      result: opts.result,
+      ...(opts.failureSummary ? { failureSummary: opts.failureSummary } : {}),
+      occurredAt: opts.occurredAt || new Date().toISOString(),
+    },
+  });
+}
+
 export async function readBackendControlPlaneAuditEvents(
   backend: NixosSharedHostControlPlaneBackendTarget,
   deploymentId: string,
