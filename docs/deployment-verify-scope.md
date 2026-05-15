@@ -43,6 +43,7 @@ The initial deployment-owned build-system boundary is intentionally narrow:
 - reviewed deployment-owned support files outside those primary prefixes:
   - `build-tools/tools/tests/scaffolding/deployment.cloudflare-containers.scaffold-contract.test.ts`
   - `build-tools/tools/tests/scaffolding/deployment.scaffold-contract.test.ts`
+  - `build-tools/tools/bin/deployment-control-plane`
   - `build-tools/tools/nix/shared-host-identity-provider-bootstrap.nix`
   - `build-tools/tools/nix/shared-host-deploy-auth-callback-module.nix`
   - `build-tools/tools/nix/shared-host-identity-provider-migration-steps.nix`

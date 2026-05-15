@@ -8,9 +8,9 @@ export const REVIEWED_DEPLOYMENT_OWNED_BUILD_SYSTEM_PREFIXES = [
 ] as const;
 
 export const REVIEWED_DEPLOYMENT_OWNED_SUPPORT_PATHS = [
-  "build-tools/tools/bin/deployment-control-plane",
   "build-tools/tools/tests/scaffolding/deployment.cloudflare-containers.scaffold-contract.test.ts",
   "build-tools/tools/tests/scaffolding/deployment.scaffold-contract.test.ts",
+  "build-tools/tools/bin/deployment-control-plane",
   "build-tools/tools/nix/shared-host-identity-provider-bootstrap.nix",
   "build-tools/tools/nix/shared-host-deploy-auth-callback-module.nix",
   "build-tools/tools/nix/shared-host-identity-provider-migration-steps.nix",
