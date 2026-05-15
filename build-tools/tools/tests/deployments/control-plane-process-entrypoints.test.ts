@@ -61,7 +61,9 @@ test("service exposes health readiness and worker heartbeat state without secret
     });
     try {
       const health = await readJson<any>(await fetch(new URL("/healthz", service.url)));
-      assert.deepEqual(health, { ok: true, instanceId: "cp-test-instance" });
+      assert.equal(health.ok, true);
+      assert.equal(health.instanceId, "cp-test-instance");
+      assert.equal(health.image.version, "unknown");
       const ready = await readJson<any>(await fetch(new URL("/readyz", service.url)));
       assert.equal(ready.database.ok, true);
       assert.equal(ready.artifactStore.ok, true);

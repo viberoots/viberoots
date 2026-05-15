@@ -1,5 +1,6 @@
 #!/usr/bin/env zx-wrapper
 import { checkControlPlaneReadiness } from "./control-plane-process-health";
+import { readControlPlaneImageMetadata } from "./control-plane-image-metadata";
 import type { ControlPlaneArtifactStore } from "./control-plane-artifact-store-types";
 import { statusFromSubmission } from "./deployment-control-plane-status";
 import { redactControlPlaneReadModel } from "./deployment-control-plane-read-redaction";
@@ -25,11 +26,13 @@ export async function readControlPlaneRuntimeStatus(opts: {
   backend: NixosSharedHostControlPlaneBackendTarget;
   objectStore?: ControlPlaneArtifactStore;
   instanceId?: string;
+  env?: NodeJS.ProcessEnv;
 }) {
   const readiness = await checkControlPlaneReadiness(opts);
   return redactControlPlaneReadModel({
     schemaVersion: "control-plane-read-status@1",
     instanceId: opts.instanceId || "unknown",
+    image: readControlPlaneImageMetadata(opts.env),
     database: readiness.database,
     artifactStore: readiness.artifactStore,
     workers: readiness.workers,

@@ -24,7 +24,7 @@ artifact-store credential files before accepting work. The service binds to `ser
 
 Service probes:
 
-- `GET /healthz` returns process liveness and the non-secret instance id.
+- `GET /healthz` returns process liveness, the non-secret instance id, and image metadata.
 - `GET /readyz` checks database connectivity, artifact-store metadata-read connectivity, and worker
   heartbeat visibility.
 - `GET /api/v1/worker-heartbeats` returns authenticated worker heartbeat summaries.
@@ -32,6 +32,16 @@ Service probes:
 Workers write heartbeat rows while starting, running, stopping, and stopped. Graceful shutdown stops
 the poll loop and waits for the current fenced execution attempt to release its lease before the
 process exits.
+
+Image metadata is non-secret and comes from the reviewed image/runtime environment:
+
+- `VBR_CONTROL_PLANE_VERSION`
+- `VBR_CONTROL_PLANE_SOURCE_REVISION`
+- `VBR_CONTROL_PLANE_IMAGE_DIGEST`
+
+Operators should set `VBR_CONTROL_PLANE_IMAGE_DIGEST` from the pinned image reference used by the
+host module, Compose file, or Podman invocation. Status APIs report this value so operators do not
+need to infer identity from a mutable image tag.
 
 ## YAML Shape
 

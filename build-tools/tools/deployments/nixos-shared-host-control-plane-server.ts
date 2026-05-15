@@ -27,6 +27,7 @@ import { assertReviewedServiceTokenConfigured } from "./nixos-shared-host-contro
 import { readJsonBody, readRawBody, writeJson } from "./control-plane-http";
 import { handleControlPlanePresentationRoutes } from "./nixos-shared-host-control-plane-presentation-routes";
 import { requireReviewedBearerToken } from "./deployment-control-plane-service-token";
+import { readControlPlaneImageMetadata } from "./control-plane-image-metadata";
 
 export async function startNixosSharedHostControlPlaneServer(opts: {
   workspaceRoot: string;
@@ -71,7 +72,11 @@ export async function startNixosSharedHostControlPlaneServer(opts: {
         return;
       }
       if (request.method === "GET" && url.pathname === "/healthz") {
-        writeJson(response, 200, { ok: true, instanceId: opts.instanceId || "unknown" });
+        writeJson(response, 200, {
+          ok: true,
+          instanceId: opts.instanceId || "unknown",
+          image: readControlPlaneImageMetadata(opts.env),
+        });
         return;
       }
       if (request.method === "GET" && url.pathname === "/readyz") {

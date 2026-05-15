@@ -53,6 +53,10 @@ let
   python = import ./python.nix { inherit pkgs repoRoot uv2nixLib; };
   pyWasiToolchain = import ../../toolchains/python-wasi.nix { inherit pkgs; };
   testSeed = import ./test-seed.nix { inherit pkgs repoRoot; };
+  controlPlaneImage = import ./deployment-control-plane-image.nix {
+    inherit pkgs repoSnapshot;
+    nodeMods = resolvedNodeMods;
+  };
 in
 {
   buck2-prelude = prelude.buck2-prelude;
@@ -66,6 +70,9 @@ in
   graph-generator-pure = graph.graphGenPure.all;
   graph-generator-pure-selected = graph.graphGenPure.selected;
   test-seed = testSeed;
+  deployment-control-plane-runtime = controlPlaneImage.runtime;
+  deployment-control-plane-image = controlPlaneImage.image;
+  deployment-control-plane-image-contract = controlPlaneImage.contractDerivation;
   node-cli = nodeCli;
   node-webapp = nodeWebapp;
   node-vercel-next = nodeVercelNext;

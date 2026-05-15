@@ -45,8 +45,8 @@ Build a reproducible OCI image for the deployment control plane. The same image 
 least two process modes:
 
 ```bash
-deployment-control-plane service
-deployment-control-plane worker
+deployment-control-plane service --config /etc/deployment-control-plane/config.yaml
+deployment-control-plane worker --config /etc/deployment-control-plane/config.yaml
 ```
 
 Optional administrative modes may share the image when they run under the same credential and
@@ -67,6 +67,54 @@ The image should contain the pinned runtime and tools needed by protected/shared
 
 The image must not contain deployment credentials, Infisical client secrets, provider tokens,
 database passwords, SSH private keys, or host-specific state.
+
+## Reviewed OCI Image
+
+The reviewed local image target is exposed through Nix:
+
+```bash
+nix build .#deployment-control-plane-image
+```
+
+The companion contract target is cheap to build and records the reviewed entrypoints, non-root user,
+runtime tools, required mounts, and prohibited image-layer paths:
+
+```bash
+nix build .#deployment-control-plane-image-contract
+cat result/contract.json
+```
+
+Production publication is an operator action outside the repo. Registry and repository names are
+inputs to the publishing path and host configuration; GitHub Container Registry is only an example,
+not a baked-in default. Production hosts should consume an immutable digest reference such as:
+
+```text
+registry.example.com/platform/deployment-control-plane@sha256:<digest>
+```
+
+Do not deploy mutable tags such as `latest` as the runtime identity. Pass the same digest into
+`VBR_CONTROL_PLANE_IMAGE_DIGEST` so `/healthz`, the web UI status API, and MCP status report the
+reviewed image identity without reading mutable registry tags.
+
+Required mounted paths:
+
+- `/etc/deployment-control-plane/config.yaml`
+- `/run/deployment-control-plane/credentials`
+- `/var/lib/deployment-control-plane/records`
+- `/var/lib/deployment-control-plane/artifacts`
+- `/var/lib/deployment-control-plane/runtime`
+
+The image includes the Node runtime and packaged control-plane command, Git and SSH for
+reviewed-source snapshots, OpenTofu for reviewed IaC apply paths, Wrangler for the existing
+Cloudflare Pages publish path, and the reviewed provider CLIs needed by current provider execution
+paths. Credential files, database URLs, provider tokens, private keys, deployment records,
+object-store payloads, local caches, and host-specific config are runtime mounts or external
+services, never image contents.
+
+The image contract test loads the built image into a local OCI runtime when Podman or Docker is
+available. That smoke run starts the real service and worker entrypoints with mounted config,
+mounted credentials, mounted records/artifact/runtime directories, checks `/healthz`, and verifies
+the configured non-root image user. The test skips only when no local OCI runtime is available.
 
 Support both Podman and Docker as OCI runtimes when the same runtime contract can be preserved.
 NixOS examples should prefer Podman because it integrates cleanly with systemd and
