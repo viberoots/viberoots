@@ -22,33 +22,12 @@ import { redactDeploymentAuthText } from "./deployment-auth-redaction";
 import { createStaticWebappUploadSession } from "./static-webapp-upload-sessions";
 import type { ControlPlaneArtifactStore } from "./control-plane-artifact-store-types";
 import { assertProductionArtifactStore } from "./control-plane-artifact-store";
+import { checkControlPlaneReadiness, readWorkerHeartbeats } from "./control-plane-process-health";
 import {
   assertReviewedServiceTokenConfigured,
   requestHasReviewedBearerToken,
 } from "./nixos-shared-host-control-plane-service-auth";
-
-const MAX_REQUEST_BODY_BYTES = 60 * 1024 * 1024;
-
-async function readRawBody(request: http.IncomingMessage): Promise<Buffer> {
-  const chunks: Buffer[] = [];
-  let total = 0;
-  for await (const chunk of request) {
-    const buffer = Buffer.from(chunk);
-    total += buffer.byteLength;
-    if (total > MAX_REQUEST_BODY_BYTES) throw new Error("request body exceeds size limit");
-    chunks.push(buffer);
-  }
-  return Buffer.concat(chunks);
-}
-
-async function readJsonBody<T>(request: http.IncomingMessage): Promise<T> {
-  return JSON.parse((await readRawBody(request)).toString("utf8")) as T;
-}
-
-function writeJson(response: http.ServerResponse, statusCode: number, value: unknown) {
-  response.writeHead(statusCode, { "content-type": "application/json; charset=utf-8" });
-  response.end(JSON.stringify(value, null, 2) + "\n");
-}
+import { readJsonBody, readRawBody, writeJson } from "./control-plane-http";
 
 function requireReviewedBearerToken(
   request: http.IncomingMessage,
@@ -75,6 +54,7 @@ export async function startNixosSharedHostControlPlaneServer(opts: {
   localFixture?: boolean;
   env?: NodeJS.ProcessEnv;
   objectStore?: ControlPlaneArtifactStore;
+  instanceId?: string;
 }) {
   assertReviewedServiceTokenConfigured({
     serviceToken: opts.token,
@@ -105,8 +85,20 @@ export async function startNixosSharedHostControlPlaneServer(opts: {
         return;
       }
       if (request.method === "GET" && url.pathname === "/healthz") {
+        writeJson(response, 200, { ok: true, instanceId: opts.instanceId || "unknown" });
+        return;
+      }
+      if (request.method === "GET" && url.pathname === "/readyz") {
+        const readiness = await checkControlPlaneReadiness({
+          backend,
+          objectStore: opts.objectStore,
+        });
+        writeJson(response, readiness.ok ? 200 : 503, readiness);
+        return;
+      }
+      if (request.method === "GET" && url.pathname === "/api/v1/worker-heartbeats") {
         if (!requireReviewedBearerToken(request, response, opts)) return;
-        writeJson(response, 200, { ok: true });
+        writeJson(response, 200, { workers: await readWorkerHeartbeats(backend) });
         return;
       }
       if (request.method === "POST" && url.pathname === "/api/v1/submissions") {

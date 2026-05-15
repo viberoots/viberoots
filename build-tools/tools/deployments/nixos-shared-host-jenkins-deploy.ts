@@ -100,6 +100,7 @@ async function runDeployChild<T>(
   args: string[],
   source: "plan" | "deploy",
 ): Promise<T> {
+  const controlPlaneToken = String(process.env.VBR_DEPLOY_CONTROL_PLANE_TOKEN || "").trim();
   try {
     const { stdout } = await runNodeWithZx({
       script: path.join(ctx.repoRoot, "build-tools/tools/deployments/deploy.ts"),
@@ -107,6 +108,7 @@ async function runDeployChild<T>(
       cwd: process.cwd(),
       env: {
         ...scrubDeploymentSecretEnv(),
+        ...(controlPlaneToken ? { VBR_DEPLOY_CONTROL_PLANE_TOKEN: controlPlaneToken } : {}),
         [REMOTE_SSH_IDENTITY_FILE_ENV]: ctx.sshIdentityFile,
         [REMOTE_SSH_KNOWN_HOSTS_FILE_ENV]: ctx.sshKnownHostsFile,
       },

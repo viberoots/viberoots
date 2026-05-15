@@ -9,6 +9,30 @@ Production hosts should mount it at:
 
 Tests and local fixtures may pass an explicit config path to the loader.
 
+## Process Commands
+
+The container image exposes one long-running command surface:
+
+```bash
+deployment-control-plane service --config /etc/deployment-control-plane/config.yaml
+deployment-control-plane worker --config /etc/deployment-control-plane/config.yaml
+```
+
+Both modes validate the mounted config, required credential files, database URL credential, and
+artifact-store credential files before accepting work. The service binds to `service.host` and
+`service.port`; workers consume the durable database queue and use the configured artifact store.
+
+Service probes:
+
+- `GET /healthz` returns process liveness and the non-secret instance id.
+- `GET /readyz` checks database connectivity, artifact-store metadata-read connectivity, and worker
+  heartbeat visibility.
+- `GET /api/v1/worker-heartbeats` returns authenticated worker heartbeat summaries.
+
+Workers write heartbeat rows while starting, running, stopping, and stopped. Graceful shutdown stops
+the poll loop and waits for the current fenced execution attempt to release its lease before the
+process exits.
+
 ## YAML Shape
 
 ```yaml
@@ -115,6 +139,13 @@ mechanism.
 Production container mode requires this object store path. Local filesystem artifact storage is only
 for tests, local fixture mode, or temporary staging directories that are scrubbed after worker use.
 Shared POSIX filesystems must not be used as the production artifact authority.
+
+## Environment Boundary
+
+Long-running service and worker processes read credentials from configured files. Child process
+environments are scrubbed of database URLs, service tokens, ambient Vault/Infisical/provider tokens,
+and Kubernetes/AWS secrets by default. Provider operations may add only reviewed operation-specific
+credential variables for the command they invoke.
 
 ## CI Boundary
 

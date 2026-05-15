@@ -174,6 +174,12 @@ async function initializeBackendSchema(pool: BackendPool) {
       provenance_json JSONB NOT NULL,
       created_at TIMESTAMPTZ NOT NULL
     );
+    CREATE TABLE IF NOT EXISTS worker_heartbeats (
+      worker_id TEXT PRIMARY KEY,
+      instance_id TEXT NOT NULL,
+      status TEXT NOT NULL,
+      last_seen_at TIMESTAMPTZ NOT NULL
+    );
   `);
 }
 

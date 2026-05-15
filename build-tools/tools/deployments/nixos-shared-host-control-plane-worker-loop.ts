@@ -22,10 +22,7 @@ import type { NixosSharedHostControlPlaneSubmission } from "./nixos-shared-host-
 import { materializeSnapshotArtifacts } from "./control-plane-artifact-materialize";
 import type { ControlPlaneArtifactStore } from "./control-plane-artifact-store-types";
 import { acquireBackendNixosSharedHostLocks } from "./nixos-shared-host-control-plane-worker-locks";
-
-function sleep(ms: number) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
+export { startNixosSharedHostControlPlaneWorkerLoop } from "./nixos-shared-host-control-plane-worker-runtime";
 
 export async function runNixosSharedHostControlPlaneWorkerOnce(opts: {
   workspaceRoot: string;
@@ -177,55 +174,4 @@ export async function runNixosSharedHostControlPlaneWorkerOnce(opts: {
     }
   }
   return true;
-}
-
-export function startNixosSharedHostControlPlaneWorkerLoop(opts: {
-  workspaceRoot: string;
-  recordsRoot: string;
-  backendDatabaseUrl: string;
-  workerId?: string;
-  pollMs?: number;
-  objectStore?: ControlPlaneArtifactStore;
-  onError?: (error: unknown) => void;
-}) {
-  let closed = false;
-  let running = false;
-  const pollMs = opts.pollMs ?? 100;
-  const workerId = opts.workerId || `worker-${process.pid}`;
-  const tick = async () => {
-    if (closed || running) return;
-    running = true;
-    try {
-      while (!closed) {
-        try {
-          if (
-            !(await runNixosSharedHostControlPlaneWorkerOnce({
-              workspaceRoot: opts.workspaceRoot,
-              recordsRoot: opts.recordsRoot,
-              backendDatabaseUrl: opts.backendDatabaseUrl,
-              workerId,
-              ...(opts.objectStore ? { objectStore: opts.objectStore } : {}),
-            }))
-          ) {
-            break;
-          }
-        } catch (error) {
-          opts.onError?.(error);
-          break;
-        }
-      }
-    } finally {
-      running = false;
-    }
-  };
-  const timer = setInterval(tick, pollMs);
-  timer.unref?.();
-  void tick();
-  return {
-    close: async () => {
-      closed = true;
-      clearInterval(timer);
-      while (running) await sleep(25);
-    },
-  };
 }

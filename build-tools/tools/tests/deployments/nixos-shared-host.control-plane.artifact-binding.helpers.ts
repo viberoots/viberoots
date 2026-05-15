@@ -17,6 +17,7 @@ export async function submitServiceRequest(opts: {
   artifactDirsByComponentId?: Record<string, string>;
   admissionEvidence?: unknown;
   smokeConnectOverride?: unknown;
+  token?: string;
 }) {
   const expected = await expectedNixosSharedHostArtifactIdentities({
     deployment: opts.deployment,
@@ -44,15 +45,21 @@ export async function submitServiceRequest(opts: {
   const challenge = await readJson<any>(
     await fetch(new URL("/api/v1/submission-challenges/artifact", opts.url), {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: {
+        "content-type": "application/json",
+        ...(opts.token ? { authorization: `Bearer ${opts.token}` } : {}),
+      },
       body: JSON.stringify(request),
     }),
   );
-  const principal = deploymentServicePrincipalForToken();
+  const principal = deploymentServicePrincipalForToken(opts.token);
   return await readJson<any>(
     await fetch(new URL("/api/v1/submissions", opts.url), {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: {
+        "content-type": "application/json",
+        ...(opts.token ? { authorization: `Bearer ${opts.token}` } : {}),
+      },
       body: JSON.stringify({
         ...request,
         artifactBindingProof: createArtifactBindingProof(

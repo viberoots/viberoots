@@ -10,6 +10,7 @@ import {
 } from "./control-plane-artifact-store";
 import { loadControlPlaneRuntimeConfig } from "./control-plane-runtime-config";
 import { startNixosSharedHostControlPlaneServer } from "./nixos-shared-host-control-plane-server";
+import type { ControlPlaneRuntimeConfig } from "./control-plane-runtime-config-types";
 
 export function resolveControlPlaneServiceToken(opts: {
   tokenFlag: string;
@@ -20,6 +21,30 @@ export function resolveControlPlaneServiceToken(opts: {
     String((opts.env || process.env).VBR_DEPLOY_CONTROL_PLANE_TOKEN || "").trim() ||
     undefined
   );
+}
+
+export async function startControlPlaneServiceFromRuntimeConfig(opts: {
+  workspaceRoot: string;
+  runtimeConfig: ControlPlaneRuntimeConfig;
+  token?: string;
+}) {
+  const objectStore = await artifactStoreFromRuntimeConfig(opts.runtimeConfig);
+  assertProductionArtifactStore({ objectStore });
+  return await startNixosSharedHostControlPlaneServer({
+    workspaceRoot: opts.workspaceRoot,
+    paths: {
+      statePath: path.join(opts.runtimeConfig.storage.runtimeRoot, "platform-state.json"),
+      hostRoot: opts.runtimeConfig.storage.runtimeRoot,
+      recordsRoot: opts.runtimeConfig.storage.recordsRoot,
+      artifactStagingRoot: opts.runtimeConfig.storage.artifactStagingRoot,
+    },
+    backendDatabaseUrl: (await fsp.readFile(opts.runtimeConfig.database.urlFile, "utf8")).trim(),
+    host: opts.runtimeConfig.service.host,
+    port: opts.runtimeConfig.service.port,
+    objectStore,
+    instanceId: opts.runtimeConfig.instanceId,
+    ...(opts.token ? { token: opts.token } : {}),
+  });
 }
 
 async function main() {
@@ -40,6 +65,15 @@ async function main() {
   const port = Number(getFlagStr("port", "7780").trim() || "7780");
   const host = getFlagStr("host", "127.0.0.1").trim() || "127.0.0.1";
   const token = resolveControlPlaneServiceToken({ tokenFlag: getFlagStr("token", "") });
+  if (runtimeConfig && !getFlagStr("host-root", "").trim()) {
+    const server = await startControlPlaneServiceFromRuntimeConfig({
+      workspaceRoot,
+      runtimeConfig,
+      ...(token ? { token } : {}),
+    });
+    console.log(JSON.stringify({ url: server.url }, null, 2));
+    return server;
+  }
   const backendDatabaseUrl =
     getFlagStr("control-plane-database-url", "").trim() ||
     (runtimeConfig ? (await fsp.readFile(runtimeConfig.database.urlFile, "utf8")).trim() : "") ||

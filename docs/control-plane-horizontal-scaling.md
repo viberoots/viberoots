@@ -33,6 +33,16 @@ replaced after its queue lease expires; operators should inspect the queue row a
 before forcing recovery. Stuck submissions should be recovered by durable submission id or deploy
 run id, not by deleting worker-local scratch files.
 
+The intended minimum production topology is one service replica and two worker replicas. Additional
+service replicas remain stateless as long as they use the same database and object store. Additional
+workers are safe because queue claims, leases, provider locks, stage state, audit, and heartbeat rows
+are all database-backed.
+
+Use `/healthz` for process liveness and `/readyz` for dependency readiness. A ready service has
+database connectivity, artifact-store metadata-read connectivity, and can read worker heartbeat
+state. Worker heartbeat rows are advisory for operators; queue leases and fencing tokens remain the
+mutation authority.
+
 If a host uses local fixture mode, file-backed mirrors and local locks are test conveniences only.
 Production container profiles must use the database-backed queue, locks, idempotency, stage-state,
 audit, and artifact records.
