@@ -21,6 +21,8 @@ export const REVIEWED_DEPLOYMENT_OWNED_SUPPORT_PATHS = [
   "build-tools/tools/nix/shared-host-vault-module.nix",
   "build-tools/tools/nix/nixos-shared-host-module.nix",
   "build-tools/tools/nix/nixos-shared-host-module-runtimes.nix",
+  "build-tools/tools/nix/deployment-control-plane-container-defaults.nix",
+  "build-tools/tools/nix/deployment-control-plane-container-module.nix",
 ] as const;
 
 export const REVIEWED_SHARED_BUILD_SYSTEM_PREFIXES = [

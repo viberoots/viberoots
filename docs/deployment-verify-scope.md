@@ -54,6 +54,8 @@ The initial deployment-owned build-system boundary is intentionally narrow:
   - `build-tools/tools/nix/shared-host-vault-module.nix`
   - `build-tools/tools/nix/nixos-shared-host-module.nix`
   - `build-tools/tools/nix/nixos-shared-host-module-runtimes.nix`
+  - `build-tools/tools/nix/deployment-control-plane-container-defaults.nix`
+  - `build-tools/tools/nix/deployment-control-plane-container-module.nix`
 - deployment-domain taxonomy data currently lives at
   `build-tools/tools/tests/deployments/deployment_domain_taxonomy.bzl`
 
@@ -156,6 +158,8 @@ inside the repo-wide owner-local methodology gate:
   - `build-tools/tools/nix/shared-host-vault-module.nix`
   - `build-tools/tools/nix/nixos-shared-host-module.nix`
   - `build-tools/tools/nix/nixos-shared-host-module-runtimes.nix`
+  - `build-tools/tools/nix/deployment-control-plane-container-defaults.nix`
+  - `build-tools/tools/nix/deployment-control-plane-container-module.nix`
     are covered automatically by that repo-wide scope
 - failure contract:
   - fail closed when a reviewed deployment-owned file exceeds 250 lines

@@ -1,0 +1,25 @@
+{
+  user = "deployment-control-plane";
+  group = "deployment-control-plane";
+  configFile = "/etc/deployment-control-plane/config.yaml";
+  credentialDirectory = "/run/deployment-control-plane/credentials";
+  recordsRoot = "/var/lib/deployment-control-plane/records";
+  artifactStagingRoot = "/var/lib/deployment-control-plane/artifacts";
+  runtimeRoot = "/var/lib/deployment-control-plane/runtime";
+  serviceContainerName = "deployment-control-plane-service";
+  workerContainerNamePrefix = "deployment-control-plane-worker";
+  servicePort = 7780;
+  bindAddress = "127.0.0.1";
+  containerRuntime = "podman";
+  workerReplicas = 2;
+  webUiBasePath = "/";
+  mcpBasePath = "/mcp";
+  artifactStoreKind = "s3-compatible";
+  artifactEndpointCredential = "artifact-store-endpoint";
+  artifactAccessKeyIdCredential = "artifact-store-access-key-id";
+  artifactSecretAccessKeyCredential = "artifact-store-secret-access-key";
+  databaseUrlCredential = "control-plane-database-url";
+  reviewedSourceSshKeyCredential = "reviewed-source-ssh-key";
+  infisicalClientIdPattern = "{deploymentId}-infisical-client-id";
+  infisicalClientSecretPattern = "{deploymentId}-infisical-client-secret";
+}

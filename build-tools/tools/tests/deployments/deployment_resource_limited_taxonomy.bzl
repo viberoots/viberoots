@@ -64,6 +64,7 @@ RESOURCE_LIMITED_DEPLOYMENT_TESTS = {
     "build-tools/tools/tests/deployments/control-plane-artifact-store-production.test.ts": True,
     "build-tools/tools/tests/deployments/control-plane-artifact-store.test.ts": True,
     "build-tools/tools/tests/deployments/control-plane-mcp.test.ts": True,
+    "build-tools/tools/tests/deployments/control-plane-nixos-container-module.test.ts": True,
     "build-tools/tools/tests/deployments/control-plane-oci-image.test.ts": True,
     "build-tools/tools/tests/deployments/control-plane-process-cli.test.ts": True,
     "build-tools/tools/tests/deployments/control-plane-process-entrypoints.test.ts": True,

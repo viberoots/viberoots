@@ -151,6 +151,8 @@ The implemented runtime loader and credential-directory contract are documented 
 [Deployment Control Plane Runtime Configuration](./control-plane-runtime-configuration.md).
 The multi-replica database coordination contract is documented in
 [Deployment Control Plane Horizontal Scaling](./control-plane-horizontal-scaling.md).
+The importable NixOS container module is documented in
+[Deployment Control Plane NixOS Container Module](./control-plane-nixos-container-module.md).
 
 Recommended config file path:
 
