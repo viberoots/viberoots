@@ -20,6 +20,9 @@ local fixture surfaces.
   prove they are updating the durable state they reviewed.
 - Retry and recovery read submission, snapshot, deploy-record, and stage-state facts from the
   durable backend. Worker-local temporary directories are mirrors for execution, not authority.
+- Artifact payloads and execution snapshots are exchanged through S3-compatible object storage.
+  Database rows store object keys, digests, sizes, content types, provenance, and admitted run
+  metadata; workers use direct key reads and recorded digests rather than object listing.
 - Audit rows are database-backed and include request id, actor or service principal, operation,
   idempotency key when present, deployment id, result, and a redacted non-secret failure summary.
 

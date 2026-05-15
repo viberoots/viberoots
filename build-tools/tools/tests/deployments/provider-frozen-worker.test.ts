@@ -31,10 +31,12 @@ import {
 } from "./vercel.control-plane.helpers";
 import {
   executeFrozenProviderSnapshot,
+  executeFrozenProviderSnapshotAndReadSubmission,
   fakeFrozenProviderSnapshot,
   frozenPolicy,
   vercelDeploymentWithSecrets,
 } from "./provider-frozen-worker.helpers";
+import { memoryControlPlaneArtifactStore } from "./control-plane-artifact-store-test-helpers";
 
 test("provider workers execute from frozen snapshot artifact and secret references", async () => {
   await runInTemp("provider-frozen-worker-executes", async (tmp, $) => {
@@ -67,6 +69,7 @@ test("provider workers execute from frozen snapshot artifact and secret referenc
     });
     try {
       await withVercelSmokeServer(async (smokeConnectOverride) => {
+        const objectStore = memoryControlPlaneArtifactStore();
         const artifactDir = await writeVercelArtifact(path.join(tmp, "vercel-worker-artifact"));
         const restoreAdmissionContext = activateDeploymentSecretContext(
           infisicalTestContext(server.siteUrl, { clientSecret: "server-local-secret" }),
@@ -76,6 +79,7 @@ test("provider workers execute from frozen snapshot artifact and secret referenc
           snapshot = await buildVercelControlPlaneSnapshot({
             workspaceRoot: tmp,
             recordsRoot,
+            objectStore,
             request: {
               schemaVersion: VERCEL_CONTROL_PLANE_SUBMIT_REQUEST_SCHEMA,
               submissionId: "vercel-worker",
@@ -91,14 +95,21 @@ test("provider workers execute from frozen snapshot artifact and secret referenc
           restoreAdmissionContext();
         }
         await fsp.rm(artifactDir, { recursive: true, force: true });
-        await executeFrozenProviderSnapshot({
+        const submitted = await executeFrozenProviderSnapshotAndReadSubmission({
           tmp,
           recordsRoot,
           provider: "vercel",
           execute: executeVercelControlPlaneSubmission,
           snapshot,
           apiClient,
+          objectStore,
         });
+        const record = JSON.parse(await fsp.readFile(submitted.resultRecordPath, "utf8"));
+        assert.ok(record.artifact.object);
+        assert.match(record.artifact.outputDir, /^artifact-object:\/\//);
+        const replaySnapshot = JSON.parse(await fsp.readFile(record.replaySnapshotPath, "utf8"));
+        assert.ok(replaySnapshot.artifact.object);
+        assert.match(replaySnapshot.artifact.outputDir, /^artifact-object:\/\//);
       });
     } finally {
       process.env = originalEnv;

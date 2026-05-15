@@ -2,6 +2,7 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { DEPLOYMENT_PROVIDER_FROZEN_SNAPSHOT_SCHEMA } from "../../deployments/deployment-provider-frozen-snapshot";
+import { materializeSnapshotArtifacts } from "../../deployments/control-plane-artifact-materialize";
 import { localHarnessControlPlaneDatabaseUrl } from "../../deployments/nixos-shared-host-control-plane-backend";
 import type { VercelApiClient } from "../../deployments/vercel-api";
 import { deploymentWithVercelSecret } from "./vercel.control-plane.helpers";
@@ -22,6 +23,7 @@ export async function executeFrozenProviderSnapshot(opts: {
   snapshot: Record<string, any>;
   submissionAdmission?: unknown;
   apiClient?: VercelApiClient;
+  objectStore?: any;
 }) {
   const submissionPath = path.join(opts.recordsRoot, `${opts.provider}-submission.json`);
   const snapshotPath = path.join(opts.recordsRoot, `${opts.provider}-snapshot.json`);
@@ -41,20 +43,33 @@ export async function executeFrozenProviderSnapshot(opts: {
     dedupe: { mode: "created", requestFingerprint: opts.provider },
     admission: opts.submissionAdmission ?? opts.snapshot.admission ?? defaultAdmission,
   });
-  return await opts.execute({
-    workspaceRoot: opts.tmp,
-    recordsRoot: opts.recordsRoot,
-    backend: {
+  const artifactsRoot = `${snapshotPath}.artifacts`;
+  try {
+    if (opts.objectStore) {
+      await materializeSnapshotArtifacts({
+        snapshot: opts.snapshot as any,
+        store: opts.objectStore,
+        outputRoot: artifactsRoot,
+        executionSnapshotPath: snapshotPath,
+      });
+    }
+    return await opts.execute({
+      workspaceRoot: opts.tmp,
       recordsRoot: opts.recordsRoot,
-      databaseUrl: localHarnessControlPlaneDatabaseUrl(opts.recordsRoot),
-    },
-    submissionPath,
-    submissionRef: submissionPath,
-    executionSnapshotPath: snapshotPath,
-    executionSnapshotRef: snapshotPath,
-    workerId: `${opts.provider}-worker`,
-    ...(opts.apiClient ? { apiClient: opts.apiClient } : {}),
-  });
+      backend: {
+        recordsRoot: opts.recordsRoot,
+        databaseUrl: localHarnessControlPlaneDatabaseUrl(opts.recordsRoot),
+      },
+      submissionPath,
+      submissionRef: submissionPath,
+      executionSnapshotPath: snapshotPath,
+      executionSnapshotRef: snapshotPath,
+      workerId: `${opts.provider}-worker`,
+      ...(opts.apiClient ? { apiClient: opts.apiClient } : {}),
+    });
+  } finally {
+    if (opts.objectStore) await fsp.rm(artifactsRoot, { recursive: true, force: true });
+  }
 }
 
 export async function executeFrozenProviderSnapshotAndReadSubmission(

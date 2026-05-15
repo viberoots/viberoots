@@ -11,6 +11,7 @@ import {
   remoteExecEnv,
   REVIEWED_PLEOMINO_DEPLOYMENT_LABEL,
 } from "./nixos-shared-host.deploy.remote-exec.helpers";
+import { memoryControlPlaneArtifactStore } from "./control-plane-artifact-store-test-helpers";
 import { readRecord, waitFor } from "./nixos-shared-host.control-plane.helpers";
 import { startNixosSharedHostPublicServer } from "./nixos-shared-host.public-server";
 
@@ -31,6 +32,7 @@ test("remote deploy fails closed on artifact staging failure and remote transpor
       $,
       artifactFiles: { "index.html": "<html>fail</html>\n", healthz: "ok\n" },
     });
+    const objectStore = memoryControlPlaneArtifactStore();
     const controlPlane = await startNixosSharedHostControlPlaneServer({
       workspaceRoot: tmp,
       paths: {
@@ -40,6 +42,7 @@ test("remote deploy fails closed on artifact staging failure and remote transpor
       },
       backendDatabaseUrl: localHarnessControlPlaneDatabaseUrl(remoteRecordsRoot),
       token: CONTROL_PLANE_TOKEN,
+      objectStore,
     });
     await installClientProfile(
       $,
@@ -85,6 +88,7 @@ test("remote deploy propagates remote deploy failures and still writes reviewed 
       $,
       artifactFiles: { "index.html": "<html>no-health</html>\n" },
     });
+    const objectStore = memoryControlPlaneArtifactStore();
     const controlPlane = await startNixosSharedHostControlPlaneServer({
       workspaceRoot: tmp,
       paths: {
@@ -94,11 +98,13 @@ test("remote deploy propagates remote deploy failures and still writes reviewed 
       },
       backendDatabaseUrl: localHarnessControlPlaneDatabaseUrl(remoteRecordsRoot),
       token: CONTROL_PLANE_TOKEN,
+      objectStore,
     });
     const worker = startNixosSharedHostControlPlaneWorkerLoop({
       workspaceRoot: tmp,
       recordsRoot: remoteRecordsRoot,
       backendDatabaseUrl: localHarnessControlPlaneDatabaseUrl(remoteRecordsRoot),
+      objectStore,
     });
     const server = await startNixosSharedHostPublicServer({
       deployment,

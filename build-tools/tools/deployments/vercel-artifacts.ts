@@ -4,10 +4,20 @@ import path from "node:path";
 import { copyTree } from "../lib/copy-tree";
 import { sanitizeName } from "../lib/sanitize";
 import { artifactIdentityForVercelNextOutput } from "../vercel/next-artifact";
+import {
+  artifactObjectReferenceUrl,
+  putVerifiedArtifactObject,
+} from "./control-plane-artifact-store";
+import type {
+  ControlPlaneArtifactObject,
+  ControlPlaneArtifactStore,
+} from "./control-plane-artifact-store-types";
+import { createStaticWebappArtifactBundleBytes } from "./static-webapp-artifact-bundle";
 
 export type AdmittedVercelPrebuiltArtifact = {
   identity: string;
   outputDir: string;
+  object?: ControlPlaneArtifactObject;
 };
 
 async function exists(dir: string): Promise<boolean> {
@@ -29,10 +39,28 @@ export async function resolveVercelPrebuiltOutputDir(artifactDir: string): Promi
 
 export async function admitVercelPrebuiltArtifact(
   artifactDir: string,
-  opts: { recordsRoot?: string } = {},
+  opts: {
+    recordsRoot?: string;
+    objectStore?: ControlPlaneArtifactStore;
+    deploymentId?: string;
+    submissionId?: string;
+  } = {},
 ): Promise<AdmittedVercelPrebuiltArtifact> {
   const outputDir = await resolveVercelPrebuiltOutputDir(artifactDir);
   const identity = await artifactIdentityForVercelNextOutput(outputDir);
+  const object = opts.objectStore
+    ? await putVerifiedArtifactObject({
+        store: opts.objectStore,
+        body: await createStaticWebappArtifactBundleBytes(outputDir),
+        payloadKind: "artifact",
+        provenance: {
+          deploymentId: opts.deploymentId,
+          submissionId: opts.submissionId,
+          artifactIdentity: identity,
+        },
+      })
+    : undefined;
+  if (object) return { identity, outputDir: artifactObjectReferenceUrl(object), object };
   if (opts.recordsRoot) {
     const storedOutputDir = path.join(
       path.resolve(opts.recordsRoot),
@@ -65,6 +93,11 @@ async function ensureStoredOutput(sourceDir: string, storedOutputDir: string): P
 export async function requireAdmittedVercelArtifactPath(
   artifact: AdmittedVercelPrebuiltArtifact,
 ): Promise<string> {
+  if (artifact.object && artifact.outputDir.startsWith("artifact-object://")) {
+    throw new Error(
+      `artifact object must be materialized before provider execution: ${artifact.identity}`,
+    );
+  }
   const outputDir = await resolveVercelPrebuiltOutputDir(artifact.outputDir);
   const actualIdentity = await artifactIdentityForVercelNextOutput(outputDir);
   if (actualIdentity !== artifact.identity) {

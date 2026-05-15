@@ -21,6 +21,7 @@ import {
   ensureNixosSharedHostReviewedSourceRef,
   nixosSharedHostDeploymentFixture,
 } from "./nixos-shared-host.fixture";
+import { memoryControlPlaneArtifactStore } from "./control-plane-artifact-store-test-helpers";
 import { reviewedLaneAdmissionEvidenceFixture } from "./deployment-lane-governance.fixture";
 import { authRequiredDeployment } from "./nixos-shared-host.service-auth-boundary.helpers";
 import { readJson, writeDemoArtifact } from "./nixos-shared-host.control-plane.helpers";
@@ -76,11 +77,13 @@ test("service removes rejected staged artifacts during challenge authorization f
     };
     const artifactDir = await writeStagedArtifact(paths.hostRoot, "authz");
     await ensureNixosSharedHostReviewedSourceRef(tmp, $, deployment);
+    const objectStore = memoryControlPlaneArtifactStore();
     const controlPlane = await startNixosSharedHostControlPlaneServer({
       workspaceRoot: tmp,
       paths,
       backendDatabaseUrl: backend.databaseUrl,
       localFixture: true,
+      objectStore,
     });
     try {
       const response = await fetch(
@@ -114,11 +117,13 @@ test("service records redacted janitor metadata when rejected cleanup fails", as
     };
     const artifactDir = await writeStagedArtifact(paths.hostRoot, "janitor-artifact");
     await ensureNixosSharedHostReviewedSourceRef(tmp, $, deployment);
+    const objectStore = memoryControlPlaneArtifactStore();
     const controlPlane = await startNixosSharedHostControlPlaneServer({
       workspaceRoot: tmp,
       paths,
       backendDatabaseUrl: backend.databaseUrl,
       token: TOKEN,
+      objectStore,
     });
     const parent = path.dirname(artifactDir);
     try {

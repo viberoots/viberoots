@@ -15,6 +15,8 @@ import type { OpenTofuApplyOutcome } from "./opentofu-apply";
 import type { KubernetesLiveDriftCheck } from "./kubernetes-live-drift";
 import { KUBERNETES_PROVIDER } from "./contract";
 import { operatorErrorFields } from "./deployment-control-plane-redaction";
+import { restoreDurableArtifactObjectReferences } from "./control-plane-artifact-durable-refs";
+import type { ControlPlaneArtifactObject } from "./control-plane-artifact-store-types";
 
 export const KUBERNETES_RECORD_SCHEMA = "deploy-record@2026-04-10";
 
@@ -48,6 +50,7 @@ export type KubernetesDeployRecord = {
     identity: string;
     storedArtifactPath: string;
     provenancePath?: string;
+    object?: ControlPlaneArtifactObject;
   }>;
   componentResults?: Array<{
     componentId: string;
@@ -112,6 +115,7 @@ export async function writeKubernetesDeployRecord(
   recordsRoot: string,
   record: KubernetesDeployRecord,
 ): Promise<string> {
+  restoreDurableArtifactObjectReferences(record);
   const recordPath = path.join(path.resolve(recordsRoot), "runs", `${record.deployRunId}.json`);
   await fsp.mkdir(path.dirname(recordPath), { recursive: true });
   await fsp.writeFile(recordPath, JSON.stringify(record, null, 2) + "\n", "utf8");

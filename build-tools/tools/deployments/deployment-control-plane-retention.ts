@@ -65,6 +65,10 @@ function isFileBackedEvidenceRef(value: string): boolean {
   return path.isAbsolute(value) || value.endsWith(".json");
 }
 
+function isObjectReference(value: string): boolean {
+  return value.startsWith("artifact-object://");
+}
+
 function requiredEvidencePaths(evidence?: EvidenceLike): string[] {
   if (!evidence) return [];
   return uniqueStrings([
@@ -105,7 +109,9 @@ export async function inspectProtectedSharedRetention(opts: {
       artifact.storedArtifactPath || "",
       artifact.provenancePath || "",
     ]),
-  ]).map((filePath) => path.resolve(filePath));
+  ])
+    .filter((filePath) => !isObjectReference(filePath))
+    .map((filePath) => path.resolve(filePath));
   for (const filePath of bundlePaths) {
     if (!(await pathExists(filePath))) missingPaths.push(filePath);
   }
@@ -141,7 +147,9 @@ export async function inspectProtectedSharedRetention(opts: {
   }
   for (const artifact of opts.artifacts) {
     const storedArtifactPath = artifact.storedArtifactPath
-      ? path.resolve(artifact.storedArtifactPath)
+      ? isObjectReference(artifact.storedArtifactPath)
+        ? ""
+        : path.resolve(artifact.storedArtifactPath)
       : "";
     if (storedArtifactPath && missingPaths.includes(storedArtifactPath)) {
       failures.push(

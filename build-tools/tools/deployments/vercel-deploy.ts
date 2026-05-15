@@ -48,9 +48,7 @@ async function writeFailure(opts: {
     operationKind: opts.operationKind,
     runClassification: opts.operationKind,
     finalOutcome: failureOutcome(opts.error),
-    ...(opts.artifact
-      ? { artifact: { identity: opts.artifact.identity, outputDir: opts.artifact.outputDir } }
-      : {}),
+    ...(opts.artifact ? { artifact: { ...opts.artifact } } : {}),
     ...(opts.sourceRunId ? { sourceRunId: opts.sourceRunId, parentRunId: opts.sourceRunId } : {}),
     ...((opts.error as any)?.providerReleaseId
       ? { providerReleaseId: String((opts.error as any).providerReleaseId) }
@@ -124,7 +122,7 @@ export async function submitVercelDeploy(opts: {
             recordsRoot: opts.recordsRoot,
             deployRunId: runId,
             deployment: opts.deployment,
-            artifact: { identity: artifact.identity, outputDir: artifact.outputDir },
+            artifact: { ...artifact },
             providerReleaseId: published.providerReleaseId,
             publicUrl: published.publicUrl,
             aliasAssigned: published.aliasAssigned,
@@ -137,7 +135,7 @@ export async function submitVercelDeploy(opts: {
       operationKind,
       runClassification: operationKind,
       finalOutcome: "succeeded",
-      artifact: { identity: artifact.identity, outputDir: artifact.outputDir },
+      artifact: { ...artifact },
       ...(opts.sourceRunId ? { sourceRunId: opts.sourceRunId, parentRunId: opts.sourceRunId } : {}),
       ...(operationKind === "deploy"
         ? { releaseLineageId: runId, artifactLineageId: artifact.identity }

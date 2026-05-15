@@ -16,6 +16,7 @@ import {
 } from "./static-webapp-artifacts";
 import type { S3StaticControlPlaneSubmitRequest } from "./s3-static-control-plane";
 import { requestedReviewedSourceFromEvidence } from "./deployment-source-revision";
+import type { ControlPlaneArtifactStore } from "./control-plane-artifact-store-types";
 
 export type S3StaticControlPlaneSnapshot = FrozenProviderSnapshotFields & {
   schemaVersion: "s3-static-control-plane-snapshot@1";
@@ -45,6 +46,7 @@ export async function buildS3StaticControlPlaneSnapshot(opts: {
   recordsRoot: string;
   request: S3StaticControlPlaneSubmitRequest;
   expectedCurrentRunId?: string | null;
+  objectStore?: ControlPlaneArtifactStore;
 }): Promise<S3StaticControlPlaneSnapshot> {
   const base = baseSnapshot(opts);
   const replay =
@@ -58,6 +60,9 @@ export async function buildS3StaticControlPlaneSnapshot(opts: {
       ? await admitStaticWebappArtifact({
           recordsRoot: opts.recordsRoot,
           artifactDir: String(opts.request.artifactDir || ""),
+          ...(opts.objectStore ? { objectStore: opts.objectStore } : {}),
+          deploymentId: opts.request.deployment.deploymentId,
+          submissionId: opts.request.submissionId,
         })
       : (replay as { artifact?: AdmittedStaticWebappArtifact }).artifact;
   const admittedContext = await admittedContextFor({ ...opts, artifact, replay });

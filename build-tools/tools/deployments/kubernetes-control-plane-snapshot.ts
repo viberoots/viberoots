@@ -19,6 +19,7 @@ import { resolveKubernetesReplaySource, type KubernetesReplaySnapshot } from "./
 import type { KubernetesControlPlaneSubmitRequest } from "./kubernetes-control-plane";
 import { writeKubernetesProvisionerPlan } from "./kubernetes-provisioner-plan";
 import { requestedReviewedSourceFromEvidence } from "./deployment-source-revision";
+import type { ControlPlaneArtifactStore } from "./control-plane-artifact-store-types";
 
 export type KubernetesControlPlaneSnapshot = FrozenProviderSnapshotFields & {
   schemaVersion: "kubernetes-control-plane-snapshot@1";
@@ -49,6 +50,7 @@ export async function buildKubernetesControlPlaneSnapshot(opts: {
   recordsRoot: string;
   request: KubernetesControlPlaneSubmitRequest;
   expectedCurrentRunId?: string | null;
+  objectStore?: ControlPlaneArtifactStore;
 }): Promise<KubernetesControlPlaneSnapshot> {
   const base = baseSnapshot(opts);
   const replay = isReplay(opts.request) ? await resolveReplay(opts) : {};
@@ -61,6 +63,9 @@ export async function buildKubernetesControlPlaneSnapshot(opts: {
             opts.request.artifactDir,
             opts.request.artifactDirsByComponentId,
           ),
+          ...(opts.objectStore ? { objectStore: opts.objectStore } : {}),
+          deploymentId: opts.request.deployment.deploymentId,
+          submissionId: opts.request.submissionId,
         })
       : (replay as { componentArtifacts?: AdmittedKubernetesComponentArtifact[] })
           .componentArtifacts;

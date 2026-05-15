@@ -25,6 +25,7 @@ import {
   type S3StaticControlPlaneSnapshot as Snapshot,
 } from "./s3-static-control-plane-snapshot";
 import { reviewedCurrentStageExpectation } from "./deployment-current-stage-state-expected";
+import type { ControlPlaneArtifactStore } from "./control-plane-artifact-store-types";
 
 export const S3_STATIC_CONTROL_PLANE_SUBMIT_REQUEST_SCHEMA =
   "s3-static-control-plane-submit-request@1";
@@ -47,6 +48,7 @@ export async function queueS3StaticControlPlaneSubmission(opts: {
   recordsRoot: string;
   backend: NixosSharedHostControlPlaneBackendTarget;
   request: S3StaticControlPlaneSubmitRequest;
+  objectStore?: ControlPlaneArtifactStore;
 }) {
   const snapshot = await buildS3StaticControlPlaneSnapshot({
     ...opts,
@@ -61,6 +63,7 @@ export async function queueS3StaticControlPlaneSubmission(opts: {
     recordsRoot: opts.recordsRoot,
     backend: opts.backend,
     snapshot,
+    ...(opts.objectStore ? { objectStore: opts.objectStore } : {}),
   });
 }
 

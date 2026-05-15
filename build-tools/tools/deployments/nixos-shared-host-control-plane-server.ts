@@ -20,6 +20,8 @@ import {
 } from "./deployment-auth-session-service";
 import { redactDeploymentAuthText } from "./deployment-auth-redaction";
 import { createStaticWebappUploadSession } from "./static-webapp-upload-sessions";
+import type { ControlPlaneArtifactStore } from "./control-plane-artifact-store-types";
+import { assertProductionArtifactStore } from "./control-plane-artifact-store";
 import {
   assertReviewedServiceTokenConfigured,
   requestHasReviewedBearerToken,
@@ -72,6 +74,7 @@ export async function startNixosSharedHostControlPlaneServer(opts: {
   token?: string;
   localFixture?: boolean;
   env?: NodeJS.ProcessEnv;
+  objectStore?: ControlPlaneArtifactStore;
 }) {
   assertReviewedServiceTokenConfigured({
     serviceToken: opts.token,
@@ -107,6 +110,10 @@ export async function startNixosSharedHostControlPlaneServer(opts: {
         return;
       }
       if (request.method === "POST" && url.pathname === "/api/v1/submissions") {
+        assertProductionArtifactStore({
+          localFixture: opts.localFixture,
+          objectStore: opts.objectStore,
+        });
         writeJson(
           response,
           200,
@@ -119,6 +126,7 @@ export async function startNixosSharedHostControlPlaneServer(opts: {
             authorizationHeader: request.headers.authorization,
             localFixture: opts.localFixture,
             env: opts.env,
+            objectStore: opts.objectStore,
           }),
         );
         return;
@@ -140,6 +148,10 @@ export async function startNixosSharedHostControlPlaneServer(opts: {
       }
       if (request.method === "POST" && url.pathname === "/api/v1/artifact-uploads/static-webapp") {
         if (!requireReviewedBearerToken(request, response, opts)) return;
+        assertProductionArtifactStore({
+          localFixture: opts.localFixture,
+          objectStore: opts.objectStore,
+        });
         const submissionId = String(request.headers["x-vbr-submission-id"] || "").trim();
         if (!submissionId) {
           writeJson(response, 400, { error: "artifact upload requires x-vbr-submission-id" });
@@ -152,6 +164,7 @@ export async function startNixosSharedHostControlPlaneServer(opts: {
             recordsRoot: opts.paths.recordsRoot,
             submissionId,
             archiveBytes: await readRawBody(request),
+            ...(opts.objectStore ? { objectStore: opts.objectStore } : {}),
           }),
         );
         return;

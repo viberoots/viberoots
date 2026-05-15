@@ -44,6 +44,41 @@ export function challengedSubmitProof(request: any, challenge: any, token?: stri
   );
 }
 
+export function memoryArtifactStore() {
+  const objects = new Map<
+    string,
+    { body: Buffer; contentType: string; metadata: Record<string, string> }
+  >();
+  return {
+    kind: "s3-compatible" as const,
+    bucket: "deploy-artifacts",
+    objects,
+    putObject: async ({
+      key,
+      body,
+      contentType,
+      metadata,
+    }: {
+      key: string;
+      body: Buffer;
+      contentType: string;
+      metadata?: Record<string, string>;
+    }) => {
+      objects.set(key, { body: Buffer.from(body), contentType, metadata: { ...(metadata || {}) } });
+    },
+    getObject: async ({ key }: { key: string }) => {
+      const value = objects.get(key);
+      if (!value) throw new Error(`missing fake object: ${key}`);
+      return Buffer.from(value.body);
+    },
+    getObjectMetadata: async ({ key }: { key: string }) => {
+      const value = objects.get(key);
+      if (!value) throw new Error(`missing fake object: ${key}`);
+      return { contentType: value.contentType, metadata: { ...value.metadata } };
+    },
+  };
+}
+
 export async function countBackendRows(backend: any, table: string, where = "TRUE") {
   const row = (
     await queryBackend<any>(backend, `SELECT COUNT(*) AS count FROM ${table} WHERE ${where}`)

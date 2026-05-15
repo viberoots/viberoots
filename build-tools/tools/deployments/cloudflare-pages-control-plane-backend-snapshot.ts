@@ -180,6 +180,7 @@ export async function buildCloudflarePagesBackendSnapshot(
   opts: {
     workspaceRoot: string;
     recordsRoot: string;
+    objectStore?: any;
     governanceResolver?: DeploymentLaneGovernanceResolver;
   },
 ): Promise<CloudflarePagesBackendSnapshot> {
@@ -189,6 +190,7 @@ export async function buildCloudflarePagesBackendSnapshot(
         workspaceRoot: opts.workspaceRoot,
         deployment: resolved.request.deployment,
         recordsRoot: opts.recordsRoot,
+        ...(opts.objectStore ? { objectStore: opts.objectStore } : {}),
         ...(resolved.request.deployBatchId && { deployBatchId: resolved.request.deployBatchId }),
         artifact: await resolveCloudflarePagesArtifactForSubmission(resolved, opts),
         expectedSourceRevision: resolved.request.expectedSourceRevision,
@@ -207,6 +209,7 @@ export async function buildCloudflarePagesBackendSnapshot(
         workspaceRoot: opts.workspaceRoot,
         deployment: resolved.request.deployment,
         recordsRoot: opts.recordsRoot,
+        ...(opts.objectStore ? { objectStore: opts.objectStore } : {}),
         ...(resolved.request.deployBatchId && { deployBatchId: resolved.request.deployBatchId }),
         ...(resolved.artifactInput
           ? { artifact: await resolveCloudflarePagesArtifactForSubmission(resolved, opts) }

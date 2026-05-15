@@ -7,6 +7,7 @@ import {
 import type { NixosSharedHostControlPlaneBackendTarget } from "./nixos-shared-host-control-plane-backend-db";
 import { writeBackendSubmissionAuditEvents } from "./deployment-stage-state-audit";
 import { writeBackendControlPlaneAuditEvent } from "./deployment-control-plane-audit";
+import { backendSnapshotPersistenceDoc } from "./control-plane-backend-snapshot-document";
 
 type SubmissionDoc = {
   submissionId: string;
@@ -125,7 +126,12 @@ export async function writeBackendSnapshotDoc(
       execution_snapshot_path = EXCLUDED.execution_snapshot_path,
       document_json = EXCLUDED.document_json,
       updated_at = EXCLUDED.updated_at`,
-    [doc.submissionId, executionSnapshotPath, JSON.stringify(doc), now],
+    [
+      doc.submissionId,
+      executionSnapshotPath,
+      JSON.stringify(backendSnapshotPersistenceDoc(doc)),
+      now,
+    ],
   );
   return doc;
 }

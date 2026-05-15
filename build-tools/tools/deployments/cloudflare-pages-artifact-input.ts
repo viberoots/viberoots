@@ -17,6 +17,7 @@ import {
 } from "./static-webapp-artifacts";
 import { admitStaticWebappUploadSession } from "./static-webapp-upload-sessions";
 import { resolveDeploymentGitCommit } from "./deployment-git-ref";
+import type { ControlPlaneArtifactStore } from "./control-plane-artifact-store-types";
 
 export type CloudflarePagesArtifactInput =
   | {
@@ -62,6 +63,9 @@ async function verifySourceRevision(workspaceRoot: string, sourceRevision: strin
 async function admitBundleRef(opts: {
   recordsRoot: string;
   artifactRef: string;
+  objectStore?: ControlPlaneArtifactStore;
+  deploymentId: string;
+  submissionId?: string;
   producer: {
     sourceRevision: string;
     deploymentLabel: string;
@@ -88,6 +92,9 @@ async function admitBundleRef(opts: {
   return await admitStaticWebappArtifact({
     recordsRoot: opts.recordsRoot,
     artifactDir: materialized,
+    ...(opts.objectStore ? { objectStore: opts.objectStore } : {}),
+    deploymentId: opts.deploymentId,
+    ...(opts.submissionId ? { submissionId: opts.submissionId } : {}),
     producer: {
       producerKind: "ci_attested",
       sourceRevision: opts.producer.sourceRevision,
@@ -105,6 +112,8 @@ async function admitServerBuild(opts: {
   recordsRoot: string;
   deployment: CloudflarePagesDeployment;
   input: Extract<CloudflarePagesArtifactInput, { kind: "server_build" }>;
+  objectStore?: ControlPlaneArtifactStore;
+  submissionId: string;
 }): Promise<AdmittedStaticWebappArtifact> {
   await verifySourceRevision(opts.workspaceRoot, opts.input.sourceRevision);
   const outPath = await buildSelectedOutPath(opts.workspaceRoot, opts.input.buildTarget);
@@ -112,6 +121,9 @@ async function admitServerBuild(opts: {
   return await admitStaticWebappArtifact({
     recordsRoot: opts.recordsRoot,
     artifactDir,
+    ...(opts.objectStore ? { objectStore: opts.objectStore } : {}),
+    deploymentId: opts.deployment.deploymentId,
+    submissionId: opts.submissionId,
     producer: {
       producerKind: "server_build",
       sourceRevision: opts.input.sourceRevision,
@@ -128,6 +140,7 @@ export async function resolveCloudflarePagesArtifactInput(opts: {
   deployment: CloudflarePagesDeployment;
   submissionId: string;
   artifactInput: CloudflarePagesArtifactInput;
+  objectStore?: ControlPlaneArtifactStore;
 }): Promise<AdmittedStaticWebappArtifact> {
   const input = opts.artifactInput;
   if (input.kind === "existing_admitted_artifact") {
@@ -137,8 +150,8 @@ export async function resolveCloudflarePagesArtifactInput(opts: {
           recordsRoot: opts.recordsRoot,
           artifactIdentity: String(input.artifactIdentity || ""),
         });
-    await requireAdmittedStaticWebappArtifactPath(artifact);
-    return artifact;
+    if (!artifact.object) await requireAdmittedStaticWebappArtifactPath(artifact);
+    return { ...artifact, producerKind: "existing_admitted_artifact" };
   }
   if (input.kind === "client_upload") {
     if (input.sourceDirty) {
@@ -149,9 +162,11 @@ export async function resolveCloudflarePagesArtifactInput(opts: {
       recordsRoot: opts.recordsRoot,
       uploadSessionId: input.uploadSessionId,
       submissionId: opts.submissionId,
+      deploymentId: opts.deployment.deploymentId,
       deploymentLabel: input.deploymentLabel,
       sourceRevision: input.sourceRevision,
       buildTarget: input.buildTarget,
+      ...(opts.objectStore ? { objectStore: opts.objectStore } : {}),
     });
   }
   if (input.kind === "ci_attested") {
@@ -159,6 +174,9 @@ export async function resolveCloudflarePagesArtifactInput(opts: {
     return await admitBundleRef({
       recordsRoot: opts.recordsRoot,
       artifactRef: input.artifactRef,
+      ...(opts.objectStore ? { objectStore: opts.objectStore } : {}),
+      deploymentId: opts.deployment.deploymentId,
+      submissionId: opts.submissionId,
       producer: input,
     });
   }
@@ -167,6 +185,8 @@ export async function resolveCloudflarePagesArtifactInput(opts: {
     recordsRoot: opts.recordsRoot,
     deployment: opts.deployment,
     input,
+    ...(opts.objectStore ? { objectStore: opts.objectStore } : {}),
+    submissionId: opts.submissionId,
   });
 }
 

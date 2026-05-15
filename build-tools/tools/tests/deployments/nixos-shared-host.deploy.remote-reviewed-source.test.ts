@@ -13,6 +13,7 @@ import {
   remoteExecEnv,
   REVIEWED_PLEOMINO_DEPLOYMENT_LABEL,
 } from "./nixos-shared-host.deploy.remote-exec.helpers";
+import { memoryControlPlaneArtifactStore } from "./control-plane-artifact-store-test-helpers";
 import { deploymentSourceRef } from "./nixos-shared-host.fixture";
 
 const CONTROL_PLANE_TOKEN = "test-control-plane-token";
@@ -44,6 +45,7 @@ test("remote deploy surfaces reviewed-source mismatch guidance when the local ch
       (await $({ cwd: tmp, stdio: "pipe" })`git rev-parse ${sourceRef}`).stdout,
     ).trim();
     assert.notEqual(clientRevision, serviceRevision);
+    const objectStore = memoryControlPlaneArtifactStore();
     const controlPlane = await startNixosSharedHostControlPlaneServer({
       workspaceRoot: tmp,
       paths: {
@@ -53,6 +55,7 @@ test("remote deploy surfaces reviewed-source mismatch guidance when the local ch
       },
       backendDatabaseUrl: localHarnessControlPlaneDatabaseUrl(remoteRecordsRoot),
       token: CONTROL_PLANE_TOKEN,
+      objectStore,
     });
     try {
       await installClientProfile(

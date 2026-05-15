@@ -17,6 +17,8 @@ import { readKubernetesDeployRecord, type KubernetesDeployRecord } from "./kuber
 import type { KubernetesAdmittedContext } from "./kubernetes-admission";
 import type { KubernetesDeployment } from "./contract";
 import { readPreparedKubernetesPublisherConfigSnapshot } from "./kubernetes-config";
+import { restoreDurableArtifactObjectReferences } from "./control-plane-artifact-durable-refs";
+import type { ControlPlaneArtifactObject } from "./control-plane-artifact-store-types";
 
 export const KUBERNETES_REPLAY_SNAPSHOT_SCHEMA = "kubernetes-replay-snapshot@1";
 
@@ -35,6 +37,7 @@ export type KubernetesReplaySnapshot = {
     identity: string;
     storedArtifactPath: string;
     provenancePath?: string;
+    object?: ControlPlaneArtifactObject;
   }>;
   admittedContext: KubernetesAdmittedContext;
   deployment: KubernetesDeployment;
@@ -69,7 +72,9 @@ export async function writeKubernetesReplaySnapshot(opts: {
     deploymentMetadataFingerprint: deploymentMetadataFingerprintFor(opts.deployment),
     runnerIdentities: kubernetesRunnerIdentities(opts.deployment),
     artifactIdentity: opts.artifactIdentity,
-    componentArtifacts: opts.componentArtifacts,
+    componentArtifacts: restoreDurableArtifactObjectReferences(
+      structuredClone(opts.componentArtifacts),
+    ),
     admittedContext: opts.admittedContext,
     deployment: opts.deployment,
     providerConfigSnapshotPath: path.resolve(opts.providerConfigSnapshotPath),

@@ -1,8 +1,14 @@
 #!/usr/bin/env zx-wrapper
 import path from "node:path";
+import * as fsp from "node:fs/promises";
 import { pathToFileURL } from "node:url";
 import { getFlagStr } from "../lib/cli";
 import { findRepoRoot } from "../lib/repo";
+import {
+  artifactStoreFromRuntimeConfig,
+  assertProductionArtifactStore,
+} from "./control-plane-artifact-store";
+import { loadControlPlaneRuntimeConfig } from "./control-plane-runtime-config";
 import { startNixosSharedHostControlPlaneServer } from "./nixos-shared-host-control-plane-server";
 
 export function resolveControlPlaneServiceToken(opts: {
@@ -18,6 +24,13 @@ export function resolveControlPlaneServiceToken(opts: {
 
 async function main() {
   const workspaceRoot = await findRepoRoot(process.cwd());
+  const configPath = getFlagStr("config", "").trim();
+  const runtimeConfig = configPath
+    ? await loadControlPlaneRuntimeConfig({ configPath, repoRoot: workspaceRoot })
+    : undefined;
+  const objectStore = runtimeConfig
+    ? await artifactStoreFromRuntimeConfig(runtimeConfig)
+    : undefined;
   const hostRoot = path.resolve(
     getFlagStr("host-root", path.join(workspaceRoot, ".local", "deployments", "nixos-shared-host")),
   );
@@ -29,12 +42,14 @@ async function main() {
   const token = resolveControlPlaneServiceToken({ tokenFlag: getFlagStr("token", "") });
   const backendDatabaseUrl =
     getFlagStr("control-plane-database-url", "").trim() ||
+    (runtimeConfig ? (await fsp.readFile(runtimeConfig.database.urlFile, "utf8")).trim() : "") ||
     String(process.env.VBR_DEPLOY_CONTROL_PLANE_DATABASE_URL || "").trim();
   if (!backendDatabaseUrl) {
     throw new Error(
       "shared control-plane service requires --control-plane-database-url or VBR_DEPLOY_CONTROL_PLANE_DATABASE_URL",
     );
   }
+  assertProductionArtifactStore({ objectStore });
   const server = await startNixosSharedHostControlPlaneServer({
     workspaceRoot,
     paths: {
@@ -50,6 +65,7 @@ async function main() {
     host,
     port,
     ...(token ? { token } : {}),
+    objectStore,
   });
   console.log(JSON.stringify({ url: server.url }, null, 2));
 }

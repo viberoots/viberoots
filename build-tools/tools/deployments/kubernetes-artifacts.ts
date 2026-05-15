@@ -3,6 +3,15 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { copyTree } from "../lib/copy-tree";
 import { sanitizeName } from "../lib/sanitize";
+import {
+  artifactObjectReferenceUrl,
+  putVerifiedArtifactObject,
+} from "./control-plane-artifact-store";
+import type {
+  ControlPlaneArtifactObject,
+  ControlPlaneArtifactStore,
+} from "./control-plane-artifact-store-types";
+import { createStaticWebappArtifactBundleBytes } from "./static-webapp-artifact-bundle";
 
 export const KUBERNETES_ARTIFACT_PROVENANCE_SCHEMA = "kubernetes-component-artifact@1";
 
@@ -12,6 +21,7 @@ export type AdmittedKubernetesComponentArtifact = {
   sourceKind: "directory" | "image-digest" | "image-ref";
   storedArtifactPath: string;
   provenancePath: string;
+  object?: ControlPlaneArtifactObject;
 };
 
 const NODE_SERVICE_IDENTITY_SCHEMA = "node-service-artifact-identity@1";
@@ -140,6 +150,7 @@ async function ensureProvenance(artifact: AdmittedKubernetesComponentArtifact): 
         artifactIdentity: artifact.identity,
         sourceKind: artifact.sourceKind,
         storedArtifactPath: artifact.storedArtifactPath,
+        ...(artifact.object ? { object: artifact.object } : {}),
         admittedAt: new Date().toISOString(),
       },
       null,
@@ -152,6 +163,9 @@ async function ensureProvenance(artifact: AdmittedKubernetesComponentArtifact): 
 export async function admitKubernetesComponentArtifacts(opts: {
   recordsRoot: string;
   artifactPathsByComponentId: Record<string, string>;
+  objectStore?: ControlPlaneArtifactStore;
+  deploymentId?: string;
+  submissionId?: string;
 }): Promise<AdmittedKubernetesComponentArtifact[]> {
   const artifacts: AdmittedKubernetesComponentArtifact[] = [];
   for (const componentId of Object.keys(opts.artifactPathsByComponentId).sort()) {
@@ -166,14 +180,30 @@ export async function admitKubernetesComponentArtifacts(opts: {
           sourceKind: "directory" as const,
         }
       : await validateImageDigestFile(artifactPath);
+    const object =
+      opts.objectStore && stat.isDirectory()
+        ? await putVerifiedArtifactObject({
+            store: opts.objectStore,
+            body: await createStaticWebappArtifactBundleBytes(artifactPath),
+            payloadKind: "artifact",
+            provenance: {
+              deploymentId: opts.deploymentId,
+              submissionId: opts.submissionId,
+              artifactIdentity: validated.identity,
+            },
+          })
+        : undefined;
     const artifact: AdmittedKubernetesComponentArtifact = {
       componentId,
       identity: validated.identity,
       sourceKind: validated.sourceKind,
-      storedArtifactPath: storedPathFor(opts.recordsRoot, validated.identity),
+      storedArtifactPath: object
+        ? artifactObjectReferenceUrl(object)
+        : storedPathFor(opts.recordsRoot, validated.identity),
       provenancePath: provenancePathFor(opts.recordsRoot, validated.identity),
+      ...(object ? { object } : {}),
     };
-    await ensureStoredArtifact(artifactPath, artifact.storedArtifactPath);
+    if (!object) await ensureStoredArtifact(artifactPath, artifact.storedArtifactPath);
     await ensureProvenance(artifact);
     artifacts.push(artifact);
   }

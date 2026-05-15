@@ -13,6 +13,15 @@ import {
   admitStaticWebappArtifact,
   type AdmittedStaticWebappArtifact,
 } from "./static-webapp-artifacts";
+import {
+  CONTROL_PLANE_ARTIFACT_CONTENT_TYPE,
+  putVerifiedArtifactObject,
+  readVerifiedArtifactObject,
+} from "./control-plane-artifact-store";
+import type {
+  ControlPlaneArtifactObject,
+  ControlPlaneArtifactStore,
+} from "./control-plane-artifact-store-types";
 
 export const STATIC_WEBAPP_UPLOAD_SESSION_SCHEMA = "static-webapp-upload-session@1";
 const UPLOAD_SESSION_TTL_MS = 30 * 60 * 1000;
@@ -26,6 +35,7 @@ export type StaticWebappUploadSession = {
   archiveFormat: typeof STATIC_WEBAPP_ARTIFACT_BUNDLE_SCHEMA;
   archiveDigest: string;
   archivePath: string;
+  archiveObject?: ControlPlaneArtifactObject;
   sizeBytes: number;
 };
 
@@ -71,11 +81,21 @@ export async function createStaticWebappUploadSession(opts: {
   recordsRoot: string;
   submissionId: string;
   archiveBytes: Buffer;
+  objectStore?: ControlPlaneArtifactStore;
 }): Promise<StaticWebappUploadSession> {
   parseStaticWebappArtifactBundle(opts.archiveBytes);
   const uploadSessionId = createUploadSessionId();
   const root = uploadSessionRoot(opts.recordsRoot, uploadSessionId);
   const createdAt = new Date();
+  const archiveObject = opts.objectStore
+    ? await putVerifiedArtifactObject({
+        store: opts.objectStore,
+        body: opts.archiveBytes,
+        payloadKind: "artifact",
+        contentType: CONTROL_PLANE_ARTIFACT_CONTENT_TYPE,
+        provenance: { submissionId: opts.submissionId },
+      })
+    : undefined;
   const session: StaticWebappUploadSession = {
     schemaVersion: STATIC_WEBAPP_UPLOAD_SESSION_SCHEMA,
     uploadSessionId,
@@ -85,10 +105,11 @@ export async function createStaticWebappUploadSession(opts: {
     archiveFormat: STATIC_WEBAPP_ARTIFACT_BUNDLE_SCHEMA,
     archiveDigest: digestStaticWebappArtifactBundleBytes(opts.archiveBytes),
     archivePath: archivePath(opts.recordsRoot, uploadSessionId),
+    ...(archiveObject ? { archiveObject } : {}),
     sizeBytes: opts.archiveBytes.byteLength,
   };
   await fsp.mkdir(root, { recursive: true });
-  await fsp.writeFile(session.archivePath, opts.archiveBytes);
+  if (!archiveObject) await fsp.writeFile(session.archivePath, opts.archiveBytes);
   await fsp.writeFile(
     metadataPath(opts.recordsRoot, uploadSessionId),
     JSON.stringify(session) + "\n",
@@ -100,9 +121,11 @@ export async function admitStaticWebappUploadSession(opts: {
   recordsRoot: string;
   uploadSessionId: string;
   submissionId: string;
+  deploymentId?: string;
   deploymentLabel: string;
   sourceRevision: string;
   buildTarget: string;
+  objectStore?: ControlPlaneArtifactStore;
 }): Promise<AdmittedStaticWebappArtifact> {
   const session = await readUploadSession(opts.recordsRoot, opts.uploadSessionId);
   if (session.submissionId !== opts.submissionId) {
@@ -111,7 +134,12 @@ export async function admitStaticWebappUploadSession(opts: {
   if (Date.now() > Date.parse(session.expiresAt)) {
     throw new Error(`static-webapp upload session expired: ${session.uploadSessionId}`);
   }
-  const archiveBytes = await fsp.readFile(session.archivePath);
+  if (session.archiveObject && !opts.objectStore) {
+    throw new Error("artifact object store is required for upload session admission");
+  }
+  const archiveBytes = session.archiveObject
+    ? await readVerifiedArtifactObject({ store: opts.objectStore!, object: session.archiveObject })
+    : await fsp.readFile(session.archivePath);
   if (digestStaticWebappArtifactBundleBytes(archiveBytes) !== session.archiveDigest) {
     throw new Error(`static-webapp upload session digest mismatch: ${session.uploadSessionId}`);
   }
@@ -120,6 +148,9 @@ export async function admitStaticWebappUploadSession(opts: {
   return await admitStaticWebappArtifact({
     recordsRoot: opts.recordsRoot,
     artifactDir: materialized,
+    ...(opts.objectStore ? { objectStore: opts.objectStore } : {}),
+    ...(opts.deploymentId ? { deploymentId: opts.deploymentId } : {}),
+    submissionId: opts.submissionId,
     producer: {
       producerKind: "client_upload",
       sourceRevision: opts.sourceRevision,

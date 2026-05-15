@@ -9,6 +9,7 @@ import { cleanupThenRethrowRejectedNixosSubmit } from "./nixos-shared-host-contr
 import { assertReviewedServiceBearerToken } from "./nixos-shared-host-control-plane-service-auth";
 import type { DeploymentLaneGovernanceResolver } from "./deployment-lane-governance-resolution";
 import type { DeploymentControlPlaneServiceInstance } from "./deployment-control-plane-contract";
+import type { ControlPlaneArtifactStore } from "./control-plane-artifact-store-types";
 
 export async function handleProtectedChallengedNixosServiceSubmit(opts: {
   workspaceRoot: string;
@@ -24,6 +25,7 @@ export async function handleProtectedChallengedNixosServiceSubmit(opts: {
   idempotencyKey: string;
   governanceResolver?: DeploymentLaneGovernanceResolver;
   serviceInstance?: DeploymentControlPlaneServiceInstance;
+  objectStore?: ControlPlaneArtifactStore;
 }) {
   try {
     assertReviewedServiceBearerToken({
@@ -61,6 +63,7 @@ export async function handleProtectedChallengedNixosServiceSubmit(opts: {
       ...(opts.governanceResolver ? { governanceResolver: opts.governanceResolver } : {}),
       ...(opts.serviceInstance ? { serviceInstance: opts.serviceInstance } : {}),
       ...(authorization ? { authorization } : {}),
+      ...(opts.objectStore ? { objectStore: opts.objectStore } : {}),
     });
   } catch (error) {
     return await cleanupThenRethrowRejectedNixosSubmit({

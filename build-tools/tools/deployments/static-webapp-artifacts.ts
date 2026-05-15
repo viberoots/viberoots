@@ -4,7 +4,18 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { copyTree } from "../lib/copy-tree";
 import { sanitizeName } from "../lib/sanitize";
-import { inspectStaticWebappArtifactDir } from "./static-webapp-artifact-bundle";
+import {
+  createStaticWebappArtifactBundleBytes,
+  inspectStaticWebappArtifactDir,
+} from "./static-webapp-artifact-bundle";
+import {
+  artifactObjectReferenceUrl,
+  putVerifiedArtifactObject,
+} from "./control-plane-artifact-store";
+import type {
+  ControlPlaneArtifactObject,
+  ControlPlaneArtifactStore,
+} from "./control-plane-artifact-store-types";
 
 export const STATIC_WEBAPP_ARTIFACT_PROVENANCE_SCHEMA = "static-webapp-artifact-provenance@1";
 
@@ -35,6 +46,7 @@ export type AdmittedStaticWebappArtifact = {
   sourceRevision?: string;
   buildTarget?: string;
   storageReference?: string;
+  object?: ControlPlaneArtifactObject;
 };
 
 type StaticWebappArtifactProvenance = {
@@ -42,6 +54,7 @@ type StaticWebappArtifactProvenance = {
   artifactKind: AdmittedStaticWebappArtifact["kind"];
   artifactIdentity: string;
   storedArtifactPath: string;
+  object?: ControlPlaneArtifactObject;
   admittedAt: string;
   producer?: StaticWebappArtifactProducer;
 };
@@ -104,6 +117,7 @@ async function ensureArtifactProvenance(
     artifactKind: artifact.kind,
     artifactIdentity: artifact.identity,
     storedArtifactPath: artifact.storedArtifactPath,
+    ...(artifact.object ? { object: artifact.object } : {}),
     admittedAt: new Date().toISOString(),
     ...(producer ? { producer } : {}),
   };
@@ -114,14 +128,32 @@ export async function admitStaticWebappArtifact(opts: {
   recordsRoot: string;
   artifactDir: string;
   producer?: StaticWebappArtifactProducer;
+  objectStore?: ControlPlaneArtifactStore;
+  deploymentId?: string;
+  submissionId?: string;
 }): Promise<AdmittedStaticWebappArtifact> {
   const artifactDir = path.resolve(opts.artifactDir);
   const identity = await artifactIdentityForStaticWebappDir(artifactDir);
+  const object = opts.objectStore
+    ? await putVerifiedArtifactObject({
+        store: opts.objectStore,
+        body: await createStaticWebappArtifactBundleBytes(artifactDir),
+        payloadKind: "artifact",
+        provenance: {
+          deploymentId: opts.deploymentId,
+          submissionId: opts.submissionId,
+          artifactIdentity: identity,
+        },
+      })
+    : undefined;
   const artifact: AdmittedStaticWebappArtifact = {
     kind: "static-webapp",
     identity,
-    storedArtifactPath: artifactStoredPathFor(opts.recordsRoot, identity),
+    storedArtifactPath: object
+      ? artifactObjectReferenceUrl(object)
+      : artifactStoredPathFor(opts.recordsRoot, identity),
     provenancePath: artifactProvenancePathFor(opts.recordsRoot, identity),
+    ...(object ? { object } : {}),
     ...(opts.producer?.producerKind ? { producerKind: opts.producer.producerKind } : {}),
     ...(opts.producer?.sourceRevision ? { sourceRevision: opts.producer.sourceRevision } : {}),
     ...(opts.producer?.buildTarget ? { buildTarget: opts.producer.buildTarget } : {}),
@@ -129,7 +161,7 @@ export async function admitStaticWebappArtifact(opts: {
       ? { storageReference: opts.producer.storageReference }
       : {}),
   };
-  await ensureStoredArtifact(artifactDir, artifact.storedArtifactPath);
+  if (!object) await ensureStoredArtifact(artifactDir, artifact.storedArtifactPath);
   await ensureArtifactProvenance(artifact.provenancePath, artifact, opts.producer);
   return artifact;
 }
@@ -150,6 +182,7 @@ export async function readAdmittedStaticWebappArtifact(opts: {
     identity: provenance.artifactIdentity,
     storedArtifactPath: provenance.storedArtifactPath,
     provenancePath,
+    ...(provenance.object ? { object: provenance.object } : {}),
     ...(provenance.producer?.producerKind
       ? { producerKind: provenance.producer.producerKind }
       : {}),
@@ -166,6 +199,11 @@ export async function readAdmittedStaticWebappArtifact(opts: {
 export async function requireAdmittedStaticWebappArtifactPath(
   artifact: AdmittedStaticWebappArtifact,
 ): Promise<string> {
+  if (artifact.object && artifact.storedArtifactPath.startsWith("artifact-object://")) {
+    throw new Error(
+      `artifact object must be materialized before provider execution: ${artifact.identity}`,
+    );
+  }
   const storedArtifactPath = path.resolve(artifact.storedArtifactPath);
   try {
     const stat = await fsp.stat(storedArtifactPath);

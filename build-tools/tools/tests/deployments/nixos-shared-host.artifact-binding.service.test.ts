@@ -20,6 +20,7 @@ import {
   nixosSharedHostDeploymentFixture,
 } from "./nixos-shared-host.fixture";
 import { multiComponentDeployment } from "./nixos-shared-host.multi-component.fixture";
+import { memoryControlPlaneArtifactStore } from "./control-plane-artifact-store-test-helpers";
 import { reviewedLaneAdmissionEvidenceFixture } from "./deployment-lane-governance.fixture";
 import { readJson, writeDemoArtifact } from "./nixos-shared-host.control-plane.helpers";
 
@@ -67,11 +68,13 @@ test("protected/shared service uploads require challenge-bound artifact proofs",
     };
     await writeDemoArtifact(artifactDir);
     await ensureNixosSharedHostReviewedSourceRef(tmp, $, deployment);
+    const objectStore = memoryControlPlaneArtifactStore();
     const controlPlane = await startNixosSharedHostControlPlaneServer({
       workspaceRoot: tmp,
       paths,
       backendDatabaseUrl: localHarnessControlPlaneDatabaseUrl(paths.recordsRoot),
       token: TOKEN,
+      objectStore,
     });
     try {
       const request = {
@@ -152,11 +155,13 @@ test("challenge issuance rejects missing required expected artifact identities b
       hostRoot: path.join(tmp, "host"),
       recordsRoot,
     };
+    const objectStore = memoryControlPlaneArtifactStore();
     const controlPlane = await startNixosSharedHostControlPlaneServer({
       workspaceRoot: tmp,
       paths,
       backendDatabaseUrl: localHarnessControlPlaneDatabaseUrl(recordsRoot),
       token: TOKEN,
+      objectStore,
     });
     try {
       const singleDeployment = nixosSharedHostDeploymentFixture();

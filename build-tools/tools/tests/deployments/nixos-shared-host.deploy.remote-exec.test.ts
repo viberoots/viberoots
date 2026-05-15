@@ -14,6 +14,7 @@ import {
   remoteExecEnv,
   REVIEWED_PLEOMINO_DEPLOYMENT_LABEL,
 } from "./nixos-shared-host.deploy.remote-exec.helpers";
+import { memoryControlPlaneArtifactStore } from "./control-plane-artifact-store-test-helpers";
 import { readBackendSnapshot } from "./nixos-shared-host.control-plane.helpers";
 import { startNixosSharedHostPublicServer } from "./nixos-shared-host.public-server";
 
@@ -35,6 +36,7 @@ test("remote deploy stages the artifact, runs deploy remotely, writes remote rec
       $,
       artifactFiles: { "index.html": "<html>pleomino</html>\n", healthz: "ok\n" },
     });
+    const objectStore = memoryControlPlaneArtifactStore();
     const controlPlane = await startNixosSharedHostControlPlaneServer({
       workspaceRoot: tmp,
       paths: {
@@ -44,11 +46,13 @@ test("remote deploy stages the artifact, runs deploy remotely, writes remote rec
       },
       backendDatabaseUrl: localHarnessControlPlaneDatabaseUrl(remoteRecordsRoot),
       token: CONTROL_PLANE_TOKEN,
+      objectStore,
     });
     const worker = startNixosSharedHostControlPlaneWorkerLoop({
       workspaceRoot: tmp,
       recordsRoot: remoteRecordsRoot,
       backendDatabaseUrl: localHarnessControlPlaneDatabaseUrl(remoteRecordsRoot),
+      objectStore,
     });
     const server = await startNixosSharedHostPublicServer({
       deployment,
@@ -81,8 +85,9 @@ test("remote deploy stages the artifact, runs deploy remotely, writes remote rec
         remoteRecordsRoot,
         String(record.controlPlane.submissionId),
       );
-      assert.equal(snapshot.deploymentLabel, REVIEWED_PLEOMINO_DEPLOYMENT_LABEL);
-      assert.equal(snapshot.providerTargetIdentity, "nixos-shared-host:default:pleomino");
+      assert.equal(snapshot.deploymentId, "pleomino-dev");
+      assert.equal(snapshot.executionSnapshotObject?.provenance?.payloadKind, "execution-snapshot");
+      assert.equal(snapshot.artifactObjects?.length, 1);
       const liveIndex = path.join(
         nixosSharedHostContainerRoot(remoteRuntimeRoot, deployment.providerTarget.containerName),
         "srv/static-app/live/index.html",
@@ -113,6 +118,7 @@ test("remote deploy retains the staged artifact when retention is requested expl
       $,
       artifactFiles: { "index.html": "<html>retain</html>\n", healthz: "ok\n" },
     });
+    const objectStore = memoryControlPlaneArtifactStore();
     const controlPlane = await startNixosSharedHostControlPlaneServer({
       workspaceRoot: tmp,
       paths: {
@@ -122,11 +128,13 @@ test("remote deploy retains the staged artifact when retention is requested expl
       },
       backendDatabaseUrl: localHarnessControlPlaneDatabaseUrl(remoteRecordsRoot),
       token: CONTROL_PLANE_TOKEN,
+      objectStore,
     });
     const worker = startNixosSharedHostControlPlaneWorkerLoop({
       workspaceRoot: tmp,
       recordsRoot: remoteRecordsRoot,
       backendDatabaseUrl: localHarnessControlPlaneDatabaseUrl(remoteRecordsRoot),
+      objectStore,
     });
     const server = await startNixosSharedHostPublicServer({
       deployment,

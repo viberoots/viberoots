@@ -5,6 +5,7 @@ import {
 } from "./nixos-shared-host-artifacts";
 import { fingerprintValue } from "./nixos-shared-host-deployment-fingerprint";
 import type { NixosSharedHostDeployment } from "./contract";
+import type { ControlPlaneArtifactStore } from "./control-plane-artifact-store-types";
 
 export type NixosSharedHostResolvedComponentArtifact = {
   componentId: string;
@@ -16,6 +17,8 @@ export async function admitNixosSharedHostComponentArtifacts(opts: {
   recordsRoot: string;
   artifactDirsByComponentId: Record<string, string>;
   stagingRoot?: string;
+  objectStore?: ControlPlaneArtifactStore;
+  submissionId?: string;
 }): Promise<NixosSharedHostResolvedComponentArtifact[]> {
   const resolved: NixosSharedHostResolvedComponentArtifact[] = [];
   for (const component of opts.deployment.components) {
@@ -30,6 +33,9 @@ export async function admitNixosSharedHostComponentArtifacts(opts: {
         artifactDir,
         kind: component.kind,
         ...(opts.stagingRoot ? { stagingRoot: opts.stagingRoot } : {}),
+        ...(opts.objectStore ? { objectStore: opts.objectStore } : {}),
+        deploymentId: opts.deployment.deploymentId,
+        ...(opts.submissionId ? { submissionId: opts.submissionId } : {}),
       }),
     });
   }

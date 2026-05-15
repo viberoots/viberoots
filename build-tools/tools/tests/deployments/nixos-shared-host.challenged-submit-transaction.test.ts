@@ -8,8 +8,10 @@ import {
 } from "../../deployments/deployment-artifact-challenges";
 import { acceptChallengedArtifactSubmission } from "../../deployments/deployment-artifact-submit-transaction";
 import { fingerprintControlPlanePayload } from "../../deployments/deployment-control-plane-idempotency";
-import { serviceSubmissionAdmissionEvidence } from "../../deployments/deployment-service-client-contract";
-import { localHarnessControlPlaneDatabaseUrl } from "../../deployments/nixos-shared-host-control-plane-backend";
+import {
+  localHarnessControlPlaneDatabaseUrl,
+  readBackendSnapshotBySubmissionId,
+} from "../../deployments/nixos-shared-host-control-plane-backend";
 import { queryBackend } from "../../deployments/nixos-shared-host-control-plane-backend-db";
 import { prepareBackendNixosSharedHostControlPlaneRun } from "../../deployments/nixos-shared-host-control-plane-backend-prepare";
 import { startNixosSharedHostControlPlaneServer } from "../../deployments/nixos-shared-host-control-plane-server";
@@ -18,6 +20,7 @@ import {
   challengedSubmitProof,
   challengedSubmitRequest,
   countBackendRows,
+  memoryArtifactStore,
 } from "./nixos-shared-host.challenged-submit.helpers";
 import { ensureNixosSharedHostReviewedSourceRef } from "./nixos-shared-host.fixture";
 import { readJson, writeDemoArtifact } from "./nixos-shared-host.control-plane.helpers";
@@ -39,11 +42,13 @@ test("challenged submit retries reuse the accepted transaction and keep audit ou
       recordsRoot: paths.recordsRoot,
       databaseUrl: localHarnessControlPlaneDatabaseUrl(paths.recordsRoot),
     };
+    const objectStore = memoryArtifactStore();
     const controlPlane = await startNixosSharedHostControlPlaneServer({
       workspaceRoot: tmp,
       paths,
       backendDatabaseUrl: backend.databaseUrl,
       token: TOKEN,
+      objectStore,
     });
     try {
       const challenge = await readJson<any>(
@@ -73,6 +78,17 @@ test("challenged submit retries reuse the accepted transaction and keep audit ou
       assert.equal(accepted.lifecycleState, "waiting_for_lock");
       assert.equal(accepted.artifactBinding.challengeId, challenge.challengeId);
       assert.equal(accepted.artifactBinding.verificationDecision, "accepted");
+      const snapshot = (await readBackendSnapshotBySubmissionId(backend, request.submissionId))!
+        .snapshot as any;
+      const artifactObject = snapshot.artifactObjects[0];
+      assert.ok(artifactObject);
+      assert.equal(snapshot.action, undefined);
+      assert.equal(objectStore.objects.has(artifactObject.key), true);
+      assert.equal(objectStore.objects.has(snapshot.executionSnapshotObject.key), true);
+      assert.equal(
+        await countBackendRows(backend, "artifact_objects", `object_key = '${artifactObject.key}'`),
+        1,
+      );
       assert.equal(
         accepted.artifactBinding.expectedIdentities.expectedArtifactIdentity,
         request.expectedArtifactIdentity,

@@ -25,6 +25,7 @@ import { writeServiceArtifact } from "./kubernetes.service-artifact.fixture";
 import { withEnvOverrides } from "./nixos-shared-host.control-plane.helpers";
 import { ensureNixosSharedHostReviewedSourceRef } from "./nixos-shared-host.fixture";
 import { executeFrozenProviderSnapshotAndReadSubmission } from "./provider-frozen-worker.helpers";
+import { memoryControlPlaneArtifactStore } from "./control-plane-artifact-store-test-helpers";
 
 const infisicalClientSecret = "server-local-secret";
 
@@ -102,11 +103,13 @@ test("kubernetes worker deploy and retry execute from frozen snapshots", async (
           VBR_KUBE_INFISICAL_CLIENT_SECRET: infisicalClientSecret,
         },
         async () => {
+          const objectStore = memoryControlPlaneArtifactStore();
           const artifactDir = path.join(tmp, "kube-artifact");
           await writeServiceArtifact(artifactDir, "api\n");
           const deploy = await buildSnapshotWithInfisicalAdmission(infisical.siteUrl, {
             workspaceRoot: tmp,
             recordsRoot,
+            objectStore,
             request: {
               schemaVersion: KUBERNETES_CONTROL_PLANE_SUBMIT_REQUEST_SCHEMA,
               submissionId: "kube-worker-deploy",
@@ -138,11 +141,22 @@ test("kubernetes worker deploy and retry execute from frozen snapshots", async (
             provider: "kube-deploy",
             execute: executeKubernetesControlPlaneSubmission,
             snapshot: deploy,
+            objectStore,
           });
           assert.equal(deployed.finalOutcome, "succeeded");
           const deployedRecord = JSON.parse(await fsp.readFile(deployed.resultRecordPath, "utf8"));
+          assert.ok(deployedRecord.componentArtifacts[0].object);
+          assert.match(
+            deployedRecord.componentArtifacts[0].storedArtifactPath,
+            /^artifact-object:\/\//,
+          );
           const replaySnapshot = JSON.parse(
             await fsp.readFile(deployedRecord.replaySnapshotPath, "utf8"),
+          );
+          assert.ok(replaySnapshot.componentArtifacts[0].object);
+          assert.match(
+            replaySnapshot.componentArtifacts[0].storedArtifactPath,
+            /^artifact-object:\/\//,
           );
           const renderedSnapshotPath = replaySnapshot.providerConfigSnapshotPath;
           const renderedSnapshot = await fsp.readFile(renderedSnapshotPath, "utf8");
@@ -173,6 +187,7 @@ test("kubernetes worker deploy and retry execute from frozen snapshots", async (
           const retry = await buildSnapshotWithInfisicalAdmission(infisical.siteUrl, {
             workspaceRoot: tmp,
             recordsRoot,
+            objectStore,
             request: {
               schemaVersion: KUBERNETES_CONTROL_PLANE_SUBMIT_REQUEST_SCHEMA,
               submissionId: "kube-worker-retry",
@@ -206,6 +221,7 @@ test("kubernetes worker deploy and retry execute from frozen snapshots", async (
             provider: "kube-retry",
             execute: executeKubernetesControlPlaneSubmission,
             snapshot: retry,
+            objectStore,
           });
           assert.equal(replayed.finalOutcome, "succeeded");
         },

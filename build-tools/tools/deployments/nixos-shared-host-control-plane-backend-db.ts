@@ -165,6 +165,15 @@ async function initializeBackendSchema(pool: BackendPool) {
       document_json JSONB NOT NULL,
       created_at TIMESTAMPTZ NOT NULL
     );
+    CREATE TABLE IF NOT EXISTS artifact_objects (
+      object_key TEXT PRIMARY KEY,
+      bucket TEXT NOT NULL,
+      digest TEXT NOT NULL,
+      size_bytes BIGINT NOT NULL,
+      content_type TEXT NOT NULL,
+      provenance_json JSONB NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL
+    );
   `);
 }
 

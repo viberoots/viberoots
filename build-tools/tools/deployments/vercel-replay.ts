@@ -9,6 +9,8 @@ import {
 } from "./deployment-replay-admission";
 import type { VercelAdmittedContext } from "./vercel-admission";
 import { readVercelDeployRecord } from "./vercel-records";
+import { restoreDurableArtifactObjectReferences } from "./control-plane-artifact-durable-refs";
+import type { ControlPlaneArtifactObject } from "./control-plane-artifact-store-types";
 
 export const VERCEL_REPLAY_SNAPSHOT_SCHEMA = "vercel-replay-snapshot@1";
 
@@ -20,7 +22,7 @@ export type VercelReplaySnapshot = {
   deploymentLabel: string;
   providerTargetIdentity: string;
   deployment: VercelDeployment;
-  artifact: { identity: string; outputDir?: string };
+  artifact: { identity: string; outputDir?: string; object?: ControlPlaneArtifactObject };
   providerReleaseId: string;
   publicUrl: string;
   aliasAssigned: boolean;
@@ -36,7 +38,7 @@ export async function writeVercelReplaySnapshot(opts: {
   recordsRoot: string;
   deployRunId: string;
   deployment: VercelDeployment;
-  artifact: { identity: string; outputDir?: string };
+  artifact: { identity: string; outputDir?: string; object?: ControlPlaneArtifactObject };
   providerReleaseId: string;
   publicUrl: string;
   aliasAssigned: boolean;
@@ -56,7 +58,7 @@ export async function writeVercelReplaySnapshot(opts: {
     deploymentLabel: opts.deployment.label,
     providerTargetIdentity: opts.deployment.providerTarget.providerTargetIdentity,
     deployment: opts.deployment,
-    artifact: opts.artifact,
+    artifact: restoreDurableArtifactObjectReferences(structuredClone(opts.artifact)),
     providerReleaseId: opts.providerReleaseId,
     publicUrl: opts.publicUrl,
     aliasAssigned: opts.aliasAssigned,

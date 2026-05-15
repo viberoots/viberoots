@@ -13,6 +13,8 @@ import {
 import type { S3StaticProvisionerPlanRef } from "./s3-static-provisioner-plan";
 import { S3_STATIC_PROVIDER } from "./contract";
 import { operatorErrorFields } from "./deployment-control-plane-redaction";
+import { restoreDurableArtifactObjectReferences } from "./control-plane-artifact-durable-refs";
+import type { ControlPlaneArtifactObject } from "./control-plane-artifact-store-types";
 
 export const S3_STATIC_RECORD_SCHEMA = "deploy-record@2026-04-09";
 
@@ -40,7 +42,12 @@ export type S3StaticDeployRecord = {
   parentRunId?: string;
   releaseLineageId?: string;
   artifactLineageId?: string;
-  artifact?: { identity: string; storedArtifactPath?: string; provenancePath?: string };
+  artifact?: {
+    identity: string;
+    storedArtifactPath?: string;
+    provenancePath?: string;
+    object?: ControlPlaneArtifactObject;
+  };
   admittedContext: S3StaticAdmittedContext;
   runnerIdentities: DeploymentRunnerIdentities;
   publisherType: string;
@@ -95,6 +102,7 @@ export async function writeS3StaticDeployRecord(
   recordsRoot: string,
   record: S3StaticDeployRecord,
 ): Promise<string> {
+  restoreDurableArtifactObjectReferences(record);
   const recordPath = path.join(path.resolve(recordsRoot), "runs", `${record.deployRunId}.json`);
   await fsp.mkdir(path.dirname(recordPath), { recursive: true });
   await fsp.writeFile(recordPath, JSON.stringify(record, null, 2) + "\n", "utf8");

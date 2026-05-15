@@ -5,6 +5,8 @@ import path from "node:path";
 import type { DeploymentSmokeOutcome } from "./deployment-smoke-policy";
 import { readVersionedJson } from "./deployment-schema-compat";
 import type { VercelDeployment } from "./contract";
+import { restoreDurableArtifactObjectReferences } from "./control-plane-artifact-durable-refs";
+import type { ControlPlaneArtifactObject } from "./control-plane-artifact-store-types";
 
 export const VERCEL_RECORD_SCHEMA = "vercel-deploy-record@2026-05-03";
 
@@ -31,7 +33,7 @@ export type VercelDeployRecord = {
   deploymentLabel: string;
   provider: "vercel";
   providerTargetIdentity: string;
-  artifact?: { identity: string; outputDir?: string };
+  artifact?: { identity: string; outputDir?: string; object?: ControlPlaneArtifactObject };
   sourceRunId?: string;
   parentRunId?: string;
   releaseLineageId?: string;
@@ -82,6 +84,7 @@ export async function writeVercelDeployRecord(
   recordsRoot: string,
   record: VercelDeployRecord,
 ): Promise<string> {
+  restoreDurableArtifactObjectReferences(record);
   const recordPath = vercelRecordPathFor(recordsRoot, record.deployRunId);
   await fsp.mkdir(path.dirname(recordPath), { recursive: true });
   await fsp.writeFile(recordPath, JSON.stringify(record, null, 2) + "\n", "utf8");

@@ -29,6 +29,9 @@ import {
   type CloudflarePagesBackendSnapshot,
 } from "./cloudflare-pages-control-plane-backend-snapshot";
 import { reviewedCurrentStageExpectation } from "./deployment-current-stage-state-expected";
+import { putVerifiedArtifactObject } from "./control-plane-artifact-store";
+import { writeBackendSnapshotArtifactObjects } from "./control-plane-artifact-snapshot-metadata";
+import type { ControlPlaneArtifactStore } from "./control-plane-artifact-store-types";
 
 type RequestDedupe = {
   mode: "created" | "reused";
@@ -127,10 +130,12 @@ export async function prepareBackendCloudflarePagesControlPlaneRun(opts: {
   authorizationSnapshot?: DeploymentControlPlaneAuthorization;
   serviceInstance?: DeploymentControlPlaneServiceInstance;
   governanceResolver?: DeploymentLaneGovernanceResolver;
+  objectStore?: ControlPlaneArtifactStore;
 }) {
   const snapshot = await buildCloudflarePagesBackendSnapshot(opts.resolved, {
     workspaceRoot: opts.workspaceRoot,
     recordsRoot: opts.recordsRoot,
+    ...(opts.objectStore ? { objectStore: opts.objectStore } : {}),
     governanceResolver: opts.governanceResolver,
   });
   (snapshot as any).expectedCurrentRunId = (
@@ -151,7 +156,23 @@ export async function prepareBackendCloudflarePagesControlPlaneRun(opts: {
         recordsRoot: opts.recordsRoot,
         governanceResolver: opts.governanceResolver,
       });
+      if (opts.objectStore) {
+        (snapshot as any).executionSnapshotObject = await putVerifiedArtifactObject({
+          store: opts.objectStore,
+          body: Buffer.from(JSON.stringify(snapshot) + "\n"),
+          payloadKind: "execution-snapshot",
+          contentType: "application/json",
+          provenance: {
+            deploymentId: String((snapshot as any).deploymentId || ""),
+            submissionId: opts.request.submissionId,
+          },
+        });
+      }
       await writeBackendSnapshotDoc(opts.backend, snapshot, refs.executionSnapshotPath);
+      await writeBackendSnapshotArtifactObjects({
+        backend: opts.backend,
+        snapshot: snapshot as any,
+      });
     } catch (error) {
       if (!(error instanceof DeploymentAdmissionError)) throw error;
       const submission = admissionFailureSubmission({

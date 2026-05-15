@@ -1,6 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import type { NixosSharedHostControlPlaneBackendTarget } from "./nixos-shared-host-control-plane-backend";
 import type { NixosSharedHostControlPlanePaths } from "./nixos-shared-host-control-plane-contract";
+import type { ControlPlaneArtifactStore } from "./control-plane-artifact-store-types";
 import {
   KUBERNETES_CONTROL_PLANE_SUBMIT_REQUEST_SCHEMA,
   queueKubernetesControlPlaneSubmission,
@@ -39,6 +40,7 @@ export async function queueDeploymentProviderControlPlaneSubmission(
     workspaceRoot: string;
     paths: NixosSharedHostControlPlanePaths;
     backend: NixosSharedHostControlPlaneBackendTarget;
+    objectStore?: ControlPlaneArtifactStore;
   },
 ) {
   assertNoProtectedSharedClientIdentityFields({
@@ -51,6 +53,7 @@ export async function queueDeploymentProviderControlPlaneSubmission(
       recordsRoot: opts.paths.recordsRoot,
       backend: opts.backend,
       request,
+      ...(opts.objectStore ? { objectStore: opts.objectStore } : {}),
     });
   }
   if (request.schemaVersion === VERCEL_CONTROL_PLANE_SUBMIT_REQUEST_SCHEMA) {
@@ -59,6 +62,7 @@ export async function queueDeploymentProviderControlPlaneSubmission(
       recordsRoot: opts.paths.recordsRoot,
       backend: opts.backend,
       request,
+      ...(opts.objectStore ? { objectStore: opts.objectStore } : {}),
     });
   }
   return await queueKubernetesControlPlaneSubmission({
@@ -66,5 +70,6 @@ export async function queueDeploymentProviderControlPlaneSubmission(
     recordsRoot: opts.paths.recordsRoot,
     backend: opts.backend,
     request,
+    ...(opts.objectStore ? { objectStore: opts.objectStore } : {}),
   });
 }

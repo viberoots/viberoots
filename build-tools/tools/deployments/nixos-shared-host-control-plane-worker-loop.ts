@@ -1,12 +1,10 @@
 #!/usr/bin/env zx-wrapper
 import {
   claimBackendQueuedSubmission,
-  acquireBackendControlPlaneLock,
   writeBackendDeployRecordDoc,
   writeBackendSubmissionDoc,
   startBackendSubmissionClaimLease,
 } from "./nixos-shared-host-control-plane-backend";
-import type { NixosSharedHostControlPlaneBackendTarget } from "./nixos-shared-host-control-plane-backend";
 import {
   materializeBackendControlPlaneFiles,
   persistMaterializedSubmission,
@@ -21,42 +19,12 @@ import { executeSubmittedNixosSharedHostControlPlaneRun } from "./nixos-shared-h
 import { reconcileNixosSharedHostRecoveredSubmission } from "./nixos-shared-host-recovery";
 import { readControlPlaneJson } from "./nixos-shared-host-control-plane-store";
 import type { NixosSharedHostControlPlaneSubmission } from "./nixos-shared-host-control-plane-contract";
-import { nixosSharedHostLockScopes } from "./nixos-shared-host-components";
+import { materializeSnapshotArtifacts } from "./control-plane-artifact-materialize";
+import type { ControlPlaneArtifactStore } from "./control-plane-artifact-store-types";
+import { acquireBackendNixosSharedHostLocks } from "./nixos-shared-host-control-plane-worker-locks";
 
 function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-async function acquireBackendNixosSharedHostLocks(opts: {
-  backend: NixosSharedHostControlPlaneBackendTarget;
-  deployment: Parameters<typeof nixosSharedHostLockScopes>[0];
-  shouldAbort?: () => Promise<"cancelled" | "superseded" | "no_longer_admitted" | null>;
-}) {
-  const releases: Array<() => Promise<void>> = [];
-  const assertions: Array<() => Promise<void>> = [];
-  let fencingToken: string | undefined;
-  try {
-    for (const lockScope of nixosSharedHostLockScopes(opts.deployment)) {
-      const lock = await acquireBackendControlPlaneLock(opts.backend, lockScope, {
-        ...(opts.shouldAbort ? { shouldAbort: opts.shouldAbort } : {}),
-      });
-      if (!fencingToken) fencingToken = lock.fencingToken;
-      assertions.push(lock.assertCurrentAuthority);
-      releases.push(lock.release);
-    }
-  } catch (error) {
-    for (const release of releases.reverse()) await release();
-    throw error;
-  }
-  return {
-    fencingToken,
-    assertCurrentAuthority: async () => {
-      for (const assertCurrentAuthority of assertions) await assertCurrentAuthority();
-    },
-    release: async () => {
-      for (const release of releases.reverse()) await release();
-    },
-  };
 }
 
 export async function runNixosSharedHostControlPlaneWorkerOnce(opts: {
@@ -64,6 +32,7 @@ export async function runNixosSharedHostControlPlaneWorkerOnce(opts: {
   recordsRoot: string;
   backendDatabaseUrl: string;
   workerId: string;
+  objectStore?: ControlPlaneArtifactStore;
 }) {
   const backend = {
     recordsRoot: opts.recordsRoot,
@@ -77,12 +46,23 @@ export async function runNixosSharedHostControlPlaneWorkerOnce(opts: {
     workerId: opts.workerId,
     claimToken: claimed.claimToken,
   });
-  const materialized = await materializeBackendControlPlaneFiles(backend, claimed.submissionId);
-  const submission = await readControlPlaneJson<NixosSharedHostControlPlaneSubmission>(
-    materialized.submissionPath,
-  );
-  const snapshot = await readControlPlaneJson<any>(materialized.executionSnapshotPath);
+  let materialized: Awaited<ReturnType<typeof materializeBackendControlPlaneFiles>> | undefined;
+  let materializedArtifactsRoot: string | undefined;
+  let shouldPersistMaterialized = false;
   try {
+    materialized = await materializeBackendControlPlaneFiles(backend, claimed.submissionId);
+    const submission = await readControlPlaneJson<NixosSharedHostControlPlaneSubmission>(
+      materialized.submissionPath,
+    );
+    let snapshot = await readControlPlaneJson<any>(materialized.executionSnapshotPath);
+    materializedArtifactsRoot = `${materialized.executionSnapshotPath}.artifacts`;
+    snapshot = await materializeSnapshotArtifacts({
+      snapshot,
+      store: opts.objectStore,
+      outputRoot: materializedArtifactsRoot,
+      executionSnapshotPath: materialized.executionSnapshotPath,
+    });
+    shouldPersistMaterialized = true;
     if (snapshot?.deployment?.provider === "cloudflare-pages") {
       if (["running", "cancelling"].includes(claimed.lifecycleState)) {
         await reconcileNixosSharedHostRecoveredSubmission({
@@ -183,14 +163,17 @@ export async function runNixosSharedHostControlPlaneWorkerOnce(opts: {
     });
   } finally {
     try {
-      await persistMaterializedControlPlaneFilesIfCurrent({
-        backend,
-        materialized,
-        assertCurrentAuthority: async () => await claimLease.assertCurrentAuthority(),
-      });
+      if (materialized && shouldPersistMaterialized) {
+        await persistMaterializedControlPlaneFilesIfCurrent({
+          backend,
+          materialized,
+          assertCurrentAuthority: async () => await claimLease.assertCurrentAuthority(),
+        });
+      }
     } finally {
       await claimLease.stop();
-      await materialized.cleanup();
+      await materialized?.cleanup();
+      await removeMirrorFile(materializedArtifactsRoot);
     }
   }
   return true;
@@ -202,6 +185,7 @@ export function startNixosSharedHostControlPlaneWorkerLoop(opts: {
   backendDatabaseUrl: string;
   workerId?: string;
   pollMs?: number;
+  objectStore?: ControlPlaneArtifactStore;
   onError?: (error: unknown) => void;
 }) {
   let closed = false;
@@ -220,6 +204,7 @@ export function startNixosSharedHostControlPlaneWorkerLoop(opts: {
               recordsRoot: opts.recordsRoot,
               backendDatabaseUrl: opts.backendDatabaseUrl,
               workerId,
+              ...(opts.objectStore ? { objectStore: opts.objectStore } : {}),
             }))
           ) {
             break;

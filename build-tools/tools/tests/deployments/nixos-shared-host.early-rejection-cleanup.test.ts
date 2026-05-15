@@ -20,6 +20,7 @@ import {
   ensureNixosSharedHostReviewedSourceRef,
   nixosSharedHostDeploymentFixture,
 } from "./nixos-shared-host.fixture";
+import { memoryControlPlaneArtifactStore } from "./control-plane-artifact-store-test-helpers";
 import { reviewedLaneAdmissionEvidenceFixture } from "./deployment-lane-governance.fixture";
 import { readJson, writeDemoArtifact } from "./nixos-shared-host.control-plane.helpers";
 import {
@@ -63,11 +64,13 @@ test("bearer-token rejection during challenge issuance still cleans staged artif
     };
     const artifactDir = await writeStagedArtifact(paths.hostRoot, "missing-token");
     await ensureNixosSharedHostReviewedSourceRef(tmp, $, deployment);
+    const objectStore = memoryControlPlaneArtifactStore();
     const controlPlane = await startNixosSharedHostControlPlaneServer({
       workspaceRoot: tmp,
       paths,
       backendDatabaseUrl: localHarnessControlPlaneDatabaseUrl(paths.recordsRoot),
       token: TOKEN,
+      objectStore,
     });
     try {
       const response = await fetch(
@@ -106,11 +109,13 @@ test("final-submit auth-boundary rejection still cleans staged artifacts before 
     };
     const artifactDir = await writeStagedArtifact(paths.hostRoot, "submit-auth");
     await ensureNixosSharedHostReviewedSourceRef(tmp, $, deployment);
+    const objectStore = memoryControlPlaneArtifactStore();
     const controlPlane = await startNixosSharedHostControlPlaneServer({
       workspaceRoot: tmp,
       paths,
       backendDatabaseUrl: localHarnessControlPlaneDatabaseUrl(paths.recordsRoot),
       token: TOKEN,
+      objectStore,
     });
     try {
       const authA = await writeAuthSession({

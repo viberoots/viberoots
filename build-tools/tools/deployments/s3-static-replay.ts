@@ -18,6 +18,7 @@ import type { S3StaticAdmittedContext } from "./s3-static-admission";
 import type { S3StaticDeployment } from "./contract";
 import type { AdmittedStaticWebappArtifact } from "./static-webapp-artifacts";
 import { requireAdmittedStaticWebappArtifactPath } from "./static-webapp-artifacts";
+import { restoreDurableArtifactObjectReferences } from "./control-plane-artifact-durable-refs";
 
 export const S3_STATIC_REPLAY_SNAPSHOT_SCHEMA = "s3-static-replay-snapshot@1";
 
@@ -58,7 +59,7 @@ export async function writeS3StaticReplaySnapshot(opts: {
     providerTargetIdentity: opts.deployment.providerTarget.providerTargetIdentity,
     deploymentMetadataFingerprint: deploymentMetadataFingerprintFor(opts.deployment),
     runnerIdentities: s3StaticRunnerIdentities(opts.deployment),
-    artifact: opts.artifact,
+    artifact: restoreDurableArtifactObjectReferences(structuredClone(opts.artifact)),
     admittedContext: opts.admittedContext,
     deployment: opts.deployment,
     providerConfigSnapshotPath: path.resolve(opts.providerConfigSnapshotPath),
@@ -118,6 +119,8 @@ export async function resolveS3StaticReplaySource(opts: {
     record,
     recordPath,
     replaySnapshot,
-    artifactDir: await requireAdmittedStaticWebappArtifactPath(replaySnapshot.artifact),
+    artifactDir: replaySnapshot.artifact.object
+      ? undefined
+      : await requireAdmittedStaticWebappArtifactPath(replaySnapshot.artifact),
   };
 }

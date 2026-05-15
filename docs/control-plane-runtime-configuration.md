@@ -94,6 +94,28 @@ Reviewed deployment metadata may override these filenames for one deployment, bu
 plain filenames resolved inside `credentials.directory`. There are no global Infisical tenant,
 project, site URL, environment, client id, or client secret defaults in the runtime config.
 
+## Artifact Store Contract
+
+`storage.artifactStore` points at an S3-compatible bucket. The endpoint, access key id, and secret
+access key are file-backed credentials resolved through `credentials.directory`; the config may name
+the bucket and region, but it does not embed secret values.
+
+Artifact-store credentials should be scoped to the configured bucket and the control-plane artifact
+key prefix used by this instance. Normal operation needs object writes, direct object reads, and
+object metadata reads for keys the control plane records in the database. Broad bucket
+administration, bucket creation/deletion, policy management, cross-bucket access, and list-wide
+permissions are not required for service or worker correctness.
+
+Admitted artifact payloads and execution-snapshot payloads are written by immutable object key. The
+database stores the object key, bucket, digest, byte size, content type, provenance fields, and
+admitted run metadata. Workers read objects by direct key and verify the recorded digest, size, and
+provenance before materializing a temporary execution copy. Object listing is not a correctness
+mechanism.
+
+Production container mode requires this object store path. Local filesystem artifact storage is only
+for tests, local fixture mode, or temporary staging directories that are scrubbed after worker use.
+Shared POSIX filesystems must not be used as the production artifact authority.
+
 ## CI Boundary
 
 CI submits reviewed requests to the deployment control plane. CI must not mount database,

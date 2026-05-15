@@ -22,6 +22,7 @@ import {
   assertProtectedSharedArtifactIdentityFields,
   finalizedStagedArtifactReference,
 } from "./nixos-shared-host-artifact-submit-request";
+import type { ControlPlaneArtifactStore } from "./control-plane-artifact-store-types";
 
 type Boundary = {
   requestedBy?: NixosSharedHostControlPlaneSubmission["requestedBy"];
@@ -40,6 +41,7 @@ export async function acceptChallengedNixosSharedHostSubmit(opts: {
   authorization?: DeploymentControlPlaneAuthorizationDecision;
   governanceResolver?: DeploymentLaneGovernanceResolver;
   serviceInstance?: DeploymentControlPlaneServiceInstance;
+  objectStore?: ControlPlaneArtifactStore;
 }) {
   assertProtectedSharedArtifactIdentityFields(opts.resolvedRequest);
   const reusable = await readReusableChallengedArtifactSubmission({
@@ -123,6 +125,7 @@ export async function acceptChallengedNixosSharedHostSubmit(opts: {
       : {}),
     ...(opts.governanceResolver ? { governanceResolver: opts.governanceResolver } : {}),
     ...(opts.serviceInstance ? { serviceInstance: opts.serviceInstance } : {}),
+    ...(opts.objectStore ? { objectStore: opts.objectStore } : {}),
     persistMode: "defer",
   });
   const accepted = await acceptChallengedArtifactSubmission({

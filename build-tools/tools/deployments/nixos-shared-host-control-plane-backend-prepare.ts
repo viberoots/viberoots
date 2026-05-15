@@ -46,6 +46,9 @@ import {
   snapshotReviewedSourceForSubmission,
 } from "./nixos-shared-host-reviewed-source-snapshot";
 import { requestedReviewedSourceFromEvidence } from "./deployment-source-revision";
+import { putVerifiedArtifactObject } from "./control-plane-artifact-store";
+import { writeBackendSnapshotArtifactObjects } from "./control-plane-artifact-snapshot-metadata";
+import type { ControlPlaneArtifactStore } from "./control-plane-artifact-store-types";
 
 function assertExpectedArtifactIdentities(
   snapshot: NixosSharedHostControlPlaneSnapshot,
@@ -112,6 +115,7 @@ export async function prepareBackendNixosSharedHostControlPlaneRun(opts: {
   governanceResolver?: DeploymentLaneGovernanceResolver;
   persistMode?: "immediate" | "defer";
   serviceInstance?: DeploymentControlPlaneServiceInstance;
+  objectStore?: ControlPlaneArtifactStore;
 }) {
   const submissionId = opts.submissionId || createNixosSharedHostSubmissionId();
   const requestedBy =
@@ -136,6 +140,7 @@ export async function prepareBackendNixosSharedHostControlPlaneRun(opts: {
       ...opts,
       deferSecretReferenceResolution: true,
       ...(reviewedSourceSnapshot ? { reviewedSourceSnapshot } : {}),
+      ...(opts.objectStore ? { objectStore: opts.objectStore } : {}),
     },
     submissionId,
   );
@@ -180,8 +185,18 @@ export async function prepareBackendNixosSharedHostControlPlaneRun(opts: {
       admissionEvidence: opts.admissionEvidence,
       governanceResolver: opts.governanceResolver,
     });
+    if (opts.objectStore) {
+      (snapshot as any).executionSnapshotObject = await putVerifiedArtifactObject({
+        store: opts.objectStore,
+        body: Buffer.from(JSON.stringify(snapshot) + "\n"),
+        payloadKind: "execution-snapshot",
+        contentType: "application/json",
+        provenance: { deploymentId: snapshot.deploymentId, submissionId },
+      });
+    }
     if (persistImmediately) {
       await writeBackendSnapshotDoc(opts.backend, snapshot, executionSnapshotPath);
+      await writeBackendSnapshotArtifactObjects({ backend: opts.backend, snapshot });
     }
   } catch (error) {
     if (!persistImmediately) throw error;

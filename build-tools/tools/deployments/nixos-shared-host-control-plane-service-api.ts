@@ -8,18 +8,12 @@ import {
 import { prepareBackendCloudflarePagesControlPlaneRun } from "./cloudflare-pages-control-plane-backend-prepare";
 import { resolveCloudflarePagesServiceSubmitRequest } from "./cloudflare-pages-control-plane-service-submit";
 import { assertNoProtectedSharedClientIdentityFields } from "./deployment-service-client-contract";
-import { handleControlPlaneRunActionService } from "./deployment-control-plane-run-action-service";
 import {
   isDeploymentProviderServiceSubmitRequest,
   queueDeploymentProviderControlPlaneSubmission,
   type DeploymentProviderServiceSubmitRequest,
 } from "./deployment-provider-control-plane-submit";
 import { submitResponseFromSubmission } from "./deployment-control-plane-status";
-import type {
-  DeploymentControlPlaneAuthorization,
-  DeploymentControlPlaneRunActionRequest,
-} from "./deployment-control-plane-contract";
-import type { DeploymentPrincipal } from "./deployment-admission-evidence";
 import {
   enqueueBackendSubmission,
   resolveBackendIdempotency,
@@ -35,11 +29,12 @@ import { reusedBackendSubmitResponse } from "./nixos-shared-host-control-plane-s
 import { resolveServiceSubmitRequest } from "./nixos-shared-host-control-plane-service-submit";
 import { handleProtectedChallengedNixosServiceSubmit } from "./nixos-shared-host-control-plane-service-protected-submit";
 import { resolveNixosSharedHostSubmitContext } from "./nixos-shared-host-control-plane-submit-context";
+import { assertProductionArtifactStore } from "./control-plane-artifact-store";
 // prettier-ignore
 export { readControlPlaneCurrentStageState, readControlPlaneRecord, readControlPlaneStageHistory, readControlPlaneStatus } from "./nixos-shared-host-control-plane-service-read";
 
 // prettier-ignore
-export type ServiceRunActionRequest = DeploymentControlPlaneRunActionRequest & { deployRunId?: string; authSessionId?: string; requestedBy?: DeploymentPrincipal; authorization?: DeploymentControlPlaneAuthorization; };
+export { handleControlPlaneRunAction, type ServiceRunActionRequest } from "./deployment-control-plane-run-action-api";
 
 type ServiceSubmitRequest =
   | NixosSharedHostControlPlaneSubmitRequest
@@ -56,6 +51,7 @@ export async function handleControlPlaneSubmit(
     authorizationHeader?: string | string[];
     localFixture?: boolean;
     env?: NodeJS.ProcessEnv;
+    objectStore?: any;
   },
 ) {
   if (
@@ -69,8 +65,15 @@ export async function handleControlPlaneSubmit(
     deployment: request.deployment,
     request,
   });
+  assertProductionArtifactStore({
+    localFixture: opts.localFixture,
+    objectStore: opts.objectStore,
+  });
   if (isDeploymentProviderServiceSubmitRequest(request))
-    return await queueDeploymentProviderControlPlaneSubmission(request, opts);
+    return await queueDeploymentProviderControlPlaneSubmission(request, {
+      ...opts,
+      objectStore: opts.objectStore,
+    });
   const resolvedRequest =
     request.schemaVersion === NIXOS_SHARED_HOST_CONTROL_PLANE_SUBMIT_REQUEST_SCHEMA
       ? await resolveServiceSubmitRequest(request, opts)
@@ -106,6 +109,7 @@ export async function handleControlPlaneSubmit(
       idempotencyKey,
       governanceResolver,
       ...(serviceInstance ? { serviceInstance } : {}),
+      ...(opts.objectStore ? { objectStore: opts.objectStore } : {}),
     });
   }
   const boundary =
@@ -210,6 +214,7 @@ export async function handleControlPlaneSubmit(
               : {}),
             governanceResolver,
             ...(serviceInstance ? { serviceInstance } : {}),
+            ...(opts.objectStore ? { objectStore: opts.objectStore } : {}),
           })
         : await prepareBackendCloudflarePagesControlPlaneRun({
             workspaceRoot: opts.workspaceRoot,
@@ -227,6 +232,7 @@ export async function handleControlPlaneSubmit(
             ...(authorization ? { authorization } : {}),
             ...(boundary.authorization ? { authorizationSnapshot: boundary.authorization } : {}),
             ...(serviceInstance ? { serviceInstance } : {}),
+            ...(opts.objectStore ? { objectStore: opts.objectStore } : {}),
             governanceResolver,
           });
     await enqueueBackendSubmission(
@@ -239,11 +245,4 @@ export async function handleControlPlaneSubmit(
     if (!(error as any)?.submission) throw error;
     return submitResponseFromSubmission((error as any).submission);
   }
-}
-
-// prettier-ignore
-export async function handleControlPlaneRunAction(
-  request: ServiceRunActionRequest,
-  opts: { backend: NixosSharedHostControlPlaneBackendTarget; workspaceRoot: string }) {
-  return await handleControlPlaneRunActionService(request, opts);
 }

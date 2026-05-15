@@ -15,6 +15,7 @@ import {
 import { resolveVercelReplaySource, type VercelReplaySnapshot } from "./vercel-replay";
 import type { VercelControlPlaneSubmitRequest } from "./vercel-control-plane";
 import { requestedReviewedSourceFromEvidence } from "./deployment-source-revision";
+import type { ControlPlaneArtifactStore } from "./control-plane-artifact-store-types";
 
 export type VercelControlPlaneSnapshot = FrozenProviderSnapshotFields & {
   schemaVersion: "vercel-control-plane-snapshot@1";
@@ -44,6 +45,7 @@ export async function buildVercelControlPlaneSnapshot(opts: {
   recordsRoot: string;
   request: VercelControlPlaneSubmitRequest;
   expectedCurrentRunId?: string | null;
+  objectStore?: ControlPlaneArtifactStore;
 }): Promise<VercelControlPlaneSnapshot> {
   const base = baseSnapshot(opts);
   const replay = needsReplay(opts.request) ? await resolveReplay(opts) : {};
@@ -52,6 +54,9 @@ export async function buildVercelControlPlaneSnapshot(opts: {
       ? (replay as { artifact?: AdmittedVercelPrebuiltArtifact }).artifact ||
         (await admitVercelPrebuiltArtifact(requireVercelArtifactDir(opts.request), {
           recordsRoot: opts.recordsRoot,
+          ...(opts.objectStore ? { objectStore: opts.objectStore } : {}),
+          deploymentId: opts.request.deployment.deploymentId,
+          submissionId: opts.request.submissionId,
         }))
       : (replay as { artifact?: AdmittedVercelPrebuiltArtifact }).artifact;
   const admittedContext = await admittedContextFor({ ...opts, replay, artifact });

@@ -4,8 +4,19 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { copyTree } from "../lib/copy-tree";
 import { sanitizeName } from "../lib/sanitize";
-import { inspectStaticWebappArtifactDir } from "./static-webapp-artifact-bundle";
+import {
+  createStaticWebappArtifactBundleBytes,
+  inspectStaticWebappArtifactDir,
+} from "./static-webapp-artifact-bundle";
 import { assertFinalizedStagedArtifactPath } from "./nixos-shared-host-staged-artifact";
+import {
+  artifactObjectReferenceUrl,
+  putVerifiedArtifactObject,
+} from "./control-plane-artifact-store";
+import type {
+  ControlPlaneArtifactObject,
+  ControlPlaneArtifactStore,
+} from "./control-plane-artifact-store-types";
 
 export const NIXOS_SHARED_HOST_ARTIFACT_PROVENANCE_SCHEMA =
   "nixos-shared-host-artifact-provenance@2";
@@ -15,6 +26,7 @@ export type NixosSharedHostAdmittedArtifact = {
   identity: string;
   storedArtifactPath: string;
   provenancePath: string;
+  object?: ControlPlaneArtifactObject;
 };
 
 type ArtifactKind = NixosSharedHostAdmittedArtifact["kind"];
@@ -82,6 +94,7 @@ async function ensureArtifactProvenance(
         artifactKind: artifact.kind,
         artifactIdentity: artifact.identity,
         storedArtifactPath: artifact.storedArtifactPath,
+        ...(artifact.object ? { object: artifact.object } : {}),
         admittedAt: new Date().toISOString(),
       },
       null,
@@ -96,6 +109,9 @@ export async function admitNixosSharedHostArtifact(opts: {
   artifactDir: string;
   kind: ArtifactKind;
   stagingRoot?: string;
+  objectStore?: ControlPlaneArtifactStore;
+  deploymentId?: string;
+  submissionId?: string;
 }): Promise<NixosSharedHostAdmittedArtifact> {
   const artifactDir = opts.stagingRoot
     ? await assertFinalizedStagedArtifactPath({
@@ -104,13 +120,28 @@ export async function admitNixosSharedHostArtifact(opts: {
       })
     : path.resolve(opts.artifactDir);
   const identity = await artifactIdentityForNixosSharedHostDir(artifactDir, opts.kind);
+  const object = opts.objectStore
+    ? await putVerifiedArtifactObject({
+        store: opts.objectStore,
+        body: await createStaticWebappArtifactBundleBytes(artifactDir),
+        payloadKind: "artifact",
+        provenance: {
+          deploymentId: opts.deploymentId,
+          submissionId: opts.submissionId,
+          artifactIdentity: identity,
+        },
+      })
+    : undefined;
   const artifact: NixosSharedHostAdmittedArtifact = {
     kind: opts.kind,
     identity,
-    storedArtifactPath: artifactStoredPathFor(opts.recordsRoot, identity),
+    storedArtifactPath: object
+      ? artifactObjectReferenceUrl(object)
+      : artifactStoredPathFor(opts.recordsRoot, identity),
     provenancePath: artifactProvenancePathFor(opts.recordsRoot, identity),
+    ...(object ? { object } : {}),
   };
-  await ensureStoredArtifact(artifactDir, artifact.storedArtifactPath);
+  if (!object) await ensureStoredArtifact(artifactDir, artifact.storedArtifactPath);
   await ensureArtifactProvenance(artifact.provenancePath, artifact);
   return artifact;
 }
@@ -119,6 +150,9 @@ export async function admitNixosSharedHostStaticArtifact(opts: {
   recordsRoot: string;
   artifactDir: string;
   stagingRoot?: string;
+  objectStore?: ControlPlaneArtifactStore;
+  deploymentId?: string;
+  submissionId?: string;
 }): Promise<NixosSharedHostAdmittedArtifact> {
   return await admitNixosSharedHostArtifact({ ...opts, kind: "static-webapp" });
 }
@@ -130,6 +164,11 @@ export async function artifactIdentityForStaticWebappDir(artifactDir: string): P
 export async function requireNixosSharedHostAdmittedArtifactPath(
   artifact: NixosSharedHostAdmittedArtifact,
 ): Promise<string> {
+  if (artifact.object && artifact.storedArtifactPath.startsWith("artifact-object://")) {
+    throw new Error(
+      `artifact object must be materialized before provider execution: ${artifact.identity}`,
+    );
+  }
   const storedArtifactPath = path.resolve(artifact.storedArtifactPath);
   try {
     const stat = await fsp.stat(storedArtifactPath);

@@ -24,6 +24,7 @@ import { installFakeS3StaticAwsCli } from "./s3-static.fake-aws";
 import { s3StaticDeploymentFixture } from "./s3-static.fixture";
 import { startS3StaticPublicServer } from "./s3-static.public-server";
 import { executeFrozenProviderSnapshotAndReadSubmission } from "./provider-frozen-worker.helpers";
+import { memoryControlPlaneArtifactStore } from "./control-plane-artifact-store-test-helpers";
 
 async function writeStaticArtifact(root: string, html: string) {
   await fsp.mkdir(root, { recursive: true });
@@ -95,6 +96,7 @@ test("s3-static worker deploy and retry execute from frozen snapshots", async ()
           VBR_S3_INFISICAL_CLIENT_SECRET: "server-local-secret",
         },
         async () => {
+          const objectStore = memoryControlPlaneArtifactStore();
           const deployArtifact = await writeStaticArtifact(path.join(tmp, "s3-artifact"), "s3\n");
           const restoreDeployAdmissionContext = activateDeploymentSecretContext(
             infisicalTestContext(infisical.siteUrl, { clientSecret: "server-local-secret" }),
@@ -104,6 +106,7 @@ test("s3-static worker deploy and retry execute from frozen snapshots", async ()
             deploy = await buildS3StaticControlPlaneSnapshot({
               workspaceRoot: tmp,
               recordsRoot,
+              objectStore,
               request: {
                 schemaVersion: S3_STATIC_CONTROL_PLANE_SUBMIT_REQUEST_SCHEMA,
                 submissionId: "s3-worker-deploy",
@@ -125,8 +128,17 @@ test("s3-static worker deploy and retry execute from frozen snapshots", async ()
             provider: "s3-deploy",
             execute: executeS3StaticControlPlaneSubmission,
             snapshot: deploy,
+            objectStore,
           });
           assert.equal(deployed.finalOutcome, "succeeded");
+          const deployRecord = JSON.parse(await fsp.readFile(deployed.resultRecordPath, "utf8"));
+          assert.ok(deployRecord.artifact.object);
+          assert.match(deployRecord.artifact.storedArtifactPath, /^artifact-object:\/\//);
+          const deployReplay = JSON.parse(
+            await fsp.readFile(deployRecord.replaySnapshotPath, "utf8"),
+          );
+          assert.ok(deployReplay.artifact.object);
+          assert.match(deployReplay.artifact.storedArtifactPath, /^artifact-object:\/\//);
           const restoreRetryAdmissionContext = activateDeploymentSecretContext(
             infisicalTestContext(infisical.siteUrl, { clientSecret: "server-local-secret" }),
           );
@@ -135,6 +147,7 @@ test("s3-static worker deploy and retry execute from frozen snapshots", async ()
             retry = await buildS3StaticControlPlaneSnapshot({
               workspaceRoot: tmp,
               recordsRoot,
+              objectStore,
               request: {
                 schemaVersion: S3_STATIC_CONTROL_PLANE_SUBMIT_REQUEST_SCHEMA,
                 submissionId: "s3-worker-retry",
@@ -155,6 +168,7 @@ test("s3-static worker deploy and retry execute from frozen snapshots", async ()
             provider: "s3-retry",
             execute: executeS3StaticControlPlaneSubmission,
             snapshot: retry,
+            objectStore,
           });
           assert.equal(replayed.finalOutcome, "succeeded");
         },

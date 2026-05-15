@@ -25,6 +25,7 @@ import {
   type KubernetesControlPlaneSnapshot as Snapshot,
 } from "./kubernetes-control-plane-snapshot";
 import { reviewedCurrentStageExpectation } from "./deployment-current-stage-state-expected";
+import type { ControlPlaneArtifactStore } from "./control-plane-artifact-store-types";
 
 export const KUBERNETES_CONTROL_PLANE_SUBMIT_REQUEST_SCHEMA =
   "kubernetes-control-plane-submit-request@1";
@@ -48,6 +49,7 @@ export async function queueKubernetesControlPlaneSubmission(opts: {
   recordsRoot: string;
   backend: NixosSharedHostControlPlaneBackendTarget;
   request: KubernetesControlPlaneSubmitRequest;
+  objectStore?: ControlPlaneArtifactStore;
 }) {
   const snapshot = await buildKubernetesControlPlaneSnapshot({
     ...opts,
@@ -62,6 +64,7 @@ export async function queueKubernetesControlPlaneSubmission(opts: {
     recordsRoot: opts.recordsRoot,
     backend: opts.backend,
     snapshot,
+    ...(opts.objectStore ? { objectStore: opts.objectStore } : {}),
   });
 }
 

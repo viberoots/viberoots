@@ -25,6 +25,9 @@ import {
 } from "./deployment-replay-admission";
 import { resolveProviderSubmitIdempotency } from "./deployment-provider-submit-idempotency";
 import type { ReviewedCurrentStageExpectation } from "./deployment-current-stage-state-expected";
+import { putVerifiedArtifactObject } from "./control-plane-artifact-store";
+import { writeBackendSnapshotArtifactObjects } from "./control-plane-artifact-snapshot-metadata";
+import type { ControlPlaneArtifactStore } from "./control-plane-artifact-store-types";
 
 export const DEPLOYMENT_PROVIDER_FROZEN_SNAPSHOT_SCHEMA =
   "deployment-provider-frozen-execution-snapshot@1";
@@ -166,6 +169,7 @@ export async function queueFrozenProviderSubmission(opts: {
     lockScope: string;
     admission: FrozenProviderAdmission;
   };
+  objectStore?: ControlPlaneArtifactStore;
 }) {
   const dedupe = await resolveProviderSubmitIdempotency({
     backend: opts.backend,
@@ -188,7 +192,23 @@ export async function queueFrozenProviderSubmission(opts: {
     executionSnapshotPath: executionSnapshotPathFor(opts.recordsRoot, opts.snapshot.submissionId),
     submissionPath: submissionPathFor(opts.recordsRoot, opts.snapshot.submissionId),
   };
+  if (opts.objectStore) {
+    (opts.snapshot as any).executionSnapshotObject = await putVerifiedArtifactObject({
+      store: opts.objectStore,
+      body: Buffer.from(JSON.stringify(opts.snapshot) + "\n"),
+      payloadKind: "execution-snapshot",
+      contentType: "application/json",
+      provenance: {
+        deploymentId: opts.snapshot.deploymentId,
+        submissionId: opts.snapshot.submissionId,
+      },
+    });
+  }
   await writeBackendSnapshotDoc(opts.backend, opts.snapshot as any, refs.executionSnapshotPath);
+  await writeBackendSnapshotArtifactObjects({
+    backend: opts.backend,
+    snapshot: opts.snapshot as any,
+  });
   const submission = {
     schemaVersion: "deployment-provider-control-plane-submission@1",
     submissionId: opts.snapshot.submissionId,

@@ -16,6 +16,7 @@ import {
   remoteExecEnv,
   REVIEWED_PLEOMINO_DEPLOYMENT_LABEL,
 } from "./nixos-shared-host.deploy.remote-exec.helpers";
+import { memoryControlPlaneArtifactStore } from "./control-plane-artifact-store-test-helpers";
 import { withEnvOverrides, waitFor } from "./nixos-shared-host.control-plane.helpers";
 import { startNixosSharedHostPublicServer } from "./nixos-shared-host.public-server";
 
@@ -88,6 +89,7 @@ test("remote profile deploy creates a service-owned auth session for interactive
         },
       },
     };
+    const objectStore = memoryControlPlaneArtifactStore();
     const controlPlane = await startNixosSharedHostControlPlaneServer({
       workspaceRoot: tmp,
       paths: {
@@ -97,11 +99,13 @@ test("remote profile deploy creates a service-owned auth session for interactive
       },
       backendDatabaseUrl: localHarnessControlPlaneDatabaseUrl(remoteRecordsRoot),
       token: CONTROL_PLANE_TOKEN,
+      objectStore,
     });
     const worker = startNixosSharedHostControlPlaneWorkerLoop({
       workspaceRoot: tmp,
       recordsRoot: remoteRecordsRoot,
       backendDatabaseUrl: localHarnessControlPlaneDatabaseUrl(remoteRecordsRoot),
+      objectStore,
     });
     const server = await startNixosSharedHostPublicServer({
       deployment: authDeployment,

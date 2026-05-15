@@ -24,6 +24,7 @@ import {
   type VercelControlPlaneSnapshot as Snapshot,
 } from "./vercel-control-plane-snapshot";
 import { reviewedCurrentStageExpectation } from "./deployment-current-stage-state-expected";
+import type { ControlPlaneArtifactStore } from "./control-plane-artifact-store-types";
 
 export const VERCEL_CONTROL_PLANE_SUBMIT_REQUEST_SCHEMA = "vercel-control-plane-submit-request@1";
 
@@ -52,6 +53,7 @@ export async function queueVercelControlPlaneSubmission(opts: {
   recordsRoot: string;
   backend: NixosSharedHostControlPlaneBackendTarget;
   request: VercelControlPlaneSubmitRequest;
+  objectStore?: ControlPlaneArtifactStore;
 }) {
   const snapshot = await buildVercelControlPlaneSnapshot({
     ...opts,
@@ -66,6 +68,7 @@ export async function queueVercelControlPlaneSubmission(opts: {
     recordsRoot: opts.recordsRoot,
     backend: opts.backend,
     snapshot,
+    ...(opts.objectStore ? { objectStore: opts.objectStore } : {}),
   });
 }
 

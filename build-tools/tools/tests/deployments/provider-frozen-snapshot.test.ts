@@ -15,6 +15,7 @@ import {
 import { localHarnessControlPlaneDatabaseUrl } from "../../deployments/nixos-shared-host-control-plane-backend";
 import { fingerprintValue } from "../../deployments/nixos-shared-host-deployment-fingerprint";
 import { runInTemp } from "../lib/test-helpers";
+import { memoryControlPlaneArtifactStore } from "./control-plane-artifact-store-test-helpers";
 import { ensureNixosSharedHostReviewedSourceRef } from "./nixos-shared-host.fixture";
 import { kubernetesDeploymentFixture } from "./kubernetes.fixture";
 import { s3StaticDeploymentFixture } from "./s3-static.fixture";
@@ -95,6 +96,7 @@ test("provider control-plane preparation freezes shared admission and admitted a
     const s3Snapshot = await buildS3StaticControlPlaneSnapshot({
       workspaceRoot: tmp,
       recordsRoot,
+      objectStore: memoryControlPlaneArtifactStore(),
       request: {
         schemaVersion: S3_STATIC_CONTROL_PLANE_SUBMIT_REQUEST_SCHEMA,
         submissionId: "s3-submit",
@@ -111,6 +113,8 @@ test("provider control-plane preparation freezes shared admission and admitted a
     });
     assertSharedAdmission(s3Snapshot);
     assert.ok(s3Snapshot.artifact?.identity.startsWith("static-webapp:"));
+    assert.ok(s3Snapshot.artifact?.object);
+    assert.match(s3Snapshot.artifact?.storedArtifactPath || "", /^artifact-object:\/\//);
 
     const serviceArtifact = path.join(tmp, "service-artifact");
     const serviceIdentity = await writeServiceArtifact(serviceArtifact, "service\n");
@@ -122,6 +126,7 @@ test("provider control-plane preparation freezes shared admission and admitted a
     const kubeSnapshot = await buildKubernetesControlPlaneSnapshot({
       workspaceRoot: tmp,
       recordsRoot,
+      objectStore: memoryControlPlaneArtifactStore(),
       request: {
         schemaVersion: KUBERNETES_CONTROL_PLANE_SUBMIT_REQUEST_SCHEMA,
         submissionId: "kube-submit",
@@ -139,11 +144,13 @@ test("provider control-plane preparation freezes shared admission and admitted a
     });
     assertSharedAdmission(kubeSnapshot);
     assert.equal(kubeSnapshot.componentArtifacts?.[0]?.componentId, "api");
+    assert.ok(kubeSnapshot.componentArtifacts?.[0]?.object);
 
     const vercelArtifact = await writeVercelArtifact(path.join(tmp, "vercel-artifact"));
     const vercelSnapshot = await buildVercelControlPlaneSnapshot({
       workspaceRoot: tmp,
       recordsRoot,
+      objectStore: memoryControlPlaneArtifactStore(),
       request: {
         schemaVersion: VERCEL_CONTROL_PLANE_SUBMIT_REQUEST_SCHEMA,
         submissionId: "vercel-submit",
@@ -160,7 +167,8 @@ test("provider control-plane preparation freezes shared admission and admitted a
     });
     assertSharedAdmission(vercelSnapshot);
     assert.ok(vercelSnapshot.artifact?.identity.startsWith("vercel-next:"));
-    assert.ok(vercelSnapshot.artifact?.outputDir.startsWith(path.join(recordsRoot, "artifacts")));
+    assert.ok(vercelSnapshot.artifact?.object);
+    assert.match(vercelSnapshot.artifact?.outputDir || "", /^artifact-object:\/\//);
   });
 });
 

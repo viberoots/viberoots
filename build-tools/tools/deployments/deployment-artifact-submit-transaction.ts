@@ -24,6 +24,8 @@ import type {
   NixosSharedHostControlPlaneSnapshot,
   NixosSharedHostControlPlaneSubmission,
 } from "./nixos-shared-host-control-plane-contract";
+import { writeBackendSnapshotArtifactObjects } from "./control-plane-artifact-snapshot-metadata";
+import { backendSnapshotPersistenceDoc } from "./control-plane-backend-snapshot-document";
 
 async function assertSubmissionSlotsFree(client: BackendQueryable, submissionId: string) {
   const [snapshots, submissions, queue] = await Promise.all([
@@ -49,7 +51,7 @@ async function persistAccepted(opts: {
     [
       opts.snapshot.submissionId,
       opts.refs.executionSnapshotPath,
-      JSON.stringify(opts.snapshot),
+      JSON.stringify(backendSnapshotPersistenceDoc(opts.snapshot)),
       now,
     ],
   );
@@ -166,6 +168,10 @@ export async function acceptChallengedArtifactSubmission(opts: {
         },
       };
       await persistAccepted({ ...opts, client, submission });
+      await writeBackendSnapshotArtifactObjects({
+        backend: client,
+        snapshot: opts.snapshot,
+      });
       await client.query("COMMIT");
       return { mode: "created" as const, submission };
     } catch (error) {

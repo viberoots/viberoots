@@ -10,6 +10,7 @@ import { startNixosSharedHostControlPlaneWorkerLoop } from "../../deployments/ni
 import { nixosSharedHostContainerRoot } from "../../deployments/nixos-shared-host-runtime";
 import { runInTemp } from "../lib/test-helpers";
 import { startNixosSharedHostPublicServer } from "./nixos-shared-host.public-server";
+import { memoryControlPlaneArtifactStore } from "./control-plane-artifact-store-test-helpers";
 import { ensureNixosSharedHostReviewedSourceRef } from "./nixos-shared-host.fixture";
 import { installFakeRemoteTransport } from "./nixos-shared-host.remote-transport.fake";
 import {
@@ -28,6 +29,45 @@ import { writeAuthSession } from "./nixos-shared-host.service-auth-boundary.help
 
 const CONTROL_PLANE_TOKEN = "test-control-plane-token";
 
+type RemoteControlPlaneRuntime = {
+  tmp: string;
+  remoteStatePath: string;
+  remoteRuntimeRoot: string;
+  remoteRecordsRoot: string;
+};
+
+async function startObjectBackedControlPlaneWorker(opts: RemoteControlPlaneRuntime) {
+  const objectStore = memoryControlPlaneArtifactStore();
+  const controlPlane = await startNixosSharedHostControlPlaneServer({
+    workspaceRoot: opts.tmp,
+    paths: {
+      statePath: opts.remoteStatePath,
+      hostRoot: opts.remoteRuntimeRoot,
+      recordsRoot: opts.remoteRecordsRoot,
+    },
+    backendDatabaseUrl: localHarnessControlPlaneDatabaseUrl(opts.remoteRecordsRoot),
+    token: CONTROL_PLANE_TOKEN,
+    objectStore,
+  });
+  const worker = startNixosSharedHostControlPlaneWorkerLoop({
+    workspaceRoot: opts.tmp,
+    recordsRoot: opts.remoteRecordsRoot,
+    backendDatabaseUrl: localHarnessControlPlaneDatabaseUrl(opts.remoteRecordsRoot),
+    objectStore,
+  });
+  return { controlPlane, worker };
+}
+
+async function writeJenkinsSubmitterAuthSession(recordsRoot: string, deployment: any) {
+  return await writeAuthSession({
+    recordsRoot,
+    deployment,
+    operationKind: "deploy",
+    principalId: "oidc:service-account-jenkins",
+    roles: ["submitter", "admission_reporter"],
+  });
+}
+
 test("jenkins wrapper stages the Pleomino artifact, submits through the control plane, and emits stable JSON", async () => {
   await runInTemp("nixos-shared-host-jenkins-exec", async (tmp, $) => {
     const deployment = pleominoDeploymentFixture();
@@ -45,20 +85,11 @@ test("jenkins wrapper stages the Pleomino artifact, submits through the control 
       remoteRuntimeRoot,
       remoteRecordsRoot,
     });
-    const controlPlane = await startNixosSharedHostControlPlaneServer({
-      workspaceRoot: tmp,
-      paths: {
-        statePath: remoteStatePath,
-        hostRoot: remoteRuntimeRoot,
-        recordsRoot: remoteRecordsRoot,
-      },
-      backendDatabaseUrl: localHarnessControlPlaneDatabaseUrl(remoteRecordsRoot),
-      token: CONTROL_PLANE_TOKEN,
-    });
-    const worker = startNixosSharedHostControlPlaneWorkerLoop({
-      workspaceRoot: tmp,
-      recordsRoot: remoteRecordsRoot,
-      backendDatabaseUrl: localHarnessControlPlaneDatabaseUrl(remoteRecordsRoot),
+    const { controlPlane, worker } = await startObjectBackedControlPlaneWorker({
+      tmp,
+      remoteStatePath,
+      remoteRuntimeRoot,
+      remoteRecordsRoot,
     });
     await writeArtifact(artifactDir, { "index.html": "<html>jenkins</html>\n", healthz: "ok\n" });
     await installClientProfile(
@@ -92,13 +123,7 @@ test("jenkins wrapper stages the Pleomino artifact, submits through the control 
       deployment,
       hostRoot: remoteRuntimeRoot,
     });
-    const authSessionId = await writeAuthSession({
-      recordsRoot: remoteRecordsRoot,
-      deployment,
-      operationKind: "deploy",
-      principalId: "oidc:service-account-jenkins",
-      roles: ["submitter", "admission_reporter"],
-    });
+    const authSessionId = await writeJenkinsSubmitterAuthSession(remoteRecordsRoot, deployment);
     const jenkinsCommand = (sessionId: string) =>
       $({
         cwd: tmp,
@@ -119,32 +144,27 @@ test("jenkins wrapper stages the Pleomino artifact, submits through the control 
         remoteRecordsRoot,
         String(record.controlPlane.submissionId),
       );
-      assert.equal(snapshot.deploymentLabel, "//projects/deployments/pleomino-dev:deploy");
-      assert.equal(snapshot.providerTargetIdentity, "nixos-shared-host:default:pleomino");
+      assert.equal(snapshot.deploymentId, "pleomino-dev");
+      assert.equal(snapshot.executionSnapshotObject?.provenance?.payloadKind, "execution-snapshot");
+      assert.equal(snapshot.artifactObjects?.length, 1);
       assert.equal(
-        snapshot.admittedContext.policyEvaluation.ciSubmission.idempotencyKey,
+        record.admittedContext.policyEvaluation.ciSubmission.idempotencyKey,
         "jenkins-pleomino-dev-1",
       );
-      const retryAuthSessionId = await writeAuthSession({
-        recordsRoot: remoteRecordsRoot,
+      const retryAuthSessionId = await writeJenkinsSubmitterAuthSession(
+        remoteRecordsRoot,
         deployment,
-        operationKind: "deploy",
-        principalId: "oidc:service-account-jenkins",
-        roles: ["submitter", "admission_reporter"],
-      });
+      );
       const retried = JSON.parse(String((await jenkinsCommand(retryAuthSessionId)).stdout));
       assert.equal(
         retried.remoteExecution.controlPlane.submissionId,
         record.controlPlane.submissionId,
       );
       await writeArtifact(artifactDir, { "index.html": "<html>changed</html>\n" });
-      const conflictAuthSessionId = await writeAuthSession({
-        recordsRoot: remoteRecordsRoot,
+      const conflictAuthSessionId = await writeJenkinsSubmitterAuthSession(
+        remoteRecordsRoot,
         deployment,
-        operationKind: "deploy",
-        principalId: "oidc:service-account-jenkins",
-        roles: ["submitter", "admission_reporter"],
-      });
+      );
       const conflict = await jenkinsCommand(conflictAuthSessionId).nothrow();
       assert.notEqual(conflict.exitCode, 0);
       assert.match(String(conflict.stdout), /idempotency/i);
@@ -154,9 +174,7 @@ test("jenkins wrapper stages the Pleomino artifact, submits through the control 
       );
       assert.equal(await fsp.readFile(liveIndex, "utf8"), "<html>jenkins</html>\n");
     } finally {
-      await worker.close();
-      await controlPlane.close();
-      await server.close();
+      await Promise.all([worker.close(), controlPlane.close(), server.close()]);
     }
   });
 });
@@ -186,20 +204,11 @@ test("jenkins wrapper forwards admit-and-deploy so bootstrap deploys can avoid h
       remoteRuntimeRoot,
       remoteRecordsRoot,
     });
-    const controlPlane = await startNixosSharedHostControlPlaneServer({
-      workspaceRoot: tmp,
-      paths: {
-        statePath: remoteStatePath,
-        hostRoot: remoteRuntimeRoot,
-        recordsRoot: remoteRecordsRoot,
-      },
-      backendDatabaseUrl: localHarnessControlPlaneDatabaseUrl(remoteRecordsRoot),
-      token: CONTROL_PLANE_TOKEN,
-    });
-    const worker = startNixosSharedHostControlPlaneWorkerLoop({
-      workspaceRoot: tmp,
-      recordsRoot: remoteRecordsRoot,
-      backendDatabaseUrl: localHarnessControlPlaneDatabaseUrl(remoteRecordsRoot),
+    const { controlPlane, worker } = await startObjectBackedControlPlaneWorker({
+      tmp,
+      remoteStatePath,
+      remoteRuntimeRoot,
+      remoteRecordsRoot,
     });
     await writeArtifact(artifactDir, { "index.html": "<html>bootstrap</html>\n", healthz: "ok\n" });
     await installClientProfile(
@@ -217,13 +226,7 @@ test("jenkins wrapper forwards admit-and-deploy so bootstrap deploys can avoid h
       deployment,
       hostRoot: remoteRuntimeRoot,
     });
-    const authSessionId = await writeAuthSession({
-      recordsRoot: remoteRecordsRoot,
-      deployment,
-      operationKind: "deploy",
-      principalId: "oidc:service-account-jenkins",
-      roles: ["submitter", "admission_reporter"],
-    });
+    const authSessionId = await writeJenkinsSubmitterAuthSession(remoteRecordsRoot, deployment);
     try {
       const result = await $({
         cwd: tmp,
@@ -232,18 +235,13 @@ test("jenkins wrapper forwards admit-and-deploy so bootstrap deploys can avoid h
       const summary = JSON.parse(String(result.stdout));
       assert.equal(summary.ok, true);
       assert.equal(summary.remoteExecution.controlPlane.finalOutcome, "succeeded");
-      const snapshot = await readBackendSnapshot(
-        remoteRecordsRoot,
-        String(summary.remoteExecution.controlPlane.submissionId),
-      );
       assert.equal(
-        snapshot.admittedContext.policyEvaluation.requiredChecks[0]?.reportingKind,
+        summary.remoteExecution.controlPlane.record.admittedContext.policyEvaluation
+          .requiredChecks[0]?.reportingKind,
         "ci_pipeline",
       );
     } finally {
-      await worker.close();
-      await controlPlane.close();
-      await server.close();
+      await Promise.all([worker.close(), controlPlane.close(), server.close()]);
     }
   });
 });
