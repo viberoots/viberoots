@@ -156,9 +156,34 @@ export async function writeBackendControlPlaneMcpAuditEvent(opts: {
     client: opts.client,
     event: {
       schemaVersion: DEPLOYMENT_CONTROL_PLANE_AUDIT_SCHEMA,
-      eventId: `audit-${opts.requestId}-${opts.result}`,
+      eventId: `audit-${opts.requestId}-${opts.operation}-${opts.result}`,
       requestId: opts.requestId,
       actor: opts.actor || "service:deployment-control-plane",
+      operation: opts.operation,
+      deploymentId: opts.deploymentId || "control-plane",
+      result: opts.result,
+      ...(opts.failureSummary ? { failureSummary: opts.failureSummary } : {}),
+      occurredAt: opts.occurredAt || new Date().toISOString(),
+    },
+  });
+}
+
+export async function writeBackendControlPlaneReadAuditEvent(opts: {
+  client: BackendQueryable;
+  requestId: string;
+  operation: string;
+  deploymentId?: string;
+  result: "success" | "failed";
+  failureSummary?: string;
+  occurredAt?: string;
+}) {
+  return await insertBackendControlPlaneAuditEvent({
+    client: opts.client,
+    event: {
+      schemaVersion: DEPLOYMENT_CONTROL_PLANE_AUDIT_SCHEMA,
+      eventId: `audit-${opts.requestId}-${opts.operation}-${opts.result}`,
+      requestId: opts.requestId,
+      actor: "service:deployment-control-plane",
       operation: opts.operation,
       deploymentId: opts.deploymentId || "control-plane",
       result: opts.result,

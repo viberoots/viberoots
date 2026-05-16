@@ -1,7 +1,10 @@
 #!/usr/bin/env zx-wrapper
+import crypto from "node:crypto";
 import http from "node:http";
 import { URL } from "node:url";
+import { writeBackendControlPlaneReadAuditEvent } from "./deployment-control-plane-audit";
 import type { ControlPlaneArtifactStore } from "./control-plane-artifact-store-types";
+import { withBackendClient } from "./nixos-shared-host-control-plane-backend-db";
 import type { NixosSharedHostControlPlaneBackendTarget } from "./nixos-shared-host-control-plane-backend";
 import { requestHasReviewedBearerToken } from "./nixos-shared-host-control-plane-service-auth";
 import {
@@ -63,28 +66,51 @@ async function handleReadApi(opts: {
 }) {
   if (!(await hasReadAuth(opts.request, opts.web))) return unauthorized(opts.response);
   if (opts.pathname === "/api/v1/read/status") {
+    await writeReadAudit(opts, { operation: "read.status" });
     writeJson(opts.response, 200, await readControlPlaneRuntimeStatus(opts.web));
     return true;
   }
   if (opts.pathname === "/api/v1/read/queue") {
+    await writeReadAudit(opts, { operation: "read.queue" });
     writeJson(opts.response, 200, await readControlPlaneQueueSummary(opts.web.backend));
     return true;
   }
   if (opts.pathname === "/api/v1/read/auth-context") {
+    await writeReadAudit(opts, { operation: "read.auth_context" });
     writeJson(opts.response, 200, await readAuthContext(opts.request, opts.web));
     return true;
   }
   const deployment = opts.pathname.match(/^\/api\/v1\/read\/deployments\/([^/]+)$/);
   if (deployment) {
+    const deploymentId = decodeURIComponent(deployment[1]);
+    await writeReadAudit(opts, { operation: "read.deployment_detail", deploymentId });
     writeJson(
       opts.response,
       200,
-      await readControlPlaneDeploymentDetail(opts.web.backend, decodeURIComponent(deployment[1])),
+      await readControlPlaneDeploymentDetail(opts.web.backend, deploymentId),
     );
     return true;
   }
   writeJson(opts.response, 404, { error: "read endpoint not found" });
   return true;
+}
+
+async function writeReadAudit(
+  opts: {
+    request: http.IncomingMessage;
+    web: ControlPlaneWebOptions;
+  },
+  event: { operation: string; deploymentId?: string },
+) {
+  await withBackendClient(opts.web.backend, async (client) => {
+    await writeBackendControlPlaneReadAuditEvent({
+      client,
+      requestId: requestIdFor(opts.request),
+      operation: event.operation,
+      deploymentId: event.deploymentId,
+      result: "success",
+    });
+  });
 }
 
 async function hasReadAuth(request: http.IncomingMessage, opts: ControlPlaneWebOptions) {
@@ -136,6 +162,10 @@ function stripBasePath(pathname: string, basePath: string): string | null {
   if (basePath === "/") return pathname;
   if (pathname === basePath) return "/";
   return pathname.startsWith(`${basePath}/`) ? pathname.slice(basePath.length) : null;
+}
+
+function requestIdFor(request: http.IncomingMessage): string {
+  return String(request.headers["x-request-id"] || "").trim() || crypto.randomUUID();
 }
 
 function unauthorized(response: http.ServerResponse): true {

@@ -72,6 +72,17 @@ For local fixture smoke checks, use the same image and mount `config.local-smoke
 disabling web UI and MCP exposure so tests can prove those config switches are honored without
 changing the production example.
 
-PR 10 remains responsible for the full containerized end-to-end deployment flow with the control
-plane running through Podman or an equivalent OCI runtime. This profile is the host wiring that
-those E2E tests should consume rather than replacing with a second control-plane behavior path.
+## End-To-End Fixture
+
+The reviewed PR 10 E2E fixture is
+`//:deployments_control_plane_container_e2e`. It builds the reviewed image, loads it into a local
+Podman or Docker runtime, starts one service container and two worker containers, and uses fixture
+Postgres plus S3-compatible object storage on the same container network. The test submits a
+deterministic `s3-static` deployment through the service, waits for exactly one finished run, and
+checks the web read API, queue view, MCP read-only tool, audit-correlated request ids, idempotency,
+artifact object materialization, and redaction.
+
+The test skips with a clear reason when no usable OCI runtime is available. The default scenario
+uses fixture credentials and does not call live providers or Infisical. Optional live smoke remains
+disabled unless the operator explicitly sets all `VBR_CONTROL_PLANE_LIVE_*` inputs named by the
+test.

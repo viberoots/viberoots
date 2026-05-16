@@ -164,7 +164,9 @@ test("non-NixOS host profile docs preserve Docker and Podman boundaries", async 
   assert.match(doc, /not a separate deployment authority/i);
   assert.match(doc, /Docker-compatible Compose or Podman/i);
   assert.match(doc, /127\.0\.0\.1:7780/i);
-  assert.match(doc, /PR 10 remains responsible for the full containerized end-to-end/i);
+  assert.match(doc, /End-To-End Fixture/i);
+  assert.match(doc, /deployments_control_plane_container_e2e/);
+  assert.match(doc, /one service container and two worker containers/i);
 });
 
 test("non-NixOS local smoke profile runs service and workers when OCI runtime is available", async (t) => {

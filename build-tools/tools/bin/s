@@ -3,9 +3,11 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
 # Status watch for verify logs.
-# Equivalent to: build-tools/tools/bin/tail-log --status -w [SECONDS] [--json] [PID]
+# Equivalent to: build-tools/tools/bin/tail-log --status -w "$VBR_TAIL_LOG_STATUS_INTERVAL" [--json] [PID]
+#
+# Keep the convenience wrapper conservative: status watch rescans the verify log
+# on each refresh, and full mixed-suite logs can grow quickly.
 export TAIL_LOG_EXTRA_STATUS=1
 command -v "${SCRIPT_DIR}/c" >/dev/null 2>&1 && "${SCRIPT_DIR}/c"
-exec "${SCRIPT_DIR}/tail-log" --status -w "$@"
-
+exec "${SCRIPT_DIR}/tail-log" --status -w "${VBR_TAIL_LOG_STATUS_INTERVAL:-2}" "$@"
 

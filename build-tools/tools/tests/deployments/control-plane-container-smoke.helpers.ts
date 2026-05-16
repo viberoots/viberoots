@@ -111,6 +111,8 @@ export async function runControlPlaneContainer(opts: {
   command: string[];
   env?: Record<string, string>;
   publishPort?: number;
+  network?: string;
+  extraMounts?: string[];
 }) {
   const args = [
     ...opts.runtime.args,
@@ -119,6 +121,7 @@ export async function runControlPlaneContainer(opts: {
     "-d",
     "--name",
     opts.name,
+    ...(opts.network ? ["--network", opts.network] : []),
     "--mount",
     `type=bind,source=${opts.mounts.configPath},target=/etc/deployment-control-plane/config.yaml,readonly`,
     "--mount",
@@ -131,6 +134,7 @@ export async function runControlPlaneContainer(opts: {
     `type=bind,source=${opts.mounts.artifactsRoot},target=/var/lib/deployment-control-plane/artifacts`,
     "--mount",
     `type=bind,source=${opts.mounts.runtimeRoot},target=/var/lib/deployment-control-plane/runtime`,
+    ...(opts.extraMounts || []).flatMap((mount) => ["--mount", mount]),
     ...Object.entries(opts.env ?? {}).flatMap(([key, value]) => ["--env", `${key}=${value}`]),
     ...(opts.publishPort ? ["-p", `127.0.0.1:${opts.publishPort}:${opts.publishPort}`] : []),
     opts.image.repoTag,

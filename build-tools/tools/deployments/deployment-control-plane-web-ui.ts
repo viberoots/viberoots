@@ -41,8 +41,12 @@ const sessionHeader = () => {
   const id = window.localStorage.getItem("vbr.controlPlane.sessionId");
   return id ? {"x-vbr-control-plane-session": id} : {};
 };
-async function api(path) {
-  const res = await fetch(base + path, {headers: sessionHeader()});
+const requestId = () => {
+  if (window.crypto && window.crypto.randomUUID) return "ui-" + window.crypto.randomUUID();
+  return "ui-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2);
+};
+async function api(path, renderRequestId) {
+  const res = await fetch(base + path, {headers: {...sessionHeader(), "x-request-id": renderRequestId}});
   if (!res.ok) throw new Error(await res.text());
   return await res.json();
 }
@@ -55,20 +59,21 @@ function renderJson(value) {
 async function render() {
   const app = document.getElementById("app");
   const route = location.pathname.slice(base.length) || "/";
+  const renderRequestId = requestId();
   if (route.startsWith("/queue")) {
-    const queue = await api("/api/v1/read/queue");
+    const queue = await api("/api/v1/read/queue", renderRequestId);
     app.innerHTML = panel("Queue", renderJson(queue));
     return;
   }
   if (route.startsWith("/deployment")) {
     const deploymentId = new URLSearchParams(location.search).get("deploymentId") || "";
     app.innerHTML = deploymentId
-      ? panel("Deployment", renderJson(await api("/api/v1/read/deployments/" + encodeURIComponent(deploymentId))))
+      ? panel("Deployment", renderJson(await api("/api/v1/read/deployments/" + encodeURIComponent(deploymentId), renderRequestId)))
       : panel("Deployment", "Select a deployment from a queue entry.");
     return;
   }
-  const status = await api("/api/v1/read/status");
-  const auth = await api("/api/v1/read/auth-context");
+  const status = await api("/api/v1/read/status", renderRequestId);
+  const auth = await api("/api/v1/read/auth-context", renderRequestId);
   app.innerHTML = panel("Status", renderJson(status)) + panel("Auth", renderJson(auth));
 }
 render().catch(error => { document.getElementById("app").innerHTML = panel("Error", renderJson({error: String(error.message || error)})); });
