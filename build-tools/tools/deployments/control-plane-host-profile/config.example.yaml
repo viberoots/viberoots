@@ -1,0 +1,39 @@
+instanceId: mini
+mode: protected-shared
+
+service:
+  host: 0.0.0.0
+  port: 7780
+  publicUrl: https://deploy.example.test
+
+storage:
+  recordsRoot: /var/lib/deployment-control-plane/records
+  artifactStagingRoot: /var/lib/deployment-control-plane/artifacts
+  runtimeRoot: /var/lib/deployment-control-plane/runtime
+  artifactStore:
+    kind: s3-compatible
+    bucket: deployment-control-plane-artifacts
+    endpointFile: /run/deployment-control-plane/credentials/artifact-store-endpoint
+    accessKeyIdFile: /run/deployment-control-plane/credentials/artifact-store-access-key-id
+    secretAccessKeyFile: /run/deployment-control-plane/credentials/artifact-store-secret-access-key
+
+database:
+  urlFile: /run/deployment-control-plane/credentials/control-plane-database-url
+
+credentials:
+  directory: /run/deployment-control-plane/credentials
+  defaults:
+    infisicalClientIdFilePattern: "{deploymentId}-infisical-client-id"
+    infisicalClientSecretFilePattern: "{deploymentId}-infisical-client-secret"
+
+reviewedSource:
+  sshKeyFile: /run/deployment-control-plane/credentials/reviewed-source-ssh-key
+  sshKnownHostsFile: /etc/deployment-control-plane/github-known-hosts
+
+webUi:
+  enabled: true
+  basePath: /
+
+mcp:
+  enabled: true
+  basePath: /mcp

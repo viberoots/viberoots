@@ -60,6 +60,7 @@ RESOURCE_LIMITED_DEPLOYMENT_TESTS = {
     "build-tools/tools/tests/deployments/deployment-control-plane.recovery.test.ts": True,
     "build-tools/tools/tests/deployments/deployment-control-plane.redaction.test.ts": True,
     "build-tools/tools/tests/deployments/control-plane-artifact-store-credentials.test.ts": True,
+    "build-tools/tools/tests/deployments/control-plane-host-profile.test.ts": True,
     "build-tools/tools/tests/deployments/control-plane-artifact-store-provenance.test.ts": True,
     "build-tools/tools/tests/deployments/control-plane-artifact-store-production.test.ts": True,
     "build-tools/tools/tests/deployments/control-plane-artifact-store.test.ts": True,

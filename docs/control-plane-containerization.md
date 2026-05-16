@@ -344,6 +344,9 @@ Avoid a separate agent-only control path.
 The implemented v1 endpoint and examples are documented in
 [Deployment Control Plane MCP](/Users/kiltyj/Code/viberoots/docs/control-plane-mcp.md).
 
+The non-NixOS Compose and Podman host profile is documented in
+[Deployment Control Plane Non-NixOS Host Profile](/Users/kiltyj/Code/viberoots/docs/control-plane-non-nixos-host-profile.md).
+
 ## Volumes And State
 
 The container filesystem must be disposable. Durable state is mounted:

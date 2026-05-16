@@ -1,0 +1,79 @@
+name: deployment-control-plane
+
+services:
+  control-plane-service:
+    image: ${VBR_CONTROL_PLANE_IMAGE:?set immutable reviewed image reference}
+    command:
+      - deployment-control-plane
+      - service
+      - --config
+      - /etc/deployment-control-plane/config.yaml
+    ports:
+      - "127.0.0.1:${VBR_CONTROL_PLANE_PORT:-7780}:7780"
+    volumes:
+      - type: bind
+        source: ${VBR_CONTROL_PLANE_CONFIG:-./config.example.yaml}
+        target: /etc/deployment-control-plane/config.yaml
+        read_only: true
+      - type: bind
+        source: ${VBR_CONTROL_PLANE_KNOWN_HOSTS:-./github-known-hosts}
+        target: /etc/deployment-control-plane/github-known-hosts
+        read_only: true
+      - type: bind
+        source: ${VBR_CONTROL_PLANE_CREDENTIALS:-./credentials}
+        target: /run/deployment-control-plane/credentials
+        read_only: true
+      - type: bind
+        source: ${VBR_CONTROL_PLANE_RECORDS:-./state/records}
+        target: /var/lib/deployment-control-plane/records
+      - type: bind
+        source: ${VBR_CONTROL_PLANE_ARTIFACTS:-./state/artifacts}
+        target: /var/lib/deployment-control-plane/artifacts
+      - type: bind
+        source: ${VBR_CONTROL_PLANE_RUNTIME:-./state/runtime}
+        target: /var/lib/deployment-control-plane/runtime
+    environment:
+      VBR_CONTROL_PLANE_IMAGE_DIGEST: ${VBR_CONTROL_PLANE_IMAGE_DIGEST:-unknown}
+
+  control-plane-worker-1:
+    image: ${VBR_CONTROL_PLANE_IMAGE:?set immutable reviewed image reference}
+    command:
+      - deployment-control-plane
+      - worker
+      - --config
+      - /etc/deployment-control-plane/config.yaml
+    volumes: &control-plane-worker-volumes
+      - type: bind
+        source: ${VBR_CONTROL_PLANE_CONFIG:-./config.example.yaml}
+        target: /etc/deployment-control-plane/config.yaml
+        read_only: true
+      - type: bind
+        source: ${VBR_CONTROL_PLANE_KNOWN_HOSTS:-./github-known-hosts}
+        target: /etc/deployment-control-plane/github-known-hosts
+        read_only: true
+      - type: bind
+        source: ${VBR_CONTROL_PLANE_CREDENTIALS:-./credentials}
+        target: /run/deployment-control-plane/credentials
+        read_only: true
+      - type: bind
+        source: ${VBR_CONTROL_PLANE_RECORDS:-./state/records}
+        target: /var/lib/deployment-control-plane/records
+      - type: bind
+        source: ${VBR_CONTROL_PLANE_ARTIFACTS:-./state/artifacts}
+        target: /var/lib/deployment-control-plane/artifacts
+      - type: bind
+        source: ${VBR_CONTROL_PLANE_RUNTIME:-./state/runtime}
+        target: /var/lib/deployment-control-plane/runtime
+    environment:
+      VBR_CONTROL_PLANE_IMAGE_DIGEST: ${VBR_CONTROL_PLANE_IMAGE_DIGEST:-unknown}
+
+  control-plane-worker-2:
+    image: ${VBR_CONTROL_PLANE_IMAGE:?set immutable reviewed image reference}
+    command:
+      - deployment-control-plane
+      - worker
+      - --config
+      - /etc/deployment-control-plane/config.yaml
+    volumes: *control-plane-worker-volumes
+    environment:
+      VBR_CONTROL_PLANE_IMAGE_DIGEST: ${VBR_CONTROL_PLANE_IMAGE_DIGEST:-unknown}

@@ -37,6 +37,7 @@ export async function findContainerRuntime(): Promise<Runtime | null> {
 
 export async function writeContainerSmokeRuntimeTree(root: string, port: number) {
   const configDir = path.join(root, "config");
+  const knownHostsPath = path.join(configDir, "github-known-hosts");
   const credentialsDir = path.join(root, "credentials");
   const recordsRoot = path.join(root, "records");
   const artifactsRoot = path.join(root, "artifacts");
@@ -61,6 +62,8 @@ export async function writeContainerSmokeRuntimeTree(root: string, port: number)
     await fsp.writeFile(path.join(credentialsDir, name), `${value}\n`, "utf8");
     await fsp.chmod(path.join(credentialsDir, name), 0o644);
   }
+  await fsp.writeFile(knownHostsPath, "github.com ssh-ed25519 AAAA\n", "utf8");
+  await fsp.chmod(knownHostsPath, 0o644);
   const configPath = path.join(configDir, "config.yaml");
   await fsp.writeFile(
     configPath,
@@ -90,7 +93,7 @@ export async function writeContainerSmokeRuntimeTree(root: string, port: number)
     ].join("\n"),
     "utf8",
   );
-  return { configPath, credentialsDir, recordsRoot, artifactsRoot, runtimeRoot };
+  return { configPath, knownHostsPath, credentialsDir, recordsRoot, artifactsRoot, runtimeRoot };
 }
 
 export async function loadImage(runtime: Runtime, image: ContainerSmokeImage): Promise<void> {
@@ -118,6 +121,8 @@ export async function runControlPlaneContainer(opts: {
     opts.name,
     "--mount",
     `type=bind,source=${opts.mounts.configPath},target=/etc/deployment-control-plane/config.yaml,readonly`,
+    "--mount",
+    `type=bind,source=${opts.mounts.knownHostsPath},target=/etc/deployment-control-plane/github-known-hosts,readonly`,
     "--mount",
     `type=bind,source=${opts.mounts.credentialsDir},target=/run/deployment-control-plane/credentials,readonly`,
     "--mount",

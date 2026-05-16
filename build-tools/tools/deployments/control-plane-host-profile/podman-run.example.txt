@@ -1,0 +1,42 @@
+podman pod create \
+  --name deployment-control-plane \
+  --publish 127.0.0.1:7780:7780
+
+podman run -d --pod deployment-control-plane \
+  --name deployment-control-plane-service \
+  --user 10001:10001 \
+  --mount type=bind,source="${VBR_CONTROL_PLANE_CONFIG:-./config.example.yaml}",target=/etc/deployment-control-plane/config.yaml,readonly \
+  --mount type=bind,source="${VBR_CONTROL_PLANE_KNOWN_HOSTS:-./github-known-hosts}",target=/etc/deployment-control-plane/github-known-hosts,readonly \
+  --mount type=bind,source="${VBR_CONTROL_PLANE_CREDENTIALS:-./credentials}",target=/run/deployment-control-plane/credentials,readonly \
+  --mount type=bind,source="${VBR_CONTROL_PLANE_RECORDS:-./state/records}",target=/var/lib/deployment-control-plane/records \
+  --mount type=bind,source="${VBR_CONTROL_PLANE_ARTIFACTS:-./state/artifacts}",target=/var/lib/deployment-control-plane/artifacts \
+  --mount type=bind,source="${VBR_CONTROL_PLANE_RUNTIME:-./state/runtime}",target=/var/lib/deployment-control-plane/runtime \
+  --env VBR_CONTROL_PLANE_IMAGE_DIGEST="${VBR_CONTROL_PLANE_IMAGE_DIGEST:-unknown}" \
+  "${VBR_CONTROL_PLANE_IMAGE:?set immutable reviewed image reference}" \
+  deployment-control-plane service --config /etc/deployment-control-plane/config.yaml
+
+podman run -d --pod deployment-control-plane \
+  --name deployment-control-plane-worker-1 \
+  --user 10001:10001 \
+  --mount type=bind,source="${VBR_CONTROL_PLANE_CONFIG:-./config.example.yaml}",target=/etc/deployment-control-plane/config.yaml,readonly \
+  --mount type=bind,source="${VBR_CONTROL_PLANE_KNOWN_HOSTS:-./github-known-hosts}",target=/etc/deployment-control-plane/github-known-hosts,readonly \
+  --mount type=bind,source="${VBR_CONTROL_PLANE_CREDENTIALS:-./credentials}",target=/run/deployment-control-plane/credentials,readonly \
+  --mount type=bind,source="${VBR_CONTROL_PLANE_RECORDS:-./state/records}",target=/var/lib/deployment-control-plane/records \
+  --mount type=bind,source="${VBR_CONTROL_PLANE_ARTIFACTS:-./state/artifacts}",target=/var/lib/deployment-control-plane/artifacts \
+  --mount type=bind,source="${VBR_CONTROL_PLANE_RUNTIME:-./state/runtime}",target=/var/lib/deployment-control-plane/runtime \
+  --env VBR_CONTROL_PLANE_IMAGE_DIGEST="${VBR_CONTROL_PLANE_IMAGE_DIGEST:-unknown}" \
+  "${VBR_CONTROL_PLANE_IMAGE:?set immutable reviewed image reference}" \
+  deployment-control-plane worker --config /etc/deployment-control-plane/config.yaml
+
+podman run -d --pod deployment-control-plane \
+  --name deployment-control-plane-worker-2 \
+  --user 10001:10001 \
+  --mount type=bind,source="${VBR_CONTROL_PLANE_CONFIG:-./config.example.yaml}",target=/etc/deployment-control-plane/config.yaml,readonly \
+  --mount type=bind,source="${VBR_CONTROL_PLANE_KNOWN_HOSTS:-./github-known-hosts}",target=/etc/deployment-control-plane/github-known-hosts,readonly \
+  --mount type=bind,source="${VBR_CONTROL_PLANE_CREDENTIALS:-./credentials}",target=/run/deployment-control-plane/credentials,readonly \
+  --mount type=bind,source="${VBR_CONTROL_PLANE_RECORDS:-./state/records}",target=/var/lib/deployment-control-plane/records \
+  --mount type=bind,source="${VBR_CONTROL_PLANE_ARTIFACTS:-./state/artifacts}",target=/var/lib/deployment-control-plane/artifacts \
+  --mount type=bind,source="${VBR_CONTROL_PLANE_RUNTIME:-./state/runtime}",target=/var/lib/deployment-control-plane/runtime \
+  --env VBR_CONTROL_PLANE_IMAGE_DIGEST="${VBR_CONTROL_PLANE_IMAGE_DIGEST:-unknown}" \
+  "${VBR_CONTROL_PLANE_IMAGE:?set immutable reviewed image reference}" \
+  deployment-control-plane worker --config /etc/deployment-control-plane/config.yaml
