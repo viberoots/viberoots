@@ -44,6 +44,7 @@ export async function handleControlPlaneRunActionService(
   try {
     boundary = await resolveRunActionAuthorizationBoundary({
       recordsRoot: opts.backend.recordsRoot,
+      backend: opts.backend,
       deployment: snapshot.deployment,
       action: request.action,
       authSessionId: request.authSessionId,

@@ -19,6 +19,7 @@
   artifactAccessKeyIdCredential = "artifact-store-access-key-id";
   artifactSecretAccessKeyCredential = "artifact-store-secret-access-key";
   databaseUrlCredential = "control-plane-database-url";
+  controlPlaneTokenCredential = "control-plane-token";
   reviewedSourceSshKeyCredential = "reviewed-source-ssh-key";
   infisicalClientIdPattern = "{deploymentId}-infisical-client-id";
   infisicalClientSecretPattern = "{deploymentId}-infisical-client-secret";

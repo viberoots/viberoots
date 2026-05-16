@@ -8,6 +8,7 @@ type EvalOut = Record<string, unknown>;
 const credentialConfig = `
   credentials = {
     control-plane-database-url.source = "/run/secrets/db";
+    control-plane-token.source = "/run/secrets/control-plane-token";
     reviewed-source-ssh-key.source = "/run/secrets/ssh";
     artifact-store-endpoint.source = "/run/secrets/endpoint";
     artifact-store-access-key-id.source = "/run/secrets/access";
@@ -95,6 +96,10 @@ test("control-plane NixOS container module defaults to Podman service plus two w
     );
     const rendered = JSON.parse(String(out.configText));
     assert.equal(rendered.instanceId, "mini");
+    assert.equal(
+      rendered.service.tokenFile,
+      "/run/deployment-control-plane/credentials/control-plane-token",
+    );
     assert.equal(rendered.storage.artifactStore.bucket, "deployment-artifacts");
     assert.equal(rendered.webUi.enabled, true);
     assert.ok(
@@ -133,8 +138,13 @@ test("control-plane NixOS container module preserves mounts when Docker is selec
         "control-plane-database-url:/run/secrets/db",
       ),
     );
-    const service = out.service as { extraOptions: string[]; ports: string[] };
+    const service = out.service as {
+      environment: Record<string, string>;
+      extraOptions: string[];
+      ports: string[];
+    };
     assert.deepEqual(service.ports, ["127.0.0.1:7780:7780"]);
+    assert.deepEqual(service.environment, {});
     assert.ok(service.extraOptions.includes("--health-interval=30s"));
     const worker = out.worker as { cmd: string[]; volumes: string[] };
     assert.deepEqual(worker.cmd.slice(0, 2), ["deployment-control-plane", "worker"]);
@@ -170,6 +180,7 @@ test("control-plane NixOS container module fails closed for required host-local 
           reviewed-source-ssh-key.source = "/run/secrets/ssh";
           artifact-store-endpoint.source = "/run/secrets/endpoint";
           artifact-store-access-key-id.source = "/run/secrets/access";
+          control-plane-token.source = "/run/secrets/control-plane-token";
         };
       `,
       },
@@ -196,6 +207,8 @@ test("control-plane NixOS container module parameterizes image and gated nginx",
     `,
       `{
       image = system.config.virtualisation.oci-containers.containers.deployment-control-plane-service.image;
+      imageDigestEnv =
+        system.config.virtualisation.oci-containers.containers.deployment-control-plane-service.environment.VBR_CONTROL_PLANE_IMAGE_DIGEST;
       nginxEnabled = system.config.services.nginx.enable;
       proxyPass =
         system.config.services.nginx.virtualHosts."deploy.example.test".locations."/".proxyPass;
@@ -203,6 +216,7 @@ test("control-plane NixOS container module parameterizes image and gated nginx",
       { image: false },
     );
     assert.equal(out.image, "registry.ops.example/deploy/control-plane@sha256:reviewed");
+    assert.equal(out.imageDigestEnv, "sha256:reviewed");
     assert.equal(out.nginxEnabled, true);
     assert.equal(out.proxyPass, "http://127.0.0.1:7780");
   });

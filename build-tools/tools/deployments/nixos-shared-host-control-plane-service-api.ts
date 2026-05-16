@@ -80,6 +80,7 @@ export async function handleControlPlaneSubmit(
       : await resolveCloudflarePagesServiceSubmitRequest(request, {
           workspaceRoot: opts.workspaceRoot,
           recordsRoot: opts.paths.recordsRoot,
+          backend: opts.backend,
           backendDatabaseUrl: opts.backend.databaseUrl,
         });
   const { requestFingerprint, idempotencyKey, governanceResolver, serviceInstance } =
@@ -219,6 +220,7 @@ export async function handleControlPlaneSubmit(
         : await prepareBackendCloudflarePagesControlPlaneRun({
             workspaceRoot: opts.workspaceRoot,
             recordsRoot: opts.paths.recordsRoot,
+            backend: opts.backend,
             backend: opts.backend,
             request,
             resolved: resolvedRequest,

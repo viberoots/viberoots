@@ -135,6 +135,7 @@ export async function prepareBackendCloudflarePagesControlPlaneRun(opts: {
   const snapshot = await buildCloudflarePagesBackendSnapshot(opts.resolved, {
     workspaceRoot: opts.workspaceRoot,
     recordsRoot: opts.recordsRoot,
+    backend: opts.backend,
     ...(opts.objectStore ? { objectStore: opts.objectStore } : {}),
     governanceResolver: opts.governanceResolver,
   });

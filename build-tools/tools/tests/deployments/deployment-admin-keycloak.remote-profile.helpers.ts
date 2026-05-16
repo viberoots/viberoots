@@ -3,6 +3,11 @@ import assert from "node:assert/strict";
 import http from "node:http";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
+import { localHarnessControlPlaneDatabaseUrl } from "../../deployments/nixos-shared-host-control-plane-backend";
+import {
+  decodeBackendJson,
+  queryBackend,
+} from "../../deployments/nixos-shared-host-control-plane-backend-db";
 import { resolveDeploymentFromTarget } from "../../deployments/deployment-query";
 import { shouldUseServiceOwnedInteractiveAuth } from "../../deployments/deployment-service-auth-client";
 import { stableBuckIsolation } from "../../lib/buck-command-env";
@@ -139,24 +144,7 @@ export async function completePendingAuthSession(
 ) {
   const sessionState = await waitFor(
     async () => {
-      const authDir = path.join(recordsRoot, "control-plane", "auth-sessions");
-      let entries: string[] = [];
-      try {
-        entries = await fsp.readdir(authDir);
-      } catch {
-        return null;
-      }
-      for (const entry of entries) {
-        if (!entry.endsWith(".json")) continue;
-        try {
-          const parsed = JSON.parse(await fsp.readFile(path.join(authDir, entry), "utf8")) as {
-            status?: string;
-            state?: string;
-          };
-          if (parsed.status === "pending" && parsed.state) return parsed.state;
-        } catch {}
-      }
-      return null;
+      return await findPendingAuthSessionState(recordsRoot);
     },
     "timed out waiting for pending auth session",
     30_000,
@@ -166,4 +154,45 @@ export async function completePendingAuthSession(
   callbackUrl.searchParams.set("state", sessionState);
   const response = await fetch(callbackUrl);
   assert.equal(response.status, expectedStatus, await response.text());
+}
+
+export async function findPendingAuthSessionState(recordsRoot: string): Promise<string | null> {
+  const backendState = await findPendingBackendAuthSessionState(recordsRoot);
+  if (backendState) return backendState;
+  return await findPendingFileAuthSessionState(recordsRoot);
+}
+
+async function findPendingBackendAuthSessionState(recordsRoot: string): Promise<string | null> {
+  try {
+    const rows = await queryBackend<{ document_json?: unknown }>(
+      { recordsRoot, databaseUrl: localHarnessControlPlaneDatabaseUrl(recordsRoot) },
+      "SELECT document_json FROM deployment_auth_sessions ORDER BY updated_at DESC",
+    );
+    for (const row of rows.rows) {
+      const parsed = decodeBackendJson<{ status?: string; state?: string }>(row.document_json);
+      if (parsed.status === "pending" && parsed.state) return parsed.state;
+    }
+  } catch {}
+  return null;
+}
+
+async function findPendingFileAuthSessionState(recordsRoot: string): Promise<string | null> {
+  const authDir = path.join(recordsRoot, "control-plane", "auth-sessions");
+  let entries: string[] = [];
+  try {
+    entries = await fsp.readdir(authDir);
+  } catch {
+    return null;
+  }
+  for (const entry of entries) {
+    if (!entry.endsWith(".json")) continue;
+    try {
+      const parsed = JSON.parse(await fsp.readFile(path.join(authDir, entry), "utf8")) as {
+        status?: string;
+        state?: string;
+      };
+      if (parsed.status === "pending" && parsed.state) return parsed.state;
+    } catch {}
+  }
+  return null;
 }

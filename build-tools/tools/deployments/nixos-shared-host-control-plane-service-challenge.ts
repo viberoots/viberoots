@@ -36,6 +36,7 @@ export async function handleControlPlaneArtifactChallenge(
     assertProtectedSharedArtifactIdentityFields(request);
     const boundary = await resolveSubmitAuthorizationBoundary({
       recordsRoot: opts.paths.recordsRoot,
+      backend: opts.backend,
       deployment: request.deployment,
       operationKind: request.operationKind,
       authSessionId: request.authSessionId,

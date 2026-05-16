@@ -117,6 +117,10 @@ test("non-NixOS profile config matches the shared runtime credential contract", 
   assert.deepEqual(config, nixosConfig);
   assert.equal(config.service.host, "0.0.0.0");
   assert.equal(config.service.port, defaults.servicePort);
+  assert.equal(
+    config.service.tokenFile,
+    `${defaults.credentialDirectory}/${defaults.controlPlaneTokenCredential}`,
+  );
   assert.equal(config.credentials.directory, defaults.credentialDirectory);
   assert.equal(config.storage.recordsRoot, defaults.recordsRoot);
   assert.equal(config.storage.artifactStagingRoot, defaults.artifactStagingRoot);

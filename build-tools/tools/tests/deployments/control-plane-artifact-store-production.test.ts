@@ -9,6 +9,7 @@ import {
   enqueueBackendSubmission,
   localHarnessControlPlaneDatabaseUrl,
 } from "../../deployments/nixos-shared-host-control-plane-backend";
+import { queryBackend } from "../../deployments/nixos-shared-host-control-plane-backend-db";
 import { prepareBackendNixosSharedHostControlPlaneRun } from "../../deployments/nixos-shared-host-control-plane-backend-prepare";
 import { runNixosSharedHostControlPlaneWorkerOnce } from "../../deployments/nixos-shared-host-control-plane-worker-loop";
 import { startNixosSharedHostControlPlaneServer } from "../../deployments/nixos-shared-host-control-plane-server";
@@ -158,6 +159,50 @@ test("production service upload route rejects local filesystem artifact authorit
     });
     assert.equal(response.status, 500);
     assert.match(await response.text(), /requires an S3-compatible object store/);
+  } finally {
+    await server.close();
+    await fsp.rm(tmp, { recursive: true, force: true });
+  }
+});
+
+test("production service upload route stores upload-session metadata in the database", async () => {
+  const tmp = await fsp.mkdtemp(path.join(os.tmpdir(), "control-plane-production-upload-db-"));
+  const recordsRoot = path.join(tmp, "records");
+  const databaseUrl = localHarnessControlPlaneDatabaseUrl(recordsRoot);
+  const store = memoryControlPlaneArtifactStore();
+  const artifactDir = path.join(tmp, "artifact");
+  await writeDemoArtifact(artifactDir, "upload-db");
+  const server = await startNixosSharedHostControlPlaneServer({
+    workspaceRoot: tmp,
+    paths: {
+      statePath: path.join(tmp, "state.json"),
+      hostRoot: path.join(tmp, "host"),
+      recordsRoot,
+    },
+    backendDatabaseUrl: databaseUrl,
+    token: "reviewed-token",
+    objectStore: store,
+  });
+  try {
+    const response = await fetch(new URL("/api/v1/artifact-uploads/static-webapp", server.url), {
+      method: "POST",
+      headers: { authorization: "Bearer reviewed-token", "x-vbr-submission-id": "submission-1" },
+      body: await createStaticWebappArtifactBundleBytes(artifactDir),
+    });
+    assert.equal(response.status, 200);
+    const body = (await response.json()) as { uploadSessionId: string };
+    const rows = (
+      await queryBackend(
+        { recordsRoot, databaseUrl },
+        `SELECT upload_session_id FROM static_webapp_upload_sessions WHERE upload_session_id = $1`,
+        [body.uploadSessionId],
+      )
+    ).rows;
+    assert.equal(rows.length, 1);
+    await assert.rejects(
+      () => fsp.stat(path.join(recordsRoot, "artifacts", "upload-sessions", body.uploadSessionId)),
+      /ENOENT/,
+    );
   } finally {
     await server.close();
     await fsp.rm(tmp, { recursive: true, force: true });

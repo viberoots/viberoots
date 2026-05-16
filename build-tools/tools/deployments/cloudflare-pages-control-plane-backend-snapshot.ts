@@ -16,8 +16,7 @@ import { evaluateDeploymentAdmission } from "./deployment-admission-evaluator";
 import { DeploymentAdmissionError } from "./deployment-control-plane-errors";
 import type { DeploymentLaneGovernanceResolver } from "./deployment-lane-governance-resolution";
 import { targetTransitionSnapshot } from "./cloudflare-pages-control-plane-backend-transition-snapshot";
-// prettier-ignore
-export type CloudflarePagesBackendSnapshot = CloudflarePagesControlPlaneSnapshot | Record<string, unknown>;
+export type CloudflarePagesBackendSnapshot = Record<string, unknown>;
 async function previewSnapshot(
   resolved: Extract<ResolvedCloudflarePagesServiceSubmitRequest, { kind: "preview" }>,
   workspaceRoot: string,
@@ -180,6 +179,7 @@ export async function buildCloudflarePagesBackendSnapshot(
   opts: {
     workspaceRoot: string;
     recordsRoot: string;
+    backend?: any;
     objectStore?: any;
     governanceResolver?: DeploymentLaneGovernanceResolver;
   },

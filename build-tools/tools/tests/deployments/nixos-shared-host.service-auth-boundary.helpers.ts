@@ -1,5 +1,6 @@
 #!/usr/bin/env zx-wrapper
 import { providerTargetIdentityFor } from "../../deployments/contract";
+import { localHarnessControlPlaneDatabaseUrl } from "../../deployments/nixos-shared-host-control-plane-backend";
 import {
   artifactBindingEnvelope,
   createArtifactBindingProof,
@@ -76,6 +77,16 @@ export async function writeAuthSession(opts: {
     },
   };
   await writeDeploymentAuthSession(opts.recordsRoot, session);
+  await writeDeploymentAuthSession(
+    {
+      recordsRoot: opts.recordsRoot,
+      backend: {
+        recordsRoot: opts.recordsRoot,
+        databaseUrl: localHarnessControlPlaneDatabaseUrl(opts.recordsRoot),
+      },
+    },
+    session,
+  );
   return sessionId;
 }
 

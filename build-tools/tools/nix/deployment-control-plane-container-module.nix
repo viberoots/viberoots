@@ -16,6 +16,7 @@ let
   credentialNames = lib.unique (
     [
       cfg.databaseUrlCredential
+      cfg.controlPlaneTokenCredential
       cfg.reviewedSourceSshKeyCredential
       cfg.artifactStore.endpointCredential
       cfg.artifactStore.accessKeyIdCredential
@@ -29,6 +30,7 @@ let
   loadCredentials = map (name: "${name}:${credentialSource name}") credentialNames;
   requiredCredentialNames = [
     cfg.databaseUrlCredential
+    cfg.controlPlaneTokenCredential
     cfg.reviewedSourceSshKeyCredential
     cfg.artifactStore.endpointCredential
     cfg.artifactStore.accessKeyIdCredential
@@ -46,6 +48,7 @@ let
       host = "0.0.0.0";
       port = cfg.port;
       publicUrl = cfg.publicUrl;
+      tokenFile = credentialFile cfg.controlPlaneTokenCredential;
     };
     storage = {
       recordsRoot = defaults.recordsRoot;
@@ -84,6 +87,9 @@ let
     image = imageRef;
     autoStart = true;
     volumes = baseVolumes;
+    environment = lib.optionalAttrs (cfg.imageDigest != null) {
+      VBR_CONTROL_PLANE_IMAGE_DIGEST = cfg.imageDigest;
+    };
     cmd = [ "deployment-control-plane" mode "--config" configFile ];
   };
   healthCmd =
@@ -136,6 +142,7 @@ in
     credentialDirectory = opt lib.types.str defaults.credentialDirectory "Container credential directory.";
     reviewedSourceKnownHostsFile = opt lib.types.str "/etc/deployment-control-plane/github-known-hosts" "Known hosts file.";
     databaseUrlCredential = opt lib.types.str defaults.databaseUrlCredential "Database credential name.";
+    controlPlaneTokenCredential = opt lib.types.str defaults.controlPlaneTokenCredential "Reviewed service bearer token credential name.";
     reviewedSourceSshKeyCredential = opt lib.types.str defaults.reviewedSourceSshKeyCredential "SSH key credential name.";
     artifactStore = {
       kind = opt (lib.types.enum [ "s3-compatible" ]) defaults.artifactStoreKind "Artifact store kind.";

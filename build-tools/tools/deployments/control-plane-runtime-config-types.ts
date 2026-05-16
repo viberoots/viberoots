@@ -9,6 +9,7 @@ export type ControlPlaneRuntimeConfig = {
     host: string;
     port: number;
     publicUrl: string;
+    tokenFile?: string;
   };
   storage: {
     recordsRoot: string;

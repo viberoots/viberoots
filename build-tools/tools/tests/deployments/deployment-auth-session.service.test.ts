@@ -1,5 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import assert from "node:assert/strict";
+import * as fsp from "node:fs/promises";
+import path from "node:path";
 import { test } from "node:test";
 import { localHarnessControlPlaneDatabaseUrl } from "../../deployments/nixos-shared-host-control-plane-backend";
 import { startNixosSharedHostControlPlaneServer } from "../../deployments/nixos-shared-host-control-plane-server";
@@ -81,6 +83,13 @@ test("deployment service owns PKCE login sessions and public OIDC callback", asy
       assert.equal(status.status, "authenticated");
       assert.equal(status.principal?.principalId, "oidc:human-1");
       assert.equal(status.authorization?.requestedBy.principalId, "oidc:human-1");
+      await assert.rejects(
+        () =>
+          fsp.stat(
+            path.join(tmp, "records", "control-plane", "auth-sessions", `${login.sessionId}.json`),
+          ),
+        /ENOENT/,
+      );
       assert.equal(
         oidc.tokenRequests.at(-1)?.get("redirect_uri"),
         "https://deploy-auth.apps.kilty.io/oidc/callback",

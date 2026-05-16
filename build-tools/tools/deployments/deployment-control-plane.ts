@@ -1,5 +1,6 @@
 #!/usr/bin/env zx-wrapper
 import { pathToFileURL } from "node:url";
+import * as fsp from "node:fs/promises";
 import { getFlagStr, getPositionalsWithValueFlags } from "../lib/cli";
 import { findRepoRoot } from "../lib/repo";
 import { loadControlPlaneRuntimeConfig } from "./control-plane-runtime-config";
@@ -24,10 +25,14 @@ export async function runDeploymentControlPlaneCommand() {
     repoRoot: workspaceRoot,
   });
   if (mode === "service") {
+    const explicitToken = getFlagStr("token", "").trim();
+    const configToken = runtimeConfig.service.tokenFile
+      ? (await fsp.readFile(runtimeConfig.service.tokenFile, "utf8")).trim()
+      : "";
     return await startControlPlaneServiceFromRuntimeConfig({
       workspaceRoot,
       runtimeConfig,
-      ...(getFlagStr("token", "").trim() ? { token: getFlagStr("token", "").trim() } : {}),
+      ...(explicitToken || configToken ? { token: explicitToken || configToken } : {}),
     });
   }
   return startControlPlaneWorkerFromRuntimeConfig({

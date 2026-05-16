@@ -20,7 +20,9 @@ import {
   findDeploymentAuthSessionByState,
   readDeploymentAuthSession,
   writeDeploymentAuthSession,
+  type DeploymentAuthSessionStoreTarget,
 } from "./deployment-auth-session-store";
+import type { NixosSharedHostControlPlaneBackendTarget } from "./nixos-shared-host-control-plane-backend-db";
 import {
   assertNonceIfPresent,
   authorizationForOidcPrincipal,
@@ -34,10 +36,12 @@ import {
 import { normalizeAuthorizationSnapshot } from "./deployment-control-plane-authz";
 
 const DEFAULT_SESSION_MS = 5 * 60 * 1000;
-
-function redirectUriFor(session: DeploymentAuthSessionRecord): string {
-  return session.redirectUri;
-}
+type AuthStoreOptions = { recordsRoot: string; backend?: NixosSharedHostControlPlaneBackendTarget };
+type AuthAuthorizationOptions = AuthStoreOptions & {
+  sessionId: string;
+  deploymentId: string;
+  operationKind: string;
+};
 
 export function publicDeploymentAuthSessionStatus(session: DeploymentAuthSessionRecord) {
   return {
@@ -60,11 +64,13 @@ export function publicDeploymentAuthSessionStatus(session: DeploymentAuthSession
   };
 }
 
-export async function createDeploymentAuthLoginSession(opts: {
-  recordsRoot: string;
-  request: DeploymentAuthLoginRequest;
-  env?: NodeJS.ProcessEnv;
-}) {
+export async function createDeploymentAuthLoginSession(
+  opts: AuthStoreOptions & {
+    request: DeploymentAuthLoginRequest;
+    env?: NodeJS.ProcessEnv;
+  },
+) {
+  const store = authStore(opts);
   const plan = resolveDeploymentVaultRuntimePlan({
     deployment: opts.request.deployment,
     env: opts.env || process.env,
@@ -102,7 +108,7 @@ export async function createDeploymentAuthLoginSession(opts: {
       repository: plan.repository,
     },
   };
-  await writeDeploymentAuthSession(opts.recordsRoot, session);
+  await writeDeploymentAuthSession(store, session);
   return {
     schemaVersion: DEPLOYMENT_AUTH_LOGIN_RESPONSE_SCHEMA,
     sessionId,
@@ -122,24 +128,26 @@ export async function createDeploymentAuthLoginSession(opts: {
   };
 }
 
-export async function handleDeploymentAuthCallback(opts: {
-  recordsRoot: string;
-  state: string;
-  code: string;
-}) {
-  const session = await findDeploymentAuthSessionByState(opts.recordsRoot, opts.state);
+export async function handleDeploymentAuthCallback(
+  opts: AuthStoreOptions & {
+    state: string;
+    code: string;
+  },
+) {
+  const store = authStore(opts);
+  const session = await findDeploymentAuthSessionByState(store, opts.state);
   if (!session) throw Object.assign(new Error("auth session not found"), { statusCode: 400 });
   if (session.status !== "pending" || session.callbackConsumedAt) {
     throw Object.assign(new Error("auth callback already consumed"), { statusCode: 410 });
   }
   const consumed = { ...session, callbackConsumedAt: new Date().toISOString() };
-  await writeDeploymentAuthSession(opts.recordsRoot, consumed);
+  await writeDeploymentAuthSession(store, consumed);
   try {
     const token = await exchangePkceCodeForToken({
       tokenEndpoint: consumed.tokenEndpoint,
       clientId: consumed.clientId,
       code: opts.code,
-      redirectUri: redirectUriFor(consumed),
+      redirectUri: consumed.redirectUri,
       verifier: consumed.verifier,
     });
     const claims = validateOidcToken({
@@ -170,7 +178,7 @@ export async function handleDeploymentAuthCallback(opts: {
       ...(reviewedIdentityAdminGroups.length > 0 ? { reviewedIdentityAdminGroups } : {}),
       authorization,
     };
-    await writeDeploymentAuthSession(opts.recordsRoot, authenticated);
+    await writeDeploymentAuthSession(store, authenticated);
     return publicDeploymentAuthSessionStatus(authenticated);
   } catch (error) {
     const failed = {
@@ -178,24 +186,28 @@ export async function handleDeploymentAuthCallback(opts: {
       status: "failed" as const,
       failure: redactDeploymentAuthText(error instanceof Error ? error.message : String(error)),
     };
-    await writeDeploymentAuthSession(opts.recordsRoot, failed);
+    await writeDeploymentAuthSession(store, failed);
     throw Object.assign(new Error(failed.failure), { statusCode: 400 });
   }
 }
 
-export async function readPublicDeploymentAuthSession(recordsRoot: string, sessionId: string) {
-  const session = await readDeploymentAuthSession(recordsRoot, sessionId);
+export async function readPublicDeploymentAuthSession(
+  recordsRoot: string,
+  sessionId: string,
+  backend?: NixosSharedHostControlPlaneBackendTarget,
+) {
+  const session = await readDeploymentAuthSession(
+    authStore({ recordsRoot, ...(backend ? { backend } : {}) }),
+    sessionId,
+  );
   return session ? publicDeploymentAuthSessionStatus(session) : undefined;
 }
 
-async function resolveDeploymentAuthSessionAuthorization(opts: {
-  recordsRoot: string;
-  sessionId: string;
-  deploymentId: string;
-  operationKind: string;
-  consume: boolean;
-}) {
-  const session = await readDeploymentAuthSession(opts.recordsRoot, opts.sessionId);
+async function resolveDeploymentAuthSessionAuthorization(
+  opts: AuthAuthorizationOptions & { consume: boolean },
+) {
+  const store = authStore(opts);
+  const session = await readDeploymentAuthSession(store, opts.sessionId);
   if (!session) throw Object.assign(new Error("auth session not found"), { statusCode: 403 });
   if (session.deployment.deploymentId !== opts.deploymentId) {
     throw Object.assign(new Error("auth session deployment mismatch"), { statusCode: 403 });
@@ -209,25 +221,19 @@ async function resolveDeploymentAuthSessionAuthorization(opts: {
     });
   }
   if (opts.consume) {
-    await writeDeploymentAuthSession(opts.recordsRoot, { ...session, status: "consumed" });
+    await writeDeploymentAuthSession(store, { ...session, status: "consumed" });
   }
   return session.authorization;
 }
 
-export async function readDeploymentAuthSessionAuthorization(opts: {
-  recordsRoot: string;
-  sessionId: string;
-  deploymentId: string;
-  operationKind: string;
-}) {
+export async function readDeploymentAuthSessionAuthorization(opts: AuthAuthorizationOptions) {
   return await resolveDeploymentAuthSessionAuthorization({ ...opts, consume: false });
 }
 
-export async function consumeDeploymentAuthSessionAuthorization(opts: {
-  recordsRoot: string;
-  sessionId: string;
-  deploymentId: string;
-  operationKind: string;
-}) {
+export async function consumeDeploymentAuthSessionAuthorization(opts: AuthAuthorizationOptions) {
   return await resolveDeploymentAuthSessionAuthorization({ ...opts, consume: true });
+}
+
+function authStore(opts: AuthStoreOptions): DeploymentAuthSessionStoreTarget {
+  return opts.backend ? { recordsRoot: opts.recordsRoot, backend: opts.backend } : opts.recordsRoot;
 }

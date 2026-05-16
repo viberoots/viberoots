@@ -22,6 +22,11 @@ import type {
   ControlPlaneArtifactObject,
   ControlPlaneArtifactStore,
 } from "./control-plane-artifact-store-types";
+import {
+  decodeBackendJson,
+  queryBackend,
+  type NixosSharedHostControlPlaneBackendTarget,
+} from "./nixos-shared-host-control-plane-backend-db";
 
 export const STATIC_WEBAPP_UPLOAD_SESSION_SCHEMA = "static-webapp-upload-session@1";
 const UPLOAD_SESSION_TTL_MS = 30 * 60 * 1000;
@@ -67,18 +72,69 @@ function createUploadSessionId(): string {
 async function readUploadSession(
   recordsRoot: string,
   uploadSessionId: string,
+  backend?: NixosSharedHostControlPlaneBackendTarget,
 ): Promise<StaticWebappUploadSession> {
-  const session = JSON.parse(
-    await fsp.readFile(metadataPath(recordsRoot, uploadSessionId), "utf8"),
-  ) as StaticWebappUploadSession;
+  const session = backend
+    ? await readUploadSessionFromBackend(backend, uploadSessionId)
+    : (JSON.parse(
+        await fsp.readFile(metadataPath(recordsRoot, uploadSessionId), "utf8"),
+      ) as StaticWebappUploadSession);
+  if (!session) throw new Error(`static-webapp upload session not found: ${uploadSessionId}`);
   if (session.schemaVersion !== STATIC_WEBAPP_UPLOAD_SESSION_SCHEMA) {
     throw new Error(`unsupported static-webapp upload session: ${session.schemaVersion}`);
   }
   return session;
 }
 
+async function readUploadSessionFromBackend(
+  backend: NixosSharedHostControlPlaneBackendTarget,
+  uploadSessionId: string,
+) {
+  const row = (
+    await queryBackend<{ document_json: unknown }>(
+      backend,
+      `SELECT document_json FROM static_webapp_upload_sessions WHERE upload_session_id = $1`,
+      [uploadSessionId],
+    )
+  ).rows[0];
+  return row ? decodeBackendJson<StaticWebappUploadSession>(row.document_json) : undefined;
+}
+
+async function writeUploadSessionMetadata(opts: {
+  recordsRoot: string;
+  session: StaticWebappUploadSession;
+  backend?: NixosSharedHostControlPlaneBackendTarget;
+}) {
+  if (opts.backend) {
+    await queryBackend(
+      opts.backend,
+      `INSERT INTO static_webapp_upload_sessions(
+         upload_session_id, submission_id, document_json, expires_at, updated_at
+       ) VALUES ($1, $2, $3::jsonb, $4, $5)
+       ON CONFLICT (upload_session_id) DO UPDATE SET
+         submission_id = EXCLUDED.submission_id,
+         document_json = EXCLUDED.document_json,
+         expires_at = EXCLUDED.expires_at,
+         updated_at = EXCLUDED.updated_at`,
+      [
+        opts.session.uploadSessionId,
+        opts.session.submissionId,
+        JSON.stringify(opts.session),
+        opts.session.expiresAt,
+        new Date().toISOString(),
+      ],
+    );
+    return;
+  }
+  await fsp.writeFile(
+    metadataPath(opts.recordsRoot, opts.session.uploadSessionId),
+    JSON.stringify(opts.session) + "\n",
+  );
+}
+
 export async function createStaticWebappUploadSession(opts: {
   recordsRoot: string;
+  backend?: NixosSharedHostControlPlaneBackendTarget;
   submissionId: string;
   archiveBytes: Buffer;
   objectStore?: ControlPlaneArtifactStore;
@@ -108,17 +164,19 @@ export async function createStaticWebappUploadSession(opts: {
     ...(archiveObject ? { archiveObject } : {}),
     sizeBytes: opts.archiveBytes.byteLength,
   };
-  await fsp.mkdir(root, { recursive: true });
+  if (!archiveObject || !opts.backend) await fsp.mkdir(root, { recursive: true });
   if (!archiveObject) await fsp.writeFile(session.archivePath, opts.archiveBytes);
-  await fsp.writeFile(
-    metadataPath(opts.recordsRoot, uploadSessionId),
-    JSON.stringify(session) + "\n",
-  );
+  await writeUploadSessionMetadata({
+    recordsRoot: opts.recordsRoot,
+    session,
+    ...(opts.backend ? { backend: opts.backend } : {}),
+  });
   return session;
 }
 
 export async function admitStaticWebappUploadSession(opts: {
   recordsRoot: string;
+  backend?: NixosSharedHostControlPlaneBackendTarget;
   uploadSessionId: string;
   submissionId: string;
   deploymentId?: string;
@@ -127,7 +185,7 @@ export async function admitStaticWebappUploadSession(opts: {
   buildTarget: string;
   objectStore?: ControlPlaneArtifactStore;
 }): Promise<AdmittedStaticWebappArtifact> {
-  const session = await readUploadSession(opts.recordsRoot, opts.uploadSessionId);
+  const session = await readUploadSession(opts.recordsRoot, opts.uploadSessionId, opts.backend);
   if (session.submissionId !== opts.submissionId) {
     throw new Error("static-webapp upload session is not bound to this submission");
   }

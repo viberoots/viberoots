@@ -1,7 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { execFile } from "node:child_process";
+import { execFile, spawn } from "node:child_process";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { promisify } from "node:util";
@@ -34,7 +34,6 @@ export async function buildImageTarball(): Promise<ControlPlaneImageTarball> {
     assert.ok(repoTag, "image archive did not include a repo tag");
     const layerPaths: string[] = [];
     const rootFilesystemPaths = new Set<string>();
-    const forbiddenPayloadPatternPath = await writeForbiddenPayloadPatternFile(tmp);
     for (const layer of manifest.Layers) {
       const layerPath = path.join(tmp, layer);
       const { stdout } = await execFileAsync("tar", ["-tf", layerPath], {
@@ -44,7 +43,7 @@ export async function buildImageTarball(): Promise<ControlPlaneImageTarball> {
         layerPaths.push(entry);
         rootFilesystemPaths.add(normalizeLayerPath(entry));
       }
-      await assertNoForbiddenLayerContents(layerPath, forbiddenPayloadPatternPath);
+      await assertNoForbiddenLayerContents(layerPath);
     }
     return {
       outPath,
@@ -98,29 +97,52 @@ async function nixBuildOutput(attr: string) {
   return outPath;
 }
 
-async function writeForbiddenPayloadPatternFile(tmp: string): Promise<string> {
-  const patternPath = path.join(tmp, "forbidden-layer-payloads.txt");
-  await fsp.writeFile(patternPath, [...forbiddenLayerPayloads(), ""].join("\n"), "utf8");
-  return patternPath;
+async function assertNoForbiddenLayerContents(layerPath: string): Promise<void> {
+  const scan = await scanTarLayerContents(layerPath);
+  assert.equal(
+    scan.match,
+    null,
+    [
+      `image layer contains forbidden secret payload: ${scan.match}`,
+      scan.stderr ? `tar stderr: ${scan.stderr}` : "",
+      scan.error ? `tar error: ${scan.error.message}` : "",
+      scan.code === 0 || scan.code === null ? "" : `tar exit code: ${scan.code}`,
+      scan.signal ? `tar signal: ${scan.signal}` : "",
+    ]
+      .filter(Boolean)
+      .join("\n"),
+  );
+  assert.equal(scan.error, null, `failed to scan image layer: ${scan.error?.message}`);
+  assert.equal(scan.code, 0, `tar failed while scanning image layer: ${scan.stderr}`);
 }
 
-async function assertNoForbiddenLayerContents(
-  layerPath: string,
-  patternPath: string,
-): Promise<void> {
-  const scan = await execFileAsync(
-    "rg",
-    ["--text", "--fixed-strings", "--line-number", "--file", patternPath, layerPath],
-    {
-      env: { ...process.env, LC_ALL: "C" },
-      maxBuffer: 1024 * 1024,
+async function scanTarLayerContents(layerPath: string) {
+  const child = spawn("tar", ["-xOf", layerPath], { stdio: ["ignore", "pipe", "pipe"] });
+  const stderr: Buffer[] = [];
+  child.stderr.on("data", (chunk) => stderr.push(chunk as Buffer));
+  const close = new Promise<{ code: number | null; signal: NodeJS.Signals | null; error: any }>(
+    (resolve) => {
+      child.once("error", (error) => resolve({ code: null, signal: null, error }));
+      child.once("close", (code, signal) => resolve({ code, signal, error: null }));
     },
-  ).catch((error: any) => error);
-  assert.equal(
-    Number(scan.code ?? 0),
-    1,
-    `image layer contains forbidden secret payload:\n${scan.stdout}`,
   );
+  const match = await findForbiddenPayloadInStream(child.stdout);
+  if (match) child.kill("SIGTERM");
+  const result = await close;
+  return { ...result, match, stderr: Buffer.concat(stderr).toString("utf8").trim() };
+}
+
+async function findForbiddenPayloadInStream(stream: AsyncIterable<Buffer>): Promise<string | null> {
+  const patterns = forbiddenLayerPayloads().map((payload) => Buffer.from(payload));
+  const carrySize = Math.max(...patterns.map((pattern) => pattern.length)) - 1;
+  let carry = Buffer.alloc(0);
+  for await (const chunk of stream) {
+    const data = Buffer.concat([carry, chunk]);
+    const match = patterns.find((pattern) => data.includes(pattern));
+    if (match) return match.toString("utf8");
+    carry = data.subarray(Math.max(0, data.length - carrySize));
+  }
+  return null;
 }
 
 function forbiddenLayerPayloads(): string[] {

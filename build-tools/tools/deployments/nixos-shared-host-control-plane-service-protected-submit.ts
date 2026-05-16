@@ -36,6 +36,7 @@ export async function handleProtectedChallengedNixosServiceSubmit(opts: {
     });
     const boundary = await resolveSubmitAuthorizationBoundary({
       recordsRoot: opts.paths.recordsRoot,
+      backend: opts.backend,
       deployment: opts.resolvedRequest.deployment,
       operationKind: opts.resolvedRequest.operationKind,
       authSessionId: opts.request.authSessionId,

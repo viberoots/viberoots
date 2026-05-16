@@ -65,6 +65,7 @@ export async function startNixosSharedHostControlPlaneServer(opts: {
           200,
           await handleDeploymentAuthCallback({
             recordsRoot: opts.paths.recordsRoot,
+            backend,
             code,
             state,
           }),
@@ -162,6 +163,7 @@ export async function startNixosSharedHostControlPlaneServer(opts: {
           200,
           await createStaticWebappUploadSession({
             recordsRoot: opts.paths.recordsRoot,
+            backend,
             submissionId,
             archiveBytes: await readRawBody(request),
             ...(opts.objectStore ? { objectStore: opts.objectStore } : {}),
@@ -176,6 +178,7 @@ export async function startNixosSharedHostControlPlaneServer(opts: {
           200,
           await createDeploymentAuthLoginSession({
             recordsRoot: opts.paths.recordsRoot,
+            backend,
             request: await readJsonBody(request),
           }),
         );
@@ -185,7 +188,7 @@ export async function startNixosSharedHostControlPlaneServer(opts: {
         if (!requireReviewedBearerToken(request, response, opts)) return;
         const sessionId = url.searchParams.get("sessionId") || "";
         const session = sessionId
-          ? await readPublicDeploymentAuthSession(opts.paths.recordsRoot, sessionId)
+          ? await readPublicDeploymentAuthSession(opts.paths.recordsRoot, sessionId, backend)
           : undefined;
         if (!session) {
           writeJson(response, 404, { error: "auth session not found" });

@@ -15,6 +15,7 @@ import {
   consumeDeploymentAuthSessionAuthorization,
   readDeploymentAuthSessionAuthorization,
 } from "./deployment-auth-session-service";
+import type { NixosSharedHostControlPlaneBackendTarget } from "./nixos-shared-host-control-plane-backend";
 
 type ClientAuthFields = {
   requestedBy?: unknown;
@@ -63,6 +64,7 @@ function assertAdmissionReportEvidenceAuthorization(
 
 export async function resolveSubmitAuthorizationBoundary(opts: {
   recordsRoot: string;
+  backend?: NixosSharedHostControlPlaneBackendTarget;
   deployment: DeploymentTarget;
   operationKind: string;
   authSessionId?: string;
@@ -94,6 +96,7 @@ export async function resolveSubmitAuthorizationBoundary(opts: {
       : consumeDeploymentAuthSessionAuthorization;
   const authorization = await resolveAuthorization({
     recordsRoot: opts.recordsRoot,
+    ...(opts.backend ? { backend: opts.backend } : {}),
     sessionId: opts.authSessionId,
     deploymentId: opts.deployment.deploymentId,
     operationKind: opts.operationKind,
@@ -112,6 +115,7 @@ export async function resolveSubmitAuthorizationBoundary(opts: {
 
 export async function resolveRunActionAuthorizationBoundary(opts: {
   recordsRoot: string;
+  backend?: NixosSharedHostControlPlaneBackendTarget;
   deployment: DeploymentTarget;
   action: DeploymentControlPlaneRunAction;
   authSessionId?: string;
@@ -143,6 +147,7 @@ export async function resolveRunActionAuthorizationBoundary(opts: {
   }
   const authorization = await consumeDeploymentAuthSessionAuthorization({
     recordsRoot: opts.recordsRoot,
+    ...(opts.backend ? { backend: opts.backend } : {}),
     sessionId: opts.authSessionId,
     deploymentId: opts.deployment.deploymentId,
     operationKind: opts.action,

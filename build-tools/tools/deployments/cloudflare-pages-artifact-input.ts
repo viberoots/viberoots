@@ -18,6 +18,7 @@ import {
 import { admitStaticWebappUploadSession } from "./static-webapp-upload-sessions";
 import { resolveDeploymentGitCommit } from "./deployment-git-ref";
 import type { ControlPlaneArtifactStore } from "./control-plane-artifact-store-types";
+import type { NixosSharedHostControlPlaneBackendTarget } from "./nixos-shared-host-control-plane-backend";
 
 export type CloudflarePagesArtifactInput =
   | {
@@ -110,6 +111,7 @@ async function admitBundleRef(opts: {
 async function admitServerBuild(opts: {
   workspaceRoot: string;
   recordsRoot: string;
+  backend?: NixosSharedHostControlPlaneBackendTarget;
   deployment: CloudflarePagesDeployment;
   input: Extract<CloudflarePagesArtifactInput, { kind: "server_build" }>;
   objectStore?: ControlPlaneArtifactStore;
@@ -160,6 +162,7 @@ export async function resolveCloudflarePagesArtifactInput(opts: {
     await verifySourceRevision(opts.workspaceRoot, input.sourceRevision);
     return await admitStaticWebappUploadSession({
       recordsRoot: opts.recordsRoot,
+      ...(opts.backend ? { backend: opts.backend } : {}),
       uploadSessionId: input.uploadSessionId,
       submissionId: opts.submissionId,
       deploymentId: opts.deployment.deploymentId,

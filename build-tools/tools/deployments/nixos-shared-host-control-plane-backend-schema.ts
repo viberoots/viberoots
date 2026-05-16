@@ -143,4 +143,22 @@ export const NIXOS_SHARED_HOST_CONTROL_PLANE_BACKEND_SCHEMA_SQL = `
     created_at TIMESTAMPTZ NOT NULL,
     expires_at TIMESTAMPTZ NOT NULL
   );
+  CREATE TABLE IF NOT EXISTS deployment_auth_sessions (
+    session_id TEXT PRIMARY KEY,
+    state TEXT NOT NULL,
+    document_json JSONB NOT NULL,
+    expires_at TIMESTAMPTZ NOT NULL,
+    updated_at TIMESTAMPTZ NOT NULL
+  );
+  CREATE UNIQUE INDEX IF NOT EXISTS deployment_auth_sessions_by_state
+    ON deployment_auth_sessions(state);
+  CREATE TABLE IF NOT EXISTS static_webapp_upload_sessions (
+    upload_session_id TEXT PRIMARY KEY,
+    submission_id TEXT NOT NULL,
+    document_json JSONB NOT NULL,
+    expires_at TIMESTAMPTZ NOT NULL,
+    updated_at TIMESTAMPTZ NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS static_webapp_upload_sessions_by_submission
+    ON static_webapp_upload_sessions(submission_id);
 `;

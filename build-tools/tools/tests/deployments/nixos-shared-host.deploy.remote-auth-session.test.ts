@@ -10,6 +10,7 @@ import { createNixosSharedHostRemotePlan } from "../../deployments/nixos-shared-
 import { runNixosSharedHostRemoteDeploy } from "../../deployments/nixos-shared-host-remote-execution";
 import { runInTemp } from "../lib/test-helpers";
 import { startFakeOidcServer } from "./deploy-vault-jwt.test-helpers";
+import { findPendingAuthSessionState } from "./deployment-admin-keycloak.remote-profile.helpers";
 import {
   installClientProfile,
   prepareRemoteExecFixture,
@@ -23,22 +24,7 @@ import { startNixosSharedHostPublicServer } from "./nixos-shared-host.public-ser
 const CONTROL_PLANE_TOKEN = "test-control-plane-token";
 async function completePendingAuthSession(controlPlaneUrl: string, recordsRoot: string) {
   const session = await waitFor(async () => {
-    const authDir = path.join(recordsRoot, "control-plane", "auth-sessions");
-    let entries: string[] = [];
-    try {
-      entries = await fsp.readdir(authDir);
-    } catch {
-      return null;
-    }
-    for (const entry of entries) {
-      if (!entry.endsWith(".json")) continue;
-      const parsed = JSON.parse(await fsp.readFile(path.join(authDir, entry), "utf8")) as {
-        status?: string;
-        state?: string;
-      };
-      if (parsed.status === "pending" && parsed.state) return parsed.state;
-    }
-    return null;
+    return await findPendingAuthSessionState(recordsRoot);
   }, "timed out waiting for pending auth session");
   const callbackUrl = new URL("/oidc/callback", controlPlaneUrl);
   callbackUrl.searchParams.set("code", "login-code");

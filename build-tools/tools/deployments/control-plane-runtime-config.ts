@@ -51,6 +51,12 @@ export function parseControlPlaneRuntimeConfig(
     database: {
       urlFile: assertCredentialDirectoryPath(config.database.urlFile, policy),
     },
+    service: {
+      ...config.service,
+      ...(config.service.tokenFile
+        ? { tokenFile: assertCredentialDirectoryPath(config.service.tokenFile, policy) }
+        : {}),
+    },
     storage: {
       ...config.storage,
       artifactStore: {
@@ -84,6 +90,9 @@ export async function validateControlPlaneRuntimeConfigFiles(
 ): Promise<void> {
   const required = [
     ["database.urlFile", config.database.urlFile],
+    ...(config.service.tokenFile
+      ? ([["service.tokenFile", config.service.tokenFile]] as const)
+      : []),
     ["storage.artifactStore.endpointFile", config.storage.artifactStore.endpointFile],
     ["storage.artifactStore.accessKeyIdFile", config.storage.artifactStore.accessKeyIdFile],
     ["storage.artifactStore.secretAccessKeyFile", config.storage.artifactStore.secretAccessKeyFile],
@@ -130,6 +139,9 @@ function withDefaults(
       host: stringValue(service.host ?? "0.0.0.0", "service.host"),
       port: numberValue(service.port ?? 7780, "service.port"),
       publicUrl: stringValue(service.publicUrl, "service.publicUrl"),
+      ...(service.tokenFile
+        ? { tokenFile: stringValue(service.tokenFile, "service.tokenFile") }
+        : {}),
     },
     storage: {
       recordsRoot: absoluteDefault(
