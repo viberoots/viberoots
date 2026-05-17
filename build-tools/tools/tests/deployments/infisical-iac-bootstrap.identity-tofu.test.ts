@@ -70,7 +70,16 @@ test("bootstrap credential rotation creates and stores a new client secret", asy
   });
   assert.equal(credential.clientId, "client-id");
   assert.equal(credential.clientSecret, "new-secret");
-  assert.equal([...sink.values.values()][0], "new-secret");
+  assert.equal(
+    sink.values.get("secret://deployments/pleomino/bootstrap/viberoots-iac-bootstrap/client-id"),
+    "client-id",
+  );
+  assert.equal(
+    sink.values.get(
+      "secret://deployments/pleomino/bootstrap/viberoots-iac-bootstrap/client-secret",
+    ),
+    "new-secret",
+  );
 });
 
 test("bootstrap credential preserve mode reads the existing local secret", async () => {

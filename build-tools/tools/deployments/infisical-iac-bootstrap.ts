@@ -18,6 +18,7 @@ import { buildDryRunReport } from "./infisical-iac-bootstrap-dry-run";
 import { resolveOrganizationId } from "./infisical-iac-bootstrap-org";
 import { readDeploymentRuntimeMetadata, runOpenTofu } from "./infisical-iac-bootstrap-tofu";
 import { reconcileDeploymentMetadata } from "./infisical-iac-bootstrap-reconcile";
+import { ensureDeploymentCredentials } from "./infisical-iac-deployment-credentials";
 import { readPleominoReviewedMetadata } from "./infisical-iac-bootstrap-reviewed-metadata";
 import { errorMessage } from "./infisical-iac-bootstrap-redaction";
 import type { BootstrapArgs } from "./infisical-iac-bootstrap-types";
@@ -58,11 +59,18 @@ export async function runInfisicalIacBootstrap(args: BootstrapArgs) {
   }
   const metadata = readDeploymentRuntimeMetadata(resolvedArgs, spawnCommandRunner);
   const reconciliation = reconcileDeploymentMetadata(metadata, reviewedMetadata);
+  const deploymentCredentialLifecycle = await ensureDeploymentCredentials({
+    api,
+    args: effectiveArgs,
+    sink,
+    metadata,
+  });
   if (access.cleanupMessage) console.error(access.cleanupMessage);
   console.log(
     JSON.stringify(
       {
         reconciliation,
+        deploymentCredentialLifecycle,
         credentialHandoff: buildCredentialHandoffReport({
           args: effectiveArgs,
           sinkSelection,

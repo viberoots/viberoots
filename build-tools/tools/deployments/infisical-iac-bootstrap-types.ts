@@ -18,6 +18,7 @@ export type BootstrapArgs = {
   noTofuApply: boolean;
   tofuPlanFile?: string;
   rotateBootstrapCredentials: boolean;
+  rotateDeploymentCredentials: boolean;
   forceOverwriteLocalCredentials: boolean;
   credentialSink: "auto" | "local-file" | "macos-keychain" | "sprinkleref";
   localCredentialFile: string;
@@ -75,6 +76,15 @@ export type DeploymentRuntimeMetadata = {
   cloudflareSecretName?: string;
   environments?: Record<string, { slug?: string }>;
   deploymentCredentials?: DeploymentCredentialRef[];
+};
+
+export type DeploymentCredentialLifecycleResult = {
+  stage: string;
+  identityId: string;
+  identityName: string;
+  clientIdRef: string;
+  clientSecretRef: string;
+  status: "preserved" | "rotated";
 };
 
 export type TofuDeploymentRuntimeStage = {

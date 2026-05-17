@@ -31,6 +31,7 @@ test("bootstrap args support host shorthands and non-interactive controls", () =
     "--tofu-plan-file",
     ".local/plan.tfplan",
     "--no-tofu-apply",
+    "--rotate-deployment-credentials",
     "--yes",
   ]);
   assert.equal(args.apiUrl, "https://eu.infisical.com");
@@ -38,6 +39,7 @@ test("bootstrap args support host shorthands and non-interactive controls", () =
   assert.equal(args.accessTokenEnv, "TOKEN_ENV");
   assert.equal(args.organizationId, "org_1");
   assert.equal(args.noTofuApply, true);
+  assert.equal(args.rotateDeploymentCredentials, true);
   assert.equal(args.yes, true);
 });
 

@@ -80,10 +80,12 @@ export async function ensureBootstrapCredential(opts: {
   sink: CredentialSink;
 }): Promise<BootstrapCredential> {
   const clientId = await readClientId(opts.api, opts.identity);
-  const ref = `secret://deployments/pleomino/bootstrap/${opts.identity.name}/client-secret`;
+  const refs = bootstrapCredentialRefs(opts.identity);
   const remoteSecrets = await listClientSecrets(opts.api, opts.identity.id);
-  const localSecret = await opts.sink.read(ref);
+  const localSecret = await opts.sink.read(refs.clientSecretRef);
+  const localClientId = await opts.sink.read(refs.clientIdRef);
   if (remoteSecrets.length > 0 && localSecret && !opts.args.rotateBootstrapCredentials) {
+    await preserveBootstrapClientId(opts.sink, refs.clientIdRef, localClientId, clientId);
     return { clientId, clientSecret: localSecret };
   }
   if (remoteSecrets.length > 0 && !opts.args.rotateBootstrapCredentials) {
@@ -91,14 +93,52 @@ export async function ensureBootstrapCredential(opts: {
       `Infisical reports an existing Universal Auth client secret record for ${opts.identity.name}, but the configured ${opts.sink.describe()} credential is missing. Import the existing value or rerun with --rotate-bootstrap-credentials.`,
     );
   }
+  if ((localSecret || localClientId) && !opts.args.rotateBootstrapCredentials) {
+    throw new Error(
+      `The configured ${opts.sink.describe()} credential already has a bootstrap client secret for ${opts.identity.name}, but Infisical has no matching usable remote record or rotation was requested. No new remote client secret was created. Preserve the existing value by restoring/importing the remote record, or rerun with --rotate-bootstrap-credentials --force-overwrite-local-credentials to replace it.`,
+    );
+  }
   if (localSecret && !opts.args.forceOverwriteLocalCredentials) {
     throw new Error(
       `The configured ${opts.sink.describe()} credential already has a bootstrap client secret for ${opts.identity.name}, but Infisical has no matching usable remote record or rotation was requested. No new remote client secret was created. Preserve the existing value by restoring/importing the remote record, or rerun with --rotate-bootstrap-credentials --force-overwrite-local-credentials to replace it.`,
     );
   }
+  if (localClientId && localClientId !== clientId && !opts.args.forceOverwriteLocalCredentials) {
+    throw new Error(bootstrapClientIdMismatchMessage(refs.clientIdRef));
+  }
   const clientSecret = await createUniversalAuthClientSecret(opts.api, opts.args, opts.identity);
-  await opts.sink.write(ref, clientSecret, opts.args.forceOverwriteLocalCredentials);
+  if (localClientId !== clientId) {
+    await opts.sink.write(refs.clientIdRef, clientId, opts.args.forceOverwriteLocalCredentials);
+  }
+  await opts.sink.write(
+    refs.clientSecretRef,
+    clientSecret,
+    opts.args.forceOverwriteLocalCredentials,
+  );
   return { clientId, clientSecret };
+}
+
+export function bootstrapCredentialRefs(identity: Identity) {
+  const prefix = `secret://deployments/pleomino/bootstrap/${identity.name}`;
+  return {
+    clientIdRef: `${prefix}/client-id`,
+    clientSecretRef: `${prefix}/client-secret`,
+  };
+}
+
+async function preserveBootstrapClientId(
+  sink: CredentialSink,
+  ref: string,
+  existing: string | undefined,
+  clientId: string,
+) {
+  if (!existing) return await sink.write(ref, clientId, false);
+  if (existing === clientId) return;
+  throw new Error(bootstrapClientIdMismatchMessage(ref));
+}
+
+function bootstrapClientIdMismatchMessage(ref: string) {
+  return `credential ${ref} already contains a different Universal Auth client id; local/resolver values may be replaced only when a new remote credential is created with --rotate-bootstrap-credentials --force-overwrite-local-credentials`;
 }
 
 export function universalAuthBody(args: BootstrapArgs) {
@@ -120,11 +160,12 @@ export async function createUniversalAuthClientSecret(
   api: InfisicalApi,
   args: BootstrapArgs,
   identity: Identity,
+  description = "viberoots IaC bootstrap",
 ) {
   const result = await api.request<{ clientSecret?: string }>(
     "POST",
     `/api/v1/auth/universal-auth/identities/${encodeURIComponent(identity.id)}/client-secrets`,
-    { description: "viberoots IaC bootstrap", numUsesLimit: 0, ttl: args.clientSecretTtl },
+    { description, numUsesLimit: 0, ttl: args.clientSecretTtl },
   );
   if (!result?.clientSecret)
     throw new Error("Infisical did not return a Universal Auth client secret");

@@ -4,6 +4,7 @@ import type {
   Identity,
 } from "./infisical-iac-bootstrap-types";
 import type { CredentialSinkSelection } from "./infisical-iac-bootstrap-sink";
+import { bootstrapCredentialRefs } from "./infisical-iac-bootstrap-identity";
 
 export function buildCredentialHandoffReport(opts: {
   args: BootstrapArgs;
@@ -12,17 +13,18 @@ export function buildCredentialHandoffReport(opts: {
   bootstrapIdentity: Identity;
   metadata: DeploymentRuntimeMetadata;
 }) {
+  const bootstrapRefs = bootstrapCredentialRefs(opts.bootstrapIdentity);
   return {
     schemaVersion: "infisical-iac-bootstrap-handoff@1",
     credentialSink: opts.sinkSelection.kind,
     credentialSinkBackend: opts.sinkSelection.backend,
     sinkDescription: opts.sinkDescription,
     sprinkleCategory: opts.args.sprinkleCategory,
-    bootstrapCredentialRef: `secret://deployments/pleomino/bootstrap/${opts.bootstrapIdentity.name}/client-secret`,
+    bootstrapCredentialRefs: bootstrapRefs,
     deploymentCredentials: (opts.metadata.deploymentCredentials ?? []).map((item) => ({
       stage: item.stage,
-      status: "handoff-only",
-      lifecycleOwner: "deployment credential lifecycle migration",
+      status: "managed",
+      lifecycleOwner: "infisical-iac-bootstrap",
       identityId: item.identityId,
       identityName: item.identityName,
       clientIdRef: item.clientIdRef,
@@ -31,18 +33,16 @@ export function buildCredentialHandoffReport(opts: {
       clientSecretFileName: item.clientSecretFileName,
     })),
     resolverHandoff: {
-      targetCategory: "bootstrap",
+      targetCategory: opts.args.sprinkleCategory,
       refs: [
-        `secret://deployments/pleomino/bootstrap/${opts.bootstrapIdentity.name}/client-secret`,
+        bootstrapRefs.clientIdRef,
+        bootstrapRefs.clientSecretRef,
         ...(opts.metadata.deploymentCredentials ?? []).flatMap((item) => [
           item.clientIdRef,
           item.clientSecretRef,
         ]),
       ],
-      nextSteps: [
-        "SprinkleRef resolver category support",
-        "deployment credential lifecycle migration",
-      ],
+      nextSteps: ["populate application secrets with sprinkleref add/update"],
     },
   };
 }

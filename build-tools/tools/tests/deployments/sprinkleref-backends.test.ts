@@ -84,6 +84,30 @@ test("explicit sprinkleref sink uses configured bootstrap category", async () =>
   });
 });
 
+test("--sprinkle-category selects access credential lifecycle category only", async () => {
+  const dir = await tmp();
+  const config = await writeResolverConfig(dir, "access-bootstrap");
+  await withEnvConfig(config, async () => {
+    const args = {
+      ...DEFAULT_BOOTSTRAP_ARGS,
+      credentialSink: "sprinkleref" as const,
+      sprinkleCategory: "access-bootstrap",
+    };
+    const selection = await resolveCredentialSinkSelection(args);
+    const dryRun = await buildDryRunReport(args);
+    assert.equal(selection.category, "access-bootstrap");
+    assert.equal(dryRun.applicationSecretsManaged, false);
+    const handoff = buildCredentialHandoffReport({
+      args,
+      sinkSelection: selection,
+      sinkDescription: "SprinkleRef access-bootstrap local-file",
+      bootstrapIdentity: { id: "identity", name: "iac-bootstrap" },
+      metadata: {},
+    });
+    assert.equal(handoff.resolverHandoff.targetCategory, "access-bootstrap");
+  });
+});
+
 test("explicit macOS Keychain sink is not overridden by SprinkleRef config", async () => {
   const dir = await tmp();
   const config = await writeResolverConfig(dir);
@@ -123,6 +147,7 @@ test("auto sink reports SprinkleRef semantics when config is present", async () 
     });
     assert.equal(handoff.credentialSink, "sprinkleref");
     assert.equal(handoff.credentialSinkBackend, "local-file");
+    assert.equal(handoff.resolverHandoff.targetCategory, "bootstrap");
   });
 });
 
@@ -130,7 +155,7 @@ async function tmp() {
   return await fs.mkdtemp(path.join(os.tmpdir(), "sprinkleref-backends-"));
 }
 
-async function writeResolverConfig(dir: string) {
+async function writeResolverConfig(dir: string, bootstrapCategory = "bootstrap") {
   const config = path.join(dir, "sprinkleref.json");
   await fs.writeFile(
     config,
@@ -140,6 +165,10 @@ async function writeResolverConfig(dir: string) {
       categories: {
         main: { backend: "local-file", file: path.join(dir, "main.json") },
         bootstrap: { backend: "local-file", file: path.join(dir, "bootstrap.json") },
+        [bootstrapCategory]: {
+          backend: "local-file",
+          file: path.join(dir, `${bootstrapCategory}.json`),
+        },
       },
     }),
   );

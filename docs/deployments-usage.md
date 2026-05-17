@@ -651,8 +651,9 @@ INFISICAL_ACCESS_TOKEN='<redacted>' \
 The bootstrap command creates or preserves the bootstrap IaC identity, runs
 `tofu init`, saves a `tofu plan`, prints a non-secret summary, prompts before
 `tofu apply` unless `--yes` is present, reconciles non-secret OpenTofu outputs
-against reviewed metadata, and writes only stable bootstrap credential refs to
-the PR-13 local secure sink. Enter the real `cloudflare_api_token` values in
+against reviewed metadata, and manages bootstrap and deployment Universal Auth
+access credentials through the selected SprinkleRef `bootstrap` category or
+explicit compatibility sink. Enter the real `cloudflare_api_token` values in
 Infisical outside this command after the project exists, then run read-only
 `deploy admin infisical plan` and `deploy admin infisical check` for staging
 before repeating the same check for production.

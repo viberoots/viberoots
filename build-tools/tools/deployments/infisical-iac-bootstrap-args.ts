@@ -28,6 +28,7 @@ const BOOL_FLAGS = new Set([
   "dry-run",
   "no-tofu-apply",
   "rotate-bootstrap-credentials",
+  "rotate-deployment-credentials",
   "force-overwrite-local-credentials",
 ]);
 
@@ -46,6 +47,7 @@ Options:
   --tofu-plan-file <path>       Saved OpenTofu plan path
   --no-tofu-apply               Stop after saved plan
   --rotate-bootstrap-credentials
+  --rotate-deployment-credentials
   --credential-sink <auto|local-file|macos-keychain|sprinkleref>
   --yes                         Skip deterministic prompts and apply confirmation
   --dry-run                     Print non-secret planned operations
@@ -86,6 +88,7 @@ export function parseBootstrapArgs(argv = getArgvTokens()): BootstrapArgs {
   args.dryRun = readFlagBoolFromTokens("dry-run", argv);
   args.noTofuApply = readFlagBoolFromTokens("no-tofu-apply", argv);
   args.rotateBootstrapCredentials = readFlagBoolFromTokens("rotate-bootstrap-credentials", argv);
+  args.rotateDeploymentCredentials = readFlagBoolFromTokens("rotate-deployment-credentials", argv);
   args.forceOverwriteLocalCredentials = readFlagBoolFromTokens(
     "force-overwrite-local-credentials",
     argv,

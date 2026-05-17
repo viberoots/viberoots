@@ -59,8 +59,9 @@ worker runtime:
 
 Use the reviewed bootstrap command as the primary path. It authenticates with
 Infisical, selects the organization, creates or reuses the bootstrap IaC machine
-identity, stores bootstrap credentials in the PR-13 local secure sink, and runs
-OpenTofu with a saved plan before applying it.
+identity, stores bootstrap and deployment access credentials through the
+selected SprinkleRef `bootstrap` category or explicit compatibility sink, and
+runs OpenTofu with a saved plan before applying it.
 
 ```bash
 build-tools/tools/deployments/infisical-iac-bootstrap.ts \
@@ -84,7 +85,11 @@ build-tools/tools/deployments/infisical-iac-bootstrap.ts \
 The command passes bootstrap credentials through the process environment only.
 It does not write personal tokens, Universal Auth client secrets, application
 secrets, `.tfvars` secret values, or OpenTofu state inputs into git-tracked
-files. Use `--no-tofu-apply` for a preview that stops after `tofu plan`.
+files. Existing remote deployment client secrets are preserved by default when
+the selected sink already has the corresponding value. Use
+`--rotate-deployment-credentials --force-overwrite-local-credentials` only for a
+coordinated credential rotation. Use `--no-tofu-apply` for a preview that stops
+after `tofu plan`.
 
 The lower-level OpenTofu sequence remains useful for debugging only. Run it with
 an Infisical bootstrap machine identity that is allowed to manage non-secret
@@ -99,10 +104,13 @@ tofu output -json deployment_runtime_metadata
 ```
 
 The bootstrap Universal Auth client secret must come from the operator
-credential path, not from git. If the `pleomino-deployments` project or its
-environments were created manually before OpenTofu was applied, import those
-objects into state before applying so the module adopts them instead of trying
-to create duplicates.
+credential path, not from git. Deployment Universal Auth client secret values
+must be imported into or rotated through the selected `bootstrap` category; if
+Infisical already has a remote record but the selected sink is missing the
+value, rotate explicitly or recover the value from the control-plane credential
+store. If the `pleomino-deployments` project or its environments were created
+manually before OpenTofu was applied, import those objects into state before
+applying so the module adopts them instead of trying to create duplicates.
 
 The deterministic bootstrap command consumes these reviewed non-secret inputs:
 Infisical Cloud US by default, organization `viberoots`, OpenTofu directory

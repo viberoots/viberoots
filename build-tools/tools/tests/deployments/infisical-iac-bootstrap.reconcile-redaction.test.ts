@@ -144,10 +144,18 @@ test("credential handoff report emits stable refs without secret values", () => 
     metadata,
   });
   const text = JSON.stringify(report);
+  assert.match(
+    text,
+    /secret:\/\/deployments\/pleomino\/bootstrap\/viberoots-iac-bootstrap\/client-id/,
+  );
+  assert.match(
+    text,
+    /secret:\/\/deployments\/pleomino\/bootstrap\/viberoots-iac-bootstrap\/client-secret/,
+  );
   assert.match(text, /secret:\/\/deployments\/pleomino\/staging\/infisical-client-secret/);
-  assert.match(text, /handoff-only/);
-  assert.match(text, /deployment credential lifecycle migration/);
-  assert.match(text, /SprinkleRef resolver category support/);
+  assert.match(text, /"status":"managed"/);
+  assert.match(text, /infisical-iac-bootstrap/);
+  assert.doesNotMatch(text, /handoff-only|deployment credential lifecycle migration/);
   assert.doesNotMatch(text, /generated-secret|access-token|human-token/);
 });
 
@@ -171,6 +179,7 @@ const REVIEWED_ARGS = {
   tofuDir: "projects/deployments/pleomino-infisical/opentofu",
   noTofuApply: false,
   rotateBootstrapCredentials: false,
+  rotateDeploymentCredentials: false,
   forceOverwriteLocalCredentials: false,
   credentialSink: "local-file" as const,
   localCredentialFile: ".local/infisical-bootstrap-credentials.json",

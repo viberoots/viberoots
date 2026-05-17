@@ -9,6 +9,7 @@ import { ensureBootstrapCredential } from "../../deployments/infisical-iac-boots
 import { LocalFileCredentialSink } from "../../deployments/infisical-iac-bootstrap-sink";
 
 const identity = { id: "id_1", name: "viberoots-iac-bootstrap" };
+const clientIdRef = "secret://deployments/pleomino/bootstrap/viberoots-iac-bootstrap/client-id";
 const ref = "secret://deployments/pleomino/bootstrap/viberoots-iac-bootstrap/client-secret";
 
 test("local sink preserves existing bootstrap credential when remote record exists", async () => {
@@ -23,6 +24,7 @@ test("local sink preserves existing bootstrap credential when remote record exis
   assert.equal(credential.clientSecret, "old-secret");
   assert.equal(api.postCount, 0);
   assert.equal((await readStore(file))[ref], "old-secret");
+  assert.equal((await readStore(file))[clientIdRef], "client-id");
 });
 
 test("local sink refuses missing local bootstrap credential when remote record exists", async () => {
@@ -57,6 +59,7 @@ test("local sink explicit rotation overwrites only when force overwrite is set",
   });
   assert.equal(credential.clientSecret, "new-secret");
   assert.equal(api.postCount, 1);
+  assert.equal((await readStore(file))[clientIdRef], "client-id");
   assert.equal((await readStore(file))[ref], "new-secret");
 });
 

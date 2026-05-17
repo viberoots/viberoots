@@ -15,6 +15,7 @@ export const DEFAULT_BOOTSTRAP_ARGS: BootstrapArgs = {
   tofuDir: "projects/deployments/pleomino-infisical/opentofu",
   noTofuApply: false,
   rotateBootstrapCredentials: false,
+  rotateDeploymentCredentials: false,
   forceOverwriteLocalCredentials: false,
   credentialSink: "auto",
   localCredentialFile: ".local/infisical-bootstrap-credentials.json",

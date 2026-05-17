@@ -11,7 +11,8 @@ The bootstrap command owns only the work required to make Infisical usable as th
 - create or reuse the bootstrap IaC identity;
 - run the Infisical OpenTofu stack through apply by default;
 - store the bootstrap access credential in a SprinkleRef-resolved bootstrap credential backend;
-- emit stable deployment credential refs and handoff data for the later deployment credential lifecycle.
+- manage bootstrap and deployment Universal Auth access credentials through a
+  SprinkleRef-resolved bootstrap credential backend.
 
 It must not manage application secrets such as `cloudflare_api_token`. Those belong to the general SprinkleRef secret-management command, which writes to the configured category backend. For this deployment, ordinary post-bootstrap secrets will normally resolve to Infisical after bringup.
 
@@ -48,6 +49,7 @@ Key flags:
 --no-tofu-apply
 --tofu-plan-file <path>
 --rotate-bootstrap-credentials
+--rotate-deployment-credentials
 --force-overwrite-local-credentials
 --local-credential-file <path>
 --sprinkle-category <category>
@@ -133,7 +135,7 @@ Default sequence:
 3. show a plan summary
 4. prompt to apply unless `--yes`
 5. `tofu apply <saved-plan>`
-6. read outputs needed for non-secret deployment credential handoff
+6. read outputs needed for deployment credential lifecycle reconciliation
 
 Requirements:
 
@@ -154,25 +156,32 @@ The OpenTofu module should continue to manage non-secret Infisical resources:
 
 The OpenTofu module should not manage Universal Auth client secret values when doing so would place secrets in state.
 
-## Deployment Infisical Credential Handoff
+## Deployment Infisical Credential Lifecycle
 
 Deployment identity client secrets are required so the deployment control plane can access Infisical. These credentials cannot be sourced from Infisical itself without an earlier credential, so they must live in a bootstrap/control-plane credential backend resolved by SprinkleRef.
 
-This bootstrap command does not create, preserve, rotate, or inspect deployment Universal Auth client secrets. Later deployment credential lifecycle work owns that policy. The bootstrap command only emits stable `secret://...` refs, reviewed identity metadata, file-name handoff data, and the lifecycle migration owner after OpenTofu apply and reconciliation.
+After OpenTofu apply, the bootstrap command reads non-secret deployment identity outputs, reconciles them with reviewed Pleomino metadata, inspects Universal Auth client-secret record metadata for each deployment identity, and manages deployment access credentials through the selected SprinkleRef `bootstrap` category or explicit compatibility sink.
 
 Policy:
 
 - Do not print generated secrets.
 - Do not store them in OpenTofu state.
 - Do not store them in Infisical as the primary source of truth.
-- Do not call deployment Universal Auth client-secret APIs in this bootstrap command.
+- Do not manage application secrets such as `cloudflare_api_token`.
 
 Default behavior:
 
 - Read OpenTofu outputs for deployment identity IDs and expected credential names/refs.
 - Reconcile those non-secret outputs against checked-in reviewed metadata.
-- Emit each deployment credential ref with status `handoff-only`.
-- Point operators at the later credential lifecycle work for creation, preserve/repair policy, and rotation.
+- Preserve remote deployment client-secret records when the selected sink already has the matching local/resolver credential.
+- Stop with secure remediation when Infisical has an existing remote client-secret record but the local/resolver secret value is missing, because Infisical only reveals client-secret values at creation time.
+- Stop before creating a new remote client secret when a local/resolver secret exists but no usable remote record is visible.
+
+Rotation:
+
+- `--rotate-deployment-credentials` creates new remote deployment Universal Auth client secrets and writes the new values to the selected sink.
+- `--force-overwrite-local-credentials` is required before replacing existing selected-sink credential values.
+- Old remote client-secret records are preserved unless a separate reviewed revocation flow is added.
 
 ## SprinkleRef Resolution
 
@@ -458,7 +467,7 @@ Add fake-API/unit coverage for:
 - preserve/rotate bootstrap credential policy;
 - OpenTofu saved plan and apply sequence;
 - apply confirmation behavior with and without `--yes`;
-- deployment credential stable-ref handoff without secret lifecycle calls;
+- deployment credential preserve/repair/rotate policy through stable refs;
 - SprinkleRef category resolution;
 - local file sink permissions;
 - macOS Keychain sink command construction where testable;
