@@ -119,6 +119,19 @@ const runtime = createDeploymentSecretRuntimeForAdmittedContext({
 const publishSecrets = await runtime.enterStep("publish");
 ```
 
+Before bootstrap, deployment admission, or CI validation, run a read-only
+SprinkleRef reference check to find missing or unmapped deployment contract refs:
+
+```bash
+build-tools/tools/deployments/sprinkleref.ts --check
+build-tools/tools/deployments/sprinkleref.ts --check --target //projects/deployments/pleomino-staging:deploy
+```
+
+The checker inventories `secret://`, `config://`, and `runtime://` refs without
+printing secret values. Add `--config <resolver.json>` when you want
+`secret://` refs presence-checked against a concrete resolver backend; otherwise
+secret refs are reported as intentionally unchecked.
+
 In this example, `targetEnvironment.lockScope` is the exact value the runtime
 checks against `targetScopes`. Operators should treat that `lockScope` value as
 the source of truth for the right target scope string.

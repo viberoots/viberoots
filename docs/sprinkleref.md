@@ -88,3 +88,26 @@ build-tools/tools/deployments/sprinkleref.ts \
 
 CI resolver templates are generated and parsed as read-only mappings for GitHub Actions, Jenkins,
 GitLab CI/CD, and Bitbucket Pipelines. This command does not perform remote CI provider writes.
+
+Check repository deployment contract references before bootstrap, admission, deployment, or CI
+validation:
+
+```bash
+build-tools/tools/deployments/sprinkleref.ts --check
+build-tools/tools/deployments/sprinkleref.ts --check --scheme secret --config sprinkleref/local.file.json
+build-tools/tools/deployments/sprinkleref.ts --check --target //projects/deployments/pleomino-staging:deploy
+build-tools/tools/deployments/sprinkleref.ts --check --target //projects/deployments/pleomino-staging:deploy --no-deps
+build-tools/tools/deployments/sprinkleref.ts --check --format json
+```
+
+`--check` scans tracked repository files for `secret://`, `config://`, and `runtime://` references
+while skipping generated output and dependency directories. `secret://` refs are presence-checked
+through the selected resolver config when one is supplied; without a config they are reported as
+unchecked rather than reading a backend implicitly. `config://` and `runtime://` refs are non-secret
+contract declarations and are not looked up in secret stores.
+
+Target checks use Buck metadata and default to transitive dependencies. Use `--deps none`,
+`--deps direct`, `--deps transitive`, or `--no-deps` to adjust the target closure. Target output
+separates refs declared directly by the selected target from refs inherited from dependencies.
+Exit codes are stable: `0` for OK or intentionally unchecked refs, `1` for missing, unmapped, or
+invalid refs, `2` for resolver/backend access errors, and `3` for usage or scanner errors.

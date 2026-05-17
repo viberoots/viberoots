@@ -22,6 +22,7 @@ RESOURCE_LIMITED_DEPLOYMENT_TESTS = {
     "build-tools/tools/tests/deployments/cloudflare-pages.secret-runtime-lifecycle.test.ts": True,
     "build-tools/tools/tests/deployments/cloudflare-pages.sprinkle-ref.e2e.test.ts": True,
     "build-tools/tools/tests/deployments/github-app-requirements.cquery.test.ts": True,
+    "build-tools/tools/tests/deployments/sprinkleref-check-app-target.test.ts": True, "build-tools/tools/tests/deployments/sprinkleref-check-json.test.ts": True, "build-tools/tools/tests/deployments/sprinkleref-check-target.test.ts": True,
     "build-tools/tools/tests/deployments/cloudflare-pages.status-profile.test.ts": True,
     "build-tools/tools/tests/deployments/cloudflare-pages.target-transition.test.ts": True,
     "build-tools/tools/tests/deployments/cloudflare-pages.timeout.test.ts": True,

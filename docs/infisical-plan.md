@@ -1723,3 +1723,119 @@ are created or overwritten.
 
 It expands the `sprinkleref` CLI surface and requires bootstrap code to choose mutation modes
 deliberately.
+
+## PR-19: SprinkleRef repository reference checker
+
+### 1. Intent
+
+Add a `sprinkleref --check` command that inventories repository deployment contract references and
+reports whether each `secret://`, `config://`, and `runtime://` reference is declared, mapped, and
+satisfiable by the appropriate resolver or runtime configuration source.
+
+### 2. Scope of changes
+
+- Implement `sprinkleref --check` following [`docs/sprinkleref-check.md`](sprinkleref-check.md).
+- Discover checked-in `secret://`, `config://`, and `runtime://` references while skipping generated
+  output and dependency directories.
+- Report source file and line information for each discovered deployment contract ref.
+- Resolve `secret://` refs through the selected SprinkleRef resolver config and category, without
+  printing secret values.
+- Check `config://` and `runtime://` refs against deployment requirement metadata or local runtime
+  config declarations instead of treating them as secret backend entries.
+- Add `--target <buck-target>` support that lists contract values required by a selected app or
+  deployment target, defaulting to transitive dependencies.
+- Add an option such as `--no-deps` or `--deps none|direct|transitive` so operators can list only
+  refs declared directly by the selected Buck target when needed.
+- Distinguish direct target refs from dependency-derived refs in human and JSON output.
+- Provide human-readable output and `--format json` output with matching status categories.
+- Support scheme filters for `secret`, `config`, and `runtime`.
+- Return stable exit codes for successful checks, missing/unmapped/invalid refs, backend/config
+  access errors, and scanner/usage errors.
+- Keep the command read-only. It must not create resolver config, write secret values, mutate
+  backends, or modify deployment metadata.
+
+### 3. External prerequisites
+
+- None. The initial implementation must be covered by local fixtures and checked-in repository
+  inputs only.
+
+### 4. Tests to be added
+
+- Add scanner tests proving tracked repository text can discover `secret://`, `config://`, and
+  `runtime://` refs with file and line locations while skipping generated/dependency paths.
+- Add resolver tests proving present, missing, unmapped, invalid, and unchecked refs are reported
+  with the expected status.
+- Add `secret://` backend tests proving presence checks never print or serialize resolved secret
+  values.
+- Add `config://` and `runtime://` tests proving non-secret refs are checked against declarations
+  rather than secret backends.
+- Add Buck target-scope tests proving `--target` reports direct and dependency-derived
+  `secret://`, `config://`, and `runtime://` requirements for representative app and deployment
+  targets.
+- Add dependency-scope tests proving `--no-deps` or `--deps none|direct|transitive` changes only the
+  target closure being inspected, not resolver semantics.
+- Add target-scope error tests proving the command does not silently fall back to repo-wide text
+  scanning when structured Buck/deployment metadata is unavailable.
+- Add JSON output tests proving statuses, schemes, sensitivity flags, categories, backends, and
+  locations, required-by targets, and direct/dependency scope are stable.
+- Add CLI exit-code tests for success, missing/unmapped/invalid refs, backend/config errors, and
+  scanner/usage errors.
+- Add redaction regression tests for backend errors and diagnostic output.
+
+### 5. Docs to be added or updated
+
+- Keep [`docs/sprinkleref-check.md`](sprinkleref-check.md) synchronized with the implemented command
+  flags, report shape, status categories, and exit codes.
+- Update [`docs/sprinkleref.md`](sprinkleref.md) with the operator-facing `--check` workflow.
+- Update deployment or secrets usage docs with guidance for running `sprinkleref --check` before
+  bootstrap, deployment admission, or CI validation.
+
+### 5.5. Expected regression scope
+
+- `deployment-only`
+- Keep changes in SprinkleRef CLI, deployment reference scanning, resolver checking, deployment
+  requirement metadata readers, docs, and tests. If implementation discovers that shared deployment
+  admission or runtime-config APIs must change, update this plan before expanding scope.
+
+### 6. Acceptance criteria
+
+- `sprinkleref --check` inventories `secret://`, `config://`, and `runtime://` deployment contract
+  refs from checked-in repository files.
+- `sprinkleref --check --target <buck-target>` inventories the same schemes for the selected Buck
+  target and, by default, its transitive dependencies.
+- Operators can exclude dependencies or choose a dependency scope and the output clearly separates
+  direct target refs from dependency-derived refs.
+- Secret refs are checked through the selected resolver/backend without exposing secret values.
+- Non-secret config and runtime refs are checked against declarations or local runtime config
+  sources, not secret stores.
+- Human and JSON output agree on status categories and include source locations.
+- Exit codes are stable and documented.
+- The command is read-only and cannot mutate resolver config, backends, or deployment metadata.
+
+### 7. Risks
+
+- Text scanning may report examples in docs that are not intended to be live requirements.
+- Backend presence checks can accidentally become value reads if backend adapters are not carefully
+  scoped.
+- `config://` and `runtime://` ownership may be ambiguous when refs appear outside structured
+  deployment metadata.
+- Buck target-scoped checks may be misleading if they fall back from structured metadata to broad
+  text scanning without making that limitation explicit.
+
+### 8. Mitigations
+
+- Start with clear `Unchecked` and `Unmapped` statuses instead of guessing ownership.
+- Keep backend adapters presence-only and reuse the existing redaction helpers for all diagnostics.
+- Add scheme filters and JSON output so CI can adopt the checker incrementally.
+- Fail clearly or report `Unchecked` for target-scoped checks when structured metadata is missing;
+  do not label repo-wide text-scan results as target-specific.
+
+### 9. Consequences of not implementing this PR
+
+Operators and CI will continue discovering missing SprinkleRef and runtime-config references only
+after bootstrap, admission, or deployment commands reach the failing backend path.
+
+### 10. Downsides for implementing this PR
+
+The command introduces a broader repository scanner and may need careful filtering to avoid noisy
+reports from documentation examples and test fixtures.

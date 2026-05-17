@@ -204,6 +204,17 @@ contract scopes, or wrong requirement sources.
 Secrets use `secret://deployments/...` contract IDs and are resolved only by the
 secret runtime for the declared lifecycle step; public runtime config uses
 `config://deployments/...` contract IDs.
+Before Infisical/Vault bootstrap, deployment admission, or CI validation,
+operators should run:
+
+```bash
+build-tools/tools/deployments/sprinkleref.ts --check --target <deployment-target>
+```
+
+Use `--config <resolver.json>` when checking secret backend presence, and
+`--format json` for CI. The checker is read-only: it inventories
+`secret://`, `config://`, and `runtime://` contracts, reports source locations
+and direct/dependency scope, and never prints secret values.
 
 The `github_app` profile declares the platform-owned GitHub App identity used
 by server-side app code. It requires `github_app_private_key` at `publish`

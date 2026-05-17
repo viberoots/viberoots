@@ -10,6 +10,7 @@ import {
 } from "./sprinkleref-config";
 import { editResolverEntry, resolverBackendFromArgs } from "./sprinkleref-config-edit";
 import { createSprinkleRefStore } from "./sprinkleref-store";
+import { runSprinkleRefCheck } from "./sprinkleref-check";
 import { initSprinkleRefConfigs } from "./sprinkleref-templates";
 import type { SprinkleRefOperation } from "./sprinkleref-types";
 
@@ -35,6 +36,10 @@ const VALUE_FLAGS = [
   "token-env",
   "scope",
   "name-prefix",
+  "scheme",
+  "format",
+  "target",
+  "deps",
 ];
 const BOOL_FLAGS = [
   "yes",
@@ -43,6 +48,9 @@ const BOOL_FLAGS = [
   "resolver-entry",
   "overwrite-existing",
   "create-missing",
+  "check",
+  "all",
+  "no-deps",
 ];
 
 export type SprinkleRefCliDeps = {
@@ -60,6 +68,7 @@ export function sprinklerefUsage() {
   sprinkleref --init <dir>
   sprinkleref --resolver-entry --add <category> --backend <kind> [backend options]
   sprinkleref --resolver-entry --update <category> --backend <kind> [backend options]
+  sprinkleref --check [--scheme secret|config|runtime] [--format json]
   sprinkleref --add <secret://...> [--category <name>] [--value-env <name>|--value-file <path>]
   sprinkleref --update <secret://...> [--category <name>] [--value-env <name>|--value-file <path>]
   sprinkleref --remove <secret://...> [--category <name>] [--yes]
@@ -69,14 +78,21 @@ Options:
   --category <name>            Resolver category, defaults from config
   --overwrite-existing         Allow --add to replace an existing ref or resolver category
   --create-missing             Allow --update to create a missing ref or resolver category
+  --check                      Inventory and validate deployment contract refs
+  --target <buck-target>       Limit --check to structured refs required by a Buck target
   --dry-run                    Describe the selected backend without reading or writing values
 `;
 }
 
 export async function runSprinkleRefCli(deps: SprinkleRefCliDeps) {
-  validateKnownFlags(deps.argv);
+  validateKnownFlags(deps.argv, readFlagBoolFromTokens("check", deps.argv));
   const out = deps.stdout || console.log;
   if (readFlagBoolFromTokens("help", deps.argv)) return out(sprinklerefUsage());
+  if (readFlagBoolFromTokens("check", deps.argv) || readFlagBoolFromTokens("all", deps.argv)) {
+    const exitCode = await runSprinkleRefCheck(deps);
+    process.exitCode = exitCode;
+    return;
+  }
   const initFlag = readFlagFromTokens("init", deps.argv);
   if (initFlag.provided) {
     const initDir = initFlag.value.trim() || "sprinkleref";
@@ -221,11 +237,14 @@ async function hiddenPrompt(label: string) {
   return value;
 }
 
-function validateKnownFlags(argv: string[]) {
+function validateKnownFlags(argv: string[], usageExit = false) {
   for (const token of argv) {
     if (!token.startsWith("--")) continue;
     const name = token.slice(2).split("=")[0];
-    if (!VALUE_FLAGS.includes(name) && !BOOL_FLAGS.includes(name))
-      throw new Error(`unknown argument: --${name}`);
+    if (!VALUE_FLAGS.includes(name) && !BOOL_FLAGS.includes(name)) {
+      const error = new Error(`unknown argument: --${name}`);
+      if (usageExit) throw Object.assign(error, { exitCode: 3 });
+      throw error;
+    }
   }
 }
