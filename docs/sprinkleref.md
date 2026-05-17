@@ -42,8 +42,19 @@ build-tools/tools/deployments/sprinkleref.ts \
 
 build-tools/tools/deployments/sprinkleref.ts \
   --config sprinkleref/local.macos.json \
+  --add secret://deployments/pleomino/staging/cloudflare_api_token \
+  --overwrite-existing
+
+build-tools/tools/deployments/sprinkleref.ts \
+  --config sprinkleref/local.macos.json \
   --update secret://deployments/pleomino/prod/cloudflare_api_token \
   --value-file .local/secrets/cloudflare-prod-token
+
+build-tools/tools/deployments/sprinkleref.ts \
+  --config sprinkleref/local.macos.json \
+  --update secret://deployments/pleomino/prod/new_runtime_secret \
+  --create-missing \
+  --value-file .local/secrets/new-runtime-secret
 
 build-tools/tools/deployments/sprinkleref.ts \
   --config sprinkleref/local.macos.json \
@@ -54,6 +65,17 @@ When no `--value-env` or `--value-file` is supplied, the command prompts for the
 accepting it as a shell argument. The command never prints secret values. `--dry-run` reports the
 resolved category and backend without reading or writing the value. `--remove` requires an
 interactive confirmation unless `--yes` is supplied.
+
+`--add` fails when the target ref already exists. Pass `--overwrite-existing` only when the
+operator deliberately wants `--add` to replace the existing backend value. `--update` fails when
+the target ref is missing. Pass `--create-missing` only when the operator deliberately wants
+`--update` to create that backend value.
+
+Resolver category edits use the same explicit collision policy with `--resolver-entry`: adding an
+existing category requires `--overwrite-existing`, and updating a missing category requires
+`--create-missing`. Resolver entries describe backend selection and non-secret routing metadata
+only; secret values must be supplied to ordinary `--add` or `--update` operations through
+`--value-env`, `--value-file`, or the prompt.
 
 For bootstrap credentials:
 

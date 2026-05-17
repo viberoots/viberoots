@@ -43,13 +43,19 @@ export function sprinkleRefStarterConfigs(platform = process.platform) {
   };
 }
 
-export async function initSprinkleRefConfigs(opts: { dir: string; platform?: NodeJS.Platform }) {
+export async function initSprinkleRefConfigs(opts: {
+  dir: string;
+  platform?: NodeJS.Platform;
+  mode?: "create" | "overwrite";
+}) {
   await fs.mkdir(opts.dir, { recursive: true });
   const configs = sprinkleRefStarterConfigs(opts.platform || os.platform());
   const written: string[] = [];
   for (const [name, config] of Object.entries(configs)) {
     const file = path.join(opts.dir, name);
-    await fs.writeFile(file, `${JSON.stringify(config, null, 2)}\n`, { flag: "wx" });
+    await fs.writeFile(file, `${JSON.stringify(config, null, 2)}\n`, {
+      flag: opts.mode === "overwrite" ? "w" : "wx",
+    });
     written.push(file);
   }
   return written;

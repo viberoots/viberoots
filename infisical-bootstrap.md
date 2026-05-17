@@ -388,6 +388,17 @@ Required flags/capabilities:
 - `--add <secret-ref>` creates a new secret value and fails if the ref already exists unless an explicit overwrite flag is provided.
 - `--update <secret-ref>` updates an existing value and fails if the ref is missing unless an explicit create flag is provided.
 - `--remove <secret-ref>` deletes/removes the value from the resolved backend after confirmation unless `--yes` is provided.
+
+For the reviewed CLI, that explicit collision surface is `--overwrite-existing` for deliberate
+`--add` replacement and `--create-missing` for deliberate `--update` creation. Resolver-config
+category edits use the same modes through `sprinkleref --resolver-entry`, and those edits accept
+only backend-selection metadata, not secret values.
+
+Bootstrap uses the resolver config as the authority for backend selection. When `--credential-sink
+auto` must create starter files, it uses create-only resolver-config writes so existing operator
+files are not replaced. Existing resolver configs are reused as-is; overwrite remains an explicit
+operator action through the SprinkleRef resolver-entry CLI rather than hidden bootstrap behavior.
+
 - `--value-env <env-name>` reads the value from an environment variable.
 - `--value-file <path>` reads the value from a file.
 - hidden TTY prompt is the primary interactive UX when no non-interactive value source is provided, so users can enter new secrets directly from the command line without the value being echoed.

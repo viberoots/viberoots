@@ -25,6 +25,30 @@ test("sprinkleref add update remove preserve by default for local-file backend",
   assert.deepEqual(await readStore(dir), {});
 });
 
+test("sprinkleref add and update require explicit collision modes", async () => {
+  const dir = await tmp();
+  const config = await localConfig(dir);
+  const ref = "secret://deployments/pleomino/staging/collision-token";
+  await run(["--config", config, "--add", ref, "--value-env", "TOKEN"], { TOKEN: "one" });
+  await assert.rejects(
+    () => run(["--config", config, "--add", ref, "--value-env", "TOKEN"], { TOKEN: "two" }),
+    /already exists/,
+  );
+  await run(["--config", config, "--add", ref, "--overwrite-existing", "--value-env", "TOKEN"], {
+    TOKEN: "two",
+  });
+  assert.equal((await readStore(dir))[ref], "two");
+  const missing = "secret://deployments/pleomino/staging/new-token";
+  await assert.rejects(
+    () => run(["--config", config, "--update", missing, "--value-env", "TOKEN"], { TOKEN: "new" }),
+    /is missing/,
+  );
+  await run(["--config", config, "--update", missing, "--create-missing", "--value-env", "TOKEN"], {
+    TOKEN: "new",
+  });
+  assert.equal((await readStore(dir))[missing], "new");
+});
+
 test("sprinkleref prompt fallback and dry-run do not read secret values", async () => {
   const dir = await tmp();
   const config = await localConfig(dir);

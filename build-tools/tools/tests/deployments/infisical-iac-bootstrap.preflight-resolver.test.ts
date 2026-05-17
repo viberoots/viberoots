@@ -119,6 +119,24 @@ test("auto credential sink creates starter resolver config only when none exists
   });
 });
 
+test("auto credential sink uses explicit create mode for starter resolver config", async () => {
+  const dir = await tmp();
+  await withCwdAndEnv(dir, async () => {
+    await fs.mkdir("sprinkleref", { recursive: true });
+    await fs.writeFile("sprinkleref/base.json", "operator-owned\n");
+    await assert.rejects(
+      () =>
+        createCredentialSink(DEFAULT_BOOTSTRAP_ARGS, {
+          platform: "linux",
+          env: {},
+        }),
+      /EEXIST/,
+    );
+    assert.equal(await fs.readFile("sprinkleref/base.json", "utf8"), "operator-owned\n");
+    await assertMissing("sprinkleref/selected.local.json");
+  });
+});
+
 async function tmp() {
   return await fs.mkdtemp(path.join(os.tmpdir(), "infisical-bootstrap-preflight-"));
 }

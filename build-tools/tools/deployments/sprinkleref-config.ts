@@ -7,6 +7,7 @@ import type {
   SprinkleRefConfig,
   SprinkleRefConfigFile,
 } from "./sprinkleref-types";
+import { stripJsonComments } from "./json-comments";
 
 const BACKENDS = new Set<SprinkleRefBackendKind>([
   "infisical",
@@ -56,7 +57,7 @@ async function loadConfig(file: string, seen: Set<string>): Promise<SprinkleRefC
 
 function parseConfig(text: string, file: string): SprinkleRefConfigFile {
   try {
-    return JSON.parse(text) as SprinkleRefConfigFile;
+    return JSON.parse(stripJsonComments(text)) as SprinkleRefConfigFile;
   } catch {
     throw new Error(`invalid SprinkleRef config JSON: ${file}`);
   }
