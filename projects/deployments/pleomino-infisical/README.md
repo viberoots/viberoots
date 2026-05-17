@@ -57,11 +57,39 @@ worker runtime:
 
 ## IaC operation
 
-Run this module with an Infisical bootstrap machine identity that is allowed to
-manage non-secret project resources in the `viberoots` organization. Pass
-bootstrap credentials through the control plane's service credential path only;
-do not pass personal tokens or secret values through OpenTofu variables,
-checked-in files, or shell history.
+Use the reviewed bootstrap command as the primary path. It authenticates with
+Infisical, selects the organization, creates or reuses the bootstrap IaC machine
+identity, stores bootstrap credentials in the PR-13 local secure sink, and runs
+OpenTofu with a saved plan before applying it.
+
+```bash
+build-tools/tools/deployments/infisical-iac-bootstrap.ts \
+  --org-name viberoots \
+  --tofu-plan-file .local/pleomino-infisical.tfplan
+```
+
+For non-interactive operator or CI flows, provide the bootstrap command's
+short-lived admin-token environment variable and an explicit organization
+selector. The exact CI variable names live in the top-level bootstrap spec, not
+in checked deployment metadata.
+
+```bash
+build-tools/tools/deployments/infisical-iac-bootstrap.ts \
+  --no-login \
+  --org-name viberoots \
+  --yes \
+  --tofu-plan-file .local/pleomino-infisical.tfplan
+```
+
+The command passes bootstrap credentials through the process environment only.
+It does not write personal tokens, Universal Auth client secrets, application
+secrets, `.tfvars` secret values, or OpenTofu state inputs into git-tracked
+files. Use `--no-tofu-apply` for a preview that stops after `tofu plan`.
+
+The lower-level OpenTofu sequence remains useful for debugging only. Run it with
+an Infisical bootstrap machine identity that is allowed to manage non-secret
+project resources in the `viberoots` organization. Do not pass personal tokens
+or secret values through OpenTofu variables, checked-in files, or shell history.
 
 ```bash
 tofu init
@@ -76,10 +104,10 @@ environments were created manually before OpenTofu was applied, import those
 objects into state before applying so the module adopts them instead of trying
 to create duplicates.
 
-PR-13 should consume these non-secret inputs for the deterministic bootstrap
-command: Infisical host `https://app.infisical.com`, organization `viberoots`,
-OpenTofu directory `projects/deployments/pleomino-infisical/opentofu`, project
-name and slug `pleomino-deployments`, environments `staging` and `prod`, secret
-path `/`, secret name `cloudflare_api_token`, machine identity names
+The deterministic bootstrap command consumes these reviewed non-secret inputs:
+Infisical Cloud US by default, organization `viberoots`, OpenTofu directory
+`projects/deployments/pleomino-infisical/opentofu`, project name and slug
+`pleomino-deployments`, environments `staging` and `prod`, secret path `/`,
+secret name `cloudflare_api_token`, machine identity names
 `pleomino-staging-deploy` and `pleomino-prod-deploy`, and the credential-file
 names listed above.

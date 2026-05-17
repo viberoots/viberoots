@@ -23,7 +23,7 @@ import { inheritedBuckIsolation } from "../lib/test-helpers";
 import { infisicalTestContext } from "./deployment-secret-infisical.fixture";
 import { startFakeInfisicalServer } from "./infisical.test-server";
 const expectedRuntime = {
-  siteUrl: "https://app.infisical.com",
+  siteUrl: "https://us.infisical.com",
   projectId: "proj_pleomino_deployments",
   secretPath: "/",
   preferredCredentialSource: "machine_identity_universal_auth",

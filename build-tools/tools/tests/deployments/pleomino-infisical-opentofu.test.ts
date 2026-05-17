@@ -5,13 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
 
-const moduleDir = path.join(
-  process.cwd(),
-  "projects",
-  "deployments",
-  "pleomino-infisical",
-  "opentofu",
-);
+const moduleDir = path.join("projects", "deployments", "pleomino-infisical", "opentofu");
 
 async function validateModuleWithProvider() {
   const workDir = await fsp.mkdtemp(path.join(os.tmpdir(), "pleomino-infisical-tofu-"));
@@ -28,7 +22,7 @@ test("Pleomino Infisical OpenTofu module stays local, formatted, and non-secret"
   await validateModuleWithProvider();
   const main = await fsp.readFile(path.join(moduleDir, "main.tf"), "utf8");
   for (const expected of [
-    'default = "https://app.infisical.com"',
+    'default = "https://us.infisical.com"',
     'default = "pleomino-deployments"',
     'default = ["staging", "prod"]',
     'default = "cloudflare_api_token"',

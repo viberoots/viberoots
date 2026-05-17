@@ -3,11 +3,23 @@ load("//build-tools/deployments:family_defs.bzl", "compose_deployment_family_kwa
 
 _ACCOUNT_ID = "1b911846f80a89272c0dbaf44f5c810f"
 _ZONE_ID = "9411ac5903acb1c2e29b3d4c04ef7e6f"
-_INFISICAL_SITE_URL = "https://app.infisical.com"
+_INFISICAL_SITE_URL = "https://us.infisical.com"
 _INFISICAL_PROJECT_ID = "proj_pleomino_deployments"
+_INFISICAL_PROJECT_NAME = "pleomino-deployments"
+_INFISICAL_PROJECT_SLUG = "pleomino-deployments"
+_INFISICAL_ENVIRONMENT_SLUGS = {
+    "staging": "staging",
+    "prod": "prod",
+}
+_INFISICAL_SECRET_PATH = "/"
+_INFISICAL_CLOUDFLARE_SECRET_NAME = "cloudflare_api_token"
 _INFISICAL_MACHINE_IDENTITY_IDS = {
     "staging": "identity_pleomino_staging_deploy",
     "prod": "identity_pleomino_prod_deploy",
+}
+_INFISICAL_MACHINE_IDENTITY_NAMES = {
+    "staging": "pleomino-staging-deploy",
+    "prod": "pleomino-prod-deploy",
 }
 _INFISICAL_CREDENTIAL_FILE_NAMES = {
     "staging": {
@@ -17,6 +29,16 @@ _INFISICAL_CREDENTIAL_FILE_NAMES = {
     "prod": {
         "client_id": "pleomino-prod-infisical-client-id",
         "client_secret": "pleomino-prod-infisical-client-secret",
+    },
+}
+_INFISICAL_CREDENTIAL_REFS = {
+    "staging": {
+        "client_id": "secret://deployments/pleomino/staging/infisical-client-id",
+        "client_secret": "secret://deployments/pleomino/staging/infisical-client-secret",
+    },
+    "prod": {
+        "client_id": "secret://deployments/pleomino/prod/infisical-client-id",
+        "client_secret": "secret://deployments/pleomino/prod/infisical-client-secret",
     },
 }
 
@@ -47,9 +69,9 @@ def _family_defaults():
 
 def _cloudflare_secret(step):
     return {
-        "name": "cloudflare_api_token",
+        "name": _INFISICAL_CLOUDFLARE_SECRET_NAME,
         "step": step,
-        "contract_id": "secret://deployments/pleomino/cloudflare_api_token",
+        "contract_id": "secret://deployments/pleomino/%s" % _INFISICAL_CLOUDFLARE_SECRET_NAME,
         "required": "true",
     }
 
@@ -81,8 +103,8 @@ def _pleomino_infisical_runtime(stage):
     return {
         "site_url": _INFISICAL_SITE_URL,
         "project_id": _INFISICAL_PROJECT_ID,
-        "environment": stage,
-        "secret_path": "/",
+        "environment": _INFISICAL_ENVIRONMENT_SLUGS[stage],
+        "secret_path": _INFISICAL_SECRET_PATH,
         "preferred_credential_source": "infisical_machine_identity_universal_auth",
         "machine_identity_client_id_env": "%s_CLIENT_ID" % env_prefix,
         "machine_identity_client_secret_env": "%s_CLIENT_SECRET" % env_prefix,

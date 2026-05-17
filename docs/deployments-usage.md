@@ -625,12 +625,38 @@ step instead of editing Keycloak by hand.
   `pleomino-deployments` project, with `staging` and `prod` environments.
 - Pleomino dev stays on the Vault-backed shared-host path so old dev workflows
   and old Vault-admitted replay records remain interpretable.
-- Before the first live Pleomino Infisical rollout, apply or confirm the
-  `projects/deployments/pleomino-infisical/opentofu` module, enter the real
-  Cloudflare token values in Infisical outside this repo, install deployment
-  control-plane credential files, and run read-only `deploy admin infisical plan`
-  and `deploy admin infisical check` for staging before repeating the same check
-  for production.
+- Before the first live Pleomino Infisical rollout, run the reviewed one-command
+  bootstrap flow instead of manually applying the OpenTofu module or hunting for
+  organization ids:
+
+```bash
+build-tools/tools/deployments/infisical-iac-bootstrap.ts \
+  --org-name viberoots \
+  --tofu-plan-file .local/pleomino-infisical.tfplan
+```
+
+In CI or a non-interactive operator shell, provide a short-lived admin token,
+an explicit organization selector, and `--yes` so the saved plan can apply
+without hanging:
+
+```bash
+INFISICAL_ACCESS_TOKEN='<redacted>' \
+  build-tools/tools/deployments/infisical-iac-bootstrap.ts \
+  --no-login \
+  --org-name viberoots \
+  --yes \
+  --tofu-plan-file .local/pleomino-infisical.tfplan
+```
+
+The bootstrap command creates or preserves the bootstrap IaC identity, runs
+`tofu init`, saves a `tofu plan`, prints a non-secret summary, prompts before
+`tofu apply` unless `--yes` is present, reconciles non-secret OpenTofu outputs
+against reviewed metadata, and writes only stable bootstrap credential refs to
+the PR-13 local secure sink. Enter the real `cloudflare_api_token` values in
+Infisical outside this command after the project exists, then run read-only
+`deploy admin infisical plan` and `deploy admin infisical check` for staging
+before repeating the same check for production.
+
 - The reviewed Pleomino Universal Auth runtime names are
   `PLEOMINO_STAGING_INFISICAL_CLIENT_ID`,
   `PLEOMINO_STAGING_INFISICAL_CLIENT_SECRET`,

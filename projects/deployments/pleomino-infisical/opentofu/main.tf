@@ -10,7 +10,7 @@ terraform {
 
 variable "infisical_host" {
   type    = string
-  default = "https://app.infisical.com"
+  default = "https://us.infisical.com"
 }
 
 variable "organization_id" {
@@ -144,10 +144,13 @@ output "deployment_runtime_metadata" {
   value = {
     for stage, identity in infisical_identity.deployment : stage => {
       site_url                    = var.infisical_host
+      project_name                = var.project_name
+      project_slug                = var.project_slug
       project_id                  = infisical_project.pleomino.id
       environment                 = stage
       secret_path                 = var.secret_path
       machine_identity_id         = identity.id
+      machine_identity_name       = identity.name
       client_id_file_name         = var.control_plane_credential_file_names[stage].client_id_file
       client_secret_file_name     = var.control_plane_credential_file_names[stage].client_secret_file
       cloudflare_secret_name      = var.cloudflare_secret_name
