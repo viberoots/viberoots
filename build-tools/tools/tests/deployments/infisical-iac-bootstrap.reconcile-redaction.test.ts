@@ -134,6 +134,11 @@ test("credential handoff report emits stable refs without secret values", () => 
   const metadata = parsePleominoReviewedMetadata(CHECKED_IN_METADATA_FIXTURE);
   const report = buildCredentialHandoffReport({
     args: REVIEWED_ARGS,
+    sinkSelection: {
+      kind: "local-file",
+      backend: "local-file",
+      description: ".local/infisical-bootstrap-credentials.json",
+    },
     sinkDescription: "local secure sink .local/infisical-bootstrap-credentials.json",
     bootstrapIdentity: { id: "identity_bootstrap", name: "viberoots-iac-bootstrap" },
     metadata,
@@ -146,8 +151,8 @@ test("credential handoff report emits stable refs without secret values", () => 
   assert.doesNotMatch(text, /generated-secret|access-token|human-token/);
 });
 
-test("dry-run report omits access tokens and generated secret values", () => {
-  const text = JSON.stringify(buildDryRunReport(REVIEWED_ARGS));
+test("dry-run report omits access tokens and generated secret values", async () => {
+  const text = JSON.stringify(await buildDryRunReport(REVIEWED_ARGS));
   assert.match(text, /infisical-iac-bootstrap-operations@1/);
   assert.doesNotMatch(text, /INFISICAL_ACCESS_TOKEN|generated-secret|access-token|clientSecret/);
 });

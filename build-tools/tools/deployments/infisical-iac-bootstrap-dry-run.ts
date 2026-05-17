@@ -1,6 +1,8 @@
 import type { BootstrapArgs } from "./infisical-iac-bootstrap-types";
+import { resolveCredentialSinkSelection } from "./infisical-iac-bootstrap-sink";
 
-export function buildDryRunReport(args: BootstrapArgs) {
+export async function buildDryRunReport(args: BootstrapArgs) {
+  const sink = await resolveCredentialSinkSelection(args);
   return {
     schemaVersion: "infisical-iac-bootstrap-operations@1",
     deterministic: true,
@@ -10,7 +12,9 @@ export function buildDryRunReport(args: BootstrapArgs) {
       savedPlan: args.tofuPlanFile || "<temporary repo-ignored plan path>",
       apply: !args.noTofuApply,
     },
-    credentialSink: args.credentialSink === "auto" ? "local-file" : args.credentialSink,
+    credentialSink: sink.kind,
+    credentialSinkBackend: sink.backend,
+    credentialSinkDescription: sink.description,
     applicationSecretsManaged: false,
   };
 }

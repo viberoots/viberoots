@@ -4,7 +4,10 @@ import { getArgvTokens } from "../lib/argv";
 import { resolveInfisicalHost } from "./infisical-iac-bootstrap-config";
 import { InfisicalApi } from "./infisical-iac-bootstrap-api";
 import { getAccessToken, spawnCommandRunner } from "./infisical-iac-bootstrap-auth";
-import { createCredentialSink } from "./infisical-iac-bootstrap-sink";
+import {
+  createCredentialSink,
+  resolveCredentialSinkSelection,
+} from "./infisical-iac-bootstrap-sink";
 import {
   ensureBootstrapCredential,
   ensureIdentity,
@@ -29,7 +32,8 @@ export async function runInfisicalIacBootstrap(args: BootstrapArgs) {
   const resolvedArgs = { ...effectiveArgs, organizationId };
   const identity = await ensureIdentity(api, resolvedArgs);
   await ensureUniversalAuth(api, resolvedArgs, identity);
-  const sink = createCredentialSink(effectiveArgs);
+  const sinkSelection = await resolveCredentialSinkSelection(effectiveArgs);
+  const sink = await createCredentialSink(effectiveArgs);
   const credential = await ensureBootstrapCredential({
     api,
     args: resolvedArgs,
@@ -61,6 +65,7 @@ export async function runInfisicalIacBootstrap(args: BootstrapArgs) {
         reconciliation,
         credentialHandoff: buildCredentialHandoffReport({
           args: effectiveArgs,
+          sinkSelection,
           sinkDescription: sink.describe(),
           bootstrapIdentity: identity,
           metadata: reviewedMetadata,
@@ -72,8 +77,8 @@ export async function runInfisicalIacBootstrap(args: BootstrapArgs) {
   );
 }
 
-function dryRun(args: BootstrapArgs) {
-  console.log(JSON.stringify(buildDryRunReport(args), null, 2));
+async function dryRun(args: BootstrapArgs) {
+  console.log(JSON.stringify(await buildDryRunReport(args), null, 2));
 }
 
 function withReviewedHost(args: BootstrapArgs, siteUrl: string): BootstrapArgs {

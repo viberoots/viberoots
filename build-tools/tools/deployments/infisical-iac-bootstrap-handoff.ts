@@ -3,16 +3,19 @@ import type {
   DeploymentRuntimeMetadata,
   Identity,
 } from "./infisical-iac-bootstrap-types";
+import type { CredentialSinkSelection } from "./infisical-iac-bootstrap-sink";
 
 export function buildCredentialHandoffReport(opts: {
   args: BootstrapArgs;
+  sinkSelection: CredentialSinkSelection;
   sinkDescription: string;
   bootstrapIdentity: Identity;
   metadata: DeploymentRuntimeMetadata;
 }) {
   return {
     schemaVersion: "infisical-iac-bootstrap-handoff@1",
-    credentialSink: opts.args.credentialSink === "auto" ? "local-file" : opts.args.credentialSink,
+    credentialSink: opts.sinkSelection.kind,
+    credentialSinkBackend: opts.sinkSelection.backend,
     sinkDescription: opts.sinkDescription,
     sprinkleCategory: opts.args.sprinkleCategory,
     bootstrapCredentialRef: `secret://deployments/pleomino/bootstrap/${opts.bootstrapIdentity.name}/client-secret`,

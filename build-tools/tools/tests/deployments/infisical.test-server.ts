@@ -30,6 +30,21 @@ export type FakeInfisicalSecret = {
   errorBody?: Record<string, unknown>;
 };
 
+function sameSecret(
+  entry: FakeInfisicalSecret,
+  params: URLSearchParams,
+  secretName: string,
+  version = "",
+) {
+  return (
+    entry.projectId === params.get("projectId") &&
+    entry.environment === params.get("environment") &&
+    entry.secretPath === params.get("secretPath") &&
+    entry.secretName === secretName &&
+    (!version || entry.version === version)
+  );
+}
+
 export type FakeInfisicalServerOptions = {
   projectId?: string;
   environment?: string;
@@ -111,14 +126,10 @@ export async function startFakeInfisicalServer(
     const projectMatch = url.pathname.match(/^\/api\/v1\/workspace\/([^/]+)$/);
     if (projectMatch) {
       const projectId = decodeURIComponent(projectMatch[1] || "");
-      if (opts.projectStatus) {
-        json(response, opts.projectStatus, { error: "project_access_failed" });
-        return;
-      }
-      if (opts.missingProject || projectId !== expectedProject) {
-        json(response, 404, { error: "missing_project" });
-        return;
-      }
+      if (opts.projectStatus)
+        return json(response, opts.projectStatus, { error: "project_access_failed" });
+      if (opts.missingProject || projectId !== expectedProject)
+        return json(response, 404, { error: "missing_project" });
       json(response, 200, { workspace: { id: projectId, name: "Deployment Project" } });
       return;
     }
@@ -128,17 +139,14 @@ export async function startFakeInfisicalServer(
     if (environmentMatch) {
       const projectId = decodeURIComponent(environmentMatch[1] || "");
       const environment = decodeURIComponent(environmentMatch[2] || "");
-      if (opts.environmentStatus) {
-        json(response, opts.environmentStatus, { error: "environment_access_failed" });
-        return;
-      }
+      if (opts.environmentStatus)
+        return json(response, opts.environmentStatus, { error: "environment_access_failed" });
       if (
         opts.missingEnvironment ||
         projectId !== expectedProject ||
         environment !== expectedEnvironment
       ) {
-        json(response, 404, { error: "missing_environment" });
-        return;
+        return json(response, 404, { error: "missing_environment" });
       }
       json(response, 200, { environment: { slug: environment, name: "Production" } });
       return;
@@ -149,14 +157,12 @@ export async function startFakeInfisicalServer(
     if (identityAccessMatch) {
       const projectId = decodeURIComponent(identityAccessMatch[1] || "");
       const identityId = decodeURIComponent(identityAccessMatch[2] || "");
-      if (opts.machineIdentityAccessStatus) {
-        json(response, opts.machineIdentityAccessStatus, { error: "identity_access_unavailable" });
-        return;
-      }
-      if (projectId !== expectedProject || identityId !== expectedIdentity) {
-        json(response, 404, { error: "missing_identity_access" });
-        return;
-      }
+      if (opts.machineIdentityAccessStatus)
+        return json(response, opts.machineIdentityAccessStatus, {
+          error: "identity_access_unavailable",
+        });
+      if (projectId !== expectedProject || identityId !== expectedIdentity)
+        return json(response, 404, { error: "missing_identity_access" });
       json(response, 200, {
         access: {
           access: opts.machineIdentityAccess !== false,
@@ -167,10 +173,7 @@ export async function startFakeInfisicalServer(
       return;
     }
     const oldSecretMatch = url.pathname.match(/^\/api\/v3\/secrets\/raw\/([^/]+)$/);
-    if (oldSecretMatch) {
-      json(response, 410, { error: "old_secret_read_path_rejected" });
-      return;
-    }
+    if (oldSecretMatch) return json(response, 410, { error: "old_secret_read_path_rejected" });
     const secretMatch = url.pathname.match(/^\/api\/v4\/secrets\/([^/]+)$/);
     if (secretMatch) {
       const secretName = decodeURIComponent(secretMatch[1] || "");
@@ -180,28 +183,43 @@ export async function startFakeInfisicalServer(
         !url.searchParams.has("projectId") ||
         !url.searchParams.has("viewSecretValue")
       ) {
-        json(response, 400, { error: "invalid_v4_secret_read_contract" });
-        return;
+        return json(response, 400, { error: "invalid_v4_secret_read_contract" });
       }
       const viewSecretValue = url.searchParams.get("viewSecretValue") === "true";
       const version = url.searchParams.get("version") || "";
       secretCalls.push(`${secretName}:${String(viewSecretValue)}:${version}`);
-      const found = secrets.find(
-        (entry) =>
-          entry.projectId === url.searchParams.get("projectId") &&
-          entry.environment === url.searchParams.get("environment") &&
-          entry.secretPath === url.searchParams.get("secretPath") &&
-          entry.secretName === secretName &&
-          (!version || entry.version === version),
+      const found = secrets.find((entry) =>
+        sameSecret(entry, url.searchParams, secretName, version),
       );
-      if (!found) {
-        json(response, 404, { error: "missing_secret" });
+      if (request.method === "POST" || request.method === "PATCH") {
+        const body = await readBody(request);
+        if (!found) {
+          secrets.push({
+            projectId: url.searchParams.get("projectId") || "",
+            environment: url.searchParams.get("environment") || "",
+            secretPath: url.searchParams.get("secretPath") || "",
+            secretName,
+            secretValue: String(body.secretValue || ""),
+            version: "v-written",
+          });
+        } else {
+          found.secretValue = String(body.secretValue || "");
+          found.version = "v-updated";
+        }
+        json(response, 200, { secret: { secretName, version: found ? "v-updated" : "v-written" } });
         return;
       }
-      if (found.status) {
-        json(response, found.status, found.errorBody || { error: "secret_read_failed" });
-        return;
+      if (request.method === "DELETE") {
+        const index = secrets.findIndex((entry) =>
+          sameSecret(entry, url.searchParams, secretName, version),
+        );
+        if (index < 0) return json(response, 404, { error: "missing_secret" });
+        secrets.splice(index, 1);
+        return json(response, 200, { deleted: true });
       }
+      if (!found) return json(response, 404, { error: "missing_secret" });
+      if (found.status)
+        return json(response, found.status, found.errorBody || { error: "secret_read_failed" });
       const returned = { ...found, ...(found.response || {}) };
       json(response, 200, {
         secret: {
