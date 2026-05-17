@@ -29,7 +29,7 @@ Defaults:
 - Infisical host: `https://app.infisical.com`.
 - Login: enabled.
 - OpenTofu init/plan/apply: enabled for the Infisical stack.
-- Apply confirmation: prompt unless `--yes` is provided.
+- Confirmation: mutation-capable bootstrap requires `--yes` before any remote or local write.
 - Credential preservation: preserve existing remote/local credentials unless explicit rotation is requested.
 - Secret output: never print secret values.
 
@@ -60,7 +60,11 @@ Key flags:
 implementation-level overrides for split API/CLI endpoint testing or future hosted variants; when
 omitted, both default to the reviewed Pleomino Infisical endpoint `https://app.infisical.com`.
 
-`--yes` means “do not prompt for confirmations when the result is otherwise deterministic.” It does not mean “guess.” If multiple organizations are available and no explicit org selector was provided, the command still presents the org list. If terminal input is unavailable, it exits with a clear error.
+`--yes` means “the operator has confirmed this mutation-capable bootstrap.” It does not mean
+“guess.” Non-dry-run bootstrap checks this before opening Infisical, running OpenTofu, creating
+resolver config files, or writing credential sinks. Use `--dry-run` for read-only inspection. If
+multiple organizations are available and no explicit org selector was provided, the command still
+presents the org list. If terminal input is unavailable, it exits with a clear error.
 
 ## Authentication
 
@@ -78,7 +82,8 @@ CI/non-interactive behavior:
 
 - `--no-login` requires a token from `--access-token-env`, default `INFISICAL_ACCESS_TOKEN`.
 - CI must also provide `--organization-id` or `--org-name`.
-- CI must provide `--yes` if apply confirmation would otherwise be required.
+- CI and local non-dry-run bootstrap must provide `--yes`; missing confirmation fails before any
+  Infisical, OpenTofu, resolver-config, or credential-sink mutation.
 - Any missing interactive input must fail fast with remediation.
 
 ## Organization Selection
@@ -133,16 +138,16 @@ Default sequence:
 1. `tofu init`
 2. `tofu plan -out=<saved-plan>`
 3. show a plan summary
-4. prompt to apply unless `--yes`
-5. `tofu apply <saved-plan>`
-6. read outputs needed for deployment credential lifecycle reconciliation
+4. `tofu apply <saved-plan>`
+5. read outputs needed for deployment credential lifecycle reconciliation
 
 Requirements:
 
 - Apply must use the saved plan file.
 - Do not implicitly re-plan during apply.
 - `--no-tofu-apply` disables the default apply path for preview/debug.
-- Failure output should include the OpenTofu directory, plan file path, and next command to retry.
+- Failure output for `init`, `plan`, and `apply` includes the OpenTofu directory, the saved plan
+  path when available, and the exact retry command for the failed stage.
 - Bootstrap credentials should be supplied through environment only, not tfvars/state.
 
 The OpenTofu module should continue to manage non-secret Infisical resources:
@@ -229,9 +234,9 @@ Recommended categories:
 - `main`: ordinary deployment/application secrets. For this deployment, `main` resolves to Infisical after bootstrap.
 - `bootstrap`: root credentials needed to access Infisical or Vault. This category must not resolve to Infisical for Infisical access credentials.
 
-This command implements `local-file` as the reviewed transitional bootstrap credential sink. `auto`
-selects that local sink until later SprinkleRef category resolution and provider-backed credential
-lifecycle writes are available.
+The bootstrap command resolves `auto` through the SprinkleRef resolver config. It uses an existing
+selected resolver config when present and creates starter resolver configs only for confirmed,
+non-dry-run bootstrap.
 
 Resolver configs should be separate per execution context, with a shared base where useful:
 
@@ -317,6 +322,13 @@ The bootstrap command should:
 - default non-macOS local `bootstrap` to local `0600` files;
 - default `main` to Infisical once OpenTofu has created the project;
 - never hide backend selection in code when a resolver config can make it explicit.
+
+With `--credential-sink auto`, bootstrap first uses `SPRINKLEREF_CONFIG` when set, then
+`sprinkleref/selected.local.json` when present. If neither exists, it creates the starter
+`sprinkleref/` config set and uses `selected.local.json`, whose `bootstrap` category explicitly
+selects macOS Keychain on macOS and local `0600` files elsewhere. Existing resolver configs are
+authoritative and are not overwritten. In `--dry-run`, bootstrap reports the starter backend it
+would use but does not create resolver config files.
 
 ## Credential Sinks
 
@@ -446,13 +458,20 @@ Fix:
 ```
 
 ```text
-OpenTofu plan succeeded, but apply was not confirmed.
-Saved plan: projects/deployments/pleomino-infisical/opentofu/plan.tfplan
-No apply was run.
+Infisical bootstrap requires --yes before mutation-capable execution.
+No Infisical resources, OpenTofu state, resolver config, or credential sink output was changed.
 
 Fix:
   rerun with --yes
-  or run the bootstrap command in an interactive terminal and answer y.
+  or use --dry-run for read-only inspection.
+```
+
+```text
+OpenTofu plan failed.
+Working directory: projects/deployments/pleomino-infisical/opentofu
+Saved plan: .local/pleomino-infisical.tfplan
+Retry: cd projects/deployments/pleomino-infisical/opentofu && tofu plan -out=.local/pleomino-infisical.tfplan
+Cause: provider authorization failed
 ```
 
 ## Validation

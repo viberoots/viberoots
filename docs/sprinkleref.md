@@ -26,6 +26,13 @@ Initialize starter configs:
 build-tools/tools/deployments/sprinkleref.ts --init sprinkleref
 ```
 
+The Infisical bootstrap command also uses this resolver shape. With `--credential-sink auto`, it
+uses `SPRINKLEREF_CONFIG` when set, then an existing `sprinkleref/selected.local.json`. If neither
+exists and `--yes` has already passed bootstrap preflight, it creates the starter config set and
+uses `selected.local.json` so the `bootstrap` backend choice is visible in config instead of hidden
+inside bootstrap code. Dry-run bootstrap reports the starter backend without creating the config
+files. Existing resolver configs are treated as authoritative.
+
 Add, update, or remove ordinary secrets:
 
 ```bash

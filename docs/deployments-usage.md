@@ -632,12 +632,14 @@ step instead of editing Keycloak by hand.
 ```bash
 build-tools/tools/deployments/infisical-iac-bootstrap.ts \
   --org-name viberoots \
+  --yes \
   --tofu-plan-file .local/pleomino-infisical.tfplan
 ```
 
-In CI or a non-interactive operator shell, provide a short-lived admin token,
-an explicit organization selector, and `--yes` so the saved plan can apply
-without hanging:
+The `--yes` flag is required for every non-dry-run bootstrap. Bootstrap checks it before opening
+Infisical, running OpenTofu, creating resolver config files, or writing credential sinks. In CI or a
+non-interactive operator shell, also provide a short-lived admin token and an explicit organization
+selector:
 
 ```bash
 INFISICAL_ACCESS_TOKEN='<redacted>' \
@@ -649,14 +651,14 @@ INFISICAL_ACCESS_TOKEN='<redacted>' \
 ```
 
 The bootstrap command creates or preserves the bootstrap IaC identity, runs
-`tofu init`, saves a `tofu plan`, prints a non-secret summary, prompts before
-`tofu apply` unless `--yes` is present, reconciles non-secret OpenTofu outputs
-against reviewed metadata, and manages bootstrap and deployment Universal Auth
-access credentials through the selected SprinkleRef `bootstrap` category or
-explicit compatibility sink. Enter the real `cloudflare_api_token` values in
-Infisical outside this command after the project exists, then run read-only
-`deploy admin infisical plan` and `deploy admin infisical check` for staging
-before repeating the same check for production.
+`tofu init`, saves a `tofu plan`, prints a non-secret summary, applies that saved plan, reconciles
+non-secret OpenTofu outputs against reviewed metadata, and manages bootstrap and deployment
+Universal Auth access credentials through the selected SprinkleRef `bootstrap` category or explicit
+compatibility sink. OpenTofu `init`, `plan`, and `apply` failures print the working directory, saved
+plan path when available, and exact retry command without printing credential values. Enter the real
+`cloudflare_api_token` values in Infisical outside this command after the project exists, then run
+read-only `deploy admin infisical plan` and `deploy admin infisical check` for staging before
+repeating the same check for production.
 
 - The reviewed Pleomino Universal Auth runtime names are
   `PLEOMINO_STAGING_INFISICAL_CLIENT_ID`,

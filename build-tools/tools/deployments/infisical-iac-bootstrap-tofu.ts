@@ -3,6 +3,7 @@ import * as os from "node:os";
 import * as path from "node:path";
 import * as readline from "node:readline/promises";
 import { canonicalInfisicalApiUrl } from "./infisical-iac-bootstrap-config";
+import { errorMessage } from "./infisical-iac-bootstrap-redaction";
 import type {
   BootstrapArgs,
   BootstrapCredential,
@@ -28,15 +29,79 @@ export async function runOpenTofu(opts: {
   const savedPlan = await planFilePath(opts.args);
   await fs.mkdir(path.dirname(savedPlan), { recursive: true });
   const env = tofuEnv(opts.args, opts.credential, opts.reviewedMetadata);
-  opts.runner({ command: "tofu", args: ["init"], cwd: tofuDir, env });
-  opts.runner({ command: "tofu", args: ["plan", `-out=${savedPlan}`], cwd: tofuDir, env });
+  runTofuStage("init", {
+    args: ["init"],
+    tofuDir,
+    env,
+    runner: opts.runner,
+    secrets: [opts.credential.clientSecret],
+  });
+  runTofuStage("plan", {
+    args: ["plan", `-out=${savedPlan}`],
+    tofuDir,
+    savedPlan,
+    env,
+    runner: opts.runner,
+    secrets: [opts.credential.clientSecret],
+  });
   printPlanSummary(tofuDir, savedPlan, opts.args.noTofuApply);
   if (opts.args.noTofuApply) return { savedPlan };
   const confirmed =
     opts.args.yes || (await (opts.confirmApply ?? promptApplyConfirmation)(savedPlan));
   if (!confirmed) throw new Error(`OpenTofu apply cancelled; saved plan remains at ${savedPlan}`);
-  opts.runner({ command: "tofu", args: ["apply", savedPlan], cwd: tofuDir, env });
+  runTofuStage("apply", {
+    args: ["apply", savedPlan],
+    tofuDir,
+    savedPlan,
+    env,
+    runner: opts.runner,
+    secrets: [opts.credential.clientSecret],
+  });
   return { savedPlan };
+}
+
+function runTofuStage(
+  stage: "init" | "plan" | "apply",
+  opts: {
+    args: string[];
+    tofuDir: string;
+    savedPlan?: string;
+    env: NodeJS.ProcessEnv;
+    runner: CommandRunner;
+    secrets?: Array<string | undefined>;
+  },
+) {
+  try {
+    return opts.runner({ command: "tofu", args: opts.args, cwd: opts.tofuDir, env: opts.env });
+  } catch (error) {
+    throw new Error(
+      buildTofuFailureMessage({
+        stage,
+        tofuDir: opts.tofuDir,
+        savedPlan: opts.savedPlan,
+        retryArgs: opts.args,
+        cause: errorMessage(error, opts.secrets),
+      }),
+    );
+  }
+}
+
+export function buildTofuFailureMessage(opts: {
+  stage: "init" | "plan" | "apply";
+  tofuDir: string;
+  savedPlan?: string;
+  retryArgs: string[];
+  cause: string;
+}) {
+  return [
+    `OpenTofu ${opts.stage} failed.`,
+    `Working directory: ${opts.tofuDir}`,
+    ...(opts.savedPlan ? [`Saved plan: ${opts.savedPlan}`] : []),
+    `Retry: cd ${quoteShell(opts.tofuDir)} && tofu ${opts.retryArgs.map(quoteShell).join(" ")}`,
+    opts.cause ? `Cause: ${opts.cause}` : "",
+  ]
+    .filter(Boolean)
+    .join("\n");
 }
 
 export function readDeploymentRuntimeMetadata(args: BootstrapArgs, runner: CommandRunner) {
@@ -139,4 +204,9 @@ function tofuEnv(
       ),
     ),
   };
+}
+
+function quoteShell(value: string) {
+  if (/^[A-Za-z0-9_./:=@%+-]+$/.test(value)) return value;
+  return `'${value.replaceAll("'", "'\\''")}'`;
 }

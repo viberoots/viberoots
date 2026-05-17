@@ -1,4 +1,5 @@
 #!/usr/bin/env zx-wrapper
+import { pathToFileURL } from "node:url";
 import { parseBootstrapArgs, usage } from "./infisical-iac-bootstrap-args";
 import { getArgvTokens } from "../lib/argv";
 import { resolveInfisicalHost } from "./infisical-iac-bootstrap-config";
@@ -17,6 +18,7 @@ import { buildCredentialHandoffReport } from "./infisical-iac-bootstrap-handoff"
 import { buildDryRunReport } from "./infisical-iac-bootstrap-dry-run";
 import { resolveOrganizationId } from "./infisical-iac-bootstrap-org";
 import { readDeploymentRuntimeMetadata, runOpenTofu } from "./infisical-iac-bootstrap-tofu";
+import { assertBootstrapPreflight } from "./infisical-iac-bootstrap-preflight";
 import { reconcileDeploymentMetadata } from "./infisical-iac-bootstrap-reconcile";
 import { ensureDeploymentCredentials } from "./infisical-iac-deployment-credentials";
 import { readPleominoReviewedMetadata } from "./infisical-iac-bootstrap-reviewed-metadata";
@@ -27,6 +29,7 @@ export async function runInfisicalIacBootstrap(args: BootstrapArgs) {
   const reviewedMetadata = await readPleominoReviewedMetadata();
   const effectiveArgs = withReviewedHost(args, reviewedMetadata.siteUrl);
   if (effectiveArgs.dryRun) return dryRun(effectiveArgs);
+  assertBootstrapPreflight(effectiveArgs);
   const access = await getAccessToken(effectiveArgs);
   const api = new InfisicalApi({ apiUrl: effectiveArgs.apiUrl, token: access.token });
   const organizationId = await resolveOrganizationId(api, effectiveArgs);
@@ -94,13 +97,19 @@ function withReviewedHost(args: BootstrapArgs, siteUrl: string): BootstrapArgs {
   return { ...args, ...resolveInfisicalHost(siteUrl) };
 }
 
-const args = parseBootstrapArgs();
-const argv = getArgvTokens();
-if (argv.includes("--help") || argv.includes("-h")) {
-  console.log(usage());
-  process.exit(0);
+if (isMainModule()) {
+  const args = parseBootstrapArgs();
+  const argv = getArgvTokens();
+  if (argv.includes("--help") || argv.includes("-h")) {
+    console.log(usage());
+    process.exit(0);
+  }
+  await runInfisicalIacBootstrap(args).catch((error: unknown) => {
+    console.error(errorMessage(error, [process.env[args.accessTokenEnv]]));
+    process.exit(1);
+  });
 }
-await runInfisicalIacBootstrap(args).catch((error: unknown) => {
-  console.error(errorMessage(error, [process.env[args.accessTokenEnv]]));
-  process.exit(1);
-});
+
+function isMainModule() {
+  return process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;
+}
