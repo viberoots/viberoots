@@ -3,7 +3,7 @@ load("//build-tools/deployments:family_defs.bzl", "compose_deployment_family_kwa
 
 _ACCOUNT_ID = "1b911846f80a89272c0dbaf44f5c810f"
 _ZONE_ID = "9411ac5903acb1c2e29b3d4c04ef7e6f"
-_INFISICAL_SITE_URL = "https://us.infisical.com"
+_INFISICAL_SITE_URL = "https://app.infisical.com"
 _INFISICAL_PROJECT_ID = "proj_pleomino_deployments"
 _INFISICAL_PROJECT_NAME = "pleomino-deployments"
 _INFISICAL_PROJECT_SLUG = "pleomino-deployments"

@@ -118,3 +118,15 @@ test("Infisical docs keep examples non-secret and admin commands read-only", asy
   assert.match(combined, /createDeploymentSecretRuntimeForAdmittedContext\(\)/);
   assert.match(combined, /createVaultDeploymentSecretRuntime\(\)[\s\S]*compatibility helper/);
 });
+
+test("Infisical plan keeps follow-up sections traceable", async () => {
+  const plan = await readRelative("docs/infisical-plan.md");
+  const prefix = "PR" + "-";
+  for (const pr of [16, 17, 18]) {
+    assert.match(plan, new RegExp(`^## ${prefix}${pr}: `, "m"));
+  }
+  assert.match(
+    plan,
+    new RegExp(`Traceability note: ${prefix}16 through ${prefix}18 are assessment-driven`),
+  );
+});

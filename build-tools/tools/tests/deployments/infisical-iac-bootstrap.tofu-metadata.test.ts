@@ -11,7 +11,7 @@ test("OpenTofu output reader parses deployment runtime metadata", () => {
   const metadata = readDeploymentRuntimeMetadata(DEFAULT_BOOTSTRAP_ARGS, () =>
     JSON.stringify({
       staging: {
-        site_url: "https://us.infisical.com/api/",
+        site_url: "https://app.infisical.com/api/",
         project_id: "project_1",
         project_name: "pleomino-deployments",
         project_slug: "pleomino-deployments",
@@ -25,7 +25,7 @@ test("OpenTofu output reader parses deployment runtime metadata", () => {
       },
     }),
   );
-  assert.equal(metadata.siteUrl, "https://us.infisical.com");
+  assert.equal(metadata.siteUrl, "https://app.infisical.com");
   assert.equal(metadata.projectId, "project_1");
   assert.equal(metadata.projectName, "pleomino-deployments");
   assert.equal(metadata.projectSlug, "pleomino-deployments");
@@ -38,7 +38,7 @@ test("OpenTofu output reader parses deployment runtime metadata", () => {
 test("OpenTofu stage-map normalization derives stable secret refs from real output shape", () => {
   const metadata = normalizeDeploymentRuntimeMetadata({
     prod: {
-      site_url: "https://us.infisical.com",
+      site_url: "https://app.infisical.com",
       project_id: "project_1",
       project_name: "pleomino-deployments",
       project_slug: "pleomino-deployments",

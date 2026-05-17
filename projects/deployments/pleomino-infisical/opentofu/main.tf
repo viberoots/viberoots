@@ -10,7 +10,7 @@ terraform {
 
 variable "infisical_host" {
   type    = string
-  default = "https://us.infisical.com"
+  default = "https://app.infisical.com"
 }
 
 variable "organization_id" {

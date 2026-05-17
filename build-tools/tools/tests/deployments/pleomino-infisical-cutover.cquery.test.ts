@@ -23,7 +23,7 @@ import { inheritedBuckIsolation } from "../lib/test-helpers";
 import { infisicalTestContext } from "./deployment-secret-infisical.fixture";
 import { startFakeInfisicalServer } from "./infisical.test-server";
 const expectedRuntime = {
-  siteUrl: "https://us.infisical.com",
+  siteUrl: "https://app.infisical.com",
   projectId: "proj_pleomino_deployments",
   secretPath: "/",
   preferredCredentialSource: "machine_identity_universal_auth",
@@ -209,6 +209,7 @@ test("Pleomino Infisical admin plan and check stay non-secret and read-only", as
     assert.equal(plan.readOnly, true);
     assert.equal(plan.providerMutation, false);
     assert.equal(plan.runtime?.projectId, expectedRuntime.projectId);
+    assert.equal(plan.runtime?.siteUrl, expectedRuntime.siteUrl);
     const server = await startFakeInfisicalServer(
       {
         clientId: "id",

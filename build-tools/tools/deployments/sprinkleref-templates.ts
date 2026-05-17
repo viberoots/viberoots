@@ -6,7 +6,7 @@ import type { SprinkleRefConfigFile } from "./sprinkleref-types";
 
 const MAIN_INFISICAL = {
   backend: "infisical" as const,
-  host: "https://us.infisical.com",
+  host: "https://app.infisical.com",
   projectId: "pleomino-project-id",
   defaultEnvironment: "staging",
   defaultPath: "/",

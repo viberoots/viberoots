@@ -12,10 +12,10 @@ import {
 } from "../../deployments/infisical-iac-bootstrap-org";
 import type { CommandRunner } from "../../deployments/infisical-iac-bootstrap-types";
 
-test("bootstrap args default to Infisical Cloud US and saved-plan apply", () => {
+test("bootstrap args default to the reviewed Pleomino Infisical host and saved-plan apply", () => {
   const args = parseBootstrapArgs([]);
-  assert.equal(args.apiUrl, "https://us.infisical.com");
-  assert.equal(args.cliDomain, "https://us.infisical.com/api");
+  assert.equal(args.apiUrl, "https://app.infisical.com");
+  assert.equal(args.cliDomain, "https://app.infisical.com/api");
   assert.equal(args.noTofuApply, false);
 });
 

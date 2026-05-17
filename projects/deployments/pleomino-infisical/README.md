@@ -25,12 +25,12 @@ handoff:
 - Object name: `pleomino-deployments/staging/cloudflare_api_token`
 - Expected result: shared Infisical secret `cloudflare_api_token` exists at `/`
   in `staging`
-- Reconcile path: after PR-14, run the reviewed `sprinkleref add/update` flow
+- Reconcile path: after PR-17, run the reviewed `sprinkleref add/update` flow
   for `secret://deployments/pleomino/cloudflare_api_token` in `staging`
 - Object name: `pleomino-deployments/prod/cloudflare_api_token`
 - Expected result: shared Infisical secret `cloudflare_api_token` exists at `/`
   in `prod`
-- Reconcile path: after PR-14, run the reviewed `sprinkleref add/update` flow
+- Reconcile path: after PR-17, run the reviewed `sprinkleref add/update` flow
   for `secret://deployments/pleomino/cloudflare_api_token` in `prod`
 
 If Infisical later adds a true metadata-only placeholder resource, add or import
@@ -113,7 +113,7 @@ manually before OpenTofu was applied, import those objects into state before
 applying so the module adopts them instead of trying to create duplicates.
 
 The deterministic bootstrap command consumes these reviewed non-secret inputs:
-Infisical Cloud US by default, organization `viberoots`, OpenTofu directory
+Infisical site URL `https://app.infisical.com` by default, organization `viberoots`, OpenTofu directory
 `projects/deployments/pleomino-infisical/opentofu`, project name and slug
 `pleomino-deployments`, environments `staging` and `prod`, secret path `/`,
 secret name `cloudflare_api_token`, machine identity names

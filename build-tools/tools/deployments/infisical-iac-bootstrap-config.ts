@@ -1,8 +1,8 @@
 import type { BootstrapArgs } from "./infisical-iac-bootstrap-types";
 
 export const DEFAULT_BOOTSTRAP_ARGS: BootstrapArgs = {
-  apiUrl: "https://us.infisical.com",
-  cliDomain: "https://us.infisical.com/api",
+  apiUrl: "https://app.infisical.com",
+  cliDomain: "https://app.infisical.com/api",
   hostOverride: false,
   identityName: "viberoots-iac-bootstrap",
   orgRole: "admin",

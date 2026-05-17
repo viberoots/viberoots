@@ -1160,7 +1160,7 @@ containerization first, this PR also assumes the containerized control plane fro
 [Deployment Control Plane Containerization Plan](control-plane-plan.md) has already landed and is
 available for Pleomino rollout. The only external setup needed before PR-12 implementation starts is
 confirming that a `viberoots` Infisical organization administrator can bootstrap the IaC runner
-identity in the selected Infisical Cloud US organization.
+identity in the selected `https://app.infisical.com` Infisical organization.
 
 These instructions assume no Pleomino Infisical project exists yet. Do not manually create durable
 objects that the PR's IaC module is supposed to own; use manual work only for bootstrap access, real
@@ -1199,7 +1199,7 @@ documented by the implementation PR.
    - Treat this as manual bootstrap work unless the organization already has an approved external
      bootstrap mechanism outside this repo. The Pleomino Infisical project cannot own the identity
      that creates itself.
-   - An Infisical Cloud US organization administrator in the `viberoots` organization creates
+   - An Infisical organization administrator in the `viberoots` organization creates
      `viberoots-iac` in the Infisical UI:
      1. Open `https://app.infisical.com` and sign in as an administrator for the `viberoots`
         organization.
@@ -1465,3 +1465,261 @@ backend migration.
 
 It introduces stage-specific Pleomino secret backend metadata and requires coordinated external
 Infisical setup before live staging or production deployments can use the new backend.
+
+## PR-16: Infisical site URL contract and end-range traceability repair
+
+### 1. Intent
+
+Reconcile the Pleomino Infisical site URL contract with the implemented metadata/IaC defaults and
+restore plan traceability for the post-PR-12 Infisical follow-up range.
+
+Traceability note: PR-16 through PR-18 are assessment-driven follow-up sections created after the
+original PR-12 range completed. Keep these headings and their implementation evidence synchronized
+so future plan assessments can map the end-of-range fixes by PR number.
+
+### 2. Scope of changes
+
+- Decide and document the authoritative Pleomino Infisical site URL for staging and production.
+- If the PR-12 contract remains authoritative, change Pleomino metadata, OpenTofu defaults, tests,
+  docs, and diagnostic expectations from `https://us.infisical.com` to
+  `https://app.infisical.com`.
+- If `https://us.infisical.com` is the intended endpoint, explicitly amend this plan, the design
+  notes, operator docs, OpenTofu defaults, metadata expectations, and tests so the regional site URL
+  is a reviewed contract instead of an implementation drift.
+- Add traceability notes for the completed end-of-range work after PR-12 so future assessments can
+  map the implemented PR-16 through PR-18 changes to reviewed plan sections.
+- Keep site URL values non-secret and continue rejecting credential material in deployment
+  metadata, IaC variables, diagnostics, and test fixtures.
+
+### 3. External prerequisites
+
+- Operators must confirm which Infisical SaaS endpoint the Pleomino project and machine identities
+  actually use before any production rollout relies on the reconciled metadata.
+
+### 4. Tests to be added
+
+- Add metadata extraction and validation tests proving Pleomino staging and production emit the
+  reviewed site URL exactly.
+- Add OpenTofu default and rendered-plan tests proving the IaC path uses the same site URL contract
+  as deployment metadata.
+- Add diagnostic tests proving `deploy admin infisical plan` reports the reviewed site URL without
+  leaking credentials.
+- Add docs/traceability guardrail coverage or a focused plan-conformance test proving the plan's
+  post-PR-12 sections remain discoverable by PR number.
+
+### 5. Docs to be added or updated
+
+- Update Infisical operator docs, Pleomino cutover docs, and any OpenTofu README or variable docs
+  to use the same reviewed site URL.
+- Add a short traceability note explaining that PR-16 through PR-18 are follow-up sections created
+  from the completed end-of-range assessments and must remain in sync with their implementation
+  evidence.
+
+### 5.5. Expected regression scope
+
+- `deployment-and-project-impact`
+- Keep changes to Pleomino deployment metadata, Infisical IaC defaults/tests, deployment docs, and
+  plan traceability. Do not alter generic Infisical runtime behavior unless the site URL
+  reconciliation exposes a shared normalization bug; if it does, update this plan before expanding
+  scope.
+
+### 6. Acceptance criteria
+
+- The plan, design references, Pleomino metadata, OpenTofu defaults, tests, and diagnostics agree on
+  one reviewed Infisical site URL.
+- Assessments no longer report PR-12 noncompliance for the Pleomino site URL.
+- Future plan assessments can find traceable PR-16, PR-17, and PR-18 sections in this document.
+- No secret values or Infisical credentials are introduced into docs, metadata, IaC defaults, tests,
+  or diagnostic output.
+
+### 7. Risks
+
+- Choosing the wrong endpoint could make live authentication fail even though static validation
+  passes.
+- Editing traceability after implementation could obscure which behavior was already shipped versus
+  which behavior remains follow-up work.
+
+### 8. Mitigations
+
+- Require explicit operator confirmation of the Infisical endpoint before finalizing the contract.
+- Keep the traceability note factual and tie it to assessment findings rather than rewriting prior
+  PR intent.
+
+### 9. Consequences of not implementing this PR
+
+Pleomino Infisical metadata and IaC will remain noncompliant with the PR-12 contract, and future
+assessments will continue losing traceability for the implemented post-PR-12 range.
+
+### 10. Downsides for implementing this PR
+
+It may require touching several docs, tests, and defaults for a single endpoint decision.
+
+## PR-17: Bootstrap preflight, resolver config, and OpenTofu retry UX
+
+### 1. Intent
+
+Make Infisical bootstrap fail before remote mutations when operator confirmation is missing, make
+resolver configuration explicit and reusable, and improve OpenTofu failure recovery instructions.
+
+### 2. Scope of changes
+
+- Add a non-interactive bootstrap preflight that checks `--yes` requirements before any remote
+  Infisical mutation or local sink write can occur.
+- Ensure all bootstrap modes that can mutate Infisical state, OpenTofu state, resolver config, or
+  local sink output run the preflight before opening remote clients or writing files.
+- Update bootstrap resolver-config behavior to read an existing `SprinkleRef` resolver config when
+  one is present.
+- Create a starter resolver config only when none exists, using explicit backend selection rather
+  than hiding the backend choice in bootstrap code.
+- Preserve reviewed Vault defaults while making Infisical backend selection visible in generated or
+  updated resolver config.
+- Improve OpenTofu init, plan, and apply failures so errors include the OpenTofu working directory,
+  the saved plan path when one exists, and the exact retry command for the failed stage.
+- Keep all failure output redacted and avoid printing Universal Auth client secrets, access tokens,
+  personal tokens, or resolved deployment secret values.
+
+### 3. External prerequisites
+
+- None. The behavior must be covered by local tests and fake OpenTofu/Infisical fixtures.
+
+### 4. Tests to be added
+
+- Add non-interactive bootstrap tests proving missing `--yes` fails before any fake remote mutation
+  or sink write.
+- Add ordering tests for init/plan/apply flows proving the confirmation preflight happens before
+  OpenTofu or Infisical side effects.
+- Add resolver-config tests proving bootstrap reads an existing `SprinkleRef` resolver config,
+  creates a starter config when none exists, and keeps backend selection explicit.
+- Add OpenTofu failure tests for init, plan, and apply proving the error includes the working
+  directory, saved plan path when applicable, and next retry command.
+- Add redaction regression tests proving failure UX never prints credential material or secret
+  values.
+
+### 5. Docs to be added or updated
+
+- Update bootstrap docs to describe when `--yes` is required and that confirmation is checked before
+  any mutation.
+- Document the resolver-config discovery and starter-config behavior, including explicit backend
+  selection.
+- Update OpenTofu troubleshooting docs with the working directory, saved plan path, and retry
+  command format shown by failures.
+
+### 5.5. Expected regression scope
+
+- `deployment-only`
+- Keep changes in deployment-owned bootstrap, resolver-config, OpenTofu orchestration, docs, and
+  tests. If a shared `SprinkleRef` parser or writer must change, update this plan before expanding
+  beyond deployment-owned paths.
+
+### 6. Acceptance criteria
+
+- Non-interactive bootstrap cannot mutate Infisical, OpenTofu state, resolver config, or local sink
+  output before failing on missing `--yes`.
+- Bootstrap reuses existing `SprinkleRef` resolver config when available and creates a starter config
+  only when none exists.
+- Backend selection is explicit in resolver config behavior and docs.
+- OpenTofu init, plan, and apply failures give operators the working directory, saved plan path when
+  available, and exact retry command.
+
+### 7. Risks
+
+- Moving confirmation checks earlier could accidentally reject read-only bootstrap inspection flows.
+- Starter resolver config generation could overwrite an operator's existing backend selection.
+- Retry commands could expose sensitive values if they include raw environment or variable content.
+
+### 8. Mitigations
+
+- Separate read-only inspection from mutation-capable flows in tests.
+- Treat existing resolver config as authoritative unless the operator explicitly requests a change.
+- Build retry commands from paths, targets, and flags only, with the existing redaction helpers
+  applied to all error output.
+
+### 9. Consequences of not implementing this PR
+
+Bootstrap can partially mutate state before refusing to continue, resolver backend selection remains
+implicit, and OpenTofu failures do not give operators enough context to retry safely.
+
+### 10. Downsides for implementing this PR
+
+It adds stricter bootstrap ordering and more detailed failure messages that must stay synchronized
+with the CLI's actual command shape.
+
+## PR-18: SprinkleRef explicit add and update collision modes
+
+### 1. Intent
+
+Make `sprinkleref` resolver-config edits explicit about create and overwrite behavior so bootstrap
+and operator workflows cannot silently choose the wrong mutation mode.
+
+### 2. Scope of changes
+
+- Add explicit overwrite capability to `sprinkleref --add` for cases where an existing resolver
+  entry should be replaced.
+- Add explicit create capability to `sprinkleref --update` for cases where a missing resolver entry
+  should be created deliberately.
+- Keep default `--add` behavior failing when the entry already exists unless overwrite is requested.
+- Keep default `--update` behavior failing when the entry is missing unless create is requested.
+- Ensure bootstrap resolver-config code uses the explicit mode that matches its intent instead of
+  relying on hidden create/update behavior.
+- Preserve existing config formatting, comments, and unrelated entries when adding, updating,
+  overwriting, or creating resolver entries.
+- Keep backend selection visible in the resolver config and avoid embedding secret values in any
+  resolver entry.
+
+### 3. External prerequisites
+
+- None.
+
+### 4. Tests to be added
+
+- Add `sprinkleref --add` tests proving existing entries fail by default and are replaced only with
+  the explicit overwrite option.
+- Add `sprinkleref --update` tests proving missing entries fail by default and are created only with
+  the explicit create option.
+- Add round-trip config tests proving unrelated resolver entries, comments, formatting, and explicit
+  backend selection are preserved.
+- Add bootstrap integration tests proving resolver-config writes call the new explicit create or
+  overwrite modes as appropriate.
+- Add guardrail tests proving resolver config edits reject or omit secret values.
+
+### 5. Docs to be added or updated
+
+- Update `sprinkleref` CLI docs with the default collision behavior and the explicit create and
+  overwrite options.
+- Update bootstrap docs to explain which resolver-config edit mode it uses when creating starter
+  configs or modifying existing configs.
+
+### 5.5. Expected regression scope
+
+- `deployment-only`
+- Keep changes in the `sprinkleref` CLI, deployment resolver-config helpers, and their tests/docs.
+  If implementation discovers that shared config editing utilities must change, update this plan
+  before expanding scope.
+
+### 6. Acceptance criteria
+
+- `sprinkleref --add` has an explicit overwrite mode and otherwise fails on existing entries.
+- `sprinkleref --update` has an explicit create mode and otherwise fails on missing entries.
+- Bootstrap uses explicit resolver-config mutation modes and does not hide backend selection in
+  code.
+- Resolver config edits preserve unrelated content and never write secret material.
+
+### 7. Risks
+
+- New flags could be confused with the existing add/update verbs if their names are too broad.
+- Config rewrite logic could accidentally churn formatting or comments.
+
+### 8. Mitigations
+
+- Name the flags around the precise collision behavior and document the default failure modes.
+- Add round-trip tests with representative resolver config comments and multiple backends.
+
+### 9. Consequences of not implementing this PR
+
+Operators and bootstrap flows will continue lacking explicit control over whether resolver entries
+are created or overwritten.
+
+### 10. Downsides for implementing this PR
+
+It expands the `sprinkleref` CLI surface and requires bootstrap code to choose mutation modes
+deliberately.

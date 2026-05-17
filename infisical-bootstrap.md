@@ -26,7 +26,7 @@ build-tools/tools/deployments/infisical-iac-bootstrap.ts
 
 Defaults:
 
-- Infisical host: US cloud.
+- Infisical host: `https://app.infisical.com`.
 - Login: enabled.
 - OpenTofu init/plan/apply: enabled for the Infisical stack.
 - Apply confirmation: prompt unless `--yes` is provided.
@@ -58,7 +58,7 @@ Key flags:
 
 `--infisical-host` is the preferred host selector. `--api-url` and `--cli-domain` are
 implementation-level overrides for split API/CLI endpoint testing or future hosted variants; when
-omitted, both default to Infisical Cloud US.
+omitted, both default to the reviewed Pleomino Infisical endpoint `https://app.infisical.com`.
 
 `--yes` means “do not prompt for confirmations when the result is otherwise deterministic.” It does not mean “guess.” If multiple organizations are available and no explicit org selector was provided, the command still presents the org list. If terminal input is unavailable, it exits with a clear error.
 
@@ -269,7 +269,7 @@ Example macOS local config:
     },
     "main": {
       "backend": "infisical",
-      "host": "https://us.infisical.com",
+      "host": "https://app.infisical.com",
       "projectRef": "secret://deployments/pleomino/infisical/project-id",
       "defaultEnvironment": "staging",
       "defaultPath": "/"
@@ -300,7 +300,7 @@ Example GitHub Actions CI config:
     },
     "main": {
       "backend": "infisical",
-      "host": "https://us.infisical.com",
+      "host": "https://app.infisical.com",
       "projectRef": "secret://deployments/pleomino/infisical/project-id",
       "defaultEnvironment": "staging",
       "defaultPath": "/"

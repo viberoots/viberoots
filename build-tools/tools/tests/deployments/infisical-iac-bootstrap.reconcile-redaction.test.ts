@@ -88,7 +88,7 @@ test("reconciliation mismatch fails with non-secret patch guidance", async () =>
   );
   assert.throws(
     () => reconcileDeploymentMetadata({ ...reviewed, siteUrl: "https://wrong.example" }, reviewed),
-    /site url: live=https:\/\/wrong\.example reviewed=https:\/\/us\.infisical\.com[\s\S]*projects\/deployments\/pleomino-shared\/family\.bzl/,
+    /site url: live=https:\/\/wrong\.example reviewed=https:\/\/app\.infisical\.com[\s\S]*projects\/deployments\/pleomino-shared\/family\.bzl/,
   );
 });
 
@@ -166,8 +166,8 @@ test("dry-run report omits access tokens and generated secret values", async () 
 });
 
 const REVIEWED_ARGS = {
-  apiUrl: "https://us.infisical.com",
-  cliDomain: "https://us.infisical.com/api",
+  apiUrl: "https://app.infisical.com",
+  cliDomain: "https://app.infisical.com/api",
   identityName: "viberoots-iac-bootstrap",
   orgRole: "admin" as const,
   accessTokenEnv: "INFISICAL_ACCESS_TOKEN",
@@ -194,7 +194,7 @@ function stringConstant(source: string, name: string) {
 
 const CHECKED_IN_METADATA_FIXTURE = `
 _INFISICAL_PROJECT_ID = "proj_fixture"
-_INFISICAL_SITE_URL = "https://us.infisical.com"
+_INFISICAL_SITE_URL = "https://app.infisical.com"
 _INFISICAL_PROJECT_NAME = "pleomino-deployments"
 _INFISICAL_PROJECT_SLUG = "pleomino-deployments"
 _INFISICAL_ENVIRONMENT_SLUGS = {

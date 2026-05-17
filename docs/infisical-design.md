@@ -203,6 +203,8 @@ Allowed non-secret keys:
   self-hosted URL. The implementation should validate the configured base URL
   against the exact Infisical endpoints it uses because Infisical's docs show
   different cloud host examples for auth and secret-read paths.
+  Pleomino staging and production use `https://app.infisical.com` as their
+  reviewed SaaS endpoint.
 - `project_id`: Infisical project id. This is routing metadata, not a secret.
 - `environment`: Infisical environment slug, such as `dev`, `staging`, or
   `prod`.

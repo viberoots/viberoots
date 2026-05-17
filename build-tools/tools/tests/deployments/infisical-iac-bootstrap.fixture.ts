@@ -1,7 +1,7 @@
 import type { DeploymentRuntimeMetadata } from "../../deployments/infisical-iac-bootstrap-types";
 
 export const reviewedMetadata: Required<DeploymentRuntimeMetadata> = {
-  siteUrl: "https://us.infisical.com",
+  siteUrl: "https://app.infisical.com",
   projectName: "pleomino-deployments",
   projectId: "proj_pleomino_deployments",
   projectSlug: "pleomino-deployments",

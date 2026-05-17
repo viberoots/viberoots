@@ -22,7 +22,7 @@ test("Pleomino Infisical OpenTofu module stays local, formatted, and non-secret"
   await validateModuleWithProvider();
   const main = await fsp.readFile(path.join(moduleDir, "main.tf"), "utf8");
   for (const expected of [
-    'default = "https://us.infisical.com"',
+    'default = "https://app.infisical.com"',
     'default = "pleomino-deployments"',
     'default = ["staging", "prod"]',
     'default = "cloudflare_api_token"',
@@ -36,4 +36,39 @@ test("Pleomino Infisical OpenTofu module stays local, formatted, and non-secret"
   assert.doesNotMatch(main, /cloudflare_api_token\s*=\s*["'][^"']+["']/i);
   assert.doesNotMatch(main, /client_secret\s*=\s*["'][^"']+["']/i);
   assert.doesNotMatch(main, /INFISICAL_(?:ACCESS_)?TOKEN/);
+});
+
+test("Pleomino Infisical OpenTofu rendered plan emits reviewed site URL", async () => {
+  const workDir = await fsp.mkdtemp(path.join(os.tmpdir(), "pleomino-infisical-render-"));
+  await fsp.copyFile(path.join(moduleDir, "main.tf"), path.join(workDir, "main.tf"));
+  await fsp.writeFile(
+    path.join(workDir, "site-url.tftest.hcl"),
+    `
+mock_provider "infisical" {}
+
+run "reviewed_site_url" {
+  command = plan
+
+  variables {
+    organization_id = "org_fixture"
+  }
+
+  assert {
+    condition     = output.deployment_runtime_metadata["staging"].site_url == "https://app.infisical.com"
+    error_message = "staging rendered site URL drifted"
+  }
+
+  assert {
+    condition     = output.deployment_runtime_metadata["prod"].site_url == "https://app.infisical.com"
+    error_message = "prod rendered site URL drifted"
+  }
+}
+`.trimStart(),
+  );
+  await $({ cwd: workDir })`tofu init -backend=false -input=false`.quiet();
+  const rendered = await $({ cwd: workDir })`tofu test -verbose`.quiet();
+  const stdout = String(rendered.stdout || "");
+  assert.match(stdout, /deployment_runtime_metadata/);
+  assert.match(stdout, /site_url\s+= "https:\/\/app\.infisical\.com"/);
+  assert.doesNotMatch(stdout, /https:\/\/us\.infisical\.com/);
 });
