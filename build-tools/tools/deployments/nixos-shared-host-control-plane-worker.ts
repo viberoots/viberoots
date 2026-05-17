@@ -10,6 +10,7 @@ import {
 } from "./control-plane-artifact-store";
 import { loadControlPlaneRuntimeConfig } from "./control-plane-runtime-config";
 import type { ControlPlaneRuntimeConfig } from "./control-plane-runtime-config-types";
+import { createControlPlaneCredentialDirectory } from "./control-plane-credentials";
 import { startNixosSharedHostControlPlaneWorkerLoop } from "./nixos-shared-host-control-plane-worker-loop";
 
 export async function startControlPlaneWorkerFromRuntimeConfig(opts: {
@@ -19,12 +20,16 @@ export async function startControlPlaneWorkerFromRuntimeConfig(opts: {
   workerId?: string;
 }) {
   const objectStore = await artifactStoreFromRuntimeConfig(opts.runtimeConfig);
+  const credentialDirectory = createControlPlaneCredentialDirectory(opts.runtimeConfig, {
+    repoRoot: opts.workspaceRoot,
+  });
   assertProductionArtifactStore({ objectStore });
   return startNixosSharedHostControlPlaneWorkerLoop({
     workspaceRoot: opts.workspaceRoot,
     recordsRoot: opts.runtimeConfig.storage.recordsRoot,
     backendDatabaseUrl: (await fsp.readFile(opts.runtimeConfig.database.urlFile, "utf8")).trim(),
     objectStore,
+    credentialDirectory,
     instanceId: opts.runtimeConfig.instanceId,
     ...(opts.pollMs ? { pollMs: opts.pollMs } : {}),
     ...(opts.workerId ? { workerId: opts.workerId } : {}),

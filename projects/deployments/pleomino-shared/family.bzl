@@ -3,6 +3,22 @@ load("//build-tools/deployments:family_defs.bzl", "compose_deployment_family_kwa
 
 _ACCOUNT_ID = "1b911846f80a89272c0dbaf44f5c810f"
 _ZONE_ID = "9411ac5903acb1c2e29b3d4c04ef7e6f"
+_INFISICAL_SITE_URL = "https://app.infisical.com"
+_INFISICAL_PROJECT_ID = "proj_pleomino_deployments"
+_INFISICAL_MACHINE_IDENTITY_IDS = {
+    "staging": "identity_pleomino_staging_deploy",
+    "prod": "identity_pleomino_prod_deploy",
+}
+_INFISICAL_CREDENTIAL_FILE_NAMES = {
+    "staging": {
+        "client_id": "pleomino-staging-infisical-client-id",
+        "client_secret": "pleomino-staging-infisical-client-secret",
+    },
+    "prod": {
+        "client_id": "pleomino-prod-infisical-client-id",
+        "client_secret": "pleomino-prod-infisical-client-secret",
+    },
+}
 
 def _vault_runtime():
     return {
@@ -27,7 +43,6 @@ def _family_defaults():
     return deployment_family_defaults(
         component = "//projects/apps/pleomino:app",
         lane_policy = "//projects/deployments/pleomino-shared:lane",
-        vault_runtime = _vault_runtime(),
     )
 
 def _cloudflare_secret(step):
@@ -49,6 +64,8 @@ def _cloudflare_stage(stage, admission_policy, protection_class, account, projec
         secret_requirements = [_cloudflare_secret(step) for step in ["provision", "publish", "preview_cleanup"]],
         external_requirement_profiles = ["cloudflare_provider"],
         prerequisites = prerequisites,
+        secret_backend = "infisical",
+        infisical_runtime = _pleomino_infisical_runtime(stage),
         preview = {
             "target_derivation": "provider_managed_source_run",
             "isolation_class": "isolated",
@@ -59,6 +76,21 @@ def _cloudflare_stage(stage, admission_policy, protection_class, account, projec
         },
     )
 
+def _pleomino_infisical_runtime(stage):
+    env_prefix = "PLEOMINO_%s_INFISICAL" % stage.upper()
+    return {
+        "site_url": _INFISICAL_SITE_URL,
+        "project_id": _INFISICAL_PROJECT_ID,
+        "environment": stage,
+        "secret_path": "/",
+        "preferred_credential_source": "infisical_machine_identity_universal_auth",
+        "machine_identity_client_id_env": "%s_CLIENT_ID" % env_prefix,
+        "machine_identity_client_secret_env": "%s_CLIENT_SECRET" % env_prefix,
+        "machine_identity_client_id_file_name": _INFISICAL_CREDENTIAL_FILE_NAMES[stage]["client_id"],
+        "machine_identity_client_secret_file_name": _INFISICAL_CREDENTIAL_FILE_NAMES[stage]["client_secret"],
+        "machine_identity_id": _INFISICAL_MACHINE_IDENTITY_IDS[stage],
+    }
+
 def pleomino_dev_deployment(name):
     nixos_shared_host_static_webapp_deployment(**compose_deployment_family_kwargs(
         _family_defaults(),
@@ -66,6 +98,7 @@ def pleomino_dev_deployment(name):
             stage = "dev",
             admission_policy = "//projects/deployments/pleomino-shared:dev_release",
             protection_class = "shared_nonprod",
+            vault_runtime = _vault_runtime(),
             provider_target = {
                 "host": "nixos-shared-host",
                 "target_group": "default",

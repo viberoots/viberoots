@@ -81,7 +81,9 @@ test("checked-in deployment metadata keeps Infisical secret material out of repo
   const files = (
     await Promise.all(
       checkedInMetadataRoots.map((root) =>
-        walkFiles(path.join(repoRoot, root), (filePath) => /\.(bzl|json|md|nix)$/.test(filePath)),
+        walkFiles(path.join(repoRoot, root), (filePath) =>
+          /\.(bzl|json|md|nix|tf)$/.test(filePath),
+        ),
       ),
     )
   ).flat();

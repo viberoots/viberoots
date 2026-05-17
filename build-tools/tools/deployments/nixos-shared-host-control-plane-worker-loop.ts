@@ -22,6 +22,7 @@ import type { NixosSharedHostControlPlaneSubmission } from "./nixos-shared-host-
 import { materializeSnapshotArtifacts } from "./control-plane-artifact-materialize";
 import type { ControlPlaneArtifactStore } from "./control-plane-artifact-store-types";
 import { acquireBackendNixosSharedHostLocks } from "./nixos-shared-host-control-plane-worker-locks";
+import type { ControlPlaneCredentialDirectory } from "./control-plane-credentials";
 export { startNixosSharedHostControlPlaneWorkerLoop } from "./nixos-shared-host-control-plane-worker-runtime";
 
 export async function runNixosSharedHostControlPlaneWorkerOnce(opts: {
@@ -30,6 +31,7 @@ export async function runNixosSharedHostControlPlaneWorkerOnce(opts: {
   backendDatabaseUrl: string;
   workerId: string;
   objectStore?: ControlPlaneArtifactStore;
+  credentialDirectory?: ControlPlaneCredentialDirectory;
 }) {
   const backend = {
     recordsRoot: opts.recordsRoot,
@@ -80,6 +82,7 @@ export async function runNixosSharedHostControlPlaneWorkerOnce(opts: {
         executionSnapshotPath: materialized.executionSnapshotPath,
         executionSnapshotRef: materialized.executionSnapshotRef,
         workerId: opts.workerId,
+        ...(opts.credentialDirectory ? { credentialDirectory: opts.credentialDirectory } : {}),
         assertCurrentAuthority: async () => await claimLease.assertCurrentAuthority(),
       });
       return true;
@@ -94,6 +97,7 @@ export async function runNixosSharedHostControlPlaneWorkerOnce(opts: {
         executionSnapshotPath: materialized.executionSnapshotPath,
         executionSnapshotRef: materialized.executionSnapshotRef,
         workerId: opts.workerId,
+        ...(opts.credentialDirectory ? { credentialDirectory: opts.credentialDirectory } : {}),
         assertCurrentAuthority: async () => await claimLease.assertCurrentAuthority(),
       })
     ) {
@@ -157,6 +161,7 @@ export async function runNixosSharedHostControlPlaneWorkerOnce(opts: {
           deployment: args.deployment,
           ...(args.shouldAbort ? { shouldAbort: args.shouldAbort } : {}),
         }),
+      ...(opts.credentialDirectory ? { credentialDirectory: opts.credentialDirectory } : {}),
     });
   } finally {
     try {

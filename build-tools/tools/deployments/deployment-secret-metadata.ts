@@ -15,6 +15,8 @@ export type DeploymentInfisicalRuntimeConfig = {
   secretPathPrefix?: string;
   machineIdentityClientIdEnv?: string;
   machineIdentityClientSecretEnv?: string;
+  machineIdentityClientIdFileName?: string;
+  machineIdentityClientSecretFileName?: string;
   machineIdentityId?: string;
   preferredCredentialSource?: "machine_identity_universal_auth";
   accessTokenTtlSeconds?: string;
@@ -69,6 +71,10 @@ function readRawRecord(node: GraphNode, key: string): Record<string, unknown> {
 function readInfisicalRuntime(node: GraphNode): DeploymentInfisicalRuntimeConfig | undefined {
   const runtime = readStringRecord(node, "infisical_runtime");
   if (Object.keys(runtime).length === 0) return undefined;
+  const credentialSource =
+    runtime.preferred_credential_source === "infisical_machine_identity_universal_auth"
+      ? "machine_identity_universal_auth"
+      : runtime.preferred_credential_source;
   return {
     siteUrl: runtime.site_url || "",
     projectId: runtime.project_id || "",
@@ -81,13 +87,14 @@ function readInfisicalRuntime(node: GraphNode): DeploymentInfisicalRuntimeConfig
     ...(runtime.machine_identity_client_secret_env
       ? { machineIdentityClientSecretEnv: runtime.machine_identity_client_secret_env }
       : {}),
-    ...(runtime.machine_identity_id ? { machineIdentityId: runtime.machine_identity_id } : {}),
-    ...(runtime.preferred_credential_source
-      ? {
-          preferredCredentialSource:
-            runtime.preferred_credential_source as "machine_identity_universal_auth",
-        }
+    ...(runtime.machine_identity_client_id_file_name
+      ? { machineIdentityClientIdFileName: runtime.machine_identity_client_id_file_name }
       : {}),
+    ...(runtime.machine_identity_client_secret_file_name
+      ? { machineIdentityClientSecretFileName: runtime.machine_identity_client_secret_file_name }
+      : {}),
+    ...(runtime.machine_identity_id ? { machineIdentityId: runtime.machine_identity_id } : {}),
+    ...(credentialSource ? { preferredCredentialSource: credentialSource } : {}),
     ...(runtime.access_token_ttl_seconds
       ? { accessTokenTtlSeconds: runtime.access_token_ttl_seconds }
       : {}),
@@ -111,15 +118,6 @@ function readInfisicalMappings(
       },
     ]),
   );
-}
-
-export function readDeploymentSecretMetadata(opts: {
-  node: GraphNode;
-  label: string;
-  requirements: DeploymentRequirement[];
-  errors: string[];
-}): DeploymentSecretMetadata {
-  return deploymentSecretMetadata(opts.node, opts.label, opts.requirements, opts.errors);
 }
 
 export function deploymentSecretMetadata(
@@ -178,6 +176,7 @@ function validateInfisicalRuntime(opts: {
   errors: string[];
   backend: DeploymentSecretBackendKind;
   rawRuntimeNode: Record<string, unknown>;
+  rawRuntime: Record<string, string>;
   runtime?: DeploymentInfisicalRuntimeConfig;
 }) {
   if (opts.backend !== "infisical" || opts.requirements.length === 0) return;
@@ -195,11 +194,15 @@ function validateInfisicalRuntime(opts: {
     opts.errors.push(
       deploymentError(
         opts.label,
-        "infisical_runtime.preferred_credential_source must be machine_identity_universal_auth",
+        "infisical_runtime.preferred_credential_source must be infisical_machine_identity_universal_auth",
       ),
     );
   }
-  pushInfisicalUniversalAuthEnvErrors(opts);
+  pushInfisicalUniversalAuthEnvErrors({
+    label: opts.label,
+    errors: opts.errors,
+    rawRuntimeNode: opts.rawRuntimeNode,
+  });
 }
 
 function validateInfisicalMappings(opts: {

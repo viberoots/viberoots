@@ -148,6 +148,26 @@ test("multi-tenant infisical lookup keeps account and project facts per deployme
   assert.match(second.clientSecretFile, /ops-staging-ua-client-secret$/);
 });
 
+test("Pleomino Infisical credential files stay deployment scoped", () => {
+  const config = parseControlPlaneRuntimeConfig(
+    configYaml("/run/deployment-control-plane/credentials"),
+  );
+  const directory = createControlPlaneCredentialDirectory(config);
+  for (const [deploymentId, environment] of [
+    ["pleomino-staging", "staging"],
+    ["pleomino-prod", "prod"],
+  ] as const) {
+    const files = directory.resolveInfisicalCredentialFiles({
+      deploymentId,
+      siteUrl: "https://app.infisical.com",
+      projectId: "proj_pleomino_deployments",
+      environment,
+    });
+    assert.match(files.clientIdFile, new RegExp(`${deploymentId}-infisical-client-id$`));
+    assert.match(files.clientSecretFile, new RegExp(`${deploymentId}-infisical-client-secret$`));
+  }
+});
+
 test("credential reads return file contents without leaking contents on read errors", async () => {
   await withScratchTemp("control-plane-credential-directory", async (tmp) => {
     const credentials = path.join(tmp, "credentials");

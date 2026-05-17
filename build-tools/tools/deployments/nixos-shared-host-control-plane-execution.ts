@@ -13,6 +13,7 @@ import type { NixosSharedHostDeployRecord } from "./nixos-shared-host-records";
 import { withWorkerDeploymentSecretRuntime } from "./deployment-secret-runtime-worker";
 import { resolveNixosSharedHostAdmittedSecretReferences } from "./nixos-shared-host-admission-helpers";
 import type { DeploymentSecretContext } from "./deployment-secret-context";
+import type { ControlPlaneCredentialDirectory } from "./control-plane-credentials";
 
 async function resolveWorkerAdmittedSecrets(opts: {
   snapshot: NixosSharedHostControlPlaneSnapshot;
@@ -42,6 +43,7 @@ export async function runNixosSharedHostControlPlaneWorker(opts: {
   deployRunId?: string;
   progressiveRollout?: NixosSharedHostControlPlaneSnapshot["progressiveRollout"];
   gateEvaluator?: NixosSharedHostGateEvaluator;
+  credentialDirectory?: ControlPlaneCredentialDirectory;
 }): Promise<{ record: NixosSharedHostDeployRecord; recordPath: string }> {
   const snapshot = await readControlPlaneJson<NixosSharedHostControlPlaneSnapshot>(
     opts.executionSnapshotPath,
@@ -57,7 +59,11 @@ export async function runNixosSharedHostControlPlaneWorker(opts: {
   };
   return snapshot.action.kind === "deploy"
     ? await withWorkerDeploymentSecretRuntime(
-        { workspaceRoot: opts.workspaceRoot || process.cwd(), deployment: snapshot.deployment },
+        {
+          workspaceRoot: opts.workspaceRoot || process.cwd(),
+          deployment: snapshot.deployment,
+          ...(opts.credentialDirectory ? { credentialDirectory: opts.credentialDirectory } : {}),
+        },
         async (runtime) => {
           await resolveWorkerAdmittedSecrets({
             snapshot,

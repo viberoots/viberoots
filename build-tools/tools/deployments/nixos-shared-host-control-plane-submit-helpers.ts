@@ -42,6 +42,7 @@ export async function executeSubmittedNixosSharedHostControlPlaneRun(opts: {
   persistSubmission?: (submission: NixosSharedHostControlPlaneSubmission) => Promise<void>;
   persistRecord?: (record: NixosSharedHostDeployRecord, recordPath: string) => Promise<void>;
   assertCurrentAuthority?: () => Promise<void>;
+  credentialDirectory?: import("./control-plane-credentials").ControlPlaneCredentialDirectory;
   recoverSubmission?: (args: {
     submissionPath: string;
     recordsRoot: string;
@@ -57,9 +58,8 @@ export async function executeSubmittedNixosSharedHostControlPlaneRun(opts: {
   }>;
 }) {
   let lock: Awaited<ReturnType<typeof acquireNixosSharedHostControlPlaneLocks>> | undefined;
-  const cleanupReviewedSource = async () => {
+  const cleanupReviewedSource = async () =>
     await cleanupReviewedSourceSnapshot(opts.workspaceRoot, opts.snapshot);
-  };
   const assertAuthority = async () => {
     await lock?.assertCurrentAuthority?.();
     await opts.assertCurrentAuthority?.();
@@ -155,10 +155,9 @@ export async function executeSubmittedNixosSharedHostControlPlaneRun(opts: {
       workerId,
       lifecycleState: "running",
       execution: {
-        currentStep:
-          opts.operationKind === "explicit_removal" || opts.operationKind === "provision_only"
-            ? "provision"
-            : "publish",
+        currentStep: ["explicit_removal", "provision_only"].includes(opts.operationKind)
+          ? "provision"
+          : "publish",
         mutationStartedAt: new Date().toISOString(),
       },
     };
@@ -176,6 +175,7 @@ export async function executeSubmittedNixosSharedHostControlPlaneRun(opts: {
       deployRunId: opts.deployRunId,
       progressiveRollout: submission.progressiveRollout || opts.snapshot.progressiveRollout,
       ...(opts.gateEvaluator ? { gateEvaluator: opts.gateEvaluator } : {}),
+      ...(opts.credentialDirectory ? { credentialDirectory: opts.credentialDirectory } : {}),
     });
     await assertAuthority();
     await opts.persistRecord?.(result.record, result.recordPath);

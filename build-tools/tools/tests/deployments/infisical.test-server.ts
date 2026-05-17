@@ -31,6 +31,9 @@ export type FakeInfisicalSecret = {
 };
 
 export type FakeInfisicalServerOptions = {
+  projectId?: string;
+  environment?: string;
+  machineIdentityId?: string;
   missingProject?: boolean;
   missingEnvironment?: boolean;
   projectStatus?: number;
@@ -94,6 +97,9 @@ export async function startFakeInfisicalServer(
 ) {
   const calls: string[] = [];
   const secretCalls: string[] = [];
+  const expectedProject = opts.projectId || "proj_123";
+  const expectedEnvironment = opts.environment || "prod";
+  const expectedIdentity = opts.machineIdentityId || "identity_123";
   const server = http.createServer(async (request, response) => {
     const url = new URL(request.url || "/", "http://127.0.0.1");
     if (url.pathname === "/api/v1/auth/universal-auth/login") {
@@ -109,7 +115,7 @@ export async function startFakeInfisicalServer(
         json(response, opts.projectStatus, { error: "project_access_failed" });
         return;
       }
-      if (opts.missingProject || projectId !== "proj_123") {
+      if (opts.missingProject || projectId !== expectedProject) {
         json(response, 404, { error: "missing_project" });
         return;
       }
@@ -126,7 +132,11 @@ export async function startFakeInfisicalServer(
         json(response, opts.environmentStatus, { error: "environment_access_failed" });
         return;
       }
-      if (opts.missingEnvironment || projectId !== "proj_123" || environment !== "prod") {
+      if (
+        opts.missingEnvironment ||
+        projectId !== expectedProject ||
+        environment !== expectedEnvironment
+      ) {
         json(response, 404, { error: "missing_environment" });
         return;
       }
@@ -143,7 +153,7 @@ export async function startFakeInfisicalServer(
         json(response, opts.machineIdentityAccessStatus, { error: "identity_access_unavailable" });
         return;
       }
-      if (projectId !== "proj_123" || identityId !== "identity_123") {
+      if (projectId !== expectedProject || identityId !== expectedIdentity) {
         json(response, 404, { error: "missing_identity_access" });
         return;
       }

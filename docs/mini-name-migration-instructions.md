@@ -319,7 +319,8 @@ confirm the migrated control-plane path can carry Infisical worker metadata
 without moving secret material into the profile or records. For the
 containerized runtime, Infisical Universal Auth credentials are files mounted
 through the control-plane credential directory; do not set host-local
-`VBR_MINI_INFISICAL_*` environment variables for the service or workers.
+`VBR_MINI_INFISICAL_CLIENT_ID` or `VBR_MINI_INFISICAL_CLIENT_SECRET`
+environment variables for the service or workers.
 
 1. keep `infisical_runtime` in `TARGETS` limited to non-secret routing data and
    reviewed environment variable names

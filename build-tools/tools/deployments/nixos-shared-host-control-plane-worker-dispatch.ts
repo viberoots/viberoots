@@ -4,6 +4,7 @@ import { executeKubernetesControlPlaneSubmission } from "./kubernetes-control-pl
 import { executeS3StaticControlPlaneSubmission } from "./s3-static-control-plane";
 import { executeVercelControlPlaneSubmission } from "./vercel-control-plane";
 import type { NixosSharedHostControlPlaneBackendTarget } from "./nixos-shared-host-control-plane-backend";
+import type { ControlPlaneCredentialDirectory } from "./control-plane-credentials";
 
 type ProviderDispatchInputs = {
   workspaceRoot: string;
@@ -14,6 +15,7 @@ type ProviderDispatchInputs = {
   executionSnapshotPath: string;
   executionSnapshotRef: string;
   workerId: string;
+  credentialDirectory?: ControlPlaneCredentialDirectory;
   assertCurrentAuthority?: () => Promise<void>;
 };
 

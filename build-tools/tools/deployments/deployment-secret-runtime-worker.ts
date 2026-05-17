@@ -15,6 +15,8 @@ import {
   prepareWorkerDeploymentVaultRuntime,
   withWorkerDeploymentVaultRuntime,
 } from "./deployment-vault-runtime-worker";
+import type { ControlPlaneCredentialDirectory } from "./control-plane-credentials";
+import type { DeploymentInfisicalRuntimeConfig } from "./deployment-secret-metadata";
 
 export type PreparedWorkerDeploymentSecretRuntime = {
   minted: boolean;
@@ -35,10 +37,39 @@ function clearInfisicalSecretContext(context: DeploymentSecretContext | undefine
   if (context.credential.kind === "access_token") context.credential.accessToken = "";
 }
 
+async function infisicalCredentialEnvFromDirectory(opts: {
+  deployment: DeploymentTarget;
+  runtime: DeploymentInfisicalRuntimeConfig;
+  credentialDirectory: ControlPlaneCredentialDirectory;
+}): Promise<NodeJS.ProcessEnv> {
+  const clientIdEnv = opts.runtime.machineIdentityClientIdEnv;
+  const clientSecretEnv = opts.runtime.machineIdentityClientSecretEnv;
+  if (!clientIdEnv || !clientSecretEnv) {
+    throw new Error("Infisical machine identity env names are required for credential files");
+  }
+  const files = opts.credentialDirectory.resolveInfisicalCredentialFiles({
+    deploymentId: opts.deployment.deploymentId,
+    siteUrl: opts.runtime.siteUrl,
+    projectId: opts.runtime.projectId,
+    environment: opts.runtime.environment,
+    ...(opts.runtime.machineIdentityClientIdFileName
+      ? { clientIdFileName: opts.runtime.machineIdentityClientIdFileName }
+      : {}),
+    ...(opts.runtime.machineIdentityClientSecretFileName
+      ? { clientSecretFileName: opts.runtime.machineIdentityClientSecretFileName }
+      : {}),
+  });
+  return {
+    [clientIdEnv]: await opts.credentialDirectory.readCredentialFile(files.clientIdFile),
+    [clientSecretEnv]: await opts.credentialDirectory.readCredentialFile(files.clientSecretFile),
+  };
+}
+
 export async function prepareWorkerDeploymentSecretRuntime(opts: {
   workspaceRoot: string;
   deployment: DeploymentTarget;
   env?: NodeJS.ProcessEnv;
+  credentialDirectory?: ControlPlaneCredentialDirectory;
   timeoutMs?: number;
 }): Promise<PreparedWorkerDeploymentSecretRuntime> {
   const backend = opts.deployment.secretBackend || "vault";
@@ -50,13 +81,20 @@ export async function prepareWorkerDeploymentSecretRuntime(opts: {
   if (!opts.deployment.infisicalRuntime) {
     throw new Error("Infisical-backed worker secret access requires infisical_runtime metadata");
   }
+  const credentialEnv = opts.credentialDirectory
+    ? await infisicalCredentialEnvFromDirectory({
+        deployment: opts.deployment,
+        runtime: opts.deployment.infisicalRuntime,
+        credentialDirectory: opts.credentialDirectory,
+      })
+    : env;
   return {
     minted: true,
     secretContext: {
       kind: "infisical",
       credential: infisicalCredentialFromRuntime({
         runtime: opts.deployment.infisicalRuntime,
-        env,
+        env: credentialEnv,
       }),
     },
   };
@@ -78,6 +116,7 @@ export async function withWorkerDeploymentSecretRuntime<T>(
     workspaceRoot: string;
     deployment: DeploymentTarget;
     env?: NodeJS.ProcessEnv;
+    credentialDirectory?: ControlPlaneCredentialDirectory;
   },
   run: (runtime: PreparedWorkerDeploymentSecretRuntime) => Promise<T>,
 ): Promise<T> {

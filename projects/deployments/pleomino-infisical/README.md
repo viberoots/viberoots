@@ -1,0 +1,85 @@
+# Pleomino Infisical Backend
+
+This package owns the non-secret Infisical infrastructure for the Pleomino
+staging and production deployment-secret cutover.
+
+The OpenTofu module in `opentofu/main.tf` is parameterized by Infisical host,
+organization id, project name and slug, environment slugs, root secret path,
+secret names, stage-specific machine identity names, and control-plane
+credential-file names. It creates the Pleomino Secrets Management project,
+`staging` and `prod` environments, stage-specific machine identities, Universal
+Auth configuration, and project identity bindings.
+
+After apply, reconcile the non-secret `deployment_runtime_metadata` output with
+the checked-in Pleomino deployment metadata before live rollout. The project id
+and machine identity ids in deployment metadata must be the Infisical ids, not
+the project name or slug.
+
+The module intentionally does not manage real `cloudflare_api_token` values or
+write placeholder values. The Infisical provider has an `infisical_secret`
+resource with write-only value support, but PR-12 must not create even dummy
+application secret values through IaC. The module therefore emits
+`cloudflare_secret_metadata_reconciliation` as the reviewed provider-gap
+handoff:
+
+- Object name: `pleomino-deployments/staging/cloudflare_api_token`
+- Expected result: shared Infisical secret `cloudflare_api_token` exists at `/`
+  in `staging`
+- Reconcile path: after PR-14, run the reviewed `sprinkleref add/update` flow
+  for `secret://deployments/pleomino/cloudflare_api_token` in `staging`
+- Object name: `pleomino-deployments/prod/cloudflare_api_token`
+- Expected result: shared Infisical secret `cloudflare_api_token` exists at `/`
+  in `prod`
+- Reconcile path: after PR-14, run the reviewed `sprinkleref add/update` flow
+  for `secret://deployments/pleomino/cloudflare_api_token` in `prod`
+
+If Infisical later adds a true metadata-only placeholder resource, add or import
+that metadata-only object into this module without storing a secret value in
+OpenTofu state. Until then, operators enter the shared secret named
+`cloudflare_api_token` at `/` in both `staging` and `prod` after the project
+exists and before live deploys.
+
+Runtime credentials are installed only as deployment control-plane service
+credentials:
+
+- `pleomino-staging-infisical-client-id`
+- `pleomino-staging-infisical-client-secret`
+- `pleomino-prod-infisical-client-id`
+- `pleomino-prod-infisical-client-secret`
+
+The deployment metadata stores only the reviewed env-var names consumed by the
+worker runtime:
+
+- `PLEOMINO_STAGING_INFISICAL_CLIENT_ID`
+- `PLEOMINO_STAGING_INFISICAL_CLIENT_SECRET`
+- `PLEOMINO_PROD_INFISICAL_CLIENT_ID`
+- `PLEOMINO_PROD_INFISICAL_CLIENT_SECRET`
+
+## IaC operation
+
+Run this module with an Infisical bootstrap machine identity that is allowed to
+manage non-secret project resources in the `viberoots` organization. Pass
+bootstrap credentials through the control plane's service credential path only;
+do not pass personal tokens or secret values through OpenTofu variables,
+checked-in files, or shell history.
+
+```bash
+tofu init
+tofu plan -var organization_id='<infisical-organization-id>'
+tofu apply -var organization_id='<infisical-organization-id>'
+tofu output -json deployment_runtime_metadata
+```
+
+The bootstrap Universal Auth client secret must come from the operator
+credential path, not from git. If the `pleomino-deployments` project or its
+environments were created manually before OpenTofu was applied, import those
+objects into state before applying so the module adopts them instead of trying
+to create duplicates.
+
+PR-13 should consume these non-secret inputs for the deterministic bootstrap
+command: Infisical host `https://app.infisical.com`, organization `viberoots`,
+OpenTofu directory `projects/deployments/pleomino-infisical/opentofu`, project
+name and slug `pleomino-deployments`, environments `staging` and `prod`, secret
+path `/`, secret name `cloudflare_api_token`, machine identity names
+`pleomino-staging-deploy` and `pleomino-prod-deploy`, and the credential-file
+names listed above.

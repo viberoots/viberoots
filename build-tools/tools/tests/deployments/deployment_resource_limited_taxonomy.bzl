@@ -36,6 +36,8 @@ RESOURCE_LIMITED_DEPLOYMENT_TESTS = {
     "build-tools/tools/tests/deployments/phase0-deployments.contract.test.ts": True,
     "build-tools/tools/tests/deployments/phase0-deployments.readiness-secrets.test.ts": True,
     "build-tools/tools/tests/deployments/phase0-deployments.smoke.test.ts": True,
+    "build-tools/tools/tests/deployments/deployment-infisical-worker-credential-directory.test.ts": True,
+    "build-tools/tools/tests/deployments/pleomino-infisical-cutover.cquery.test.ts": True,
     "build-tools/tools/tests/deployments/deployment-admin-keycloak.remote-profile.grant-user-errors.test.ts": True,
     "build-tools/tools/tests/deployments/deployment-admin-keycloak.remote-profile.sync-reviewed-session.test.ts": True,
     "build-tools/tools/tests/deployments/deployment-admin-keycloak.remote-profile.test.ts": True,

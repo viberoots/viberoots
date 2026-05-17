@@ -22,9 +22,7 @@ import {
 import { executeCloudflarePagesBackendTargetTransition } from "./cloudflare-pages-control-plane-backend-transition";
 import type { CloudflareBackendRunOpts } from "./cloudflare-pages-control-plane-backend-run-types";
 export async function executeCloudflarePagesBackendSubmission(opts: CloudflareBackendRunOpts) {
-  const submission = await readControlPlaneJson<CloudflareBackendSubmissionLike>(
-    opts.submissionPath,
-  );
+  const submission = await readControlPlaneJson<any>(opts.submissionPath);
   const snapshot = await readControlPlaneJson<any>(opts.executionSnapshotPath);
   const lock = await acquireBackendControlPlaneLock(opts.backend, snapshot.lockScope, {
     shouldAbort: async () => await lockWaitAbortReasonForSubmission(opts.submissionPath),
@@ -75,6 +73,7 @@ export async function executeCloudflarePagesBackendSubmission(opts: CloudflareBa
             workspaceRoot: opts.workspaceRoot,
             deployment: snapshot.deployment,
             timeoutMs: timeouts.vaultMs,
+            ...(opts.credentialDirectory ? { credentialDirectory: opts.credentialDirectory } : {}),
           }),
       );
       const restoreSecretContext = activateDeploymentSecretContext(runtime.secretContext);

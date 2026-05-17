@@ -619,6 +619,32 @@ step instead of editing Keycloak by hand.
   source run, while promotion selects the reviewed source artifact and then
   admits fresh target-deployment secret references from the target's current
   metadata.
+- Pleomino staging and production now use the Infisical backend for the existing
+  `secret://deployments/pleomino/cloudflare_api_token` contract. The secret is a
+  shared Infisical secret named `cloudflare_api_token` at `/` in the
+  `pleomino-deployments` project, with `staging` and `prod` environments.
+- Pleomino dev stays on the Vault-backed shared-host path so old dev workflows
+  and old Vault-admitted replay records remain interpretable.
+- Before the first live Pleomino Infisical rollout, apply or confirm the
+  `projects/deployments/pleomino-infisical/opentofu` module, enter the real
+  Cloudflare token values in Infisical outside this repo, install deployment
+  control-plane credential files, and run read-only `deploy admin infisical plan`
+  and `deploy admin infisical check` for staging before repeating the same check
+  for production.
+- The reviewed Pleomino Universal Auth runtime names are
+  `PLEOMINO_STAGING_INFISICAL_CLIENT_ID`,
+  `PLEOMINO_STAGING_INFISICAL_CLIENT_SECRET`,
+  `PLEOMINO_PROD_INFISICAL_CLIENT_ID`, and
+  `PLEOMINO_PROD_INFISICAL_CLIENT_SECRET`. They are runtime bindings derived
+  from service credential files, not values to commit, paste into local shells,
+  or install in CI.
+- If Infisical access is unavailable during rollout, restore Vault for new
+  admissions by changing only Pleomino staging and production metadata back to
+  `secret_backend = "vault"` and the existing Pleomino `vault_runtime`; keep the
+  `secret_requirements` contract ids unchanged. Do not edit recorded admitted
+  contexts: old Vault-admitted runs continue replaying with Vault references,
+  and any already-recorded Infisical runs continue replaying with their exact
+  Infisical references.
 - use this guide plus [Deployment Provider Capabilities](/Users/kiltyj/Code/viberoots/docs/deployment-provider-capabilities.md)
 
 Scaffold-first examples:

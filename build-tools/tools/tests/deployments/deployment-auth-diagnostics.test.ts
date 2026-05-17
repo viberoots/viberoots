@@ -22,7 +22,7 @@ import {
 import { renderDeploymentJenkinsHelp } from "../../deployments/deployment-auth-matrix";
 import { resolveDeploymentVaultRuntimePlan } from "../../deployments/deployment-vault-runtime-plan";
 
-const DEPLOYMENT = "//projects/deployments/pleomino-staging:deploy";
+const DEPLOYMENT = "//projects/deployments/pleomino-dev:deploy";
 
 async function fixtureDeployment() {
   return await resolveDeploymentFromTarget(process.cwd(), DEPLOYMENT);
@@ -101,9 +101,9 @@ test("auth group summary prints reviewed human groups and automation patterns", 
   const groups = buildDeploymentAuthGroupSummary(deployment, ["jenkins"]);
   assert.equal(groups.schemaVersion, "deployment-auth-groups@1");
   assert.deepEqual(groups.humanGroups, [
-    "deploy-submitters-pleomino-staging",
-    "deploy-approvers-pleomino-staging",
-    "deploy-admission-reporters-pleomino-staging",
+    "deploy-submitters-pleomino-dev",
+    "deploy-approvers-pleomino-dev",
+    "deploy-admission-reporters-pleomino-dev",
   ]);
   assert.match(groups.automationGroupPatterns.join("\n"), /deploy-automation-<principal>/);
   assert.deepEqual(groups.automationGroupsByPrincipal[0]?.groups.slice(0, 2), [
@@ -117,13 +117,13 @@ test("auth action summary and realm export stay aligned on reviewed group names"
   const action = buildDeploymentAuthActionSummary(deployment, "approve", ["jenkins"]);
   const realm = buildDeploymentAuthKeycloakRealm([deployment], ["jenkins"]);
   assert.equal(action.requiredRole, "approver");
-  assert.equal(action.humanGroup, "deploy-approvers-pleomino-staging");
+  assert.equal(action.humanGroup, "deploy-approvers-pleomino-dev");
   assert.match(action.nextStep, /deploy auth explain-groups/);
   assert.deepEqual(realm.groups.map((group) => group.name).slice(0, 4), [
-    "deploy-admission-reporters-pleomino-staging",
-    "deploy-approvers-pleomino-staging",
+    "deploy-admission-reporters-pleomino-dev",
+    "deploy-approvers-pleomino-dev",
     "deploy-automation-jenkins-admission-reporters-all-deployments",
-    "deploy-automation-jenkins-admission-reporters-project-pleomino",
+    "deploy-automation-jenkins-admission-reporters-dev",
   ]);
   assert.equal(realm.clients[0]?.clientId, "deployment-cli");
   assert.equal(realm.clients[1]?.clientId, "deployment-runner");
