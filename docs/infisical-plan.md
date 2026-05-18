@@ -1839,3 +1839,181 @@ after bootstrap, admission, or deployment commands reach the failing backend pat
 
 The command introduces a broader repository scanner and may need careful filtering to avoid noisy
 reports from documentation examples and test fixtures.
+
+## PR-20: Repo-wide Infisical bootstrap boundary
+
+### 1. Intent
+
+Separate repo-wide Infisical/SprinkleRef backend bootstrap from Pleomino-specific Infisical
+deployment provisioning so operators can initialize and validate the repository's secret backend
+profile registry without implicitly creating or reconciling Pleomino resources. Preserve support
+for mixed backends, including the near-term Vault/Infisical split and future deployments that may
+use different Infisical accounts or different Vault instances.
+
+### 2. Scope of changes
+
+- Introduce explicit bootstrap command modes:
+  - `infisical-bootstrap repo --dry-run|--yes` initializes and validates repo-wide backend profile
+    configuration without assuming a deployment family.
+  - `infisical-bootstrap deployment --target <buck-target> --dry-run|--yes` provisions or
+    reconciles deployment-specific Infisical resources selected by reviewed deployment metadata.
+- Make repo-wide bootstrap responsible for:
+  - creating or validating the `sprinkleref/` resolver config set;
+  - selecting or validating one or more named backend profiles, including the default Infisical
+    host/organization profile and any future Vault or Infisical profile aliases used by deployment
+    metadata;
+  - selecting the bootstrap credential sink for each profile that needs bootstrap credentials and
+    ensuring bootstrap credentials never resolve through the same backend they unlock;
+  - reporting the next commands needed to verify `sprinkleref --check --config ...`;
+  - remaining read-only in dry-run mode and mutation-gated by `--yes` in non-dry-run mode.
+- Represent backend instances/accounts as named SprinkleRef profiles, with categories describing
+  usage lanes. Use `vault-default` for the current Vault behavior and `infisical-default` for the
+  initial Infisical host/organization defaults, while allowing future aliases such as
+  `infisical-regulated` or `vault-regulated`.
+- Extend or document deployment metadata so deployments can select both a backend kind and a named
+  backend profile or alias, rather than assuming a single repo-global Vault instance or Infisical
+  account. Add or document `secret_backend_profile`, defaulting `vault` deployments to
+  `vault-default` and `infisical` deployments to `infisical-default` when omitted.
+- Keep deployment metadata responsible for selecting the profile alias only. Local/CI resolver
+  config owns the account-specific profile details, and admitted run metadata records the concrete
+  backend kind/profile/ref used at admission time.
+- Preserve a simple default profile path for current deployments so existing Vault-backed
+  deployments and the Pleomino Infisical cutover do not require unnecessary per-deployment config
+  churn.
+- Move the current Pleomino-specific OpenTofu module, reviewed metadata reconciliation, project
+  creation, environment creation, and deployment Universal Auth credential management behind an
+  explicit deployment-specific mode or target selection.
+- Require deployment-specific bootstrap to name its scope explicitly with `--target <buck-target>`
+  before it can use
+  `projects/deployments/pleomino-infisical/opentofu` or
+  `projects/deployments/pleomino-shared/family.bzl`.
+- Keep existing Pleomino bootstrap behavior available through the new explicit deployment-specific
+  path, without changing the reviewed Pleomino metadata contract.
+- Update dry-run output so repo-wide bootstrap reports no Pleomino paths, projects, or OpenTofu
+  modules unless a Pleomino deployment scope was explicitly selected.
+- Update `sprinkleref --check` guidance so an absent resolver config points operators at repo-wide
+  bootstrap or `sprinkleref --init`, not a Pleomino provisioning command.
+
+### 3. External prerequisites
+
+- None beyond the existing operator access required for Infisical/Vault bootstrap. This PR adopts
+  `repo` and `deployment --target <buck-target>` as the command shape, `secret_backend_profile` as
+  the deployment metadata alias field, and `vault-default` / `infisical-default` as the initial
+  default profile aliases.
+
+### 4. Tests to be added
+
+- Add repo-wide dry-run tests proving no Pleomino OpenTofu directory, reviewed metadata path, project
+  slug, or deployment credential names appear unless a deployment-specific scope is selected.
+- Add repo-wide non-dry-run preflight tests proving missing `--yes` fails before resolver config,
+  Infisical, OpenTofu, or credential-sink mutation.
+- Add repo-wide resolver-config tests proving the command creates starter configs only in the
+  repo-wide bootstrap path and preserves existing authoritative resolver configs.
+- Add resolver schema tests proving profiles and categories are distinct: profiles name backend
+  instances/accounts, while categories such as `main` and `bootstrap` select usage lanes.
+- Add backend-profile tests proving repo-wide bootstrap can validate multiple named profiles without
+  forcing all deployments onto one Infisical account or one Vault instance.
+- Add credential-sink tests proving bootstrap credentials cannot resolve through the same backend
+  profile they unlock, including Infisical bootstrap credentials that must not use the Infisical
+  `main` backend.
+- Add deployment metadata tests proving existing Vault-backed deployments keep selecting the Vault
+  default profile while Infisical-backed deployments select the intended Infisical profile, both
+  explicitly and through defaults when `secret_backend_profile` is omitted.
+- Add admission metadata tests proving admitted runs record the concrete backend kind, profile alias,
+  and backend reference used at admission time so replays do not silently switch profiles.
+- Add deployment-specific selection tests proving the Pleomino OpenTofu module and reviewed
+  metadata reconciliation run only when the Pleomino deployment scope is explicitly selected.
+- Add regression tests proving the existing Pleomino provisioning path still reconciles against
+  checked-in Pleomino metadata and manages the expected deployment credential refs.
+- Add `sprinkleref --check` guidance tests proving missing resolver config diagnostics mention
+  repo-wide bootstrap or `sprinkleref --init`, and do not imply that Pleomino provisioning is
+  required for repo-wide validation.
+
+### 5. Docs to be added or updated
+
+- Update `infisical-bootstrap.md` to describe the two bootstrap layers:
+  repo-wide backend-profile/bootstrap credential setup and deployment-specific Infisical project
+  provisioning.
+- Document the adopted operator commands:
+  - `infisical-bootstrap repo --dry-run`
+  - `infisical-bootstrap repo --yes`
+  - `infisical-bootstrap deployment --target <buck-target> --dry-run`
+  - `infisical-bootstrap deployment --target <buck-target> --yes`
+- Update `docs/sprinkleref.md` and `docs/sprinkleref-check.md` with the repo-wide initialization
+  workflow before running `sprinkleref --check --config ...`.
+- Update `projects/deployments/pleomino-infisical/README.md` so Pleomino instructions call the
+  explicit deployment-specific bootstrap path and no longer appear to be the default repo-wide
+  bootstrap.
+- Update `docs/infisical-design.md` and deployment metadata docs if needed to clarify that
+  deployment declarations select a backend kind and profile alias, while provisioning an Infisical
+  project/environment/identity remains a scoped deployment concern.
+- Add resolver config examples showing:
+  - `profiles.vault-default` for the existing Vault behavior;
+  - `profiles.infisical-default` for the initial Infisical host/organization defaults;
+  - `categories.main.profile = "infisical-default"` for ordinary Infisical-backed deployment
+    secrets;
+  - a non-Infisical `bootstrap` category for credentials that unlock Infisical.
+
+### 5.5. Expected regression scope
+
+- `deployment-only`
+- Keep changes in Infisical bootstrap CLI/configuration, SprinkleRef initialization/check guidance,
+  Pleomino Infisical provisioning wiring, docs, and tests. If implementation requires changes to
+  generic deployment admission or runtime secret acquisition, update this plan before expanding
+  scope.
+
+### 6. Acceptance criteria
+
+- Operators can run a repo-wide Infisical/SprinkleRef bootstrap dry-run without seeing Pleomino
+  project, OpenTofu, or reviewed metadata paths.
+- Repo-wide bootstrap can initialize and validate the repository backend-profile registry and
+  resolver config boundary without provisioning a deployment-specific Infisical project.
+- The design supports multiple named Vault or Infisical profiles while preserving a default profile
+  for the current simple path.
+- Existing Vault-backed deployments remain Vault-backed, and Infisical-backed deployments select the
+  intended Infisical profile explicitly or through the documented default.
+- Deployment metadata can set `secret_backend_profile` to select a non-default profile without
+  embedding account-specific secrets or backend coordinates in deployment targets.
+- Admitted run metadata records the selected backend kind/profile/ref so replay behavior is stable
+  across later profile config changes.
+- Pleomino Infisical provisioning still exists, but requires an explicit deployment-specific
+  `--target` selector before it can touch the Pleomino OpenTofu module or reviewed metadata.
+- `sprinkleref --check` absent-config guidance points to repo-wide initialization, and configured
+  checks can distinguish present, missing, unmapped, and unchecked refs without requiring Pleomino
+  provisioning.
+- Bootstrap dry-run and non-dry-run confirmation semantics remain explicit and mutation-safe.
+
+### 7. Risks
+
+- Splitting command modes could break existing operator muscle memory for the Pleomino bootstrap
+  path.
+- Repo-wide bootstrap could become too abstract if it tries to infer deployment provisioning policy
+  that belongs in deployment metadata.
+- Resolver config creation could still look like a deployment-specific action if docs and command
+  names are not precise.
+- A profile registry could add unnecessary complexity if the first implementation overfits unlikely
+  multi-account or multi-Vault scenarios.
+
+### 8. Mitigations
+
+- Preserve the current Pleomino behavior behind a compatibility path or a clearly documented
+  deployment selector during the migration.
+- Keep repo-wide bootstrap narrowly focused on resolver config, named backend profiles, and
+  bootstrap credential sink policy.
+- Implement one default Infisical profile and one default Vault profile first, but make the data
+  model and docs allow additional named profiles without another CLI redesign.
+- Add dry-run output assertions and docs examples that make the repo-wide/deployment-specific
+  boundary visible.
+
+### 9. Consequences of not implementing this PR
+
+Operators will continue seeing Pleomino-specific resources in what appears to be a repo-wide
+Infisical bootstrap flow, making it unclear whether setting up Infisical for the repo requires
+provisioning a specific deployment family. The repo will also lack an explicit place to model
+future deployments that need a different Infisical account or Vault instance.
+
+### 10. Downsides for implementing this PR
+
+The bootstrap CLI surface becomes more explicit and may require a short migration for existing
+Pleomino bootstrap instructions and scripts. Introducing backend profile aliases adds a small
+configuration concept that must be documented carefully.
