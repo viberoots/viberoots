@@ -222,6 +222,10 @@ Allowed non-secret keys:
   config.
 - `machine_identity_client_secret_env`: environment variable that holds the
   Universal Auth client secret.
+- `machine_identity_client_id_file_name`: file-name-only pointer to a projected
+  Universal Auth client id credential.
+- `machine_identity_client_secret_file_name`: file-name-only pointer to a
+  projected Universal Auth client secret credential.
 - `machine_identity_id`: optional non-secret identity id for diagnostics and
   admin reconciliation.
 - `preferred_credential_source`: initially
@@ -243,7 +247,8 @@ Unsupported token-style env indirections are also rejected. Do not add
 `token_env`, `access_token_env`, `personal_token_env`, or `secret_value_env`;
 the reviewed runtime metadata only accepts the non-secret fields above plus the
 Universal Auth `machine_identity_client_id_env` and
-`machine_identity_client_secret_env` names.
+`machine_identity_client_secret_env` names, plus reviewed file-name-only
+credential pointers.
 
 For deployments with `secret_backend = "infisical"` and non-empty
 `secret_requirements`, validation should require `infisical_runtime.site_url`,

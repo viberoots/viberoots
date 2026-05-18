@@ -6,6 +6,7 @@ import * as path from "node:path";
 import { test } from "node:test";
 import { runSprinkleRefCli } from "../../deployments/sprinkleref-cli";
 import { readSprinkleRefConfig } from "../../deployments/sprinkleref-config";
+import { initSprinkleRefConfigs } from "../../deployments/sprinkleref-templates";
 
 test("resolver entry add preserves unrelated config text", async () => {
   const dir = await tmp();
@@ -103,6 +104,25 @@ test("resolver entry update preserves inherited base config", async () => {
   const config = await readSprinkleRefConfig(configPath);
   assert.equal(config.categories.main.file, "rotated-main.json");
   assert.equal(config.categories.bootstrap.service, "viberoots-bootstrap");
+});
+
+test("resolver entry update accepts generated profile-backed resolver config", async () => {
+  const dir = await tmp();
+  await initSprinkleRefConfigs({ dir, platform: "darwin" });
+  const configPath = path.join(dir, "selected.local.json");
+  await runSprinkleRefCli({
+    argv: entryArgs(configPath, "update", [
+      "--backend",
+      "local-file",
+      "--file",
+      "rotated-bootstrap.json",
+    ]),
+    stdout: () => undefined,
+  });
+  const config = await readSprinkleRefConfig(configPath);
+  assert.equal(config.categories.bootstrap.file, "rotated-bootstrap.json");
+  assert.deepEqual(config.categories.main, { profile: "infisical-default" });
+  assert.equal(config.profiles["infisical-default"]?.backend, "infisical");
 });
 
 test("resolver entry edits reject secret value inputs", async () => {

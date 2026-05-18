@@ -36,6 +36,7 @@ export async function editResolverEntry(opts: {
   validateConfig(
     {
       defaultCategory: parsed.defaultCategory || resolved.defaultCategory || opts.category,
+      profiles: resolved.profiles,
       categories: nextCategories,
     },
     opts.configPath,

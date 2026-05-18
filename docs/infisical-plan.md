@@ -2212,3 +2212,75 @@ to exactly one organization.
 
 The bootstrap CLI becomes stricter for token-based automation, requiring scripts to pass one more
 explicit flag.
+
+## PR-23: Resolver-entry profile config closure
+
+### 1. Intent
+
+Close the remaining post-PR-22 design assessment gap in SprinkleRef resolver-entry editing. Ensure
+operator remediation commands work against the generated starter resolver config, including
+profile-backed categories inherited from `base.json`.
+
+### 2. Scope of changes
+
+- Update resolver-entry config validation so edits preserve and validate against the already-loaded
+  `profiles` table when merging categories.
+- Keep explicit `--add`, `--update`, `--overwrite-existing`, and `--create-missing` semantics
+  unchanged.
+- Keep the protected `bootstrap` category Infisical backend/profile guard unchanged.
+- Sync the Infisical design doc with the accepted file-name runtime metadata keys already documented
+  in the root bootstrap spec and implemented in validation.
+
+### 3. External prerequisites
+
+- None. This PR is local resolver config editing, docs, and test coverage only.
+
+### 4. Tests to be added
+
+- Add a focused resolver-entry regression test that initializes the generated SprinkleRef starter
+  configs and updates the `bootstrap` category in `selected.local.json` while `main` remains
+  profile-backed through `infisical-default`.
+
+### 5. Docs to be added or updated
+
+- Update `docs/infisical-design.md` to list the accepted machine identity file-name runtime keys.
+
+### 5.5. Expected regression scope
+
+- `deployment-only`
+- Keep changes limited to SprinkleRef resolver-entry validation, focused tests, and design-doc sync.
+  Do not change resolver file generation, secret backends, bootstrap mutation behavior, or live
+  Infisical API calls.
+
+### 6. Acceptance criteria
+
+- `sprinkleref --resolver-entry --update bootstrap ...` works against the generated
+  `sprinkleref/selected.local.json` shape that extends `base.json` and keeps `main` as
+  `{ "profile": "infisical-default" }`.
+- Profile-backed categories remain validated against the merged profile table instead of being
+  rejected as missing.
+- Existing resolver-entry explicit-mode and bootstrap guard behavior remains unchanged.
+- Focused tests cover the generated starter config regression and the repository validation suite
+  passes.
+
+### 7. Risks
+
+- Passing merged profiles into validation could mask malformed local profile edits if the merged
+  config is not validated consistently.
+
+### 8. Mitigations
+
+- Reuse the existing `readSprinkleRefConfig` resolved config and `validateConfig` path so inherited
+  profiles and categories are validated by the same loader used elsewhere.
+- Add the regression test against the generated starter config rather than a hand-rolled minimal
+  fixture.
+
+### 9. Consequences of not implementing this PR
+
+Operators following the documented resolver-entry remediation path can hit a false validation
+failure on the default generated config because `main` references an inherited profile.
+
+### 10. Downsides for implementing this PR
+
+The resolver-entry edit path depends more directly on the resolved config loader, but that is the
+same source of truth used by check and resolution paths.
