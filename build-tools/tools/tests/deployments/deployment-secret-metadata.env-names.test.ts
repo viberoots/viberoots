@@ -126,3 +126,22 @@ test("infisical metadata validation rejects unsupported token-style env metadata
     );
   }
 });
+
+test("infisical metadata validation rejects unsupported non-string runtime keys", () => {
+  for (const [key, value] of [
+    ["token", { env: "INFISICAL_TOKEN" }],
+    ["access_token_env", ["INFISICAL_ACCESS_TOKEN"]],
+    ["personal_token_env", true],
+    ["secret_value_env", 123],
+  ] as const) {
+    const errors = errorsFor(infisicalRuntime({ [key]: value }));
+    assert.ok(
+      errors.some(
+        (entry) =>
+          entry.includes(`infisical_runtime.${key} is unsupported`) &&
+          entry.includes("accepted keys:"),
+      ),
+      `${key} should be rejected; errors: ${errors.join("\n")}`,
+    );
+  }
+});

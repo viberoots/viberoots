@@ -133,7 +133,6 @@ export function deploymentSecretMetadata(
   const profile =
     readString(node, "secret_backend_profile") || defaultDeploymentSecretBackendProfile(backend);
   const rawRuntimeNode = readRawRecord(node, "infisical_runtime");
-  const rawRuntime = readStringRecord(node, "infisical_runtime");
   const runtime = readInfisicalRuntime(node);
   const mappings = readInfisicalMappings(node);
   validateDeploymentSecretMetadata({
@@ -143,7 +142,6 @@ export function deploymentSecretMetadata(
     backend,
     profile,
     rawRuntimeNode,
-    rawRuntime,
     runtime,
     mappings,
   });
@@ -162,7 +160,6 @@ function validateDeploymentSecretMetadata(opts: {
   backend: DeploymentSecretBackendKind;
   profile: string;
   rawRuntimeNode: Record<string, unknown>;
-  rawRuntime: Record<string, string>;
   runtime?: DeploymentInfisicalRuntimeConfig;
   mappings?: Record<string, DeploymentInfisicalSecretMapping>;
 }) {
@@ -174,7 +171,7 @@ function validateDeploymentSecretMetadata(opts: {
   }
   pushForbiddenInfisicalRuntimeKeyErrors({
     label: opts.label,
-    runtime: opts.rawRuntime,
+    runtime: opts.rawRuntimeNode,
     errors: opts.errors,
   });
   validateInfisicalRuntime(opts);
@@ -187,7 +184,6 @@ function validateInfisicalRuntime(opts: {
   errors: string[];
   backend: DeploymentSecretBackendKind;
   rawRuntimeNode: Record<string, unknown>;
-  rawRuntime: Record<string, string>;
   runtime?: DeploymentInfisicalRuntimeConfig;
 }) {
   if (opts.backend !== "infisical" || opts.requirements.length === 0) return;

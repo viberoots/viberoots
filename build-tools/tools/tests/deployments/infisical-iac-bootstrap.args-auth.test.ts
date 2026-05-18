@@ -83,6 +83,21 @@ test("bootstrap args support host shorthands and non-interactive controls", () =
   assert.equal(args.yes, true);
 });
 
+test("--no-login requires an explicit organization selector", () => {
+  assert.throws(
+    () => parseBootstrapArgs(["repo", "--no-login", "--yes"]),
+    /--no-login requires exactly one organization selector[\s\S]*--org-name <name> or --organization-id <id>/,
+  );
+  assert.equal(
+    parseBootstrapArgs(["repo", "--no-login", "--org-name", "viberoots"]).orgName,
+    "viberoots",
+  );
+  assert.equal(
+    parseBootstrapArgs(["repo", "--no-login", "--organization-id", "org_1"]).organizationId,
+    "org_1",
+  );
+});
+
 test("bootstrap args parse explicit repo and deployment modes", () => {
   assert.equal(parseBootstrapArgs(["repo", "--dry-run"]).mode, "repo");
   const deployment = parseBootstrapArgs([
@@ -113,7 +128,7 @@ test("organization exact-name selection and non-interactive remediation include 
   assert.throws(() => orgIdByExactName(orgs, "missing"), /no accessible/);
 });
 
-test("organization selection auto-selects one accessible org with --yes", async () => {
+test("login-based organization selection auto-selects one accessible org with --yes", async () => {
   const api = fakeOrgApi([{ id: "org_1", name: "viberoots" }]);
   const orgId = await resolveOrganizationId(api as never, { ...DEFAULT_BOOTSTRAP_ARGS, yes: true });
   assert.equal(orgId, "org_1");

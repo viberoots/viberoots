@@ -105,6 +105,11 @@ export function parseBootstrapArgs(argv = getArgvTokens()): BootstrapArgs {
   args.accessTokenTtl = numberFlag("access-token-ttl", args.accessTokenTtl, 1, argv);
   if (args.organizationId && args.orgName)
     throw new Error("use only one of --organization-id or --org-name");
+  if (args.noLogin && !args.organizationId && !args.orgName) {
+    throw new Error(
+      "--no-login requires exactly one organization selector: pass --org-name <name> or --organization-id <id>",
+    );
+  }
   if (args.noLogin && args.forceLogin)
     throw new Error("use only one of --no-login or --force-login");
   if (args.mode === "deployment" && !args.target) {

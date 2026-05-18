@@ -2128,3 +2128,87 @@ keys that weaken the reviewed Universal Auth contract.
 The bootstrap/resolver validation surface becomes stricter, and local configs that relied on unsafe
 or undocumented `bootstrap` mappings will need to move those credentials to a non-Infisical control
 plane backend.
+
+## PR-22: Bootstrap validation edge-case closure
+
+### 1. Intent
+
+Close the final post-PR-21 assessment gaps in Infisical bootstrap validation. Make metadata
+allowlists inspect raw runtime keys instead of only string-normalized values, and enforce the
+documented requirement that non-interactive `--no-login` bootstrap flows name the intended
+Infisical organization explicitly.
+
+### 2. Scope of changes
+
+- Update Infisical runtime metadata validation so unsupported key names are detected from the raw
+  `infisical_runtime` object, including non-string values that would otherwise be dropped by
+  string-record normalization.
+- Keep accepting the reviewed non-secret runtime fields and Universal Auth env-name fields, but
+  reject unsupported token/secret env-source keys regardless of value type.
+- Update bootstrap argument parsing or preflight so `--no-login` requires exactly one explicit
+  organization selector via `--organization-id` or `--org-name`.
+- Preserve existing interactive/org-discovery behavior for login-based operator flows that do not
+  use `--no-login`.
+- Update any tests that currently codify `--no-login --yes` auto-selecting a single organization.
+
+### 3. External prerequisites
+
+- None. This PR is local validation and test coverage only.
+
+### 4. Tests to be added
+
+- Add deployment metadata tests proving unsupported `infisical_runtime` keys are rejected even when
+  their values are non-string objects, arrays, booleans, or numbers.
+- Add parser/preflight tests proving `--no-login` without `--organization-id` or `--org-name` fails
+  with remediation, while `--no-login --organization-id ...` and `--no-login --org-name ...`
+  continue to parse.
+- Keep the existing login-based single-organization auto-selection test, or rename it to clarify it
+  does not apply to `--no-login`.
+
+### 5. Docs to be added or updated
+
+- Update `infisical-bootstrap.md` and `docs/infisical-bootstrap.md` if needed to clarify that
+  `--no-login` flows must provide an explicit organization selector and that runtime metadata key
+  validation applies before value normalization.
+
+### 5.5. Expected regression scope
+
+- `deployment-only`
+- Keep changes in bootstrap argument validation, deployment metadata validation, docs, and focused
+  tests. Do not change live Infisical API calls, deployment admission behavior, or resolver storage
+  semantics beyond the validation edge cases above.
+
+### 6. Acceptance criteria
+
+- Unsupported Infisical runtime metadata keys fail validation regardless of whether their values are
+  strings or non-string JSON/Starlark values.
+- `--no-login` bootstrap invocations fail before authentication or mutation when no organization
+  selector is provided.
+- Login-based interactive and `--yes` organization discovery remains available when `--no-login` is
+  not selected.
+- Focused tests cover the validation edge cases and the repository validation suite passes.
+
+### 7. Risks
+
+- Tightening raw-key validation could reveal malformed fixture metadata that was previously ignored
+  because its value type was not a string.
+- Requiring an organization selector for `--no-login` may break local scripts that relied on
+  single-organization auto-selection with token-based auth.
+
+### 8. Mitigations
+
+- Error messages should name the unsupported key and the accepted reviewed fields.
+- Parser or preflight remediation should explicitly suggest `--org-name <name>` or
+  `--organization-id <id>`.
+- Keep the login-based auto-selection path unchanged for operator convenience.
+
+### 9. Consequences of not implementing this PR
+
+Unsupported runtime metadata can evade validation by using non-string values, and CI/non-interactive
+bootstrap flows can still silently choose the wrong Infisical organization when a token has access
+to exactly one organization.
+
+### 10. Downsides for implementing this PR
+
+The bootstrap CLI becomes stricter for token-based automation, requiring scripts to pass one more
+explicit flag.

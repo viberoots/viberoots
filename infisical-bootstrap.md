@@ -76,8 +76,10 @@ omitted, both default to the reviewed Pleomino Infisical endpoint `https://app.i
 `--yes` means “the operator has confirmed this mutation-capable bootstrap.” It does not mean
 “guess.” Non-dry-run bootstrap checks this before opening Infisical, running OpenTofu, creating
 resolver config files, or writing credential sinks. Use `--dry-run` for read-only inspection. If
-multiple organizations are available and no explicit org selector was provided, the command still
-presents the org list. If terminal input is unavailable, it exits with a clear error.
+multiple organizations are available and no explicit org selector was provided, login-based
+operator flows still present the org list. If terminal input is unavailable, the command exits with
+a clear error. `--no-login` token-based flows require an explicit `--org-name` or
+`--organization-id` before authentication or mutation.
 
 ## Authentication
 
@@ -94,7 +96,7 @@ Requirements:
 CI/non-interactive behavior:
 
 - `--no-login` requires a token from `--access-token-env`, default `INFISICAL_ACCESS_TOKEN`.
-- CI must also provide `--organization-id` or `--org-name`.
+- `--no-login` must also provide exactly one of `--organization-id` or `--org-name`.
 - CI and local non-dry-run bootstrap must provide `--yes`; missing confirmation fails before any
   Infisical, OpenTofu, resolver-config, or credential-sink mutation.
 - Any missing interactive input must fail fast with remediation.
@@ -107,7 +109,7 @@ Resolution order:
 
 1. `--organization-id`: use directly.
 2. `--org-name`: list accessible orgs and match exact name.
-3. If exactly one org is accessible and `--yes` is set: use it.
+3. For login-based flows, if exactly one org is accessible and `--yes` is set: use it.
 4. Otherwise print a numbered list and prompt.
 
 If a list must be presented and stdin/stdout are not interactive, exit with:
@@ -226,7 +228,8 @@ content, or rendered provider config.
 
 Token-style env indirections are intentionally rejected. Do not add `token_env`,
 `access_token_env`, `personal_token_env`, or `secret_value_env` to `infisical_runtime`; validation
-reports each of those keys as unsupported.
+reports each raw key as unsupported before value normalization, including object, array, boolean,
+and number values.
 
 ## SprinkleRef Resolution
 
