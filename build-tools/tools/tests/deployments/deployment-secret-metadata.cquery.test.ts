@@ -30,7 +30,7 @@ test("deployment TARGETS emit Infisical secret backend metadata", async () => {
         '    account = "web-platform-staging",',
         '    project = "pleomino-staging-pages",',
         '    protection_class = "local_only",',
-        '    secret_backend = "infisical",',
+        '    secret_backend = "infisical/default",',
         "    infisical_runtime = {",
         '        "site_url": "https://app.infisical.com",',
         '        "project_id": "proj_123",',
@@ -56,7 +56,7 @@ test("deployment TARGETS emit Infisical secret backend metadata", async () => {
       },
     })`buck2 --isolation-dir ${inheritedBuckIsolation("deployment-secret-metadata-cquery")} cquery --target-platforms prelude//platforms:default //projects/deployments/pleomino-staging:deploy --json ${attrFlags}`.quiet();
     const node = Object.values(JSON.parse(String(cquery.stdout || "{}")))[0] as any;
-    assert.equal(node.secret_backend, "infisical");
+    assert.equal(node.secret_backend, "infisical/default");
     assert.equal(node.infisical_runtime.project_id, "proj_123");
     assert.equal(
       node.infisical_secret_mappings["secret://deployments/pleomino/token"].secret_name,

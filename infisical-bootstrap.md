@@ -205,6 +205,12 @@ Rotation:
 
 ## Infisical Runtime Metadata
 
+Deployment targets select Infisical with the unified backend selector, for example
+`secret_backend = "infisical/default"`. Non-default resolver profiles use the same local alias
+shape, such as `secret_backend = "infisical/regulated"`, which normalizes to the
+`infisical-regulated` SprinkleRef profile. Bare backend values and separate
+`secret_backend_profile` metadata are not accepted.
+
 Deployment targets may declare `infisical_runtime` as non-secret routing and credential-source
 metadata for Infisical-backed secret requirements. Accepted keys are:
 

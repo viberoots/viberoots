@@ -86,7 +86,7 @@ def _cloudflare_stage(stage, admission_policy, protection_class, account, projec
         secret_requirements = [_cloudflare_secret(step) for step in ["provision", "publish", "preview_cleanup"]],
         external_requirement_profiles = ["cloudflare_provider"],
         prerequisites = prerequisites,
-        secret_backend = "infisical",
+        secret_backend = "infisical/default",
         infisical_runtime = _pleomino_infisical_runtime(stage),
         preview = {
             "target_derivation": "provider_managed_source_run",

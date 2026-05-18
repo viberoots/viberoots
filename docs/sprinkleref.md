@@ -66,6 +66,12 @@ instances/accounts, while categories name usage lanes:
 }
 ```
 
+Deployment metadata selects these profiles through `secret_backend =
+"<backend>/<profile-alias>"`. For example, `secret_backend = "infisical/default"` selects the
+`infisical-default` profile, while `secret_backend = "vault/regulated"` selects
+`vault-regulated`. Deployment metadata does not expose a separate profile field; keep resolver
+profile selection in the unified selector.
+
 Add, update, or remove ordinary secrets:
 
 ```bash

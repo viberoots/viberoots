@@ -4,11 +4,11 @@ import { readString, readStringRecord } from "./deployment-graph-readers";
 import { deploymentError } from "./contract-extract-shared";
 import { pushInfisicalUniversalAuthEnvErrors } from "./deployment-infisical-env-validation";
 import { deploymentSecretFixturePath } from "./deployment-secret-fixture";
+import { pushForbiddenInfisicalRuntimeKeyErrors } from "./deployment-secret-profile";
 import {
-  defaultDeploymentSecretBackendProfile,
-  isDeploymentSecretBackendProfile,
-  pushForbiddenInfisicalRuntimeKeyErrors,
-} from "./deployment-secret-profile";
+  deploymentSecretBackendSelectorErrors,
+  normalizeDeploymentSecretBackendSelector,
+} from "./deployment-secret-backend-selector";
 import type { DeploymentRequirement } from "./deployment-requirements";
 import type { DeploymentSecretBackendKind } from "./deployment-sprinkle-ref";
 
@@ -42,7 +42,6 @@ export type DeploymentSecretMetadata = {
   infisicalSecretMappings?: Record<string, DeploymentInfisicalSecretMapping>;
 };
 
-const SUPPORTED_BACKENDS = new Set<DeploymentSecretBackendKind>(["vault", "infisical"]);
 function readStringRecordMap(node: GraphNode, key: string): Record<string, Record<string, string>> {
   const value = node[key];
   if (!value || typeof value !== "object" || Array.isArray(value)) return {};
@@ -129,9 +128,12 @@ export function deploymentSecretMetadata(
   requirements: DeploymentRequirement[],
   errors: string[],
 ): DeploymentSecretMetadata {
-  const backend = (readString(node, "secret_backend") || "vault") as DeploymentSecretBackendKind;
-  const profile =
-    readString(node, "secret_backend_profile") || defaultDeploymentSecretBackendProfile(backend);
+  const secretBackend = readString(node, "secret_backend");
+  const secretBackendProfile = readString(node, "secret_backend_profile");
+  const { backend, profile } = normalizeDeploymentSecretBackendSelector({
+    secretBackend,
+    secretBackendProfile,
+  });
   const rawRuntimeNode = readRawRecord(node, "infisical_runtime");
   const runtime = readInfisicalRuntime(node);
   const mappings = readInfisicalMappings(node);
@@ -144,9 +146,10 @@ export function deploymentSecretMetadata(
     rawRuntimeNode,
     runtime,
     mappings,
+    selectorErrors: deploymentSecretBackendSelectorErrors({ secretBackend, secretBackendProfile }),
   });
   return {
-    secretBackend: SUPPORTED_BACKENDS.has(backend) ? backend : "vault",
+    secretBackend: backend,
     secretBackendProfile: profile,
     ...(runtime ? { infisicalRuntime: runtime } : {}),
     ...(mappings ? { infisicalSecretMappings: mappings } : {}),
@@ -162,12 +165,10 @@ function validateDeploymentSecretMetadata(opts: {
   rawRuntimeNode: Record<string, unknown>;
   runtime?: DeploymentInfisicalRuntimeConfig;
   mappings?: Record<string, DeploymentInfisicalSecretMapping>;
+  selectorErrors: string[];
 }) {
-  if (!SUPPORTED_BACKENDS.has(opts.backend)) {
-    opts.errors.push(deploymentError(opts.label, `unsupported secret_backend "${opts.backend}"`));
-  }
-  if (!opts.profile || !isDeploymentSecretBackendProfile(opts.profile)) {
-    opts.errors.push(deploymentError(opts.label, "secret_backend_profile must be kebab-case"));
+  for (const error of opts.selectorErrors) {
+    opts.errors.push(deploymentError(opts.label, error));
   }
   pushForbiddenInfisicalRuntimeKeyErrors({
     label: opts.label,

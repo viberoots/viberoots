@@ -26,7 +26,6 @@ export const DEPLOYMENT_CQUERY_ATTRS = [
   "resource_sizing",
   "vault_runtime",
   "secret_backend",
-  "secret_backend_profile",
   "infisical_runtime",
   "infisical_secret_mappings",
   "smoke",

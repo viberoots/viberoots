@@ -66,8 +66,8 @@ test("repo bootstrap creates and validates resolver profiles independent of cred
   const dir = await tmp();
   await withCwdAndEnv(dir, async () => {
     await writeGraph([
-      { name: "//deployments/vault:deploy", secret_backend: "vault" },
-      { name: "//deployments/infisical:deploy", secret_backend: "infisical" },
+      { name: "//deployments/vault:deploy", secret_backend: "vault/default" },
+      { name: "//deployments/infisical:deploy", secret_backend: "infisical/default" },
     ]);
     const output = await captureStdout(() =>
       runInfisicalIacBootstrap({
@@ -115,8 +115,7 @@ test("repo bootstrap validates non-default profiles selected by deployment metad
     await writeGraph([
       {
         name: "//deployments/regulated:deploy",
-        secret_backend: "infisical",
-        secret_backend_profile: "infisical-regulated",
+        secret_backend: "infisical/regulated",
       },
     ]);
     await assert.rejects(
@@ -148,7 +147,9 @@ test("repo bootstrap validates bootstrap category even with explicit credential 
         bootstrap: { profile: "infisical-default" },
       },
     });
-    await writeGraph([{ name: "//deployments/infisical:deploy", secret_backend: "infisical" }]);
+    await writeGraph([
+      { name: "//deployments/infisical:deploy", secret_backend: "infisical/default" },
+    ]);
     for (const credentialSink of ["local-file", "macos-keychain"] as const) {
       await assert.rejects(
         () =>

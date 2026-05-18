@@ -1,8 +1,6 @@
 #!/usr/bin/env zx-wrapper
-import type { DeploymentSecretBackendKind } from "./deployment-sprinkle-ref";
 import { deploymentError } from "./contract-extract-shared";
 
-const PROFILE_ALIAS = /^[a-z0-9][a-z0-9-]*$/;
 const ALLOWED_INFISICAL_RUNTIME_KEYS = [
   "site_url",
   "project_id",
@@ -21,14 +19,6 @@ const ALLOWED_INFISICAL_RUNTIME_KEYS = [
 const ALLOWED_INFISICAL_RUNTIME_KEY_SET: ReadonlySet<string> = new Set(
   ALLOWED_INFISICAL_RUNTIME_KEYS,
 );
-
-export function defaultDeploymentSecretBackendProfile(backend: DeploymentSecretBackendKind) {
-  return backend === "infisical" ? "infisical-default" : "vault-default";
-}
-
-export function isDeploymentSecretBackendProfile(value: string) {
-  return PROFILE_ALIAS.test(value);
-}
 
 export function pushForbiddenInfisicalRuntimeKeyErrors(opts: {
   label: string;

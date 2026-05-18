@@ -161,25 +161,29 @@ one deployment secret backend per admitted context.
 
 ### Backend Selection
 
-Add an optional `secret_backend` metadata field:
+Add an optional `secret_backend` metadata selector:
 
 ```python
-secret_backend = "infisical"
+secret_backend = "infisical/default"
 ```
 
-Allowed values:
+Preferred selector values use `<backend>/<profile-alias>`:
 
-- `"vault"`
-- `"infisical"`
+- `"vault/default"`
+- `"vault/regulated"`
+- `"infisical/default"`
+- `"infisical/regulated"`
 
-Omitted means `"vault"` for compatibility. Extractors should normalize the field
-onto the deployment contract as `secretBackend`.
+Omitted means `"vault/default"` for compatibility. Extractors normalize the
+selector onto the deployment contract as `secretBackend` plus
+`secretBackendProfile`. The local profile alias is backend-prefixed internally,
+so `"infisical/regulated"` becomes `secretBackend = "infisical"` and
+`secretBackendProfile = "infisical-regulated"`.
 
-Deployments may also set `secret_backend_profile` to select a named resolver
-profile alias. Omitted profiles default to `vault-default` for Vault-backed
-deployments and `infisical-default` for Infisical-backed deployments. Deployment
-metadata selects only the alias; account-specific host, organization, project,
-and credential details stay in local or CI SprinkleRef resolver config.
+Bare backend values such as `secret_backend = "infisical"` are invalid; use
+`secret_backend = "infisical/default"` instead. Deployment metadata selects only
+the alias; account-specific host, organization, project, and credential details
+stay in local or CI SprinkleRef resolver config.
 
 This field answers only which backend satisfies `secret_requirements`. It does
 not change contract ids, lifecycle steps, target scopes, or provider credential
@@ -250,7 +254,7 @@ Universal Auth `machine_identity_client_id_env` and
 `machine_identity_client_secret_env` names, plus reviewed file-name-only
 credential pointers.
 
-For deployments with `secret_backend = "infisical"` and non-empty
+For deployments with `secret_backend = "infisical/default"` and non-empty
 `secret_requirements`, validation should require `infisical_runtime.site_url`,
 `project_id`, `environment`, `machine_identity_client_id_env`,
 `machine_identity_client_secret_env`, and a reviewed credential source unless
@@ -499,7 +503,7 @@ Rules:
 - replay fails closed if an admitted reference cannot be resolved exactly
 - replay must not silently substitute latest Infisical values after rotation
 - a replay that recorded `backend: "vault"` continues using Vault, even if the
-  current deployment metadata now says `secret_backend = "infisical"`
+  current deployment metadata now says `secret_backend = "infisical/default"`
 - a replay that recorded `backend: "infisical"` continues using Infisical
 
 This last rule is important for migration. Backend migration changes future
@@ -593,8 +597,8 @@ Recommended sequence for one deployment:
 1. create Infisical project/environment/path and machine identity
 2. copy the current Vault secret values into Infisical using the same
    `secret://deployments/...` contract ids as the reviewed source of truth
-3. add `secret_backend = "infisical"` and `infisical_runtime = {...}` to the
-   deployment metadata
+3. add `secret_backend = "infisical/default"` and `infisical_runtime = {...}`
+   to the deployment metadata
 4. run read-only validation and `deploy auth explain-secret-backend`
 5. run an admission-only or validate-only flow that proves admitted references
    are Infisical references
@@ -610,9 +614,9 @@ admissions to Infisical. Old run replay can still need Vault exact versions.
 Add validation for:
 
 - unsupported `secret_backend`
-- `secret_backend = "infisical"` with missing `infisical_runtime` when
+- `secret_backend = "infisical/default"` with missing `infisical_runtime` when
   `secret_requirements` is non-empty
-- `secret_backend = "vault"` with missing existing Vault requirements when
+- `secret_backend = "vault/default"` with missing existing Vault requirements when
   secrets are required and fixture is inactive
 - stale `infisical_secret_mappings` entries that do not correspond to declared
   requirements

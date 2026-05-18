@@ -37,7 +37,7 @@ test("mini migration docs cover Infisical worker secret boundary", async () => {
   for (const fragment of [
     /Mini Pre-`viberoots` Infisical Migration/,
     /docs\/mini-name-migration-instructions\.md/,
-    /secret_backend = "infisical"/,
+    /secret_backend = "infisical\/default"/,
     /pre-`viberoots` control-plane identity/,
     /server-local Infisical credential references/,
     /--profile mini/,

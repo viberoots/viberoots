@@ -2,16 +2,15 @@
 import * as fs from "node:fs/promises";
 import { DEFAULT_GRAPH_PATH } from "../lib/graph-const";
 import { readGraph, type GraphNode } from "../lib/graph";
-import { defaultDeploymentSecretBackendProfile } from "./deployment-secret-profile";
+import {
+  deploymentSecretBackendSelectorErrors,
+  normalizeDeploymentSecretBackendSelector,
+} from "./deployment-secret-backend-selector";
 import { resolverConfigPath } from "./infisical-iac-bootstrap-preflight";
 import { readSprinkleRefConfig } from "./sprinkleref-config";
 import { resolveBootstrapAccessCredentialSinkBackend } from "./sprinkleref-bootstrap-guard";
 import { initSprinkleRefConfigs } from "./sprinkleref-templates";
 import type { SprinkleRefConfig } from "./sprinkleref-types";
-import type { DeploymentSecretBackendKind } from "./deployment-sprinkle-ref";
-
-const SUPPORTED_BACKENDS = new Set<DeploymentSecretBackendKind>(["vault", "infisical"]);
-
 export async function ensureRepoResolverConfig(opts: {
   dryRun: boolean;
   platform?: NodeJS.Platform;
@@ -50,14 +49,16 @@ export async function requiredBackendProfiles(graphPath = DEFAULT_GRAPH_PATH) {
   const profiles = new Set(["vault-default", "infisical-default"]);
   const nodes = await readGraph(graphPath).catch(() => []);
   for (const node of nodes) {
-    const explicit = stringAttr(node, "secret_backend_profile");
-    if (explicit) {
-      profiles.add(explicit);
-      continue;
+    const secretBackend = stringAttr(node, "secret_backend");
+    const secretBackendProfile = stringAttr(node, "secret_backend_profile");
+    const errors = deploymentSecretBackendSelectorErrors({ secretBackend, secretBackendProfile });
+    if (errors.length > 0) {
+      const label = stringAttr(node, "name") || "<unknown deployment>";
+      throw new Error(`${label}: ${errors.join("; ")}`);
     }
-    const backend = stringAttr(node, "secret_backend") as DeploymentSecretBackendKind;
-    if (SUPPORTED_BACKENDS.has(backend))
-      profiles.add(defaultDeploymentSecretBackendProfile(backend));
+    profiles.add(
+      normalizeDeploymentSecretBackendSelector({ secretBackend, secretBackendProfile }).profile,
+    );
   }
   return profiles;
 }

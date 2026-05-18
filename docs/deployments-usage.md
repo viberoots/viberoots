@@ -673,7 +673,7 @@ repeating the same check for production.
   or install in CI.
 - If Infisical access is unavailable during rollout, restore Vault for new
   admissions by changing only Pleomino staging and production metadata back to
-  `secret_backend = "vault"` and the existing Pleomino `vault_runtime`; keep the
+  `secret_backend = "vault/default"` and the existing Pleomino `vault_runtime`; keep the
   `secret_requirements` contract ids unchanged. Do not edit recorded admitted
   contexts: old Vault-admitted runs continue replaying with Vault references,
   and any already-recorded Infisical runs continue replaying with their exact

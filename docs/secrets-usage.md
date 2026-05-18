@@ -44,10 +44,11 @@ For production Vault bring-up and the optional local/test export bridge into
   captured during admission for one resolved secret contract
 - secret fixture: the reviewed local/test override file format named by
   `deployment-secret-fixture@1`
-- `secret_backend`: the deployment-wide backend for `secret_requirements`;
-  omitted means `vault`
+- `secret_backend`: the deployment-wide backend selector for
+  `secret_requirements`; omitted means `vault/default`
 - Vault: the default backend that stores the real secret values
-- Infisical: an alternate backend selected with `secret_backend = "infisical"`
+- Infisical: an alternate backend selected with
+  `secret_backend = "infisical/default"`
 
 ## How The Layers Fit Together
 
@@ -136,10 +137,11 @@ In this example, `targetEnvironment.lockScope` is the exact value the runtime
 checks against `targetScopes`. Operators should treat that `lockScope` value as
 the source of truth for the right target scope string.
 
-To select Infisical for a deployment, set `secret_backend = "infisical"` and
-provide non-secret `infisical_runtime` routing metadata:
+To select Infisical for a deployment, set `secret_backend = "infisical/default"`
+and provide non-secret `infisical_runtime` routing metadata:
 
 ```python
+secret_backend = "infisical/default"
 infisical_runtime = {
     "site_url": "https://app.infisical.com",
     "project_id": "proj_123",
@@ -422,7 +424,7 @@ workload credential material.
 Backend migration is per deployment and affects only new admissions. To move a
 deployment from Vault to Infisical:
 
-- add `secret_backend = "infisical"` and reviewed non-secret
+- add `secret_backend = "infisical/default"` and reviewed non-secret
   `infisical_runtime` metadata
 - create matching Infisical shared secrets for the existing contract IDs
 - run a fresh deploy or promotion so the target admits Infisical references

@@ -101,7 +101,7 @@ test("infisical backend exposes only non-secret routing metadata", () => {
     appNode(),
     ...policyNodes(),
     deploymentNode({
-      secret_backend: "infisical",
+      secret_backend: "infisical/default",
       secret_requirements: [requirement()],
       infisical_runtime: infisicalRuntime({
         secret_path: "/deployments/pleomino",
@@ -130,8 +130,7 @@ test("deployment metadata extracts explicit backend profile aliases", () => {
     appNode(),
     ...policyNodes(),
     deploymentNode({
-      secret_backend: "infisical",
-      secret_backend_profile: "infisical-regulated",
+      secret_backend: "infisical/regulated",
       secret_requirements: [],
     }),
   ]);
@@ -140,12 +139,12 @@ test("deployment metadata extracts explicit backend profile aliases", () => {
 });
 
 test("infisical deployment with no secret requirements does not require credentials", () => {
-  assert.deepEqual(errorsFor({ secret_backend: "infisical", secret_requirements: [] }), []);
+  assert.deepEqual(errorsFor({ secret_backend: "infisical/default", secret_requirements: [] }), []);
 });
 
 test("infisical metadata validation rejects unsafe or stale metadata", () => {
   const errors = errorsFor({
-    secret_backend: "infisical",
+    secret_backend: "infisical/default",
     secret_requirements: [requirement()],
     infisical_runtime: infisicalRuntime({
       token: "not-reviewed",
@@ -179,7 +178,7 @@ test("infisical metadata validation rejects unsafe or stale metadata", () => {
 
 test("infisical metadata validation rejects missing runtime for secret requirements", () => {
   const errors = errorsFor({
-    secret_backend: "infisical",
+    secret_backend: "infisical/default",
     secret_requirements: [requirement()],
   });
   assert.ok(errors.some((entry) => entry.includes("infisical_runtime.site_url is required")));
@@ -193,7 +192,7 @@ test("infisical metadata validation rejects missing runtime for secret requireme
 
 test("deployment secret metadata validation rejects unsupported backends", () => {
   const errors = errorsFor({ secret_backend: "other" });
-  assert.ok(errors.some((entry) => entry.includes('unsupported secret_backend "other"')));
+  assert.ok(errors.some((entry) => entry.includes('unsupported secret_backend backend "other"')));
 });
 
 test("deployment secret metadata extraction does not contact Infisical", () => {
@@ -204,7 +203,7 @@ test("deployment secret metadata extraction does not contact Infisical", () => {
   try {
     assert.deepEqual(
       errorsFor({
-        secret_backend: "infisical",
+        secret_backend: "infisical/default",
         secret_requirements: [requirement()],
         infisical_runtime: {
           site_url: "https://app.infisical.com",

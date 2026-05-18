@@ -169,7 +169,7 @@ export async function writeTempCloudflareValidationWorkspace(
       '    protection_class = "shared_nonprod",',
       ...(opts.infisicalSiteUrl
         ? [
-            '    secret_backend = "infisical",',
+            '    secret_backend = "infisical/default",',
             "    infisical_runtime = {",
             `        "site_url": "${opts.infisicalSiteUrl}",`,
             '        "project_id": "proj_123",',

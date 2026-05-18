@@ -33,7 +33,6 @@ def _deployment_document(ctx):
         "resource_sizing": ctx.attrs.resource_sizing,
         "vault_runtime": ctx.attrs.vault_runtime,
         "secret_backend": ctx.attrs.secret_backend,
-        "secret_backend_profile": ctx.attrs.secret_backend_profile,
         "infisical_runtime": ctx.attrs.infisical_runtime,
         "infisical_secret_mappings": ctx.attrs.infisical_secret_mappings,
         "smoke": smoke,
@@ -79,7 +78,6 @@ deployment_target = rule(
         "resource_sizing": attrs.dict(key = attrs.string(), value = attrs.string(), default = {}),
         "vault_runtime": attrs.dict(key = attrs.string(), value = attrs.string(), default = {}),
         "secret_backend": attrs.string(default = ""),
-        "secret_backend_profile": attrs.string(default = ""),
         "infisical_runtime": attrs.dict(key = attrs.string(), value = attrs.string(), default = {}),
         "infisical_secret_mappings": attrs.dict(
             key = attrs.string(),

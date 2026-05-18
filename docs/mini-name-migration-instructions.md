@@ -314,7 +314,7 @@ Success signals:
 
 ### C1. Infisical-backed deployment readiness
 
-Before switching a protected/shared deployment to `secret_backend = "infisical"`,
+Before switching a protected/shared deployment to `secret_backend = "infisical/default"`,
 confirm the migrated control-plane path can carry Infisical worker metadata
 without moving secret material into the profile or records. For the
 containerized runtime, Infisical Universal Auth credentials are files mounted

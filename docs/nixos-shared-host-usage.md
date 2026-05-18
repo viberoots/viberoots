@@ -110,7 +110,7 @@ deployment-service flags directly to the remote wrapper commands.
 If your `mini` deployments use deployment secrets, Vault remains the default
 backend and its canonical setup instructions live in
 [Vault Production Bootstrap Runbook](vault-production-bootstrap.md). Deployments
-may also select Infisical with `secret_backend = "infisical"` after the
+may also select Infisical with `secret_backend = "infisical/default"` after the
 deployment service and worker are on the current `viberoots` control-plane
 shape. The worker reads only non-secret `infisical_runtime` routing metadata
 from the execution snapshot and resolves the Universal Auth client id and client
@@ -422,7 +422,7 @@ not, update the reviewed identity mapper before retrying the self-service flow.
 
 If `mini` is still on the pre-`viberoots` control-plane identity, run the
 checked migration procedure in [docs/mini-name-migration-instructions.md](mini-name-migration-instructions.md)
-before enabling `secret_backend = "infisical"` on protected/shared
+before enabling `secret_backend = "infisical/default"` on protected/shared
 deployments. The required order is:
 
 1. complete the host checkout, reviewed Git remote, deployment-service

@@ -77,7 +77,7 @@ Vault as the default for every existing deployment.
 - Validate backend metadata shape at extraction/validation time:
   - unsupported `secret_backend` fails
   - omitted backend normalizes to Vault
-  - `secret_backend = "infisical"` with non-empty `secret_requirements` requires
+  - `secret_backend = "infisical/default"` with non-empty `secret_requirements` requires
     `infisical_runtime.site_url`, `project_id`, `environment`, and a reviewed credential source
     unless fixture mode is explicitly active
   - Infisical mapping keys must correspond to declared `secret_requirements`
@@ -122,7 +122,7 @@ Vault as the default for every existing deployment.
 ### 6. Acceptance criteria
 
 - Existing Vault deployments validate without metadata changes.
-- A deployment can declare `secret_backend = "infisical"` and non-secret Infisical runtime metadata.
+- A deployment can declare `secret_backend = "infisical/default"` and non-secret Infisical runtime metadata.
 - Invalid Infisical metadata fails before any admission or provider mutation.
 - Documentation, tests, and extracted metadata all use the same field names and defaulting rules.
 
@@ -497,7 +497,7 @@ generic runtime surface.
   provider lifecycle step is running.
 - Update the reviewed `mini` control-plane migration path so hosts still running the
   pre-`viberoots`-rename control plane can be migrated to the current `viberoots` control plane and
-  then support `secret_backend = "infisical"` for protected/shared deployments through
+  then support `secret_backend = "infisical/default"` for protected/shared deployments through
   `--profile mini`.
 - Migrate provider publishers, provisioners, smoke runners, and release-action execution paths that
   currently call `createVaultDeploymentSecretRuntime(...)` to the neutral helper where they are not
@@ -676,7 +676,7 @@ operator documentation that proves the full Infisical design is implemented.
 ### 2. Scope of changes
 
 - Add a representative Infisical-backed deployment fixture or sample package using
-  `secret_backend = "infisical"`, `infisical_runtime`, and at least one required publish-step
+  `secret_backend = "infisical/default"`, `infisical_runtime`, and at least one required publish-step
   secret.
 - Exercise validate/admit/runtime flows through the public `deploy` front door where possible.
 - Add final stale-name and boundary guardrails:
@@ -742,7 +742,7 @@ operator documentation that proves the full Infisical design is implemented.
   references.
 - Vault-backed deployments and old Vault-admitted replay paths still work.
 - The documented `mini` migration path brings a pre-`viberoots` control plane onto the current
-  `viberoots` service identity and leaves `secret_backend = "infisical"` deployments supported
+  `viberoots` service identity and leaves `secret_backend = "infisical/default"` deployments supported
   through `--profile mini`.
 - All functionality described in `docs/infisical-design.md` is either implemented or explicitly
   preserved as a documented non-goal for a future design, with no untested implemented behavior.
@@ -1075,7 +1075,7 @@ contract ids, lane governance, provider behavior, and replay guarantees intact.
 ### 2. Scope of changes
 
 - Update `//projects/deployments/pleomino-staging:deploy` and
-  `//projects/deployments/pleomino-prod:deploy` so they declare `secret_backend = "infisical"`.
+  `//projects/deployments/pleomino-prod:deploy` so they declare `secret_backend = "infisical/default"`.
 - Preserve `//projects/deployments/pleomino-dev:deploy` on the existing Vault-backed shared-host
   path unless a separate plan explicitly moves dev as well.
 - Refactor `projects/deployments/pleomino-shared/family.bzl` so the shared family defaults no
@@ -1367,13 +1367,13 @@ documented by the implementation PR.
      retention decision.
    - Keep the Infisical IaC state and object ids available so operator-created gaps can be imported
      or reconciled instead of recreated.
-   - Document how to restore `secret_backend = "vault"` for new admissions if live Infisical access
+   - Document how to restore `secret_backend = "vault/default"` for new admissions if live Infisical access
      is unavailable during rollout.
 
 ### 4. Tests to be added
 
 - Add extraction/cquery tests proving Pleomino staging and production emit:
-  - `secret_backend = "infisical"`
+  - `secret_backend = "infisical/default"`
   - reviewed `infisical_runtime` metadata
   - no `infisical_secret_mappings`
   - unchanged `secret_requirements`
@@ -1870,10 +1870,10 @@ use different Infisical accounts or different Vault instances.
   usage lanes. Use `vault-default` for the current Vault behavior and `infisical-default` for the
   initial Infisical host/organization defaults, while allowing future aliases such as
   `infisical-regulated` or `vault-regulated`.
-- Extend or document deployment metadata so deployments can select both a backend kind and a named
-  backend profile or alias, rather than assuming a single repo-global Vault instance or Infisical
-  account. Add or document `secret_backend_profile`, defaulting `vault` deployments to
-  `vault-default` and `infisical` deployments to `infisical-default` when omitted.
+- Extend or document deployment metadata so deployments select both backend kind and named backend
+  profile through the unified `secret_backend = "<backend>/<profile-alias>"` selector, rather than
+  assuming a single repo-global Vault instance or Infisical account. Omitted `secret_backend`
+  defaults to `vault/default`.
 - Keep deployment metadata responsible for selecting the profile alias only. Local/CI resolver
   config owns the account-specific profile details, and admitted run metadata records the concrete
   backend kind/profile/ref used at admission time.
@@ -1897,9 +1897,8 @@ use different Infisical accounts or different Vault instances.
 ### 3. External prerequisites
 
 - None beyond the existing operator access required for Infisical/Vault bootstrap. This PR adopts
-  `repo` and `deployment --target <buck-target>` as the command shape, `secret_backend_profile` as
-  the deployment metadata alias field, and `vault-default` / `infisical-default` as the initial
-  default profile aliases.
+  `repo` and `deployment --target <buck-target>` as the command shape, and `vault-default` /
+  `infisical-default` as the initial default profile aliases.
 
 ### 4. Tests to be added
 
@@ -1917,8 +1916,8 @@ use different Infisical accounts or different Vault instances.
   profile they unlock, including Infisical bootstrap credentials that must not use the Infisical
   `main` backend.
 - Add deployment metadata tests proving existing Vault-backed deployments keep selecting the Vault
-  default profile while Infisical-backed deployments select the intended Infisical profile, both
-  explicitly and through defaults when `secret_backend_profile` is omitted.
+  default profile while Infisical-backed deployments select the intended Infisical profile through
+  the unified selector or omitted default.
 - Add admission metadata tests proving admitted runs record the concrete backend kind, profile alias,
   and backend reference used at admission time so replays do not silently switch profiles.
 - Add deployment-specific selection tests proving the Pleomino OpenTofu module and reviewed
@@ -1972,8 +1971,9 @@ use different Infisical accounts or different Vault instances.
   for the current simple path.
 - Existing Vault-backed deployments remain Vault-backed, and Infisical-backed deployments select the
   intended Infisical profile explicitly or through the documented default.
-- Deployment metadata can set `secret_backend_profile` to select a non-default profile without
-  embedding account-specific secrets or backend coordinates in deployment targets.
+- Deployment metadata can set `secret_backend = "<backend>/<profile-alias>"` to select a
+  non-default profile without embedding account-specific secrets or backend coordinates in
+  deployment targets.
 - Admitted run metadata records the selected backend kind/profile/ref so replay behavior is stable
   across later profile config changes.
 - Pleomino Infisical provisioning still exists, but requires an explicit deployment-specific
@@ -2492,3 +2492,106 @@ default category needed to route access credential refs.
 ### 10. Downsides for implementing this PR
 
 Repo bootstrap becomes stricter about resolver config validity before every repo bootstrap run.
+
+## PR-27: Unified deployment secret backend selector
+
+### 1. Intent
+
+Make deployment secret backend/profile mismatches syntactically unrepresentable by replacing the
+two independent deployment metadata fields with one canonical backend selector. Preserve existing
+runtime shape internally while giving authors a cleaner `secret_backend` contract.
+
+### 2. Scope of changes
+
+- Add support for a unified `secret_backend` selector string with the shape
+  `<backend>/<profile-alias>`, for example:
+  - `vault/default`
+  - `vault/regulated`
+  - `infisical/default`
+  - `infisical/regulated`
+- Normalize unified selectors into the existing internal fields:
+  - `vault/default` becomes `secretBackend: "vault"` and
+    `secretBackendProfile: "vault-default"`.
+  - `infisical/default` becomes `secretBackend: "infisical"` and
+    `secretBackendProfile: "infisical-default"`.
+  - Non-default aliases are prefixed by backend, such as
+    `infisical/regulated` -> `infisical-regulated`.
+- Keep omitted `secret_backend` defaulting to `vault/default`.
+- Reject bare backend values such as `secret_backend = "vault/default"` or `"infisical"`;
+  deployment metadata must use the unified selector when it declares a backend explicitly.
+- Remove public deployment metadata support for `secret_backend_profile`.
+- Keep resolver profile names unchanged. This PR changes only deployment metadata authoring and
+  normalization, not SprinkleRef resolver config shape.
+
+### 3. External prerequisites
+
+- None. This PR is a metadata parser/validation compatibility improvement and does not require live
+  Infisical, Vault, OpenTofu, or resolver backend access.
+
+### 4. Tests to be added
+
+- Add deployment metadata tests proving:
+  - omitted `secret_backend` still normalizes to `vault/default`;
+  - `secret_backend = "vault/default"` normalizes to `vault-default`;
+  - `secret_backend = "infisical/default"` normalizes to `infisical-default`;
+  - non-default aliases such as `infisical/regulated` normalize to
+    `infisical-regulated`;
+  - malformed selectors fail with clear remediation;
+  - bare backend values and `secret_backend_profile` fail validation.
+- Add admission metadata tests proving admitted contexts and admitted secret references still record
+  the normalized backend kind and profile alias after unified selector parsing.
+- Add cquery or contract extraction coverage for at least one checked-in or fixture deployment that
+  uses the unified selector form.
+
+### 5. Docs to be added or updated
+
+- Update `docs/infisical-design.md` to make the unified `secret_backend =
+"<backend>/<profile-alias>"` selector the only explicit backend-selection contract.
+- Update `infisical-bootstrap.md`, `docs/sprinkleref.md`, and deployment metadata docs/examples
+  that discuss backend profile selection.
+- Update this plan only for the transition policy if implementation discovers additional
+  compatibility constraints.
+
+### 5.5. Expected regression scope
+
+- `deployment-only`
+- Keep changes limited to deployment metadata extraction/validation, admission metadata
+  normalization, focused tests, and docs. Do not change resolver config format, secret runtime
+  backend behavior, Infisical/Vault API calls, or bootstrap credential sink semantics.
+
+### 6. Acceptance criteria
+
+- New deployment metadata can express backend and profile selection with one selector that cannot
+  syntactically pair Vault with an Infisical-prefixed profile or Infisical with a Vault-prefixed
+  profile.
+- Bare backend values and `secret_backend_profile` are rejected on the public metadata surface.
+- Internal normalized deployment contracts continue exposing `secretBackend` and
+  `secretBackendProfile` so existing admission/runtime code does not need a broad refactor.
+- Admitted contexts and admitted secret references continue recording the normalized backend kind
+  and profile alias.
+- Focused tests cover unified selectors, split-form rejection, and malformed selector remediation.
+
+### 7. Risks
+
+- Existing deployments or fixtures that still use bare backend values need to migrate to the
+  unified selector.
+- A selector string is compact but can hide the normalization rule if docs do not show examples.
+- Backend-local aliases such as `default` and `regulated` must normalize deterministically to the
+  existing global profile names used by resolver config.
+
+### 8. Mitigations
+
+- Emit validation errors that explain the preferred unified selector and the normalized profile
+  name.
+- Document the selector grammar and examples near deployment metadata authoring docs.
+- Keep resolver profile names unchanged so operators do not need to rename resolver configs.
+
+### 9. Consequences of not implementing this PR
+
+Deployment metadata can continue to express contradictory backend/profile pairs that are only
+detected by later validation or assessment, making backend selection harder to reason about.
+
+### 10. Downsides for implementing this PR
+
+The metadata parser becomes stricter and existing bare-backend fixtures must be migrated in the
+same PR.

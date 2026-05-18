@@ -52,7 +52,7 @@ function errorsFor(runtime: Record<string, unknown>, secretRequirements = [requi
       lane_policy: "//projects/deployments/pleomino-shared:lane",
       environment_stage: "staging",
       admission_policy: "//projects/deployments/pleomino-shared:staging_release",
-      secret_backend: "infisical",
+      secret_backend: "infisical/default",
       secret_requirements: secretRequirements,
       runtime_config_requirements: [],
       infisical_runtime: runtime,

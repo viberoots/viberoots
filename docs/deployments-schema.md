@@ -12,32 +12,31 @@ Authoritative source: the canonical deployment rule in `projects/deployments/<de
 
 Minimum fields:
 
-| Field                           | Required                                         | Notes                                                                                                                                                               |
-| ------------------------------- | ------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `name`                          | yes                                              | Canonical target name, normally `deploy`.                                                                                                                           |
-| `provider`                      | yes                                              | Provider family identifier.                                                                                                                                         |
-| `provider_target`               | yes                                              | Structured provider-target identity object.                                                                                                                         |
-| `components`                    | yes                                              | Non-empty list of deployable component descriptors.                                                                                                                 |
-| `publisher`                     | yes                                              | Structured publish contract.                                                                                                                                        |
-| `protection_class`              | yes                                              | `local_only`, `shared_nonprod`, or `production_facing`.                                                                                                             |
-| `secret_requirements`           | yes                                              | `{}` allowed and reviewable.                                                                                                                                        |
-| `runtime_config_requirements`   | yes                                              | `{}` allowed; declares non-secret runtime config inputs.                                                                                                            |
-| `external_requirement_profiles` | no                                               | Names reviewed external provider or product requirement families whose typed secret/runtime-config declarations must be present and correctly scoped.               |
-| `provisioner`                   | no                                               | Present only when provisioning is deployment-owned.                                                                                                                 |
-| `release_actions`               | no                                               | Present only when release-time actions are needed.                                                                                                                  |
-| `migration_bundle`              | no                                               | Optional Buck-visible migration bundle artifact reference for foundation deployments that own reviewed schema migration inputs.                                     |
-| `smoke`                         | yes for protected/shared                         | Optional for `local_only`.                                                                                                                                          |
-| `preview`                       | no                                               | Explicit opt-in only.                                                                                                                                               |
-| `prerequisites`                 | no                                               | Explicit direct-edge deployment prerequisites.                                                                                                                      |
-| `secret_backend`                | no                                               | Deployment-wide backend for `secret_requirements`; omitted means `vault`. Allowed values are `vault` and `infisical`.                                               |
-| `secret_backend_profile`        | no                                               | Named resolver profile alias for the selected backend. Omitted means `vault-default` for Vault and `infisical-default` for Infisical.                               |
-| `vault_runtime`                 | no                                               | Stable Vault/IdP runtime metadata for deployment-derived JWT auth. Secret values must not be stored here.                                                           |
-| `infisical_runtime`             | no                                               | Non-secret Infisical routing metadata such as `site_url`, `project_id`, `environment`, and reviewed Universal Auth environment variable names.                      |
-| `infisical_secret_mappings`     | no                                               | Optional map from declared `secret_requirements` contract IDs to non-secret `secret_path` and `secret_name` overrides.                                              |
-| `lane_policy`                   | yes for `shared_nonprod` and `production_facing` | Must resolve to authoritative policy object.                                                                                                                        |
-| `environment_stage`             | yes for `shared_nonprod` and `production_facing` | Must be defined by the lane policy.                                                                                                                                 |
-| `admission_policy`              | yes for `shared_nonprod` and `production_facing` | Repo-owned policy reference.                                                                                                                                        |
-| `rollout_policy`                | no                                               | Required when behavior differs from provider default, and also required for protected/shared multi-component deployments even when they match the provider default. |
+| Field                           | Required                                         | Notes                                                                                                                                                                                      |
+| ------------------------------- | ------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `name`                          | yes                                              | Canonical target name, normally `deploy`.                                                                                                                                                  |
+| `provider`                      | yes                                              | Provider family identifier.                                                                                                                                                                |
+| `provider_target`               | yes                                              | Structured provider-target identity object.                                                                                                                                                |
+| `components`                    | yes                                              | Non-empty list of deployable component descriptors.                                                                                                                                        |
+| `publisher`                     | yes                                              | Structured publish contract.                                                                                                                                                               |
+| `protection_class`              | yes                                              | `local_only`, `shared_nonprod`, or `production_facing`.                                                                                                                                    |
+| `secret_requirements`           | yes                                              | `{}` allowed and reviewable.                                                                                                                                                               |
+| `runtime_config_requirements`   | yes                                              | `{}` allowed; declares non-secret runtime config inputs.                                                                                                                                   |
+| `external_requirement_profiles` | no                                               | Names reviewed external provider or product requirement families whose typed secret/runtime-config declarations must be present and correctly scoped.                                      |
+| `provisioner`                   | no                                               | Present only when provisioning is deployment-owned.                                                                                                                                        |
+| `release_actions`               | no                                               | Present only when release-time actions are needed.                                                                                                                                         |
+| `migration_bundle`              | no                                               | Optional Buck-visible migration bundle artifact reference for foundation deployments that own reviewed schema migration inputs.                                                            |
+| `smoke`                         | yes for protected/shared                         | Optional for `local_only`.                                                                                                                                                                 |
+| `preview`                       | no                                               | Explicit opt-in only.                                                                                                                                                                      |
+| `prerequisites`                 | no                                               | Explicit direct-edge deployment prerequisites.                                                                                                                                             |
+| `secret_backend`                | no                                               | Deployment-wide backend selector for `secret_requirements`; omitted means `vault/default`. Preferred shape is `<backend>/<profile-alias>`, such as `vault/default` or `infisical/default`. |
+| `vault_runtime`                 | no                                               | Stable Vault/IdP runtime metadata for deployment-derived JWT auth. Secret values must not be stored here.                                                                                  |
+| `infisical_runtime`             | no                                               | Non-secret Infisical routing metadata such as `site_url`, `project_id`, `environment`, and reviewed Universal Auth environment variable names.                                             |
+| `infisical_secret_mappings`     | no                                               | Optional map from declared `secret_requirements` contract IDs to non-secret `secret_path` and `secret_name` overrides.                                                                     |
+| `lane_policy`                   | yes for `shared_nonprod` and `production_facing` | Must resolve to authoritative policy object.                                                                                                                                               |
+| `environment_stage`             | yes for `shared_nonprod` and `production_facing` | Must be defined by the lane policy.                                                                                                                                                        |
+| `admission_policy`              | yes for `shared_nonprod` and `production_facing` | Repo-owned policy reference.                                                                                                                                                               |
+| `rollout_policy`                | no                                               | Required when behavior differs from provider default, and also required for protected/shared multi-component deployments even when they match the provider default.                        |
 
 Single-provider invariant:
 
@@ -49,9 +48,12 @@ Secret backend invariant:
 
 - `secret_requirements` remains the only secret declaration surface
 - `secret_backend` selects one backend for the whole deployment and defaults to
-  `vault`
-- `secret_backend_profile` selects only a named resolver profile alias; account-specific backend
-  coordinates and credentials stay in local/CI SprinkleRef resolver config
+  `vault/default`
+- preferred values use `<backend>/<profile-alias>` and normalize to existing
+  backend-prefixed resolver profiles such as `vault-default` or
+  `infisical-regulated`
+- account-specific backend coordinates and credentials stay in local/CI
+  SprinkleRef resolver config
 - Infisical metadata is routing data only; access tokens, client secrets,
   personal tokens, secret values, and rendered secret-bearing configs are
   rejected from reviewed metadata
