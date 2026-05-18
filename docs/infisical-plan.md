@@ -2517,7 +2517,7 @@ runtime shape internally while giving authors a cleaner `secret_backend` contrac
   - Non-default aliases are prefixed by backend, such as
     `infisical/regulated` -> `infisical-regulated`.
 - Keep omitted `secret_backend` defaulting to `vault/default`.
-- Reject bare backend values such as `secret_backend = "vault/default"` or `"infisical"`;
+- Reject bare backend values such as `secret_backend = "vault"` or `"infisical"`;
   deployment metadata must use the unified selector when it declares a backend explicitly.
 - Remove public deployment metadata support for `secret_backend_profile`.
 - Keep resolver profile names unchanged. This PR changes only deployment metadata authoring and
