@@ -21,6 +21,17 @@ Remediate: build-tools/tools/deployments/infisical-bootstrap.ts repo --dry-run, 
   }
 }
 
+export function assertBootstrapAccessCredentialSinkCanWrite(resolved: ResolvedSprinkleRefBackend) {
+  if (resolved.profile?.startsWith("infisical")) {
+    throw new Error(`Infisical access credential sink category ${resolved.category} must not use an Infisical profile.
+Remediate: choose a non-Infisical SprinkleRef category such as bootstrap, or update the selected category with sprinkleref --resolver-entry --update ${resolved.category} --backend local-file --file .local/infisical/bootstrap/credentials.json --config <resolver-config>`);
+  }
+  if (resolved.backend.backend === "infisical") {
+    throw new Error(`Infisical access credential sink category ${resolved.category} must not use an Infisical backend.
+Remediate: choose a non-Infisical SprinkleRef category such as bootstrap, or update the selected category with sprinkleref --resolver-entry --update ${resolved.category} --backend local-file --file .local/infisical/bootstrap/credentials.json --config <resolver-config>`);
+  }
+}
+
 export function resolveBootstrapSprinkleRefBackend(
   config: SprinkleRefConfig,
   category: string,
@@ -28,6 +39,27 @@ export function resolveBootstrapSprinkleRefBackend(
   try {
     const resolved = resolveSprinkleRefBackend(config, category);
     assertBootstrapCategoryCanWrite(resolved);
+    return resolved;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (
+      category === "bootstrap" &&
+      /SprinkleRef (category bootstrap|profile .* not)/.test(message)
+    ) {
+      throw new Error(`${message}
+${bootstrapResolverRemediation()}`);
+    }
+    throw error;
+  }
+}
+
+export function resolveBootstrapAccessCredentialSinkBackend(
+  config: SprinkleRefConfig,
+  category: string,
+): ResolvedSprinkleRefBackend {
+  try {
+    const resolved = resolveSprinkleRefBackend(config, category);
+    assertBootstrapAccessCredentialSinkCanWrite(resolved);
     return resolved;
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);

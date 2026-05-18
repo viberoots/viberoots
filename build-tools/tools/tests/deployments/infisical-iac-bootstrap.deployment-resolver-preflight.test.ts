@@ -14,7 +14,7 @@ test("deployment bootstrap rejects unsafe auto resolver before remote mutation",
     [
       "unsafe",
       unsafeInfisicalBootstrapConfig(),
-      /bootstrap category must not use an Infisical backend/,
+      /access credential sink category bootstrap must not use an Infisical backend/,
     ],
     ["missing", missingBootstrapConfig(), /category bootstrap is not configured[\s\S]*Remediate:/],
   ] as const) {

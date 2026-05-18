@@ -2360,3 +2360,71 @@ responses that only expose exact version metadata on ordinary value reads.
 
 The admission path performs one extra Infisical read for servers that omit version metadata from
 metadata-only responses.
+
+## PR-25: Bootstrap credential sink category closure
+
+### 1. Intent
+
+Close the remaining design assessment gap that allowed bootstrap Infisical access credentials to be
+written to an Infisical-backed SprinkleRef category by selecting a category other than the literal
+`bootstrap` lane.
+
+### 2. Scope of changes
+
+- Add a bootstrap-command credential-sink guard that rejects any selected SprinkleRef category or
+  profile resolving to Infisical when storing Infisical access/bootstrap credentials.
+- Preserve the existing literal `bootstrap` category guard for generic SprinkleRef add/update/remove
+  and check flows.
+- Keep custom non-Infisical access categories supported for operators who intentionally separate
+  bootstrap access credentials from the default `bootstrap` category.
+
+### 3. External prerequisites
+
+- None. This PR is local validation and tests only.
+
+### 4. Tests to be added
+
+- Add regression tests proving `--credential-sink sprinkleref --sprinkle-category main` fails when
+  `main` resolves through an Infisical profile.
+- Add regression tests proving a custom selected category fails when it directly uses an Infisical
+  backend.
+- Keep the existing custom local-file category test passing.
+
+### 5. Docs to be added or updated
+
+- Update this plan only unless user-facing command docs need remediation wording changes.
+
+### 5.5. Expected regression scope
+
+- `deployment-only`
+- Keep changes limited to bootstrap credential sink validation and focused tests. Do not change
+  application secret storage, generic SprinkleRef category semantics, or Infisical API behavior.
+
+### 6. Acceptance criteria
+
+- Bootstrap/deployment access credentials cannot be written to Infisical through any selected
+  SprinkleRef category or profile.
+- Non-Infisical selected categories remain supported for access credential lifecycle handoff.
+- Literal `bootstrap` category protections for generic SprinkleRef paths remain unchanged.
+- Focused tests cover both profile-backed and direct Infisical-backed selected categories and the
+  repository validation suite passes.
+
+### 7. Risks
+
+- Operators with experimental `--sprinkle-category main` flows backed by Infisical will now fail.
+
+### 8. Mitigations
+
+- Error messages should name the selected category and tell the operator to choose or update a
+  non-Infisical category such as `bootstrap`.
+
+### 9. Consequences of not implementing this PR
+
+Bootstrap Universal Auth credentials can be stored in the same Infisical account they unlock,
+breaking the bootstrap trust boundary.
+
+### 10. Downsides for implementing this PR
+
+The bootstrap credential sink path becomes stricter than generic SprinkleRef operations for
+non-`bootstrap` categories, but only when the bootstrap command is storing Infisical access
+credentials.

@@ -108,6 +108,59 @@ test("--sprinkle-category selects access credential lifecycle category only", as
   });
 });
 
+test("--sprinkle-category rejects Infisical-backed access credential categories", async () => {
+  const dir = await tmp();
+  const config = path.join(dir, "sprinkleref.json");
+  await fs.writeFile(
+    config,
+    JSON.stringify({
+      version: 1,
+      defaultCategory: "main",
+      profiles: {
+        "infisical-default": {
+          backend: "infisical",
+          host: "https://app.infisical.com",
+          projectId: "project",
+          defaultEnvironment: "staging",
+          clientIdEnv: "INFISICAL_CLIENT_ID",
+          clientSecretEnv: "INFISICAL_CLIENT_SECRET",
+        },
+      },
+      categories: {
+        main: { profile: "infisical-default" },
+        access: {
+          backend: "infisical",
+          host: "https://app.infisical.com",
+          projectId: "project",
+          defaultEnvironment: "staging",
+          tokenEnv: "INFISICAL_TOKEN",
+        },
+        bootstrap: { backend: "local-file", file: path.join(dir, "bootstrap.json") },
+      },
+    }),
+  );
+  await withEnvConfig(config, async () => {
+    await assert.rejects(
+      () =>
+        resolveCredentialSinkSelection({
+          ...DEFAULT_BOOTSTRAP_ARGS,
+          credentialSink: "sprinkleref",
+          sprinkleCategory: "main",
+        }),
+      /access credential sink category main must not use an Infisical profile/,
+    );
+    await assert.rejects(
+      () =>
+        resolveCredentialSinkSelection({
+          ...DEFAULT_BOOTSTRAP_ARGS,
+          credentialSink: "sprinkleref",
+          sprinkleCategory: "access",
+        }),
+      /access credential sink category access must not use an Infisical backend/,
+    );
+  });
+});
+
 test("explicit macOS Keychain sink is not overridden by SprinkleRef config", async () => {
   const dir = await tmp();
   const config = await writeResolverConfig(dir);

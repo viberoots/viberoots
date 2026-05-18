@@ -140,7 +140,7 @@ export async function createCredentialSink(
 
 async function resolvedSprinkleRefBackend(args: BootstrapArgs, configPath?: string) {
   const config = await readSprinkleRefConfig(configPath);
-  return bootstrapGuard.resolveBootstrapSprinkleRefBackend(
+  return bootstrapGuard.resolveBootstrapAccessCredentialSinkBackend(
     config,
     args.sprinkleCategory || "bootstrap",
   );

@@ -153,7 +153,7 @@ test("bootstrap credentials cannot resolve through an Infisical backend or profi
           { ...DEFAULT_BOOTSTRAP_ARGS, credentialSink: "sprinkleref" },
           { platform: "linux", env: {} },
         ),
-      /bootstrap category must not use an Infisical profile[\s\S]*Remediate:/,
+      /access credential sink category bootstrap must not use an Infisical profile[\s\S]*Remediate:/,
     );
   });
 });
