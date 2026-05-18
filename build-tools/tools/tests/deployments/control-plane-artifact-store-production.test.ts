@@ -26,7 +26,7 @@ import {
 } from "./nixos-shared-host.fixture";
 import {
   memoryControlPlaneArtifactStore,
-  tmpControlPlaneDirs,
+  tmpControlPlaneDirsForSubmission,
 } from "./control-plane-artifact-store-test-helpers";
 import { writeDemoArtifact } from "./nixos-shared-host.control-plane.helpers";
 
@@ -41,6 +41,25 @@ function uploadAdmission(tmp: string, uploadSessionId: string, objectStore?: any
     ...(objectStore ? { objectStore } : {}),
   });
 }
+
+test("submission temp-dir scan ignores unrelated malformed control-plane temp dirs", async () => {
+  const corrupt = await fsp.mkdtemp(path.join(os.tmpdir(), "vbr-control-plane-"));
+  const matching = await fsp.mkdtemp(path.join(os.tmpdir(), "vbr-control-plane-"));
+  try {
+    await fsp.writeFile(path.join(corrupt, "submission.json"), "{");
+    await fsp.writeFile(
+      path.join(matching, "submission.json"),
+      JSON.stringify({ submissionId: "current-submission" }),
+    );
+    assert.deepEqual(
+      await tmpControlPlaneDirsForSubmission("current-submission"),
+      new Set([path.basename(matching)]),
+    );
+  } finally {
+    await fsp.rm(corrupt, { recursive: true, force: true });
+    await fsp.rm(matching, { recursive: true, force: true });
+  }
+});
 
 test("worker fails closed on object mismatch before provider execution", async () => {
   await runInTemp("control-plane-artifact-worker-mismatch", async (tmp, $) => {
@@ -82,7 +101,6 @@ test("worker fails closed on object mismatch before provider execution", async (
         provenance_json: JSON.stringify(snapshot.action.publishInput.artifact.object.provenance),
       },
     });
-    const beforeTempDirs = await tmpControlPlaneDirs();
     await assert.rejects(
       () =>
         runNixosSharedHostControlPlaneWorkerOnce({
@@ -94,8 +112,10 @@ test("worker fails closed on object mismatch before provider execution", async (
         }),
       /artifact object (digest|size) mismatch/,
     );
-    const afterTempDirs = await tmpControlPlaneDirs();
-    assert.deepEqual(afterTempDirs, beforeTempDirs);
+    assert.deepEqual(
+      await tmpControlPlaneDirsForSubmission(prepared.submission.submissionId),
+      new Set(),
+    );
   });
 });
 

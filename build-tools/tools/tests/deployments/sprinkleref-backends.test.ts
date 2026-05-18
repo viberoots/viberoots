@@ -198,6 +198,7 @@ test("auto sink reports SprinkleRef semantics when config is present", async () 
       bootstrapIdentity: { id: "identity", name: "iac-bootstrap" },
       metadata: {},
     });
+    assert.equal(handoff.sprinkleCategory, "bootstrap");
     assert.equal(handoff.credentialSink, "sprinkleref");
     assert.equal(handoff.credentialSinkBackend, "local-file");
     assert.equal(handoff.resolverHandoff.targetCategory, "bootstrap");

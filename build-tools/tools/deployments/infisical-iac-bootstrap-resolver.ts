@@ -5,6 +5,7 @@ import { readGraph, type GraphNode } from "../lib/graph";
 import { defaultDeploymentSecretBackendProfile } from "./deployment-secret-profile";
 import { resolverConfigPath } from "./infisical-iac-bootstrap-preflight";
 import { readSprinkleRefConfig } from "./sprinkleref-config";
+import { resolveBootstrapAccessCredentialSinkBackend } from "./sprinkleref-bootstrap-guard";
 import { initSprinkleRefConfigs } from "./sprinkleref-templates";
 import type { SprinkleRefConfig } from "./sprinkleref-types";
 import type { DeploymentSecretBackendKind } from "./deployment-sprinkle-ref";
@@ -73,6 +74,7 @@ export function validateRepoResolverConfig(
       throw new Error(`SprinkleRef config missing category ${category}`);
     }
   }
+  resolveBootstrapAccessCredentialSinkBackend(config, "bootstrap");
 }
 
 function bootstrapCredentialProfiles(config: SprinkleRefConfig, requiredProfiles: Set<string>) {

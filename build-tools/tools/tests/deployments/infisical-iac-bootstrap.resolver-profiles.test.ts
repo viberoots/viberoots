@@ -126,6 +126,43 @@ test("repo bootstrap validates non-default profiles selected by deployment metad
   });
 });
 
+test("repo bootstrap validates bootstrap category even with explicit credential sinks", async () => {
+  const dir = await tmp();
+  await withCwdAndEnv(dir, async () => {
+    await writeJson("sprinkleref/selected.local.json", {
+      version: 1,
+      defaultCategory: "main",
+      profiles: {
+        "vault-default": { backend: "local-file", file: ".local/vault.json" },
+        "infisical-default": {
+          backend: "infisical",
+          host: "https://app.infisical.com",
+          projectId: "project",
+          defaultEnvironment: "staging",
+          clientIdEnv: "INFISICAL_CLIENT_ID",
+          clientSecretEnv: "INFISICAL_CLIENT_SECRET",
+        },
+      },
+      categories: {
+        main: { profile: "infisical-default" },
+        bootstrap: { profile: "infisical-default" },
+      },
+    });
+    await writeGraph([{ name: "//deployments/infisical:deploy", secret_backend: "infisical" }]);
+    for (const credentialSink of ["local-file", "macos-keychain"] as const) {
+      await assert.rejects(
+        () =>
+          runInfisicalIacBootstrap({
+            ...DEFAULT_BOOTSTRAP_ARGS,
+            credentialSink,
+            yes: true,
+          }),
+        /access credential sink category bootstrap must not use an Infisical profile[\s\S]*Remediate:/,
+      );
+    }
+  });
+});
+
 test("bootstrap credentials cannot resolve through an Infisical backend or profile", async () => {
   const dir = await tmp();
   await withCwdAndEnv(dir, async () => {

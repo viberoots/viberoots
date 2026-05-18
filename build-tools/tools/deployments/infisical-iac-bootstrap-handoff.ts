@@ -14,12 +14,13 @@ export function buildCredentialHandoffReport(opts: {
   metadata: DeploymentRuntimeMetadata;
 }) {
   const bootstrapRefs = bootstrapCredentialRefs(opts.bootstrapIdentity);
+  const targetCategory = opts.sinkSelection.category || opts.args.sprinkleCategory || "bootstrap";
   return {
     schemaVersion: "infisical-iac-bootstrap-handoff@1",
     credentialSink: opts.sinkSelection.kind,
     credentialSinkBackend: opts.sinkSelection.backend,
     sinkDescription: opts.sinkDescription,
-    sprinkleCategory: opts.args.sprinkleCategory,
+    sprinkleCategory: targetCategory,
     bootstrapCredentialRefs: bootstrapRefs,
     deploymentCredentials: (opts.metadata.deploymentCredentials ?? []).map((item) => ({
       stage: item.stage,
@@ -33,7 +34,7 @@ export function buildCredentialHandoffReport(opts: {
       clientSecretFileName: item.clientSecretFileName,
     })),
     resolverHandoff: {
-      targetCategory: opts.args.sprinkleCategory,
+      targetCategory,
       refs: [
         bootstrapRefs.clientIdRef,
         bootstrapRefs.clientSecretRef,

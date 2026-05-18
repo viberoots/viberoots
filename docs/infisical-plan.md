@@ -2428,3 +2428,67 @@ breaking the bootstrap trust boundary.
 The bootstrap credential sink path becomes stricter than generic SprinkleRef operations for
 non-`bootstrap` categories, but only when the bootstrap command is storing Infisical access
 credentials.
+
+## PR-26: Bootstrap resolver validation and handoff closure
+
+### 1. Intent
+
+Close the remaining design assessment gaps in repo resolver validation and deployment credential
+handoff metadata after the repo-wide bootstrap split.
+
+### 2. Scope of changes
+
+- Make repo bootstrap resolver validation reject an unsafe `bootstrap` category even when the
+  selected credential sink is explicit `local-file` or `macos-keychain`.
+- Keep the validation scoped to the repo resolver config contract; do not change explicit sink
+  storage behavior.
+- Normalize handoff reports so the default selected access credential category is materialized as
+  `bootstrap` instead of omitted.
+
+### 3. External prerequisites
+
+- None. This PR is local validation and tests only.
+
+### 4. Tests to be added
+
+- Add a repo-bootstrap regression test proving `--credential-sink local-file` still rejects a
+  resolver config whose `bootstrap` category resolves through Infisical.
+- Add or tighten handoff report assertions proving the default selected SprinkleRef category is
+  emitted as `bootstrap`.
+
+### 5. Docs to be added or updated
+
+- Update this plan only unless user-facing output text changes.
+
+### 5.5. Expected regression scope
+
+- `deployment-only`
+- Keep changes limited to repo bootstrap resolver validation and credential handoff metadata.
+
+### 6. Acceptance criteria
+
+- Repo bootstrap cannot report an unsafe resolver config as valid when `bootstrap` points to
+  Infisical.
+- The default deployment handoff JSON includes `sprinkleCategory: "bootstrap"` and
+  `resolverHandoff.targetCategory: "bootstrap"`.
+- Existing custom non-Infisical category behavior remains unchanged.
+- Focused tests and the repository validation suite pass.
+
+### 7. Risks
+
+- Existing resolver configs with an unsafe `bootstrap` category will fail earlier during repo
+  bootstrap, even when operators are temporarily writing credentials to an explicit local sink.
+
+### 8. Mitigations
+
+- Reuse the existing bootstrap credential sink remediation text so the failure names the category
+  and points to a non-Infisical backend fix.
+
+### 9. Consequences of not implementing this PR
+
+Repo bootstrap can validate an unsafe resolver config, and deployment handoff output can omit the
+default category needed to route access credential refs.
+
+### 10. Downsides for implementing this PR
+
+Repo bootstrap becomes stricter about resolver config validity before every repo bootstrap run.
