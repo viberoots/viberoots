@@ -27,7 +27,6 @@ test("scanner discovers deployment refs and skips generated paths", async () => 
     { file: "src/contract.txt", line: 1 },
   ]);
 });
-
 test("scanner skips tracked directory symlinks", async () => {
   const dir = await gitRepo();
   await fs.mkdir(path.join(dir, "store-dir"));
@@ -41,7 +40,6 @@ test("scanner skips tracked directory symlinks", async () => {
     ["config://deployments/demo/public_url"],
   );
 });
-
 test("scanner skips docs, test fixtures, and placeholder refs", async () => {
   const dir = await gitRepo();
   await writeTracked(dir, "src/contract.txt", "secret://deployments/real/api_token\n");
@@ -173,7 +171,9 @@ test("check exposes stable usage and resolver access exit codes", async () => {
     (error: any) =>
       error.exitCode === 2 &&
       /resolver config not found/.test(error.message) &&
-      /repo --dry-run[\s\S]*sprinkleref --init sprinkleref/.test(error.message),
+      /infisical-bootstrap\.ts repo --dry-run[\s\S]*sprinkleref --init sprinkleref/.test(
+        error.message,
+      ),
   );
 });
 

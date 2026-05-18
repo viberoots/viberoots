@@ -21,10 +21,10 @@ It must not manage application secrets such as `cloudflare_api_token`. Those bel
 Primary commands:
 
 ```bash
-build-tools/tools/deployments/infisical-iac-bootstrap.ts repo --dry-run
-build-tools/tools/deployments/infisical-iac-bootstrap.ts repo --yes
-build-tools/tools/deployments/infisical-iac-bootstrap.ts deployment --target <buck-target> --dry-run
-build-tools/tools/deployments/infisical-iac-bootstrap.ts deployment --target <buck-target> --yes
+build-tools/tools/deployments/infisical-bootstrap.ts repo --dry-run
+build-tools/tools/deployments/infisical-bootstrap.ts repo --yes
+build-tools/tools/deployments/infisical-bootstrap.ts deployment --target <buck-target> --dry-run
+build-tools/tools/deployments/infisical-bootstrap.ts deployment --target <buck-target> --yes
 ```
 
 `repo` initializes and validates the repo-wide SprinkleRef resolver/profile boundary only. It
@@ -201,6 +201,33 @@ Rotation:
 - `--force-overwrite-local-credentials` is required before replacing existing selected-sink credential values.
 - Old remote client-secret records are preserved unless a separate reviewed revocation flow is added.
 
+## Infisical Runtime Metadata
+
+Deployment targets may declare `infisical_runtime` as non-secret routing and credential-source
+metadata for Infisical-backed secret requirements. Accepted keys are:
+
+- `site_url`
+- `project_id`
+- `environment`
+- `secret_path`
+- `secret_path_prefix`
+- `machine_identity_client_id_env`
+- `machine_identity_client_secret_env`
+- `machine_identity_client_id_file_name`
+- `machine_identity_client_secret_file_name`
+- `machine_identity_id`
+- `preferred_credential_source`
+- `access_token_ttl_seconds`
+- `access_token_max_uses`
+
+These fields may name reviewed environment variables or non-secret routing identifiers, but they
+must not contain secret values, personal tokens, access tokens, service tokens, exported `.env`
+content, or rendered provider config.
+
+Token-style env indirections are intentionally rejected. Do not add `token_env`,
+`access_token_env`, `personal_token_env`, or `secret_value_env` to `infisical_runtime`; validation
+reports each of those keys as unsupported.
+
 ## SprinkleRef Resolution
 
 Stable references should stay backend-neutral. Do not encode concrete backends like `jenkins`, `github`, or `macos-keychain` in the URI.
@@ -343,6 +370,10 @@ selects macOS Keychain on macOS and local `0600` files elsewhere. Existing resol
 authoritative and are not overwritten. In `--dry-run`, bootstrap reports the starter backend it
 would use but does not create resolver config files.
 
+Deployment bootstrap performs this resolver-config creation or validation before opening Infisical,
+running OpenTofu, or writing any credential sink output. Missing `--yes` and unsafe bootstrap
+category mappings fail without local resolver, remote Infisical, OpenTofu, or credential mutations.
+
 ## Credential Sinks
 
 Credential sink priority:
@@ -397,7 +428,7 @@ Required flags/capabilities:
 
 - `--category <name>` optionally selects the SprinkleRef resolver category.
 - If `--category` is omitted, use the main/default secret backend category. For this deployment, that resolves to Infisical after bootstrap.
-- `--category bootstrap` writes to the bootstrap/control-plane backend, not Infisical. Use this for credentials required to access Infisical or Vault.
+- `--category bootstrap` writes to the bootstrap/control-plane backend, not Infisical. Use this for credentials required to access Infisical or Vault. Generic SprinkleRef add, update, remove, check, and resolver-entry edit paths reject `bootstrap` when it resolves to an Infisical backend or an Infisical profile.
 - `--add <secret-ref>` creates a new secret value and fails if the ref already exists unless an explicit overwrite flag is provided.
 - `--update <secret-ref>` updates an existing value and fails if the ref is missing unless an explicit create flag is provided.
 - `--remove <secret-ref>` deletes/removes the value from the resolved backend after confirmation unless `--yes` is provided.

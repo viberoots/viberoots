@@ -21,7 +21,7 @@ test("bootstrap preflight rejects missing --yes before local or remote side effe
 test("bootstrap preflight retry command includes the explicit repo mode", () => {
   assert.match(
     bootstrapRetryMessage({ ...DEFAULT_BOOTSTRAP_ARGS, yes: false, dryRun: false }),
-    /infisical-iac-bootstrap\.ts repo .*--yes/,
+    /infisical-bootstrap\.ts repo .*--yes/,
   );
 });
 
@@ -34,7 +34,7 @@ test("bootstrap preflight retry command includes deployment target scope", () =>
       yes: false,
       dryRun: false,
     }),
-    /infisical-iac-bootstrap\.ts deployment --target \/\/projects\/deployments\/pleomino-staging:deploy .*--yes/,
+    /infisical-bootstrap\.ts deployment --target \/\/projects\/deployments\/pleomino-staging:deploy .*--yes/,
   );
 });
 
@@ -132,11 +132,6 @@ async function withCwdAndEnv(dir: string, run: () => Promise<void>) {
     if (oldConfig === undefined) delete process.env.SPRINKLEREF_CONFIG;
     else process.env.SPRINKLEREF_CONFIG = oldConfig;
   }
-}
-
-async function writeJson(file: string, value: unknown) {
-  await fs.mkdir(path.dirname(file), { recursive: true });
-  await fs.writeFile(file, `${JSON.stringify(value, null, 2)}\n`);
 }
 
 function bootstrapRetryMessage(args: typeof DEFAULT_BOOTSTRAP_ARGS) {

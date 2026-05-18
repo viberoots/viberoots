@@ -630,7 +630,7 @@ step instead of editing Keycloak by hand.
   organization ids:
 
 ```bash
-build-tools/tools/deployments/infisical-iac-bootstrap.ts \
+build-tools/tools/deployments/infisical-bootstrap.ts \
   deployment \
   --target //projects/deployments/pleomino-staging:deploy \
   --org-name viberoots \
@@ -645,7 +645,7 @@ selector:
 
 ```bash
 INFISICAL_ACCESS_TOKEN='<redacted>' \
-  build-tools/tools/deployments/infisical-iac-bootstrap.ts \
+  build-tools/tools/deployments/infisical-bootstrap.ts \
   deployment \
   --target //projects/deployments/pleomino-staging:deploy \
   --no-login \

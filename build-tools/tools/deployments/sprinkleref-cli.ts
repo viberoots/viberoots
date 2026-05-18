@@ -9,6 +9,7 @@ import {
   resolveSprinkleRefBackend,
 } from "./sprinkleref-config";
 import { editResolverEntry, resolverBackendFromArgs } from "./sprinkleref-config-edit";
+import { assertBootstrapCategoryCanWrite } from "./sprinkleref-bootstrap-guard";
 import { createSprinkleRefStore } from "./sprinkleref-store";
 import { runSprinkleRefCheck } from "./sprinkleref-check";
 import { initSprinkleRefConfigs } from "./sprinkleref-templates";
@@ -105,16 +106,15 @@ export async function runSprinkleRefCli(deps: SprinkleRefCliDeps) {
   }
   assertBackendNeutralSecretRef(action.ref);
   const config = await readSprinkleRefConfig(readFlagStrFromTokens("config", "", deps.argv));
-  const resolved = resolveSprinkleRefBackend(
-    config,
-    readFlagStrFromTokens("category", "", deps.argv),
-  );
+  const category = readFlagStrFromTokens("category", "", deps.argv);
+  const resolved = resolveSprinkleRefBackend(config, category);
+  assertBootstrapCategoryCanWrite(resolved);
   const store = createSprinkleRefStore(resolved.backend, {
     env: deps.env,
     platform: deps.platform,
     fetchImpl: deps.fetchImpl,
   });
-  if (readFlagBoolFromTokens("dry-run", deps.argv)) {
+  if (readFlagBoolFromTokens("dry-run", deps.argv))
     return out(
       JSON.stringify(
         {
@@ -127,7 +127,6 @@ export async function runSprinkleRefCli(deps: SprinkleRefCliDeps) {
         2,
       ),
     );
-  }
   if (action.operation === "remove") {
     if (!readFlagBoolFromTokens("yes", deps.argv) && !(await confirmRemoval(deps, action.ref))) {
       throw new Error(`remove ${action.ref} requires confirmation or --yes`);

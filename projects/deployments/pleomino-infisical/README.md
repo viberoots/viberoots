@@ -64,7 +64,7 @@ selected SprinkleRef `bootstrap` category or explicit compatibility sink, and
 runs OpenTofu with a saved plan before applying it.
 
 ```bash
-build-tools/tools/deployments/infisical-iac-bootstrap.ts \
+build-tools/tools/deployments/infisical-bootstrap.ts \
   deployment \
   --target //projects/deployments/pleomino-staging:deploy \
   --org-name viberoots \
@@ -77,7 +77,7 @@ selector. The exact CI variable names live in the top-level bootstrap spec, not
 in checked deployment metadata.
 
 ```bash
-build-tools/tools/deployments/infisical-iac-bootstrap.ts \
+build-tools/tools/deployments/infisical-bootstrap.ts \
   deployment \
   --target //projects/deployments/pleomino-staging:deploy \
   --no-login \

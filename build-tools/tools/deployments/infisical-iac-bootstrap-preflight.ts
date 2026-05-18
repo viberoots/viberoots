@@ -15,7 +15,7 @@ export function assertBootstrapPreflight(args: BootstrapArgs) {
 
 export function bootstrapRetryCommand(args: BootstrapArgs) {
   return [
-    "build-tools/tools/deployments/infisical-iac-bootstrap.ts",
+    "build-tools/tools/deployments/infisical-bootstrap.ts",
     args.mode,
     ...(args.mode === "deployment" ? retryFlag("target", args.target) : []),
     ...retryFlag("infisical-host", args.hostOverride ? args.apiUrl : ""),

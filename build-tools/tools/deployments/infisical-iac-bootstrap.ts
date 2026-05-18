@@ -41,13 +41,15 @@ export async function runInfisicalIacBootstrap(args: BootstrapArgs) {
   const effectiveArgs = withReviewedHost(args, reviewedMetadata.siteUrl);
   if (effectiveArgs.dryRun) return dryRun(effectiveArgs);
   assertBootstrapPreflight(effectiveArgs);
+  const sinkSelection = await resolveCredentialSinkSelection(effectiveArgs, {
+    createMissingResolverConfig: true,
+  });
   const access = await getAccessToken(effectiveArgs);
   const api = new InfisicalApi({ apiUrl: effectiveArgs.apiUrl, token: access.token });
   const organizationId = await resolveOrganizationId(api, effectiveArgs);
   const resolvedArgs = { ...effectiveArgs, organizationId };
   const identity = await ensureIdentity(api, resolvedArgs);
   await ensureUniversalAuth(api, resolvedArgs, identity);
-  const sinkSelection = await resolveCredentialSinkSelection(effectiveArgs);
   const sink = await createCredentialSink(effectiveArgs);
   const credential = await ensureBootstrapCredential({
     api,
@@ -148,18 +150,30 @@ function withReviewedHost(args: BootstrapArgs, siteUrl: string): BootstrapArgs {
   return { ...args, ...resolveInfisicalHost(siteUrl) };
 }
 
-if (isMainModule()) {
-  const args = parseBootstrapArgs();
-  const argv = getArgvTokens();
+export async function runInfisicalBootstrapMain(
+  opts: {
+    argv?: string[];
+    stdout?: (text: string) => void;
+    stderr?: (text: string) => void;
+    exit?: (code: number) => void;
+  } = {},
+) {
+  const argv = opts.argv || getArgvTokens();
+  const stdout = opts.stdout || console.log;
+  const stderr = opts.stderr || console.error;
+  const exit = opts.exit || process.exit;
   if (argv.includes("--help") || argv.includes("-h")) {
-    console.log(usage());
-    process.exit(0);
+    stdout(usage());
+    return;
   }
+  const args = parseBootstrapArgs(argv);
   await runInfisicalIacBootstrap(args).catch((error: unknown) => {
-    console.error(errorMessage(error, [process.env[args.accessTokenEnv]]));
-    process.exit(1);
+    stderr(errorMessage(error, [process.env[args.accessTokenEnv]]));
+    exit(1);
   });
 }
+
+if (isMainModule()) await runInfisicalBootstrapMain();
 
 function isMainModule() {
   return process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;

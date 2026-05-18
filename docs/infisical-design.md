@@ -239,6 +239,12 @@ Forbidden values:
 - exported `.env` content
 - secret values or rendered provider config
 
+Unsupported token-style env indirections are also rejected. Do not add
+`token_env`, `access_token_env`, `personal_token_env`, or `secret_value_env`;
+the reviewed runtime metadata only accepts the non-secret fields above plus the
+Universal Auth `machine_identity_client_id_env` and
+`machine_identity_client_secret_env` names.
+
 For deployments with `secret_backend = "infisical"` and non-empty
 `secret_requirements`, validation should require `infisical_runtime.site_url`,
 `project_id`, `environment`, `machine_identity_client_id_env`,

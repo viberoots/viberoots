@@ -6,6 +6,7 @@ import {
   readSprinkleRefConfig,
   resolveSprinkleRefBackend,
 } from "./sprinkleref-config";
+import { assertBootstrapCategoryCanWrite } from "./sprinkleref-bootstrap-guard";
 import { createSprinkleRefStore } from "./sprinkleref-store";
 import { scanRepositoryRefs, type ScannedRef } from "./sprinkleref-check-scan";
 import { collectTargetRefs, type TargetRef } from "./sprinkleref-check-target";
@@ -124,6 +125,7 @@ async function checkRefs(
       try {
         assertBackendNeutralSecretRef(entry.ref);
         const resolved = resolveSprinkleRefBackend(config, options.category);
+        assertBootstrapCategoryCanWrite(resolved);
         const store = createStore(deps, resolved.backend);
         const present = await store.has(entry.ref).catch((error: unknown) => {
           backendError(error instanceof Error ? error.message : String(error));
@@ -159,7 +161,7 @@ function configReadErrorMessage(selected: string, error: unknown): string {
     (error && typeof error === "object" && "code" in error && error.code === "ENOENT") ||
     /ENOENT/.test(message)
   ) {
-    return `SprinkleRef resolver config not found: ${selected}. Run infisical-iac-bootstrap.ts repo --dry-run, then infisical-iac-bootstrap.ts repo --yes or sprinkleref --init sprinkleref, edit the generated config for this environment, then retry with --config ${selected}.`;
+    return `SprinkleRef resolver config not found: ${selected}. Run build-tools/tools/deployments/infisical-bootstrap.ts repo --dry-run, then build-tools/tools/deployments/infisical-bootstrap.ts repo --yes or sprinkleref --init sprinkleref, edit the generated config for this environment, then retry with --config ${selected}.`;
   }
   return message;
 }

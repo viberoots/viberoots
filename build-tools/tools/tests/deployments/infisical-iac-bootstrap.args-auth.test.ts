@@ -2,8 +2,9 @@
 import assert from "node:assert/strict";
 import * as fs from "node:fs/promises";
 import { test } from "node:test";
-import { parseBootstrapArgs } from "../../deployments/infisical-iac-bootstrap-args";
+import { parseBootstrapArgs, usage } from "../../deployments/infisical-iac-bootstrap-args";
 import { DEFAULT_BOOTSTRAP_ARGS } from "../../deployments/infisical-iac-bootstrap-config";
+import { runInfisicalBootstrapMain } from "../../deployments/infisical-iac-bootstrap";
 import { getAccessToken } from "../../deployments/infisical-iac-bootstrap-auth";
 import {
   orgIdByExactName,
@@ -14,6 +15,40 @@ import type { CommandRunner } from "../../deployments/infisical-iac-bootstrap-ty
 
 test("bootstrap args require an explicit mode", () => {
   assert.throws(() => parseBootstrapArgs([]), /use exactly one bootstrap mode/);
+});
+
+test("bootstrap usage prints the selected operator command surface", () => {
+  const text = usage();
+  assert.match(text, /build-tools\/tools\/deployments\/infisical-bootstrap\.ts repo --dry-run/);
+  assert.match(text, /build-tools\/tools\/deployments\/infisical-bootstrap\.ts repo --yes/);
+  assert.match(
+    text,
+    /build-tools\/tools\/deployments\/infisical-bootstrap\.ts deployment --target <buck-target> --dry-run/,
+  );
+  assert.match(
+    text,
+    /build-tools\/tools\/deployments\/infisical-bootstrap\.ts deployment --target <buck-target> --yes/,
+  );
+  assert.doesNotMatch(text, /infisical-iac-bootstrap\.ts/);
+});
+
+test("bootstrap main help prints usage before required mode parsing", async () => {
+  for (const helpFlag of ["--help", "-h"]) {
+    const output: string[] = [];
+    await runInfisicalBootstrapMain({
+      argv: [helpFlag],
+      stdout: (text) => output.push(text),
+      stderr: () => assert.fail("help must not print an error"),
+      exit: () => assert.fail("help must not exit"),
+    });
+    const text = output.join("\n");
+    assert.match(text, /build-tools\/tools\/deployments\/infisical-bootstrap\.ts repo --dry-run/);
+    assert.match(
+      text,
+      /build-tools\/tools\/deployments\/infisical-bootstrap\.ts deployment --target <buck-target> --yes/,
+    );
+    assert.doesNotMatch(text, /use exactly one bootstrap mode/);
+  }
 });
 
 test("bootstrap repo args default to the reviewed Infisical host and saved-plan apply", () => {

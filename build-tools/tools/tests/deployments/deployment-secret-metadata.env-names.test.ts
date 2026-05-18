@@ -109,3 +109,20 @@ test("infisical env-name validation errors do not expose credential-shaped value
   assert.ok(errors.some((entry) => entry.includes("machine_identity_client_secret_env")));
   assert.ok(!errors.join("\n").includes(secretLikeValue));
 });
+
+test("infisical metadata validation rejects unsupported token-style env metadata", () => {
+  const errors = errorsFor(
+    infisicalRuntime({
+      token_env: "INFISICAL_TOKEN",
+      access_token_env: "INFISICAL_ACCESS_TOKEN",
+      personal_token_env: "INFISICAL_PERSONAL_TOKEN",
+      secret_value_env: "INFISICAL_SECRET_VALUE",
+    }),
+  );
+  for (const key of ["token_env", "access_token_env", "personal_token_env", "secret_value_env"]) {
+    assert.ok(
+      errors.some((entry) => entry.includes(`infisical_runtime.${key} is unsupported`)),
+      `${key} should be rejected; errors: ${errors.join("\n")}`,
+    );
+  }
+});

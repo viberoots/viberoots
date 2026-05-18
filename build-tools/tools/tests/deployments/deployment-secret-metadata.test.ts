@@ -160,12 +160,14 @@ test("infisical metadata validation rejects unsafe or stale metadata", () => {
       },
     },
   });
-  assert.ok(errors.some((entry) => entry.includes("infisical_runtime.token is forbidden")));
-  assert.ok(errors.some((entry) => entry.includes("infisical_runtime.client_id is forbidden")));
-  assert.ok(errors.some((entry) => entry.includes("infisical_runtime.client_secret is forbidden")));
+  assert.ok(errors.some((entry) => entry.includes("infisical_runtime.token is unsupported")));
+  assert.ok(errors.some((entry) => entry.includes("infisical_runtime.client_id is unsupported")));
+  assert.ok(
+    errors.some((entry) => entry.includes("infisical_runtime.client_secret is unsupported")),
+  );
   assert.ok(
     errors.some((entry) =>
-      entry.includes("infisical_runtime.machine_identity_client_id is forbidden"),
+      entry.includes("infisical_runtime.machine_identity_client_id is unsupported"),
     ),
   );
   assert.ok(

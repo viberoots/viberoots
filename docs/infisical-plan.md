@@ -2017,3 +2017,114 @@ future deployments that need a different Infisical account or Vault instance.
 The bootstrap CLI surface becomes more explicit and may require a short migration for existing
 Pleomino bootstrap instructions and scripts. Introducing backend profile aliases adds a small
 configuration concept that must be documented carefully.
+
+## PR-21: Bootstrap operator guardrail completion
+
+### 1. Intent
+
+Close the post-PR-20 assessment gaps around Infisical bootstrap safety and operator-facing command
+shape. Ensure repo and deployment bootstrap paths fail before mutation when resolver config
+preconditions are missing or unsafe, prevent the `bootstrap` usage lane from resolving through
+Infisical in all SprinkleRef entrypoints, and align the documented command surface with the
+implemented operator entrypoint.
+
+### 2. Scope of changes
+
+- Add or expose the adopted `infisical-bootstrap` operator command surface, or explicitly amend the
+  reviewed command contract to keep `infisical-iac-bootstrap.ts` as the canonical entrypoint.
+- Align bootstrap CLI usage text, retry guidance, SprinkleRef missing-config diagnostics, and docs
+  so they all name the same reviewed operator command and include the required `repo` or
+  `deployment --target <buck-target>` mode.
+- Add the missing `docs/infisical-bootstrap.md` documentation path, or redirect it intentionally to
+  the existing top-level bootstrap document if that remains the canonical spec.
+- Make deployment-mode bootstrap validate or create the starter `sprinkleref/` resolver config
+  before Infisical identity, Universal Auth, OpenTofu, or credential-sink mutations when
+  `--credential-sink auto` is selected and no resolver config exists.
+- Keep dry-run read-only and non-dry-run mutation-gated by `--yes`; failures caused by missing or
+  unsafe resolver config must report the remediation command without writing credentials or touching
+  Infisical/OpenTofu state.
+- Enforce that the SprinkleRef `bootstrap` category cannot resolve to an Infisical backend or an
+  Infisical profile in every entrypoint that creates a writable store, not only the Infisical
+  bootstrap credential-sink helper.
+- Tighten Infisical runtime metadata validation so only reviewed non-secret runtime fields and
+  Universal Auth env-name fields are accepted; reject unsupported token-style env metadata such as
+  `token_env`, `access_token_env`, `personal_token_env`, and `secret_value_env`.
+
+### 3. External prerequisites
+
+- None. This PR is a local CLI/config/docs guardrail follow-up and must not require live Infisical,
+  Vault, or OpenTofu access.
+
+### 4. Tests to be added
+
+- Add bootstrap CLI/usage tests proving the selected operator command text is consistent across
+  `--help`, missing-`--yes` retry output, and `sprinkleref --check` missing-config guidance.
+- Add deployment bootstrap preflight tests proving `--credential-sink auto` creates or validates the
+  starter resolver config before any Infisical, OpenTofu, or credential-sink mutation, and preserves
+  dry-run read-only behavior.
+- Add SprinkleRef CLI tests proving `--category bootstrap add/update/remove/check` rejects Infisical
+  backends and Infisical profiles while still allowing non-Infisical control-plane backends.
+- Add deployment metadata tests proving unsupported token-style Infisical runtime env keys are
+  rejected while approved Universal Auth env-name fields continue to pass validation.
+- Add regression coverage for category-only resolver configs so PR-20's profile support remains
+  backward-compatible with existing local/operator configs.
+
+### 5. Docs to be added or updated
+
+- Update `infisical-bootstrap.md`, `docs/infisical-bootstrap.md`, `docs/sprinkleref.md`, and
+  `docs/sprinkleref-check.md` so the repo-wide bootstrap, deployment-specific bootstrap, and
+  resolver initialization flows all use one consistent command vocabulary.
+- Document that `bootstrap` is a protected control-plane credential lane and must not use Infisical
+  as the storage backend for credentials that unlock Infisical.
+- Document the accepted Infisical runtime metadata fields and call out rejected token-style env
+  metadata as an intentional guardrail.
+
+### 5.5. Expected regression scope
+
+- `deployment-only`
+- Keep changes in Infisical bootstrap CLI/configuration, SprinkleRef resolver validation and CLI
+  store creation, deployment metadata validation, docs, and focused tests. Do not change live
+  Infisical/Vault APIs or deployment execution semantics beyond the guardrails above.
+
+### 6. Acceptance criteria
+
+- Operators see one consistent reviewed bootstrap command surface across CLI help, docs, retry
+  output, and missing-config guidance.
+- Deployment bootstrap with `--credential-sink auto` cannot perform remote or credential mutations
+  before resolver config creation/validation has succeeded.
+- No SprinkleRef write path can use `--category bootstrap` with an Infisical backend or Infisical
+  profile.
+- Infisical runtime metadata rejects unsupported token/secret env-source keys and continues to
+  accept reviewed Universal Auth client id/client secret env-name fields.
+- Existing category-only resolver configs remain valid for edit/check flows.
+
+### 7. Risks
+
+- Adding a friendlier `infisical-bootstrap` entrypoint could create drift from the underlying
+  TypeScript script if both are documented inconsistently.
+- A global `bootstrap` category restriction could reject a niche operator config that previously
+  worked but was unsafe for Infisical bootstrap credentials.
+- Tightening runtime metadata validation could expose stale checked-in metadata or fixture data that
+  used unsupported token-style names.
+
+### 8. Mitigations
+
+- Keep the operator entrypoint as a thin wrapper or single documented alias around the existing
+  implementation.
+- Add targeted tests for both rejected Infisical bootstrap categories and accepted local/keychain/CI
+  bootstrap categories.
+- Use explicit allowlists for Infisical runtime metadata so the error messages identify the
+  unsupported key and the reviewed replacement fields.
+
+### 9. Consequences of not implementing this PR
+
+Operators could still hit mutation-after-partial-bootstrap failures, store Infisical bootstrap
+credentials in Infisical through a generic SprinkleRef path, or follow stale command guidance that
+the parser rejects. Deployment metadata could also continue accepting unsupported token-style env
+keys that weaken the reviewed Universal Auth contract.
+
+### 10. Downsides for implementing this PR
+
+The bootstrap/resolver validation surface becomes stricter, and local configs that relied on unsafe
+or undocumented `bootstrap` mappings will need to move those credentials to a non-Infisical control
+plane backend.

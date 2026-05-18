@@ -33,12 +33,12 @@ const BOOL_FLAGS = new Set([
   "force-overwrite-local-credentials",
 ]);
 
-export function usage() {
+export function usage(command = "build-tools/tools/deployments/infisical-bootstrap.ts") {
   return `Usage:
-  infisical-iac-bootstrap.ts repo --dry-run
-  infisical-iac-bootstrap.ts repo --yes
-  infisical-iac-bootstrap.ts deployment --target <buck-target> --dry-run
-  infisical-iac-bootstrap.ts deployment --target <buck-target> --yes
+  ${command} repo --dry-run
+  ${command} repo --yes
+  ${command} deployment --target <buck-target> --dry-run
+  ${command} deployment --target <buck-target> --yes
 
 Options:
   --infisical-host <us|eu|url>  Infisical host shorthand or URL

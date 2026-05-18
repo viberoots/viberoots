@@ -3,6 +3,7 @@ import * as fs from "node:fs/promises";
 import { readFlagStrFromTokens } from "../lib/argv";
 import { stripJsonComments } from "./json-comments";
 import { readSprinkleRefConfig, validateConfig } from "./sprinkleref-config";
+import { assertBootstrapCategoryCanWrite } from "./sprinkleref-bootstrap-guard";
 import type { SprinkleRefBackendConfig, SprinkleRefConfigFile } from "./sprinkleref-types";
 
 export type ResolverEntryMode = "add" | "update";
@@ -15,6 +16,10 @@ export async function editResolverEntry(opts: {
   overwriteExisting?: boolean;
   createMissing?: boolean;
 }) {
+  assertBootstrapCategoryCanWrite({
+    category: opts.category,
+    backend: opts.backend,
+  });
   const text = await fs.readFile(opts.configPath, "utf8");
   const parsed = JSON.parse(stripJsonComments(text)) as SprinkleRefConfigFile;
   const categories = parsed.categories || {};

@@ -2,7 +2,8 @@ import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import type { BootstrapArgs, CredentialSink } from "./infisical-iac-bootstrap-types";
 import { resolverConfigPath } from "./infisical-iac-bootstrap-preflight";
-import { readSprinkleRefConfig, resolveSprinkleRefBackend } from "./sprinkleref-config";
+import { readSprinkleRefConfig } from "./sprinkleref-config";
+import * as bootstrapGuard from "./sprinkleref-bootstrap-guard";
 import { createSprinkleRefStore } from "./sprinkleref-store";
 import { initSprinkleRefConfigs } from "./sprinkleref-templates";
 import type { SprinkleRefBackendConfig } from "./sprinkleref-types";
@@ -139,14 +140,10 @@ export async function createCredentialSink(
 
 async function resolvedSprinkleRefBackend(args: BootstrapArgs, configPath?: string) {
   const config = await readSprinkleRefConfig(configPath);
-  const resolved = resolveSprinkleRefBackend(config, args.sprinkleCategory || "bootstrap");
-  if (resolved.backend.backend === "infisical") {
-    throw new Error("bootstrap credentials must not use an Infisical SprinkleRef backend");
-  }
-  if (resolved.profile?.startsWith("infisical")) {
-    throw new Error("bootstrap credentials must not use the Infisical profile they unlock");
-  }
-  return resolved;
+  return bootstrapGuard.resolveBootstrapSprinkleRefBackend(
+    config,
+    args.sprinkleCategory || "bootstrap",
+  );
 }
 
 function createSprinkleRefCredentialSinkFromBackend(
@@ -220,7 +217,10 @@ async function ensureResolverConfigPath(
   env = process.env,
   createMissingResolverConfig = true,
 ) {
-  if (env.SPRINKLEREF_CONFIG) return env.SPRINKLEREF_CONFIG;
+  if (env.SPRINKLEREF_CONFIG) {
+    await bootstrapGuard.assertBootstrapResolverConfigExists(env.SPRINKLEREF_CONFIG);
+    return env.SPRINKLEREF_CONFIG;
+  }
   const selected = resolverConfigPath();
   try {
     await fs.access(selected);
