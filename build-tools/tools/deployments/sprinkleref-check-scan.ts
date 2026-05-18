@@ -40,6 +40,7 @@ export function collectFileRefs(
   for (let index = 0; index < lines.length; index++) {
     for (const match of lines[index].matchAll(REF_RE)) {
       const ref = match[0].replace(TRAILING, "");
+      if (shouldIgnoreRef(ref)) continue;
       const scheme = ref.slice(0, ref.indexOf("://")) as SprinkleRefScheme;
       const entry = refs.get(ref) || { ref, scheme, locations: [] };
       entry.locations.push({ file, line: index + 1 });
@@ -50,7 +51,17 @@ export function collectFileRefs(
 }
 
 function shouldSkip(file: string): boolean {
-  return file.split(/[\\/]/).some((part) => SKIP_PARTS.has(part));
+  if (file.endsWith(".md")) return true;
+  if (/\.(?:test|spec)\.[cm]?[jt]sx?$/.test(file)) return true;
+  return file
+    .split(/[\\/]/)
+    .some((part) => SKIP_PARTS.has(part) || part === "tests" || part === "__tests__");
+}
+
+function shouldIgnoreRef(ref: string): boolean {
+  if (/^(secret|config|runtime):\/\/$/.test(ref)) return true;
+  if (ref.endsWith("/")) return true;
+  return /[%$]/.test(ref);
 }
 
 async function trackedFiles(root: string): Promise<string[]> {

@@ -42,6 +42,21 @@ test("scanner skips tracked directory symlinks", async () => {
   );
 });
 
+test("scanner skips docs, test fixtures, and placeholder refs", async () => {
+  const dir = await gitRepo();
+  await writeTracked(dir, "src/contract.txt", "secret://deployments/real/api_token\n");
+  await writeTracked(dir, "docs/example.md", "secret://deployments/docs/example\n");
+  await writeTracked(dir, "src/placeholder.txt", "secret://deployments/%s/api_token\n");
+  await writeTracked(dir, "src/truncated.txt", "config://deployments/\n");
+  await writeTracked(dir, "tests/fixture.ts", "secret://deployments/test/api_token\n");
+  await writeTracked(dir, "src/example.test.ts", "runtime://deployments/test/app_id\n");
+  const scanned = await scanRepositoryRefs(dir);
+  assert.deepEqual(
+    scanned.refs.map((entry) => entry.ref),
+    ["secret://deployments/real/api_token"],
+  );
+});
+
 test("check reports secret presence without serializing secret values", async () => {
   const dir = await gitRepo();
   const secretRef = "secret://deployments/demo/api_token";
@@ -177,7 +192,7 @@ test("check separates invalid refs from unmapped resolver categories", async () 
       argv: ["--check", "--config", config, "--format", "json"],
       stdout: (text) => (output = text),
     });
-    assert.equal(exitCode, 1);
+    assert.equal(exitCode, 0);
     return output;
   });
   const report = JSON.parse(output);

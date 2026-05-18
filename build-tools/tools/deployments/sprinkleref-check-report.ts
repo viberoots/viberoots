@@ -2,6 +2,7 @@
 import type { SprinkleRefCheckEntry, SprinkleRefCheckReport } from "./sprinkleref-check-types";
 
 const ORDER = ["present", "declared", "missing", "unmapped", "invalid", "unchecked"];
+const ACTIONABLE = new Set(["missing", "unmapped"]);
 
 export function summarize(entries: SprinkleRefCheckEntry[]): Record<string, number> {
   return Object.fromEntries(
@@ -10,9 +11,7 @@ export function summarize(entries: SprinkleRefCheckEntry[]): Record<string, numb
 }
 
 export function exitCodeFor(report: SprinkleRefCheckReport): number {
-  return report.refs.some((entry) => ["missing", "unmapped", "invalid"].includes(entry.status))
-    ? 1
-    : 0;
+  return report.refs.some((entry) => ["missing", "unmapped"].includes(entry.status)) ? 1 : 0;
 }
 
 export function renderReport(report: SprinkleRefCheckReport): string {
@@ -20,16 +19,12 @@ export function renderReport(report: SprinkleRefCheckReport): string {
     report.target ? `SprinkleRef check for ${report.target}` : "SprinkleRef check",
     report.target ? `Deps: ${report.deps}` : `Scanned files: ${report.scannedFiles}`,
     `Refs found: ${report.refs.length}`,
+    `Summary: ${ORDER.map((status) => `${status} ${report.summary[status] || 0}`).join(", ")}`,
     "",
   ];
   if (report.target) return renderTargetReport(report, lines);
-  for (const status of ORDER) {
-    const entries = report.refs.filter((entry) => entry.status === status);
-    if (entries.length === 0) continue;
-    lines.push(title(status));
-    for (const entry of entries) lines.push(...renderEntry(entry));
-    lines.push("");
-  }
+  renderActionableGroup(lines, report.refs);
+  renderUncheckedHint(lines, report.summary.unchecked || 0);
   return lines.join("\n").trimEnd();
 }
 
@@ -38,34 +33,49 @@ function renderTargetReport(report: SprinkleRefCheckReport, lines: string[]): st
     ["Direct refs", "direct"],
     ["From dependencies", "dependency"],
   ] as const) {
-    const scoped = report.refs.filter((entry) => entry.scope === scope);
+    const scoped = actionable(report.refs.filter((entry) => entry.scope === scope));
     if (scoped.length === 0) continue;
     lines.push(label);
-    for (const status of ORDER) {
-      const entries = scoped.filter((entry) => entry.status === status);
-      if (entries.length === 0) continue;
-      lines.push(`  ${title(status)}`);
-      for (const entry of entries) {
-        lines.push(...renderEntry(entry).map((line) => `  ${line}`));
-      }
-    }
+    renderActionableGroup(lines, scoped, "  ");
     lines.push("");
   }
+  if (actionable(report.refs).length === 0) renderActionableGroup(lines, []);
+  renderUncheckedHint(lines, report.summary.unchecked || 0);
   return lines.join("\n").trimEnd();
 }
 
-function renderEntry(entry: SprinkleRefCheckEntry): string[] {
-  const lines = [`  ${entry.ref}`, `    scope: ${entry.scope}`];
-  if (entry.category) lines.push(`    category: ${entry.category}`);
-  if (entry.backend) lines.push(`    backend: ${entry.backend}`);
-  if (entry.source) lines.push(`    source: ${entry.source}`);
-  if (entry.reason) lines.push(`    reason: ${entry.reason}`);
-  for (const requiredBy of entry.requiredBy) lines.push(`    required by ${requiredBy}`);
-  for (const location of entry.locations) lines.push(`    location: ${location}`);
-  return lines;
+function renderActionableGroup(
+  lines: string[],
+  entries: SprinkleRefCheckEntry[],
+  prefix = "",
+): void {
+  const actionableEntries = actionable(entries);
+  if (actionableEntries.length === 0) {
+    lines.push(`${prefix}No missing or unmapped refs.`);
+    lines.push("");
+    return;
+  }
+  lines.push(`${prefix}Action required`);
+  for (const entry of actionableEntries) lines.push(renderEntry(entry, prefix));
+  lines.push("");
 }
 
-function title(status: string): string {
-  if (status === "present" || status === "declared") return "OK";
-  return status[0].toUpperCase() + status.slice(1);
+function actionable(entries: SprinkleRefCheckEntry[]): SprinkleRefCheckEntry[] {
+  return entries.filter((entry) => ACTIONABLE.has(entry.status));
+}
+
+function renderEntry(entry: SprinkleRefCheckEntry, prefix: string): string {
+  const details = [
+    entry.category ? `category ${entry.category}` : "",
+    entry.backend ? `backend ${entry.backend}` : "",
+    entry.source ? `source ${entry.source}` : "",
+    entry.reason ? `reason ${entry.reason}` : "",
+    entry.requiredBy.length ? `required by ${entry.requiredBy.join(", ")}` : "",
+  ].filter(Boolean);
+  return `${prefix}  ${entry.status} ${entry.ref}${details.length ? ` (${details.join("; ")})` : ""}`;
+}
+
+function renderUncheckedHint(lines: string[], count: number): void {
+  if (count === 0) return;
+  lines.push(`Unchecked secrets: ${count} (pass --config to check backend presence).`);
 }

@@ -60,7 +60,7 @@ test("target check locates refs defined by shared macro files", async () => {
   });
 });
 
-test("target human output separates direct refs from dependency refs", () => {
+test("target human output separates actionable direct refs from dependency refs", () => {
   const text = renderReport({
     target: "//projects/deployments/check-demo:deploy",
     deps: "transitive",
@@ -70,7 +70,7 @@ test("target human output separates direct refs from dependency refs", () => {
         ref: "secret://deployments/check-demo/api_token",
         scheme: "secret",
         sensitive: true,
-        status: "unchecked",
+        status: "missing",
         scope: "direct",
         locations: ["projects/deployments/check-demo/TARGETS:21"],
         requiredBy: ["//projects/deployments/check-demo:deploy"],
@@ -84,11 +84,50 @@ test("target human output separates direct refs from dependency refs", () => {
         locations: ["projects/deployments/check-demo/TARGETS:16"],
         requiredBy: ["//projects/deployments/check-demo:component"],
       },
+      {
+        ref: "secret://deployments/check-demo/shared_token",
+        scheme: "secret",
+        sensitive: true,
+        status: "missing",
+        scope: "dependency",
+        locations: ["projects/deployments/check-demo/TARGETS:19"],
+        requiredBy: ["//projects/deployments/check-demo:component"],
+      },
     ],
-    summary: summarize([]),
+    summary: summarize([
+      {
+        ref: "secret://deployments/check-demo/api_token",
+        scheme: "secret",
+        sensitive: true,
+        status: "missing",
+        scope: "direct",
+        locations: [],
+        requiredBy: [],
+      },
+      {
+        ref: "runtime://deployments/check-demo/app_id",
+        scheme: "runtime",
+        sensitive: false,
+        status: "declared",
+        scope: "dependency",
+        locations: [],
+        requiredBy: [],
+      },
+      {
+        ref: "secret://deployments/check-demo/shared_token",
+        scheme: "secret",
+        sensitive: true,
+        status: "missing",
+        scope: "dependency",
+        locations: [],
+        requiredBy: [],
+      },
+    ]),
   });
   assert.match(text, /Direct refs[\s\S]*secret:\/\/deployments\/check-demo\/api_token/);
-  assert.match(text, /From dependencies[\s\S]*runtime:\/\/deployments\/check-demo\/app_id/);
+  assert.match(text, /From dependencies[\s\S]*secret:\/\/deployments\/check-demo\/shared_token/);
+  assert.doesNotMatch(text, /runtime:\/\/deployments\/check-demo\/app_id/);
+  assert.equal(text.match(/secret:\/\/deployments\/check-demo\/api_token/g)?.length, 1);
 });
 
 test("target check fails instead of falling back to repo text scan", async () => {

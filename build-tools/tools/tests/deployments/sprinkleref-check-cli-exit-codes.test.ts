@@ -12,7 +12,7 @@ test("CLI check sets process exit code 0 for successful checks", async () => {
   assert.equal(await runCliInDir(dir, ["--check"]), 0);
 });
 
-test("CLI check sets process exit code 1 for missing unmapped or invalid refs", async () => {
+test("CLI check sets process exit code 1 for missing or unmapped refs", async () => {
   const dir = await repoWithContract("secret://deployments/cli/api_token");
   const config = path.join(dir, "resolver.json");
   await fs.writeFile(

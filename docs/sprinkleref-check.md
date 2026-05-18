@@ -51,8 +51,10 @@ limit the report to refs directly declared by the selected target. If a richer o
 
 ## Discovery
 
-The checker should scan tracked repository files by default and skip generated or dependency
-directories such as `.git`, `buck-out`, and `node_modules`.
+The checker should scan tracked repository files by default and skip generated, dependency,
+documentation, and test paths such as `.git`, `buck-out`, `node_modules`, Markdown files,
+`tests/`, and `*.test.ts`. Repo-wide scans should focus on refs that can affect reviewed runtime
+or deployment paths, not examples or test fixtures.
 
 The scanner should discover literal references matching:
 
@@ -82,21 +84,19 @@ discovery should inspect available requirement surfaces such as:
 - external deployment requirement profiles that emit `secret://...` and `config://...` refs
 - provider target metadata or generated deployment metadata that declares contract refs
 
-The human report should distinguish direct requirements from dependency-derived requirements with
-separate `Direct refs` and `From dependencies` sections:
+The human report should summarize the full check while listing only actionable refs once. For
+target-scoped checks, it should distinguish direct requirements from dependency-derived actionable
+requirements with separate `Direct refs` and `From dependencies` sections:
 
 ```text
 SprinkleRef check for //projects/deployments/pleomino-staging:deploy
-
-Direct refs
-  OK
-    secret://deployments/pleomino/cloudflare_api_token
-      required by //projects/deployments/pleomino-staging:deploy
+Deps: transitive
+Refs found: 2
+Summary: present 1, declared 0, missing 1, unmapped 0, invalid 0, unchecked 0
 
 From dependencies
-  Missing
-    config://deployments/supabase/public_url/prod
-      required by //projects/apps/pleomino:server
+  Action required
+    missing config://deployments/supabase/public_url/prod (required by //projects/apps/pleomino:server)
 ```
 
 JSON output should preserve the same distinction:
@@ -162,14 +162,19 @@ The checker should report declaration and source information before it attempts 
 
 ## Report Categories
 
-Human output should group refs by status:
+Human output should summarize every status and list only refs that can cause unexpected missing
+value errors:
 
 - `OK`: declared, mapped, and present enough for the selected check.
 - `Missing`: mapped or declared, but not present in the expected backend/source.
 - `Unmapped`: discovered in repo text but no resolver category or declaration owns it.
-- `Invalid`: malformed or violates backend-neutral naming policy.
+- `Invalid`: malformed or violates backend-neutral naming policy. Invalid refs are preserved in
+  JSON for diagnostics but are not expanded in default human output.
 - `Unchecked`: discovered but intentionally skipped because no resolver config or source was
   supplied for that scheme.
+
+Non-actionable `OK`, `Invalid`, and `Unchecked` entries should not be expanded in human output.
+JSON output preserves full per-ref detail, including source locations.
 
 JSON output should use the same model:
 
@@ -200,7 +205,7 @@ JSON output should use the same model:
 ## Exit Codes
 
 - `0`: all checked refs are OK or intentionally unchecked.
-- `1`: one or more refs are missing, unmapped, or invalid.
+- `1`: one or more refs are missing or unmapped.
 - `2`: resolver config or backend access failed.
 - `3`: scanner or command usage error.
 
@@ -219,7 +224,6 @@ reviewed non-secret config values when the scheme is `config://` or `runtime://`
 
 ## Open Questions
 
-- Whether checked-in docs should be scanned by default or only source/config files.
 - Whether non-secret `config://` and `runtime://` value display should be opt-in with
   `--show-non-secret-values`.
 - Whether CI should require zero `Unchecked` refs or allow them when a backend config is not
