@@ -101,7 +101,6 @@ function validateBackend(file: string, name: string, backend: SprinkleRefBackend
   if (!BACKENDS.has(backend.backend)) {
     throw new Error(`${file} category ${name} has unsupported backend ${String(backend.backend)}`);
   }
-  if (backend.projectRef) assertBackendNeutralSecretRef(backend.projectRef);
   if (backend.backend === "local-file" && !backend.file) {
     throw new Error(`${file} category ${name} local-file backend requires file`);
   }
@@ -112,6 +111,11 @@ function validateBackend(file: string, name: string, backend: SprinkleRefBackend
 }
 
 function validateInfisical(file: string, name: string, backend: SprinkleRefBackendConfig) {
+  if (backend.projectRef) {
+    throw new Error(
+      `${file} category ${name} infisical backend uses unsupported projectRef; use projectId`,
+    );
+  }
   for (const key of ["host", "projectId", "defaultEnvironment"] as const) {
     if (!backend[key])
       throw new Error(`${file} category ${name} infisical backend requires ${key}`);

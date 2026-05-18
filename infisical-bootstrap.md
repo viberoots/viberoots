@@ -318,7 +318,7 @@ Example macOS local config:
     "main": {
       "backend": "infisical",
       "host": "https://app.infisical.com",
-      "projectRef": "secret://deployments/pleomino/infisical/project-id",
+      "projectId": "proj_pleomino_deployments",
       "defaultEnvironment": "staging",
       "defaultPath": "/"
     }
@@ -349,7 +349,7 @@ Example GitHub Actions CI config:
     "main": {
       "backend": "infisical",
       "host": "https://app.infisical.com",
-      "projectRef": "secret://deployments/pleomino/infisical/project-id",
+      "projectId": "proj_pleomino_deployments",
       "defaultEnvironment": "staging",
       "defaultPath": "/"
     }

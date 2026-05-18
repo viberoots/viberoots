@@ -26,6 +26,7 @@ export type FakeInfisicalSecret = {
   revoked?: boolean;
   unavailable?: boolean;
   response?: Partial<FakeInfisicalSecret> & Record<string, unknown>;
+  metadataResponse?: Partial<FakeInfisicalSecret> & Record<string, unknown>;
   status?: number;
   errorBody?: Record<string, unknown>;
 };
@@ -221,6 +222,8 @@ export async function startFakeInfisicalServer(
       if (found.status)
         return json(response, found.status, found.errorBody || { error: "secret_read_failed" });
       const returned = { ...found, ...(found.response || {}) };
+      if (!viewSecretValue && found.metadataResponse)
+        Object.assign(returned, found.metadataResponse);
       json(response, 200, {
         secret: {
           ...returned,

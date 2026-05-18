@@ -88,6 +88,29 @@ test("resolver config rejects unsupported backends and backend-specific refs", a
   await assert.rejects(() => readSprinkleRefConfig(configPath), /unsupported backend/);
 });
 
+test("resolver config rejects Infisical projectRef and requires projectId", async () => {
+  const dir = await tmp();
+  const configPath = path.join(dir, "project-ref.json");
+  await writeJson(configPath, {
+    version: 1,
+    defaultCategory: "main",
+    categories: {
+      main: {
+        backend: "infisical",
+        host: "http://127.0.0.1:1",
+        projectRef: "secret://deployments/pleomino/project-id",
+        defaultEnvironment: "staging",
+        clientIdEnv: "INFISICAL_CLIENT_ID",
+        clientSecretEnv: "INFISICAL_CLIENT_SECRET",
+      },
+    },
+  });
+  await assert.rejects(
+    () => readSprinkleRefConfig(configPath),
+    /unsupported projectRef; use projectId/,
+  );
+});
+
 test("resolver config rejects missing default and requested categories", async () => {
   const dir = await tmp();
   const configPath = path.join(dir, "missing-default.json");

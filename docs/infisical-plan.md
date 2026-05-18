@@ -2284,3 +2284,79 @@ failure on the default generated config because `main` references an inherited p
 
 The resolver-entry edit path depends more directly on the resolved config loader, but that is the
 same source of truth used by check and resolution paths.
+
+## PR-24: Infisical resolver and admission design closure
+
+### 1. Intent
+
+Close the remaining post-PR-23 design assessment gaps. Align resolver documentation with the
+implemented non-secret `projectId` contract, and implement the documented Infisical admission
+fallback when metadata-only reads omit exact version metadata.
+
+### 2. Scope of changes
+
+- Clarify that Infisical SprinkleRef resolver profiles use concrete non-secret `projectId`, not
+  `projectRef`, and reject `projectRef` with remediation.
+- Keep `projectId` as non-secret routing metadata, consistent with deployment runtime metadata and
+  Infisical API query parameters.
+- Update root bootstrap examples that still showed `projectRef`.
+- Implement admission fallback: read metadata with `viewSecretValue=false` first; if the returned
+  record is usable but lacks a version, perform a value read only to obtain exact metadata and
+  discard `secretValue` before constructing admitted references.
+
+### 3. External prerequisites
+
+- None. This PR is local resolver validation, docs, fake-server support, and focused tests only.
+
+### 4. Tests to be added
+
+- Add a resolver config test proving Infisical `projectRef` is rejected with a `projectId`
+  remediation.
+- Update the Infisical admission test that previously locked in missing-version rejection so it now
+  proves the value-read fallback freezes the exact version and does not include the returned secret
+  value in admitted references.
+
+### 5. Docs to be added or updated
+
+- Update `infisical-bootstrap.md` resolver examples from `projectRef` to `projectId`.
+
+### 5.5. Expected regression scope
+
+- `deployment-only`
+- Keep changes limited to Infisical resolver validation/docs and the admission metadata fallback.
+  Do not change deployment bootstrap side effects, OpenTofu behavior, credential sink storage, or
+  runtime secret replay semantics.
+
+### 6. Acceptance criteria
+
+- Operators following the documented resolver examples can create a valid Infisical resolver profile
+  using `projectId`.
+- Resolver configs using `projectRef` fail clearly and tell the operator to use `projectId`.
+- Admission still starts with `viewSecretValue=false` and only performs a value read when exact
+  version metadata is missing.
+- Fallback value reads discard `secretValue` and admitted references contain only non-secret
+  selector/version metadata.
+- Focused tests cover both edge cases and the repository validation suite passes.
+
+### 7. Risks
+
+- Rejecting `projectRef` may break local experimental configs copied from the older docs.
+- Fallback value reads touch secret material during admission in the narrow case where Infisical
+  omits version metadata from metadata-only responses.
+
+### 8. Mitigations
+
+- Error messages point directly to `projectId`, which is already required by validation and used by
+  the Infisical API paths.
+- The fallback strips `secretValue` immediately and existing redaction/no-leak assertions continue
+  to cover admitted references.
+
+### 9. Consequences of not implementing this PR
+
+Operators can copy invalid resolver examples, and admission remains incompatible with Infisical
+responses that only expose exact version metadata on ordinary value reads.
+
+### 10. Downsides for implementing this PR
+
+The admission path performs one extra Infisical read for servers that omit version metadata from
+metadata-only responses.

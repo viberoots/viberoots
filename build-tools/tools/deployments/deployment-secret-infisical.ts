@@ -32,6 +32,7 @@ import {
   readInfisicalSecret,
   type InfisicalSecretRecord,
 } from "./deployment-secret-infisical-client";
+import { readAdmittedInfisicalSecret } from "./deployment-secret-infisical-admission-read";
 import {
   deploymentInfisicalBackendRef,
   deploymentInfisicalSelector,
@@ -93,21 +94,9 @@ function assertContext(context?: DeploymentSecretContext) {
   return resolved;
 }
 
-async function readAdmittedSecret(opts: {
-  credential: DeploymentSecretContext & { kind: "infisical" };
-  selector: ReturnType<typeof deploymentInfisicalSelector>;
-}) {
-  return await readInfisicalSecret({
-    credential: opts.credential.credential,
-    selector: opts.selector,
-    viewSecretValue: false,
-  });
-}
-
 function assertUsable(record: InfisicalSecretRecord | undefined, contractId: string) {
-  if (!record || record.deleted || record.revoked || record.unavailable) {
+  if (!record || record.deleted || record.revoked || record.unavailable)
     throw new Error(`required secret contract ${contractId} is missing`);
-  }
   return record;
 }
 
@@ -166,7 +155,7 @@ export async function resolveDeploymentInfisicalAdmittedReferences(opts: {
       runtime: opts.runtime!,
       mappings: opts.mappings,
     });
-    const record = await readAdmittedSecret({ credential: context!, selector });
+    const record = await readAdmittedInfisicalSecret({ credential: context!, selector });
     if (!record) {
       if (binding.required)
         throw new Error(`required secret contract ${binding.contractId} is missing`);

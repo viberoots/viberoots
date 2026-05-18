@@ -145,7 +145,7 @@ test("Infisical missing optional secrets are skipped and required secrets fail",
   }
 });
 
-test("Infisical admission rejects present required secret without exact version", async () => {
+test("Infisical admission falls back to value read when metadata-only read omits exact version", async () => {
   const server = await startFakeInfisicalServer(
     { clientId: "id", clientSecret: "secret", accessToken: "token" },
     [
@@ -155,21 +155,25 @@ test("Infisical admission rejects present required secret without exact version"
         environment: "prod",
         secretPath: "/deployments/pleomino",
         secretName: "cloudflare_api_token",
-        secretValue: "token-without-version",
+        version: "7",
+        secretValue: "sensitive-fallback-token",
+        metadataResponse: { version: undefined },
       },
     ],
   );
   try {
-    await assert.rejects(
-      () =>
-        resolveDeploymentInfisicalAdmittedReferences({
-          requirements: [infisicalRequirement],
-          targetScope: infisicalTargetScope,
-          runtime: { ...infisicalRuntime, siteUrl: server.siteUrl },
-          secretContext: infisicalTestContext(server.siteUrl),
-        }),
-      /missing exact Infisical version/,
-    );
+    const admitted = await resolveDeploymentInfisicalAdmittedReferences({
+      requirements: [infisicalRequirement],
+      targetScope: infisicalTargetScope,
+      runtime: { ...infisicalRuntime, siteUrl: server.siteUrl },
+      secretContext: infisicalTestContext(server.siteUrl),
+    });
+    assert.equal(admitted[0]?.resolvedVersion, "7");
+    assert.deepEqual(server.secretCalls, [
+      "cloudflare_api_token:false:",
+      "cloudflare_api_token:true:",
+    ]);
+    assert.ok(!JSON.stringify(admitted).includes("sensitive-fallback-token"));
   } finally {
     await server.close();
   }
