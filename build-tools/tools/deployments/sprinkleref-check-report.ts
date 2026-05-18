@@ -51,7 +51,7 @@ function renderActionableGroup(
 ): void {
   const actionableEntries = actionable(entries);
   if (actionableEntries.length === 0) {
-    lines.push(`${prefix}No missing or unmapped refs.`);
+    lines.push(`${prefix}No checked missing or unmapped refs.`);
     lines.push("");
     return;
   }
@@ -77,5 +77,7 @@ function renderEntry(entry: SprinkleRefCheckEntry, prefix: string): string {
 
 function renderUncheckedHint(lines: string[], count: number): void {
   if (count === 0) return;
-  lines.push(`Unchecked secrets: ${count} (pass --config to check backend presence).`);
+  lines.push(
+    `Unchecked secrets: ${count} (pass --config to determine whether they are present or missing).`,
+  );
 }
