@@ -4,6 +4,7 @@ import * as path from "node:path";
 import type {
   SprinkleRefBackendConfig,
   SprinkleRefBackendKind,
+  SprinkleRefCategoryConfig,
   SprinkleRefConfig,
   SprinkleRefConfigFile,
 } from "./sprinkleref-types";
@@ -49,6 +50,7 @@ async function loadConfig(file: string, seen: Set<string>): Promise<SprinkleRefC
     {
       path: file,
       defaultCategory: raw.defaultCategory || base.defaultCategory,
+      profiles: { ...base.profiles, ...(raw.profiles || {}) },
       categories: { ...base.categories, ...(raw.categories || {}) },
     },
     file,
@@ -64,17 +66,35 @@ function parseConfig(text: string, file: string): SprinkleRefConfigFile {
 }
 
 function emptyConfig(): SprinkleRefConfig {
-  return { defaultCategory: "main", categories: {} };
+  return { defaultCategory: "main", profiles: {}, categories: {} };
 }
 
 export function validateConfig(config: SprinkleRefConfig, file = "SprinkleRef config") {
+  const profiles = config.profiles || {};
+  const categories = config.categories || {};
   if (!config.defaultCategory.trim()) throw new Error(`${file} defaultCategory is required`);
-  if (!config.categories[config.defaultCategory]) {
+  if (!categories[config.defaultCategory]) {
     throw new Error(`${file} missing default category ${config.defaultCategory}`);
   }
-  for (const [name, backend] of Object.entries(config.categories))
-    validateBackend(file, name, backend);
+  for (const [name, profile] of Object.entries(profiles)) validateBackend(file, name, profile);
+  for (const [name, category] of Object.entries(categories))
+    validateCategory(file, name, category, profiles);
   return config;
+}
+
+function validateCategory(
+  file: string,
+  name: string,
+  category: SprinkleRefCategoryConfig,
+  profiles: Record<string, SprinkleRefBackendConfig>,
+) {
+  if ("profile" in category) {
+    if (!profiles[category.profile]) {
+      throw new Error(`${file} category ${name} references missing profile ${category.profile}`);
+    }
+    return;
+  }
+  validateBackend(file, name, category);
 }
 
 function validateBackend(file: string, name: string, backend: SprinkleRefBackendConfig) {
@@ -106,7 +126,12 @@ function validateInfisical(file: string, name: string, backend: SprinkleRefBacke
 
 export function resolveSprinkleRefBackend(config: SprinkleRefConfig, category?: string) {
   const selected = category || config.defaultCategory;
-  const backend = config.categories[selected];
-  if (!backend) throw new Error(`SprinkleRef category ${selected} is not configured`);
-  return { category: selected, backend };
+  const entry = config.categories[selected];
+  if (!entry) throw new Error(`SprinkleRef category ${selected} is not configured`);
+  if ("profile" in entry) {
+    const backend = config.profiles[entry.profile];
+    if (!backend) throw new Error(`SprinkleRef profile ${entry.profile} is not configured`);
+    return { category: selected, profile: entry.profile, backend };
+  }
+  return { category: selected, backend: entry };
 }

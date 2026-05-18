@@ -22,6 +22,7 @@ export type S3StaticAdmittedContext = {
   admissionPolicyFingerprint: string;
   environmentStage: string;
   secretBackend?: DeploymentSecretBackendKind;
+  secretBackendProfile?: string;
   infisicalRuntime?: S3StaticDeployment["infisicalRuntime"];
   infisicalSecretMappings?: S3StaticDeployment["infisicalSecretMappings"];
   secretRequirements: DeploymentRequirement[];
@@ -65,6 +66,7 @@ export async function resolveInitialS3StaticAdmittedContext(opts: {
     admissionPolicyFingerprint: opts.deployment.admissionPolicy.fingerprint,
     environmentStage: opts.deployment.environmentStage,
     secretBackend: opts.deployment.secretBackend || "vault",
+    secretBackendProfile: opts.deployment.secretBackendProfile,
     ...(opts.deployment.infisicalRuntime
       ? { infisicalRuntime: opts.deployment.infisicalRuntime }
       : {}),
@@ -76,6 +78,7 @@ export async function resolveInitialS3StaticAdmittedContext(opts: {
       requirements: opts.deployment.secretRequirements,
       targetScope: target.lockScope,
       secretBackend: opts.deployment.secretBackend,
+      secretBackendProfile: opts.deployment.secretBackendProfile,
       vaultRuntime: opts.deployment.vaultRuntime,
       infisicalRuntime: opts.deployment.infisicalRuntime,
       infisicalSecretMappings: opts.deployment.infisicalSecretMappings,

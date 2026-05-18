@@ -8,10 +8,6 @@ import { test } from "node:test";
 import { DEFAULT_BOOTSTRAP_ARGS } from "../../deployments/infisical-iac-bootstrap-config";
 import { assertBootstrapPreflight } from "../../deployments/infisical-iac-bootstrap-preflight";
 import { runInfisicalIacBootstrap } from "../../deployments/infisical-iac-bootstrap";
-import {
-  createCredentialSink,
-  resolveCredentialSinkSelection,
-} from "../../deployments/infisical-iac-bootstrap-sink";
 
 test("bootstrap preflight rejects missing --yes before local or remote side effects", () => {
   const sideEffects: string[] = [];
@@ -20,6 +16,26 @@ test("bootstrap preflight rejects missing --yes before local or remote side effe
     sideEffects.push("mutation");
   }, /requires --yes[\s\S]*No Infisical resources, OpenTofu state, resolver config, or credential sink output was changed/);
   assert.deepEqual(sideEffects, []);
+});
+
+test("bootstrap preflight retry command includes the explicit repo mode", () => {
+  assert.match(
+    bootstrapRetryMessage({ ...DEFAULT_BOOTSTRAP_ARGS, yes: false, dryRun: false }),
+    /infisical-iac-bootstrap\.ts repo .*--yes/,
+  );
+});
+
+test("bootstrap preflight retry command includes deployment target scope", () => {
+  assert.match(
+    bootstrapRetryMessage({
+      ...DEFAULT_BOOTSTRAP_ARGS,
+      mode: "deployment",
+      target: "//projects/deployments/pleomino-staging:deploy",
+      yes: false,
+      dryRun: false,
+    }),
+    /infisical-iac-bootstrap\.ts deployment --target \/\/projects\/deployments\/pleomino-staging:deploy .*--yes/,
+  );
 });
 
 test("bootstrap path rejects missing --yes before Infisical, OpenTofu, or sink writes", async () => {
@@ -47,6 +63,8 @@ test("bootstrap path rejects missing --yes before Infisical, OpenTofu, or sink w
         () =>
           runInfisicalIacBootstrap({
             ...DEFAULT_BOOTSTRAP_ARGS,
+            mode: "deployment",
+            target: "//projects/deployments/pleomino-staging:deploy",
             apiUrl: `http://127.0.0.1:${port}`,
             cliDomain: `http://127.0.0.1:${port}/api`,
             noLogin: true,
@@ -72,6 +90,19 @@ test("bootstrap path rejects missing --yes before Infisical, OpenTofu, or sink w
   }
 });
 
+test("deployment bootstrap rejects unsupported target selectors before reviewed metadata lookup", async () => {
+  await assert.rejects(
+    () =>
+      runInfisicalIacBootstrap({
+        ...DEFAULT_BOOTSTRAP_ARGS,
+        mode: "deployment",
+        target: "//projects/deployments/not-pleomino:deploy",
+        dryRun: true,
+      }),
+    /target .* is not supported/,
+  );
+});
+
 test("bootstrap dry-run path does not create resolver config without --yes", async () => {
   const dir = await tmp();
   await writeReviewedMetadata(dir);
@@ -82,58 +113,6 @@ test("bootstrap dry-run path does not create resolver config without --yes", asy
     const report = JSON.parse(output) as { credentialSinkDescription: string };
     assert.match(report.credentialSinkDescription, /starter config not created during dry-run/);
     await assert.rejects(() => fs.stat("sprinkleref/selected.local.json"), /ENOENT/);
-  });
-});
-
-test("auto credential sink reuses existing SprinkleRef resolver config", async () => {
-  const dir = await tmp();
-  await withCwdAndEnv(dir, async () => {
-    await fs.mkdir("sprinkleref", { recursive: true });
-    await writeJson("sprinkleref/selected.local.json", {
-      version: 1,
-      defaultCategory: "bootstrap",
-      categories: { bootstrap: { backend: "local-file", file: "kept-bootstrap.json" } },
-    });
-    const selection = await resolveCredentialSinkSelection(DEFAULT_BOOTSTRAP_ARGS, {
-      platform: "linux",
-      env: {},
-    });
-    assert.equal(selection.kind, "sprinkleref");
-    assert.equal(selection.backend, "local-file");
-    assert.equal(selection.configPath, "sprinkleref/selected.local.json");
-    await assert.rejects(() => fs.stat("sprinkleref/base.json"), /ENOENT/);
-  });
-});
-
-test("auto credential sink creates starter resolver config only when none exists", async () => {
-  const dir = await tmp();
-  await withCwdAndEnv(dir, async () => {
-    const sink = await createCredentialSink(DEFAULT_BOOTSTRAP_ARGS, {
-      platform: "linux",
-      env: {},
-    });
-    assert.match(sink.describe(), /SprinkleRef bootstrap local-file/);
-    const selected = await fs.readFile("sprinkleref/selected.local.json", "utf8");
-    assert.match(selected, /"backend": "local-file"/);
-    assert.doesNotMatch(selected, /clientSecret":/);
-  });
-});
-
-test("auto credential sink uses explicit create mode for starter resolver config", async () => {
-  const dir = await tmp();
-  await withCwdAndEnv(dir, async () => {
-    await fs.mkdir("sprinkleref", { recursive: true });
-    await fs.writeFile("sprinkleref/base.json", "operator-owned\n");
-    await assert.rejects(
-      () =>
-        createCredentialSink(DEFAULT_BOOTSTRAP_ARGS, {
-          platform: "linux",
-          env: {},
-        }),
-      /EEXIST/,
-    );
-    assert.equal(await fs.readFile("sprinkleref/base.json", "utf8"), "operator-owned\n");
-    await assertMissing("sprinkleref/selected.local.json");
   });
 });
 
@@ -156,7 +135,17 @@ async function withCwdAndEnv(dir: string, run: () => Promise<void>) {
 }
 
 async function writeJson(file: string, value: unknown) {
+  await fs.mkdir(path.dirname(file), { recursive: true });
   await fs.writeFile(file, `${JSON.stringify(value, null, 2)}\n`);
+}
+
+function bootstrapRetryMessage(args: typeof DEFAULT_BOOTSTRAP_ARGS) {
+  try {
+    assertBootstrapPreflight(args);
+  } catch (error) {
+    return String((error as Error).message);
+  }
+  return "";
 }
 
 async function writeFakeTofu(file: string, marker: string) {

@@ -173,7 +173,7 @@ test("check exposes stable usage and resolver access exit codes", async () => {
     (error: any) =>
       error.exitCode === 2 &&
       /resolver config not found/.test(error.message) &&
-      /sprinkleref --init sprinkleref/.test(error.message),
+      /repo --dry-run[\s\S]*sprinkleref --init sprinkleref/.test(error.message),
   );
 });
 

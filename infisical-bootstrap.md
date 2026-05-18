@@ -18,17 +18,30 @@ It must not manage application secrets such as `cloudflare_api_token`. Those bel
 
 ## Command Shape
 
-Primary command:
+Primary commands:
 
 ```bash
-build-tools/tools/deployments/infisical-iac-bootstrap.ts
+build-tools/tools/deployments/infisical-iac-bootstrap.ts repo --dry-run
+build-tools/tools/deployments/infisical-iac-bootstrap.ts repo --yes
+build-tools/tools/deployments/infisical-iac-bootstrap.ts deployment --target <buck-target> --dry-run
+build-tools/tools/deployments/infisical-iac-bootstrap.ts deployment --target <buck-target> --yes
 ```
+
+`repo` initializes and validates the repo-wide SprinkleRef resolver/profile boundary only. It
+creates or checks `sprinkleref/`, named backend profiles such as `vault-default` and
+`infisical-default`, and category lanes such as `main` and `bootstrap`. Repo bootstrap must not
+mention or touch Pleomino OpenTofu modules, reviewed Pleomino metadata, project resources, or
+deployment credentials.
+
+`deployment --target <buck-target>` is the explicit deployment provisioning layer. The existing
+Pleomino Infisical OpenTofu project/environment/identity reconciliation and deployment Universal
+Auth credential lifecycle live behind this mode.
 
 Defaults:
 
 - Infisical host: `https://app.infisical.com`.
 - Login: enabled.
-- OpenTofu init/plan/apply: enabled for the Infisical stack.
+- OpenTofu init/plan/apply: enabled only for explicit deployment bootstrap.
 - Confirmation: mutation-capable bootstrap requires `--yes` before any remote or local write.
 - Credential preservation: preserve existing remote/local credentials unless explicit rotation is requested.
 - Secret output: never print secret values.

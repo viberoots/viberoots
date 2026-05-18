@@ -26,12 +26,45 @@ Initialize starter configs:
 sprinkleref --init sprinkleref
 ```
 
-The Infisical bootstrap command also uses this resolver shape. With `--credential-sink auto`, it
-uses `SPRINKLEREF_CONFIG` when set, then an existing `sprinkleref/selected.local.json`. If neither
-exists and `--yes` has already passed bootstrap preflight, it creates the starter config set and
-uses `selected.local.json` so the `bootstrap` backend choice is visible in config instead of hidden
-inside bootstrap code. Dry-run bootstrap reports the starter backend without creating the config
-files. Existing resolver configs are treated as authoritative.
+Repo-wide bootstrap also uses this resolver shape:
+
+```bash
+build-tools/tools/deployments/infisical-iac-bootstrap.ts repo --dry-run
+build-tools/tools/deployments/infisical-iac-bootstrap.ts repo --yes
+sprinkleref --check --config sprinkleref/selected.local.json
+```
+
+With `--credential-sink auto`, it uses `SPRINKLEREF_CONFIG` when set, then an existing
+`sprinkleref/selected.local.json`. If neither exists and `--yes` has already passed bootstrap
+preflight, it creates the starter config set and uses `selected.local.json` so the `bootstrap`
+backend choice is visible in config instead of hidden inside bootstrap code. Dry-run bootstrap
+reports the starter backend without creating the config files. Existing resolver configs are
+treated as authoritative.
+
+Resolver configs may define named backend profiles separately from categories. Profiles name backend
+instances/accounts, while categories name usage lanes:
+
+```json
+{
+  "version": 1,
+  "defaultCategory": "main",
+  "profiles": {
+    "vault-default": { "backend": "local-file", "file": ".local/vault-default.json" },
+    "infisical-default": {
+      "backend": "infisical",
+      "host": "https://app.infisical.com",
+      "projectId": "proj",
+      "defaultEnvironment": "staging",
+      "clientIdEnv": "INFISICAL_MACHINE_IDENTITY_CLIENT_ID",
+      "clientSecretEnv": "INFISICAL_MACHINE_IDENTITY_CLIENT_SECRET"
+    }
+  },
+  "categories": {
+    "main": { "profile": "infisical-default" },
+    "bootstrap": { "profile": "vault-default" }
+  }
+}
+```
 
 Add, update, or remove ordinary secrets:
 

@@ -60,6 +60,7 @@ export async function resolveNixosSharedHostAdmittedSecretReferences(opts: {
       requirements: opts.deployment.secretRequirements,
       targetScope: opts.admittedContext.targetEnvironment.lockScope,
       secretBackend: opts.deployment.secretBackend,
+      secretBackendProfile: opts.deployment.secretBackendProfile,
       vaultRuntime: opts.deployment.vaultRuntime,
       infisicalRuntime: opts.deployment.infisicalRuntime,
       infisicalSecretMappings: opts.deployment.infisicalSecretMappings,

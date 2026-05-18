@@ -21,7 +21,6 @@ import {
 import type { NixosSharedHostDeployRecord } from "./nixos-shared-host-records";
 import type { NixosSharedHostReplaySnapshot } from "./nixos-shared-host-replay";
 import type { DeploymentReviewedSourceSnapshot } from "./nixos-shared-host-reviewed-source-snapshot";
-
 export type NixosSharedHostSourceAdmission = {
   mode: "reviewed_source_ref" | "source_run_reuse" | "promotion_source_run";
   sourceRef: string;
@@ -39,6 +38,7 @@ export type NixosSharedHostAdmittedContext = {
   admissionPolicyFingerprint: string;
   environmentStage: string;
   secretBackend?: Sprinkle.DeploymentSecretBackendKind;
+  secretBackendProfile?: string;
   infisicalRuntime?: NixosSharedHostDeployment["infisicalRuntime"];
   infisicalSecretMappings?: NixosSharedHostDeployment["infisicalSecretMappings"];
   secretRequirements: DeploymentRequirement[];
@@ -76,6 +76,7 @@ async function baseContext(
     admissionPolicyFingerprint: deployment.admissionPolicy.fingerprint,
     environmentStage: deployment.environmentStage,
     secretBackend: deployment.secretBackend || "vault",
+    secretBackendProfile: deployment.secretBackendProfile,
     ...(deployment.infisicalRuntime ? { infisicalRuntime: deployment.infisicalRuntime } : {}),
     ...(deployment.infisicalSecretMappings
       ? { infisicalSecretMappings: deployment.infisicalSecretMappings }
@@ -94,6 +95,7 @@ async function baseContext(
             requirements: deployment.secretRequirements,
             targetScope,
             secretBackend: deployment.secretBackend,
+            secretBackendProfile: deployment.secretBackendProfile,
             vaultRuntime: deployment.vaultRuntime,
             infisicalRuntime: deployment.infisicalRuntime,
             infisicalSecretMappings: deployment.infisicalSecretMappings,

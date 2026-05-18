@@ -159,7 +159,7 @@ function configReadErrorMessage(selected: string, error: unknown): string {
     (error && typeof error === "object" && "code" in error && error.code === "ENOENT") ||
     /ENOENT/.test(message)
   ) {
-    return `SprinkleRef resolver config not found: ${selected}. Run sprinkleref --init sprinkleref, edit the generated config for this environment, then retry with --config ${selected}.`;
+    return `SprinkleRef resolver config not found: ${selected}. Run infisical-iac-bootstrap.ts repo --dry-run, then infisical-iac-bootstrap.ts repo --yes or sprinkleref --init sprinkleref, edit the generated config for this environment, then retry with --config ${selected}.`;
   }
   return message;
 }

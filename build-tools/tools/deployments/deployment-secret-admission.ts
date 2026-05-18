@@ -23,6 +23,7 @@ export async function resolveInitialAdmittedSecretReferences(opts: {
   requirements: DeploymentRequirement[];
   targetScope: string;
   secretBackend?: DeploymentSecretBackendKind;
+  secretBackendProfile?: string;
   vaultRuntime?: DeploymentVaultRuntimeConfig;
   infisicalRuntime?: DeploymentInfisicalRuntimeConfig;
   infisicalSecretMappings?: Record<string, DeploymentInfisicalSecretMapping>;
@@ -37,6 +38,7 @@ export async function resolveInitialAdmittedSecretReferences(opts: {
       runtime: opts.infisicalRuntime,
       mappings: opts.infisicalSecretMappings,
       secretContext: opts.secretContext,
+      secretBackendProfile: opts.secretBackendProfile,
     });
   }
   throw new Error(`unsupported deployment secret backend ${backend}`);

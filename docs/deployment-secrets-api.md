@@ -810,6 +810,9 @@ Deployment metadata also carries backend routing fields:
 
 - `secretBackend`: normalized from `secret_backend`; omitted TARGETS metadata
   becomes `vault`
+- `secretBackendProfile`: normalized from `secret_backend_profile`; omitted
+  TARGETS metadata becomes `vault-default` for Vault and `infisical-default`
+  for Infisical
 - `infisicalRuntime`: normalized from `infisical_runtime`; contains non-secret
   Infisical routing data and reviewed Universal Auth environment variable names
 - `infisicalSecretMappings`: normalized from `infisical_secret_mappings`; maps

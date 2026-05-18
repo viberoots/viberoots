@@ -175,6 +175,12 @@ Allowed values:
 Omitted means `"vault"` for compatibility. Extractors should normalize the field
 onto the deployment contract as `secretBackend`.
 
+Deployments may also set `secret_backend_profile` to select a named resolver
+profile alias. Omitted profiles default to `vault-default` for Vault-backed
+deployments and `infisical-default` for Infisical-backed deployments. Deployment
+metadata selects only the alias; account-specific host, organization, project,
+and credential details stay in local or CI SprinkleRef resolver config.
+
 This field answers only which backend satisfies `secret_requirements`. It does
 not change contract ids, lifecycle steps, target scopes, or provider credential
 rules.

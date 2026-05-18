@@ -41,6 +41,7 @@ export type CloudflarePagesAdmittedContext = {
   admissionPolicyFingerprint: string;
   environmentStage: string;
   secretBackend?: DeploymentSecretBackendKind;
+  secretBackendProfile?: string;
   infisicalRuntime?: CloudflarePagesDeployment["infisicalRuntime"];
   infisicalSecretMappings?: CloudflarePagesDeployment["infisicalSecretMappings"];
   secretRequirements: DeploymentRequirement[];
@@ -78,6 +79,7 @@ async function baseContext(
     admissionPolicyFingerprint: deployment.admissionPolicy.fingerprint,
     environmentStage: deployment.environmentStage,
     secretBackend: deployment.secretBackend || "vault",
+    secretBackendProfile: deployment.secretBackendProfile,
     ...(deployment.infisicalRuntime ? { infisicalRuntime: deployment.infisicalRuntime } : {}),
     ...(deployment.infisicalSecretMappings
       ? { infisicalSecretMappings: deployment.infisicalSecretMappings }
@@ -96,6 +98,7 @@ async function baseContext(
             requirements: deployment.secretRequirements,
             targetScope,
             secretBackend: deployment.secretBackend,
+            secretBackendProfile: deployment.secretBackendProfile,
             vaultRuntime: deployment.vaultRuntime,
             infisicalRuntime: deployment.infisicalRuntime,
             infisicalSecretMappings: deployment.infisicalSecretMappings,
@@ -229,6 +232,7 @@ export async function resolveCloudflarePagesAdmittedSecretReferences(opts: {
       requirements: opts.deployment.secretRequirements,
       targetScope: opts.admittedContext.targetEnvironment.lockScope,
       secretBackend: opts.deployment.secretBackend,
+      secretBackendProfile: opts.deployment.secretBackendProfile,
       vaultRuntime: opts.deployment.vaultRuntime,
       infisicalRuntime: opts.deployment.infisicalRuntime,
       infisicalSecretMappings: opts.deployment.infisicalSecretMappings,

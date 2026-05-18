@@ -1,6 +1,7 @@
 import type { BootstrapArgs } from "./infisical-iac-bootstrap-types";
 
 export const DEFAULT_BOOTSTRAP_ARGS: BootstrapArgs = {
+  mode: "repo",
   apiUrl: "https://app.infisical.com",
   cliDomain: "https://app.infisical.com/api",
   hostOverride: false,

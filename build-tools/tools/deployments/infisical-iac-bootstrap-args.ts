@@ -19,6 +19,7 @@ const VALUE_FLAGS = new Set([
   "sprinkle-category",
   "client-secret-ttl",
   "access-token-ttl",
+  "target",
 ]);
 const BOOL_FLAGS = new Set([
   "help",
@@ -34,7 +35,10 @@ const BOOL_FLAGS = new Set([
 
 export function usage() {
   return `Usage:
-  infisical-iac-bootstrap.ts [--organization-id <id> | --org-name <name>] [options]
+  infisical-iac-bootstrap.ts repo --dry-run
+  infisical-iac-bootstrap.ts repo --yes
+  infisical-iac-bootstrap.ts deployment --target <buck-target> --dry-run
+  infisical-iac-bootstrap.ts deployment --target <buck-target> --yes
 
 Options:
   --infisical-host <us|eu|url>  Infisical host shorthand or URL
@@ -57,6 +61,10 @@ Options:
 export function parseBootstrapArgs(argv = getArgvTokens()): BootstrapArgs {
   validateKnownFlags(argv);
   const args: BootstrapArgs = { ...DEFAULT_BOOTSTRAP_ARGS };
+  const mode = modeFromArgs(argv);
+  if (!mode) throw new Error("use exactly one bootstrap mode: repo or deployment");
+  args.mode = mode;
+  setString(args, "target", readFlagStrFromTokens("target", "", argv));
   const host = readFlagStrFromTokens("infisical-host", "", argv).trim();
   if (host) {
     Object.assign(args, resolveInfisicalHost(host));
@@ -99,7 +107,16 @@ export function parseBootstrapArgs(argv = getArgvTokens()): BootstrapArgs {
     throw new Error("use only one of --organization-id or --org-name");
   if (args.noLogin && args.forceLogin)
     throw new Error("use only one of --no-login or --force-login");
+  if (args.mode === "deployment" && !args.target) {
+    throw new Error("infisical bootstrap deployment mode requires --target <buck-target>");
+  }
   return args;
+}
+
+function modeFromArgs(argv: string[]): BootstrapArgs["mode"] | undefined {
+  const modes = argv.filter((token) => token === "repo" || token === "deployment");
+  if (modes.length > 1) throw new Error("use exactly one bootstrap mode: repo or deployment");
+  return modes[0] as BootstrapArgs["mode"] | undefined;
 }
 
 function setString<T extends keyof BootstrapArgs>(args: BootstrapArgs, key: T, value: string) {

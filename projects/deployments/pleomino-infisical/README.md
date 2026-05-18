@@ -65,6 +65,8 @@ runs OpenTofu with a saved plan before applying it.
 
 ```bash
 build-tools/tools/deployments/infisical-iac-bootstrap.ts \
+  deployment \
+  --target //projects/deployments/pleomino-staging:deploy \
   --org-name viberoots \
   --tofu-plan-file .local/pleomino-infisical.tfplan
 ```
@@ -76,6 +78,8 @@ in checked deployment metadata.
 
 ```bash
 build-tools/tools/deployments/infisical-iac-bootstrap.ts \
+  deployment \
+  --target //projects/deployments/pleomino-staging:deploy \
   --no-login \
   --org-name viberoots \
   --yes \

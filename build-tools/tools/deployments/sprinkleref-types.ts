@@ -24,17 +24,25 @@ export type SprinkleRefBackendConfig = {
   namePrefix?: string;
 };
 
+export type SprinkleRefCategoryConfig =
+  | SprinkleRefBackendConfig
+  | {
+      profile: string;
+    };
+
 export type SprinkleRefConfigFile = {
   version: 1;
   extends?: string;
   defaultCategory?: string;
-  categories?: Record<string, SprinkleRefBackendConfig>;
+  profiles?: Record<string, SprinkleRefBackendConfig>;
+  categories?: Record<string, SprinkleRefCategoryConfig>;
 };
 
 export type SprinkleRefConfig = {
   path?: string;
   defaultCategory: string;
-  categories: Record<string, SprinkleRefBackendConfig>;
+  profiles: Record<string, SprinkleRefBackendConfig>;
+  categories: Record<string, SprinkleRefCategoryConfig>;
 };
 
 export type SprinkleRefOperation = "add" | "update" | "remove";

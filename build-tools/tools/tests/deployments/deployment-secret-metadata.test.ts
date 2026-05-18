@@ -93,6 +93,7 @@ test("omitted secret_backend normalizes extracted metadata to vault", () => {
   ]);
   assert.deepEqual(errors, []);
   assert.equal(deployments[0]?.secretBackend, "vault");
+  assert.equal(deployments[0]?.secretBackendProfile, "vault-default");
 });
 
 test("infisical backend exposes only non-secret routing metadata", () => {
@@ -115,12 +116,27 @@ test("infisical backend exposes only non-secret routing metadata", () => {
   ]);
   assert.deepEqual(errors, []);
   assert.equal(deployments[0]?.secretBackend, "infisical");
+  assert.equal(deployments[0]?.secretBackendProfile, "infisical-default");
   assert.equal(deployments[0]?.infisicalRuntime?.projectId, "proj_123");
   assert.equal(
     deployments[0]?.infisicalSecretMappings?.["secret://deployments/pleomino/cloudflare_api_token"]
       ?.secretName,
     "CLOUDFLARE_API_TOKEN",
   );
+});
+
+test("deployment metadata extracts explicit backend profile aliases", () => {
+  const { deployments, errors } = extractCloudflarePagesDeployments([
+    appNode(),
+    ...policyNodes(),
+    deploymentNode({
+      secret_backend: "infisical",
+      secret_backend_profile: "infisical-regulated",
+      secret_requirements: [],
+    }),
+  ]);
+  assert.deepEqual(errors, []);
+  assert.equal(deployments[0]?.secretBackendProfile, "infisical-regulated");
 });
 
 test("infisical deployment with no secret requirements does not require credentials", () => {

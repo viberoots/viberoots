@@ -12,8 +12,12 @@ import {
 } from "../../deployments/infisical-iac-bootstrap-org";
 import type { CommandRunner } from "../../deployments/infisical-iac-bootstrap-types";
 
-test("bootstrap args default to the reviewed Pleomino Infisical host and saved-plan apply", () => {
-  const args = parseBootstrapArgs([]);
+test("bootstrap args require an explicit mode", () => {
+  assert.throws(() => parseBootstrapArgs([]), /use exactly one bootstrap mode/);
+});
+
+test("bootstrap repo args default to the reviewed Infisical host and saved-plan apply", () => {
+  const args = parseBootstrapArgs(["repo"]);
   assert.equal(args.apiUrl, "https://app.infisical.com");
   assert.equal(args.cliDomain, "https://app.infisical.com/api");
   assert.equal(args.noTofuApply, false);
@@ -21,6 +25,7 @@ test("bootstrap args default to the reviewed Pleomino Infisical host and saved-p
 
 test("bootstrap args support host shorthands and non-interactive controls", () => {
   const args = parseBootstrapArgs([
+    "repo",
     "--infisical-host",
     "eu",
     "--no-login",
@@ -43,9 +48,21 @@ test("bootstrap args support host shorthands and non-interactive controls", () =
   assert.equal(args.yes, true);
 });
 
+test("bootstrap args parse explicit repo and deployment modes", () => {
+  assert.equal(parseBootstrapArgs(["repo", "--dry-run"]).mode, "repo");
+  const deployment = parseBootstrapArgs([
+    "deployment",
+    "--target",
+    "//projects/deployments/pleomino-staging:deploy",
+    "--dry-run",
+  ]);
+  assert.equal(deployment.mode, "deployment");
+  assert.equal(deployment.target, "//projects/deployments/pleomino-staging:deploy");
+});
+
 test("bootstrap args reject ambiguous organization selectors", () => {
   assert.throws(
-    () => parseBootstrapArgs(["--organization-id", "org_1", "--org-name", "viberoots"]),
+    () => parseBootstrapArgs(["repo", "--organization-id", "org_1", "--org-name", "viberoots"]),
     /use only one/,
   );
 });

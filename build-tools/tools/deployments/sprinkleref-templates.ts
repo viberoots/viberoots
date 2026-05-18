@@ -4,7 +4,7 @@ import * as os from "node:os";
 import * as path from "node:path";
 import type { SprinkleRefConfigFile } from "./sprinkleref-types";
 
-const MAIN_INFISICAL = {
+const INFISICAL_DEFAULT = {
   backend: "infisical" as const,
   host: "https://app.infisical.com",
   projectId: "pleomino-project-id",
@@ -12,6 +12,11 @@ const MAIN_INFISICAL = {
   defaultPath: "/",
   clientIdEnv: "INFISICAL_MACHINE_IDENTITY_CLIENT_ID",
   clientSecretEnv: "INFISICAL_MACHINE_IDENTITY_CLIENT_SECRET",
+};
+
+const VAULT_DEFAULT = {
+  backend: "local-file" as const,
+  file: ".local/vault-default-placeholder.json",
 };
 
 export function sprinkleRefStarterConfigs(platform = process.platform) {
@@ -22,7 +27,11 @@ export function sprinkleRefStarterConfigs(platform = process.platform) {
   const base: SprinkleRefConfigFile = {
     version: 1,
     defaultCategory: "main",
-    categories: { main: MAIN_INFISICAL },
+    profiles: {
+      "vault-default": VAULT_DEFAULT,
+      "infisical-default": INFISICAL_DEFAULT,
+    },
+    categories: { main: { profile: "infisical-default" } },
   };
   return {
     "base.json": base,
@@ -38,7 +47,7 @@ export function sprinkleRefStarterConfigs(platform = process.platform) {
       version: 1,
       extends: "./base.json",
       defaultCategory: "main",
-      categories: { bootstrap },
+      categories: { bootstrap, main: { profile: "infisical-default" } },
     },
   };
 }

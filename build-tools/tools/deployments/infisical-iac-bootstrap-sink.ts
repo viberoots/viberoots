@@ -8,6 +8,14 @@ import { initSprinkleRefConfigs } from "./sprinkleref-templates";
 import type { SprinkleRefBackendConfig } from "./sprinkleref-types";
 
 type Store = Record<string, string>;
+type SprinkleRefWritableStore = {
+  describe(): string;
+  has(ref: string): Promise<boolean>;
+  read(ref: string): Promise<string | undefined>;
+  add(ref: string, value: string): Promise<void>;
+  update(ref: string, value: string): Promise<void>;
+};
+
 export class LocalFileCredentialSink implements CredentialSink {
   private readonly file: string;
 
@@ -57,24 +65,9 @@ export class LocalFileCredentialSink implements CredentialSink {
 
 class SprinkleRefCredentialSink implements CredentialSink {
   private readonly category: string;
-  private readonly store: {
-    describe(): string;
-    has(ref: string): Promise<boolean>;
-    read(ref: string): Promise<string | undefined>;
-    add(ref: string, value: string): Promise<void>;
-    update(ref: string, value: string): Promise<void>;
-  };
+  private readonly store: SprinkleRefWritableStore;
 
-  constructor(
-    category: string,
-    store: {
-      describe(): string;
-      has(ref: string): Promise<boolean>;
-      read(ref: string): Promise<string | undefined>;
-      add(ref: string, value: string): Promise<void>;
-      update(ref: string, value: string): Promise<void>;
-    },
-  ) {
+  constructor(category: string, store: SprinkleRefWritableStore) {
     this.category = category;
     this.store = store;
   }
@@ -114,7 +107,8 @@ export async function resolveCredentialSinkSelection(
   } = {},
 ): Promise<CredentialSinkSelection> {
   const env = opts.env || process.env;
-  const createMissingResolverConfig = opts.createMissingResolverConfig ?? !args.dryRun;
+  const createMissingResolverConfig =
+    opts.createMissingResolverConfig ?? (!args.dryRun && args.mode === "repo");
   if (args.credentialSink === "local-file") {
     return { kind: "local-file", backend: "local-file", description: args.localCredentialFile };
   }
@@ -148,6 +142,9 @@ async function resolvedSprinkleRefBackend(args: BootstrapArgs, configPath?: stri
   const resolved = resolveSprinkleRefBackend(config, args.sprinkleCategory || "bootstrap");
   if (resolved.backend.backend === "infisical") {
     throw new Error("bootstrap credentials must not use an Infisical SprinkleRef backend");
+  }
+  if (resolved.profile?.startsWith("infisical")) {
+    throw new Error("bootstrap credentials must not use the Infisical profile they unlock");
   }
   return resolved;
 }

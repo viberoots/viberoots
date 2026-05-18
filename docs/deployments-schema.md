@@ -30,6 +30,7 @@ Minimum fields:
 | `preview`                       | no                                               | Explicit opt-in only.                                                                                                                                               |
 | `prerequisites`                 | no                                               | Explicit direct-edge deployment prerequisites.                                                                                                                      |
 | `secret_backend`                | no                                               | Deployment-wide backend for `secret_requirements`; omitted means `vault`. Allowed values are `vault` and `infisical`.                                               |
+| `secret_backend_profile`        | no                                               | Named resolver profile alias for the selected backend. Omitted means `vault-default` for Vault and `infisical-default` for Infisical.                               |
 | `vault_runtime`                 | no                                               | Stable Vault/IdP runtime metadata for deployment-derived JWT auth. Secret values must not be stored here.                                                           |
 | `infisical_runtime`             | no                                               | Non-secret Infisical routing metadata such as `site_url`, `project_id`, `environment`, and reviewed Universal Auth environment variable names.                      |
 | `infisical_secret_mappings`     | no                                               | Optional map from declared `secret_requirements` contract IDs to non-secret `secret_path` and `secret_name` overrides.                                              |
@@ -49,6 +50,8 @@ Secret backend invariant:
 - `secret_requirements` remains the only secret declaration surface
 - `secret_backend` selects one backend for the whole deployment and defaults to
   `vault`
+- `secret_backend_profile` selects only a named resolver profile alias; account-specific backend
+  coordinates and credentials stay in local/CI SprinkleRef resolver config
 - Infisical metadata is routing data only; access tokens, client secrets,
   personal tokens, secret values, and rendered secret-bearing configs are
   rejected from reviewed metadata

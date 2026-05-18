@@ -23,9 +23,20 @@ import { reconcileDeploymentMetadata } from "./infisical-iac-bootstrap-reconcile
 import { ensureDeploymentCredentials } from "./infisical-iac-deployment-credentials";
 import { readPleominoReviewedMetadata } from "./infisical-iac-bootstrap-reviewed-metadata";
 import { errorMessage } from "./infisical-iac-bootstrap-redaction";
+import { ensureRepoResolverConfig } from "./infisical-iac-bootstrap-resolver";
 import type { BootstrapArgs } from "./infisical-iac-bootstrap-types";
 
+const PLEOMINO_DEPLOYMENT_BOOTSTRAP_TARGETS = new Set([
+  "//projects/deployments/pleomino-staging:deploy",
+  "//projects/deployments/pleomino-prod:deploy",
+]);
+
 export async function runInfisicalIacBootstrap(args: BootstrapArgs) {
+  if (args.mode === "repo") return await runRepoBootstrap(args);
+  const scope = deploymentScopeFromTarget(args);
+  if (scope.kind !== "pleomino") {
+    throw new Error(`unsupported deployment bootstrap scope: ${args.target || "<missing>"}`);
+  }
   const reviewedMetadata = await readPleominoReviewedMetadata();
   const effectiveArgs = withReviewedHost(args, reviewedMetadata.siteUrl);
   if (effectiveArgs.dryRun) return dryRun(effectiveArgs);
@@ -86,6 +97,46 @@ export async function runInfisicalIacBootstrap(args: BootstrapArgs) {
       2,
     ),
   );
+}
+
+async function runRepoBootstrap(args: BootstrapArgs) {
+  if (args.dryRun) return dryRun(args);
+  assertBootstrapPreflight(args);
+  const resolver = await ensureRepoResolverConfig({ dryRun: false });
+  const sink = await resolveCredentialSinkSelection(args, { createMissingResolverConfig: true });
+  console.log(
+    JSON.stringify(
+      {
+        schemaVersion: "infisical-repo-bootstrap-result@1",
+        resolverConfig: resolver.configPath,
+        profiles: resolver.profiles,
+        categories: ["main", "bootstrap"],
+        bootstrapCredentialSinks: resolver.bootstrapCredentialProfiles.map((profile) => ({
+          profile,
+          credentialSink: sink.kind,
+          credentialSinkBackend: sink.backend,
+          category: sink.category || args.sprinkleCategory || "bootstrap",
+        })),
+        nextCommands: [`sprinkleref --check --config ${resolver.configPath}`],
+        credentialSink: sink.kind,
+        credentialSinkBackend: sink.backend,
+      },
+      null,
+      2,
+    ),
+  );
+}
+
+function deploymentScopeFromTarget(args: BootstrapArgs) {
+  if (!args.target) throw new Error("deployment bootstrap requires --target <buck-target>");
+  if (!PLEOMINO_DEPLOYMENT_BOOTSTRAP_TARGETS.has(args.target)) {
+    throw new Error(
+      `deployment bootstrap target ${args.target} is not supported; supported targets: ${[
+        ...PLEOMINO_DEPLOYMENT_BOOTSTRAP_TARGETS,
+      ].join(", ")}`,
+    );
+  }
+  return { kind: "pleomino" as const, target: args.target };
 }
 
 async function dryRun(args: BootstrapArgs) {

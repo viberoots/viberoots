@@ -138,9 +138,14 @@ export async function resolveDeploymentInfisicalAdmittedReferences(opts: {
   targetScope: string;
   runtime?: DeploymentInfisicalRuntimeConfig;
   mappings?: Record<string, DeploymentInfisicalSecretMapping>;
+  secretBackendProfile?: string;
   secretContext?: DeploymentSecretContext;
 }): Promise<DeploymentSecretAdmittedReference[]> {
-  const bindings = deploymentSecretContractBindings(opts.requirements, "infisical");
+  const bindings = deploymentSecretContractBindings(
+    opts.requirements,
+    "infisical",
+    opts.secretBackendProfile,
+  );
   const fixture = deploymentSecretFixturePath() ? await readDeploymentSecretFixture() : undefined;
   const context = fixture ? undefined : assertContext(opts.secretContext);
   if (!fixture && !opts.runtime) throw missingDeploymentSecretContextError();

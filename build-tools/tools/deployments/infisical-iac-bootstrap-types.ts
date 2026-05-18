@@ -1,6 +1,8 @@
 export type InfisicalHost = "us" | "eu" | string;
 
 export type BootstrapArgs = {
+  mode: "repo" | "deployment";
+  target?: string;
   apiUrl: string;
   cliDomain: string;
   hostOverride?: boolean;

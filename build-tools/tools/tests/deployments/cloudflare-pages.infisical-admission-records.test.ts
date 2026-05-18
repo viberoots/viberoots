@@ -46,6 +46,7 @@ function deployment(siteUrl: string): CloudflarePagesDeployment {
       secretRequirements: [infisicalRequirement],
     }),
     secretBackend: "infisical",
+    secretBackendProfile: "infisical-regulated",
     infisicalRuntime: { ...infisicalRuntime, siteUrl },
   };
 }
@@ -100,7 +101,12 @@ test("cloudflare-pages promotion uses source artifact and fresh target Infisical
     assert.equal(snapshot.action.kind, "deploy");
     assert.equal(snapshot.action.publishInput.artifact.identity, sourceArtifact.identity);
     assert.equal(snapshot.admittedContext.source.sourceRunId, "deploy-source-1");
+    assert.equal(snapshot.admittedContext.secretBackendProfile, "infisical-regulated");
     assert.equal(snapshot.admittedContext.admittedSecretReferences[0]?.backend, "infisical");
+    assert.equal(
+      snapshot.admittedContext.admittedSecretReferences[0]?.backendProfile,
+      "infisical-regulated",
+    );
     assert.match(
       snapshot.admittedContext.admittedSecretReferences[0]?.referenceId || "",
       /^infisical:/,

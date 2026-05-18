@@ -11,6 +11,7 @@ export type DeploymentSecretContractBinding = {
   contractId: string;
   required: boolean;
   backend: DeploymentSecretBackendKind;
+  backendProfile?: string;
   referenceId: string;
 };
 
@@ -31,6 +32,7 @@ export type DeploymentSecretReference =
 export function deploymentSecretContractBindings(
   requirements: DeploymentRequirement[],
   backend: DeploymentSecretBackendKind = "vault",
+  backendProfile = backend === "infisical" ? "infisical-default" : "vault-default",
 ): DeploymentSecretContractBinding[] {
   return requirements.map((requirement) => ({
     name: requirement.name,
@@ -38,6 +40,7 @@ export function deploymentSecretContractBindings(
     contractId: requirement.contractId,
     required: requirement.required,
     backend,
+    backendProfile,
     referenceId: `${backend}:${requirement.contractId}`,
   }));
 }

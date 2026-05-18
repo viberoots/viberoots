@@ -110,9 +110,14 @@ function ensureFixtureReferenceMatches(
 export async function resolveDeploymentVaultAdmittedReferences(opts: {
   requirements: DeploymentRequirement[];
   targetScope: string;
+  secretBackendProfile?: string;
   secretContext?: DeploymentSecretContext;
 }): Promise<DeploymentSecretAdmittedReference[]> {
-  const bindings = deploymentSecretContractBindings(opts.requirements);
+  const bindings = deploymentSecretContractBindings(
+    opts.requirements,
+    "vault",
+    opts.secretBackendProfile,
+  );
   const resolved: DeploymentSecretAdmittedReference[] = [];
   for (const binding of bindings) {
     const admitted = await admittedReferenceFor(binding, opts.targetScope, opts.secretContext);

@@ -42,6 +42,33 @@ test("resolver config applies default category and extends base categories", asy
   assert.equal(resolveSprinkleRefBackend(config, "bootstrap").backend.backend, "local-file");
 });
 
+test("resolver config resolves categories through named backend profiles", async () => {
+  const dir = await tmp();
+  const configPath = path.join(dir, "profiles.json");
+  await writeJson(configPath, {
+    version: 1,
+    defaultCategory: "main",
+    profiles: {
+      "infisical-default": {
+        backend: "infisical",
+        host: "http://127.0.0.1:1",
+        projectId: "proj",
+        defaultEnvironment: "staging",
+        clientIdEnv: "INFISICAL_CLIENT_ID",
+        clientSecretEnv: "INFISICAL_CLIENT_SECRET",
+      },
+      "vault-default": { backend: "local-file", file: path.join(dir, "vault.json") },
+    },
+    categories: {
+      main: { profile: "infisical-default" },
+      bootstrap: { profile: "vault-default" },
+    },
+  });
+  const config = await readSprinkleRefConfig(configPath);
+  assert.equal(resolveSprinkleRefBackend(config, "main").profile, "infisical-default");
+  assert.equal(resolveSprinkleRefBackend(config, "bootstrap").backend.backend, "local-file");
+});
+
 test("resolver config rejects unsupported backends and backend-specific refs", async () => {
   assert.throws(
     () => assertBackendNeutralSecretRef("secret://github/deployments/token"),

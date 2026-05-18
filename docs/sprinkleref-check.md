@@ -39,6 +39,18 @@ sprinkleref --check --target //projects/deployments/pleomino-staging:deploy --no
 sprinkleref --check --target //projects/apps/pleomino:app --deps transitive
 ```
 
+If no resolver config exists yet, initialize the repo-wide backend profile registry before checking
+configured secret presence:
+
+```bash
+build-tools/tools/deployments/infisical-iac-bootstrap.ts repo --dry-run
+build-tools/tools/deployments/infisical-iac-bootstrap.ts repo --yes
+sprinkleref --check --config sprinkleref/selected.local.json
+```
+
+The repo-wide path sets up resolver profiles and categories only. Pleomino OpenTofu provisioning is
+explicitly separate and requires `infisical-iac-bootstrap.ts deployment --target <buck-target>`.
+
 `--check` should default to all supported deployment contract schemes. Scheme filters narrow the
 report without changing validation semantics. `--all` is accepted as an explicit alias for the
 default all-schemes check.

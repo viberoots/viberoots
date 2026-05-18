@@ -631,6 +631,8 @@ step instead of editing Keycloak by hand.
 
 ```bash
 build-tools/tools/deployments/infisical-iac-bootstrap.ts \
+  deployment \
+  --target //projects/deployments/pleomino-staging:deploy \
   --org-name viberoots \
   --yes \
   --tofu-plan-file .local/pleomino-infisical.tfplan
@@ -644,6 +646,8 @@ selector:
 ```bash
 INFISICAL_ACCESS_TOKEN='<redacted>' \
   build-tools/tools/deployments/infisical-iac-bootstrap.ts \
+  deployment \
+  --target //projects/deployments/pleomino-staging:deploy \
   --no-login \
   --org-name viberoots \
   --yes \
