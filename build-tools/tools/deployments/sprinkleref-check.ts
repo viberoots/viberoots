@@ -149,8 +149,19 @@ async function maybeReadConfig(configPath: string, env: NodeJS.ProcessEnv = proc
   try {
     return await readSprinkleRefConfig(selected);
   } catch (error) {
-    backendError(error instanceof Error ? error.message : String(error));
+    backendError(configReadErrorMessage(selected, error));
   }
+}
+
+function configReadErrorMessage(selected: string, error: unknown): string {
+  const message = error instanceof Error ? error.message : String(error);
+  if (
+    (error && typeof error === "object" && "code" in error && error.code === "ENOENT") ||
+    /ENOENT/.test(message)
+  ) {
+    return `SprinkleRef resolver config not found: ${selected}. Run sprinkleref --init sprinkleref, edit the generated config for this environment, then retry with --config ${selected}.`;
+  }
+  return message;
 }
 
 function createStore(

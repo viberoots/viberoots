@@ -78,6 +78,6 @@ function renderEntry(entry: SprinkleRefCheckEntry, prefix: string): string {
 function renderUncheckedHint(lines: string[], count: number): void {
   if (count === 0) return;
   lines.push(
-    `Unchecked secrets: ${count} (pass --config to determine whether they are present or missing).`,
+    `Unchecked secrets: ${count} (run sprinkleref --init sprinkleref, configure it, then pass --config to determine whether they are present or missing).`,
   );
 }

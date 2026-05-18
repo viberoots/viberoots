@@ -170,7 +170,10 @@ test("check exposes stable usage and resolver access exit codes", async () => {
       runInDir(dir, () =>
         runSprinkleRefCheck({ argv: ["--check", "--config", "/missing/resolver.json"] }),
       ),
-    (error: any) => error.exitCode === 2 && /ENOENT/.test(error.message),
+    (error: any) =>
+      error.exitCode === 2 &&
+      /resolver config not found/.test(error.message) &&
+      /sprinkleref --init sprinkleref/.test(error.message),
   );
 });
 
