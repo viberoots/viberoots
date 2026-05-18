@@ -26,17 +26,17 @@ as `https://`, `s3://`, `evidence://`, or `approval://` are ignored unless a lat
 Initial command forms:
 
 ```bash
-build-tools/tools/deployments/sprinkleref.ts --check
-build-tools/tools/deployments/sprinkleref.ts --check --scheme secret
-build-tools/tools/deployments/sprinkleref.ts --check --scheme config
-build-tools/tools/deployments/sprinkleref.ts --check --scheme runtime
-build-tools/tools/deployments/sprinkleref.ts --check --all
-build-tools/tools/deployments/sprinkleref.ts --check --format json
-build-tools/tools/deployments/sprinkleref.ts --check --config sprinkleref/local.macos.json
-build-tools/tools/deployments/sprinkleref.ts --check --category bootstrap
-build-tools/tools/deployments/sprinkleref.ts --check --target //projects/deployments/pleomino-staging:deploy
-build-tools/tools/deployments/sprinkleref.ts --check --target //projects/deployments/pleomino-staging:deploy --no-deps
-build-tools/tools/deployments/sprinkleref.ts --check --target //projects/apps/pleomino:app --deps transitive
+sprinkleref --check
+sprinkleref --check --scheme secret
+sprinkleref --check --scheme config
+sprinkleref --check --scheme runtime
+sprinkleref --check --all
+sprinkleref --check --format json
+sprinkleref --check --config sprinkleref/local.macos.json
+sprinkleref --check --category bootstrap
+sprinkleref --check --target //projects/deployments/pleomino-staging:deploy
+sprinkleref --check --target //projects/deployments/pleomino-staging:deploy --no-deps
+sprinkleref --check --target //projects/apps/pleomino:app --deps transitive
 ```
 
 `--check` should default to all supported deployment contract schemes. Scheme filters narrow the

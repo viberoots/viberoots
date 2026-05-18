@@ -28,6 +28,20 @@ test("scanner discovers deployment refs and skips generated paths", async () => 
   ]);
 });
 
+test("scanner skips tracked directory symlinks", async () => {
+  const dir = await gitRepo();
+  await fs.mkdir(path.join(dir, "store-dir"));
+  await fs.symlink("store-dir", path.join(dir, "node_modules"));
+  await writeTracked(dir, "contracts.txt", "config://deployments/demo/public_url\n");
+  await $({ cwd: dir })`git add node_modules`.quiet();
+  const scanned = await scanRepositoryRefs(dir);
+  assert.equal(scanned.scannedFiles, 1);
+  assert.deepEqual(
+    scanned.refs.map((entry) => entry.ref),
+    ["config://deployments/demo/public_url"],
+  );
+});
+
 test("check reports secret presence without serializing secret values", async () => {
   const dir = await gitRepo();
   const secretRef = "secret://deployments/demo/api_token";

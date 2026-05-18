@@ -23,7 +23,7 @@ or restrictive local files.
 Initialize starter configs:
 
 ```bash
-build-tools/tools/deployments/sprinkleref.ts --init sprinkleref
+sprinkleref --init sprinkleref
 ```
 
 The Infisical bootstrap command also uses this resolver shape. With `--credential-sink auto`, it
@@ -36,27 +36,27 @@ files. Existing resolver configs are treated as authoritative.
 Add, update, or remove ordinary secrets:
 
 ```bash
-build-tools/tools/deployments/sprinkleref.ts \
+sprinkleref \
   --config sprinkleref/local.macos.json \
   --add secret://deployments/pleomino/staging/cloudflare_api_token
 
-build-tools/tools/deployments/sprinkleref.ts \
+sprinkleref \
   --config sprinkleref/local.macos.json \
   --add secret://deployments/pleomino/staging/cloudflare_api_token \
   --overwrite-existing
 
-build-tools/tools/deployments/sprinkleref.ts \
+sprinkleref \
   --config sprinkleref/local.macos.json \
   --update secret://deployments/pleomino/prod/cloudflare_api_token \
   --value-file .local/secrets/cloudflare-prod-token
 
-build-tools/tools/deployments/sprinkleref.ts \
+sprinkleref \
   --config sprinkleref/local.macos.json \
   --update secret://deployments/pleomino/prod/new_runtime_secret \
   --create-missing \
   --value-file .local/secrets/new-runtime-secret
 
-build-tools/tools/deployments/sprinkleref.ts \
+sprinkleref \
   --config sprinkleref/local.macos.json \
   --remove secret://deployments/pleomino/staging/cloudflare_api_token
 ```
@@ -80,7 +80,7 @@ only; secret values must be supplied to ordinary `--add` or `--update` operation
 For bootstrap credentials:
 
 ```bash
-build-tools/tools/deployments/sprinkleref.ts \
+sprinkleref \
   --config sprinkleref/local.file.json \
   --add secret://deployments/pleomino/staging/infisical-client-secret \
   --category bootstrap
@@ -93,11 +93,11 @@ Check repository deployment contract references before bootstrap, admission, dep
 validation:
 
 ```bash
-build-tools/tools/deployments/sprinkleref.ts --check
-build-tools/tools/deployments/sprinkleref.ts --check --scheme secret --config sprinkleref/local.file.json
-build-tools/tools/deployments/sprinkleref.ts --check --target //projects/deployments/pleomino-staging:deploy
-build-tools/tools/deployments/sprinkleref.ts --check --target //projects/deployments/pleomino-staging:deploy --no-deps
-build-tools/tools/deployments/sprinkleref.ts --check --format json
+sprinkleref --check
+sprinkleref --check --scheme secret --config sprinkleref/local.file.json
+sprinkleref --check --target //projects/deployments/pleomino-staging:deploy
+sprinkleref --check --target //projects/deployments/pleomino-staging:deploy --no-deps
+sprinkleref --check --format json
 ```
 
 `--check` scans tracked repository files for `secret://`, `config://`, and `runtime://` references

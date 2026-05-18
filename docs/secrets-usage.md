@@ -123,8 +123,8 @@ Before bootstrap, deployment admission, or CI validation, run a read-only
 SprinkleRef reference check to find missing or unmapped deployment contract refs:
 
 ```bash
-build-tools/tools/deployments/sprinkleref.ts --check
-build-tools/tools/deployments/sprinkleref.ts --check --target //projects/deployments/pleomino-staging:deploy
+sprinkleref --check
+sprinkleref --check --target //projects/deployments/pleomino-staging:deploy
 ```
 
 The checker inventories `secret://`, `config://`, and `runtime://` refs without

@@ -208,7 +208,7 @@ Before Infisical/Vault bootstrap, deployment admission, or CI validation,
 operators should run:
 
 ```bash
-build-tools/tools/deployments/sprinkleref.ts --check --target <deployment-target>
+sprinkleref --check --target <deployment-target>
 ```
 
 Use `--config <resolver.json>` when checking secret backend presence, and
