@@ -36,8 +36,10 @@ const BOOL_FLAGS = new Set([
 export function usage(command = "build-tools/tools/deployments/infisical-bootstrap.ts") {
   return `Usage:
   ${command} repo --dry-run
+  ${command} repo
   ${command} repo --yes
   ${command} deployment --target <buck-target> --dry-run
+  ${command} deployment --target <buck-target>
   ${command} deployment --target <buck-target> --yes
 
 Options:
@@ -53,7 +55,7 @@ Options:
   --rotate-bootstrap-credentials
   --rotate-deployment-credentials
   --credential-sink <auto|local-file|macos-keychain|sprinkleref>
-  --yes                         Skip deterministic prompts and apply confirmation
+  --yes                         Skip confirmation prompts
   --dry-run                     Print non-secret planned operations
 `;
 }

@@ -6,15 +6,61 @@ import * as os from "node:os";
 import * as path from "node:path";
 import { test } from "node:test";
 import { DEFAULT_BOOTSTRAP_ARGS } from "../../deployments/infisical-iac-bootstrap-config";
-import { assertBootstrapPreflight } from "../../deployments/infisical-iac-bootstrap-preflight";
+import {
+  assertBootstrapPreflight,
+  confirmBootstrapPreflight,
+  isAffirmativeConfirmation,
+} from "../../deployments/infisical-iac-bootstrap-preflight";
 import { runInfisicalIacBootstrap } from "../../deployments/infisical-iac-bootstrap";
 
-test("bootstrap preflight rejects missing --yes before local or remote side effects", () => {
+test("bootstrap preflight rejects non-interactive execution before side effects", async () => {
   const sideEffects: string[] = [];
-  assert.throws(() => {
-    assertBootstrapPreflight({ ...DEFAULT_BOOTSTRAP_ARGS, yes: false, dryRun: false });
+  await assert.rejects(async () => {
+    await confirmBootstrapPreflight(
+      { ...DEFAULT_BOOTSTRAP_ARGS, yes: false, dryRun: false },
+      {
+        stdin: { isTTY: false } as NodeJS.ReadStream,
+        stdout: { isTTY: false } as NodeJS.WriteStream,
+      },
+    );
     sideEffects.push("mutation");
-  }, /requires --yes[\s\S]*No Infisical resources, OpenTofu state, resolver config, or credential sink output was changed/);
+  }, /needs confirmation[\s\S]*Retry non-interactively:[\s\S]*--yes/);
+  assert.deepEqual(sideEffects, []);
+});
+
+test("bootstrap preflight allows interactive confirmation without --yes", async () => {
+  await confirmBootstrapPreflight(
+    { ...DEFAULT_BOOTSTRAP_ARGS, yes: false, dryRun: false },
+    {
+      stdin: { isTTY: true } as NodeJS.ReadStream,
+      stdout: { isTTY: true } as NodeJS.WriteStream,
+      question: async () => "yes",
+    },
+  );
+});
+
+test("bootstrap preflight accepts y or yes confirmation", () => {
+  for (const answer of ["", "y", "Y", "yes", "YES"]) {
+    assert.equal(isAffirmativeConfirmation(answer), true);
+  }
+  for (const answer of ["n", "N", "no", "sure"]) {
+    assert.equal(isAffirmativeConfirmation(answer), false);
+  }
+});
+
+test("bootstrap preflight cancellation stops before side effects", async () => {
+  const sideEffects: string[] = [];
+  await assert.rejects(async () => {
+    await confirmBootstrapPreflight(
+      { ...DEFAULT_BOOTSTRAP_ARGS, yes: false, dryRun: false },
+      {
+        stdin: { isTTY: true } as NodeJS.ReadStream,
+        stdout: { isTTY: true } as NodeJS.WriteStream,
+        question: async () => "no",
+      },
+    );
+    sideEffects.push("mutation");
+  }, /bootstrap cancelled/);
   assert.deepEqual(sideEffects, []);
 });
 
@@ -38,7 +84,7 @@ test("bootstrap preflight retry command includes deployment target scope", () =>
   );
 });
 
-test("bootstrap path rejects missing --yes before Infisical, OpenTofu, or sink writes", async () => {
+test("bootstrap path rejects non-interactive execution before Infisical, OpenTofu, or sink writes", async () => {
   const dir = await tmp();
   await writeReviewedMetadata(dir);
   const binDir = path.join(dir, "bin");
@@ -73,7 +119,7 @@ test("bootstrap path rejects missing --yes before Infisical, OpenTofu, or sink w
             tofuPlanFile: "side-effects/plan.tfplan",
             localCredentialFile: "side-effects/credentials.json",
           }),
-        /requires --yes/,
+        /needs confirmation/,
       );
       assert.deepEqual(requests, []);
       await assertMissing("sprinkleref/selected.local.json");
@@ -185,31 +231,13 @@ async function writeReviewedMetadata(dir: string) {
   );
 }
 
-async function captureStdout(run: () => Promise<void>) {
-  const original = console.log;
-  const lines: string[] = [];
-  console.log = (value?: unknown) => {
-    lines.push(String(value));
-  };
-  try {
-    await run();
-  } finally {
-    console.log = original;
-  }
-  return lines.join("\n");
-}
-
 async function captureConsole(run: () => Promise<void>) {
   const originalLog = console.log;
   const originalError = console.error;
   const stdout: string[] = [];
   const stderr: string[] = [];
-  console.log = (value?: unknown) => {
-    stdout.push(String(value));
-  };
-  console.error = (value?: unknown) => {
-    stderr.push(String(value));
-  };
+  console.log = (value?: unknown) => stdout.push(String(value));
+  console.error = (value?: unknown) => stderr.push(String(value));
   try {
     await run();
   } finally {

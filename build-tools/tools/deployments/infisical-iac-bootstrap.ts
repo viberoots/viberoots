@@ -18,7 +18,7 @@ import { buildCredentialHandoffReport } from "./infisical-iac-bootstrap-handoff"
 import { buildDryRunGuidance, buildDryRunReport } from "./infisical-iac-bootstrap-dry-run";
 import { resolveOrganizationId } from "./infisical-iac-bootstrap-org";
 import { readDeploymentRuntimeMetadata, runOpenTofu } from "./infisical-iac-bootstrap-tofu";
-import { assertBootstrapPreflight } from "./infisical-iac-bootstrap-preflight";
+import { confirmBootstrapPreflight } from "./infisical-iac-bootstrap-preflight";
 import { reconcileDeploymentMetadata } from "./infisical-iac-bootstrap-reconcile";
 import { ensureDeploymentCredentials } from "./infisical-iac-deployment-credentials";
 import { readPleominoReviewedMetadata } from "./infisical-iac-bootstrap-reviewed-metadata";
@@ -40,7 +40,7 @@ export async function runInfisicalIacBootstrap(args: BootstrapArgs) {
   const reviewedMetadata = await readPleominoReviewedMetadata();
   const effectiveArgs = withReviewedHost(args, reviewedMetadata.siteUrl);
   if (effectiveArgs.dryRun) return dryRun(effectiveArgs);
-  assertBootstrapPreflight(effectiveArgs);
+  await confirmBootstrapPreflight(effectiveArgs);
   const sinkSelection = await resolveCredentialSinkSelection(effectiveArgs, {
     createMissingResolverConfig: true,
   });
@@ -103,7 +103,7 @@ export async function runInfisicalIacBootstrap(args: BootstrapArgs) {
 
 async function runRepoBootstrap(args: BootstrapArgs) {
   if (args.dryRun) return dryRun(args);
-  assertBootstrapPreflight(args);
+  await confirmBootstrapPreflight(args);
   const resolver = await ensureRepoResolverConfig({ dryRun: false });
   const sink = await resolveCredentialSinkSelection(args, { createMissingResolverConfig: true });
   console.log(
