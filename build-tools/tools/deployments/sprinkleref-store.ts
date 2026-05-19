@@ -15,5 +15,8 @@ export function createSprinkleRefStore(
   if (backend.backend === "infisical") {
     return new SprinkleRefInfisicalStore(backend, opts.env, opts.fetchImpl);
   }
+  if (backend.backend === "vault") {
+    throw new Error("vault SprinkleRef profile is used by deployment bootstrap, not direct stores");
+  }
   throw new Error(`${backend.backend} SprinkleRef backend is read-only in this PR`);
 }

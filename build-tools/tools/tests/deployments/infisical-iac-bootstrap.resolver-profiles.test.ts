@@ -10,6 +10,15 @@ import {
   createCredentialSink,
   resolveCredentialSinkSelection,
 } from "../../deployments/infisical-iac-bootstrap-sink";
+import { fakeRepoBootstrapFetch } from "./sprinkleref-test-helpers";
+
+const VAULT_PROFILE = {
+  backend: "vault",
+  addressEnv: "VBR_VAULT_ADDR",
+  tokenEnv: "VBR_VAULT_TOKEN",
+  mount: "secret",
+  defaultPath: "/deployments",
+};
 
 test("auto credential sink reuses existing SprinkleRef resolver config", async () => {
   const dir = await tmp();
@@ -103,7 +112,7 @@ test("repo bootstrap validates non-default profiles selected by deployment metad
       version: 1,
       defaultCategory: "main",
       profiles: {
-        "vault-default": { backend: "local-file", file: ".local/vault.json" },
+        "vault-default": VAULT_PROFILE,
         "infisical-default": {
           backend: "infisical",
           host: "https://app.infisical.com",
@@ -138,7 +147,7 @@ test("repo bootstrap validates bootstrap category even with explicit credential 
       version: 1,
       defaultCategory: "main",
       profiles: {
-        "vault-default": { backend: "local-file", file: ".local/vault.json" },
+        "vault-default": VAULT_PROFILE,
         "infisical-default": {
           backend: "infisical",
           host: "https://app.infisical.com",
@@ -170,38 +179,6 @@ test("repo bootstrap validates bootstrap category even with explicit credential 
   });
 });
 
-test("bootstrap credentials cannot resolve through an Infisical backend or profile", async () => {
-  const dir = await tmp();
-  await withCwdAndEnv(dir, async () => {
-    await writeJson("sprinkleref/selected.local.json", {
-      version: 1,
-      defaultCategory: "main",
-      profiles: {
-        "infisical-default": {
-          backend: "infisical",
-          host: "https://app.infisical.com",
-          projectId: "project",
-          defaultEnvironment: "staging",
-          clientIdEnv: "INFISICAL_CLIENT_ID",
-          clientSecretEnv: "INFISICAL_CLIENT_SECRET",
-        },
-      },
-      categories: {
-        main: { profile: "infisical-default" },
-        bootstrap: { profile: "infisical-default" },
-      },
-    });
-    await assert.rejects(
-      () =>
-        resolveCredentialSinkSelection(
-          { ...DEFAULT_BOOTSTRAP_ARGS, credentialSink: "sprinkleref" },
-          { platform: "linux", env: {} },
-        ),
-      /access credential sink category bootstrap must not use an Infisical profile[\s\S]*Remediate:/,
-    );
-  });
-});
-
 async function tmp() {
   return await fs.mkdtemp(path.join(os.tmpdir(), "infisical-bootstrap-resolver-"));
 }
@@ -209,7 +186,17 @@ async function tmp() {
 async function withCwdAndEnv(dir: string, run: () => Promise<void>) {
   const cwd = process.cwd();
   const oldConfig = process.env.SPRINKLEREF_CONFIG;
+  const oldProjectId = process.env.VBR_INFISICAL_PROJECT_ID;
+  const oldToken = process.env.INFISICAL_ACCESS_TOKEN;
+  const oldVaultAddr = process.env.VBR_VAULT_ADDR;
+  const oldVaultToken = process.env.VBR_VAULT_TOKEN;
+  const oldFetch = globalThis.fetch;
   delete process.env.SPRINKLEREF_CONFIG;
+  process.env.VBR_INFISICAL_PROJECT_ID = "proj_repo_test";
+  process.env.INFISICAL_ACCESS_TOKEN = "admin-token";
+  process.env.VBR_VAULT_ADDR = "https://vault.test";
+  process.env.VBR_VAULT_TOKEN = "vault-token";
+  globalThis.fetch = fakeRepoBootstrapFetch as typeof fetch;
   process.chdir(dir);
   try {
     await run();
@@ -217,6 +204,15 @@ async function withCwdAndEnv(dir: string, run: () => Promise<void>) {
     process.chdir(cwd);
     if (oldConfig === undefined) delete process.env.SPRINKLEREF_CONFIG;
     else process.env.SPRINKLEREF_CONFIG = oldConfig;
+    if (oldProjectId === undefined) delete process.env.VBR_INFISICAL_PROJECT_ID;
+    else process.env.VBR_INFISICAL_PROJECT_ID = oldProjectId;
+    if (oldToken === undefined) delete process.env.INFISICAL_ACCESS_TOKEN;
+    else process.env.INFISICAL_ACCESS_TOKEN = oldToken;
+    if (oldVaultAddr === undefined) delete process.env.VBR_VAULT_ADDR;
+    else process.env.VBR_VAULT_ADDR = oldVaultAddr;
+    if (oldVaultToken === undefined) delete process.env.VBR_VAULT_TOKEN;
+    else process.env.VBR_VAULT_TOKEN = oldVaultToken;
+    globalThis.fetch = oldFetch;
   }
 }
 

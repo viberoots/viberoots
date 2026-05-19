@@ -29,9 +29,11 @@ build-tools/tools/deployments/infisical-bootstrap.ts deployment --target <buck-t
 
 `repo` initializes and validates the repo-wide SprinkleRef resolver/profile boundary only. It
 creates or checks `sprinkleref/`, named backend profiles such as `vault-default` and
-`infisical-default`, and category lanes such as `main` and `bootstrap`. Repo bootstrap must not
-mention or touch Pleomino OpenTofu modules, reviewed Pleomino metadata, project resources, or
-deployment credentials.
+`infisical-default`, and category lanes such as `main` and `bootstrap`. Confirmed repo bootstrap also
+materializes shared backend profile metadata and the selected bootstrap credential sink. It writes
+only non-secret resolver metadata such as Infisical project ids, Vault address env names, mounts,
+default paths, and credential env names. Repo bootstrap must not mention or touch Pleomino OpenTofu
+modules, reviewed Pleomino metadata, deployment resources, or deployment credentials.
 
 `deployment --target <buck-target>` is the explicit deployment provisioning layer. The existing
 Pleomino Infisical OpenTofu project/environment/identity reconciliation and deployment Universal
@@ -324,7 +326,7 @@ Example macOS local config:
     "main": {
       "backend": "infisical",
       "host": "https://app.infisical.com",
-      "projectId": "proj_pleomino_deployments",
+      "projectId": "<repo-infisical-project-id>",
       "defaultEnvironment": "staging",
       "defaultPath": "/"
     }
@@ -355,7 +357,7 @@ Example GitHub Actions CI config:
     "main": {
       "backend": "infisical",
       "host": "https://app.infisical.com",
-      "projectId": "proj_pleomino_deployments",
+      "projectId": "<repo-infisical-project-id>",
       "defaultEnvironment": "staging",
       "defaultPath": "/"
     }
@@ -367,6 +369,13 @@ The bootstrap command should:
 
 - read the selected SprinkleRef resolver config if it exists;
 - create starter resolver configs if none exist;
+- validate or materialize repo-wide `infisical-*` and `vault-*` backend profiles;
+- create or select the repo-level Infisical project when a selected profile needs one;
+- validate existing Infisical profile `projectId` values against the selected organization instead
+  of overwriting operator-authored resolver profiles;
+- validate Vault profile address/token/mount metadata against Vault when configured env values are
+  available, otherwise fail with remediation naming the missing bootstrap env;
+- materialize the configured local bootstrap sink path, or validate the macOS Keychain service name;
 - default local macOS `bootstrap` to macOS Keychain;
 - default non-macOS local `bootstrap` to local `0600` files;
 - default `main` to Infisical once OpenTofu has created the project;
@@ -377,7 +386,9 @@ With `--credential-sink auto`, bootstrap first uses `SPRINKLEREF_CONFIG` when se
 `sprinkleref/` config set and uses `selected.local.json`, whose `bootstrap` category explicitly
 selects macOS Keychain on macOS and local `0600` files elsewhere. Existing resolver configs are
 authoritative and are not overwritten. In `--dry-run`, bootstrap reports the starter backend it
-would use but does not create resolver config files.
+would use plus a `materializationPlan` for backend login, Infisical project validation/creation,
+Vault mount/profile validation, resolver profile creation, and bootstrap sink setup, but does not
+create resolver config files or call backends.
 
 Deployment bootstrap performs this resolver-config creation or validation before opening Infisical,
 running OpenTofu, or writing any credential sink output. Missing `--yes` and unsafe bootstrap

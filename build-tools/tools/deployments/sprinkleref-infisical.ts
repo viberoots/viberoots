@@ -23,7 +23,7 @@ export class SprinkleRefInfisicalStore implements SprinkleRefStore {
   }
 
   describe() {
-    return `infisical project ${this.config.projectId} environment ${this.config.defaultEnvironment}`;
+    return `infisical project ${this.projectId()} environment ${this.config.defaultEnvironment}`;
   }
 
   async has(ref: string) {
@@ -80,7 +80,7 @@ export class SprinkleRefInfisicalStore implements SprinkleRefStore {
 
   private url(ref: string, viewSecretValue: boolean) {
     const url = new URL(`/api/v4/secrets/${encodeURIComponent(secretName(ref))}`, this.config.host);
-    url.searchParams.set("projectId", this.config.projectId || "");
+    url.searchParams.set("projectId", this.projectId());
     url.searchParams.set("environment", this.config.defaultEnvironment || "");
     url.searchParams.set("secretPath", this.config.defaultPath || "/");
     url.searchParams.set("type", "shared");
@@ -102,6 +102,13 @@ export class SprinkleRefInfisicalStore implements SprinkleRefStore {
       throw new Error("missing Infisical Universal Auth environment variables");
     }
     return { kind: "universal_auth", siteUrl: this.config.host || "", clientId, clientSecret };
+  }
+
+  private projectId() {
+    const fromEnv = this.config.projectIdEnv ? this.env[this.config.projectIdEnv] : undefined;
+    const projectId = this.config.projectId || String(fromEnv || "").trim();
+    if (!projectId) throw new Error("missing Infisical project id");
+    return projectId;
   }
 }
 

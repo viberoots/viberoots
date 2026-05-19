@@ -57,7 +57,7 @@ test("resolver config resolves categories through named backend profiles", async
         clientIdEnv: "INFISICAL_CLIENT_ID",
         clientSecretEnv: "INFISICAL_CLIENT_SECRET",
       },
-      "vault-default": { backend: "local-file", file: path.join(dir, "vault.json") },
+      "vault-default": vaultProfile(),
     },
     categories: {
       main: { profile: "infisical-default" },
@@ -66,7 +66,7 @@ test("resolver config resolves categories through named backend profiles", async
   });
   const config = await readSprinkleRefConfig(configPath);
   assert.equal(resolveSprinkleRefBackend(config, "main").profile, "infisical-default");
-  assert.equal(resolveSprinkleRefBackend(config, "bootstrap").backend.backend, "local-file");
+  assert.equal(resolveSprinkleRefBackend(config, "bootstrap").backend.backend, "vault");
 });
 
 test("resolver config rejects unsupported backends and backend-specific refs", async () => {
@@ -135,6 +135,7 @@ test("starter configs are deterministic and contain no secret values", async () 
   const serialized = JSON.stringify(configs);
   assert.match(serialized, /macos-keychain/);
   assert.doesNotMatch(serialized, /clientSecret":/);
+  assert.doesNotMatch(serialized, /pleomino-project-id|vault-default-placeholder/);
   assert.deepEqual(configs, sprinkleRefStarterConfigs("darwin"));
   const dir = await tmp();
   const written = await initSprinkleRefConfigs({ dir, platform: "linux" });
@@ -178,4 +179,14 @@ async function tmp() {
 
 async function writeJson(file: string, value: unknown) {
   await fs.writeFile(file, `${JSON.stringify(value, null, 2)}\n`);
+}
+
+function vaultProfile() {
+  return {
+    backend: "vault",
+    addressEnv: "VBR_VAULT_ADDR",
+    tokenEnv: "VBR_VAULT_TOKEN",
+    mount: "secret",
+    defaultPath: "/deployments",
+  };
 }

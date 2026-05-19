@@ -208,6 +208,11 @@ Repo bootstrap should:
 - write only non-secret resolver metadata into SprinkleRef config, including
   backend host/address, project id or mount path, namespace, default
   environment/path, and credential env names;
+- materialize generated repo starter profiles into real shared backend metadata during confirmed
+  repo bootstrap, while treating existing operator-authored resolver profiles as authoritative and
+  validating them instead of silently replacing them;
+- keep repo dry-run read-only while reporting planned backend login, project/profile validation or
+  creation, Vault mount validation, and bootstrap credential sink materialization;
 - materialize or validate local bootstrap credential sinks such as macOS
   Keychain services or restrictive local files, while keeping root/bootstrap
   access credentials out of Infisical-backed categories;

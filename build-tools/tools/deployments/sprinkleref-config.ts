@@ -12,6 +12,7 @@ import { stripJsonComments } from "./json-comments";
 
 const BACKENDS = new Set<SprinkleRefBackendKind>([
   "infisical",
+  "vault",
   "local-file",
   "macos-keychain",
   "github-actions",
@@ -108,6 +109,7 @@ function validateBackend(file: string, name: string, backend: SprinkleRefBackend
     throw new Error(`${file} category ${name} macos-keychain backend requires service`);
   }
   if (backend.backend === "infisical") validateInfisical(file, name, backend);
+  if (backend.backend === "vault") validateVault(file, name, backend);
 }
 
 function validateInfisical(file: string, name: string, backend: SprinkleRefBackendConfig) {
@@ -116,15 +118,29 @@ function validateInfisical(file: string, name: string, backend: SprinkleRefBacke
       `${file} category ${name} infisical backend uses unsupported projectRef; use projectId`,
     );
   }
-  for (const key of ["host", "projectId", "defaultEnvironment"] as const) {
+  for (const key of ["host", "defaultEnvironment"] as const) {
     if (!backend[key])
       throw new Error(`${file} category ${name} infisical backend requires ${key}`);
+  }
+  if (!backend.projectId && !backend.projectIdEnv) {
+    throw new Error(
+      `${file} category ${name} infisical backend requires projectId or projectIdEnv`,
+    );
   }
   if (!backend.clientIdEnv && !backend.tokenEnv) {
     throw new Error(`${file} category ${name} infisical backend requires clientIdEnv or tokenEnv`);
   }
   if (backend.clientIdEnv && !backend.clientSecretEnv) {
     throw new Error(`${file} category ${name} infisical backend requires clientSecretEnv`);
+  }
+}
+
+function validateVault(file: string, name: string, backend: SprinkleRefBackendConfig) {
+  if (!backend.address && !backend.addressEnv) {
+    throw new Error(`${file} category ${name} vault backend requires address or addressEnv`);
+  }
+  for (const key of ["mount", "defaultPath", "tokenEnv"] as const) {
+    if (!backend[key]) throw new Error(`${file} category ${name} vault backend requires ${key}`);
   }
 }
 

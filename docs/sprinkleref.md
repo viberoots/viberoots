@@ -49,11 +49,17 @@ instances/accounts, while categories name usage lanes:
   "version": 1,
   "defaultCategory": "main",
   "profiles": {
-    "vault-default": { "backend": "local-file", "file": ".local/vault-default.json" },
+    "vault-default": {
+      "backend": "vault",
+      "addressEnv": "VBR_VAULT_ADDR",
+      "tokenEnv": "VBR_VAULT_TOKEN",
+      "mount": "secret",
+      "defaultPath": "/deployments"
+    },
     "infisical-default": {
       "backend": "infisical",
       "host": "https://app.infisical.com",
-      "projectId": "proj",
+      "projectId": "<repo-infisical-project-id>",
       "defaultEnvironment": "staging",
       "clientIdEnv": "INFISICAL_MACHINE_IDENTITY_CLIENT_ID",
       "clientSecretEnv": "INFISICAL_MACHINE_IDENTITY_CLIENT_SECRET"
@@ -61,10 +67,17 @@ instances/accounts, while categories name usage lanes:
   },
   "categories": {
     "main": { "profile": "infisical-default" },
-    "bootstrap": { "profile": "vault-default" }
+    "bootstrap": { "backend": "local-file", "file": ".local/infisical/bootstrap/credentials.json" }
   }
 }
 ```
+
+Generated starter configs use generic env-name based profile metadata. Confirmed
+`infisical-bootstrap repo --yes` validates those profiles and writes or preserves real non-secret
+backend metadata, such as an Infisical `projectId`, before deployment bootstrap consumes them.
+Repo dry-run is read-only and reports a `materializationPlan` showing whether backend login,
+Infisical project validation/creation, Vault profile/mount validation, resolver profile creation,
+or bootstrap sink setup would be needed.
 
 Deployment metadata selects these profiles through `secret_backend =
 "<backend>/<profile-alias>"`. For example, `secret_backend = "infisical/default"` selects the

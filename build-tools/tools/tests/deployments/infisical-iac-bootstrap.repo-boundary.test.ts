@@ -11,17 +11,32 @@ import { resolveCredentialSinkSelection } from "../../deployments/infisical-iac-
 test("repo bootstrap dry-run reports resolver profiles without Pleomino provisioning", async () => {
   const dir = await tmp();
   await withCwdAndEnv(dir, async () => {
-    const output = await captureConsole(() =>
-      runInfisicalIacBootstrap({
-        ...DEFAULT_BOOTSTRAP_ARGS,
-        mode: "repo",
-        dryRun: true,
-        yes: false,
-      }),
-    );
+    let fetchCalled = false;
+    const oldFetch = globalThis.fetch;
+    globalThis.fetch = (async () => {
+      fetchCalled = true;
+      throw new Error("dry-run must not call backend APIs");
+    }) as typeof fetch;
+    const output = await captureConsole(async () => {
+      try {
+        await runInfisicalIacBootstrap({
+          ...DEFAULT_BOOTSTRAP_ARGS,
+          mode: "repo",
+          dryRun: true,
+          yes: false,
+        });
+      } finally {
+        globalThis.fetch = oldFetch;
+      }
+    });
     const report = JSON.parse(output.stdout) as {
       mode: string;
-      resolverConfig: unknown;
+      materializationPlan?: {
+        readOnly?: boolean;
+        backendLogin?: { infisicalRequired?: boolean; wouldAuthenticate?: boolean };
+        profiles?: Array<{ name: string; needsLiveValidation?: boolean }>;
+        bootstrapSink?: { wouldMaterialize?: boolean; wouldValidate?: boolean };
+      };
       nextCommands?: unknown;
       credentialSinkDescription?: unknown;
       applicationSecretsManaged?: unknown;
@@ -30,7 +45,18 @@ test("repo bootstrap dry-run reports resolver profiles without Pleomino provisio
       browserAutomation?: unknown;
     };
     assert.equal(report.mode, "repo");
-    assert.ok(report.resolverConfig);
+    assert.equal(report.materializationPlan?.readOnly, true);
+    assert.equal(report.materializationPlan?.backendLogin?.infisicalRequired, true);
+    assert.equal(report.materializationPlan?.backendLogin?.wouldAuthenticate, true);
+    assert.ok(report.materializationPlan?.profiles?.some((profile) => profile.needsLiveValidation));
+    assert.equal(
+      Boolean(
+        report.materializationPlan?.bootstrapSink?.wouldMaterialize ||
+          report.materializationPlan?.bootstrapSink?.wouldValidate,
+      ),
+      true,
+    );
+    assert.equal(fetchCalled, false);
     assert.equal(report.nextCommands, undefined);
     assert.equal(report.credentialSinkDescription, undefined);
     assert.equal(report.applicationSecretsManaged, undefined);

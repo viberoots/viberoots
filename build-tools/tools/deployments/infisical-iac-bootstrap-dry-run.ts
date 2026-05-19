@@ -1,9 +1,11 @@
 import type { BootstrapArgs } from "./infisical-iac-bootstrap-types";
+import { buildRepoDryRunMaterializationPlan } from "./infisical-iac-bootstrap-dry-run-plan";
 import { resolveCredentialSinkSelection } from "./infisical-iac-bootstrap-sink";
 
 export async function buildDryRunReport(args: BootstrapArgs) {
   const sink = await resolveCredentialSinkSelection(args);
   if (args.mode === "repo") {
+    const materializationPlan = await buildRepoDryRunMaterializationPlan({ sink });
     return {
       schemaVersion: "infisical-repo-bootstrap-operations@1",
       mode: "repo",
@@ -14,6 +16,7 @@ export async function buildDryRunReport(args: BootstrapArgs) {
       },
       credentialSink: sink.kind,
       credentialSinkBackend: sink.backend,
+      materializationPlan,
     };
   }
   return {

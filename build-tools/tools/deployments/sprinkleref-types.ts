@@ -1,6 +1,7 @@
 #!/usr/bin/env zx-wrapper
 export type SprinkleRefBackendKind =
   | "infisical"
+  | "vault"
   | "local-file"
   | "macos-keychain"
   | "github-actions"
@@ -20,6 +21,11 @@ export type SprinkleRefBackendConfig = {
   clientIdEnv?: string;
   clientSecretEnv?: string;
   tokenEnv?: string;
+  projectIdEnv?: string;
+  address?: string;
+  addressEnv?: string;
+  namespace?: string;
+  mount?: string;
   scope?: string;
   namePrefix?: string;
 };

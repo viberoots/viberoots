@@ -24,7 +24,10 @@ import { ensureDeploymentCredentials } from "./infisical-iac-deployment-credenti
 import { readPleominoReviewedMetadata } from "./infisical-iac-bootstrap-reviewed-metadata";
 import { errorMessage } from "./infisical-iac-bootstrap-redaction";
 import { ensureRepoResolverConfig } from "./infisical-iac-bootstrap-resolver";
+import { materializeRepoBackendProfiles } from "./infisical-iac-bootstrap-profiles";
+import { materializeBootstrapCredentialSink } from "./infisical-iac-bootstrap-sink-materialize";
 import type { BootstrapArgs } from "./infisical-iac-bootstrap-types";
+import { readSprinkleRefConfig } from "./sprinkleref-config";
 
 const PLEOMINO_DEPLOYMENT_BOOTSTRAP_TARGETS = new Set([
   "//projects/deployments/pleomino-staging:deploy",
@@ -106,6 +109,11 @@ async function runRepoBootstrap(args: BootstrapArgs) {
   await confirmBootstrapPreflight(args);
   const resolver = await ensureRepoResolverConfig({ dryRun: false });
   const sink = await resolveCredentialSinkSelection(args, { createMissingResolverConfig: true });
+  const materialization = await materializeRepoProfiles(args, resolver);
+  const credentialSinkMaterialization = await materializeBootstrapCredentialSink({
+    args,
+    selection: sink,
+  });
   console.log(
     JSON.stringify(
       {
@@ -122,6 +130,8 @@ async function runRepoBootstrap(args: BootstrapArgs) {
         })),
         credentialSink: sink.kind,
         credentialSinkBackend: sink.backend,
+        profileMaterialization: materialization,
+        credentialSinkMaterialization,
       },
       null,
       2,
@@ -129,6 +139,40 @@ async function runRepoBootstrap(args: BootstrapArgs) {
   );
   console.error(`Credential sink: ${sink.description}`);
   printRepoFollowUpCommands(resolver.configPath);
+}
+
+async function materializeRepoProfiles(
+  args: BootstrapArgs,
+  resolver: Awaited<ReturnType<typeof ensureRepoResolverConfig>>,
+) {
+  if (!(await hasRequiredInfisicalProfile(resolver))) {
+    return await materializeRepoBackendProfiles({
+      args,
+      configPath: resolver.configPath,
+      requiredProfiles: resolver.profiles,
+    });
+  }
+  const access = await getAccessToken(args);
+  const api = new InfisicalApi({ apiUrl: args.apiUrl, token: access.token });
+  const organizationId = await resolveOrganizationId(api, args);
+  if (access.cleanupMessage) console.error(access.cleanupMessage);
+  return await materializeRepoBackendProfiles({
+    args,
+    api,
+    organizationId,
+    configPath: resolver.configPath,
+    requiredProfiles: resolver.profiles,
+  });
+}
+
+async function hasRequiredInfisicalProfile(
+  resolver: Awaited<ReturnType<typeof ensureRepoResolverConfig>>,
+) {
+  const config = await readSprinkleRefConfig(resolver.configPath);
+  return resolver.profiles.some((profile) => {
+    const backend = config.profiles[profile];
+    return backend?.backend === "infisical";
+  });
 }
 
 function deploymentScopeFromTarget(args: BootstrapArgs) {

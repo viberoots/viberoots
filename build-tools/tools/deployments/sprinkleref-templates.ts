@@ -7,16 +7,19 @@ import type { SprinkleRefConfigFile } from "./sprinkleref-types";
 const INFISICAL_DEFAULT = {
   backend: "infisical" as const,
   host: "https://app.infisical.com",
-  projectId: "pleomino-project-id",
+  projectIdEnv: "VBR_INFISICAL_PROJECT_ID",
   defaultEnvironment: "staging",
   defaultPath: "/",
-  clientIdEnv: "INFISICAL_MACHINE_IDENTITY_CLIENT_ID",
-  clientSecretEnv: "INFISICAL_MACHINE_IDENTITY_CLIENT_SECRET",
+  clientIdEnv: "VBR_INFISICAL_CLIENT_ID",
+  clientSecretEnv: "VBR_INFISICAL_CLIENT_SECRET",
 };
 
 const VAULT_DEFAULT = {
-  backend: "local-file" as const,
-  file: ".local/vault-default-placeholder.json",
+  backend: "vault" as const,
+  addressEnv: "VBR_VAULT_ADDR",
+  tokenEnv: "VBR_VAULT_TOKEN",
+  mount: "secret",
+  defaultPath: "/deployments",
 };
 
 export function sprinkleRefStarterConfigs(platform = process.platform) {

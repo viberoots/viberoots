@@ -69,6 +69,7 @@ export function validateRepoResolverConfig(
 ) {
   for (const profile of requiredProfiles) {
     if (!config.profiles[profile]) throw new Error(`SprinkleRef config missing profile ${profile}`);
+    validateRepoProfile(profile, config.profiles[profile]);
   }
   for (const category of ["main", "bootstrap"]) {
     if (!config.categories[category]) {
@@ -76,6 +77,19 @@ export function validateRepoResolverConfig(
     }
   }
   resolveBootstrapAccessCredentialSinkBackend(config, "bootstrap");
+}
+
+function validateRepoProfile(profile: string, config: { backend: string }) {
+  if (profile.startsWith("vault-") && config.backend !== "vault") {
+    throw new Error(
+      `SprinkleRef config profile ${profile} must use vault backend; run repo bootstrap to materialize Vault metadata`,
+    );
+  }
+  if (profile.startsWith("infisical-") && config.backend !== "infisical") {
+    throw new Error(
+      `SprinkleRef config profile ${profile} must use infisical backend; run repo bootstrap to materialize Infisical metadata`,
+    );
+  }
 }
 
 function bootstrapCredentialProfiles(config: SprinkleRefConfig, requiredProfiles: Set<string>) {
