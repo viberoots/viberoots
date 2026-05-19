@@ -9,6 +9,10 @@ build-tools/tools/deployments/infisical-bootstrap.ts deployment --target <buck-t
 build-tools/tools/deployments/infisical-bootstrap.ts deployment --target <buck-target> --yes
 ```
 
+Use `--yes` for non-interactive pre-confirmation. Local interactive operators may omit `--yes` and
+confirm the mutation-capable run at the `Y/n` prompt; CI and other non-interactive flows must pass
+`--yes`.
+
 This document intentionally redirects to the repo-root bootstrap spec at
 [`infisical-bootstrap.md`](../infisical-bootstrap.md). Keep command examples there and here on the
 same `repo` or `deployment --target <buck-target>` mode vocabulary.

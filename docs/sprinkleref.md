@@ -72,6 +72,10 @@ instances/accounts, while categories name usage lanes:
 }
 ```
 
+Infisical profiles use Universal Auth env names only: `clientIdEnv` and `clientSecretEnv`.
+`tokenEnv` remains valid for Vault profiles, but Infisical resolver profiles reject raw token env
+credentials.
+
 Generated starter configs use generic env-name based profile metadata. Confirmed
 `infisical-bootstrap repo --yes` validates those profiles and writes or preserves real non-secret
 backend metadata, such as an Infisical `projectId`, before deployment bootstrap consumes them.

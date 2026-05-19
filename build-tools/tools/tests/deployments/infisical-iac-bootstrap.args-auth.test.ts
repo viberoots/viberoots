@@ -51,11 +51,21 @@ test("bootstrap main help prints usage before required mode parsing", async () =
   }
 });
 
-test("bootstrap repo args default to the reviewed Infisical host and saved-plan apply", () => {
+test("bootstrap repo args default to generic resolver setup", () => {
   const args = parseBootstrapArgs(["repo"]);
   assert.equal(args.apiUrl, "https://app.infisical.com");
   assert.equal(args.cliDomain, "https://app.infisical.com/api");
   assert.equal(args.noTofuApply, false);
+  assert.equal(args.tofuDir, "");
+});
+
+test("bootstrap deployment args default to reviewed OpenTofu setup", () => {
+  const args = parseBootstrapArgs([
+    "deployment",
+    "--target",
+    "//projects/deployments/pleomino-staging:deploy",
+  ]);
+  assert.equal(args.tofuDir, "projects/deployments/pleomino-infisical/opentofu");
 });
 
 test("bootstrap args support host shorthands and non-interactive controls", () => {

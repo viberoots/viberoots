@@ -1,5 +1,7 @@
 import type { BootstrapArgs } from "./infisical-iac-bootstrap-types";
 
+export const DEPLOYMENT_BOOTSTRAP_TOFU_DIR = "projects/deployments/pleomino-infisical/opentofu";
+
 export const DEFAULT_BOOTSTRAP_ARGS: BootstrapArgs = {
   mode: "repo",
   apiUrl: "https://app.infisical.com",
@@ -13,7 +15,7 @@ export const DEFAULT_BOOTSTRAP_ARGS: BootstrapArgs = {
   forceLogin: false,
   yes: false,
   dryRun: false,
-  tofuDir: "projects/deployments/pleomino-infisical/opentofu",
+  tofuDir: "",
   noTofuApply: false,
   rotateBootstrapCredentials: false,
   rotateDeploymentCredentials: false,
@@ -24,6 +26,11 @@ export const DEFAULT_BOOTSTRAP_ARGS: BootstrapArgs = {
   clientSecretTtl: 0,
   accessTokenTtl: 3600,
 };
+
+export function withDeploymentBootstrapDefaults(args: BootstrapArgs): BootstrapArgs {
+  if (args.mode !== "deployment" || args.tofuDir) return args;
+  return { ...args, tofuDir: DEPLOYMENT_BOOTSTRAP_TOFU_DIR };
+}
 
 export function resolveInfisicalHost(host: string) {
   const normalized = host.trim();

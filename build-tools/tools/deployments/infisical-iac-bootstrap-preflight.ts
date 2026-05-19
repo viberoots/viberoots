@@ -1,5 +1,6 @@
 import * as path from "node:path";
 import * as readline from "node:readline/promises";
+import { withDeploymentBootstrapDefaults } from "./infisical-iac-bootstrap-config";
 import type { BootstrapArgs } from "./infisical-iac-bootstrap-types";
 
 type PreflightIo = {
@@ -13,15 +14,7 @@ export async function confirmBootstrapPreflight(args: BootstrapArgs, io: Preflig
   const stdin = io.stdin || process.stdin;
   const stdout = io.stdout || process.stdout;
   if (!stdin.isTTY || !stdout.isTTY) {
-    throw new Error(
-      [
-        "Infisical bootstrap needs confirmation before mutation-capable execution.",
-        "No Infisical resources, OpenTofu state, resolver config, or credential sink output was changed.",
-        `Retry non-interactively: ${bootstrapRetryCommand(args)}`,
-        "Or rerun from an interactive terminal and confirm the prompt.",
-        "Use --dry-run for read-only inspection.",
-      ].join("\n"),
-    );
+    throw new Error(nonInteractiveConfirmationError(args));
   }
   const answer = await askConfirmation(
     [
@@ -31,9 +24,7 @@ export async function confirmBootstrapPreflight(args: BootstrapArgs, io: Preflig
     io,
   );
   if (!isAffirmativeConfirmation(answer)) {
-    throw new Error(
-      "Infisical bootstrap cancelled; no Infisical resources, OpenTofu state, resolver config, or credential sink output was changed.",
-    );
+    throw new Error(`Infisical bootstrap cancelled; ${unchangedStateMessage(args)}`);
   }
 }
 
@@ -51,11 +42,18 @@ export function assertBootstrapPreflight(args: BootstrapArgs) {
 function nonInteractiveConfirmationError(args: BootstrapArgs) {
   return [
     "Infisical bootstrap needs confirmation before mutation-capable execution.",
-    "No Infisical resources, OpenTofu state, resolver config, or credential sink output was changed.",
+    unchangedStateMessage(args),
     `Retry non-interactively: ${bootstrapRetryCommand(args)}`,
     "Or rerun from an interactive terminal and confirm the prompt.",
     "Use --dry-run for read-only inspection.",
   ].join("\n");
+}
+
+function unchangedStateMessage(args: BootstrapArgs) {
+  if (args.mode === "deployment") {
+    return "No Infisical resources, OpenTofu state, resolver config, or credential sink output was changed.";
+  }
+  return "No Infisical resources, resolver config, or credential sink output was changed.";
 }
 
 async function askConfirmation(prompt: string, io: PreflightIo) {
@@ -72,17 +70,21 @@ async function askConfirmation(prompt: string, io: PreflightIo) {
 }
 
 export function bootstrapRetryCommand(args: BootstrapArgs) {
+  const retryArgs = withDeploymentBootstrapDefaults(args);
   return [
     "build-tools/tools/deployments/infisical-bootstrap.ts",
-    args.mode,
-    ...(args.mode === "deployment" ? retryFlag("target", args.target) : []),
-    ...retryFlag("infisical-host", args.hostOverride ? args.apiUrl : ""),
-    ...retryFlag("organization-id", args.organizationId),
-    ...retryFlag("org-name", args.orgName),
-    ...retryFlag("tofu-dir", args.tofuDir),
-    ...retryFlag("tofu-plan-file", args.tofuPlanFile),
-    ...retryFlag("credential-sink", args.credentialSink === "auto" ? "" : args.credentialSink),
-    ...retryFlag("local-credential-file", args.localCredentialFile),
+    retryArgs.mode,
+    ...(retryArgs.mode === "deployment" ? retryFlag("target", retryArgs.target) : []),
+    ...retryFlag("infisical-host", retryArgs.hostOverride ? retryArgs.apiUrl : ""),
+    ...retryFlag("organization-id", retryArgs.organizationId),
+    ...retryFlag("org-name", retryArgs.orgName),
+    ...(retryArgs.mode === "deployment" ? retryFlag("tofu-dir", retryArgs.tofuDir) : []),
+    ...(retryArgs.mode === "deployment" ? retryFlag("tofu-plan-file", retryArgs.tofuPlanFile) : []),
+    ...retryFlag(
+      "credential-sink",
+      retryArgs.credentialSink === "auto" ? "" : retryArgs.credentialSink,
+    ),
+    ...retryFlag("local-credential-file", retryArgs.localCredentialFile),
     "--yes",
   ].join(" ");
 }

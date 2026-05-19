@@ -127,10 +127,15 @@ function validateInfisical(file: string, name: string, backend: SprinkleRefBacke
       `${file} category ${name} infisical backend requires projectId or projectIdEnv`,
     );
   }
-  if (!backend.clientIdEnv && !backend.tokenEnv) {
-    throw new Error(`${file} category ${name} infisical backend requires clientIdEnv or tokenEnv`);
+  if (backend.tokenEnv) {
+    throw new Error(
+      `${file} category ${name} infisical backend does not support tokenEnv; use Universal Auth clientIdEnv and clientSecretEnv`,
+    );
   }
-  if (backend.clientIdEnv && !backend.clientSecretEnv) {
+  if (!backend.clientIdEnv) {
+    throw new Error(`${file} category ${name} infisical backend requires clientIdEnv`);
+  }
+  if (!backend.clientSecretEnv) {
     throw new Error(`${file} category ${name} infisical backend requires clientSecretEnv`);
   }
 }

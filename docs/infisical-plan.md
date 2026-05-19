@@ -2734,3 +2734,110 @@ placeholders in supposedly repo-wide config.
 Repo bootstrap becomes more capable and therefore more sensitive: a confirmed non-dry-run invocation
 may need live backend access and local credential-sink validation, so it must have strong prompts,
 dry-run output, and fake-server/fake-sink test coverage.
+
+## PR-29: Assessment cleanup for bootstrap profile boundaries
+
+### 1. Intent
+
+Close the post-PR-28 assessment gaps so the shipped Infisical resolver and bootstrap surfaces match
+the reviewed first-release model. Infisical resolver profiles should expose only Universal Auth
+workload credentials, repo bootstrap retry/default guidance should not leak Pleomino deployment
+paths, and bootstrap docs should consistently distinguish interactive confirmation from
+non-interactive `--yes` automation.
+
+### 2. Scope of changes
+
+- Remove public SprinkleRef Infisical `tokenEnv` profile support. Infisical resolver profiles must
+  require Universal Auth `clientIdEnv` and `clientSecretEnv`, plus project and environment
+  metadata.
+- Remove any Infisical resolver runtime path that turns a raw token environment variable into an
+  access-token credential for normal SprinkleRef profile resolution.
+- Keep Vault `tokenEnv` support unchanged. This PR only removes raw-token support from Infisical
+  resolver profiles.
+- Split repo-mode bootstrap defaults and retry guidance from deployment-mode OpenTofu defaults.
+  Repo-mode retry output must not include `--tofu-dir`, Pleomino paths, or other deployment-only
+  flags unless a deployment scope is explicitly selected.
+- Ensure repo bootstrap config defaults and dry-run output remain repo-wide and generic; Pleomino
+  OpenTofu defaults may exist only on the explicit deployment bootstrap path.
+- Update bootstrap documentation so mutation-capable local operator flows may either pass `--yes`
+  for non-interactive confirmation or answer the interactive `Y/n` prompt, while CI and
+  non-interactive flows still require `--yes`.
+- Preserve the existing dry-run guarantee: no Infisical login, backend mutation, resolver write, or
+  credential-sink write during dry-run.
+
+### 3. External prerequisites
+
+- None for tests. Runtime behavior should continue to use fake Infisical, fake Vault, and fake sink
+  fixtures in focused tests.
+- Operators with old Infisical resolver configs that use `tokenEnv` must migrate those profiles to
+  Universal Auth env names before running normal SprinkleRef resolution.
+
+### 4. Tests to be added
+
+- Add SprinkleRef config validation tests proving Infisical profiles reject `tokenEnv` and require
+  both `clientIdEnv` and `clientSecretEnv`.
+- Add Infisical resolver/runtime tests proving no normal SprinkleRef profile path accepts raw access
+  token credentials, while Universal Auth credential acquisition still works.
+- Add bootstrap preflight/retry tests proving repo-mode retry guidance omits `--tofu-dir` and
+  Pleomino deployment paths, while deployment-mode retry guidance keeps explicit deployment
+  OpenTofu flags.
+- Add docs or starter regression coverage proving repo-mode dry-run and operator examples do not
+  mention Pleomino unless the explicit deployment mode is selected.
+- Keep existing interactive confirmation tests for `Y/n` local operator flows and add docs
+  consistency coverage if a suitable docs regression test exists.
+
+### 5. Docs to be added or updated
+
+- Update `docs/infisical-design.md` to state that Infisical SprinkleRef profiles use Universal Auth
+  env names only and do not accept raw token profile credentials.
+- Update `infisical-bootstrap.md` and `docs/infisical-bootstrap.md` so `--yes` means
+  non-interactive pre-confirmation, while interactive local operators may confirm at the prompt.
+- Update `docs/sprinkleref.md` examples so Infisical profiles show only Universal Auth credential
+  fields.
+
+### 5.5. Expected regression scope
+
+- `deployment-only`
+- Keep changes limited to SprinkleRef config validation/runtime, Infisical resolver credential
+  acquisition, bootstrap default/retry reporting, focused tests, and docs. Do not change deployment
+  metadata parsing, provider publish/provision behavior, Vault resolver semantics, or Infisical
+  deployment resource reconciliation.
+
+### 6. Acceptance criteria
+
+- Infisical SprinkleRef profiles cannot be configured with raw token credentials.
+- Universal Auth remains the only operator-visible Infisical workload credential source for normal
+  resolver profiles.
+- Repo-mode bootstrap retry guidance and dry-run/operator output contain no Pleomino OpenTofu path
+  or deployment-only flag leakage.
+- Deployment-mode bootstrap still carries the deployment OpenTofu defaults and flags it needs.
+- Bootstrap docs consistently describe `--yes` as non-interactive pre-confirmation and preserve
+  interactive `Y/n` confirmation for local operators.
+- Focused tests and the repository validation suite pass.
+
+### 7. Risks
+
+- Existing local resolver configs using Infisical `tokenEnv` will fail validation and require
+  migration.
+- Shared bootstrap argument defaults may currently be used by tests that assume deployment defaults
+  are always present.
+
+### 8. Mitigations
+
+- Emit a validation error that names Universal Auth `clientIdEnv` and `clientSecretEnv` as the
+  remediation for old Infisical `tokenEnv` profiles.
+- Keep deployment-mode defaults explicit and covered by tests so removing repo-mode leakage does
+  not break deployment bootstrap behavior.
+- Document the interactive versus `--yes` confirmation split in both bootstrap docs.
+
+### 9. Consequences of not implementing this PR
+
+The repo would continue to expose an unreviewed raw-token Infisical resolver path, repo bootstrap
+guidance would still imply Pleomino/OpenTofu during repo-wide setup, and docs would contradict the
+implemented interactive confirmation behavior.
+
+### 10. Downsides for implementing this PR
+
+This is a breaking cleanup for any local Infisical resolver profile that still uses `tokenEnv`, but
+the stricter surface matches the first-release security model and avoids carrying unsupported
+credential modes.

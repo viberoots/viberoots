@@ -91,11 +91,6 @@ export class SprinkleRefInfisicalStore implements SprinkleRefStore {
   }
 
   private credential(): InfisicalCredentialConfig {
-    if (this.config.tokenEnv) {
-      const accessToken = String(this.env[this.config.tokenEnv] || "").trim();
-      if (!accessToken) throw new Error(`missing Infisical token env ${this.config.tokenEnv}`);
-      return { kind: "access_token", siteUrl: this.config.host || "", accessToken };
-    }
     const clientId = String(this.env[this.config.clientIdEnv || ""] || "").trim();
     const clientSecret = String(this.env[this.config.clientSecretEnv || ""] || "").trim();
     if (!clientId || !clientSecret) {

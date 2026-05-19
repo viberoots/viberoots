@@ -219,6 +219,11 @@ Repo bootstrap should:
 - keep generated `base.json` and starter resolver templates free of
   deployment-specific names, project ids, paths, and Pleomino examples.
 
+Infisical SprinkleRef profiles expose only Universal Auth workload credentials. They must use
+`clientIdEnv` and `clientSecretEnv` plus non-secret project/environment metadata; raw-token profile
+credentials such as `tokenEnv` are not part of the reviewed Infisical resolver surface. Vault
+profiles may continue to use `tokenEnv`.
+
 Deployment bootstrap should consume those shared resolver profiles. It may create
 or reconcile deployment-specific backend resources such as Infisical
 environments, machine identities, Vault policies/roles, paths, and application

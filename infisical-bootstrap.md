@@ -8,8 +8,9 @@ The bootstrap command owns only the work required to make Infisical usable as th
 
 - authenticate a human or CI bootstrap caller;
 - select the Infisical organization without asking users to hunt for IDs;
-- create or reuse the bootstrap IaC identity;
-- run the Infisical OpenTofu stack through apply by default;
+- create or reuse shared repo bootstrap metadata and credentials;
+- run the deployment Infisical OpenTofu stack through apply by default only when explicit
+  deployment bootstrap is selected;
 - store the bootstrap access credential in a SprinkleRef-resolved bootstrap credential backend;
 - manage bootstrap and deployment Universal Auth access credentials through a
   SprinkleRef-resolved bootstrap credential backend.
@@ -44,7 +45,8 @@ Defaults:
 - Infisical host: `https://app.infisical.com`.
 - Login: enabled.
 - OpenTofu init/plan/apply: enabled only for explicit deployment bootstrap.
-- Confirmation: mutation-capable bootstrap requires `--yes` before any remote or local write.
+- Confirmation: mutation-capable bootstrap requires either non-interactive `--yes` or an
+  interactive `Y/n` prompt confirmation before any remote or local write.
 - Credential preservation: preserve existing remote/local credentials unless explicit rotation is requested.
 - Secret output: never print secret values.
 
@@ -75,13 +77,14 @@ Key flags:
 implementation-level overrides for split API/CLI endpoint testing or future hosted variants; when
 omitted, both default to the reviewed Pleomino Infisical endpoint `https://app.infisical.com`.
 
-`--yes` means “the operator has confirmed this mutation-capable bootstrap.” It does not mean
-“guess.” Non-dry-run bootstrap checks this before opening Infisical, running OpenTofu, creating
-resolver config files, or writing credential sinks. Use `--dry-run` for read-only inspection. If
-multiple organizations are available and no explicit org selector was provided, login-based
-operator flows still present the org list. If terminal input is unavailable, the command exits with
-a clear error. `--no-login` token-based flows require an explicit `--org-name` or
-`--organization-id` before authentication or mutation.
+`--yes` means “the operator has pre-confirmed this mutation-capable bootstrap for
+non-interactive execution.” It does not mean “guess.” Non-dry-run bootstrap checks for `--yes` or an
+interactive `Y/n` confirmation before opening Infisical, running OpenTofu, creating resolver config
+files, or writing credential sinks. Use `--dry-run` for read-only inspection. If multiple
+organizations are available and no explicit org selector was provided, login-based operator flows
+still present the org list. If terminal input is unavailable, the command exits with a clear error.
+`--no-login` token-based flows require an explicit `--org-name` or `--organization-id` before
+authentication or mutation.
 
 ## Authentication
 
@@ -99,8 +102,9 @@ CI/non-interactive behavior:
 
 - `--no-login` requires a token from `--access-token-env`, default `INFISICAL_ACCESS_TOKEN`.
 - `--no-login` must also provide exactly one of `--organization-id` or `--org-name`.
-- CI and local non-dry-run bootstrap must provide `--yes`; missing confirmation fails before any
-  Infisical, OpenTofu, resolver-config, or credential-sink mutation.
+- CI and other non-interactive non-dry-run bootstrap must provide `--yes`; local interactive
+  operators may instead confirm the `Y/n` prompt. Missing confirmation fails before any Infisical,
+  OpenTofu, resolver-config, or credential-sink mutation.
 - Any missing interactive input must fail fast with remediation.
 
 ## Organization Selection
@@ -146,9 +150,11 @@ Rotation:
 - `--force-overwrite-local-credentials` controls local/sink overwrite when a new value is written.
 - Old remote client secret records are not revoked or deleted by default unless a separate safe revocation flow is implemented.
 
-## OpenTofu Infisical Stack
+## Deployment OpenTofu Infisical Stack
 
-The bootstrap command should run OpenTofu for the Infisical stack by default. A successful single bootstrap command should leave the Infisical project, environments, identities, and bindings applied.
+Deployment bootstrap should run OpenTofu for the Infisical stack by default. A successful explicit
+deployment bootstrap command should leave the deployment Infisical project, environments,
+identities, and bindings applied.
 
 Default sequence:
 
@@ -533,12 +539,13 @@ Fix:
 ```
 
 ```text
-Infisical bootstrap requires --yes before mutation-capable execution.
-No Infisical resources, OpenTofu state, resolver config, or credential sink output was changed.
+Infisical bootstrap needs confirmation before mutation-capable execution.
+No Infisical resources, resolver config, or credential sink output was changed.
 
 Fix:
   rerun with --yes
-  or use --dry-run for read-only inspection.
+  rerun from an interactive terminal and confirm the prompt
+  or use --dry-run for read-only inspection
 ```
 
 ```text

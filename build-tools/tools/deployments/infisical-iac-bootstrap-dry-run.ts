@@ -1,4 +1,5 @@
 import type { BootstrapArgs } from "./infisical-iac-bootstrap-types";
+import { withDeploymentBootstrapDefaults } from "./infisical-iac-bootstrap-config";
 import { buildRepoDryRunMaterializationPlan } from "./infisical-iac-bootstrap-dry-run-plan";
 import { resolveCredentialSinkSelection } from "./infisical-iac-bootstrap-sink";
 
@@ -19,14 +20,15 @@ export async function buildDryRunReport(args: BootstrapArgs) {
       materializationPlan,
     };
   }
+  const deploymentArgs = withDeploymentBootstrapDefaults(args);
   return {
     schemaVersion: "infisical-iac-bootstrap-operations@1",
     mode: "deployment",
-    target: args.target,
+    target: deploymentArgs.target,
     tofu: {
-      directory: args.tofuDir,
-      savedPlan: args.tofuPlanFile || "<temporary repo-ignored plan path>",
-      apply: !args.noTofuApply,
+      directory: deploymentArgs.tofuDir,
+      savedPlan: deploymentArgs.tofuPlanFile || "<temporary repo-ignored plan path>",
+      apply: !deploymentArgs.noTofuApply,
     },
     credentialSink: sink.kind,
     credentialSinkBackend: sink.backend,

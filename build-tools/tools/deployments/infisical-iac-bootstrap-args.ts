@@ -1,5 +1,9 @@
 import { getArgvTokens, readFlagBoolFromTokens, readFlagStrFromTokens } from "../lib/argv";
-import { DEFAULT_BOOTSTRAP_ARGS, resolveInfisicalHost } from "./infisical-iac-bootstrap-config";
+import {
+  DEFAULT_BOOTSTRAP_ARGS,
+  resolveInfisicalHost,
+  withDeploymentBootstrapDefaults,
+} from "./infisical-iac-bootstrap-config";
 import type { BootstrapArgs } from "./infisical-iac-bootstrap-types";
 
 const VALUE_FLAGS = new Set([
@@ -117,7 +121,7 @@ export function parseBootstrapArgs(argv = getArgvTokens()): BootstrapArgs {
   if (args.mode === "deployment" && !args.target) {
     throw new Error("infisical bootstrap deployment mode requires --target <buck-target>");
   }
-  return args;
+  return withDeploymentBootstrapDefaults(args);
 }
 
 function modeFromArgs(argv: string[]): BootstrapArgs["mode"] | undefined {

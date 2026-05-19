@@ -65,23 +65,24 @@ test("bootstrap preflight cancellation stops before side effects", async () => {
 });
 
 test("bootstrap preflight retry command includes the explicit repo mode", () => {
-  assert.match(
-    bootstrapRetryMessage({ ...DEFAULT_BOOTSTRAP_ARGS, yes: false, dryRun: false }),
-    /infisical-bootstrap\.ts repo .*--yes/,
-  );
+  const message = bootstrapRetryMessage({ ...DEFAULT_BOOTSTRAP_ARGS, yes: false, dryRun: false });
+  assert.match(message, /infisical-bootstrap\.ts repo .*--yes/);
+  assert.doesNotMatch(message, /--tofu-dir|pleomino-infisical|OpenTofu/i);
 });
 
 test("bootstrap preflight retry command includes deployment target scope", () => {
+  const message = bootstrapRetryMessage({
+    ...DEFAULT_BOOTSTRAP_ARGS,
+    mode: "deployment",
+    target: "//projects/deployments/pleomino-staging:deploy",
+    yes: false,
+    dryRun: false,
+  });
   assert.match(
-    bootstrapRetryMessage({
-      ...DEFAULT_BOOTSTRAP_ARGS,
-      mode: "deployment",
-      target: "//projects/deployments/pleomino-staging:deploy",
-      yes: false,
-      dryRun: false,
-    }),
+    message,
     /infisical-bootstrap\.ts deployment --target \/\/projects\/deployments\/pleomino-staging:deploy .*--yes/,
   );
+  assert.match(message, /--tofu-dir projects\/deployments\/pleomino-infisical\/opentofu/);
 });
 
 test("bootstrap path rejects non-interactive execution before Infisical, OpenTofu, or sink writes", async () => {

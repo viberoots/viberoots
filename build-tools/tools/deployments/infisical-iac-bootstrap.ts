@@ -2,7 +2,10 @@
 import { pathToFileURL } from "node:url";
 import { parseBootstrapArgs, usage } from "./infisical-iac-bootstrap-args";
 import { getArgvTokens } from "../lib/argv";
-import { resolveInfisicalHost } from "./infisical-iac-bootstrap-config";
+import {
+  resolveInfisicalHost,
+  withDeploymentBootstrapDefaults,
+} from "./infisical-iac-bootstrap-config";
 import { InfisicalApi } from "./infisical-iac-bootstrap-api";
 import { getAccessToken, spawnCommandRunner } from "./infisical-iac-bootstrap-auth";
 import {
@@ -36,12 +39,15 @@ const PLEOMINO_DEPLOYMENT_BOOTSTRAP_TARGETS = new Set([
 
 export async function runInfisicalIacBootstrap(args: BootstrapArgs) {
   if (args.mode === "repo") return await runRepoBootstrap(args);
-  const scope = deploymentScopeFromTarget(args);
+  const deploymentArgs = withDeploymentBootstrapDefaults(args);
+  const scope = deploymentScopeFromTarget(deploymentArgs);
   if (scope.kind !== "pleomino") {
-    throw new Error(`unsupported deployment bootstrap scope: ${args.target || "<missing>"}`);
+    throw new Error(
+      `unsupported deployment bootstrap scope: ${deploymentArgs.target || "<missing>"}`,
+    );
   }
   const reviewedMetadata = await readPleominoReviewedMetadata();
-  const effectiveArgs = withReviewedHost(args, reviewedMetadata.siteUrl);
+  const effectiveArgs = withReviewedHost(deploymentArgs, reviewedMetadata.siteUrl);
   if (effectiveArgs.dryRun) return dryRun(effectiveArgs);
   await confirmBootstrapPreflight(effectiveArgs);
   const sinkSelection = await resolveCredentialSinkSelection(effectiveArgs, {

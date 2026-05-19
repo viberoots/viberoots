@@ -66,6 +66,7 @@ test("repo bootstrap dry-run reports resolver profiles without Pleomino provisio
     assert.match(output.stderr, /Credential sink: .*starter config not created during dry-run/);
     assert.match(output.stderr, /sprinkleref --check --config sprinkleref\/selected\.local\.json/);
     assert.doesNotMatch(output.stdout, /pleomino|opentofu|cloudflare_api_token/);
+    assert.doesNotMatch(output.stderr, /pleomino|opentofu|--tofu-dir|cloudflare_api_token/i);
     await assertMissing("sprinkleref/selected.local.json");
   });
 });
