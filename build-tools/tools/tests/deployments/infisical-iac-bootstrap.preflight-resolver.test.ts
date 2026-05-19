@@ -107,11 +107,12 @@ test("bootstrap dry-run path does not create resolver config without --yes", asy
   const dir = await tmp();
   await writeReviewedMetadata(dir);
   await withCwdAndEnv(dir, async () => {
-    const output = await captureStdout(() =>
+    const output = await captureConsole(() =>
       runInfisicalIacBootstrap({ ...DEFAULT_BOOTSTRAP_ARGS, dryRun: true, yes: false }),
     );
-    const report = JSON.parse(output) as { credentialSinkDescription: string };
-    assert.match(report.credentialSinkDescription, /starter config not created during dry-run/);
+    const report = JSON.parse(output.stdout) as { credentialSinkDescription?: unknown };
+    assert.equal(report.credentialSinkDescription, undefined);
+    assert.match(output.stderr, /starter config not created during dry-run/);
     await assert.rejects(() => fs.stat("sprinkleref/selected.local.json"), /ENOENT/);
   });
 });
@@ -196,4 +197,24 @@ async function captureStdout(run: () => Promise<void>) {
     console.log = original;
   }
   return lines.join("\n");
+}
+
+async function captureConsole(run: () => Promise<void>) {
+  const originalLog = console.log;
+  const originalError = console.error;
+  const stdout: string[] = [];
+  const stderr: string[] = [];
+  console.log = (value?: unknown) => {
+    stdout.push(String(value));
+  };
+  console.error = (value?: unknown) => {
+    stderr.push(String(value));
+  };
+  try {
+    await run();
+  } finally {
+    console.log = originalLog;
+    console.error = originalError;
+  }
+  return { stdout: stdout.join("\n"), stderr: stderr.join("\n") };
 }

@@ -15,7 +15,7 @@ import {
   ensureUniversalAuth,
 } from "./infisical-iac-bootstrap-identity";
 import { buildCredentialHandoffReport } from "./infisical-iac-bootstrap-handoff";
-import { buildDryRunReport } from "./infisical-iac-bootstrap-dry-run";
+import { buildDryRunGuidance, buildDryRunReport } from "./infisical-iac-bootstrap-dry-run";
 import { resolveOrganizationId } from "./infisical-iac-bootstrap-org";
 import { readDeploymentRuntimeMetadata, runOpenTofu } from "./infisical-iac-bootstrap-tofu";
 import { assertBootstrapPreflight } from "./infisical-iac-bootstrap-preflight";
@@ -110,6 +110,7 @@ async function runRepoBootstrap(args: BootstrapArgs) {
     JSON.stringify(
       {
         schemaVersion: "infisical-repo-bootstrap-result@1",
+        mode: "repo",
         resolverConfig: resolver.configPath,
         profiles: resolver.profiles,
         categories: ["main", "bootstrap"],
@@ -119,7 +120,6 @@ async function runRepoBootstrap(args: BootstrapArgs) {
           credentialSinkBackend: sink.backend,
           category: sink.category || args.sprinkleCategory || "bootstrap",
         })),
-        nextCommands: [`sprinkleref --check --config ${resolver.configPath}`],
         credentialSink: sink.kind,
         credentialSinkBackend: sink.backend,
       },
@@ -127,6 +127,8 @@ async function runRepoBootstrap(args: BootstrapArgs) {
       2,
     ),
   );
+  console.error(`Credential sink: ${sink.description}`);
+  printRepoFollowUpCommands(resolver.configPath);
 }
 
 function deploymentScopeFromTarget(args: BootstrapArgs) {
@@ -143,6 +145,16 @@ function deploymentScopeFromTarget(args: BootstrapArgs) {
 
 async function dryRun(args: BootstrapArgs) {
   console.log(JSON.stringify(await buildDryRunReport(args), null, 2));
+  for (const line of await buildDryRunGuidance(args)) console.error(line);
+  if (args.mode === "repo") {
+    printRepoFollowUpCommands("sprinkleref/selected.local.json");
+  }
+}
+
+function printRepoFollowUpCommands(configPath: string) {
+  console.error("Next checks:");
+  console.error(`  sprinkleref --check --config ${configPath}`);
+  console.error(`  sprinkleref --check --category bootstrap --config ${configPath}`);
 }
 
 function withReviewedHost(args: BootstrapArgs, siteUrl: string): BootstrapArgs {

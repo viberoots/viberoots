@@ -69,19 +69,25 @@ test("repo bootstrap creates and validates resolver profiles independent of cred
       { name: "//deployments/vault:deploy", secret_backend: "vault/default" },
       { name: "//deployments/infisical:deploy", secret_backend: "infisical/default" },
     ]);
-    const output = await captureStdout(() =>
+    const output = await captureConsole(() =>
       runInfisicalIacBootstrap({
         ...DEFAULT_BOOTSTRAP_ARGS,
         credentialSink: "local-file",
         yes: true,
       }),
     );
-    assert.match(output, /infisical-repo-bootstrap-result@1/);
-    assert.match(output, /vault-default/);
-    assert.match(output, /infisical-default/);
-    const report = JSON.parse(output) as {
+    assert.match(output.stdout, /infisical-repo-bootstrap-result@1/);
+    assert.match(output.stdout, /vault-default/);
+    assert.match(output.stdout, /infisical-default/);
+    assert.doesNotMatch(output.stdout, /nextCommands/);
+    assert.match(output.stderr, /sprinkleref --check --config sprinkleref\/selected\.local\.json/);
+    const report = JSON.parse(output.stdout) as {
       bootstrapCredentialSinks: Array<{ profile: string; credentialSinkBackend: string }>;
+      nextCommands?: unknown;
+      credentialSinkDescription?: unknown;
     };
+    assert.equal(report.nextCommands, undefined);
+    assert.equal(report.credentialSinkDescription, undefined);
     assert.equal(report.bootstrapCredentialSinks.length, 1);
     assert.equal(report.bootstrapCredentialSinks[0]?.profile, "infisical-default");
     assert.equal(report.bootstrapCredentialSinks[0]?.credentialSinkBackend, "local-file");
@@ -227,16 +233,18 @@ async function assertMissing(file: string) {
   await assert.rejects(() => fs.stat(file), /ENOENT/);
 }
 
-async function captureStdout(run: () => Promise<void>) {
-  const original = console.log;
-  const lines: string[] = [];
-  console.log = (value?: unknown) => {
-    lines.push(String(value));
-  };
+async function captureConsole(run: () => Promise<void>) {
+  const originalLog = console.log;
+  const originalError = console.error;
+  const stdout: string[] = [];
+  const stderr: string[] = [];
+  console.log = (value?: unknown) => stdout.push(String(value));
+  console.error = (value?: unknown) => stderr.push(String(value));
   try {
     await run();
   } finally {
-    console.log = original;
+    console.log = originalLog;
+    console.error = originalError;
   }
-  return lines.join("\n");
+  return { stdout: stdout.join("\n"), stderr: stderr.join("\n") };
 }

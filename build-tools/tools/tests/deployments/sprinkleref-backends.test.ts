@@ -90,13 +90,14 @@ test("--sprinkle-category selects access credential lifecycle category only", as
   await withEnvConfig(config, async () => {
     const args = {
       ...DEFAULT_BOOTSTRAP_ARGS,
+      mode: "deployment" as const,
       credentialSink: "sprinkleref" as const,
       sprinkleCategory: "access-bootstrap",
     };
     const selection = await resolveCredentialSinkSelection(args);
     const dryRun = await buildDryRunReport(args);
     assert.equal(selection.category, "access-bootstrap");
-    assert.equal(dryRun.applicationSecretsManaged, false);
+    assert.equal(dryRun.credentialSink, "sprinkleref");
     const handoff = buildCredentialHandoffReport({
       args,
       sinkSelection: selection,

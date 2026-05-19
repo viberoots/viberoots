@@ -11,7 +11,7 @@ import { resolveCredentialSinkSelection } from "../../deployments/infisical-iac-
 test("repo bootstrap dry-run reports resolver profiles without Pleomino provisioning", async () => {
   const dir = await tmp();
   await withCwdAndEnv(dir, async () => {
-    const output = await captureStdout(() =>
+    const output = await captureConsole(() =>
       runInfisicalIacBootstrap({
         ...DEFAULT_BOOTSTRAP_ARGS,
         mode: "repo",
@@ -19,10 +19,27 @@ test("repo bootstrap dry-run reports resolver profiles without Pleomino provisio
         yes: false,
       }),
     );
-    const report = JSON.parse(output) as { mode: string; resolverConfig: unknown };
+    const report = JSON.parse(output.stdout) as {
+      mode: string;
+      resolverConfig: unknown;
+      nextCommands?: unknown;
+      credentialSinkDescription?: unknown;
+      applicationSecretsManaged?: unknown;
+      deploymentProvisioning?: unknown;
+      deterministic?: unknown;
+      browserAutomation?: unknown;
+    };
     assert.equal(report.mode, "repo");
     assert.ok(report.resolverConfig);
-    assert.doesNotMatch(output, /pleomino|opentofu|cloudflare_api_token/);
+    assert.equal(report.nextCommands, undefined);
+    assert.equal(report.credentialSinkDescription, undefined);
+    assert.equal(report.applicationSecretsManaged, undefined);
+    assert.equal(report.deploymentProvisioning, undefined);
+    assert.equal(report.deterministic, undefined);
+    assert.equal(report.browserAutomation, undefined);
+    assert.match(output.stderr, /Credential sink: .*starter config not created during dry-run/);
+    assert.match(output.stderr, /sprinkleref --check --config sprinkleref\/selected\.local\.json/);
+    assert.doesNotMatch(output.stdout, /pleomino|opentofu|cloudflare_api_token/);
     await assertMissing("sprinkleref/selected.local.json");
   });
 });
@@ -68,16 +85,22 @@ async function assertMissing(file: string) {
   await assert.rejects(() => fs.stat(file), /ENOENT/);
 }
 
-async function captureStdout(run: () => Promise<void>) {
-  const original = console.log;
-  const lines: string[] = [];
+async function captureConsole(run: () => Promise<void>) {
+  const originalLog = console.log;
+  const originalError = console.error;
+  const stdout: string[] = [];
+  const stderr: string[] = [];
   console.log = (value?: unknown) => {
-    lines.push(String(value));
+    stdout.push(String(value));
+  };
+  console.error = (value?: unknown) => {
+    stderr.push(String(value));
   };
   try {
     await run();
   } finally {
-    console.log = original;
+    console.log = originalLog;
+    console.error = originalError;
   }
-  return lines.join("\n");
+  return { stdout: stdout.join("\n"), stderr: stderr.join("\n") };
 }
