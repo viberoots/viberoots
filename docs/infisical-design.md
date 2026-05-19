@@ -189,6 +189,37 @@ This field answers only which backend satisfies `secret_requirements`. It does
 not change contract ids, lifecycle steps, target scopes, or provider credential
 rules.
 
+### Repo Bootstrap And Resolver Profile Ownership
+
+Repo bootstrap owns the shared resolver-profile and bootstrap credential-sink
+boundary. If a repository uses a profile such as `infisical-default` or
+`vault-default`, `infisical-bootstrap repo` should make that profile operational
+at the repo level instead of leaving it as a placeholder for each deployment to
+repair later.
+
+Repo bootstrap should:
+
+- run backend-specific authentication or validation flows needed by configured
+  repo profiles, such as Infisical login or token-based organization selection
+  for `infisical-default` and Vault address/auth/mount validation for
+  `vault-default`;
+- create, select, or validate the repo-level backend account/project/mount
+  backing shared profiles;
+- write only non-secret resolver metadata into SprinkleRef config, including
+  backend host/address, project id or mount path, namespace, default
+  environment/path, and credential env names;
+- materialize or validate local bootstrap credential sinks such as macOS
+  Keychain services or restrictive local files, while keeping root/bootstrap
+  access credentials out of Infisical-backed categories;
+- keep generated `base.json` and starter resolver templates free of
+  deployment-specific names, project ids, paths, and Pleomino examples.
+
+Deployment bootstrap should consume those shared resolver profiles. It may create
+or reconcile deployment-specific backend resources such as Infisical
+environments, machine identities, Vault policies/roles, paths, and application
+secrets, but it should not require each deployment to independently solve
+account login or repo-wide default profile setup.
+
 ### Infisical Runtime Metadata
 
 Add an optional `infisical_runtime` metadata dictionary, analogous to

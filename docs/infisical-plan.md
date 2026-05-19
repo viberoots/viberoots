@@ -2595,3 +2595,142 @@ detected by later validation or assessment, making backend selection harder to r
 
 The metadata parser becomes stricter and existing bare-backend fixtures must be migrated in the
 same PR.
+
+## PR-28: Repo bootstrap backend profile materialization
+
+### 1. Intent
+
+Make repo-wide bootstrap responsible for making shared resolver profiles and bootstrap credential
+sinks operational. If deployments select `secret_backend = "infisical/default"` or
+`secret_backend = "vault/default"`, repo bootstrap should not leave the corresponding profile as a
+placeholder or require each deployment bootstrap to solve account login, Vault address/mount
+selection, organization selection, default project wiring, or local bootstrap sink setup
+independently.
+
+### 2. Scope of changes
+
+- Extend `infisical-bootstrap repo` so confirmed non-dry-run execution performs the backend-specific
+  profile materialization or validation required by every repo-wide resolver profile.
+- For Infisical-backed profiles, run the Infisical login or token-based authentication flow when an
+  Infisical-backed repo profile is required.
+- Resolve the Infisical organization through the existing explicit selector, interactive selector,
+  or `--yes` single-organization path. Preserve the existing `--no-login` requirement that
+  token-based flows provide an explicit `--organization-id` or `--org-name`.
+- Create, select, or validate the repo-level Infisical project/account backing shared resolver
+  profiles such as `infisical-default`.
+- For Vault-backed profiles, validate or materialize the repo-level Vault profile metadata needed by
+  deployments, such as address, namespace, mount/path defaults, auth env names, and any required
+  local profile naming convention.
+- Materialize non-secret resolver metadata for shared backend profiles:
+  - `host`;
+  - Vault address or namespace when applicable;
+  - `projectId`;
+  - Vault mount/path defaults when applicable;
+  - default environment;
+  - default path when needed;
+  - backend credential environment variable names.
+- Materialize or validate the configured bootstrap credential sink, including local-file paths and
+  macOS Keychain services, so root/bootstrap access credentials are stored only through the
+  configured non-Infisical bootstrap credential sink category.
+- Remove deployment-specific placeholders from generated repo-wide starter configs. Generated
+  `sprinkleref/base.json` and sibling templates must not mention Pleomino names, Pleomino project
+  ids, Pleomino secret paths, or any other deployment-specific value.
+- Keep deployment bootstrap focused on deployment-specific backend resources and application secret
+  lifecycle. It should consume repo-level resolver profiles instead of asking every deployment to
+  independently establish the shared account/project/Vault/profile/bootstrap-sink boundary.
+- Preserve dry-run behavior as read-only. Dry-run should report whether repo bootstrap would need
+  backend login, project/mount/profile materialization, or bootstrap sink setup, but it must not
+  write resolver config, credential sinks, or backend resources.
+
+### 3. External prerequisites
+
+- Live backend access is required only for non-dry-run repo bootstrap paths that create or validate
+  real backend account/project/mount/profile state.
+- Tests must continue to use fake Infisical API/CLI fixtures, fake Vault fixtures, and fake local
+  credential sinks rather than depending on live backend accounts.
+
+### 4. Tests to be added
+
+- Add fake Infisical login/API tests proving repo bootstrap:
+  - prompts or uses `--yes`/`--no-login` consistently with existing authentication rules;
+  - selects the intended organization;
+  - creates or selects the repo-level project for `infisical-default`;
+  - writes the real non-secret `projectId` into resolver config;
+  - stores bootstrap credentials only in a non-Infisical bootstrap sink.
+- Add Vault profile tests proving repo bootstrap validates or materializes `vault-default` with
+  real non-secret resolver metadata and rejects placeholder Vault profile values with remediation.
+- Add local credential sink tests proving repo bootstrap validates or materializes the selected
+  bootstrap sink, including macOS Keychain service names and restrictive local-file paths, without
+  routing bootstrap credentials through Infisical.
+- Add starter-template regression tests proving generated resolver configs contain no
+  deployment-specific names, Pleomino placeholders, Pleomino project ids, or example refs.
+- Add dry-run tests proving repo bootstrap reports planned backend profile and bootstrap sink
+  materialization without calling login, writing resolver files, writing credential sinks, or
+  mutating backends.
+- Add validation tests proving existing configured resolver profiles are treated as authoritative
+  and are validated rather than overwritten.
+- Keep focused tests for `infisical-bootstrap repo`, `sprinkleref --init`, and resolver config
+  parsing under the strict file-size gate.
+
+### 5. Docs to be added or updated
+
+- Update `docs/infisical-design.md` with the repo-bootstrap profile and credential-sink ownership
+  boundary.
+- Update `infisical-bootstrap.md` to explain that repo bootstrap owns shared backend account,
+  organization/project or Vault profile, resolver-profile setup, and bootstrap sink validation,
+  while deployment bootstrap owns deployment-specific resources.
+- Update `docs/sprinkleref.md` and generated config examples to avoid project-specific starter
+  values and explain how repo bootstrap fills or validates backend profile metadata.
+
+### 5.5. Expected regression scope
+
+- `deployment-only`
+- Changes should be limited to repo bootstrap, backend profile materialization/validation,
+  SprinkleRef starter templates, resolver config validation/materialization, focused tests, and
+  docs. Do not change deployment runtime secret acquisition or provider publish/provision behavior.
+
+### 6. Acceptance criteria
+
+- Running confirmed `infisical-bootstrap repo` for a repo that requires `infisical-default` or
+  `vault-default` performs the necessary backend login/org/project/profile or Vault profile setup,
+  or fails with clear remediation.
+- Generated repo-wide starter configs are generic and contain no deployment-specific placeholders
+  such as Pleomino project ids.
+- Resolver config written by repo bootstrap contains real non-secret profile metadata for required
+  backend profiles, not fake project ids, fake Vault addresses, or hidden sink assumptions.
+- Repo bootstrap validates or materializes the selected bootstrap credential sink before reporting
+  success.
+- Deployment bootstrap can assume shared resolver profiles are already real and focuses on
+  deployment-specific reconciliation.
+- Dry-run remains read-only and accurately reports planned repo-profile and bootstrap sink
+  materialization.
+- Focused tests and the repository validation suite pass.
+
+### 7. Risks
+
+- Repo bootstrap becomes a live backend operation instead of only local resolver scaffolding when
+  live backend profiles are required.
+- Operators may need to choose between creating new repo-level backend resources and binding
+  existing ones.
+- Existing local generated starter configs may contain old placeholders and need remediation.
+
+### 8. Mitigations
+
+- Keep dry-run read-only and explicit about the live operations a confirmed run would perform.
+- Require explicit prompts or `--yes` before live repo bootstrap mutations.
+- Prefer preserving existing resolver configs when present; validate and report remediation instead
+  of overwriting operator-owned config.
+- Emit clear migration guidance for old generated placeholders.
+
+### 9. Consequences of not implementing this PR
+
+Repo-wide profiles such as `infisical-default` and `vault-default`, plus bootstrap sinks such as
+macOS Keychain or local-file, remain partially fictional after repo bootstrap. That pushes backend
+account/profile/sink setup confusion into each deployment and can generate project-specific
+placeholders in supposedly repo-wide config.
+
+### 10. Downsides for implementing this PR
+
+Repo bootstrap becomes more capable and therefore more sensitive: a confirmed non-dry-run invocation
+may need live backend access and local credential-sink validation, so it must have strong prompts,
+dry-run output, and fake-server/fake-sink test coverage.
