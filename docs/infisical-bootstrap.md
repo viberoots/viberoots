@@ -4,14 +4,17 @@ The canonical operator entrypoint is:
 
 ```bash
 build-tools/tools/deployments/infisical-bootstrap.ts repo --dry-run
+build-tools/tools/deployments/infisical-bootstrap.ts repo
 build-tools/tools/deployments/infisical-bootstrap.ts repo --yes
+build-tools/tools/deployments/infisical-bootstrap.ts repo --without-deployments
 build-tools/tools/deployments/infisical-bootstrap.ts deployment --target <buck-target> --dry-run
 build-tools/tools/deployments/infisical-bootstrap.ts deployment --target <buck-target> --yes
 ```
 
 Use `--yes` for non-interactive pre-confirmation. Local interactive operators may omit `--yes` and
-confirm the mutation-capable run at the `Y/n` prompt; CI and other non-interactive flows must pass
-`--yes`.
+confirm the repo setup and deployment fan-out prompts; CI and other non-interactive flows must pass
+`--yes`. Use `repo --without-deployments` when only resolver/profile setup should run, then retry a
+single deployment later with `deployment --target <buck-target>`.
 
 This document intentionally redirects to the repo-root bootstrap spec at
 [`infisical-bootstrap.md`](../infisical-bootstrap.md). Keep command examples there and here on the

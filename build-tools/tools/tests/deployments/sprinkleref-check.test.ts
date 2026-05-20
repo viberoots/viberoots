@@ -54,7 +54,6 @@ test("scanner skips docs, test fixtures, and placeholder refs", async () => {
     ["secret://deployments/real/api_token"],
   );
 });
-
 test("check reports secret presence without serializing secret values", async () => {
   const dir = await gitRepo();
   const secretRef = "secret://deployments/demo/api_token";
@@ -86,7 +85,6 @@ test("check reports secret presence without serializing secret values", async ()
   assert.equal(report.summary.missing, 1);
   assert.equal(report.refs.find((entry: any) => entry.ref === secretRef).sensitive, true);
 });
-
 test("check validates non-secret refs as declarations, not secret backend entries", async () => {
   const dir = await gitRepo();
   await writeTracked(
@@ -125,7 +123,6 @@ test("check reports unchecked secrets when no resolver config is supplied", asyn
   const report = JSON.parse(output);
   assert.equal(report.refs[0].status, "unchecked");
 });
-
 test("check uses injected SPRINKLEREF_CONFIG env for resolver selection", async () => {
   const dir = await gitRepo();
   const secretRef = "secret://deployments/demo/api_token";
@@ -168,15 +165,17 @@ test("check exposes stable usage and resolver access exit codes", async () => {
       runInDir(dir, () =>
         runSprinkleRefCheck({ argv: ["--check", "--config", "/missing/resolver.json"] }),
       ),
-    (error: any) =>
-      error.exitCode === 2 &&
-      /resolver config not found/.test(error.message) &&
-      /infisical-bootstrap\.ts repo --dry-run[\s\S]*sprinkleref --init sprinkleref/.test(
+    (error: any) => {
+      assert.equal(error.exitCode, 2);
+      assert.match(
         error.message,
-      ),
+        /resolver config not found[\s\S]*infisical-bootstrap\.ts repo --dry-run[\s\S]*infisical-bootstrap\.ts repo \(or add --yes to skip the prompt\)[\s\S]*sprinkleref --init sprinkleref/,
+      );
+      assert.doesNotMatch(error.message, /infisical-bootstrap\.ts repo --yes/);
+      return true;
+    },
   );
 });
-
 test("check separates invalid refs from unmapped resolver categories", async () => {
   const dir = await gitRepo();
   const config = path.join(dir, "resolver.json");
@@ -226,20 +225,20 @@ test("check reports unmapped refs for missing resolver categories", async () => 
   assert.equal(JSON.parse(output).refs[0].status, "unmapped");
 });
 
-async function gitRepo(): Promise<string> {
+async function gitRepo() {
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), "sprinkleref-check-"));
   await $({ cwd: dir })`git init`.quiet();
   return dir;
 }
 
-async function writeTracked(dir: string, file: string, text: string | string[]): Promise<void> {
+async function writeTracked(dir: string, file: string, text: string | string[]) {
   const full = path.join(dir, file);
   await fs.mkdir(path.dirname(full), { recursive: true });
   await fs.writeFile(full, Array.isArray(text) ? `${text.join("\n")}\n` : text);
   await $({ cwd: dir })`git add ${file}`.quiet();
 }
 
-async function runInDir<T>(dir: string, fn: () => Promise<T>): Promise<T> {
+async function runInDir<T>(dir: string, fn: () => Promise<T>) {
   const old = process.cwd();
   process.chdir(dir);
   try {

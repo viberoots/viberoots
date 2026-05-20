@@ -31,6 +31,7 @@ const BOOL_FLAGS = new Set([
   "force-login",
   "yes",
   "dry-run",
+  "without-deployments",
   "no-tofu-apply",
   "rotate-bootstrap-credentials",
   "rotate-deployment-credentials",
@@ -42,6 +43,7 @@ export function usage(command = "build-tools/tools/deployments/infisical-bootstr
   ${command} repo --dry-run
   ${command} repo
   ${command} repo --yes
+  ${command} repo --without-deployments
   ${command} deployment --target <buck-target> --dry-run
   ${command} deployment --target <buck-target>
   ${command} deployment --target <buck-target> --yes
@@ -61,6 +63,7 @@ Options:
   --credential-sink <auto|local-file|macos-keychain|sprinkleref>
   --yes                         Skip confirmation prompts
   --dry-run                     Print non-secret planned operations
+  --without-deployments          Skip repo bootstrap deployment fan-out
 `;
 }
 
@@ -100,6 +103,7 @@ export function parseBootstrapArgs(argv = getArgvTokens()): BootstrapArgs {
   args.forceLogin = readFlagBoolFromTokens("force-login", argv);
   args.yes = readFlagBoolFromTokens("yes", argv);
   args.dryRun = readFlagBoolFromTokens("dry-run", argv);
+  args.withoutDeployments = readFlagBoolFromTokens("without-deployments", argv);
   args.noTofuApply = readFlagBoolFromTokens("no-tofu-apply", argv);
   args.rotateBootstrapCredentials = readFlagBoolFromTokens("rotate-bootstrap-credentials", argv);
   args.rotateDeploymentCredentials = readFlagBoolFromTokens("rotate-deployment-credentials", argv);

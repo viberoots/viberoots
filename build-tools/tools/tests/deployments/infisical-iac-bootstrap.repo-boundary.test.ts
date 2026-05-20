@@ -41,6 +41,11 @@ test("repo bootstrap dry-run reports resolver profiles without Pleomino provisio
       credentialSinkDescription?: unknown;
       applicationSecretsManaged?: unknown;
       deploymentProvisioning?: unknown;
+      deploymentFanOut?: {
+        readOnly?: boolean;
+        optOutFlag?: string;
+        offeredTargets?: string[];
+      };
       deterministic?: unknown;
       browserAutomation?: unknown;
     };
@@ -61,6 +66,9 @@ test("repo bootstrap dry-run reports resolver profiles without Pleomino provisio
     assert.equal(report.credentialSinkDescription, undefined);
     assert.equal(report.applicationSecretsManaged, undefined);
     assert.equal(report.deploymentProvisioning, undefined);
+    assert.equal(report.deploymentFanOut?.readOnly, true);
+    assert.equal(report.deploymentFanOut?.optOutFlag, "--without-deployments");
+    assert.deepEqual(report.deploymentFanOut?.offeredTargets, []);
     assert.equal(report.deterministic, undefined);
     assert.equal(report.browserAutomation, undefined);
     assert.match(output.stderr, /Credential sink: .*starter config not created during dry-run/);

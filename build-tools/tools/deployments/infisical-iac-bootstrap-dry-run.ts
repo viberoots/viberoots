@@ -1,5 +1,6 @@
 import type { BootstrapArgs } from "./infisical-iac-bootstrap-types";
 import { withDeploymentBootstrapDefaults } from "./infisical-iac-bootstrap-config";
+import { buildDeploymentFanOutDryRunReport } from "./infisical-iac-bootstrap-deployments";
 import { buildRepoDryRunMaterializationPlan } from "./infisical-iac-bootstrap-dry-run-plan";
 import { resolveCredentialSinkSelection } from "./infisical-iac-bootstrap-sink";
 
@@ -18,6 +19,7 @@ export async function buildDryRunReport(args: BootstrapArgs) {
       credentialSink: sink.kind,
       credentialSinkBackend: sink.backend,
       materializationPlan,
+      deploymentFanOut: await buildDeploymentFanOutDryRunReport(args),
     };
   }
   const deploymentArgs = withDeploymentBootstrapDefaults(args);

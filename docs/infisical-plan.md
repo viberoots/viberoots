@@ -3035,3 +3035,148 @@ expresses the family.
 Deployment metadata extraction becomes slightly more path-aware, and authors must understand that
 moving a target under a canonical family directory can affect its effective family unless they set
 an explicit override.
+
+## PR-32: Repo bootstrap deployment fan-out and command entrypoint closure
+
+### 1. Intent
+
+Close the remaining operator-DX gap after the repo/deployment bootstrap split. A confirmed
+`infisical-bootstrap repo` run should make the repo-wide resolver and backend profile boundary
+operational, then offer to run the deployment-specific bootstrap scopes that are required to clear
+managed deployment outputs. Operators who only want repo-wide setup should opt out explicitly with
+`--without-deployments`. The public command examples must also be executable as written, and
+SprinkleRef remediation output should keep pointing at the interactive repo bootstrap path instead
+of implying that `--yes` is required.
+
+### 2. Scope of changes
+
+- Add a `--without-deployments` flag to repo bootstrap mode.
+- After confirmed non-dry-run `infisical-bootstrap repo` completes repo-level resolver/profile and
+  bootstrap credential-sink materialization, discover the deployment bootstrap scopes that should be
+  offered for this repo and run them unless `--without-deployments` is present.
+- Gate deployment fan-out with an explicit interactive `Y/n` prompt after the repo-level phase.
+  When `--yes` is present, treat the deployment fan-out prompt as pre-confirmed.
+- Keep `repo --dry-run` read-only. It should report the deployment bootstrap targets it would offer
+  and note that `--without-deployments` suppresses the deployment fan-out, but it must not open
+  Infisical, run OpenTofu, write resolver files, write credential sinks, or mutate deployments.
+- Derive deployment bootstrap targets from reviewed deployment metadata or the exported deployment
+  graph rather than hardcoding operator command text. It is acceptable for this PR to run only the
+  currently supported Pleomino deployment bootstrap targets, but unsupported targets must be
+  reported clearly rather than silently ignored.
+- Ensure failures from a deployment bootstrap run are reported with the target that failed and do
+  not claim the repo bootstrap fully cleared managed deployment outputs.
+- Preserve the explicit `deployment --target <buck-target>` path for operators who want to run or
+  retry a single deployment scope directly.
+- Fix the public command entrypoint mismatch. Either make
+  `build-tools/tools/deployments/infisical-bootstrap.ts` executable in git or update every
+  operator-facing example and retry/remediation message to invoke the reviewed executable command
+  form, such as `zx-wrapper build-tools/tools/deployments/infisical-bootstrap.ts ...`, so copied
+  commands do not fail with `zsh: permission denied`.
+- Keep SprinkleRef missing-config and unchecked-secret guidance aligned with the interactive repo
+  bootstrap flow: recommend `infisical-bootstrap repo` after `repo --dry-run`, mention `--yes` only
+  as the optional non-interactive prompt skip, and keep `sprinkleref --init sprinkleref` as the
+  resolver-only alternative.
+- Preserve the multiline missing-value report shape:
+  - each missing `secret://...` ref appears once per grouped backend context;
+  - `required by:` is a multiline indented list;
+  - example/documentation refs and test-configured refs remain excluded from repo checks.
+
+### 3. External prerequisites
+
+- Live Infisical/OpenTofu/provider access is required only for the confirmed deployment fan-out or
+  explicit `deployment --target` paths.
+- Tests must use fake Infisical CLI/API, fake OpenTofu/provider runners, and temp resolver configs;
+  they must not depend on live Infisical, Vault, macOS Keychain, or provider accounts.
+
+### 4. Tests to be added
+
+- Add repo-bootstrap flow tests proving confirmed `repo` runs repo-level setup and then prompts to
+  fan out to discovered deployment bootstrap targets.
+- Add tests proving `repo --without-deployments` performs only repo-level setup and does not call
+  deployment bootstrap, OpenTofu, deployment credential creation, or reviewed deployment
+  reconciliation.
+- Add tests proving `repo --yes` pre-confirms both repo-level mutation and deployment fan-out, while
+  interactive `Y/n` can decline deployment fan-out after repo-level setup succeeds.
+- Add dry-run tests proving `repo --dry-run` reports the deployment targets it would offer and
+  remains read-only.
+- Add target-discovery tests proving the deployment fan-out target list comes from reviewed
+  metadata or graph data and reports unsupported deployment targets clearly.
+- Add error-path tests proving a failed deployment bootstrap names the failing target and leaves
+  follow-up `sprinkleref --check` guidance honest about remaining managed outputs.
+- Add command-entrypoint tests or docs guard tests proving operator-facing bootstrap commands are
+  executable as written and do not reference a non-executable path without `zx-wrapper`.
+- Add SprinkleRef guidance/report regression tests covering missing resolver config text,
+  unchecked-secret hints, and multiline `required by:` output.
+
+### 5. Docs to be added or updated
+
+- Update `infisical-bootstrap.md`, `docs/infisical-bootstrap.md`, `docs/sprinkleref.md`, and
+  `docs/sprinkleref-check.md` to document the default repo bootstrap flow:
+  repo setup first, optional deployment fan-out second, and `--without-deployments` as the opt-out.
+- Update operator examples to use the executable command form chosen in this PR.
+- Update the docs to explain when to use `repo --without-deployments`, when to retry
+  `deployment --target <buck-target>`, and why managed bootstrap outputs may still appear until the
+  deployment fan-out or explicit deployment bootstrap succeeds.
+- Update this plan only if implementation discovers another public command surface that still
+  contradicts the reviewed bootstrap flow.
+
+### 5.5. Expected regression scope
+
+- `deployment-only`
+- Keep changes limited to Infisical bootstrap CLI parsing/control flow, deployment bootstrap target
+  discovery, operator prompts, user-facing guidance/report strings, focused tests, docs, and file
+  mode or wrapper-command alignment. Do not change runtime secret acquisition, provider publish
+  semantics, resolver backend semantics, deployment metadata contracts, or Infisical/Vault API
+  behavior beyond invoking the already-reviewed deployment bootstrap path.
+
+### 6. Acceptance criteria
+
+- Running confirmed `infisical-bootstrap repo` performs repo-level bootstrap and then offers to run
+  discovered deployment bootstrap targets by default.
+- `infisical-bootstrap repo --without-deployments` suppresses deployment fan-out and leaves the
+  explicit `deployment --target` retry path available.
+- `repo --dry-run` remains read-only and shows both repo-level planned work and the deployment
+  targets that a confirmed run would offer.
+- `--yes` is consistently treated as non-interactive pre-confirmation, not as the only way to run a
+  mutation-capable command.
+- Managed deployment bootstrap outputs are no longer surprising after a default confirmed repo
+  bootstrap: either the deployment fan-out created them or the output clearly states which
+  deployment target still needs explicit bootstrap.
+- Operator-facing command examples and remediation messages are executable as written and do not
+  produce `permission denied` for the canonical bootstrap command.
+- SprinkleRef missing-config and unchecked-secret guidance points to the interactive repo bootstrap
+  flow and keeps `sprinkleref --init sprinkleref` as the resolver-only path.
+- Missing-value output keeps one line per missing ref with multiline `required by:` details.
+- Focused tests and the repository validation suite pass.
+
+### 7. Risks
+
+- Default deployment fan-out makes `repo` bootstrap broader and more mutation-capable than the
+  earlier strict repo/deployment split.
+- Automatically discovered target ordering could become nondeterministic if it is not sorted.
+- A partially successful fan-out can confuse operators if the summary does not distinguish
+  repo-level success from deployment-level failure.
+- Making a TypeScript file executable may conflict with existing repo conventions if wrappers are
+  preferred.
+
+### 8. Mitigations
+
+- Keep a visible second prompt for deployment fan-out in interactive mode and document
+  `--without-deployments` prominently.
+- Sort discovered deployment targets and report unsupported targets explicitly.
+- Print a final summary with separate repo-level and per-deployment outcomes.
+- Prefer one canonical command surface and enforce it with docs/usage tests so examples do not
+  drift between raw `.ts` paths and wrapper invocations.
+
+### 9. Consequences of not implementing this PR
+
+Operators will continue expecting `repo` bootstrap to clear managed deployment outputs, then see
+those outputs remain because only explicit deployment bootstrap creates them. The documented command
+surface will also remain inconsistent with executable permissions, producing avoidable
+`permission denied` failures for copied examples.
+
+### 10. Downsides for implementing this PR
+
+The repo bootstrap path becomes a two-stage operation with more prompts and more live side effects
+by default. Operators who only want resolver/profile setup must learn the new
+`--without-deployments` opt-out.

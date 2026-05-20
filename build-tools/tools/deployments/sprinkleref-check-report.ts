@@ -202,6 +202,6 @@ function parseInfisicalBackend(backend?: string) {
 function renderUncheckedHint(lines: string[], count: number): void {
   if (count === 0) return;
   lines.push(
-    `Unchecked secrets: ${count} (run build-tools/tools/deployments/infisical-bootstrap.ts repo --dry-run, build-tools/tools/deployments/infisical-bootstrap.ts repo --yes, or sprinkleref --init sprinkleref; then pass --config to determine whether they are present or missing).`,
+    `Unchecked secrets: ${count} (run build-tools/tools/deployments/infisical-bootstrap.ts repo --dry-run, build-tools/tools/deployments/infisical-bootstrap.ts repo, or sprinkleref --init sprinkleref; then pass --config to determine whether they are present or missing).`,
   );
 }

@@ -15,6 +15,7 @@ export const DEFAULT_BOOTSTRAP_ARGS: BootstrapArgs = {
   forceLogin: false,
   yes: false,
   dryRun: false,
+  withoutDeployments: false,
   tofuDir: "",
   noTofuApply: false,
   rotateBootstrapCredentials: false,

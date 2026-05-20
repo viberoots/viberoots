@@ -20,6 +20,7 @@ import {
 import { ensureRepoBootstrapCredential } from "./infisical-iac-bootstrap-repo-credential";
 import { buildCredentialHandoffReport } from "./infisical-iac-bootstrap-handoff";
 import { buildDryRunGuidance, buildDryRunReport } from "./infisical-iac-bootstrap-dry-run";
+import { runDeploymentBootstrapFanOut } from "./infisical-iac-bootstrap-deployments";
 import { resolveOrganizationId } from "./infisical-iac-bootstrap-org";
 import { readDeploymentRuntimeMetadata, runOpenTofu } from "./infisical-iac-bootstrap-tofu";
 import { confirmBootstrapPreflight } from "./infisical-iac-bootstrap-preflight";
@@ -41,12 +42,7 @@ const PLEOMINO_DEPLOYMENT_BOOTSTRAP_TARGETS = new Set([
 export async function runInfisicalIacBootstrap(args: BootstrapArgs) {
   if (args.mode === "repo") return await runRepoBootstrap(args);
   const deploymentArgs = withDeploymentBootstrapDefaults(args);
-  const scope = deploymentScopeFromTarget(deploymentArgs);
-  if (scope.kind !== "pleomino") {
-    throw new Error(
-      `unsupported deployment bootstrap scope: ${deploymentArgs.target || "<missing>"}`,
-    );
-  }
+  deploymentScopeFromTarget(deploymentArgs);
   const reviewedMetadata = await readPleominoReviewedMetadata();
   const effectiveArgs = withReviewedHost(deploymentArgs, reviewedMetadata.siteUrl);
   if (effectiveArgs.dryRun) return dryRun(effectiveArgs);
@@ -142,6 +138,7 @@ async function runRepoBootstrap(args: BootstrapArgs) {
         credentialSinkBackend: sink.backend,
         profileMaterialization: materialization,
         credentialSinkMaterialization,
+        deploymentFanOut: { skipped: args.withoutDeployments, optOutFlag: "--without-deployments" },
       },
       null,
       2,
@@ -149,6 +146,10 @@ async function runRepoBootstrap(args: BootstrapArgs) {
   );
   console.error(`Credential sink: ${sink.description}`);
   printRepoFollowUpCommands(resolver.configPath);
+  await runDeploymentBootstrapFanOut({
+    args,
+    execute: async (deploymentArgs) => runInfisicalIacBootstrap(deploymentArgs),
+  });
 }
 
 async function materializeRepoProfiles(

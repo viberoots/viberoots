@@ -48,6 +48,22 @@ test("human check output groups deployment environments for the same missing ref
   );
 });
 
+test("human check output points unchecked secrets at interactive repo bootstrap", () => {
+  const unchecked = {
+    ...entry("secret://deployments/demo/api_token"),
+    status: "unchecked" as const,
+  };
+  const text = renderReport({
+    scannedFiles: 1,
+    refs: [unchecked],
+    summary: summarize([unchecked]),
+  });
+  assert.match(text, /Unchecked secrets: 1/);
+  assert.match(text, /infisical-bootstrap\.ts repo --dry-run/);
+  assert.match(text, /infisical-bootstrap\.ts repo, or sprinkleref --init sprinkleref/);
+  assert.doesNotMatch(text, /infisical-bootstrap\.ts repo --yes/);
+});
+
 test("check report shows inferred deployment family for missing target refs", async () => {
   await runInTemp("sprinkleref-report-inferred-family", async (tmp) => {
     await writeReportTarget(path.join(tmp, "projects/deployments/report-demo/staging"), {

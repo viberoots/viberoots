@@ -9,7 +9,7 @@ The bootstrap command owns only the work required to make Infisical usable as th
 - authenticate a human or CI bootstrap caller;
 - select the Infisical organization without asking users to hunt for IDs;
 - create or reuse shared repo bootstrap metadata and credentials;
-- run the deployment Infisical OpenTofu stack through apply by default only when explicit
+- run the deployment Infisical OpenTofu stack through apply when confirmed repo fan-out or explicit
   deployment bootstrap is selected;
 - store the bootstrap access credential in a SprinkleRef-resolved bootstrap credential backend;
 - manage bootstrap and deployment Universal Auth access credentials through a
@@ -23,18 +23,25 @@ Primary commands:
 
 ```bash
 build-tools/tools/deployments/infisical-bootstrap.ts repo --dry-run
+build-tools/tools/deployments/infisical-bootstrap.ts repo
 build-tools/tools/deployments/infisical-bootstrap.ts repo --yes
+build-tools/tools/deployments/infisical-bootstrap.ts repo --without-deployments
 build-tools/tools/deployments/infisical-bootstrap.ts deployment --target <buck-target> --dry-run
 build-tools/tools/deployments/infisical-bootstrap.ts deployment --target <buck-target> --yes
 ```
 
-`repo` initializes and validates the repo-wide SprinkleRef resolver/profile boundary only. It
+`repo` first initializes and validates the repo-wide SprinkleRef resolver/profile boundary. It
 creates or checks `sprinkleref/`, named backend profiles such as `vault-default` and
-`infisical-default`, and category lanes such as `main` and `bootstrap`. Confirmed repo bootstrap also
-materializes shared backend profile metadata and the selected bootstrap credential sink. It writes
-only non-secret resolver metadata such as Infisical project ids, Vault address env names, mounts,
-default paths, and credential env names. Repo bootstrap must not mention or touch Pleomino OpenTofu
-modules, reviewed Pleomino metadata, deployment resources, or deployment credentials.
+`infisical-default`, and category lanes such as `main` and `bootstrap`. Confirmed repo bootstrap
+also materializes shared backend profile metadata and the selected bootstrap credential sink. It
+writes only non-secret resolver metadata such as Infisical project ids, Vault address env names,
+mounts, default paths, and credential env names.
+
+After the repo-wide phase succeeds, confirmed `repo` runs a second `Y/n` prompt to fan out to
+reviewed deployment bootstrap targets discovered from deployment metadata. `--yes` pre-confirms
+both the repo setup prompt and this deployment fan-out prompt. Use `repo --without-deployments`
+when you only want resolver/profile setup; managed deployment bootstrap outputs may remain missing
+until a later default repo run or an explicit deployment bootstrap succeeds.
 
 `deployment --target <buck-target>` is the explicit deployment provisioning layer. The existing
 Pleomino Infisical OpenTofu project/environment/identity reconciliation and deployment Universal
@@ -47,6 +54,8 @@ Defaults:
 - OpenTofu init/plan/apply: enabled only for explicit deployment bootstrap.
 - Confirmation: mutation-capable bootstrap requires either non-interactive `--yes` or an
   interactive `Y/n` prompt confirmation before any remote or local write.
+- Repo deployment fan-out: enabled by default after repo setup; opt out with
+  `--without-deployments`.
 - Credential preservation: preserve existing remote/local credentials unless explicit rotation is requested.
 - Secret output: never print secret values.
 
@@ -59,6 +68,7 @@ Key flags:
 --organization-id <id>
 --org-name <exact-name>
 --yes
+--without-deployments
 --no-login
 --force-login
 --access-token-env <env-name>

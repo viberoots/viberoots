@@ -23,6 +23,10 @@ test("bootstrap usage prints the selected operator command surface", () => {
   assert.match(text, /build-tools\/tools\/deployments\/infisical-bootstrap\.ts repo --yes/);
   assert.match(
     text,
+    /build-tools\/tools\/deployments\/infisical-bootstrap\.ts repo --without-deployments/,
+  );
+  assert.match(
+    text,
     /build-tools\/tools\/deployments\/infisical-bootstrap\.ts deployment --target <buck-target> --dry-run/,
   );
   assert.match(
@@ -51,12 +55,22 @@ test("bootstrap main help prints usage before required mode parsing", async () =
   }
 });
 
+test("bootstrap entrypoint is executable as documented", async () => {
+  const mode = (await fs.stat("build-tools/tools/deployments/infisical-bootstrap.ts")).mode;
+  assert.notEqual(mode & 0o111, 0);
+});
+
 test("bootstrap repo args default to generic resolver setup", () => {
   const args = parseBootstrapArgs(["repo"]);
   assert.equal(args.apiUrl, "https://app.infisical.com");
   assert.equal(args.cliDomain, "https://app.infisical.com/api");
   assert.equal(args.noTofuApply, false);
   assert.equal(args.tofuDir, "");
+  assert.equal(args.withoutDeployments, false);
+});
+
+test("bootstrap repo args support deployment fan-out opt-out", () => {
+  assert.equal(parseBootstrapArgs(["repo", "--without-deployments"]).withoutDeployments, true);
 });
 
 test("bootstrap deployment args default to reviewed OpenTofu setup", () => {

@@ -56,7 +56,7 @@ function unchangedStateMessage(args: BootstrapArgs) {
   return "No Infisical resources, resolver config, or credential sink output was changed.";
 }
 
-async function askConfirmation(prompt: string, io: PreflightIo) {
+export async function askConfirmation(prompt: string, io: PreflightIo) {
   if (io.question) return await io.question(prompt);
   const rl = readline.createInterface({
     input: io.stdin || process.stdin,

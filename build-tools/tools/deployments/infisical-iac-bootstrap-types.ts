@@ -16,6 +16,7 @@ export type BootstrapArgs = {
   forceLogin: boolean;
   yes: boolean;
   dryRun: boolean;
+  withoutDeployments: boolean;
   tofuDir: string;
   noTofuApply: boolean;
   tofuPlanFile?: string;

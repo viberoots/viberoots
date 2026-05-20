@@ -44,12 +44,13 @@ configured secret presence:
 
 ```bash
 build-tools/tools/deployments/infisical-bootstrap.ts repo --dry-run
-build-tools/tools/deployments/infisical-bootstrap.ts repo --yes
+build-tools/tools/deployments/infisical-bootstrap.ts repo
 sprinkleref --check --config sprinkleref/selected.local.json
 ```
 
-The repo-wide path sets up resolver profiles and categories only. Pleomino OpenTofu provisioning is
-explicitly separate and requires
+The repo-wide path sets up resolver profiles and categories first, then offers a second prompt to
+fan out to reviewed deployment bootstrap targets. Use `repo --without-deployments` when you only
+want resolver/profile setup. Retry a failed or skipped deployment scope with
 `build-tools/tools/deployments/infisical-bootstrap.ts deployment --target <buck-target>`.
 
 `--check` should default to all supported deployment contract schemes. Scheme filters narrow the

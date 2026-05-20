@@ -30,7 +30,7 @@ Repo-wide bootstrap also uses this resolver shape:
 
 ```bash
 build-tools/tools/deployments/infisical-bootstrap.ts repo --dry-run
-build-tools/tools/deployments/infisical-bootstrap.ts repo --yes
+build-tools/tools/deployments/infisical-bootstrap.ts repo
 sprinkleref --check --config sprinkleref/selected.local.json
 ```
 
@@ -39,7 +39,10 @@ With `--credential-sink auto`, it uses `SPRINKLEREF_CONFIG` when set, then an ex
 preflight, it creates the starter config set and uses `selected.local.json` so the `bootstrap`
 backend choice is visible in config instead of hidden inside bootstrap code. Dry-run bootstrap
 reports the starter backend without creating the config files. Existing resolver configs are
-treated as authoritative.
+treated as authoritative. Confirmed repo bootstrap offers a second deployment fan-out prompt by
+default so managed deployment bootstrap outputs can be created after repo setup. Use
+`repo --without-deployments` to stop after resolver/profile setup, or retry one scope directly with
+`deployment --target <buck-target>`.
 
 Resolver configs may define named backend profiles separately from categories. Profiles name backend
 instances/accounts, while categories name usage lanes:
@@ -77,11 +80,12 @@ Infisical profiles use Universal Auth env names only: `clientIdEnv` and `clientS
 credentials.
 
 Generated starter configs use generic env-name based profile metadata. Confirmed
-`infisical-bootstrap repo --yes` validates those profiles and writes or preserves real non-secret
+`infisical-bootstrap repo` validates those profiles and writes or preserves real non-secret
 backend metadata, such as an Infisical `projectId`, before deployment bootstrap consumes them.
 Repo dry-run is read-only and reports a `materializationPlan` showing whether backend login,
 Infisical project validation/creation, Vault profile/mount validation, resolver profile creation,
-or bootstrap sink setup would be needed.
+bootstrap sink setup, or deployment fan-out would be needed. Add `--yes` only when the prompts must
+be pre-confirmed non-interactively.
 
 Deployment metadata selects these profiles through `secret_backend =
 "<backend>/<profile-alias>"`. For example, `secret_backend = "infisical/default"` selects the
