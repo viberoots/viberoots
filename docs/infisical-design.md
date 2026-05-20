@@ -243,7 +243,7 @@ infisical_runtime = {
     "secret_path": "/deployments/pleomino",
     "machine_identity_client_id_env": "VBR_INFISICAL_CLIENT_ID",
     "machine_identity_client_secret_env": "VBR_INFISICAL_CLIENT_SECRET",
-    "preferred_credential_source": "machine_identity_universal_auth",
+    "preferred_credential_source": "infisical_machine_identity_universal_auth",
 }
 ```
 
@@ -274,7 +274,7 @@ Allowed non-secret keys:
 - `machine_identity_id`: optional non-secret identity id for diagnostics and
   admin reconciliation.
 - `preferred_credential_source`: initially
-  `machine_identity_universal_auth`.
+  `infisical_machine_identity_universal_auth`.
 - `access_token_ttl_seconds`: optional expected token TTL for diagnostics and
   renewal scheduling. The runtime must trust the login response over this value.
 - `access_token_max_uses`: optional expected max-use policy for diagnostics.

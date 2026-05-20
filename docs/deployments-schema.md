@@ -68,8 +68,8 @@ Optional keys:
 - `secret_path`: default Infisical secret path for declared contracts. Omit to
   use `/`.
 - `preferred_credential_source`: must be
-  `machine_identity_universal_auth` for Infisical deployments with secret
-  requirements.
+  `infisical_machine_identity_universal_auth` for Infisical deployments with
+  secret requirements.
 - `machine_identity_client_id_env`: environment variable name containing the
   Universal Auth client id.
 - `machine_identity_client_secret_env`: environment variable name containing the

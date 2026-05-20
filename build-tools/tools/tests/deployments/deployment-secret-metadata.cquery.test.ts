@@ -35,7 +35,7 @@ test("deployment TARGETS emit Infisical secret backend metadata", async () => {
         '        "site_url": "https://app.infisical.com",',
         '        "project_id": "proj_123",',
         '        "environment": "staging",',
-        '        "preferred_credential_source": "machine_identity_universal_auth",',
+        '        "preferred_credential_source": "infisical_machine_identity_universal_auth",',
         "    },",
         '    infisical_secret_mappings = {"secret://deployments/pleomino/token": {',
         '        "secret_path": "/deployments/pleomino",',

@@ -41,7 +41,7 @@ function infisicalRuntime(overrides: Record<string, unknown> = {}) {
     site_url: "https://app.infisical.com",
     project_id: "proj_123",
     environment: "staging",
-    preferred_credential_source: "machine_identity_universal_auth",
+    preferred_credential_source: "infisical_machine_identity_universal_auth",
     machine_identity_client_id_env: "VBR_INFISICAL_CLIENT_ID",
     machine_identity_client_secret_env: "VBR_INFISICAL_CLIENT_SECRET",
     ...overrides,
@@ -190,6 +190,23 @@ test("infisical metadata validation rejects missing runtime for secret requireme
   assert.ok(errors.some((entry) => entry.includes("preferred_credential_source")));
 });
 
+test("infisical metadata validation requires backend-qualified credential source", () => {
+  const errors = errorsFor({
+    secret_backend: "infisical/default",
+    secret_requirements: [requirement()],
+    infisical_runtime: infisicalRuntime({
+      preferred_credential_source: "machine_identity_universal_auth",
+    }),
+  });
+  assert.ok(
+    errors.some((entry) =>
+      entry.includes(
+        "infisical_runtime.preferred_credential_source must be infisical_machine_identity_universal_auth",
+      ),
+    ),
+  );
+});
+
 test("deployment secret metadata validation rejects unsupported backends", () => {
   const errors = errorsFor({ secret_backend: "other" });
   assert.ok(errors.some((entry) => entry.includes('unsupported secret_backend backend "other"')));
@@ -209,7 +226,7 @@ test("deployment secret metadata extraction does not contact Infisical", () => {
           site_url: "https://app.infisical.com",
           project_id: "proj_123",
           environment: "staging",
-          preferred_credential_source: "machine_identity_universal_auth",
+          preferred_credential_source: "infisical_machine_identity_universal_auth",
           machine_identity_client_id_env: "VBR_INFISICAL_CLIENT_ID",
           machine_identity_client_secret_env: "VBR_INFISICAL_CLIENT_SECRET",
         },

@@ -175,7 +175,7 @@ export async function writeTempCloudflareValidationWorkspace(
             '        "project_id": "proj_123",',
             '        "environment": "prod",',
             '        "secret_path": "/deployments/pleomino",',
-            '        "preferred_credential_source": "machine_identity_universal_auth",',
+            '        "preferred_credential_source": "infisical_machine_identity_universal_auth",',
             '        "machine_identity_client_id_env": "VBR_MINI_INFISICAL_CLIENT_ID",',
             '        "machine_identity_client_secret_env": "VBR_MINI_INFISICAL_CLIENT_SECRET",',
             "    },",

@@ -37,6 +37,11 @@ const docsWithInfisicalExamples = [
   "docs/nixos-shared-host-usage.md",
   "docs/secrets-usage.md",
 ];
+const docsWithInfisicalResolverExamples = [
+  ...docsWithInfisicalExamples,
+  "docs/infisical-design.md",
+  "infisical-bootstrap.md",
+];
 
 async function walkFiles(
   root: string,
@@ -117,6 +122,21 @@ test("Infisical docs keep examples non-secret and admin commands read-only", asy
   assert.doesNotMatch(combined, /secretValue\s*[:=]\s*["'][^"']+["']/);
   assert.match(combined, /createDeploymentSecretRuntimeForAdmittedContext\(\)/);
   assert.match(combined, /createVaultDeploymentSecretRuntime\(\)[\s\S]*compatibility helper/);
+});
+
+test("Infisical resolver docs show Universal Auth profile fields", async () => {
+  for (const relPath of docsWithInfisicalResolverExamples) {
+    const text = await readRelative(relPath);
+    const jsonBlocks = text.match(/```json\n[\s\S]*?\n```/g) || [];
+    for (const block of jsonBlocks) {
+      if (!block.includes('"backend": "infisical"') || !block.includes('"defaultEnvironment"')) {
+        continue;
+      }
+      assert.match(block, /"clientIdEnv"\s*:/, relPath);
+      assert.match(block, /"clientSecretEnv"\s*:/, relPath);
+      assert.doesNotMatch(block, /"tokenEnv"\s*:/, relPath);
+    }
+  }
 });
 
 test("Infisical plan keeps follow-up sections traceable", async () => {

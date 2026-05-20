@@ -53,7 +53,7 @@ function parsedDeployment(siteUrl: string): CloudflarePagesDeployment {
         project_id: infisicalRuntime.projectId,
         environment: infisicalRuntime.environment,
         secret_path: infisicalRuntime.secretPath,
-        preferred_credential_source: "machine_identity_universal_auth",
+        preferred_credential_source: "infisical_machine_identity_universal_auth",
         machine_identity_client_id_env: "INFISICAL_CLIENT_ID",
         machine_identity_client_secret_env: "INFISICAL_CLIENT_SECRET",
       },

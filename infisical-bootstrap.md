@@ -334,7 +334,9 @@ Example macOS local config:
       "host": "https://app.infisical.com",
       "projectId": "<repo-infisical-project-id>",
       "defaultEnvironment": "staging",
-      "defaultPath": "/"
+      "defaultPath": "/",
+      "clientIdEnv": "VBR_INFISICAL_CLIENT_ID",
+      "clientSecretEnv": "VBR_INFISICAL_CLIENT_SECRET"
     }
   }
 }
@@ -365,7 +367,9 @@ Example GitHub Actions CI config:
       "host": "https://app.infisical.com",
       "projectId": "<repo-infisical-project-id>",
       "defaultEnvironment": "staging",
-      "defaultPath": "/"
+      "defaultPath": "/",
+      "clientIdEnv": "VBR_INFISICAL_CLIENT_ID",
+      "clientSecretEnv": "VBR_INFISICAL_CLIENT_SECRET"
     }
   }
 }

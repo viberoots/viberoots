@@ -2,6 +2,7 @@
 import type { GraphNode } from "../lib/graph";
 import { readString, readStringRecord } from "./deployment-graph-readers";
 import { deploymentError } from "./contract-extract-shared";
+import { pushInfisicalCredentialSourceErrors } from "./deployment-infisical-credential-source-validation";
 import { pushInfisicalUniversalAuthEnvErrors } from "./deployment-infisical-env-validation";
 import { deploymentSecretFixturePath } from "./deployment-secret-fixture";
 import { pushForbiddenInfisicalRuntimeKeyErrors } from "./deployment-secret-profile";
@@ -198,6 +199,7 @@ function validateInfisicalRuntime(opts: {
     if (!value)
       opts.errors.push(deploymentError(opts.label, `infisical_runtime.${field} is required`));
   }
+  pushInfisicalCredentialSourceErrors(opts);
   if (runtime?.preferredCredentialSource !== "machine_identity_universal_auth") {
     opts.errors.push(
       deploymentError(

@@ -2841,3 +2841,96 @@ implemented interactive confirmation behavior.
 This is a breaking cleanup for any local Infisical resolver profile that still uses `tokenEnv`, but
 the stricter surface matches the first-release security model and avoids carrying unsupported
 credential modes.
+
+## PR-30: Infisical metadata and bootstrap docs final alignment
+
+### 1. Intent
+
+Close the final plan-assessment gaps by making the public Infisical deployment metadata contract
+and bootstrap resolver examples match the reviewed first-release surface. Deployment authors should
+only be able to select the backend-qualified Infisical credential source, and every documented
+Infisical SprinkleRef resolver example should be valid under Universal Auth-only profile
+validation.
+
+### 2. Scope of changes
+
+- Reject public `infisical_runtime.preferred_credential_source =
+"machine_identity_universal_auth"` on Infisical-backed deployments.
+- Continue normalizing the reviewed public value
+  `infisical_machine_identity_universal_auth` to the existing internal
+  `machine_identity_universal_auth` runtime enum.
+- Preserve any internal runtime code that expects `machine_identity_universal_auth`; this PR only
+  tightens the operator-visible metadata contract.
+- Update tests and checked-in deployment fixtures/docs that currently use the unqualified public
+  value.
+- Update root bootstrap resolver examples so every Infisical resolver profile includes
+  `clientIdEnv` and `clientSecretEnv`.
+- Extend docs guard coverage so stale Infisical resolver examples in `infisical-bootstrap.md` and
+  `docs/infisical-design.md` fail when they omit required Universal Auth fields.
+
+### 3. External prerequisites
+
+- None. This is a metadata validation/docs/test cleanup and should not require live Infisical,
+  Vault, OpenTofu, or resolver backend access.
+
+### 4. Tests to be added
+
+- Add deployment metadata validation tests proving the backend-qualified
+  `infisical_machine_identity_universal_auth` source is accepted and the unqualified
+  `machine_identity_universal_auth` source is rejected with clear remediation.
+- Update cquery or checked-in metadata tests to use the backend-qualified public source.
+- Add or extend docs guard tests proving documented Infisical resolver examples include Universal
+  Auth `clientIdEnv` and `clientSecretEnv` fields and do not show raw-token or incomplete
+  Infisical profiles.
+
+### 5. Docs to be added or updated
+
+- Update `docs/infisical-design.md`, `docs/deployments-schema.md`, `docs/secrets-usage.md`, and any
+  other metadata authoring docs that still show the unqualified credential source.
+- Update `infisical-bootstrap.md` resolver examples so they validate against the PR-29
+  Universal Auth-only profile contract.
+- Update this plan only if implementation discovers another public metadata spelling that must be
+  resolved at the same boundary.
+
+### 5.5. Expected regression scope
+
+- `deployment-only`
+- Keep changes limited to deployment secret metadata parsing/validation, deployment metadata tests,
+  docs guard tests, and docs. Do not change deployment runtime secret acquisition, provider
+  publish/provision behavior, resolver backend semantics, repo bootstrap materialization, or
+  Infisical/Vault API behavior.
+
+### 6. Acceptance criteria
+
+- Public deployment metadata accepts only
+  `infisical_runtime.preferred_credential_source =
+"infisical_machine_identity_universal_auth"` for Infisical-backed deployments.
+- The unqualified `machine_identity_universal_auth` value fails validation before runtime with
+  remediation naming the backend-qualified value.
+- Internal runtime behavior still receives the existing `machine_identity_universal_auth` enum after
+  public metadata normalization.
+- Root bootstrap and design docs contain no invalid Infisical resolver profile examples missing
+  `clientIdEnv` or `clientSecretEnv`.
+- Focused tests and the repository validation suite pass.
+
+### 7. Risks
+
+- Any local fixture or operator metadata still using the unqualified source will fail validation.
+- Docs guard parsing can become brittle if it tries to be a general Markdown JSON parser.
+
+### 8. Mitigations
+
+- Keep the validation error explicit and name the exact backend-qualified replacement.
+- Keep docs guard checks focused on the known Infisical resolver examples and required field names.
+- Preserve the internal normalized enum so runtime code does not need a broad refactor.
+
+### 9. Consequences of not implementing this PR
+
+The repo would continue to accept a credential-source spelling that the plan intended to reserve
+away from the public Infisical metadata contract, and bootstrap docs would keep showing resolver
+examples that fail the current Universal Auth-only validation.
+
+### 10. Downsides for implementing this PR
+
+This removes a lenient public metadata spelling, so any uncommitted local deployment metadata using
+it must be updated to the backend-qualified value.
