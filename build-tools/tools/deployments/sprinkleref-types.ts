@@ -15,11 +15,14 @@ export type SprinkleRefBackendConfig = {
   service?: string;
   host?: string;
   projectId?: string;
+  projectName?: string;
   projectRef?: string;
   defaultEnvironment?: string;
   defaultPath?: string;
   clientIdEnv?: string;
   clientSecretEnv?: string;
+  clientIdRef?: string;
+  clientSecretRef?: string;
   tokenEnv?: string;
   projectIdEnv?: string;
   address?: string;

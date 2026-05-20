@@ -66,6 +66,7 @@ def cloudflare_pages_static_webapp_deployment(
         publisher_config = "wrangler.jsonc",
         protection_class = "shared_nonprod",
         lane_policy = None,
+        deployment_family = "",
         environment_stage = "",
         admission_policy = None,
         prerequisites = [],
@@ -93,6 +94,7 @@ def cloudflare_pages_static_webapp_deployment(
         publisher_config = publisher_config,
         protection_class = protection_class,
         lane_policy = lane_policy,
+        deployment_family = deployment_family,
         environment_stage = environment_stage,
         admission_policy = admission_policy,
         components = [{
@@ -149,6 +151,7 @@ def cloudflare_containers_deployment(
         publisher_config = "wrangler.jsonc",
         protection_class = "shared_nonprod",
         lane_policy = None,
+        deployment_family = "",
         environment_stage = "",
         admission_policy = None,
         prerequisites = [],
@@ -176,6 +179,7 @@ def cloudflare_containers_deployment(
         publisher_config = publisher_config,
         protection_class = protection_class,
         lane_policy = lane_policy,
+        deployment_family = deployment_family,
         environment_stage = environment_stage,
         admission_policy = admission_policy,
         components = [{

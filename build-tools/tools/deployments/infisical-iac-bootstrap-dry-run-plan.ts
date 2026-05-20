@@ -6,6 +6,8 @@ import type { CredentialSinkSelection } from "./infisical-iac-bootstrap-sink";
 import { readSprinkleRefConfig } from "./sprinkleref-config";
 import type { SprinkleRefBackendConfig } from "./sprinkleref-types";
 
+const STARTER_PROFILES = ["vault-default", "infisical-default"];
+
 export async function buildRepoDryRunMaterializationPlan(opts: {
   sink: CredentialSinkSelection;
   graphPath?: string;
@@ -13,9 +15,8 @@ export async function buildRepoDryRunMaterializationPlan(opts: {
 }) {
   const configPath = opts.configPath || resolverConfigPath();
   const configExists = await exists(configPath);
-  const profiles = [
-    ...(await requiredBackendProfiles(opts.graphPath || DEFAULT_GRAPH_PATH)),
-  ].sort();
+  const requiredProfiles = await requiredBackendProfiles(opts.graphPath || DEFAULT_GRAPH_PATH);
+  const profiles = [...(requiredProfiles.size > 0 ? requiredProfiles : STARTER_PROFILES)].sort();
   const profilePlans = configExists
     ? await existingProfilePlans(configPath, profiles)
     : profiles.map((profile) => missingConfigProfilePlan(profile));

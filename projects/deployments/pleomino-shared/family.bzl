@@ -13,6 +13,7 @@ _INFISICAL_ENVIRONMENT_SLUGS = {
 }
 _INFISICAL_SECRET_PATH = "/"
 _INFISICAL_CLOUDFLARE_SECRET_NAME = "cloudflare_api_token"
+_INFISICAL_CLOUDFLARE_SECRET_REF = "secret://deployments/pleomino/cloudflare_api_token"
 _INFISICAL_MACHINE_IDENTITY_IDS = {
     "staging": "identity_pleomino_staging_deploy",
     "prod": "identity_pleomino_prod_deploy",
@@ -63,6 +64,7 @@ def _vault_runtime():
 
 def _family_defaults():
     return deployment_family_defaults(
+        deployment_family = "pleomino",
         component = "//projects/apps/pleomino:app",
         lane_policy = "//projects/deployments/pleomino-shared:lane",
     )
@@ -71,7 +73,7 @@ def _cloudflare_secret(step):
     return {
         "name": _INFISICAL_CLOUDFLARE_SECRET_NAME,
         "step": step,
-        "contract_id": "secret://deployments/pleomino/%s" % _INFISICAL_CLOUDFLARE_SECRET_NAME,
+        "contract_id": _INFISICAL_CLOUDFLARE_SECRET_REF,
         "required": "true",
     }
 

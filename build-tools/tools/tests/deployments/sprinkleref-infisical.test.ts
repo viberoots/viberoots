@@ -9,6 +9,8 @@ import { runSprinkleRefCli } from "../../deployments/sprinkleref-cli";
 import { startFakeInfisicalServer } from "./infisical.test-server";
 import { writeSprinkleRefConfig } from "./sprinkleref-test-helpers";
 
+const ref = "secret://deployments/pleomino/prod/cloudflare-api-token";
+
 test("sprinkleref writes ordinary secrets to Infisical main backend through resolver", async () => {
   const server = await startFakeInfisicalServer({
     clientId: "client-id",
@@ -34,7 +36,6 @@ test("sprinkleref writes ordinary secrets to Infisical main backend through reso
         },
       },
     };
-    const ref = "secret://deployments/pleomino/prod/cloudflare-api-token";
     const configPath = await writeSprinkleRefConfig(config);
     await runSprinkleRefCli({
       argv: ["--config", configPath, "--add", ref, "--value-env", "TOKEN"],
@@ -57,6 +58,49 @@ test("sprinkleref writes ordinary secrets to Infisical main backend through reso
       stdout: () => undefined,
     });
     assert.equal(server.secrets.length, 0);
+  } finally {
+    await server.close();
+  }
+});
+
+test("sprinkleref reads Infisical Universal Auth credentials from bootstrap refs", async () => {
+  const server = await startFakeInfisicalServer({
+    clientId: "client-id",
+    clientSecret: "client-secret",
+    accessToken: "access-token",
+  });
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), "sprinkleref-infisical-refs-"));
+  try {
+    const bootstrapFile = path.join(dir, "bootstrap.json");
+    await fs.writeFile(
+      bootstrapFile,
+      JSON.stringify({
+        "secret://bootstrap/client-id": "client-id",
+        "secret://bootstrap/client-secret": "client-secret",
+      }),
+    );
+    const configPath = await writeSprinkleRefConfig({
+      defaultCategory: "main",
+      categories: {
+        bootstrap: { backend: "local-file", file: bootstrapFile },
+        main: {
+          backend: "infisical",
+          host: server.siteUrl,
+          projectId: "proj_123",
+          defaultEnvironment: "prod",
+          defaultPath: "/",
+          clientIdRef: "secret://bootstrap/client-id",
+          clientSecretRef: "secret://bootstrap/client-secret",
+        },
+      },
+    });
+    await runSprinkleRefCli({
+      argv: ["--config", configPath, "--add", ref, "--value-env", "TOKEN"],
+      env: { TOKEN: "one", SPRINKLEREF_CONFIG: configPath },
+      fetchImpl: fetch,
+      stdout: () => undefined,
+    });
+    assert.equal(server.secrets[0]?.secretValue, "one");
   } finally {
     await server.close();
   }

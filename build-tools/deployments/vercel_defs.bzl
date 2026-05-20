@@ -15,6 +15,7 @@ def vercel_next_webapp_deployment(
         provisioner_config = "",
         protection_class = "shared_nonprod",
         lane_policy = None,
+        deployment_family = "",
         environment_stage = "",
         admission_policy = None,
         prerequisites = [],
@@ -50,6 +51,7 @@ def vercel_next_webapp_deployment(
         provisioner_config = provisioner_config,
         protection_class = protection_class,
         lane_policy = lane_policy,
+        deployment_family = deployment_family,
         environment_stage = environment_stage,
         admission_policy = admission_policy,
         components = [{

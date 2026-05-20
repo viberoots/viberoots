@@ -1,7 +1,11 @@
 # Deployment Family Composition
 
 Deployment families use Buck/Starlark composition as the repo-native replacement
-for base/overlay deployment packages.
+for base/overlay deployment packages. A target under the canonical
+`projects/deployments/<family>/...` layout receives `<family>` as its effective
+`deployment_family` when the field is omitted. An explicit `deployment_family`
+always wins, and flat legacy packages such as `projects/deployments/example-prod`
+do not infer a family from their package name.
 
 Keep common facts in a shared family package, usually
 `projects/deployments/<family>-shared/`:

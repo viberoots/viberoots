@@ -32,12 +32,9 @@ import {
 } from "./deployment-extract-metadata";
 import { readDeploymentRequirements } from "./deployment-requirements";
 import { pushCloudflareComponentKindErrors } from "./cloudflare-pages-capability-validation";
-import {
-  pushCloudflarePreviewErrors,
-  pushDuplicateCloudflareTargetIdentityErrors,
-} from "./cloudflare-pages-extract-helpers";
-const TARGET_TOKEN_RE = /^[a-z0-9](?:[a-z0-9-]{0,126}[a-z0-9])?$/;
-const [SHARED_NONPROD, PRODUCTION_FACING] = ["shared_nonprod", "production_facing"];
+import * as cloudflarePagesExtract from "./cloudflare-pages-extract-helpers";
+const TARGET_TOKEN_RE = /^[a-z0-9](?:[a-z0-9-]{0,126}[a-z0-9])?$/,
+  [SHARED_NONPROD, PRODUCTION_FACING] = ["shared_nonprod", "production_facing"];
 export function extractCloudflarePagesDeploymentsFromContext(
   context: DeploymentExtractionContext,
 ): CloudflarePagesDeployment[] {
@@ -164,7 +161,7 @@ export function extractCloudflarePagesDeploymentsFromContext(
         ),
       );
     }
-    pushCloudflarePreviewErrors(label, preview, deploymentErrors);
+    cloudflarePagesExtract.pushCloudflarePreviewErrors(label, preview, deploymentErrors);
     pushSmokePolicyErrors({
       label,
       protectionClass,
@@ -213,6 +210,7 @@ export function extractCloudflarePagesDeploymentsFromContext(
       protectionClass,
       lanePolicyRef,
       lanePolicy: lanePolicy!,
+      deploymentFamily: readString(node, "deployment_family") || undefined,
       environmentStage,
       admissionPolicyRef,
       admissionPolicy: admissionPolicy!,
@@ -245,6 +243,6 @@ export function extractCloudflarePagesDeploymentsFromContext(
       }),
     });
   }
-  pushDuplicateCloudflareTargetIdentityErrors(context.errors, deployments);
+  cloudflarePagesExtract.pushDuplicateCloudflareTargetIdentityErrors(context.errors, deployments);
   return deployments.sort((a, b) => a.label.localeCompare(b.label));
 }

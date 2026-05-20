@@ -2934,3 +2934,104 @@ examples that fail the current Universal Auth-only validation.
 
 This removes a lenient public metadata spelling, so any uncommitted local deployment metadata using
 it must be updated to the backend-qualified value.
+
+## PR-31: Deployment family directory inference
+
+### 1. Intent
+
+Make deployment family metadata harder to mismatch by deriving `deployment_family` from canonical
+family-oriented deployment paths when the field is not explicitly supplied. Explicit
+`deployment_family` values should remain supported as true overrides for non-canonical layouts,
+shared infrastructure directories, and future migrations.
+
+### 2. Scope of changes
+
+- Add deployment-family inference for targets under canonical family directories such as
+  `projects/deployments/<family>/...`.
+- Preserve explicit `deployment_family` as the highest-precedence value. If an explicit family is
+  present, use it even when it differs from the inferred directory name.
+- Keep flat legacy deployment packages such as `projects/deployments/pleomino-prod` working with no
+  inferred family unless they explicitly pass `deployment_family`.
+- Keep `environment_stage` explicit. Do not infer stages from target names or directories in this
+  PR.
+- Keep stable deployment IDs separate from family inference. This PR must not rename deployment
+  IDs, generated records, prerequisite IDs, or published target labels.
+- Update SprinkleRef check/report enrichment to consume the effective family value, whether it came
+  from explicit metadata or directory inference.
+- Document the precedence rule: explicit `deployment_family` wins, otherwise canonical family path
+  inference applies, otherwise the family remains unset.
+
+### 3. External prerequisites
+
+- None. This is a metadata inference, reporting, and documentation change and should not require
+  live Infisical, Vault, OpenTofu, or provider access.
+
+### 4. Tests to be added
+
+- Add metadata/cquery tests proving a target under `projects/deployments/<family>/...` receives the
+  inferred family when `deployment_family` is omitted.
+- Add tests proving an explicit `deployment_family` overrides the inferred directory family without
+  error.
+- Add tests proving flat legacy packages do not accidentally infer a family from names such as
+  `pleomino-prod`.
+- Add SprinkleRef report tests proving missing values show the effective family for both explicit
+  and inferred family metadata.
+- Add docs or schema guard coverage for the explicit-overrides-inferred precedence rule if a
+  suitable deployment metadata docs test exists.
+
+### 5. Docs to be added or updated
+
+- Update `docs/infisical-design.md` and any deployment metadata authoring docs that describe
+  `deployment_family` so they document family directory inference and explicit override
+  precedence.
+- Update this plan's Infisical/SprinkleRef sections only if implementation finds additional
+  family-path constraints needed to keep repo scans deterministic.
+
+### 5.5. Expected regression scope
+
+- `deployment-only`
+- Keep changes limited to deployment metadata inference/export, focused metadata tests,
+  SprinkleRef family-aware reporting, and docs. Do not change provider provisioning, deployment
+  IDs, prerequisite semantics, Infisical/Vault resolver behavior, or bootstrap credential
+  materialization.
+
+### 6. Acceptance criteria
+
+- Targets under canonical family directories receive an effective deployment family without
+  requiring duplicate explicit metadata.
+- Explicit `deployment_family` remains a valid override and does not fail merely because it differs
+  from the directory name.
+- Flat legacy deployment packages keep their current behavior unless they explicitly set
+  `deployment_family`.
+- `environment_stage` remains explicit and unaffected by family inference.
+- SprinkleRef missing-value output shows the effective family when known.
+- Focused tests and the repository validation suite pass.
+
+### 7. Risks
+
+- Path inference can accidentally classify helper packages as deployment families if the canonical
+  directory rule is too broad.
+- Future directory moves could change inferred family values if deployment authors rely on implicit
+  family inference without noticing.
+- Existing tests may assume family metadata is always explicit.
+
+### 8. Mitigations
+
+- Limit inference to actual deployment targets under `projects/deployments/<family>/...`, not helper
+  files or arbitrary nested source paths.
+- Keep explicit `deployment_family` as the escape hatch and document it as the way to represent
+  non-canonical layouts.
+- Add negative tests for flat legacy packages and explicit override cases.
+
+### 9. Consequences of not implementing this PR
+
+Family membership remains duplicated metadata for canonical family layouts, so future deployment
+families can drift between target path and `deployment_family` value. SprinkleRef and bootstrap
+reporting will keep depending on manual family metadata even when the directory structure already
+expresses the family.
+
+### 10. Downsides for implementing this PR
+
+Deployment metadata extraction becomes slightly more path-aware, and authors must understand that
+moving a target under a canonical family directory can affect its effective family unless they set
+an explicit override.

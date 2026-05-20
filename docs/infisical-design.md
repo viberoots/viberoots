@@ -159,6 +159,19 @@ one deployment secret backend per admitted context.
 
 ## Deployment Metadata
 
+### Deployment Family
+
+`deployment_family` is an effective metadata value. Explicit metadata wins, so
+authors may set `deployment_family` for legacy packages, shared infrastructure,
+or temporary migrations even when the target path would suggest another family.
+When the field is omitted, targets under canonical
+`projects/deployments/<family>/...` directories infer `<family>`. Flat legacy
+packages such as `projects/deployments/pleomino-prod` do not infer a family from
+their package name.
+
+`environment_stage` remains explicit. Deployment IDs, labels, prerequisites, and
+secret contract IDs stay stable when a family is inferred.
+
 ### Backend Selection
 
 Add an optional `secret_backend` metadata selector:

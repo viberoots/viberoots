@@ -113,6 +113,7 @@ export async function runSprinkleRefCli(deps: SprinkleRefCliDeps) {
     env: deps.env,
     platform: deps.platform,
     fetchImpl: deps.fetchImpl,
+    resolverConfig: config,
   });
   if (readFlagBoolFromTokens("dry-run", deps.argv))
     return out(

@@ -93,6 +93,7 @@ test("repo bootstrap validates macOS Keychain sink through fake security runner"
     "viberoots-bootstrap",
     "-a",
   ]);
+  assert.equal(calls[0]?.args[4], "viberoots-bootstrap-keychain-validation");
 });
 
 test("repo bootstrap reports Keychain remediation when service is unusable", async () => {

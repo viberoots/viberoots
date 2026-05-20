@@ -62,6 +62,19 @@ export async function ensureUniversalAuth(
   await api.request("POST", endpoint, universalAuthBody(args));
 }
 
+export async function ensureProjectIdentityMembership(
+  api: InfisicalApi,
+  projectId: string,
+  identity: Identity,
+  role = "admin",
+) {
+  const endpoint = `/api/v1/projects/${encodeURIComponent(projectId)}/memberships/identities/${encodeURIComponent(identity.id)}`;
+  const existing = await api.request<unknown>("GET", endpoint, undefined, true);
+  if (existing) return { changed: false };
+  await api.request("POST", endpoint, { role, roles: [{ role, isTemporary: false }] });
+  return { changed: true };
+}
+
 export async function readClientId(api: InfisicalApi, identity: Identity) {
   const auth = await api.request<{ identityUniversalAuth?: { clientId?: string } }>(
     "GET",

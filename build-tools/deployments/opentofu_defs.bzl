@@ -6,6 +6,7 @@ def opentofu_foundation_deployment(
         provisioner_config,
         provider_target,
         lane_policy = None,
+        deployment_family = "",
         environment_stage = "",
         admission_policy = None,
         protection_class = "shared_nonprod",
@@ -36,6 +37,7 @@ def opentofu_foundation_deployment(
         provisioner_config = provisioner_config,
         protection_class = protection_class,
         lane_policy = lane_policy,
+        deployment_family = deployment_family,
         environment_stage = environment_stage,
         admission_policy = admission_policy,
         components = [{

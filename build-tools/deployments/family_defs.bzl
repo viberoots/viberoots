@@ -1,5 +1,6 @@
 _FAMILY_DEFAULT_FIELDS = [
     "component",
+    "deployment_family",
     "lane_policy",
 ]
 
@@ -62,6 +63,7 @@ def _validate_provider_target_args(provider_target, composed):
 def deployment_family_defaults(
         component,
         lane_policy,
+        deployment_family = "",
         vault_runtime = {},
         external_requirement_profiles = [],
         runtime_config_requirements = [],
@@ -70,6 +72,7 @@ def deployment_family_defaults(
     _forbid_keys(kwargs, _STAGE_DELTA_FIELDS, "deployment_family_defaults", "stage deltas")
     defaults = {
         "component": component,
+        "deployment_family": deployment_family,
         "lane_policy": lane_policy,
         "vault_runtime": vault_runtime,
         "external_requirement_profiles": external_requirement_profiles,

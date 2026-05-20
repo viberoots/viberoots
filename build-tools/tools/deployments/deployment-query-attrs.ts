@@ -13,6 +13,7 @@ export const DEPLOYMENT_CQUERY_ATTRS = [
   "provisioner_config",
   "protection_class",
   "lane_policy",
+  "deployment_family",
   "environment_stage",
   "admission_policy",
   "rollout_policy",

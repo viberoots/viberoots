@@ -36,6 +36,7 @@ export async function ensureRepoResolverConfig(opts: {
   }
   const config = await readSprinkleRefConfig(configPath);
   const requiredProfiles = await requiredBackendProfiles(opts.graphPath || DEFAULT_GRAPH_PATH);
+  for (const profile of categoryProfiles(config)) requiredProfiles.add(profile);
   validateRepoResolverConfig(config, requiredProfiles);
   return {
     configPath,
@@ -46,11 +47,12 @@ export async function ensureRepoResolverConfig(opts: {
 }
 
 export async function requiredBackendProfiles(graphPath = DEFAULT_GRAPH_PATH) {
-  const profiles = new Set(["vault-default", "infisical-default"]);
+  const profiles = new Set<string>();
   const nodes = await readGraph(graphPath).catch(() => []);
   for (const node of nodes) {
     const secretBackend = stringAttr(node, "secret_backend");
     const secretBackendProfile = stringAttr(node, "secret_backend_profile");
+    if (!secretBackend && !secretBackendProfile) continue;
     const errors = deploymentSecretBackendSelectorErrors({ secretBackend, secretBackendProfile });
     if (errors.length > 0) {
       const label = stringAttr(node, "name") || "<unknown deployment>";
@@ -96,6 +98,12 @@ function bootstrapCredentialProfiles(config: SprinkleRefConfig, requiredProfiles
   return [...requiredProfiles]
     .filter((profile) => config.profiles[profile]?.backend === "infisical")
     .sort();
+}
+
+function categoryProfiles(config: SprinkleRefConfig) {
+  return Object.values(config.categories)
+    .map((category) => ("profile" in category ? category.profile.trim() : ""))
+    .filter(Boolean);
 }
 
 async function fileExists(file: string) {

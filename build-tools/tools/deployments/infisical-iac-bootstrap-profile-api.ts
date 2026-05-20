@@ -3,6 +3,7 @@ import type { InfisicalApi } from "./infisical-iac-bootstrap-api";
 export type InfisicalRepoProject = {
   id: string;
   name: string;
+  orgId?: string;
 };
 
 export const REPO_INFISICAL_PROJECT_NAME = "viberoots-deployments";
@@ -23,8 +24,7 @@ export async function validateInfisicalRepoProject(
   organizationId: string,
   projectId: string,
 ) {
-  const endpoint = `/api/v1/workspace?organizationId=${encodeURIComponent(organizationId)}`;
-  const result = await api.request<ProjectListResponse>("GET", endpoint);
+  const result = await api.request<ProjectListResponse>("GET", projectListEndpoint());
   const project = projectsFromResponse(result).find((candidate) => candidate.id === projectId);
   if (!project) {
     throw new Error(
@@ -39,9 +39,11 @@ export async function findInfisicalRepoProject(
   organizationId: string,
   projectName = REPO_INFISICAL_PROJECT_NAME,
 ) {
-  const endpoint = `/api/v1/workspace?organizationId=${encodeURIComponent(organizationId)}`;
-  const result = await api.request<ProjectListResponse>("GET", endpoint);
-  return projectsFromResponse(result).find((project) => project.name === projectName);
+  const result = await api.request<ProjectListResponse>("GET", projectListEndpoint());
+  return projectsFromResponse(result).find(
+    (project) =>
+      project.name === projectName && projectMatchesOrganization(project, organizationId),
+  );
 }
 
 async function createInfisicalRepoProject(
@@ -49,10 +51,10 @@ async function createInfisicalRepoProject(
   organizationId: string,
   projectName: string,
 ) {
-  const result = await api.request<ProjectCreateResponse>("POST", "/api/v1/workspace", {
+  const result = await api.request<ProjectCreateResponse>("POST", "/api/v1/projects", {
     projectName,
-    name: projectName,
-    organizationId,
+    type: "secret-manager",
+    shouldCreateDefaultEnvs: true,
   });
   const project = projectFromUnknown(result?.workspace || result?.project);
   if (!project) throw new Error("Infisical project create response did not include a project id");
@@ -80,9 +82,18 @@ function projectFromUnknown(value: unknown) {
   const record = value as Record<string, unknown>;
   const id = stringValue(record.id) || stringValue(record.projectId);
   const name = stringValue(record.name) || stringValue(record.projectName);
-  return id && name ? { id, name } : undefined;
+  const orgId = stringValue(record.orgId) || stringValue(record.organizationId);
+  return id && name ? { id, name, orgId } : undefined;
 }
 
 function stringValue(value: unknown) {
   return typeof value === "string" && value.trim() ? value.trim() : undefined;
+}
+
+function projectListEndpoint() {
+  return "/api/v1/projects?type=secret-manager";
+}
+
+function projectMatchesOrganization(project: InfisicalRepoProject, organizationId: string) {
+  return !project.orgId || project.orgId === organizationId;
 }

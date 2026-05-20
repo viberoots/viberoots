@@ -17,6 +17,7 @@ import {
   ensureIdentity,
   ensureUniversalAuth,
 } from "./infisical-iac-bootstrap-identity";
+import { ensureRepoBootstrapCredential } from "./infisical-iac-bootstrap-repo-credential";
 import { buildCredentialHandoffReport } from "./infisical-iac-bootstrap-handoff";
 import { buildDryRunGuidance, buildDryRunReport } from "./infisical-iac-bootstrap-dry-run";
 import { resolveOrganizationId } from "./infisical-iac-bootstrap-org";
@@ -29,7 +30,7 @@ import { errorMessage } from "./infisical-iac-bootstrap-redaction";
 import { ensureRepoResolverConfig } from "./infisical-iac-bootstrap-resolver";
 import { materializeRepoBackendProfiles } from "./infisical-iac-bootstrap-profiles";
 import { materializeBootstrapCredentialSink } from "./infisical-iac-bootstrap-sink-materialize";
-import type { BootstrapArgs } from "./infisical-iac-bootstrap-types";
+import type { BootstrapArgs, Identity } from "./infisical-iac-bootstrap-types";
 import { readSprinkleRefConfig } from "./sprinkleref-config";
 
 const PLEOMINO_DEPLOYMENT_BOOTSTRAP_TARGETS = new Set([
@@ -115,7 +116,10 @@ async function runRepoBootstrap(args: BootstrapArgs) {
   await confirmBootstrapPreflight(args);
   const resolver = await ensureRepoResolverConfig({ dryRun: false });
   const sink = await resolveCredentialSinkSelection(args, { createMissingResolverConfig: true });
-  const materialization = await materializeRepoProfiles(args, resolver);
+  const credential = (await hasRequiredInfisicalProfile(resolver))
+    ? await ensureRepoBootstrapCredential(args)
+    : undefined;
+  const materialization = await materializeRepoProfiles(args, resolver, credential);
   const credentialSinkMaterialization = await materializeBootstrapCredentialSink({
     args,
     selection: sink,
@@ -150,6 +154,7 @@ async function runRepoBootstrap(args: BootstrapArgs) {
 async function materializeRepoProfiles(
   args: BootstrapArgs,
   resolver: Awaited<ReturnType<typeof ensureRepoResolverConfig>>,
+  credential?: { api: InfisicalApi; organizationId: string; identity: Identity },
 ) {
   if (!(await hasRequiredInfisicalProfile(resolver))) {
     return await materializeRepoBackendProfiles({
@@ -158,14 +163,12 @@ async function materializeRepoProfiles(
       requiredProfiles: resolver.profiles,
     });
   }
-  const access = await getAccessToken(args);
-  const api = new InfisicalApi({ apiUrl: args.apiUrl, token: access.token });
-  const organizationId = await resolveOrganizationId(api, args);
-  if (access.cleanupMessage) console.error(access.cleanupMessage);
+  if (!credential) throw new Error("Infisical bootstrap credential was not prepared");
   return await materializeRepoBackendProfiles({
     args,
-    api,
-    organizationId,
+    api: credential.api,
+    organizationId: credential.organizationId,
+    identity: credential.identity,
     configPath: resolver.configPath,
     requiredProfiles: resolver.profiles,
   });

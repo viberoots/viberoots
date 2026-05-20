@@ -9,7 +9,14 @@ import { deploymentBuckEnv, deploymentIsolationArgs } from "./deployment-query-h
 import { readDeploymentRequirements } from "./deployment-requirements";
 import type { SprinkleRefDepsMode, SprinkleRefScope } from "./sprinkleref-check-types";
 
-const ATTRS = ["name", "component", "secret_requirements", "runtime_config_requirements"];
+const ATTRS = [
+  "name",
+  "component",
+  "deployment_family",
+  "environment_stage",
+  "secret_requirements",
+  "runtime_config_requirements",
+];
 
 export type TargetRef = {
   ref: string;
@@ -17,6 +24,8 @@ export type TargetRef = {
   requiredBy: string;
   scope: SprinkleRefScope;
   locations: string[];
+  backendEnvironment?: string;
+  deploymentFamily?: string;
 };
 
 export async function collectTargetRefs(opts: {
@@ -35,6 +44,33 @@ export async function collectTargetRefs(opts: {
   if (refs.length === 0) {
     throw new Error(`target ${target} did not expose structured SprinkleRef requirement metadata`);
   }
+  return refs.sort(
+    (a, b) => a.ref.localeCompare(b.ref) || a.requiredBy.localeCompare(b.requiredBy),
+  );
+}
+
+export async function collectAllDeploymentRefs(
+  opts: {
+    cwd?: string;
+    env?: NodeJS.ProcessEnv;
+  } = {},
+): Promise<TargetRef[]> {
+  const cwd = opts.cwd || process.cwd();
+  const buckEnv = deploymentBuckEnv(cwd, opts.env);
+  const attrFlags = ATTRS.flatMap((attr) => ["--output-attribute", attr]);
+  const result = await $({
+    cwd,
+    stdio: "pipe",
+    env: buckEnv,
+  })`buck2 ${deploymentIsolationArgs(buckEnv)} cquery --target-platforms prelude//platforms:default 'kind("deployment_target", //projects/deployments/...)' --json ${attrFlags}`.quiet();
+  const nodes = nodesFromCqueryJson(
+    JSON.parse(String(result.stdout || "{}")) as Record<string, unknown>,
+  );
+  const refs = await Promise.all(
+    nodes
+      .flatMap((node) => refsFromNode(node, new Set()))
+      .map((entry) => locateTargetRef(cwd, entry)),
+  );
   return refs.sort(
     (a, b) => a.ref.localeCompare(b.ref) || a.requiredBy.localeCompare(b.requiredBy),
   );
@@ -102,6 +138,10 @@ function isAppTarget(target: string): boolean {
 function refsFromNode(node: GraphNode, direct: Set<string>): TargetRef[] {
   const label = normalizeTargetLabel(String(node.name || ""));
   const scope: SprinkleRefScope = direct.has(label) ? "direct" : "dependency";
+  const common = {
+    backendEnvironment: readString(node, "environment_stage"),
+    deploymentFamily: readString(node, "deployment_family"),
+  };
   return [
     ...readDeploymentRequirements(node, "secret_requirements").map((requirement) => ({
       ref: requirement.contractId,
@@ -109,6 +149,7 @@ function refsFromNode(node: GraphNode, direct: Set<string>): TargetRef[] {
       requiredBy: label,
       scope,
       locations: [],
+      ...common,
     })),
     ...readDeploymentRequirements(node, "runtime_config_requirements").map((requirement) => ({
       ref: requirement.contractId,
@@ -116,8 +157,14 @@ function refsFromNode(node: GraphNode, direct: Set<string>): TargetRef[] {
       requiredBy: label,
       scope,
       locations: [],
+      ...common,
     })),
   ].filter((entry) => /^(secret|config|runtime):\/\//.test(entry.ref));
+}
+
+function readString(node: GraphNode, key: string): string | undefined {
+  const value = node[key];
+  return typeof value === "string" && value.trim() ? value.trim() : undefined;
 }
 
 async function locateTargetRef(cwd: string, entry: TargetRef): Promise<TargetRef> {

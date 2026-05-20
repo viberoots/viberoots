@@ -5,7 +5,7 @@ import { test } from "node:test";
 import { parseBootstrapArgs, usage } from "../../deployments/infisical-iac-bootstrap-args";
 import { DEFAULT_BOOTSTRAP_ARGS } from "../../deployments/infisical-iac-bootstrap-config";
 import { runInfisicalBootstrapMain } from "../../deployments/infisical-iac-bootstrap";
-import { getAccessToken } from "../../deployments/infisical-iac-bootstrap-auth";
+import { getAccessToken, spawnCommandRunner } from "../../deployments/infisical-iac-bootstrap-auth";
 import {
   orgIdByExactName,
   organizationListReason,
@@ -174,14 +174,23 @@ test("organization selection fails non-interactively with org names and remediat
 
 test("CLI login uses isolated HOME and removes local state after token extraction", async () => {
   let observedHome = "";
-  const runner: CommandRunner = ({ args, env }) => {
+  let observedUpdateCheck = "";
+  const commands: string[] = [];
+  const captures: Array<boolean | undefined> = [];
+  const runner: CommandRunner = ({ args, env, capture }) => {
     observedHome = String(env?.HOME || "");
+    observedUpdateCheck = String(env?.INFISICAL_DISABLE_UPDATE_CHECK || "");
+    commands.push(args.join(" "));
+    captures.push(capture);
     if (args.includes("login")) return "";
     return "human-token\n";
   };
   const result = await getAccessToken({ ...DEFAULT_BOOTSTRAP_ARGS }, runner, {});
   assert.equal(result.token, "human-token");
   assert.match(observedHome, /infisical-iac-bootstrap-home-/);
+  assert.equal(observedUpdateCheck, "true");
+  assert.equal(commands[0], "vault set file --domain https://app.infisical.com/api --silent");
+  assert.equal(captures[0], true);
   await assert.rejects(() => fs.stat(observedHome), /ENOENT/);
 });
 
@@ -189,6 +198,19 @@ test("--no-login fails fast when the configured env var is missing", async () =>
   await assert.rejects(
     () => getAccessToken({ ...DEFAULT_BOOTSTRAP_ARGS, noLogin: true }, () => "", {}),
     /missing Infisical access token env var/,
+  );
+});
+
+test("missing Infisical CLI reports install and token alternatives", () => {
+  assert.throws(
+    () =>
+      spawnCommandRunner({
+        command: "infisical",
+        args: ["login"],
+        env: { PATH: "" },
+        capture: true,
+      }),
+    /Infisical CLI was not found[\s\S]*--infisical-bin[\s\S]*--no-login/,
   );
 });
 

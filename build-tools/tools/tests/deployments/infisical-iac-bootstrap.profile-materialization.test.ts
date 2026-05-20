@@ -18,20 +18,27 @@ test("repo profile materialization writes Infisical project id without secret va
     requiredProfiles: ["infisical-default", "vault-default"],
     api: api as never,
     organizationId: "org_1",
+    identity: { id: "id_1", name: "viberoots-iac-bootstrap" },
     env: vaultEnv(),
     fetchImpl: fakeVaultFetch as typeof fetch,
   });
   const written = await fs.readFile(configPath, "utf8");
   assert.deepEqual(result.materializedProfiles, ["infisical-default"]);
   assert.match(written, /"projectId": "proj_repo"/);
+  assert.match(
+    written,
+    /"clientIdRef": "secret:\/\/deployments\/pleomino\/bootstrap\/viberoots-iac-bootstrap\/client-id"/,
+  );
   assert.doesNotMatch(written, /"clientSecret"|secretValue|pleomino-project-id/);
   assert.deepEqual(api.calls, [
-    "GET /api/v1/workspace?organizationId=org_1",
-    "POST /api/v1/workspace",
+    "GET /api/v1/projects?type=secret-manager",
+    "POST /api/v1/projects",
+    "GET /api/v1/projects/proj_repo/memberships/identities/id_1",
+    "POST /api/v1/projects/proj_repo/memberships/identities/id_1",
   ]);
 });
 
-test("existing Infisical project profile is authoritative and validated without overwrite", async () => {
+test("existing Infisical project profile is validated and receives bootstrap credential refs", async () => {
   const dir = await tmp();
   const configPath = path.join(dir, "selected.local.json");
   const config = starterConfig();
@@ -41,7 +48,6 @@ test("existing Infisical project profile is authoritative and validated without 
     projectIdEnv: undefined,
   };
   await writeJson(configPath, config);
-  const before = await fs.readFile(configPath, "utf8");
   const api = fakeProjectApi([{ id: "proj_existing", name: "operator-owned" }]);
   const result = await materializeRepoBackendProfiles({
     args: DEFAULT_BOOTSTRAP_ARGS,
@@ -49,12 +55,17 @@ test("existing Infisical project profile is authoritative and validated without 
     requiredProfiles: ["infisical-default", "vault-default"],
     api: api as never,
     organizationId: "org_1",
+    identity: { id: "id_1", name: "viberoots-iac-bootstrap" },
     env: vaultEnv(),
     fetchImpl: fakeVaultFetch as typeof fetch,
   });
-  assert.deepEqual(result.materializedProfiles, []);
-  assert.equal(await fs.readFile(configPath, "utf8"), before);
-  assert.deepEqual(api.calls, ["GET /api/v1/workspace?organizationId=org_1"]);
+  assert.deepEqual(result.materializedProfiles, ["infisical-default"]);
+  assert.match(await fs.readFile(configPath, "utf8"), /"clientSecretRef"/);
+  assert.deepEqual(api.calls, [
+    "GET /api/v1/projects?type=secret-manager",
+    "GET /api/v1/projects/proj_existing/memberships/identities/id_1",
+    "POST /api/v1/projects/proj_existing/memberships/identities/id_1",
+  ]);
 });
 
 test("repo profile validation rejects placeholder Vault metadata", async () => {
@@ -141,10 +152,14 @@ async function writeJson(file: string, value: unknown) {
 function fakeProjectApi(projects: Array<{ id: string; name: string }> = []) {
   return {
     calls: [] as string[],
-    async request(method: string, endpoint: string) {
+    async request(method: string, endpoint: string, _body?: unknown, allow404?: boolean) {
       this.calls.push(`${method} ${endpoint}`);
+      if (endpoint.includes("/memberships/identities/")) {
+        if (method === "GET" && allow404) return undefined;
+        return { identityMembership: { id: "membership_1" } };
+      }
       if (method === "GET") return { workspaces: projects };
-      return { workspace: { id: "proj_repo", name: "viberoots-deployments" } };
+      return { project: { id: "proj_repo", name: "viberoots-deployments", orgId: "org_1" } };
     },
   };
 }

@@ -37,7 +37,16 @@ export function collectFileRefs(
   refs = new Map<string, ScannedRef>(),
 ): Map<string, ScannedRef> {
   const lines = text.split(/\r?\n/);
+  let ignoreNext = false;
   for (let index = 0; index < lines.length; index++) {
+    if (/sprinkleref:\s*ignore-next-line/.test(lines[index])) {
+      ignoreNext = true;
+      continue;
+    }
+    if (ignoreNext) {
+      ignoreNext = false;
+      continue;
+    }
     for (const match of lines[index].matchAll(REF_RE)) {
       const ref = match[0].replace(TRAILING, "");
       if (shouldIgnoreRef(ref)) continue;
@@ -52,6 +61,7 @@ export function collectFileRefs(
 
 function shouldSkip(file: string): boolean {
   if (file.endsWith(".md")) return true;
+  if (file.startsWith("build-tools/tools/")) return true;
   if (/\.(?:test|spec)\.[cm]?[jt]sx?$/.test(file)) return true;
   return file
     .split(/[\\/]/)

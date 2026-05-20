@@ -3,6 +3,7 @@ export type SprinkleRefScheme = "secret" | "config" | "runtime";
 export type SprinkleRefStatus =
   | "present"
   | "declared"
+  | "managed"
   | "missing"
   | "unmapped"
   | "invalid"
@@ -23,8 +24,12 @@ export type SprinkleRefCheckEntry = {
   scope: SprinkleRefScope;
   locations: string[];
   requiredBy: string[];
+  backendEnvironment?: string;
   category?: string;
   backend?: string;
+  deploymentFamily?: string;
+  managedBy?: string;
+  managedFamily?: string;
   source?: string;
   reason?: string;
 };

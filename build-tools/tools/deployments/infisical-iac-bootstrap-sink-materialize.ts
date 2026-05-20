@@ -7,7 +7,7 @@ import { readSprinkleRefConfig } from "./sprinkleref-config";
 import { resolveBootstrapAccessCredentialSinkBackend } from "./sprinkleref-bootstrap-guard";
 import { macosKeychainCommand, type KeychainRunner } from "./sprinkleref-keychain";
 
-const VALIDATION_ACCOUNT = "secret://viberoots/bootstrap/keychain-validation";
+const VALIDATION_ACCOUNT = "viberoots-bootstrap-keychain-validation";
 
 export async function materializeBootstrapCredentialSink(opts: {
   args: BootstrapArgs;

@@ -11,7 +11,7 @@ export const spawnCommandRunner: CommandRunner = (opts) => {
     encoding: "utf8",
     stdio: opts.capture ? ["inherit", "pipe", "pipe"] : "inherit",
   });
-  if (result.error) throw result.error;
+  if (result.error) throw commandSpawnError(opts.command, result.error);
   if (result.status !== 0) {
     const stderr = opts.capture && result.stderr ? `\n${result.stderr.trim()}` : "";
     throw new Error(
@@ -20,6 +20,19 @@ export const spawnCommandRunner: CommandRunner = (opts) => {
   }
   return result.stdout ?? "";
 };
+
+function commandSpawnError(command: string, error: Error) {
+  if ((error as NodeJS.ErrnoException).code !== "ENOENT") return error;
+  if (command === "infisical") {
+    return new Error(
+      [
+        "Infisical CLI was not found on PATH.",
+        "Install the Infisical CLI, pass --infisical-bin <path>, or use --no-login with --access-token-env plus --org-name or --organization-id.",
+      ].join("\n"),
+    );
+  }
+  return new Error(`required command was not found on PATH: ${command}`);
+}
 
 export function extractToken(stdout: string) {
   const token = stdout
@@ -48,6 +61,12 @@ export async function getAccessToken(
   try {
     runner({
       command: args.infisicalBin,
+      args: ["vault", "set", "file", "--domain", args.cliDomain, "--silent"],
+      env: cliEnv,
+      capture: true,
+    });
+    runner({
+      command: args.infisicalBin,
       args: ["login", "--domain", args.cliDomain],
       env: cliEnv,
     });
@@ -74,5 +93,6 @@ export function isolatedCliEnv(tempHome: string, cliDomain: string): NodeJS.Proc
     XDG_CONFIG_HOME: path.join(tempHome, ".config"),
     XDG_CACHE_HOME: path.join(tempHome, ".cache"),
     INFISICAL_API_URL: cliDomain,
+    INFISICAL_DISABLE_UPDATE_CHECK: "true",
   };
 }

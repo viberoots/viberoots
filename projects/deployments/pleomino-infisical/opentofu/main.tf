@@ -77,7 +77,8 @@ locals {
       object_name     = "${var.project_slug}/${environment}${var.secret_path}${var.cloudflare_secret_name}"
       expected_result = "shared Infisical secret ${var.cloudflare_secret_name} exists at ${var.secret_path} in ${environment}"
       provider_gap    = "infisical_secret can manage values with value_wo, but this cutover scaffold must not create placeholder application secret values"
-      reconcile_path  = "after the reviewed secret-management command lands, run sprinkleref add/update for secret://deployments/pleomino/cloudflare_api_token in ${environment}; if Infisical adds metadata-only placeholders, add/import that metadata-only object here without secret values"
+      # sprinkleref: ignore-next-line
+      reconcile_path = "after the reviewed secret-management command lands, run sprinkleref add/update for secret://deployments/pleomino/cloudflare_api_token in ${environment}; if Infisical adds metadata-only placeholders, add/import that metadata-only object here without secret values"
     }
   }
 }

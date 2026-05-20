@@ -1,29 +1,44 @@
 #!/usr/bin/env zx-wrapper
 import {
+  readSprinkleRefConfig,
+  resolveSprinkleRefBackend,
+  type SprinkleRefConfig,
+} from "./sprinkleref-config";
+import { assertBootstrapCategoryCanWrite } from "./sprinkleref-bootstrap-guard";
+import type { SprinkleRefBackendConfig, SprinkleRefStore } from "./sprinkleref-types";
+import { SprinkleRefLocalFileStore } from "./sprinkleref-local-file";
+import { SprinkleRefMacosKeychainStore } from "./sprinkleref-keychain";
+import {
   redactInfisicalCredentialJson,
   redactInfisicalCredentialText,
   resolveInfisicalAccessToken,
   type InfisicalCredentialConfig,
 } from "./deployment-secret-infisical-credentials";
-import type { SprinkleRefBackendConfig, SprinkleRefStore } from "./sprinkleref-types";
 
 export class SprinkleRefInfisicalStore implements SprinkleRefStore {
   private readonly config: SprinkleRefBackendConfig;
   private readonly env: NodeJS.ProcessEnv;
   private readonly fetchImpl: typeof fetch;
+  private readonly platform?: NodeJS.Platform;
+  private readonly resolverConfig?: SprinkleRefConfig;
 
   constructor(
     config: SprinkleRefBackendConfig,
     env: NodeJS.ProcessEnv = process.env,
     fetchImpl: typeof fetch = fetch,
+    platform?: NodeJS.Platform,
+    resolverConfig?: SprinkleRefConfig,
   ) {
     this.config = config;
     this.env = env;
     this.fetchImpl = fetchImpl;
+    this.platform = platform;
+    this.resolverConfig = resolverConfig;
   }
 
   describe() {
-    return `infisical project ${this.projectId()} environment ${this.config.defaultEnvironment}`;
+    const projectName = this.config.projectName ? ` (${this.config.projectName})` : "";
+    return `infisical project ${this.projectId()}${projectName} environment ${this.config.defaultEnvironment}`;
   }
 
   async has(ref: string) {
@@ -63,7 +78,7 @@ export class SprinkleRefInfisicalStore implements SprinkleRefStore {
   }
 
   private async request(method: string, ref: string, value: boolean, secretValue?: string) {
-    const token = await resolveInfisicalAccessToken(this.credential(), {
+    const token = await resolveInfisicalAccessToken(await this.credential(), {
       fetchImpl: this.fetchImpl,
     });
     const url = this.url(ref, value);
@@ -90,13 +105,33 @@ export class SprinkleRefInfisicalStore implements SprinkleRefStore {
     return url;
   }
 
-  private credential(): InfisicalCredentialConfig {
-    const clientId = String(this.env[this.config.clientIdEnv || ""] || "").trim();
-    const clientSecret = String(this.env[this.config.clientSecretEnv || ""] || "").trim();
+  private async credential(): Promise<InfisicalCredentialConfig> {
+    const clientId = await this.credentialValue(
+      "client id",
+      this.config.clientIdEnv,
+      this.config.clientIdRef,
+    );
+    const clientSecret = await this.credentialValue(
+      "client secret",
+      this.config.clientSecretEnv,
+      this.config.clientSecretRef,
+    );
     if (!clientId || !clientSecret) {
       throw new Error("missing Infisical Universal Auth environment variables");
     }
     return { kind: "universal_auth", siteUrl: this.config.host || "", clientId, clientSecret };
+  }
+
+  private async credentialValue(label: string, envName?: string, ref?: string) {
+    const envValue = String(this.env[envName || ""] || "").trim();
+    if (envValue || !ref) return envValue;
+    const config = this.resolverConfig || (await readSprinkleRefConfig());
+    const resolved = resolveSprinkleRefBackend(config, "bootstrap");
+    assertBootstrapCategoryCanWrite(resolved);
+    const store = bootstrapCredentialStore(resolved.backend, this.platform);
+    const value = await store.read(ref);
+    if (!value) throw new Error(`missing Infisical Universal Auth ${label} credential ${ref}`);
+    return value.trim();
   }
 
   private projectId() {
@@ -105,6 +140,16 @@ export class SprinkleRefInfisicalStore implements SprinkleRefStore {
     if (!projectId) throw new Error("missing Infisical project id");
     return projectId;
   }
+}
+
+function bootstrapCredentialStore(backend: SprinkleRefBackendConfig, platform?: NodeJS.Platform) {
+  if (backend.backend === "local-file") return new SprinkleRefLocalFileStore(backend.file || "");
+  if (backend.backend === "macos-keychain") {
+    return new SprinkleRefMacosKeychainStore(backend.service || "", platform);
+  }
+  throw new Error(
+    `unsupported bootstrap credential backend for Infisical profile: ${backend.backend}`,
+  );
 }
 
 function secretName(ref: string) {

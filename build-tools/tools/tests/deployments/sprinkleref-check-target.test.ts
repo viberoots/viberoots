@@ -74,6 +74,8 @@ test("target human output separates actionable direct refs from dependency refs"
         scope: "direct",
         locations: ["projects/deployments/check-demo/TARGETS:21"],
         requiredBy: ["//projects/deployments/check-demo:deploy"],
+        category: "main",
+        backend: "infisical project proj_123 environment staging",
       },
       {
         ref: "runtime://deployments/check-demo/app_id",

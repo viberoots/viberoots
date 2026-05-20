@@ -4,6 +4,28 @@ def _optional_label(attr):
 def _label_list(attrs):
     return [str(attr.label) for attr in attrs]
 
+def _infer_deployment_family_from_package(package):
+    prefix = "projects/deployments/"
+    if not package.startswith(prefix):
+        return ""
+    rest = package[len(prefix):]
+    if "/" not in rest:
+        return ""
+    return rest.split("/")[0]
+
+def _effective_deployment_family(ctx):
+    if ctx.attrs.deployment_family:
+        return ctx.attrs.deployment_family
+    return _infer_deployment_family_from_package(_label_package_path(ctx.label))
+
+def _label_package_path(label):
+    package = str(label.package)
+    if "//" in package:
+        package = package.split("//")[1]
+    if package.startswith("//"):
+        package = package[2:]
+    return package
+
 def _deployment_document(ctx):
     smoke = dict(ctx.attrs.smoke)
     if ctx.attrs.smoke_exception:
@@ -20,6 +42,7 @@ def _deployment_document(ctx):
         "provisioner_config": ctx.attrs.provisioner_config,
         "protection_class": ctx.attrs.protection_class,
         "lane_policy": _optional_label(ctx.attrs.lane_policy),
+        "deployment_family": _effective_deployment_family(ctx),
         "environment_stage": ctx.attrs.environment_stage,
         "admission_policy": _optional_label(ctx.attrs.admission_policy),
         "rollout_policy": ctx.attrs.rollout_policy,
@@ -48,12 +71,12 @@ def _deployment_document(ctx):
         "migration_bundle": _optional_label(ctx.attrs.migration_bundle),
     }
 
-def _deployment_target_impl(ctx):
+def _deployment_target_rule_impl(ctx):
     out = ctx.actions.write_json(ctx.label.name + ".json", _deployment_document(ctx))
     return [DefaultInfo(default_output = out)]
 
-deployment_target = rule(
-    impl = _deployment_target_impl,
+_deployment_target_rule = rule(
+    impl = _deployment_target_rule_impl,
     attrs = {
         "provider": attrs.string(),
         "component": attrs.dep(),
@@ -64,6 +87,7 @@ deployment_target = rule(
         "provisioner_config": attrs.string(default = ""),
         "protection_class": attrs.string(default = "shared_nonprod"),
         "lane_policy": attrs.option(attrs.dep(), default = None),
+        "deployment_family": attrs.string(default = ""),
         "environment_stage": attrs.string(default = ""),
         "admission_policy": attrs.option(attrs.dep(), default = None),
         "components": attrs.list(attrs.dict(key = attrs.string(), value = attrs.string()), default = []),
@@ -98,6 +122,12 @@ deployment_target = rule(
         "labels": attrs.list(attrs.string(), default = []),
     },
 )
+
+def deployment_target(**kwargs):
+    kwargs = dict(kwargs)
+    if not kwargs.get("deployment_family"):
+        kwargs["deployment_family"] = _infer_deployment_family_from_package(native.package_name())
+    _deployment_target_rule(**kwargs)
 
 def _write_stub_json(ctx):
     out = ctx.actions.declare_output(ctx.label.name + ".json")

@@ -21,6 +21,7 @@ def nixos_shared_host_static_webapp_deployment(
         provisioner = "nixos-shared-host-manifest",
         protection_class = "shared_nonprod",
         lane_policy = None,
+        deployment_family = "",
         environment_stage = "",
         admission_policy = None,
         bootstrap = None,
@@ -49,6 +50,7 @@ def nixos_shared_host_static_webapp_deployment(
         provisioner = provisioner,
         protection_class = protection_class,
         lane_policy = lane_policy,
+        deployment_family = deployment_family,
         environment_stage = environment_stage,
         admission_policy = admission_policy,
         components = [{
@@ -98,6 +100,7 @@ def nixos_shared_host_ssr_webapp_deployment(
         provisioner = "nixos-shared-host-manifest",
         protection_class = "shared_nonprod",
         lane_policy = None,
+        deployment_family = "",
         environment_stage = "",
         admission_policy = None,
         bootstrap = None,
@@ -124,6 +127,7 @@ def nixos_shared_host_ssr_webapp_deployment(
         provisioner = provisioner,
         protection_class = protection_class,
         lane_policy = lane_policy,
+        deployment_family = deployment_family,
         environment_stage = environment_stage,
         admission_policy = admission_policy,
         components = [{
@@ -169,6 +173,7 @@ def nixos_shared_host_multi_static_webapp_deployment(
         provisioner = "nixos-shared-host-manifest",
         protection_class = "shared_nonprod",
         lane_policy = None,
+        deployment_family = "",
         environment_stage = "",
         admission_policy = None,
         bootstrap = None,
@@ -201,6 +206,7 @@ def nixos_shared_host_multi_static_webapp_deployment(
         provisioner = provisioner,
         protection_class = protection_class,
         lane_policy = lane_policy,
+        deployment_family = deployment_family,
         environment_stage = environment_stage,
         admission_policy = admission_policy,
         components = [

@@ -132,11 +132,15 @@ function validateInfisical(file: string, name: string, backend: SprinkleRefBacke
       `${file} category ${name} infisical backend does not support tokenEnv; use Universal Auth clientIdEnv and clientSecretEnv`,
     );
   }
-  if (!backend.clientIdEnv) {
-    throw new Error(`${file} category ${name} infisical backend requires clientIdEnv`);
+  if (!backend.clientIdEnv && !backend.clientIdRef) {
+    throw new Error(
+      `${file} category ${name} infisical backend requires clientIdEnv or clientIdRef`,
+    );
   }
-  if (!backend.clientSecretEnv) {
-    throw new Error(`${file} category ${name} infisical backend requires clientSecretEnv`);
+  if (!backend.clientSecretEnv && !backend.clientSecretRef) {
+    throw new Error(
+      `${file} category ${name} infisical backend requires clientSecretEnv or clientSecretRef`,
+    );
   }
 }
 

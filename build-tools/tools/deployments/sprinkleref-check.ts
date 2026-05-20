@@ -8,9 +8,15 @@ import {
 } from "./sprinkleref-config";
 import { assertBootstrapCategoryCanWrite } from "./sprinkleref-bootstrap-guard";
 import { createSprinkleRefStore } from "./sprinkleref-store";
-import { scanRepositoryRefs, type ScannedRef } from "./sprinkleref-check-scan";
-import { collectTargetRefs, type TargetRef } from "./sprinkleref-check-target";
+import { scanRepositoryRefs } from "./sprinkleref-check-scan";
+import { collectAllDeploymentRefs, collectTargetRefs } from "./sprinkleref-check-target";
 import { exitCodeFor, renderReport, summarize } from "./sprinkleref-check-report";
+import {
+  backendForEntry,
+  consolidateRefs,
+  managedBootstrapOutput,
+  type CheckableRef,
+} from "./sprinkleref-check-classify";
 import type {
   SprinkleRefCheckEntry,
   SprinkleRefCheckReport,
@@ -33,7 +39,7 @@ export async function runSprinkleRefCheck(deps: SprinkleRefCheckDeps): Promise<n
     ? await targetRefs(options.target, options.deps, deps.env)
     : await repoRefs();
   const filtered = refs.refs.filter((entry) => options.schemes.has(entry.scheme));
-  const entries = await checkRefs(filtered, deps, options);
+  const entries = await checkRefs(consolidateRefs(filtered), deps, options);
   const report = {
     target: options.target,
     deps: options.target ? options.deps : undefined,
@@ -80,15 +86,33 @@ async function repoRefs() {
   const scanned = await scanRepositoryRefs().catch((error: unknown) =>
     usageError(error instanceof Error ? error.message : String(error)),
   );
+  const structured = await collectAllDeploymentRefs().catch(() => []);
+  const scannedRefs = new Set(scanned.refs.map((entry) => entry.ref));
+  const relevantStructured = structured.filter((entry) => scannedRefs.has(entry.ref));
+  const structuredRefs = new Set(relevantStructured.map((entry) => entry.ref));
   return {
     scannedFiles: scanned.scannedFiles,
-    refs: scanned.refs.map((entry) => ({
-      ref: entry.ref,
-      scheme: entry.scheme,
-      scope: "repo" as const,
-      locations: entry.locations.map((loc) => `${loc.file}:${loc.line}`),
-      requiredBy: [],
-    })),
+    refs: [
+      ...scanned.refs
+        .filter((entry) => !structuredRefs.has(entry.ref))
+        .map((entry) => ({
+          ref: entry.ref,
+          scheme: entry.scheme,
+          scope: "repo" as const,
+          locations: entry.locations.map((loc) => `${loc.file}:${loc.line}`),
+          requiredBy: [],
+        })),
+      ...relevantStructured.map((entry) => ({
+        ref: entry.ref,
+        scheme: schemeOf(entry.ref),
+        scope: "repo" as const,
+        locations: entry.locations,
+        requiredBy: [entry.requiredBy],
+        source: entry.source,
+        backendEnvironment: entry.backendEnvironment,
+        deploymentFamily: entry.deploymentFamily,
+      })),
+    ],
   };
 }
 
@@ -105,14 +129,14 @@ async function targetRefs(target: string, deps: SprinkleRefDepsMode, env?: NodeJ
       locations: entry.locations,
       requiredBy: [entry.requiredBy],
       source: entry.source,
+      backendEnvironment: entry.backendEnvironment,
+      deploymentFamily: entry.deploymentFamily,
     })),
   };
 }
 
 async function checkRefs(
-  refs: Array<
-    Pick<SprinkleRefCheckEntry, "ref" | "scheme" | "scope" | "locations" | "requiredBy" | "source">
-  >,
+  refs: CheckableRef[],
   deps: SprinkleRefCheckDeps,
   options: ReturnType<typeof parseCheckOptions>,
 ): Promise<SprinkleRefCheckEntry[]> {
@@ -121,12 +145,22 @@ async function checkRefs(
     refs.map(async (entry) => {
       if (!validRef(entry.ref)) return base(entry, "invalid", "malformed deployment contract ref");
       if (entry.scheme !== "secret") return base(entry, "declared");
+      const managed =
+        options.category === "bootstrap" ? undefined : managedBootstrapOutput(entry.ref);
+      if (managed) {
+        return {
+          ...base(entry, "managed", managed.reason),
+          managedBy: managed.by,
+          managedFamily: managed.family,
+        };
+      }
       if (!config) return base(entry, "unchecked", "no resolver config supplied");
       try {
         assertBackendNeutralSecretRef(entry.ref);
         const resolved = resolveSprinkleRefBackend(config, options.category);
         assertBootstrapCategoryCanWrite(resolved);
-        const store = createStore(deps, resolved.backend);
+        const backend = backendForEntry(resolved.backend, entry);
+        const store = createStore(deps, backend, config);
         const present = await store.has(entry.ref).catch((error: unknown) => {
           backendError(error instanceof Error ? error.message : String(error));
         });
@@ -169,9 +203,10 @@ function configReadErrorMessage(selected: string, error: unknown): string {
 function createStore(
   deps: SprinkleRefCheckDeps,
   backend: Parameters<typeof createSprinkleRefStore>[0],
+  resolverConfig: Awaited<ReturnType<typeof readSprinkleRefConfig>>,
 ) {
   try {
-    return (deps.storeFactory || createSprinkleRefStore)(backend, deps);
+    return (deps.storeFactory || createSprinkleRefStore)(backend, { ...deps, resolverConfig });
   } catch (error) {
     backendError(error instanceof Error ? error.message : String(error));
   }
@@ -180,7 +215,14 @@ function createStore(
 function base(
   entry: Pick<
     SprinkleRefCheckEntry,
-    "ref" | "scheme" | "scope" | "locations" | "requiredBy" | "source"
+    | "ref"
+    | "scheme"
+    | "scope"
+    | "locations"
+    | "requiredBy"
+    | "source"
+    | "backendEnvironment"
+    | "deploymentFamily"
   >,
   status: SprinkleRefCheckEntry["status"],
   reason?: string,

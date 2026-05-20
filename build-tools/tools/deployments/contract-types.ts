@@ -1,4 +1,3 @@
-#!/usr/bin/env zx-wrapper
 import type { DeploymentAdmissionPolicy, DeploymentLanePolicy } from "./deployment-policy";
 import type { DeploymentComponentKind } from "./deployment-component-kinds";
 import type { DeploymentRolloutPolicy } from "./deployment-rollout";
@@ -102,6 +101,7 @@ export type DeploymentBase = DeploymentSecretMetadata & {
   protectionClass: string;
   lanePolicyRef: string;
   lanePolicy: DeploymentLanePolicy;
+  deploymentFamily?: string;
   environmentStage: string;
   admissionPolicyRef: string;
   admissionPolicy: DeploymentAdmissionPolicy;

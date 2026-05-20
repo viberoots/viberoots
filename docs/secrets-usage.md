@@ -348,7 +348,9 @@ Common example values and when to use them:
   credential runtime.
 - `contract_id = "secret://deployments/demoapp/database_url"`
   Use this kind of shape for app-specific credentials that belong to one
-  deployment family.
+  deployment family. SprinkleRef reports use the effective deployment family:
+  explicit `deployment_family` metadata first, then canonical
+  `projects/deployments/<family>/...` directory inference.
 - `required = "true"`
   Use this when the deployment must stop if the secret is missing.
 - `required = "false"`

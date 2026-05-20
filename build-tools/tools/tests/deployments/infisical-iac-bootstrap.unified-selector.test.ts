@@ -8,6 +8,7 @@ import { requiredBackendProfiles } from "../../deployments/infisical-iac-bootstr
 
 test("repo resolver profile discovery accepts unified backend selectors", async () => {
   const graphPath = await writeGraph([
+    { name: "//deployments/app:build" },
     { name: "//deployments/default:deploy", secret_backend: "infisical/default" },
     { name: "//deployments/regulated:deploy", secret_backend: "infisical/regulated" },
     { name: "//deployments/vault:deploy", secret_backend: "vault/default" },
@@ -18,6 +19,12 @@ test("repo resolver profile discovery accepts unified backend selectors", async 
     "infisical-regulated",
     "vault-default",
   ]);
+});
+
+test("repo resolver profile discovery ignores nodes without backend selectors", async () => {
+  const graphPath = await writeGraph([{ name: "//deployments/app:build" }]);
+  const profiles = await requiredBackendProfiles(graphPath);
+  assert.deepEqual([...profiles], []);
 });
 
 test("repo resolver profile discovery rejects split backend metadata", async () => {
