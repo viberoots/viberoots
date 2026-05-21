@@ -27,9 +27,9 @@ test("repo profile materialization writes Infisical project id without secret va
   assert.match(written, /"projectId": "proj_repo"/);
   assert.match(
     written,
-    /"clientIdRef": "secret:\/\/deployments\/pleomino\/bootstrap\/viberoots-iac-bootstrap\/client-id"/,
+    /"clientIdRef": "secret:\/\/viberoots\/bootstrap\/viberoots-iac-bootstrap\/client-id"/,
   );
-  assert.doesNotMatch(written, /"clientSecret"|secretValue|pleomino-project-id/);
+  assert.doesNotMatch(written, /secret:\/\/deployments\/pleomino|secretValue|pleomino-project-id/);
   assert.deepEqual(api.calls, [
     "GET /api/v1/projects?type=secret-manager",
     "POST /api/v1/projects",
@@ -60,7 +60,9 @@ test("existing Infisical project profile is validated and receives bootstrap cre
     fetchImpl: fakeVaultFetch as typeof fetch,
   });
   assert.deepEqual(result.materializedProfiles, ["infisical-default"]);
-  assert.match(await fs.readFile(configPath, "utf8"), /"clientSecretRef"/);
+  const written = await fs.readFile(configPath, "utf8");
+  assert.match(written, /"clientSecretRef"/);
+  assert.doesNotMatch(written, /secret:\/\/deployments\/pleomino/);
   assert.deepEqual(api.calls, [
     "GET /api/v1/projects?type=secret-manager",
     "GET /api/v1/projects/proj_existing/memberships/identities/id_1",

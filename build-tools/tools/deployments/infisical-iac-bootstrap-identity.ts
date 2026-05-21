@@ -93,7 +93,7 @@ export async function ensureBootstrapCredential(opts: {
   sink: CredentialSink;
 }): Promise<BootstrapCredential> {
   const clientId = await readClientId(opts.api, opts.identity);
-  const refs = bootstrapCredentialRefs(opts.identity);
+  const refs = repoBootstrapCredentialRefs(opts.identity);
   const remoteSecrets = await listClientSecrets(opts.api, opts.identity.id);
   const localSecret = await opts.sink.read(refs.clientSecretRef);
   const localClientId = await opts.sink.read(refs.clientIdRef);
@@ -131,8 +131,8 @@ export async function ensureBootstrapCredential(opts: {
   return { clientId, clientSecret };
 }
 
-export function bootstrapCredentialRefs(identity: Identity) {
-  const prefix = `secret://deployments/pleomino/bootstrap/${identity.name}`;
+export function repoBootstrapCredentialRefs(identity: Pick<Identity, "name">) {
+  const prefix = `secret://viberoots/bootstrap/${identity.name}`;
   return {
     clientIdRef: `${prefix}/client-id`,
     clientSecretRef: `${prefix}/client-secret`,

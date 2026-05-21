@@ -52,8 +52,9 @@ test("bootstrap credential sink auto uses configured SprinkleRef bootstrap categ
   process.env.SPRINKLEREF_CONFIG = config;
   try {
     const sink = await createCredentialSink({ ...DEFAULT_BOOTSTRAP_ARGS, credentialSink: "auto" });
-    await sink.write("secret://deployments/pleomino/bootstrap/client-secret", "value", false);
-    assert.equal(await sink.read("secret://deployments/pleomino/bootstrap/client-secret"), "value");
+    const ref = "secret://viberoots/bootstrap/viberoots-iac-bootstrap/client-secret";
+    await sink.write(ref, "value", false);
+    assert.equal(await sink.read(ref), "value");
     assert.match(sink.describe(), /SprinkleRef bootstrap/);
   } finally {
     if (old === undefined) delete process.env.SPRINKLEREF_CONFIG;

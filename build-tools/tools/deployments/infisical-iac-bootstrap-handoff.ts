@@ -4,7 +4,7 @@ import type {
   Identity,
 } from "./infisical-iac-bootstrap-types";
 import type { CredentialSinkSelection } from "./infisical-iac-bootstrap-sink";
-import { bootstrapCredentialRefs } from "./infisical-iac-bootstrap-identity";
+import { repoBootstrapCredentialRefs } from "./infisical-iac-bootstrap-identity";
 
 export function buildCredentialHandoffReport(opts: {
   args: BootstrapArgs;
@@ -13,7 +13,7 @@ export function buildCredentialHandoffReport(opts: {
   bootstrapIdentity: Identity;
   metadata: DeploymentRuntimeMetadata;
 }) {
-  const bootstrapRefs = bootstrapCredentialRefs(opts.bootstrapIdentity);
+  const bootstrapRefs = repoBootstrapCredentialRefs(opts.bootstrapIdentity);
   const targetCategory = opts.sinkSelection.category || opts.args.sprinkleCategory || "bootstrap";
   return {
     schemaVersion: "infisical-iac-bootstrap-handoff@1",

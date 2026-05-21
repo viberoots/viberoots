@@ -20,12 +20,13 @@ test("repo bootstrap skips unused starter backend profiles", async () => {
       }),
     );
     const report = JSON.parse(output.stdout) as { profiles: string[] };
+    const config = await fs.readFile("sprinkleref/selected.local.json", "utf8");
+    const credentials = await fs.readFile(".local/infisical-bootstrap-credentials.json", "utf8");
     assert.deepEqual(report.profiles, ["infisical-default"]);
-    assert.match(await fs.readFile("sprinkleref/selected.local.json", "utf8"), /"clientIdRef"/);
-    assert.match(
-      await fs.readFile(".local/infisical-bootstrap-credentials.json", "utf8"),
-      /client-secret/,
-    );
+    assert.match(config, /secret:\/\/viberoots\/bootstrap\/viberoots-iac-bootstrap\/client-id/);
+    assert.doesNotMatch(config, /secret:\/\/deployments\/pleomino/);
+    assert.match(credentials, /secret:\/\/viberoots\/bootstrap\/viberoots-iac-bootstrap/);
+    assert.match(credentials, /client-secret/);
   });
 });
 

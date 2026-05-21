@@ -3308,3 +3308,109 @@ partly duplicated in shared metadata instead of being expressed by the source tr
 This is mostly mechanical but high-churn. It will touch many tests and docs, and any external
 operator notes, local scripts, or saved commands that use the old flat labels will need to be
 updated to the canonical labels.
+
+## PR-34: Repo bootstrap credential namespace decoupling
+
+### 1. Intent
+
+Remove the remaining Pleomino-specific credential namespace from repo-wide Infisical profile
+materialization. Repo bootstrap should be able to create and validate generic repo backend profiles
+without storing normal profile auth refs under `secret://deployments/pleomino/...`, while
+deployment bootstrap remains responsible for Pleomino managed workload credentials.
+
+### 2. Scope of changes
+
+- Replace the current hardcoded Pleomino bootstrap credential refs used for repo-wide
+  `infisical-default` profile materialization with a repo-scoped credential namespace such as
+  `secret://viberoots/bootstrap/infisical-default/client-id` and
+  `secret://viberoots/bootstrap/infisical-default/client-secret`, or another explicit repo-wide
+  namespace chosen during implementation.
+- Keep deployment managed outputs, including
+  `secret://deployments/pleomino/<stage>/infisical-client-id` and
+  `secret://deployments/pleomino/<stage>/infisical-client-secret`, owned by deployment bootstrap
+  and grouped as managed deployment outputs in SprinkleRef.
+- Ensure repo-mode bootstrap profile materialization, dry-run JSON, generated resolver config, and
+  operator-facing summaries contain no Pleomino family names, Pleomino project paths, Pleomino
+  secret paths, or deployment-only OpenTofu values unless an explicit deployment target is selected.
+- Preserve support for multiple Infisical accounts/projects or Vault instances through separate
+  repo profile aliases without requiring those profiles to reuse a deployment family namespace.
+- Update any helper names or docs that currently imply the repo credential refs are deployment
+  bootstrap credentials when they are actually repo bootstrap profile credentials.
+
+### 3. External prerequisites
+
+- None for tests. The implementation must not require live Infisical, Vault, Keychain, OpenTofu, or
+  macOS access for validation.
+- Operators may need to rerun repo bootstrap after the change to materialize the new repo-scoped
+  credential refs in local resolver state.
+
+### 4. Tests to be added
+
+- Add repo-bootstrap profile materialization tests proving `infisical-default` uses repo-scoped
+  credential refs and does not contain `secret://deployments/pleomino/...`.
+- Add regression tests proving deployment bootstrap still reports Pleomino managed workload outputs
+  under the deployment namespace and does not confuse them with repo profile credentials.
+- Add dry-run and generated-config tests proving repo mode contains no Pleomino-specific values
+  unless deployment fan-out or an explicit deployment target is selected.
+- Add negative stale-string or guard coverage for the generic profile helper so future repo-wide
+  profiles cannot accidentally reintroduce a deployment-family credential namespace.
+- Update any existing SprinkleRef or bootstrap tests whose expected resolver output currently
+  assumes Pleomino-scoped repo profile credentials.
+
+### 5. Docs to be added or updated
+
+- Update `docs/infisical-design.md`, `docs/infisical-bootstrap.md`, and `infisical-bootstrap.md` to
+  distinguish repo profile credentials from deployment managed workload credentials.
+- Document the repo-scoped credential namespace and the operator action needed when old local
+  resolver state still points at the previous Pleomino-scoped refs.
+- Keep Pleomino deployment bootstrap docs focused on deployment-created workload credentials, not
+  repo-wide profile auth refs.
+
+### 5.5. Expected regression scope
+
+- `deployment-only`
+- Keep changes limited to Infisical bootstrap profile materialization, credential-ref helpers,
+  resolver config expectations, SprinkleRef reporting/tests, and docs. Do not change runtime secret
+  acquisition, deployment admission semantics, provider publish behavior, or live resource naming.
+
+### 6. Acceptance criteria
+
+- Repo-wide `infisical-default` profile materialization no longer references
+  `secret://deployments/pleomino/...`.
+- Repo-mode bootstrap output and generated resolver config remain repo-wide and generic when no
+  deployment target is selected.
+- Pleomino deployment bootstrap still owns and reports the stage-specific managed Infisical client
+  ID/secret refs under the deployment namespace.
+- Tests cover both the new generic repo credential namespace and the preservation of deployment
+  managed outputs.
+- Updated docs clearly explain the distinction and migration path for old local resolver state.
+- Focused tests and the repository validation suite pass.
+
+### 7. Risks
+
+- Existing local `sprinkleref/selected.local.json` files may still contain the old Pleomino-scoped
+  repo profile refs until operators rerun repo bootstrap or update local state.
+- Renaming helper functions could obscure the distinction between profile credentials and managed
+  deployment workload credentials if the code remains too implicit.
+- A broad stale-string guard could accidentally flag legitimate historical migration notes or
+  deployment-owned managed output refs.
+
+### 8. Mitigations
+
+- Treat local resolver state as regenerated local output and document the rerun path instead of
+  attempting backward compatibility for the old public surface.
+- Name helper functions around repo profile credentials and deployment managed outputs separately.
+- Scope stale-string guards to active repo bootstrap/profile materialization output and allow
+  intentional deployment managed-output refs and historical notes.
+
+### 9. Consequences of not implementing this PR
+
+Repo-wide Infisical bootstrap will remain coupled to Pleomino, contradicting the repo/deployment
+boundary and making future non-Pleomino profiles or alternate Infisical accounts look like they
+belong under a Pleomino deployment namespace.
+
+### 10. Downsides for implementing this PR
+
+Operators who already generated local resolver state may need to rerun repo bootstrap or refresh
+their local config. The implementation also adds one more credential namespace concept that docs and
+tests must keep distinct from deployment managed workload outputs.

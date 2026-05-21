@@ -2,8 +2,8 @@ import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import type { InfisicalApi } from "./infisical-iac-bootstrap-api";
 import {
-  bootstrapCredentialRefs,
   ensureProjectIdentityMembership,
+  repoBootstrapCredentialRefs,
 } from "./infisical-iac-bootstrap-identity";
 import {
   ensureInfisicalRepoProject,
@@ -102,7 +102,7 @@ async function ensureProfileIdentityMembership(
 }
 
 function bootstrapCredentialProfileRefs(identityName: string) {
-  const refs = bootstrapCredentialRefs({ id: "", name: identityName });
+  const refs = repoBootstrapCredentialRefs({ name: identityName });
   return { clientIdRef: refs.clientIdRef, clientSecretRef: refs.clientSecretRef };
 }
 

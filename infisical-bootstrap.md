@@ -264,11 +264,18 @@ Use the repo’s existing stable secret URI convention unless repo inspection pr
 Example logical refs:
 
 ```text
+secret://viberoots/bootstrap/viberoots-iac-bootstrap/client-id
+secret://viberoots/bootstrap/viberoots-iac-bootstrap/client-secret
 secret://deployments/pleomino/staging/infisical-client-id
 secret://deployments/pleomino/staging/infisical-client-secret
 secret://deployments/pleomino/prod/infisical-client-id
 secret://deployments/pleomino/prod/infisical-client-secret
 ```
+
+Repo-wide backend profiles such as `infisical-default` use the repo-scoped
+`secret://viberoots/bootstrap/...` refs for their Universal Auth client id and secret. Pleomino
+deployment bootstrap still owns only the stage-specific managed workload refs under
+`secret://deployments/pleomino/<stage>/...`.
 
 SprinkleRef should resolve these using a category, for example:
 
@@ -356,7 +363,7 @@ In the macOS Keychain backend, `service` is the Keychain generic-password servic
 
 ```text
 service: viberoots-bootstrap
-account: secret://deployments/pleomino/staging/infisical-client-secret
+account: secret://viberoots/bootstrap/viberoots-iac-bootstrap/client-secret
 ```
 
 Example GitHub Actions CI config:
@@ -390,6 +397,8 @@ The bootstrap command should:
 - read the selected SprinkleRef resolver config if it exists;
 - create starter resolver configs if none exist;
 - validate or materialize repo-wide `infisical-*` and `vault-*` backend profiles;
+- materialize Infisical profile credentials under repo-scoped
+  `secret://viberoots/bootstrap/...` refs, not a deployment family namespace;
 - create or select the repo-level Infisical project when a selected profile needs one;
 - validate existing Infisical profile `projectId` values against the selected organization instead
   of overwriting operator-authored resolver profiles;

@@ -25,6 +25,12 @@ Pleomino deployment targets use canonical family labels such as
 `projects/deployments/pleomino-*` packages are migration history; see
 [`pleomino-deployment-directory-migration.md`](pleomino-deployment-directory-migration.md).
 
+Repo bootstrap materializes backend profile credentials under repo-scoped refs such as
+`secret://viberoots/bootstrap/viberoots-iac-bootstrap/client-id`. Pleomino deployment bootstrap
+continues to report only stage-specific managed workload refs under
+`secret://deployments/pleomino/<stage>/...`. If local `sprinkleref/selected.local.json` still
+points profile auth at the old Pleomino bootstrap namespace, rerun `infisical-bootstrap.ts repo`.
+
 Token-based `--no-login` bootstrap flows must pass exactly one of `--org-name` or
 `--organization-id`; login-based operator flows may still use interactive or `--yes` single-org
 discovery.

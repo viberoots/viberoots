@@ -92,6 +92,12 @@ Provider implementations consume only layer 1 and layer 2 through the existing
 runtime surface. They should never branch on whether the backend is Vault or
 Infisical.
 
+Repo bootstrap profile credentials are not deployment managed workload credentials.
+`infisical-default` and other repo-wide profile aliases use repo-scoped SprinkleRef refs such as
+`secret://viberoots/bootstrap/viberoots-iac-bootstrap/client-id` for Universal Auth materialization.
+Pleomino deployment bootstrap remains responsible for stage-specific workload refs such as
+`secret://deployments/pleomino/staging/infisical-client-id`.
+
 ## Public Contract Changes
 
 ### Secret Backend Kind
