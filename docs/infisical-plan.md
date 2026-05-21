@@ -3522,3 +3522,94 @@ setups fragile.
 Bootstrap profile materialization becomes slightly more stateful because it must classify existing
 profiles before deciding whether to preserve or rewrite them. Operators and tests also need one more
 summary concept to distinguish validation from materialization.
+
+## PR-36: Repo bootstrap dry-run profile selection parity
+
+### 1. Intent
+
+Make repo bootstrap dry-run select and report the same resolver profiles that confirmed repo
+bootstrap will validate or materialize. Dry-run must include active category-selected profiles from
+the existing resolver config, not only profiles inferred from the deployment requirement graph, so
+operators can see unresolved operator-authored profile blockers before running a mutation-capable
+bootstrap.
+
+### 2. Scope of changes
+
+- Update repo dry-run planning so profile selection mirrors confirmed repo bootstrap: include
+  graph-required profiles and active profiles selected by configured resolver categories.
+- Preserve PR-35 behavior for operator-authored Infisical profiles: dry-run should report resolved
+  existing profiles in `validatedExistingProfiles`, generated/missing profiles in
+  `materializedProfiles`, and unresolved operator-authored `projectIdEnv` profiles in
+  `unresolvedExistingProfiles` with `validationBlocked: true`.
+- Ensure confirmed and dry-run selection stay deterministic, sorted, and use the same category
+  interpretation for the repo bootstrap profile set.
+- Keep repo dry-run read-only and keep deployment fan-out planning separate from repo profile
+  validation/materialization.
+
+### 3. External prerequisites
+
+- None. Tests must not require live Infisical, Vault, Keychain, OpenTofu, or macOS access.
+
+### 4. Tests to be added
+
+- Add dry-run tests proving an active category-selected Infisical profile is reported even when the
+  graph only requires a different backend profile such as `vault/default`.
+- Add tests proving an operator-authored category-selected profile with unresolved `projectIdEnv`
+  appears in `unresolvedExistingProfiles` during dry-run and fails closed in confirmed bootstrap
+  without being rewritten.
+- Add tests proving dry-run and confirmed bootstrap agree on the profile set for graph-required plus
+  category-selected profiles.
+- Update existing dry-run/profile selection tests whose expected profile lists only include
+  graph-derived profiles.
+
+### 5. Docs to be added or updated
+
+- Update `docs/infisical-bootstrap.md` and `infisical-bootstrap.md` to state that repo dry-run
+  reports both graph-required profiles and active category-selected resolver profiles.
+- Clarify that dry-run can surface unresolved operator-authored profiles even if the current graph
+  does not require that backend, because confirmed bootstrap validates active category selections.
+
+### 5.5. Expected regression scope
+
+- `deployment-only`
+- Keep changes limited to repo bootstrap dry-run planning, shared profile-selection helpers if
+  needed, profile summary tests, and docs. Do not change runtime secret acquisition, deployment
+  admission semantics, provider publish behavior, deployment fan-out execution, or live resource
+  naming.
+
+### 6. Acceptance criteria
+
+- Repo dry-run and confirmed repo bootstrap use the same deterministic profile set for validation
+  and materialization.
+- Active category-selected Infisical profiles are surfaced in dry-run even when graph requirements
+  alone would not include them.
+- Unresolved operator-authored `projectIdEnv` profiles are reported in dry-run before confirmed
+  bootstrap would fail closed.
+- Tests cover graph-only, category-only, and combined graph/category profile selection.
+- Updated docs match the implemented dry-run behavior and the repository validation suite passes.
+
+### 7. Risks
+
+- Dry-run output may become noisier by reporting active category-selected profiles that are not
+  currently graph-required.
+- Duplicating profile-selection logic between dry-run and confirmed bootstrap could reintroduce
+  drift.
+- Category selection may include legacy or partially configured local profiles that operators did
+  not expect dry-run to validate.
+
+### 8. Mitigations
+
+- Prefer a shared helper for dry-run and confirmed profile selection where practical.
+- Sort and de-duplicate profiles before reporting.
+- Keep summary grouping explicit so operators can distinguish graph-required materialization from
+  active resolver profile validation.
+
+### 9. Consequences of not implementing this PR
+
+Dry-run can keep reporting a clean plan while confirmed repo bootstrap later fails on an active
+operator-authored profile, undermining dry-run as a reliable preview of repo bootstrap behavior.
+
+### 10. Downsides for implementing this PR
+
+Dry-run may mention profiles that are active in local resolver categories but not currently needed by
+the graph. That is a small DX cost in exchange for making dry-run match the mutation-capable command.

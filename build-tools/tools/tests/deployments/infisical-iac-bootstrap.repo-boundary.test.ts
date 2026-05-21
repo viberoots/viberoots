@@ -56,10 +56,7 @@ test("repo bootstrap dry-run reports resolver profiles without Pleomino provisio
     assert.equal(report.materializationPlan?.readOnly, true);
     assert.equal(report.materializationPlan?.backendLogin?.infisicalRequired, true);
     assert.equal(report.materializationPlan?.backendLogin?.wouldAuthenticate, true);
-    assert.deepEqual(report.materializationPlan?.materializedProfiles, [
-      "infisical-default",
-      "vault-default",
-    ]);
+    assert.deepEqual(report.materializationPlan?.materializedProfiles, ["infisical-default"]);
     assert.deepEqual(report.materializationPlan?.validatedExistingProfiles, []);
     assert.ok(report.materializationPlan?.profiles?.some((profile) => profile.needsLiveValidation));
     assert.equal(

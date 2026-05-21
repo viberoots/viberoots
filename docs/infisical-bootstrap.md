@@ -40,6 +40,9 @@ Profiles that use operator-authored `projectIdEnv` are also preserved; confirmed
 the resolved env value when present and fails closed without rewriting the profile when the env var
 is unset. Repo dry-run mirrors that closed state by reporting the profile in
 `unresolvedExistingProfiles` instead of `validatedExistingProfiles`.
+Repo dry-run reports the same backend profile set confirmed repo bootstrap will validate or
+materialize: graph-required profiles plus active profiles selected by resolver categories, even when
+the current deployment graph does not require that category-selected backend.
 
 Token-based `--no-login` bootstrap flows must pass exactly one of `--org-name` or
 `--organization-id`; login-based operator flows may still use interactive or `--yes` single-org

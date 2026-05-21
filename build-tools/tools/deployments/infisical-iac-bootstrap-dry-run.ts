@@ -13,7 +13,7 @@ export async function buildDryRunReport(args: BootstrapArgs) {
       mode: "repo",
       resolverConfig: {
         directory: "sprinkleref",
-        profiles: ["vault-default", "infisical-default"],
+        profiles: materializationPlan.profiles.map((profile) => profile.name),
         categories: ["main", "bootstrap"],
       },
       credentialSink: sink.kind,

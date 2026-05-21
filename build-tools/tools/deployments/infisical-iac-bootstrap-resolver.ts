@@ -11,6 +11,9 @@ import { readSprinkleRefConfig } from "./sprinkleref-config";
 import { resolveBootstrapAccessCredentialSinkBackend } from "./sprinkleref-bootstrap-guard";
 import { initSprinkleRefConfigs } from "./sprinkleref-templates";
 import type { SprinkleRefConfig } from "./sprinkleref-types";
+
+const STARTER_CATEGORY_PROFILES = ["infisical-default"];
+
 export async function ensureRepoResolverConfig(opts: {
   dryRun: boolean;
   platform?: NodeJS.Platform;
@@ -20,11 +23,15 @@ export async function ensureRepoResolverConfig(opts: {
   const configPath = opts.configPath || resolverConfigPath();
   const exists = await fileExists(configPath);
   if (!exists) {
+    const profiles = await repoBootstrapProfiles({
+      graphPath: opts.graphPath,
+      starterCategoryProfiles: true,
+    });
     if (opts.dryRun) {
       return {
         configPath,
-        profiles: ["vault-default", "infisical-default"],
-        bootstrapCredentialProfiles: ["infisical-default"],
+        profiles,
+        bootstrapCredentialProfiles: profiles.filter((profile) => profile.startsWith("infisical-")),
         validated: false,
       };
     }
@@ -35,8 +42,9 @@ export async function ensureRepoResolverConfig(opts: {
     });
   }
   const config = await readSprinkleRefConfig(configPath);
-  const requiredProfiles = await requiredBackendProfiles(opts.graphPath || DEFAULT_GRAPH_PATH);
-  for (const profile of categoryProfiles(config)) requiredProfiles.add(profile);
+  const requiredProfiles = new Set(
+    await repoBootstrapProfiles({ graphPath: opts.graphPath, config }),
+  );
   validateRepoResolverConfig(config, requiredProfiles);
   return {
     configPath,
@@ -44,6 +52,19 @@ export async function ensureRepoResolverConfig(opts: {
     bootstrapCredentialProfiles: bootstrapCredentialProfiles(config, requiredProfiles),
     validated: true,
   };
+}
+
+export async function repoBootstrapProfiles(opts: {
+  graphPath?: string;
+  config?: SprinkleRefConfig;
+  starterCategoryProfiles?: boolean;
+}) {
+  const profiles = await requiredBackendProfiles(opts.graphPath || DEFAULT_GRAPH_PATH);
+  if (opts.config) addCategoryProfiles(profiles, opts.config);
+  if (opts.starterCategoryProfiles) {
+    for (const profile of STARTER_CATEGORY_PROFILES) profiles.add(profile);
+  }
+  return [...profiles].sort();
 }
 
 export async function requiredBackendProfiles(graphPath = DEFAULT_GRAPH_PATH) {
@@ -105,7 +126,11 @@ function bootstrapCredentialProfiles(config: SprinkleRefConfig, requiredProfiles
     .sort();
 }
 
-function categoryProfiles(config: SprinkleRefConfig) {
+function addCategoryProfiles(profiles: Set<string>, config: SprinkleRefConfig) {
+  for (const profile of activeCategoryProfiles(config)) profiles.add(profile);
+}
+
+function activeCategoryProfiles(config: SprinkleRefConfig) {
   return Object.values(config.categories)
     .map((category) => ("profile" in category ? category.profile.trim() : ""))
     .filter(Boolean);

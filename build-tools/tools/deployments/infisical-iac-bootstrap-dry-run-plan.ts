@@ -2,12 +2,10 @@ import * as fs from "node:fs/promises";
 import { DEFAULT_GRAPH_PATH } from "../lib/graph-const";
 import { resolverConfigPath } from "./infisical-iac-bootstrap-preflight";
 import { isGeneratedInfisicalResolverProfile } from "./infisical-iac-bootstrap-profile-kind";
-import { requiredBackendProfiles } from "./infisical-iac-bootstrap-resolver";
+import { repoBootstrapProfiles } from "./infisical-iac-bootstrap-resolver";
 import type { CredentialSinkSelection } from "./infisical-iac-bootstrap-sink";
 import { readSprinkleRefConfig } from "./sprinkleref-config";
-import type { SprinkleRefBackendConfig } from "./sprinkleref-types";
-
-const STARTER_PROFILES = ["vault-default", "infisical-default"];
+import type { SprinkleRefBackendConfig, SprinkleRefConfig } from "./sprinkleref-types";
 
 export async function buildRepoDryRunMaterializationPlan(opts: {
   sink: CredentialSinkSelection;
@@ -17,10 +15,14 @@ export async function buildRepoDryRunMaterializationPlan(opts: {
 }) {
   const configPath = opts.configPath || resolverConfigPath();
   const configExists = await exists(configPath);
-  const requiredProfiles = await requiredBackendProfiles(opts.graphPath || DEFAULT_GRAPH_PATH);
-  const profiles = [...(requiredProfiles.size > 0 ? requiredProfiles : STARTER_PROFILES)].sort();
-  const profilePlans = configExists
-    ? await existingProfilePlans(configPath, profiles, opts.env)
+  const config = configExists ? await readSprinkleRefConfig(configPath) : undefined;
+  const profiles = await repoBootstrapProfiles({
+    graphPath: opts.graphPath || DEFAULT_GRAPH_PATH,
+    config,
+    starterCategoryProfiles: !configExists,
+  });
+  const profilePlans = config
+    ? existingProfilePlans(config, profiles, opts.env)
     : profiles.map((profile) => missingConfigProfilePlan(profile));
   const materializedProfiles = profilePlans
     .filter((plan) => plan.wouldMaterialize)
@@ -57,8 +59,7 @@ export async function buildRepoDryRunMaterializationPlan(opts: {
   };
 }
 
-async function existingProfilePlans(configPath: string, profiles: string[], env = process.env) {
-  const config = await readSprinkleRefConfig(configPath);
+function existingProfilePlans(config: SprinkleRefConfig, profiles: string[], env = process.env) {
   return profiles.map((profile) => {
     const backend = config.profiles[profile];
     if (!backend) return missingProfilePlan(profile);

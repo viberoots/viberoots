@@ -431,6 +431,11 @@ dry-run does not claim confirmed bootstrap would preserve a profile it cannot va
 intentionally regenerate an
 operator-authored profile, remove that profile or add the generated marker before rerunning repo
 bootstrap.
+Dry-run and confirmed repo bootstrap use the same deterministic backend profile set for validation
+and materialization: profiles required by the deployment graph plus active resolver category-selected
+profiles. This can surface an unresolved operator-authored Infisical profile even when the current
+deployment graph only requires another backend, because confirmed bootstrap validates active
+category selections before mutation.
 
 Deployment bootstrap performs this resolver-config creation or validation before opening Infisical,
 running OpenTofu, or writing any credential sink output. Missing `--yes` and unsafe bootstrap
