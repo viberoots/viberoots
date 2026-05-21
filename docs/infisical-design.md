@@ -242,6 +242,10 @@ Repo bootstrap should:
 - classify generated Infisical starter profiles only by the explicit
   `generatedBy: "viberoots-repo-bootstrap"` marker or the exact legacy starter shape that used
   `VBR_INFISICAL_PROJECT_ID`, `VBR_INFISICAL_CLIENT_ID`, and `VBR_INFISICAL_CLIENT_SECRET`;
+- treat that legacy shape as exactly `backend`, `host`, `projectIdEnv`, `defaultEnvironment`,
+  `defaultPath`, `clientIdEnv`, and `clientSecretEnv` with the old starter values and no additional
+  keys; any `namespace`, custom refs, `projectName`, or future metadata makes the profile
+  operator-authored unless the explicit generated marker is present;
 - fail closed rather than rewriting operator-authored profiles when `projectIdEnv` is configured but
   the environment variable is unavailable during confirmed bootstrap;
 - keep repo dry-run read-only while reporting planned backend login, project/profile validation or

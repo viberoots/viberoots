@@ -31,6 +31,25 @@ test("operator-authored projectIdEnv profile is validated and preserved when env
   ]);
 });
 
+test("historical env profile with extra metadata is preserved", async () => {
+  const configPath = await writeProfileConfig(historicalEnvProfileWithOperatorFields());
+  const before = await fs.readFile(configPath, "utf8");
+  const result = await materializeRepoBackendProfiles({
+    args: DEFAULT_BOOTSTRAP_ARGS,
+    configPath,
+    requiredProfiles: ["infisical-default"],
+    api: fakeProjectApi([
+      { id: "proj_env", name: "operator-env-project", orgId: "org_1" },
+    ]) as never,
+    organizationId: "org_1",
+    identity: { id: "id_1", name: "viberoots-iac-bootstrap" },
+    env: { VBR_INFISICAL_PROJECT_ID: "proj_env" },
+  });
+  assert.deepEqual(result.materializedProfiles, []);
+  assert.deepEqual(result.validatedExistingProfiles, ["infisical-default"]);
+  assert.equal(await fs.readFile(configPath, "utf8"), before);
+});
+
 test("operator-authored projectIdEnv profile fails closed when env is unset", async () => {
   const configPath = await writeProfileConfig(operatorProjectIdEnvProfile());
   const before = await fs.readFile(configPath, "utf8");
@@ -102,20 +121,9 @@ test("dry-run and confirmed bootstrap both block unresolved projectIdEnv operato
   assert.deepEqual(plan.validatedExistingProfiles, []);
   assert.deepEqual(plan.materializedProfiles, []);
   assert.deepEqual(plan.unresolvedExistingProfiles, ["infisical-default"]);
-  assert.deepEqual(
-    plan.profiles.map((profile) => ({
-      name: profile.name,
-      unresolvedProjectIdEnv: profile.unresolvedProjectIdEnv,
-      validationBlocked: profile.validationBlocked,
-    })),
-    [
-      {
-        name: "infisical-default",
-        unresolvedProjectIdEnv: true,
-        validationBlocked: true,
-      },
-    ],
-  );
+  assert.deepEqual(profileValidationStates(plan), [
+    { name: "infisical-default", unresolvedProjectIdEnv: true, validationBlocked: true },
+  ]);
   await assert.rejects(
     () =>
       materializeRepoBackendProfiles({
@@ -142,21 +150,20 @@ test("dry-run validates projectIdEnv operator profiles when env resolves", async
   assert.deepEqual(plan.validatedExistingProfiles, ["infisical-default"]);
   assert.deepEqual(plan.materializedProfiles, []);
   assert.deepEqual(plan.unresolvedExistingProfiles, []);
-  assert.deepEqual(
-    plan.profiles.map((profile) => ({
-      name: profile.name,
-      unresolvedProjectIdEnv: profile.unresolvedProjectIdEnv,
-      validationBlocked: profile.validationBlocked,
-    })),
-    [
-      {
-        name: "infisical-default",
-        unresolvedProjectIdEnv: false,
-        validationBlocked: false,
-      },
-    ],
-  );
+  assert.deepEqual(profileValidationStates(plan), [
+    { name: "infisical-default", unresolvedProjectIdEnv: false, validationBlocked: false },
+  ]);
 });
+
+function profileValidationStates(
+  plan: Awaited<ReturnType<typeof buildRepoDryRunMaterializationPlan>>,
+) {
+  return plan.profiles.map(({ name, unresolvedProjectIdEnv, validationBlocked }) => ({
+    name,
+    unresolvedProjectIdEnv,
+    validationBlocked,
+  }));
+}
 
 async function writeProfileConfig(profile: unknown) {
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), "infisical-profile-env-"));
@@ -203,6 +210,21 @@ function operatorInlineProjectProfile() {
     defaultPath: "/operator",
     clientIdRef: "secret://operator/infisical/client-id",
     clientSecretRef: "secret://operator/infisical/client-secret",
+  };
+}
+
+function historicalEnvProfileWithOperatorFields() {
+  return {
+    backend: "infisical",
+    host: "https://app.infisical.com",
+    projectIdEnv: "VBR_INFISICAL_PROJECT_ID",
+    defaultEnvironment: "staging",
+    defaultPath: "/",
+    clientIdEnv: "VBR_INFISICAL_CLIENT_ID",
+    clientSecretEnv: "VBR_INFISICAL_CLIENT_SECRET",
+    clientIdRef: "secret://operator/custom-client-id",
+    clientSecretRef: "secret://operator/custom-client-secret",
+    namespace: "operator-namespace",
   };
 }
 

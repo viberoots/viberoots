@@ -409,6 +409,12 @@ The bootstrap command should:
   `generatedBy: "viberoots-repo-bootstrap"`, or untouched legacy starter profiles that exactly match
   the old `VBR_INFISICAL_PROJECT_ID`, `VBR_INFISICAL_CLIENT_ID`, and
   `VBR_INFISICAL_CLIENT_SECRET` starter shape;
+- classify that legacy shape as exactly `backend: "infisical"`,
+  `host: "https://app.infisical.com"`, `projectIdEnv: "VBR_INFISICAL_PROJECT_ID"`,
+  `defaultEnvironment: "staging"`, `defaultPath: "/"`,
+  `clientIdEnv: "VBR_INFISICAL_CLIENT_ID"`, and
+  `clientSecretEnv: "VBR_INFISICAL_CLIENT_SECRET"` with no additional keys; `namespace`, custom
+  refs, or other resolver metadata make the profile operator-authored;
 - validate Vault profile address/token/mount metadata against Vault when configured env values are
   available, otherwise fail with remediation naming the missing bootstrap env;
 - materialize the configured local bootstrap sink path, or validate the macOS Keychain service name;

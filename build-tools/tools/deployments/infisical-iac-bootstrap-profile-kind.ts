@@ -18,21 +18,31 @@ export function starterInfisicalProfile(): SprinkleRefBackendConfig {
 
 export function isGeneratedInfisicalResolverProfile(profile: SprinkleRefBackendConfig) {
   if (profile.generatedBy === GENERATED_INFISICAL_PROFILE_MARKER) return true;
-  return isLegacyStarterProfile(profile);
+  return isHistoricalStarterProfile(profile);
 }
 
-function isLegacyStarterProfile(profile: SprinkleRefBackendConfig) {
+function isHistoricalStarterProfile(profile: SprinkleRefBackendConfig) {
+  const expected = historicalStarterInfisicalProfile();
+  const keys = Object.keys(profile);
+  const expectedKeys = Object.keys(expected);
   return (
-    profile.backend === "infisical" &&
-    profile.host === "https://app.infisical.com" &&
-    profile.projectIdEnv === "VBR_INFISICAL_PROJECT_ID" &&
-    profile.defaultEnvironment === "staging" &&
-    profile.defaultPath === "/" &&
-    profile.clientIdEnv === "VBR_INFISICAL_CLIENT_ID" &&
-    profile.clientSecretEnv === "VBR_INFISICAL_CLIENT_SECRET" &&
-    !profile.projectId &&
-    !profile.projectName &&
-    !profile.clientIdRef &&
-    !profile.clientSecretRef
+    keys.length === expectedKeys.length &&
+    expectedKeys.every((key) => profileValue(profile, key) === profileValue(expected, key))
   );
+}
+
+function historicalStarterInfisicalProfile(): SprinkleRefBackendConfig {
+  return {
+    backend: "infisical",
+    host: "https://app.infisical.com",
+    projectIdEnv: "VBR_INFISICAL_PROJECT_ID",
+    defaultEnvironment: "staging",
+    defaultPath: "/",
+    clientIdEnv: "VBR_INFISICAL_CLIENT_ID",
+    clientSecretEnv: "VBR_INFISICAL_CLIENT_SECRET",
+  };
+}
+
+function profileValue(profile: SprinkleRefBackendConfig, key: string) {
+  return (profile as Record<string, unknown>)[key];
 }

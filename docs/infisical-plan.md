@@ -3613,3 +3613,87 @@ operator-authored profile, undermining dry-run as a reliable preview of repo boo
 
 Dry-run may mention profiles that are active in local resolver categories but not currently needed by
 the graph. That is a small DX cost in exchange for making dry-run match the mutation-capable command.
+
+## PR-37: Exact legacy generated-profile detection
+
+### 1. Intent
+
+Tighten Infisical resolver profile generated/starter detection so repo bootstrap only rewrites
+profiles with an explicit `generatedBy: "viberoots-repo-bootstrap"` marker or the exact historical
+starter profile shape. Operator-authored profiles that happen to use old `VBR_INFISICAL_*` env names
+plus any additional metadata or custom fields must be treated as operator-authored and preserved
+after validation.
+
+### 2. Scope of changes
+
+- Update the generated-profile classifier so the legacy starter path requires an exact key/value
+  match for the old starter object, not just matching old env-var field values.
+- Preserve explicit generated profiles marked with `generatedBy: "viberoots-repo-bootstrap"` as the
+  modern rewrite/materialization path.
+- Ensure non-secret extra fields such as `namespace`, custom markers, or other future resolver
+  metadata disqualify the legacy starter fallback and force operator-authored preservation behavior.
+- Keep PR-35 and PR-36 behavior intact: operator-authored profiles validate before preservation,
+  generated/missing profiles materialize with repo-scoped refs, and dry-run/confirmed profile sets
+  remain aligned.
+
+### 3. External prerequisites
+
+- None. Tests must not require live Infisical, Vault, Keychain, OpenTofu, or macOS access.
+
+### 4. Tests to be added
+
+- Add tests proving the exact historical starter object is still classified as generated and can be
+  rewritten/materialized.
+- Add tests proving profiles with the old `VBR_INFISICAL_*` env names plus extra fields such as
+  `namespace` are classified as operator-authored, validated, and preserved rather than rewritten.
+- Add negative tests proving custom refs or metadata are not erased by the legacy starter fallback.
+- Keep or update generated marker tests proving `generatedBy: "viberoots-repo-bootstrap"` remains
+  the supported explicit generated-profile marker.
+
+### 5. Docs to be added or updated
+
+- Update `docs/infisical-design.md`, `docs/infisical-bootstrap.md`, and `infisical-bootstrap.md` to
+  define the exact legacy starter shape and clarify that additional fields make a profile
+  operator-authored.
+- Document that operators can opt into regeneration by using the explicit generated marker or by
+  removing/recreating the profile through repo bootstrap.
+
+### 5.5. Expected regression scope
+
+- `deployment-only`
+- Keep changes limited to generated-profile classification, profile materialization tests, and docs.
+  Do not change runtime secret acquisition, deployment admission semantics, provider publish
+  behavior, deployment fan-out, dry-run profile selection, or live resource naming.
+
+### 6. Acceptance criteria
+
+- Legacy starter detection requires an exact historical starter shape.
+- Profiles with old env names plus extra fields are preserved as operator-authored profiles after
+  validation.
+- Explicit generated marker behavior remains supported.
+- Tests cover exact legacy starter rewrite, extra-field preservation, and explicit marker rewrite.
+- Updated docs match the implemented classification rule and the repository validation suite passes.
+
+### 7. Risks
+
+- Tightening legacy detection may preserve a previously generated local profile if it was manually
+  edited with extra fields.
+- The exact key set may need updates if the resolver profile schema gains new generated-only fields.
+
+### 8. Mitigations
+
+- Treat manually edited generated profiles as operator-authored unless they keep the explicit
+  generated marker.
+- Prefer the explicit marker for all newly generated profiles so the legacy fallback remains a narrow
+  compatibility path.
+
+### 9. Consequences of not implementing this PR
+
+Repo bootstrap can still silently rewrite some operator-authored profiles that use legacy env names
+with extra metadata, contradicting the resolver authority model introduced in PR-35.
+
+### 10. Downsides for implementing this PR
+
+Some locally edited legacy starter profiles may stop being regenerated automatically. Operators who
+want regeneration must use the explicit generated marker or recreate the profile through repo
+bootstrap.

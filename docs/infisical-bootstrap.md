@@ -34,6 +34,11 @@ Existing operator-authored Infisical profiles are preserved once their `projectI
 selected organization.
 Bootstrap rewrites only missing profiles, profiles with `generatedBy: "viberoots-repo-bootstrap"`,
 or untouched legacy starter profiles that exactly match the old `VBR_INFISICAL_*` starter shape.
+That legacy shape is exactly `backend: "infisical"`, `host: "https://app.infisical.com"`,
+`projectIdEnv: "VBR_INFISICAL_PROJECT_ID"`, `defaultEnvironment: "staging"`, `defaultPath: "/"`,
+`clientIdEnv: "VBR_INFISICAL_CLIENT_ID"`, and
+`clientSecretEnv: "VBR_INFISICAL_CLIENT_SECRET"` with no other keys. Additional fields such as
+`namespace`, custom refs, or future resolver metadata make the profile operator-authored.
 To intentionally regenerate a profile, remove that profile or add the generated marker before
 rerunning repo bootstrap.
 Profiles that use operator-authored `projectIdEnv` are also preserved; confirmed bootstrap validates
