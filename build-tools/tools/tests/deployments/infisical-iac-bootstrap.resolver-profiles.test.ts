@@ -85,27 +85,21 @@ test("repo bootstrap creates and validates resolver profiles independent of cred
         yes: true,
       }),
     );
-    assert.match(output.stdout, /infisical-repo-bootstrap-result@1/);
-    assert.match(output.stdout, /vault-default/);
-    assert.match(output.stdout, /infisical-default/);
     assert.doesNotMatch(output.stdout, /nextCommands/);
     assert.match(output.stderr, /sprinkleref --check --config sprinkleref\/selected\.local\.json/);
-    const report = JSON.parse(output.stdout) as {
-      bootstrapCredentialSinks: Array<{ profile: string; credentialSinkBackend: string }>;
-      nextCommands?: unknown;
-      credentialSinkDescription?: unknown;
-    };
+    const report = JSON.parse(output.stdout);
     assert.equal(report.nextCommands, undefined);
-    assert.equal(report.credentialSinkDescription, undefined);
     assert.equal(report.bootstrapCredentialSinks.length, 1);
     assert.equal(report.bootstrapCredentialSinks[0]?.profile, "infisical-default");
     assert.equal(report.bootstrapCredentialSinks[0]?.credentialSinkBackend, "local-file");
+    assert.deepEqual(report.profileMaterialization?.materializedProfiles, ["infisical-default"]);
+    assert.deepEqual(report.profileMaterialization?.validatedExistingProfiles, []);
     const selected = await fs.readFile("sprinkleref/selected.local.json", "utf8");
     assert.match(selected, /"profile": "infisical-default"/);
   });
 });
 
-test("repo bootstrap validates non-default profiles selected by deployment metadata", async () => {
+test("repo bootstrap materializes missing non-default Infisical profiles", async () => {
   const dir = await tmp();
   await withCwdAndEnv(dir, async () => {
     await writeJson("sprinkleref/selected.local.json", {
@@ -116,7 +110,7 @@ test("repo bootstrap validates non-default profiles selected by deployment metad
         "infisical-default": {
           backend: "infisical",
           host: "https://app.infisical.com",
-          projectId: "project",
+          projectId: "proj_repo_test",
           defaultEnvironment: "staging",
           clientIdEnv: "INFISICAL_CLIENT_ID",
           clientSecretEnv: "INFISICAL_CLIENT_SECRET",
@@ -133,9 +127,17 @@ test("repo bootstrap validates non-default profiles selected by deployment metad
         secret_backend: "infisical/regulated",
       },
     ]);
-    await assert.rejects(
-      () => runInfisicalIacBootstrap({ ...DEFAULT_BOOTSTRAP_ARGS, yes: true }),
-      /missing profile infisical-regulated/,
+    const output = await captureConsole(() =>
+      runInfisicalIacBootstrap({ ...DEFAULT_BOOTSTRAP_ARGS, yes: true }),
+    );
+    const report = JSON.parse(output.stdout);
+    assert.deepEqual(report.profileMaterialization?.materializedProfiles, ["infisical-regulated"]);
+    assert.deepEqual(report.profileMaterialization?.validatedExistingProfiles, [
+      "infisical-default",
+    ]);
+    assert.match(
+      await fs.readFile("sprinkleref/selected.local.json", "utf8"),
+      /"infisical-regulated"/,
     );
   });
 });

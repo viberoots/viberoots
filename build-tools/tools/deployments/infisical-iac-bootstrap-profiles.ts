@@ -6,6 +6,10 @@ import {
   repoBootstrapCredentialRefs,
 } from "./infisical-iac-bootstrap-identity";
 import {
+  isGeneratedInfisicalResolverProfile,
+  starterInfisicalProfile,
+} from "./infisical-iac-bootstrap-profile-kind";
+import {
   ensureInfisicalRepoProject,
   validateInfisicalRepoProject,
 } from "./infisical-iac-bootstrap-profile-api";
@@ -26,30 +30,35 @@ export async function materializeRepoBackendProfiles(opts: {
 }) {
   const config = await readSprinkleRefConfig(opts.configPath);
   const updates: Record<string, SprinkleRefBackendConfig> = {};
+  const validatedExistingProfiles: string[] = [];
   const profiles = opts.requiredProfiles.map((name) => [name, config.profiles[name]] as const);
   for (const [name, profile] of profiles) {
-    if (!profile) throw new Error(`SprinkleRef config missing profile ${name}`);
-    if (name.startsWith("vault-")) {
+    if (!profile && !name.startsWith("infisical-")) {
+      throw new Error(`SprinkleRef config missing profile ${name}`);
+    }
+    if (name.startsWith("vault-") && profile) {
       await validateVaultRepoProfile(name, profile, {
         env: opts.env,
         fetchImpl: opts.fetchImpl,
       });
     }
-    if (profile.backend === "infisical") {
-      const materialized = await materializeInfisicalProfile(name, profile, opts);
-      if (materialized !== profile) updates[name] = materialized;
+    if (profile?.backend === "infisical" || name.startsWith("infisical-")) {
+      const result = await materializeInfisicalProfile(name, profile, opts);
+      if (result.status === "validated-existing") validatedExistingProfiles.push(name);
+      if (result.status === "materialized") updates[name] = result.profile;
     }
   }
   if (Object.keys(updates).length > 0) await writeProfileOverrides(opts.configPath, updates);
   return {
     profiles: opts.requiredProfiles,
     materializedProfiles: Object.keys(updates).sort(),
+    validatedExistingProfiles: validatedExistingProfiles.sort(),
   };
 }
 
 async function materializeInfisicalProfile(
   name: string,
-  profile: SprinkleRefBackendConfig,
+  existingProfile: SprinkleRefBackendConfig | undefined,
   opts: {
     args: BootstrapArgs;
     api?: InfisicalApi;
@@ -58,52 +67,64 @@ async function materializeInfisicalProfile(
     env?: NodeJS.ProcessEnv;
   },
 ) {
+  const profile = existingProfile || starterInfisicalProfile();
+  const generated = isGeneratedInfisicalResolverProfile(profile);
   const projectId = profile.projectId || envValue(opts.env, profile.projectIdEnv);
   if (projectId) {
     if (!opts.api || !opts.organizationId) {
       throw new Error(`SprinkleRef profile ${name} requires Infisical project validation`);
     }
-    const project = await validateInfisicalRepoProject(opts.api, opts.organizationId, projectId);
+    const project = await validateInfisicalRepoProject(opts.api, opts.organizationId, projectId, {
+      requireOrganizationEvidence: Boolean(existingProfile && !generated),
+    });
     await ensureProfileIdentityMembership(opts.api, opts.identity, projectId);
+    if (!generated) {
+      validateInfisicalProfile(name, profile);
+      return { profile, status: "validated-existing" as const };
+    }
     const materialized = {
       ...profile,
       projectId,
       projectName: project.name,
+      projectIdEnv: undefined,
+      clientIdEnv: undefined,
+      clientSecretEnv: undefined,
       ...bootstrapCredentialProfileRefs(opts.args.identityName),
     };
     validateInfisicalProfile(name, materialized);
-    return profile.projectId &&
-      profile.clientIdRef === materialized.clientIdRef &&
-      profile.clientSecretRef === materialized.clientSecretRef
-      ? profile
-      : materialized;
+    return sameProfile(profile, materialized)
+      ? { profile, status: "unchanged-generated" as const }
+      : { profile: materialized, status: "materialized" as const };
   }
   if (!opts.api || !opts.organizationId) {
-    throw new Error(`SprinkleRef profile ${name} requires Infisical project materialization`);
+    throw new Error(
+      existingProfile && !generated
+        ? `SprinkleRef profile ${name} requires Infisical project validation`
+        : `SprinkleRef profile ${name} requires Infisical project materialization`,
+    );
+  }
+  if (existingProfile && !generated) {
+    validateInfisicalProfile(name, profile);
+    throw new Error(unresolvedOperatorProfileProjectMessage(name, profile));
   }
   const { project } = await ensureInfisicalRepoProject(opts.api, opts.organizationId);
   await ensureProfileIdentityMembership(opts.api, opts.identity, project.id);
-  return validateInfisicalProfile(name, {
-    ...profile,
-    projectId: project.id,
-    projectName: project.name,
-    projectIdEnv: undefined,
-    ...bootstrapCredentialProfileRefs(opts.args.identityName),
-  });
+  return {
+    profile: validateInfisicalProfile(name, {
+      ...profile,
+      projectId: project.id,
+      projectName: project.name,
+      projectIdEnv: undefined,
+      clientIdEnv: undefined,
+      clientSecretEnv: undefined,
+      ...bootstrapCredentialProfileRefs(opts.args.identityName),
+    }),
+    status: "materialized" as const,
+  };
 }
 
-async function ensureProfileIdentityMembership(
-  api: InfisicalApi,
-  identity: Identity | undefined,
-  projectId: string,
-) {
-  if (!identity) return;
-  await ensureProjectIdentityMembership(api, projectId, identity);
-}
-
-function bootstrapCredentialProfileRefs(identityName: string) {
-  const refs = repoBootstrapCredentialRefs({ name: identityName });
-  return { clientIdRef: refs.clientIdRef, clientSecretRef: refs.clientSecretRef };
+function sameProfile(left: SprinkleRefBackendConfig, right: SprinkleRefBackendConfig) {
+  return JSON.stringify(left) === JSON.stringify(right);
 }
 
 function validateInfisicalProfile(name: string, profile: SprinkleRefBackendConfig) {
@@ -142,4 +163,25 @@ async function readConfigFile(configPath: string): Promise<SprinkleRefConfigFile
 
 function envValue(env = process.env, name?: string) {
   return name ? String(env[name] || "").trim() : "";
+}
+
+function unresolvedOperatorProfileProjectMessage(name: string, profile: SprinkleRefBackendConfig) {
+  if (profile.projectIdEnv) {
+    return `SprinkleRef profile ${name} uses operator-authored projectIdEnv ${profile.projectIdEnv}, but that environment variable is unset; export it or set projectId before rerunning repo bootstrap`;
+  }
+  return `SprinkleRef profile ${name} is operator-authored but has no projectId to validate`;
+}
+
+async function ensureProfileIdentityMembership(
+  api: InfisicalApi,
+  identity: Identity | undefined,
+  projectId: string,
+) {
+  if (!identity) return;
+  await ensureProjectIdentityMembership(api, projectId, identity);
+}
+
+function bootstrapCredentialProfileRefs(identityName: string) {
+  const refs = repoBootstrapCredentialRefs({ name: identityName });
+  return { clientIdRef: refs.clientIdRef, clientSecretRef: refs.clientSecretRef };
 }

@@ -2,17 +2,8 @@
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
+import { starterInfisicalProfile } from "./infisical-iac-bootstrap-profile-kind";
 import type { SprinkleRefConfigFile } from "./sprinkleref-types";
-
-const INFISICAL_DEFAULT = {
-  backend: "infisical" as const,
-  host: "https://app.infisical.com",
-  projectIdEnv: "VBR_INFISICAL_PROJECT_ID",
-  defaultEnvironment: "staging",
-  defaultPath: "/",
-  clientIdEnv: "VBR_INFISICAL_CLIENT_ID",
-  clientSecretEnv: "VBR_INFISICAL_CLIENT_SECRET",
-};
 
 const VAULT_DEFAULT = {
   backend: "vault" as const,
@@ -32,7 +23,7 @@ export function sprinkleRefStarterConfigs(platform = process.platform) {
     defaultCategory: "main",
     profiles: {
       "vault-default": VAULT_DEFAULT,
-      "infisical-default": INFISICAL_DEFAULT,
+      "infisical-default": starterInfisicalProfile(),
     },
     categories: { main: { profile: "infisical-default" } },
   };

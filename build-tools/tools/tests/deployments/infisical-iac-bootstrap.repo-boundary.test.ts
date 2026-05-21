@@ -6,6 +6,7 @@ import * as path from "node:path";
 import { test } from "node:test";
 import { DEFAULT_BOOTSTRAP_ARGS } from "../../deployments/infisical-iac-bootstrap-config";
 import { runInfisicalIacBootstrap } from "../../deployments/infisical-iac-bootstrap";
+import { buildRepoDryRunMaterializationPlan } from "../../deployments/infisical-iac-bootstrap-dry-run-plan";
 import { resolveCredentialSinkSelection } from "../../deployments/infisical-iac-bootstrap-sink";
 
 test("repo bootstrap dry-run reports resolver profiles without Pleomino provisioning", async () => {
@@ -34,6 +35,8 @@ test("repo bootstrap dry-run reports resolver profiles without Pleomino provisio
       materializationPlan?: {
         readOnly?: boolean;
         backendLogin?: { infisicalRequired?: boolean; wouldAuthenticate?: boolean };
+        materializedProfiles?: string[];
+        validatedExistingProfiles?: string[];
         profiles?: Array<{ name: string; needsLiveValidation?: boolean }>;
         bootstrapSink?: { wouldMaterialize?: boolean; wouldValidate?: boolean };
       };
@@ -53,6 +56,11 @@ test("repo bootstrap dry-run reports resolver profiles without Pleomino provisio
     assert.equal(report.materializationPlan?.readOnly, true);
     assert.equal(report.materializationPlan?.backendLogin?.infisicalRequired, true);
     assert.equal(report.materializationPlan?.backendLogin?.wouldAuthenticate, true);
+    assert.deepEqual(report.materializationPlan?.materializedProfiles, [
+      "infisical-default",
+      "vault-default",
+    ]);
+    assert.deepEqual(report.materializationPlan?.validatedExistingProfiles, []);
     assert.ok(report.materializationPlan?.profiles?.some((profile) => profile.needsLiveValidation));
     assert.equal(
       Boolean(
@@ -98,6 +106,45 @@ test("deployment bootstrap auto credential sink does not create starter resolver
   });
 });
 
+test("repo bootstrap dry-run reports preserved operator profiles separately", async () => {
+  const dir = await tmp();
+  await withCwdAndEnv(dir, async () => {
+    await writeJson("sprinkleref/selected.local.json", {
+      version: 1,
+      defaultCategory: "main",
+      profiles: {
+        "infisical-default": {
+          backend: "infisical",
+          host: "https://app.infisical.com",
+          projectId: "proj_operator",
+          defaultEnvironment: "staging",
+          clientIdRef: "secret://operator/client-id",
+          clientSecretRef: "secret://operator/client-secret",
+        },
+      },
+      categories: {
+        main: { profile: "infisical-default" },
+        bootstrap: { backend: "local-file", file: ".local/bootstrap.json" },
+      },
+    });
+    await writeJson("graph.json", {
+      nodes: [{ name: "//deployments/infisical:deploy", secret_backend: "infisical/default" }],
+    });
+    const plan = await buildRepoDryRunMaterializationPlan({
+      configPath: "sprinkleref/selected.local.json",
+      graphPath: "graph.json",
+      sink: {
+        kind: "sprinkleref",
+        backend: "local-file",
+        category: "bootstrap",
+        description: "test sink",
+      },
+    });
+    assert.deepEqual(plan.validatedExistingProfiles, ["infisical-default"]);
+    assert.deepEqual(plan.materializedProfiles, []);
+  });
+});
+
 async function tmp() {
   return await fs.mkdtemp(path.join(os.tmpdir(), "infisical-bootstrap-repo-boundary-"));
 }
@@ -118,6 +165,11 @@ async function withCwdAndEnv(dir: string, run: () => Promise<void>) {
 
 async function assertMissing(file: string) {
   await assert.rejects(() => fs.stat(file), /ENOENT/);
+}
+
+async function writeJson(file: string, value: unknown) {
+  await fs.mkdir(path.dirname(file), { recursive: true });
+  await fs.writeFile(file, `${JSON.stringify(value, null, 2)}\n`);
 }
 
 async function captureConsole(run: () => Promise<void>) {

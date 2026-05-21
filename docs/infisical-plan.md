@@ -3414,3 +3414,111 @@ belong under a Pleomino deployment namespace.
 Operators who already generated local resolver state may need to rerun repo bootstrap or refresh
 their local config. The implementation also adds one more credential namespace concept that docs and
 tests must keep distinct from deployment managed workload outputs.
+
+## PR-35: Operator-authored resolver profile preservation
+
+### 1. Intent
+
+Make repo bootstrap respect existing operator-authored Infisical resolver profiles as authoritative.
+Repo bootstrap may materialize missing starter profiles or replace known generated placeholders, but
+it must not silently overwrite an existing real profile's credential refs, endpoint, path prefix, or
+other operator-chosen fields after validating that the profile's `projectId` still matches the
+selected repo profile.
+
+### 2. Scope of changes
+
+- Update Infisical repo profile materialization so an existing operator-authored profile is
+  validated for compatible `projectId` and preserved as-is instead of being rebuilt with generated
+  repo bootstrap credential refs.
+- Define the supported marker or structural rule that distinguishes starter/generated profiles from
+  operator-authored profiles. The rule must be deterministic, documented, and narrow enough that
+  arbitrary real profiles are not treated as generated just because they use the repo bootstrap
+  credential namespace.
+- Continue materializing missing profiles and replacing only generated starter/placeholders with the
+  current repo-scoped bootstrap credential refs from PR-34.
+- Preserve the PR-34 boundary: repo-generated profile refs remain under
+  `secret://viberoots/bootstrap/...`, while deployment managed workload refs remain under
+  `secret://deployments/pleomino/<stage>/...`.
+- Ensure dry-run and result summaries distinguish `validatedExistingProfiles` from
+  `materializedProfiles` so operators can tell whether bootstrap preserved existing local state or
+  wrote a generated profile.
+
+### 3. External prerequisites
+
+- None for tests. The implementation must not require live Infisical, Vault, Keychain, OpenTofu, or
+  macOS access.
+- Operators with existing local resolver profiles should not need to regenerate or edit them unless
+  the selected profile points at a different Infisical project than the selected repo profile.
+
+### 4. Tests to be added
+
+- Add tests proving an existing real Infisical profile with matching `projectId` and custom
+  credential refs is validated and preserved byte-for-byte or semantically without being replaced by
+  generated repo bootstrap refs.
+- Add tests proving an existing profile with mismatched `projectId` fails closed and reports the
+  mismatch without rewriting the profile.
+- Add tests proving missing profiles and explicitly generated starter/placeholders are materialized
+  with the repo-scoped PR-34 credential refs.
+- Add dry-run/result summary tests for `validatedExistingProfiles` versus `materializedProfiles`.
+- Update any tests that currently encode unconditional overwrite behavior so they assert
+  preservation for operator-authored profiles and materialization only for missing/generated ones.
+
+### 5. Docs to be added or updated
+
+- Update `docs/infisical-design.md`, `docs/infisical-bootstrap.md`, and `infisical-bootstrap.md` to
+  state that existing operator-authored Infisical resolver profiles are authoritative once their
+  `projectId` validates.
+- Document how generated starter profiles are identified, when repo bootstrap will rewrite them, and
+  how operators can intentionally regenerate a profile.
+- Clarify that rerunning repo bootstrap after PR-34 does not force existing real profiles onto the
+  generated repo bootstrap credential refs.
+
+### 5.5. Expected regression scope
+
+- `deployment-only`
+- Keep changes limited to Infisical resolver profile materialization, generated-profile detection,
+  bootstrap result/dry-run reporting, tests, and docs. Do not change runtime secret acquisition,
+  deployment admission semantics, provider publish behavior, deployment fan-out, or live resource
+  naming.
+
+### 6. Acceptance criteria
+
+- Existing operator-authored Infisical resolver profiles with matching `projectId` in the selected
+  organization are preserved and reported as validated, not materialized.
+- Profiles with mismatched `projectId` fail closed without being rewritten.
+- Missing or explicitly generated starter profiles are still materialized with repo-scoped
+  `secret://viberoots/bootstrap/...` refs.
+- Dry-run and confirmed result summaries make profile preservation versus materialization explicit.
+- Dry-run reports unresolved operator-authored `projectIdEnv` profiles separately instead of
+  classifying them as validated when confirmed bootstrap would fail closed.
+- Tests cover preservation, mismatch failure, starter materialization, unresolved `projectIdEnv`,
+  and summary reporting.
+- Updated docs match the implemented rule and the repository validation suite passes.
+
+### 7. Risks
+
+- A weak generated-profile detector could accidentally preserve stale generated placeholders or
+  overwrite real operator profiles.
+- Preserving arbitrary operator-authored profile fields may leave unsupported combinations in place
+  if validation checks are too narrow.
+- Adding summary fields could create churn in bootstrap JSON tests and operator examples.
+
+### 8. Mitigations
+
+- Prefer an explicit generated marker in starter profiles over broad heuristic detection where the
+  existing config format can support it.
+- Validate the fields that are required for safe repo bootstrap use, especially backend kind and
+  `projectId`, while preserving non-conflicting operator choices.
+- Keep summary schema additions additive and update examples/tests together.
+
+### 9. Consequences of not implementing this PR
+
+Repo bootstrap will continue rewriting real operator-authored resolver profiles, contradicting the
+design's resolver authority model and making custom Infisical credential refs or alternate account
+setups fragile.
+
+### 10. Downsides for implementing this PR
+
+Bootstrap profile materialization becomes slightly more stateful because it must classify existing
+profiles before deciding whether to preserve or rewrite them. Operators and tests also need one more
+summary concept to distinguish validation from materialization.

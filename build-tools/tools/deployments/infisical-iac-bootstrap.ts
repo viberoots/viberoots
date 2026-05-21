@@ -181,7 +181,7 @@ async function hasRequiredInfisicalProfile(
   const config = await readSprinkleRefConfig(resolver.configPath);
   return resolver.profiles.some((profile) => {
     const backend = config.profiles[profile];
-    return backend?.backend === "infisical";
+    return profile.startsWith("infisical-") || backend?.backend === "infisical";
   });
 }
 

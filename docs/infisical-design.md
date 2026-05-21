@@ -238,9 +238,15 @@ Repo bootstrap should:
   environment/path, and credential env names;
 - materialize generated repo starter profiles into real shared backend metadata during confirmed
   repo bootstrap, while treating existing operator-authored resolver profiles as authoritative and
-  validating them instead of silently replacing them;
+  validating their project id against the selected organization instead of silently replacing them;
+- classify generated Infisical starter profiles only by the explicit
+  `generatedBy: "viberoots-repo-bootstrap"` marker or the exact legacy starter shape that used
+  `VBR_INFISICAL_PROJECT_ID`, `VBR_INFISICAL_CLIENT_ID`, and `VBR_INFISICAL_CLIENT_SECRET`;
+- fail closed rather than rewriting operator-authored profiles when `projectIdEnv` is configured but
+  the environment variable is unavailable during confirmed bootstrap;
 - keep repo dry-run read-only while reporting planned backend login, project/profile validation or
-  creation, Vault mount validation, and bootstrap credential sink materialization;
+  creation, Vault mount validation, unresolved operator-authored `projectIdEnv` profiles, and
+  bootstrap credential sink materialization;
 - materialize or validate local bootstrap credential sinks such as macOS
   Keychain services or restrictive local files, while keeping root/bootstrap
   access credentials out of Infisical-backed categories;

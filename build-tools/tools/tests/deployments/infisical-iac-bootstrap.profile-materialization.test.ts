@@ -38,17 +38,23 @@ test("repo profile materialization writes Infisical project id without secret va
   ]);
 });
 
-test("existing Infisical project profile is validated and receives bootstrap credential refs", async () => {
+test("operator-authored Infisical profile is validated and preserved", async () => {
   const dir = await tmp();
   const configPath = path.join(dir, "selected.local.json");
   const config = starterConfig();
   config.profiles["infisical-default"] = {
-    ...config.profiles["infisical-default"],
+    backend: "infisical",
+    host: "https://infisical.operator.example",
     projectId: "proj_existing",
-    projectIdEnv: undefined,
+    projectName: "operator-owned",
+    defaultEnvironment: "dev",
+    defaultPath: "/custom",
+    clientIdRef: "secret://operator/infisical/client-id",
+    clientSecretRef: "secret://operator/infisical/client-secret",
   };
   await writeJson(configPath, config);
-  const api = fakeProjectApi([{ id: "proj_existing", name: "operator-owned" }]);
+  const before = await fs.readFile(configPath, "utf8");
+  const api = fakeProjectApi([{ id: "proj_existing", name: "operator-owned", orgId: "org_1" }]);
   const result = await materializeRepoBackendProfiles({
     args: DEFAULT_BOOTSTRAP_ARGS,
     configPath,
@@ -59,15 +65,69 @@ test("existing Infisical project profile is validated and receives bootstrap cre
     env: vaultEnv(),
     fetchImpl: fakeVaultFetch as typeof fetch,
   });
-  assert.deepEqual(result.materializedProfiles, ["infisical-default"]);
-  const written = await fs.readFile(configPath, "utf8");
-  assert.match(written, /"clientSecretRef"/);
-  assert.doesNotMatch(written, /secret:\/\/deployments\/pleomino/);
+  assert.deepEqual(result.materializedProfiles, []);
+  assert.deepEqual(result.validatedExistingProfiles, ["infisical-default"]);
+  assert.equal(await fs.readFile(configPath, "utf8"), before);
   assert.deepEqual(api.calls, [
     "GET /api/v1/projects?type=secret-manager",
     "GET /api/v1/projects/proj_existing/memberships/identities/id_1",
     "POST /api/v1/projects/proj_existing/memberships/identities/id_1",
   ]);
+});
+
+test("generated Infisical starter profile with project id is rewritten with repo refs", async () => {
+  const dir = await tmp();
+  const configPath = path.join(dir, "selected.local.json");
+  const config = starterConfig();
+  config.profiles["infisical-default"] = {
+    ...config.profiles["infisical-default"],
+    generatedBy: "viberoots-repo-bootstrap",
+    projectId: "proj_existing",
+    projectIdEnv: undefined,
+  };
+  await writeJson(configPath, config);
+  const result = await materializeRepoBackendProfiles({
+    args: DEFAULT_BOOTSTRAP_ARGS,
+    configPath,
+    requiredProfiles: ["infisical-default"],
+    api: fakeProjectApi([{ id: "proj_existing", name: "viberoots-deployments" }]) as never,
+    organizationId: "org_1",
+    identity: { id: "id_1", name: "viberoots-iac-bootstrap" },
+  });
+  const written = await fs.readFile(configPath, "utf8");
+  assert.deepEqual(result.materializedProfiles, ["infisical-default"]);
+  assert.deepEqual(result.validatedExistingProfiles, []);
+  assert.match(written, /"clientIdRef": "secret:\/\/viberoots\/bootstrap\//);
+  assert.doesNotMatch(written, /VBR_INFISICAL_CLIENT_SECRET/);
+});
+
+test("operator-authored Infisical project mismatch fails without rewriting", async () => {
+  const dir = await tmp();
+  const configPath = path.join(dir, "selected.local.json");
+  const config = starterConfig();
+  config.profiles["infisical-default"] = {
+    backend: "infisical",
+    host: "https://app.infisical.com",
+    projectId: "proj_missing",
+    defaultEnvironment: "staging",
+    clientIdRef: "secret://operator/client-id",
+    clientSecretRef: "secret://operator/client-secret",
+  };
+  await writeJson(configPath, config);
+  const before = await fs.readFile(configPath, "utf8");
+  await assert.rejects(
+    () =>
+      materializeRepoBackendProfiles({
+        args: DEFAULT_BOOTSTRAP_ARGS,
+        configPath,
+        requiredProfiles: ["infisical-default"],
+        api: fakeProjectApi([{ id: "proj_repo", name: "viberoots-deployments" }]) as never,
+        organizationId: "org_1",
+        identity: { id: "id_1", name: "viberoots-iac-bootstrap" },
+      }),
+    /Infisical project proj_missing was not found/,
+  );
+  assert.equal(await fs.readFile(configPath, "utf8"), before);
 });
 
 test("repo profile validation rejects placeholder Vault metadata", async () => {
@@ -151,7 +211,7 @@ async function writeJson(file: string, value: unknown) {
   await fs.writeFile(file, `${JSON.stringify(value, null, 2)}\n`);
 }
 
-function fakeProjectApi(projects: Array<{ id: string; name: string }> = []) {
+function fakeProjectApi(projects: Array<{ id: string; name: string; orgId?: string }> = []) {
   return {
     calls: [] as string[],
     async request(method: string, endpoint: string, _body?: unknown, allow404?: boolean) {

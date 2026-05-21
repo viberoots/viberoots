@@ -17,6 +17,7 @@ export type SprinkleRefBackendConfig = {
   projectId?: string;
   projectName?: string;
   projectRef?: string;
+  generatedBy?: string;
   defaultEnvironment?: string;
   defaultPath?: string;
   clientIdEnv?: string;

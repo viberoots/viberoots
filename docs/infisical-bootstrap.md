@@ -30,6 +30,16 @@ Repo bootstrap materializes backend profile credentials under repo-scoped refs s
 continues to report only stage-specific managed workload refs under
 `secret://deployments/pleomino/<stage>/...`. If local `sprinkleref/selected.local.json` still
 points profile auth at the old Pleomino bootstrap namespace, rerun `infisical-bootstrap.ts repo`.
+Existing operator-authored Infisical profiles are preserved once their `projectId` validates in the
+selected organization.
+Bootstrap rewrites only missing profiles, profiles with `generatedBy: "viberoots-repo-bootstrap"`,
+or untouched legacy starter profiles that exactly match the old `VBR_INFISICAL_*` starter shape.
+To intentionally regenerate a profile, remove that profile or add the generated marker before
+rerunning repo bootstrap.
+Profiles that use operator-authored `projectIdEnv` are also preserved; confirmed bootstrap validates
+the resolved env value when present and fails closed without rewriting the profile when the env var
+is unset. Repo dry-run mirrors that closed state by reporting the profile in
+`unresolvedExistingProfiles` instead of `validatedExistingProfiles`.
 
 Token-based `--no-login` bootstrap flows must pass exactly one of `--org-name` or
 `--organization-id`; login-based operator flows may still use interactive or `--yes` single-org

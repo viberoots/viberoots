@@ -17,7 +17,9 @@ export async function fakeRepoBootstrapFetch(input: string | URL | Request, init
     return jsonResponse({ organizations: [{ id: "org_1", name: "viberoots" }] });
   }
   if (url.pathname === "/api/v1/projects") {
-    return jsonResponse({ projects: [{ id: "proj_repo_test", name: "viberoots-deployments" }] });
+    return jsonResponse({
+      projects: [{ id: "proj_repo_test", name: "viberoots-deployments", orgId: "org_1" }],
+    });
   }
   if (url.pathname === "/api/v1/projects/proj_repo_test/memberships/identities/created_identity") {
     if (method === "GET") return jsonResponse({}, 404);

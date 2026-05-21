@@ -23,15 +23,31 @@ export async function validateInfisicalRepoProject(
   api: InfisicalApi,
   organizationId: string,
   projectId: string,
+  opts: { requireOrganizationEvidence?: boolean } = {},
 ) {
   const result = await api.request<ProjectListResponse>("GET", projectListEndpoint());
-  const project = projectsFromResponse(result).find((candidate) => candidate.id === projectId);
-  if (!project) {
+  const projects = projectsFromResponse(result);
+  const project = projects.find((candidate) => {
+    if (candidate.id !== projectId) return false;
+    return opts.requireOrganizationEvidence
+      ? candidate.orgId === organizationId
+      : projectMatchesOrganization(candidate, organizationId);
+  });
+  if (project) return project;
+  const sameIdProject = projects.find((candidate) => candidate.id === projectId);
+  if (sameIdProject?.orgId) {
     throw new Error(
-      `Infisical project ${projectId} was not found in organization ${organizationId}; update the resolver profile projectId or rerun repo bootstrap with access to create/select the repo project`,
+      `Infisical project ${projectId} belongs to organization ${sameIdProject.orgId}, not selected organization ${organizationId}; update the resolver profile projectId or rerun repo bootstrap with the matching organization`,
     );
   }
-  return project;
+  if (sameIdProject && opts.requireOrganizationEvidence) {
+    throw new Error(
+      `Infisical project ${projectId} did not include organization evidence for selected organization ${organizationId}; update the resolver profile projectId or rerun repo bootstrap with an Infisical API response that includes orgId or organizationId`,
+    );
+  }
+  throw new Error(
+    `Infisical project ${projectId} was not found in organization ${organizationId}; update the resolver profile projectId or rerun repo bootstrap with access to create/select the repo project`,
+  );
 }
 
 export async function findInfisicalRepoProject(

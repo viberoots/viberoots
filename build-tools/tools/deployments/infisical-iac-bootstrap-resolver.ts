@@ -70,8 +70,10 @@ export function validateRepoResolverConfig(
   requiredProfiles: Set<string>,
 ) {
   for (const profile of requiredProfiles) {
-    if (!config.profiles[profile]) throw new Error(`SprinkleRef config missing profile ${profile}`);
-    validateRepoProfile(profile, config.profiles[profile]);
+    const backend = config.profiles[profile];
+    if (!backend && profile.startsWith("infisical-")) continue;
+    if (!backend) throw new Error(`SprinkleRef config missing profile ${profile}`);
+    validateRepoProfile(profile, backend);
   }
   for (const category of ["main", "bootstrap"]) {
     if (!config.categories[category]) {
@@ -96,7 +98,10 @@ function validateRepoProfile(profile: string, config: { backend: string }) {
 
 function bootstrapCredentialProfiles(config: SprinkleRefConfig, requiredProfiles: Set<string>) {
   return [...requiredProfiles]
-    .filter((profile) => config.profiles[profile]?.backend === "infisical")
+    .filter(
+      (profile) =>
+        profile.startsWith("infisical-") || config.profiles[profile]?.backend === "infisical",
+    )
     .sort();
 }
 
