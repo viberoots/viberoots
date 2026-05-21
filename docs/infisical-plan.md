@@ -3697,3 +3697,122 @@ with extra metadata, contradicting the resolver authority model introduced in PR
 Some locally edited legacy starter profiles may stop being regenerated automatically. Operators who
 want regeneration must use the explicit generated marker or recreate the profile through repo
 bootstrap.
+
+## PR-38: Remove speculative non-Pleomino deployment packages
+
+### 1. Intent
+
+Remove checked-in deployment packages that are not current Pleomino deployments. The repository
+should not contain speculative Data Room, Phase 0, or platform-foundation deployment targets until
+those projects are explicitly approved as real deployments. Deployment capability tests must use
+temp-repo fixtures or purpose-built hermetic test workspaces instead of polluting
+`projects/deployments` with future-looking operator surfaces.
+
+### 2. Scope of changes
+
+- Delete the checked-in non-Pleomino deployment packages under `projects/deployments`, including
+  `data-room-console-*`, `data-room-web-*`, `data-room-worker-*`, `platform-foundation-*`, and
+  `platform-shared`.
+- Leave `projects/deployments` containing only active Pleomino deployment packages and shared
+  Pleomino support, plus any repo-root `TARGETS` file needed for package discovery.
+- Remove placeholder OpenTofu files and stack metadata associated with the speculative Phase 0
+  packages, including `replace-me` state backend identities, empty `plan.tfplan` placeholders, and
+  `*.example.invalid` deployment URLs.
+- Move any capability coverage that currently cqueries those checked-in packages into temp-repo
+  fixtures or local test workspaces created during the tests. This includes provider, admission,
+  release-readiness, prerequisite, smoke, secret-contract, and migration-bundle coverage that still
+  matters for deployment tooling.
+- Remove or rewrite tests whose only purpose is to assert the existence of Data Room or Phase 0
+  checked-in deployment packages.
+- Update any code, docs, examples, and guardrails that present `data-room-*` or
+  `platform-foundation-*` labels as current operator-facing deployments.
+
+### 3. External prerequisites
+
+- None. This cleanup must be source-tree and test-fixture work only.
+- No live Infisical, Vault, OpenTofu, Vercel, Kubernetes, Supabase, macOS Keychain, or provider
+  access should be required.
+
+### 4. Tests to be added
+
+- Add a repository guard test proving `projects/deployments` contains only approved live deployment
+  families, initially Pleomino, and fails if future speculative deployment packages are checked in
+  without an explicit allowlist update.
+- Add or update temp-repo fixture tests for deployment capability behavior currently covered by the
+  Phase 0 packages, including admission prerequisites, readiness-secret contracts, smoke metadata,
+  provider target metadata, and OpenTofu foundation metadata.
+- Add docs/usage stale-reference tests or extend existing stale-name checks so operator-facing docs
+  do not advertise removed Data Room or platform-foundation deployment labels as runnable current
+  commands.
+- Add regression coverage proving deleted package labels are not selected by repo bootstrap,
+  SprinkleRef scans, deployment-family inference tests, or deployment-domain cquery sweeps.
+- Keep Pleomino deployment tests passing and ensure the cleanup does not weaken real Pleomino
+  metadata, secret, bootstrap, or provider coverage.
+
+### 5. Docs to be added or updated
+
+- Update `docs/infisical-design.md`, `docs/infisical-bootstrap.md`, and `infisical-bootstrap.md` to
+  state that the only checked-in live deployment family is Pleomino.
+- Update deployment docs such as `docs/deployments-usage.md`, `docs/deployment-adjustment.md`,
+  `docs/secrets-usage.md`, `docs/deployments-schema.md`, and troubleshooting docs so Data Room and
+  Phase 0 deployment labels are not presented as current operator commands or concrete package
+  inventory.
+- Where capability examples are still useful, mark them clearly as temp-repo/test-fixture examples
+  or convert them to generic illustrative snippets that do not imply live repo packages.
+- Add a short cleanup note explaining why the speculative packages were removed and how future
+  deployment families should be introduced only after product approval.
+
+### 5.5. Expected regression scope
+
+- `deployment-only`
+- Expect broad deployment test and docs churn because these packages are referenced by cquery tests,
+  release/admission tests, deployment docs, and secret-contract examples. Keep the cleanup focused on
+  removing speculative checked-in deployments and relocating required capability coverage to
+  temp-repo fixtures. Do not change Pleomino runtime behavior, Infisical/Vault backend semantics,
+  deployment provider implementations, reviewed-source admission policy, or live Pleomino resource
+  names.
+
+### 6. Acceptance criteria
+
+- `projects/deployments` contains only Pleomino deployment packages and any necessary Pleomino/shared
+  package discovery files.
+- No checked-in Data Room, Phase 0, or platform-foundation deployment packages, placeholder OpenTofu
+  plans, or speculative provider stack configs remain.
+- Deployment capability tests that still matter run from temp repos or hermetic test workspaces, not
+  from speculative checked-in deployment packages.
+- Operator-facing docs no longer list removed Data Room or platform-foundation labels as current
+  deployments or runnable commands.
+- Guard coverage prevents future speculative deployment packages from being added under
+  `projects/deployments` without an explicit allowlist change.
+- Pleomino deployment, Infisical bootstrap, SprinkleRef, and deployment-domain validation continue
+  to pass.
+- Focused tests and the repository validation suite pass.
+
+### 7. Risks
+
+- Removing the packages can break many tests that currently rely on their real labels instead of
+  constructing temp repos.
+- Some docs may use Data Room examples for broader deployment concepts and need careful rewriting so
+  useful concepts are not lost.
+- A too-strict allowlist guard could make it awkward to add approved future deployment families.
+
+### 8. Mitigations
+
+- First map every existing Data Room, Phase 0, and platform-foundation reference to either
+  delete, convert to temp fixture, or rewrite as generic documentation.
+- Preserve deployment capability coverage by moving behavior-focused cases into temp repos before
+  deleting the real packages.
+- Keep the allowlist guard explicit and documented so future approved families can be added with a
+  deliberate plan PR.
+
+### 9. Consequences of not implementing this PR
+
+The repo will continue to advertise speculative Data Room and platform-foundation deployments as if
+they were real operator surfaces, and deployment tests will keep depending on checked-in future
+project packages instead of isolated fixtures.
+
+### 10. Downsides for implementing this PR
+
+This cleanup is high-churn across deployment tests and docs. It may temporarily obscure some
+end-to-end deployment examples until the useful parts are rebuilt as temp-repo fixtures or generic
+illustrations.
