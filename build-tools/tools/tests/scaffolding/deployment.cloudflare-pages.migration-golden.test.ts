@@ -14,6 +14,7 @@ const wranglerShape = `{
 const deployments = [
   {
     id: "pleomino-staging",
+    packagePath: ["pleomino", "staging"],
     account: "web-platform-staging",
     domain: "staging.pleomino.com",
     project: "pleomino-staging-pages",
@@ -23,6 +24,7 @@ const deployments = [
   },
   {
     id: "pleomino-prod",
+    packagePath: ["pleomino", "prod"],
     account: "web-platform-prod",
     domain: "pleomino.com",
     project: "pleomino-prod-pages",
@@ -32,15 +34,15 @@ const deployments = [
   },
 ];
 
-async function readDeploymentFile(deploymentId: string, file: string): Promise<string> {
+async function readDeploymentFile(packagePath: readonly string[], file: string): Promise<string> {
   return await fsp.readFile(
-    path.join(repoRoot, "projects/deployments", deploymentId, file),
+    path.join(repoRoot, "projects/deployments", ...packagePath, file),
     "utf8",
   );
 }
 
 function expectedTargets(deployment: (typeof deployments)[number]): string {
-  return `load("//projects/deployments/pleomino-shared:family.bzl", "pleomino_cloudflare_deployment")
+  return `load("//projects/deployments/pleomino/shared:family.bzl", "pleomino_cloudflare_deployment")
 
 pleomino_cloudflare_deployment(
     name = "deploy",
@@ -57,8 +59,11 @@ pleomino_cloudflare_deployment(
 
 test("checked-in Cloudflare Pages deployments keep scaffolded file shape", async () => {
   for (const deployment of deployments) {
-    const wrangler = await readDeploymentFile(deployment.id, "wrangler.jsonc");
+    const wrangler = await readDeploymentFile(deployment.packagePath, "wrangler.jsonc");
     assert.equal(wrangler, wranglerShape);
-    assert.equal(await readDeploymentFile(deployment.id, "TARGETS"), expectedTargets(deployment));
+    assert.equal(
+      await readDeploymentFile(deployment.packagePath, "TARGETS"),
+      expectedTargets(deployment),
+    );
   }
 });

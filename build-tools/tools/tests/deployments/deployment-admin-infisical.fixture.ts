@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { resolveDeploymentFromTarget } from "../../deployments/deployment-query";
 import { infisicalRequirement, infisicalRuntime } from "./deployment-secret-infisical.fixture";
 
-export const INFISICAL_ADMIN_DEPLOYMENT = "//projects/deployments/pleomino-staging:deploy";
+export const INFISICAL_ADMIN_DEPLOYMENT = "//projects/deployments/pleomino/staging:deploy";
 
 export async function infisicalAdminDeployment(siteUrl = "http://127.0.0.1") {
   const deployment = await resolveDeploymentFromTarget(process.cwd(), INFISICAL_ADMIN_DEPLOYMENT);

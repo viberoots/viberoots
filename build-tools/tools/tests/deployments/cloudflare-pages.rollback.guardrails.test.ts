@@ -53,7 +53,7 @@ test("cloudflare-pages rollback rejects preview source runs and missing exact ar
     await writeArtifact(artifactDir, "<html>preview-source</html>\n");
     await writeArtifact(secondArtifactDir, "<html>current-source</html>\n");
     await writeWranglerConfig(
-      path.join(tmp, "projects", "deployments", "pleomino-staging", "wrangler.jsonc"),
+      path.join(tmp, "projects", "deployments", "pleomino", "staging", "wrangler.jsonc"),
     );
     await installCloudflarePagesTargets(tmp, [deployment]);
     await ensureNixosSharedHostReviewedSourceRef(tmp, $, deployment);
@@ -146,7 +146,7 @@ test("cloudflare-pages production rollback requires fresh approval evidence", as
     const baseLanePolicy = cloudflarePagesDeploymentFixture().lanePolicy;
     const deployment = cloudflarePagesDeploymentFixture({
       deploymentId: "pleomino-prod",
-      label: "//projects/deployments/pleomino-prod:deploy",
+      label: "//projects/deployments/pleomino/prod:deploy",
       protectionClass: "production_facing",
       environmentStage: "prod",
       lanePolicy: {
@@ -171,11 +171,11 @@ test("cloudflare-pages production rollback requires fresh approval evidence", as
       },
       admissionPolicy: {
         ...cloudflarePagesDeploymentFixture().admissionPolicy,
-        ref: "//projects/deployments/pleomino-prod:prod_release",
+        ref: "//projects/deployments/pleomino/prod:prod_release",
         allowedRefs: ["main"],
         requiredApprovals: ["prod-approval", "release-owner"],
       },
-      admissionPolicyRef: "//projects/deployments/pleomino-prod:prod_release",
+      admissionPolicyRef: "//projects/deployments/pleomino/prod:prod_release",
       providerTarget: {
         ...cloudflarePagesDeploymentFixture().providerTarget,
         account: "web-platform-prod",
@@ -191,7 +191,7 @@ test("cloudflare-pages production rollback requires fresh approval evidence", as
     const fake = await installFakeCloudflarePagesWrangler(tmp);
     await writeArtifact(artifactDir, "<html>prod-good</html>\n");
     await writeWranglerConfig(
-      path.join(tmp, "projects", "deployments", "pleomino-prod", "wrangler.jsonc"),
+      path.join(tmp, "projects", "deployments", "pleomino", "prod", "wrangler.jsonc"),
     );
     await installCloudflarePagesTargets(tmp, [deployment]);
     await ensureNixosSharedHostReviewedSourceRef(tmp, $, deployment);

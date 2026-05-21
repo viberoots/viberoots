@@ -38,7 +38,7 @@ test("static-webapp client uploads are digested, stored, and provenance-recorded
       recordsRoot,
       uploadSessionId: upload.uploadSessionId,
       submissionId: "submission-1",
-      deploymentLabel: "//projects/deployments/pleomino-staging:deploy",
+      deploymentLabel: "//projects/deployments/pleomino/staging:deploy",
       sourceRevision: "abc123",
       buildTarget: "//projects/apps/pleomino:app",
     });
@@ -153,7 +153,7 @@ test("static-webapp upload sessions are bound to one submission", async () => {
           recordsRoot: path.join(tmp, "records"),
           uploadSessionId: upload.uploadSessionId,
           submissionId: "submission-b",
-          deploymentLabel: "//projects/deployments/pleomino-staging:deploy",
+          deploymentLabel: "//projects/deployments/pleomino/staging:deploy",
           sourceRevision: "abc123",
           buildTarget: "//projects/apps/pleomino:app",
         }),

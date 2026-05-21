@@ -37,7 +37,7 @@ test("deployment bootstrap rejects unsafe auto resolver before remote mutation",
             runInfisicalIacBootstrap({
               ...DEFAULT_BOOTSTRAP_ARGS,
               mode: "deployment",
-              target: "//projects/deployments/pleomino-staging:deploy",
+              target: "//projects/deployments/pleomino/staging:deploy",
               apiUrl: `http://127.0.0.1:${port}`,
               cliDomain: `http://127.0.0.1:${port}/api`,
               hostOverride: true,
@@ -85,7 +85,7 @@ test("deployment bootstrap creates missing auto resolver before remote mutation"
           runInfisicalIacBootstrap({
             ...DEFAULT_BOOTSTRAP_ARGS,
             mode: "deployment",
-            target: "//projects/deployments/pleomino-staging:deploy",
+            target: "//projects/deployments/pleomino/staging:deploy",
             apiUrl: `http://127.0.0.1:${port}`,
             cliDomain: `http://127.0.0.1:${port}/api`,
             hostOverride: true,
@@ -137,7 +137,7 @@ test("deployment bootstrap remediates missing selected resolver before remote mu
           runInfisicalIacBootstrap({
             ...DEFAULT_BOOTSTRAP_ARGS,
             mode: "deployment",
-            target: "//projects/deployments/pleomino-staging:deploy",
+            target: "//projects/deployments/pleomino/staging:deploy",
             apiUrl: `http://127.0.0.1:${port}`,
             cliDomain: `http://127.0.0.1:${port}/api`,
             hostOverride: true,
@@ -226,7 +226,7 @@ async function close(server: http.Server) {
 }
 
 async function writeReviewedMetadata(dir: string) {
-  const file = path.join(dir, "projects/deployments/pleomino-shared/family.bzl");
+  const file = path.join(dir, "projects/deployments/pleomino/shared/family.bzl");
   await fs.mkdir(path.dirname(file), { recursive: true });
   await fs.writeFile(
     file,

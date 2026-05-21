@@ -74,15 +74,15 @@ test("bootstrap preflight retry command includes deployment target scope", () =>
   const message = bootstrapRetryMessage({
     ...DEFAULT_BOOTSTRAP_ARGS,
     mode: "deployment",
-    target: "//projects/deployments/pleomino-staging:deploy",
+    target: "//projects/deployments/pleomino/staging:deploy",
     yes: false,
     dryRun: false,
   });
   assert.match(
     message,
-    /infisical-bootstrap\.ts deployment --target \/\/projects\/deployments\/pleomino-staging:deploy .*--yes/,
+    /infisical-bootstrap\.ts deployment --target \/\/projects\/deployments\/pleomino\/staging:deploy .*--yes/,
   );
-  assert.match(message, /--tofu-dir projects\/deployments\/pleomino-infisical\/opentofu/);
+  assert.match(message, /--tofu-dir projects\/deployments\/pleomino\/infisical\/opentofu/);
 });
 
 test("bootstrap path rejects non-interactive execution before Infisical, OpenTofu, or sink writes", async () => {
@@ -111,7 +111,7 @@ test("bootstrap path rejects non-interactive execution before Infisical, OpenTof
           runInfisicalIacBootstrap({
             ...DEFAULT_BOOTSTRAP_ARGS,
             mode: "deployment",
-            target: "//projects/deployments/pleomino-staging:deploy",
+            target: "//projects/deployments/pleomino/staging:deploy",
             apiUrl: `http://127.0.0.1:${port}`,
             cliDomain: `http://127.0.0.1:${port}/api`,
             noLogin: true,
@@ -211,7 +211,7 @@ async function close(server: http.Server) {
 }
 
 async function writeReviewedMetadata(dir: string) {
-  const file = path.join(dir, "projects/deployments/pleomino-shared/family.bzl");
+  const file = path.join(dir, "projects/deployments/pleomino/shared/family.bzl");
   await fs.mkdir(path.dirname(file), { recursive: true });
   await fs.writeFile(
     file,

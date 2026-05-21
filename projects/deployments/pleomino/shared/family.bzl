@@ -64,9 +64,8 @@ def _vault_runtime():
 
 def _family_defaults():
     return deployment_family_defaults(
-        deployment_family = "pleomino",
         component = "//projects/apps/pleomino:app",
-        lane_policy = "//projects/deployments/pleomino-shared:lane",
+        lane_policy = "//projects/deployments/pleomino/shared:lane",
     )
 
 def _cloudflare_secret(step):
@@ -81,7 +80,7 @@ def _cloudflare_stage(stage, admission_policy, protection_class, account, projec
     prerequisites = [] if not prerequisite else [{"deployment_id": prerequisite, "mode": "ordering_only"}]
     return deployment_stage_delta(
         stage = stage,
-        admission_policy = "//projects/deployments/pleomino-shared:%s" % admission_policy,
+        admission_policy = "//projects/deployments/pleomino/shared:%s" % admission_policy,
         protection_class = protection_class,
         provider_target = {"account": account, "project": project, "custom_domain": domain},
         ingress_hostnames = [domain],
@@ -120,7 +119,7 @@ def pleomino_dev_deployment(name):
         _family_defaults(),
         deployment_stage_delta(
             stage = "dev",
-            admission_policy = "//projects/deployments/pleomino-shared:dev_release",
+            admission_policy = "//projects/deployments/pleomino/shared:dev_release",
             protection_class = "shared_nonprod",
             vault_runtime = _vault_runtime(),
             provider_target = {

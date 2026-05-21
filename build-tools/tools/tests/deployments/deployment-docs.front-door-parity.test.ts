@@ -12,11 +12,7 @@ const vaultRunbookDocPath = path.join(repoRoot, "docs", "vault-production-bootst
 const designDocPath = path.join(repoRoot, "docs", "deployments-design.md");
 const scenariosDocPath = path.join(repoRoot, "docs", "deployment-scenarios.md");
 const contractDocPath = path.join(repoRoot, "docs", "deployments-contract.md");
-const providerCapabilitiesDocPath = path.join(
-  repoRoot,
-  "docs",
-  "deployment-provider-capabilities.md",
-);
+const providerCapabilitiesDocPath = path.join(repoRoot, "docs/deployment-provider-capabilities.md");
 const defsPath = path.join(repoRoot, "build-tools", "deployments", "defs.bzl");
 
 const bannedDocFragments = [
@@ -30,13 +26,18 @@ const bannedDocFragments = [
 ] as const;
 
 async function read(filePath: string): Promise<string> {
-  return await fsp.readFile(filePath, "utf8");
+  return fsp.readFile(filePath, "utf8");
 }
 
 function assertBannedFragmentsAbsent(doc: string, label: string) {
   for (const fragment of bannedDocFragments) {
     assert.ok(!doc.includes(fragment), `${label} must not contain stale fragment: ${fragment}`);
   }
+}
+
+function assertNoFlatPleominoPackageLabels(doc: string, label: string) {
+  const stale = doc.match(/(?:\/\/)?projects\/deployments\/pleomino-[A-Za-z0-9_-]+(?::|\/|\b)/g);
+  assert.equal(stale, null, `${label} must not present old flat Pleomino labels: ${stale}`);
 }
 
 test("deployment design and scenario docs stay aligned with the reviewed front door and authoring surface", async () => {
@@ -62,23 +63,39 @@ test("deployment design and scenario docs stay aligned with the reviewed front d
     read(defsPath),
   ]);
 
-  assertBannedFragmentsAbsent(designDoc, "deployment design");
-  assertBannedFragmentsAbsent(scenariosDoc, "deployment scenarios");
-  assertBannedFragmentsAbsent(contractDoc, "deployment contract");
-  assertBannedFragmentsAbsent(usageDoc, "deployments usage");
+  for (const [doc, label] of [
+    [usageDoc, "deployments usage"],
+    [secretsUsageDoc, "secrets usage"],
+    [apiDoc, "deployment and secrets API"],
+    [vaultRunbookDoc, "vault production bootstrap"],
+    [designDoc, "deployment design"],
+    [scenariosDoc, "deployment scenarios"],
+    [contractDoc, "deployment contract"],
+    [providerCapabilitiesDoc, "provider capabilities"],
+  ] as const) {
+    assertNoFlatPleominoPackageLabels(doc, label);
+  }
+  for (const [doc, label] of [
+    [designDoc, "deployment design"],
+    [scenariosDoc, "deployment scenarios"],
+    [contractDoc, "deployment contract"],
+    [usageDoc, "deployments usage"],
+  ] as const) {
+    assertBannedFragmentsAbsent(doc, label);
+  }
 
   assert.match(
     designDoc,
-    /deploy --deployment \/\/projects\/deployments\/pleomino-prod:deploy/,
+    /deploy --deployment \/\/projects\/deployments\/pleomino\/prod:deploy/,
     "deployment design must document the reviewed --deployment <label> front door",
   );
   assert.match(
     scenariosDoc,
-    /deploy --deployment \/\/projects\/deployments\/pleomino-prod:deploy/,
+    /deploy --deployment \/\/projects\/deployments\/pleomino\/prod:deploy/,
     "deployment scenarios must use the reviewed --deployment <label> front door",
   );
   for (const command of [
-    /deploy --deployment \/\/projects\/deployments\/pleomino-prod:deploy/,
+    /deploy --deployment \/\/projects\/deployments\/pleomino\/prod:deploy/,
     /--preview\s+\\?\s*--source-run-id <deploy-run-id>/,
     /--preview-cleanup\s+\\?\s*--source-run-id <deploy-run-id>/,
     /--publish-only\s+\\?\s*--source-run-id <deploy-run-id>/,
@@ -110,26 +127,10 @@ test("deployment design and scenario docs stay aligned with the reviewed front d
       `deployments usage must include ${provider} in the provider family quick starts`,
     );
   }
-  assert.match(
-    usageDoc,
-    /NixOS Shared Host Usage/,
-    "deployments usage must link to the provider-specific mini host usage guide",
-  );
-  assert.match(
-    usageDoc,
-    /Deployment And Secrets API/,
-    "deployments usage must link to the shared deployment and secrets API reference",
-  );
-  assert.match(
-    secretsUsageDoc,
-    /Deployment And Secrets API/,
-    "secrets usage must link to the shared deployment and secrets API reference",
-  );
-  assert.match(
-    secretsUsageDoc,
-    /Vault Production Bootstrap Runbook/,
-    "secrets usage must link to the production Vault bootstrap runbook",
-  );
+  assert.match(usageDoc, /NixOS Shared Host Usage/);
+  assert.match(usageDoc, /Deployment And Secrets API/);
+  assert.match(secretsUsageDoc, /Deployment And Secrets API/);
+  assert.match(secretsUsageDoc, /Vault Production Bootstrap Runbook/);
   for (const fragment of [
     /End-To-End Example/,
     /cloudflare_pages_static_webapp_deployment\(/,
@@ -160,7 +161,7 @@ test("deployment design and scenario docs stay aligned with the reviewed front d
   }
   for (const fragment of [
     /deploy --list/,
-    /deploy --deployment \/\/projects\/deployments\/pleomino-prod:deploy/,
+    /deploy --deployment \/\/projects\/deployments\/pleomino\/prod:deploy/,
     /\/api\/v1\/submissions/,
     /\/api\/v1\/status/,
     /\/api\/v1\/records/,

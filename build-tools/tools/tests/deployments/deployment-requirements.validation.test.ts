@@ -7,7 +7,7 @@ import { deploymentRequirementFixture } from "./deployment-metadata.fixture";
 function errorsFor(requirements: ReturnType<typeof deploymentRequirementFixture>[]) {
   const errors: string[] = [];
   validateDeploymentRequirements({
-    label: "//projects/deployments/pleomino-staging:deploy",
+    label: "//projects/deployments/pleomino/staging:deploy",
     fieldPath: "secret_requirements",
     requirements,
     errors,

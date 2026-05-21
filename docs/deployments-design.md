@@ -173,18 +173,21 @@ projects/
   libs/
     shared-ui/
   deployments/
-    pleomino-prod/
-      TARGETS
-      wrangler.jsonc
-    pleomino-staging/
-      TARGETS
-      wrangler.jsonc
+    pleomino/
+      prod/
+        TARGETS
+        wrangler.jsonc
+      staging/
+        TARGETS
+        wrangler.jsonc
     acme-platform-preview/
       TARGETS
       smoke.ts
 ```
 
-The deployment id is the directory name under `projects/deployments/`.
+The deployment id is the reviewed deployment identity, such as `pleomino-prod`, while
+Pleomino's repo package path is the canonical family/stage path under
+`projects/deployments/pleomino/`.
 The `acme-platform-preview` example is illustrative of a local-only or isolated-preview-capable shape;
 protected/shared packages should normally stay closer to declarative metadata plus provider-native config.
 
@@ -211,7 +214,7 @@ Those names leak implementation detail into the identity more than necessary.
 I want each deployment package to expose a canonical `:deploy` target:
 
 ```text
-//projects/deployments/pleomino-prod:deploy
+//projects/deployments/pleomino/prod:deploy
 ```
 
 That gives us:
@@ -516,7 +519,7 @@ sequenceDiagram
 
     participant PV3 as "Provider APIs"
 
-    Dev->>CLI3: deploy --deployment //projects/deployments/pleomino-prod:deploy
+    Dev->>CLI3: deploy --deployment //projects/deployments/pleomino/prod:deploy
     CLI3->>BX3: extract deployment metadata
     BX3->>VAL3: validate shape and policy references
     VAL3-->>CLI3: validated payload
@@ -1016,16 +1019,16 @@ I want one canonical deploy entrypoint for everything under `projects/deployment
 Examples:
 
 ```bash
-deploy --deployment //projects/deployments/pleomino-prod:deploy
-deploy --deployment //projects/deployments/pleomino-prod:deploy --preview --source-run-id <deploy-run-id>
-deploy --deployment //projects/deployments/pleomino-dev:deploy --preview --preview-branch <branch-name>
-deploy --deployment //projects/deployments/pleomino-dev:deploy --preview --preview-commit <commit-sha>
-deploy --deployment //projects/deployments/pleomino-prod:deploy --validate-only
-deploy --deployment //projects/deployments/pleomino-prod:deploy --provision-only
-deploy --deployment //projects/deployments/pleomino-prod:deploy --publish-only --source-run-id <deploy-run-id>
-deploy --deployment //projects/deployments/pleomino-prod:deploy --publish-only --source-run-id <deploy-run-id> --rollback
-deploy --deployment //projects/deployments/pleomino-dev:deploy --preview-cleanup --preview-branch <branch-name>
-deploy --deployment //projects/deployments/pleomino-dev:deploy --preview-cleanup --preview-commit <commit-sha>
+deploy --deployment //projects/deployments/pleomino/prod:deploy
+deploy --deployment //projects/deployments/pleomino/prod:deploy --preview --source-run-id <deploy-run-id>
+deploy --deployment //projects/deployments/pleomino/dev:deploy --preview --preview-branch <branch-name>
+deploy --deployment //projects/deployments/pleomino/dev:deploy --preview --preview-commit <commit-sha>
+deploy --deployment //projects/deployments/pleomino/prod:deploy --validate-only
+deploy --deployment //projects/deployments/pleomino/prod:deploy --provision-only
+deploy --deployment //projects/deployments/pleomino/prod:deploy --publish-only --source-run-id <deploy-run-id>
+deploy --deployment //projects/deployments/pleomino/prod:deploy --publish-only --source-run-id <deploy-run-id> --rollback
+deploy --deployment //projects/deployments/pleomino/dev:deploy --preview-cleanup --preview-branch <branch-name>
+deploy --deployment //projects/deployments/pleomino/dev:deploy --preview-cleanup --preview-commit <commit-sha>
 deploy --from-changes
 deploy --list
 ```
@@ -1134,7 +1137,7 @@ How to read this map:
 - routine JSON submissions/snapshots under `<records-root>/control-plane/` and protected/shared deploy-record files under `<records-root>/runs/` are no longer the normal operator-readable authority path
 - isolated fixture tests and explicitly local harnesses may use an explicit `pgmem://...` backend URL, but that harness is not the reviewed operator backend
 - provider, provisioner, and release-action modules still hold only vetted built-in execution adapters
-- repo-owned `deployment_lane_policy(...)` and `deployment_admission_policy(...)` rules remain Buck-visible policy-definition objects, typically in shared deployment packages such as `//projects/deployments/pleomino-shared:lane`
+- repo-owned `deployment_lane_policy(...)` and `deployment_admission_policy(...)` rules remain Buck-visible policy-definition objects, typically in shared deployment packages such as `//projects/deployments/pleomino/shared:lane`
 - exact filenames may evolve, but these directory boundaries should remain stable so the implementation matches the design's trust and ownership model
 
 CLI/front-door responsibilities:
@@ -1345,7 +1348,7 @@ This distinction needs to stay explicit because it is one of the easiest places 
 So:
 
 - `pleomino-prod` and `pleomino-staging` are different deployments
-- `deploy --deployment //projects/deployments/pleomino-prod:deploy --preview --source-run-id <deploy-run-id>` is still operating on `pleomino-prod`
+- `deploy --deployment //projects/deployments/pleomino/prod:deploy --preview --source-run-id <deploy-run-id>` is still operating on `pleomino-prod`
 - preview should not silently invent a second deployment id or bypass the deployment package's validation rules
 - for `shared_nonprod` and `production_facing`, preview should not be used from unadmitted revisions or artifacts
 - for `shared_nonprod` and `production_facing`, `--preview` should require an explicit admitted source selector such as `--source-run-id <deploy-run-id>`
@@ -1398,7 +1401,7 @@ Protected/shared clarification:
 
 Good pattern:
 
-- user runs `deploy --deployment //projects/deployments/pleomino-prod:deploy`
+- user runs `deploy --deployment //projects/deployments/pleomino/prod:deploy`
 - the repo-level deploy tool resolves the deployment target
 - for `local_only` or isolated-preview flows, the repo-level deploy tool may delegate one step to a deployment-local script if needed
 - for `shared_nonprod` and `production_facing`, the normal path should stay within vetted built-in control-plane code plus declarative metadata and provider-native config
@@ -1519,7 +1522,7 @@ When you would use it:
 Local-only example:
 
 ```bash
-deploy --deployment //projects/deployments/pleomino-prod:deploy --validate-only
+deploy --deployment //projects/deployments/pleomino/prod:deploy --validate-only
 ```
 
 Plain-language version:
@@ -1547,12 +1550,12 @@ When you would use it:
 Example:
 
 ```bash
-deploy --deployment //projects/deployments/pleomino-prod:deploy --provision-only
+deploy --deployment //projects/deployments/pleomino/prod:deploy --provision-only
 ```
 
 If a reviewed protected/shared provisioner needs `immutable_resolved_inputs` rather than plain
 `metadata_only`, the operator contract should add an explicit admitted source-run selector such as
-`deploy --deployment //projects/deployments/pleomino-prod:deploy --provision-only --source-run-id <deploy-run-id>`.
+`deploy --deployment //projects/deployments/pleomino/prod:deploy --provision-only --source-run-id <deploy-run-id>`.
 
 Even in the default protected/shared `metadata_only` case, the control plane must still admit and record
 one concrete source revision for the provision-only run before mutation begins. The difference is that the
@@ -1601,7 +1604,7 @@ When you would use it:
 Example:
 
 ```bash
-deploy --deployment //projects/deployments/pleomino-prod:deploy --publish-only --source-run-id <deploy-run-id>
+deploy --deployment //projects/deployments/pleomino/prod:deploy --publish-only --source-run-id <deploy-run-id>
 ```
 
 Plain-language version:
@@ -1708,9 +1711,9 @@ cloudflare_pages_static_webapp_deployment(
     component = "//projects/apps/pleomino:app",
     account = "web-platform-prod",
     project = "pleomino-prod-pages",
-    lane_policy = "//projects/deployments/pleomino-shared:lane",
+    lane_policy = "//projects/deployments/pleomino/shared:lane",
     environment_stage = "prod",
-    admission_policy = "//projects/deployments/pleomino-shared:prod_release",
+    admission_policy = "//projects/deployments/pleomino/shared:prod_release",
     protection_class = "production_facing",
     preview = {
         "target_derivation": "provider_managed_source_run",
@@ -1749,22 +1752,22 @@ Preview lifecycle examples:
 
 - CI-managed preview of an already-admitted production artifact
   - CI or another automation trigger asks the shared control plane to select an already-admitted `pleomino-prod` run
-  - it runs `deploy --deployment //projects/deployments/pleomino-prod:deploy --preview --source-run-id <deploy-run-id>`
+  - it runs `deploy --deployment //projects/deployments/pleomino/prod:deploy --preview --source-run-id <deploy-run-id>`
   - the provider adapter derives an isolated target such as `preview-from-run-184`
   - smoke runs against the preview URL
   - when the preview expires, the control plane destroys that isolated target or asks the provider to expire it
 - Branch preview with provider-managed ephemeral target
-  - CI publishes a branch preview for a local-only or explicitly preview-safe deployment by running `deploy --deployment //projects/deployments/pleomino-dev:deploy --preview --preview-branch feature/new-nav`
+  - CI publishes a branch preview for a local-only or explicitly preview-safe deployment by running `deploy --deployment //projects/deployments/pleomino/dev:deploy --preview --preview-branch feature/new-nav`
   - the provider owns most of the lifecycle
   - the provider adapter derives the isolated preview target, URL, cleanup identity, and lock scope from that explicit branch selector
   - repo policy still requires that the preview target be isolated from the normal live target
 - Commit preview with provider-managed ephemeral target
-  - CI or a developer publishes a commit preview for a local-only or explicitly preview-safe deployment by running `deploy --deployment //projects/deployments/pleomino-dev:deploy --preview --preview-commit abc1234`
+  - CI or a developer publishes a commit preview for a local-only or explicitly preview-safe deployment by running `deploy --deployment //projects/deployments/pleomino/dev:deploy --preview --preview-commit abc1234`
   - the provider adapter derives the isolated preview target, URL, cleanup identity, and lock scope from that explicit commit selector
   - repo policy still requires that the preview target be isolated from the normal live target
 - Manual local preview to a personal isolated target
   - a developer may run preview locally only when the provider adapter supports a clearly isolated local or personal preview target
-  - the request should still use one canonical selector such as `deploy --deployment //projects/deployments/pleomino-dev:deploy --preview --preview-branch feature/new-nav`
+  - the request should still use one canonical selector such as `deploy --deployment //projects/deployments/pleomino/dev:deploy --preview --preview-branch feature/new-nav`
   - that preview must not mutate any shared deployment target
   - if isolation cannot be proven, local preview is out of policy
 
@@ -1801,9 +1804,9 @@ Preview cleanup contract:
 - preview cleanup should be modeled as its own audited operation kind:
   - `preview_cleanup`
 - the public operator surface should expose preview cleanup explicitly rather than hiding it behind provider-specific tooling or implicit TTL-only behavior
-  - example protected/shared cleanup: `deploy --deployment //projects/deployments/pleomino-prod:deploy --preview-cleanup --source-run-id <deploy-run-id>`
-  - example preview-safe local cleanup: `deploy --deployment //projects/deployments/pleomino-dev:deploy --preview-cleanup --preview-branch <branch-name>`
-  - example preview-safe local cleanup: `deploy --deployment //projects/deployments/pleomino-dev:deploy --preview-cleanup --preview-commit <commit-sha>`
+  - example protected/shared cleanup: `deploy --deployment //projects/deployments/pleomino/prod:deploy --preview-cleanup --source-run-id <deploy-run-id>`
+  - example preview-safe local cleanup: `deploy --deployment //projects/deployments/pleomino/dev:deploy --preview-cleanup --preview-branch <branch-name>`
+  - example preview-safe local cleanup: `deploy --deployment //projects/deployments/pleomino/dev:deploy --preview-cleanup --preview-commit <commit-sha>`
 - preview cleanup must record at least:
   - the deployment id
   - `publish_mode = preview`
@@ -2000,13 +2003,13 @@ Suppose `pleomino-prod` uses Cloudflare Pages.
 
 Typical uses:
 
-- `deploy --deployment //projects/deployments/pleomino-prod:deploy --validate-only`
+- `deploy --deployment //projects/deployments/pleomino/prod:deploy --validate-only`
   - verify that the deployment package, app target, and Wrangler config are wired correctly
-- `deploy --deployment //projects/deployments/pleomino-prod:deploy --provision-only`
+- `deploy --deployment //projects/deployments/pleomino/prod:deploy --provision-only`
   - create the Pages project and custom domain configuration if that is repo-owned
-- `deploy --deployment //projects/deployments/pleomino-prod:deploy --publish-only --source-run-id <deploy-run-id>`
+- `deploy --deployment //projects/deployments/pleomino/prod:deploy --publish-only --source-run-id <deploy-run-id>`
   - publish one selected previously built immutable artifact to an already-existing Pages project
-- `deploy --deployment //projects/deployments/pleomino-prod:deploy`
+- `deploy --deployment //projects/deployments/pleomino/prod:deploy`
   - run the full lifecycle in order
 
 This is one of the main reasons the model separates:
@@ -2039,14 +2042,14 @@ deployment_target(
     component_kind = "static-webapp",
     publisher = "wrangler-pages",
     publisher_config = "wrangler.jsonc",
-    lane_policy = "//projects/deployments/pleomino-shared:lane",
+    lane_policy = "//projects/deployments/pleomino/shared:lane",
     provider_target = {
         "project": "pleomino-prod-pages",
         "account": "web-platform-prod",
         "id": "pleomino-prod-pages",
     },
     environment_stage = "prod",
-    admission_policy = "//projects/deployments/pleomino-shared:prod_release",
+    admission_policy = "//projects/deployments/pleomino/shared:prod_release",
     protection_class = "production_facing",
     components = [
         {
@@ -2200,7 +2203,7 @@ Policy evaluation order:
     - required for `shared_nonprod` and `production_facing`
     - should be an explicit reference to a centrally defined stable source-ref/check/approval policy object for that deployment
     - should be Buck-visible and repo-owned rather than an opaque free-form string
-    - should normally be represented as a Buck label or equivalent structured repo-owned policy reference, for example `//projects/deployments/pleomino-shared:prod_release`
+    - should normally be represented as a Buck label or equivalent structured repo-owned policy reference, for example `//projects/deployments/pleomino/shared:prod_release`
     - keeps the deploy rule authoritative for which admission policy applies, even if the policy definition itself lives outside the deployment package
   - `protection_class`
     - required
@@ -2912,7 +2915,7 @@ This is one of the reasons `--publish-only` exists.
 If the deployment has a provisioner but you do not want to run provisioning on a particular release, you can use:
 
 ```bash
-deploy --deployment //projects/deployments/pleomino-prod:deploy --publish-only --source-run-id <deploy-run-id>
+deploy --deployment //projects/deployments/pleomino/prod:deploy --publish-only --source-run-id <deploy-run-id>
 ```
 
 That is an operational choice for one run.
@@ -3375,9 +3378,9 @@ cloudflare_pages_static_webapp_deployment(
     component = "//projects/apps/pleomino:app",
     account = "web-platform-prod",
     project = "pleomino-prod-pages",
-    lane_policy = "//projects/deployments/pleomino-shared:lane",
+    lane_policy = "//projects/deployments/pleomino/shared:lane",
     environment_stage = "prod",
-    admission_policy = "//projects/deployments/pleomino-shared:prod_release",
+    admission_policy = "//projects/deployments/pleomino/shared:prod_release",
     protection_class = "production_facing",
     smoke = {
         "type": "http-smoke",
@@ -3394,7 +3397,7 @@ directly to the authoritative lane-policy object rather than rely on implicit re
 Suggested package files:
 
 ```text
-projects/deployments/pleomino-prod/
+projects/deployments/pleomino/prod/
   TARGETS
   wrangler.jsonc
 ```
@@ -3434,9 +3437,10 @@ Publish flow:
 
 ```text
 projects/deployments/
-  pleomino-prod/
-  pleomino-staging/
-  pleomino-acme/
+  pleomino/
+    prod/
+    staging/
+    acme/
 ```
 
 Each deployment may point to the same app target while differing in:
@@ -3452,7 +3456,7 @@ The deployment id, not the app target, is what gives each release target its ide
 If checked-in provider config files are kept separate per deployment, they should differ only in provider-native settings that are not already derived from deployment metadata:
 
 ```jsonc
-// projects/deployments/pleomino-prod/wrangler.jsonc
+// projects/deployments/pleomino/prod/wrangler.jsonc
 {
   "$schema": "../../../node_modules/wrangler/config-schema.json",
   "compatibility_date": "2026-03-18",
@@ -3460,7 +3464,7 @@ If checked-in provider config files are kept separate per deployment, they shoul
 ```
 
 ```jsonc
-// projects/deployments/pleomino-staging/wrangler.jsonc
+// projects/deployments/pleomino/staging/wrangler.jsonc
 {
   "$schema": "../../../node_modules/wrangler/config-schema.json",
   "compatibility_date": "2026-03-18",
@@ -4030,8 +4034,8 @@ cloudflare_pages_static_webapp_deployment(
     component = "//projects/apps/pleomino:app",
     account = "web-platform-dev",
     project = "pleomino-dev-pages",
-    lane_policy = "//projects/deployments/pleomino-shared:lane",
-    admission_policy = "//projects/deployments/pleomino-shared:dev_release",
+    lane_policy = "//projects/deployments/pleomino/shared:lane",
+    admission_policy = "//projects/deployments/pleomino/shared:dev_release",
     environment_stage = "dev",
     protection_class = "shared_nonprod",
     smoke = {
@@ -4348,9 +4352,9 @@ cloudflare_pages_static_webapp_deployment(
     component = "//projects/apps/pleomino:app",
     account = "web-platform-prod",
     project = "pleomino-prod-pages",
-    lane_policy = "//projects/deployments/pleomino-shared:lane",
+    lane_policy = "//projects/deployments/pleomino/shared:lane",
     environment_stage = "prod",
-    admission_policy = "//projects/deployments/pleomino-shared:prod_release",
+    admission_policy = "//projects/deployments/pleomino/shared:prod_release",
     protection_class = "production_facing",
     smoke = {
         "type": "http-smoke",
@@ -4368,9 +4372,9 @@ Normal lock-scope story:
 
 - canonical provider-target identity for this deployment is `provider = cloudflare-pages` plus `provider_target.account = web-platform-prod` and `provider_target.project = pleomino-prod-pages`
 - the derived shared-environment lock scope is therefore conceptually `cloudflare-pages:web-platform-prod/pleomino-prod-pages`
-- `deploy --deployment //projects/deployments/pleomino-prod:deploy`
-- `deploy --deployment //projects/deployments/pleomino-prod:deploy --publish-only --source-run-id <deploy-run-id>`
-- `deploy --deployment //projects/deployments/pleomino-prod:deploy --preview --source-run-id <deploy-run-id>`
+- `deploy --deployment //projects/deployments/pleomino/prod:deploy`
+- `deploy --deployment //projects/deployments/pleomino/prod:deploy --publish-only --source-run-id <deploy-run-id>`
+- `deploy --deployment //projects/deployments/pleomino/prod:deploy --preview --source-run-id <deploy-run-id>`
 
 All three runs must contend on that same lock by default unless preview is explicitly configured to publish
 to a fully isolated preview target with a different canonical provider-target identity.
@@ -5381,7 +5385,7 @@ This example uses the canonical `operation_kind`, `lifecycle_state`, `terminatio
   "schema_version": "deploy-record@2026-03-01",
   "deploy_run_id": "dr_2026_03_19_pleomino_prod_00017",
   "deployment_id": "pleomino-prod",
-  "deployment_label": "//projects/deployments/pleomino-prod:deploy",
+  "deployment_label": "//projects/deployments/pleomino/prod:deploy",
   "operation_kind": "promotion",
   "lifecycle_state": "finished",
   "termination_reason": null,
@@ -5415,9 +5419,9 @@ This example uses the canonical `operation_kind`, `lifecycle_state`, `terminatio
   "release_lineage_id": "pleomino/2026-03-19/abc1234",
   "artifact_lineage_id": "pleomino-web/2026-03-19/abc1234",
   "execution_snapshot_ref": "snap_2026_03_19_pleomino_prod_00017",
-  "lane_policy_ref": "//projects/deployments/pleomino-shared:lane",
+  "lane_policy_ref": "//projects/deployments/pleomino/shared:lane",
   "lane_policy_fingerprint": "sha256:lane-pleomino-v4",
-  "admission_policy_ref": "//projects/deployments/pleomino-shared:prod_release",
+  "admission_policy_ref": "//projects/deployments/pleomino/shared:prod_release",
   "admission_policy_fingerprint": "sha256:admission-pleomino-prod-v7",
   "approval_evidence": {
     "mode": "fresh",
@@ -5525,9 +5529,9 @@ cloudflare_pages_static_webapp_deployment(
     component = "//projects/apps/pleomino:app",
     account = "web-platform-prod",
     project = "pleomino-prod-pages",
-    lane_policy = "//projects/deployments/pleomino-shared:lane",
+    lane_policy = "//projects/deployments/pleomino/shared:lane",
     environment_stage = "prod",
-    admission_policy = "//projects/deployments/pleomino-shared:prod_release",
+    admission_policy = "//projects/deployments/pleomino/shared:prod_release",
     protection_class = "production_facing",
     smoke = {
         "type": "http-smoke",
@@ -5736,9 +5740,9 @@ puzzle_cloudflare_deployment(
     component = "//projects/apps/pleomino:app",
     account = "web-platform-prod",
     project = "pleomino-prod-pages",
-    lane_policy = "//projects/deployments/pleomino-shared:lane",
+    lane_policy = "//projects/deployments/pleomino/shared:lane",
     environment_stage = "prod",
-    admission_policy = "//projects/deployments/pleomino-shared:prod_release",
+    admission_policy = "//projects/deployments/pleomino/shared:prod_release",
     protection_class = "production_facing",
     smoke = {
         "type": "http-smoke",
@@ -5787,7 +5791,7 @@ It does not know about one specific deployment id such as `pleomino-prod`.
 ### Step 3: Concrete Deployment Package
 
 ```text
-projects/deployments/pleomino-prod/
+projects/deployments/pleomino/prod/
   TARGETS
   wrangler.jsonc
 ```
@@ -5802,9 +5806,9 @@ puzzle_cloudflare_deployment(
     component = "//projects/apps/pleomino:app",
     account = "web-platform-prod",
     project = "pleomino-prod-pages",
-    lane_policy = "//projects/deployments/pleomino-shared:lane",
+    lane_policy = "//projects/deployments/pleomino/shared:lane",
     environment_stage = "prod",
-    admission_policy = "//projects/deployments/pleomino-shared:prod_release",
+    admission_policy = "//projects/deployments/pleomino/shared:prod_release",
     protection_class = "production_facing",
     smoke = {
         "type": "http-smoke",
@@ -5819,7 +5823,7 @@ Now the ownership boundaries are clean:
 
 - `build-tools` owns generic deployment machinery
 - `projects/deployment-kits/puzzle-apps` owns puzzle-family conventions
-- `projects/deployments/pleomino-prod` owns the concrete release target
+- `projects/deployments/pleomino/prod` owns the concrete release target
 
 ## Third-Party Infrastructure And Sidecars
 
@@ -6008,8 +6012,9 @@ projects/
   deployments/
     shared-observability-prod/
       TARGETS
-    pleomino-prod/
-      TARGETS
+    pleomino/
+      prod/
+        TARGETS
     docs-prod/
       TARGETS
 ```
@@ -6171,9 +6176,10 @@ projects/
     shared-observability-prod/
       TARGETS
       helm/values.yaml
-    pleomino-prod/
-      TARGETS
-      wrangler.jsonc
+    pleomino/
+      prod/
+        TARGETS
+        wrangler.jsonc
 ```
 
 Possible `shared-observability-prod/TARGETS`:
@@ -6271,7 +6277,7 @@ That is the right shape for a complex but disciplined build system.
 For a static PWA, the final developer experience should be simple:
 
 ```bash
-deploy --deployment //projects/deployments/pleomino-prod:deploy
+deploy --deployment //projects/deployments/pleomino/prod:deploy
 ```
 
 For a `production_facing` deployment, that command should be read as the one public submission interface,

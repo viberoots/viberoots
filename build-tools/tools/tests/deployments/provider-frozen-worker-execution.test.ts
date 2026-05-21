@@ -33,7 +33,7 @@ async function writeStaticArtifact(root: string, html: string) {
 }
 
 async function writeS3Config(tmp: string) {
-  const configDir = path.join(tmp, "projects", "deployments", "pleomino-staging-s3");
+  const configDir = path.join(tmp, "projects", "deployments", "pleomino", "staging-s3");
   await fsp.mkdir(configDir, { recursive: true });
   await fsp.writeFile(
     path.join(configDir, "aws-s3-sync.jsonc"),

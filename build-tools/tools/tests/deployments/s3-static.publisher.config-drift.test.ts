@@ -31,7 +31,8 @@ test("s3-static rejects provider config drift before publish begins", async () =
       tmp,
       "projects",
       "deployments",
-      "pleomino-staging-s3",
+      "pleomino",
+      "staging-s3",
       "aws-s3-sync.jsonc",
     );
     await fsp.mkdir(path.dirname(configPath), { recursive: true });

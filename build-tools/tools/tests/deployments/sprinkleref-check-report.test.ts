@@ -27,13 +27,13 @@ test("human check output groups deployment environments for the same missing ref
       ...entry("secret://deployments/pleomino/cloudflare_api_token"),
       backend: "infisical project proj_123 (pleomino-deployments) environment staging",
       deploymentFamily: "pleomino",
-      requiredBy: ["//projects/deployments/pleomino-staging:deploy"],
+      requiredBy: ["//projects/deployments/pleomino/staging:deploy"],
     },
     {
       ...entry("secret://deployments/pleomino/cloudflare_api_token"),
       backend: "infisical project proj_123 (pleomino-deployments) environment prod",
       deploymentFamily: "pleomino",
-      requiredBy: ["//projects/deployments/pleomino-prod:deploy"],
+      requiredBy: ["//projects/deployments/pleomino/prod:deploy"],
     },
   ];
   const text = renderReport({ scannedFiles: 1, refs, summary: summarize(refs) });
@@ -44,7 +44,7 @@ test("human check output groups deployment environments for the same missing ref
   assert.doesNotMatch(text, /source secret_requirements/);
   assert.match(
     text,
-    /required by:\n\s+\/\/projects\/deployments\/pleomino-staging:deploy\n\s+\/\/projects\/deployments\/pleomino-prod:deploy/,
+    /required by:\n\s+\/\/projects\/deployments\/pleomino\/staging:deploy\n\s+\/\/projects\/deployments\/pleomino\/prod:deploy/,
   );
 });
 

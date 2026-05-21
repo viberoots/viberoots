@@ -10,8 +10,8 @@ import {
 } from "../../deployments/deployment-query";
 import type { GraphNode } from "../../lib/graph";
 
-const STAGING = "//projects/deployments/pleomino-staging:deploy";
-const PROD = "//projects/deployments/pleomino-prod:deploy";
+const STAGING = "//projects/deployments/pleomino/staging:deploy";
+const PROD = "//projects/deployments/pleomino/prod:deploy";
 const SCAFFOLD_WRANGLER = `{
   "$schema": "../../../node_modules/wrangler/config-schema.json",
   "compatibility_date": "2026-03-18",
@@ -29,11 +29,11 @@ test("real pleomino Cloudflare profile fails closed when a lifecycle secret is m
   const nodes = await queryDeploymentNodes(process.cwd(), [
     STAGING,
     "//projects/apps/pleomino:app",
-    "//projects/deployments/pleomino-dev:deploy",
-    "//projects/deployments/pleomino-shared:lane",
+    "//projects/deployments/pleomino/dev:deploy",
+    "//projects/deployments/pleomino/shared:lane",
     "//projects/deployments:defaults",
-    "//projects/deployments/pleomino-shared:lane_governance",
-    "//projects/deployments/pleomino-shared:staging_release",
+    "//projects/deployments/pleomino/shared:lane_governance",
+    "//projects/deployments/pleomino/shared:staging_release",
   ]);
   const mutated = nodes.map((node): GraphNode => {
     if (node.name !== STAGING) return node;
@@ -51,8 +51,8 @@ test("real pleomino Cloudflare profile fails closed when a lifecycle secret is m
 });
 
 test("real pleomino Cloudflare wrangler configs match the scaffolded minimal shape", async () => {
-  for (const deploymentId of ["pleomino-staging", "pleomino-prod"]) {
-    const wranglerPath = path.join("projects", "deployments", deploymentId, "wrangler.jsonc");
+  for (const stage of ["staging", "prod"]) {
+    const wranglerPath = path.join("projects", "deployments", "pleomino", stage, "wrangler.jsonc");
     assert.equal(await fsp.readFile(wranglerPath, "utf8"), SCAFFOLD_WRANGLER);
   }
 });

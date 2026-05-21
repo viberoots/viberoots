@@ -88,7 +88,7 @@ test("reconciliation mismatch fails with non-secret patch guidance", async () =>
   );
   assert.throws(
     () => reconcileDeploymentMetadata({ ...reviewed, siteUrl: "https://wrong.example" }, reviewed),
-    /site url: live=https:\/\/wrong\.example reviewed=https:\/\/app\.infisical\.com[\s\S]*projects\/deployments\/pleomino-shared\/family\.bzl/,
+    /site url: live=https:\/\/wrong\.example reviewed=https:\/\/app\.infisical\.com[\s\S]*projects\/deployments\/pleomino\/shared\/family\.bzl/,
   );
 });
 
@@ -176,7 +176,7 @@ const REVIEWED_ARGS = {
   forceLogin: false,
   yes: true,
   dryRun: false,
-  tofuDir: "projects/deployments/pleomino-infisical/opentofu",
+  tofuDir: "projects/deployments/pleomino/infisical/opentofu",
   noTofuApply: false,
   rotateBootstrapCredentials: false,
   rotateDeploymentCredentials: false,

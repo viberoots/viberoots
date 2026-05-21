@@ -31,7 +31,8 @@ test("cloudflare-pages rejects wrangler config drift before publish begins", asy
       tmp,
       "projects",
       "deployments",
-      "pleomino-staging",
+      "pleomino",
+      "staging",
       "wrangler.jsonc",
     );
     await fsp.mkdir(path.dirname(configPath), { recursive: true });
@@ -72,7 +73,8 @@ test("cloudflare-pages rejects wrangler account_id drift before omitting it for 
       tmp,
       "projects",
       "deployments",
-      "pleomino-staging",
+      "pleomino",
+      "staging",
       "wrangler.jsonc",
     );
     await fsp.mkdir(path.dirname(configPath), { recursive: true });

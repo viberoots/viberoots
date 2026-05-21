@@ -22,7 +22,7 @@ import {
 import { renderDeploymentJenkinsHelp } from "../../deployments/deployment-auth-matrix";
 import { resolveDeploymentVaultRuntimePlan } from "../../deployments/deployment-vault-runtime-plan";
 
-const DEPLOYMENT = "//projects/deployments/pleomino-dev:deploy";
+const DEPLOYMENT = "//projects/deployments/pleomino/dev:deploy";
 
 async function fixtureDeployment() {
   return await resolveDeploymentFromTarget(process.cwd(), DEPLOYMENT);

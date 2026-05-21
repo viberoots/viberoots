@@ -42,9 +42,9 @@ function stagedDeployment(stage: "staging" | "prod") {
     deploymentId: `demoapp-${stage}`,
     label: `//projects/deployments/demoapp-${stage}:deploy`,
     environmentStage: stage,
-    admissionPolicyRef: `//projects/deployments/pleomino-shared:${stage}_release`,
+    admissionPolicyRef: `//projects/deployments/pleomino/shared:${stage}_release`,
     admissionPolicy: {
-      ref: `//projects/deployments/pleomino-shared:${stage}_release`,
+      ref: `//projects/deployments/pleomino/shared:${stage}_release`,
       name: `${stage}_release`,
       allowedRefs: [stage === "prod" ? "refs/tags/release/*" : "main"],
     },

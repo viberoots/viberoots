@@ -34,16 +34,16 @@ const expectedIdentities = {
 };
 const tokenContract = "secret://deployments/pleomino/cloudflare_api_token";
 const query = `set(${[
-  "//projects/deployments/pleomino-dev:deploy",
-  "//projects/deployments/pleomino-staging:deploy",
-  "//projects/deployments/pleomino-prod:deploy",
+  "//projects/deployments/pleomino/dev:deploy",
+  "//projects/deployments/pleomino/staging:deploy",
+  "//projects/deployments/pleomino/prod:deploy",
   "//projects/apps/pleomino:app",
-  "//projects/deployments/pleomino-shared:lane",
+  "//projects/deployments/pleomino/shared:lane",
   "//projects/deployments:defaults",
-  "//projects/deployments/pleomino-shared:lane_governance",
-  "//projects/deployments/pleomino-shared:dev_release",
-  "//projects/deployments/pleomino-shared:staging_release",
-  "//projects/deployments/pleomino-shared:prod_release",
+  "//projects/deployments/pleomino/shared:lane_governance",
+  "//projects/deployments/pleomino/shared:dev_release",
+  "//projects/deployments/pleomino/shared:staging_release",
+  "//projects/deployments/pleomino/shared:prod_release",
 ].join(" ")})`;
 let cachedDeployments:
   | { cloudflare: CloudflarePagesDeployment[]; nixos: NixosSharedHostDeployment[] }

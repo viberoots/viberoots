@@ -129,7 +129,7 @@ test("cloudflare-pages persisted records and snapshots keep Infisical selectors 
     const fake = await installFakeCloudflarePagesWrangler(tmp);
     await writeArtifact(artifactDir, "<html>infisical deploy</html>\n");
     await writeWranglerConfig(
-      path.join(tmp, "projects", "deployments", "pleomino-staging", "wrangler.jsonc"),
+      path.join(tmp, "projects", "deployments", "pleomino", "staging", "wrangler.jsonc"),
     );
     const admittedArtifact = await admitStaticWebappArtifact({ recordsRoot, artifactDir });
     const publicServer = await startCloudflarePagesPublicServer({

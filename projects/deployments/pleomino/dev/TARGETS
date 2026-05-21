@@ -1,0 +1,3 @@
+load("//projects/deployments/pleomino/shared:family.bzl", "pleomino_dev_deployment")
+
+pleomino_dev_deployment(name = "deploy")

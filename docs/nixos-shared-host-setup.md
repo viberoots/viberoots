@@ -46,7 +46,7 @@ Current supported scope:
   - `static-webapp`
   - `ssr-webapp` for the reviewed single-component host slice
 - protection class: `shared_nonprod`
-- example deployment: `//projects/deployments/pleomino-dev:deploy`
+- example deployment: `//projects/deployments/pleomino/dev:deploy`
 
 ## When Vault Is In Scope
 
@@ -406,7 +406,7 @@ Before you rebuild, generate the reviewed identity group shape with:
 
 ```bash
 direnv exec . build-tools/tools/bin/deploy admin identity sync \
-  --deployment //projects/deployments/pleomino-dev:deploy \
+  --deployment //projects/deployments/pleomino/dev:deploy \
   --realm-file ./deployment-host/identity-provider/deployment-auth-realm.json \
   --acting-principal <principal> \
   --admin-group deploy-admin-identity-shape-admin-project-pleomino
@@ -434,7 +434,7 @@ One reviewed membership grant example is:
 
 ```bash
 direnv exec . build-tools/tools/bin/deploy admin identity grant-user \
-  --deployment //projects/deployments/pleomino-dev:deploy \
+  --deployment //projects/deployments/pleomino/dev:deploy \
   --action submit \
   --user-email alice@example.com \
   --membership-file ./deployment-host/identity-provider/deployment-auth-memberships.json \
@@ -454,18 +454,18 @@ manual SSH session:
 
 ```bash
 direnv exec . build-tools/tools/bin/deploy admin identity sync \
-  --deployment //projects/deployments/pleomino-dev:deploy \
+  --deployment //projects/deployments/pleomino/dev:deploy \
   --profile mini \
   --apply-host-dry-run
 
 direnv exec . build-tools/tools/bin/deploy admin identity grant-user \
-  --deployment //projects/deployments/pleomino-dev:deploy \
+  --deployment //projects/deployments/pleomino/dev:deploy \
   --profile mini \
   --action submit \
   --apply-host
 
 direnv exec . build-tools/tools/bin/deploy admin identity grant-user \
-  --deployment //projects/deployments/pleomino-dev:deploy \
+  --deployment //projects/deployments/pleomino/dev:deploy \
   --profile mini \
   --action submit \
   --user-email alice@example.com \
@@ -711,7 +711,7 @@ Plan from a dev machine:
 
 ```bash
 direnv exec . build-tools/tools/bin/deploy \
-  --deployment //projects/deployments/pleomino-dev:deploy \
+  --deployment //projects/deployments/pleomino/dev:deploy \
   --profile mini \
   --plan
 ```
@@ -734,7 +734,7 @@ direnv exec . build-tools/tools/bin/nixos-shared-host-install \
   --ssh-known-hosts "$HOME/.ssh/mini-known-hosts"
 
 direnv exec . build-tools/tools/bin/deploy \
-  --deployment //projects/deployments/pleomino-dev:deploy \
+  --deployment //projects/deployments/pleomino/dev:deploy \
   --profile mini \
   --artifact-dir ./dist
 ```
@@ -762,7 +762,7 @@ Deploy from Jenkins:
 
 ```bash
 direnv exec . build-tools/tools/bin/nixos-shared-host-jenkins-deploy \
-  --deployment //projects/deployments/pleomino-dev:deploy \
+  --deployment //projects/deployments/pleomino/dev:deploy \
   --profile mini \
   --artifact-dir "$WORKSPACE/projects/apps/pleomino/dist" \
   --ssh-identity-file "$JENKINS_SSH_IDENTITY" \
@@ -784,7 +784,7 @@ inspect that same run:
 
 ```bash
 direnv exec . build-tools/tools/bin/deploy \
-  --deployment //projects/deployments/pleomino-dev:deploy \
+  --deployment //projects/deployments/pleomino/dev:deploy \
   --profile mini \
   --status \
   --deploy-run-id "$DEPLOY_RUN_ID"
@@ -801,7 +801,7 @@ Then approve that same run:
 
 ```bash
 direnv exec . build-tools/tools/bin/deploy \
-  --deployment //projects/deployments/pleomino-dev:deploy \
+  --deployment //projects/deployments/pleomino/dev:deploy \
   --profile mini \
   --approve \
   --deploy-run-id "$DEPLOY_RUN_ID" \

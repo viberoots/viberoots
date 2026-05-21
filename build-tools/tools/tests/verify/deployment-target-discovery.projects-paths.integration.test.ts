@@ -17,14 +17,16 @@ test("deployment target discovery resolves projects/deployments labels from an i
         tmp,
         "projects",
         "deployments",
-        "pleomino-shared",
+        "pleomino",
+        "shared",
         "TARGETS",
       );
       const deployTargetsPath = path.join(
         tmp,
         "projects",
         "deployments",
-        "pleomino-dev",
+        "pleomino",
+        "dev",
         "TARGETS",
       );
       await fsp.mkdir(path.dirname(appTargetsPath), { recursive: true });
@@ -92,9 +94,9 @@ test("deployment target discovery resolves projects/deployments labels from an i
           '    component = "//projects/apps/pleomino:app",',
           '    app_name = "pleomino",',
           "    container_port = 3000,",
-          '    lane_policy = "//projects/deployments/pleomino-shared:lane",',
+          '    lane_policy = "//projects/deployments/pleomino/shared:lane",',
           '    environment_stage = "dev",',
-          '    admission_policy = "//projects/deployments/pleomino-shared:dev_release",',
+          '    admission_policy = "//projects/deployments/pleomino/shared:dev_release",',
           ")",
           "",
         ].join("\n"),
@@ -102,7 +104,7 @@ test("deployment target discovery resolves projects/deployments labels from an i
       );
 
       const targets = await listDeploymentTargets(tmp);
-      assert.deepEqual(targets, ["//projects/deployments/pleomino-dev:deploy"]);
+      assert.deepEqual(targets, ["//projects/deployments/pleomino/dev:deploy"]);
     } finally {
       if (previousIsolation === undefined) delete process.env.BUCK_NESTED_ISO;
       else process.env.BUCK_NESTED_ISO = previousIsolation;

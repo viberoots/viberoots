@@ -58,7 +58,7 @@ These are the public surfaces you can rely on:
 The main command-line entry point is:
 
 ```bash
-deploy --deployment //projects/deployments/pleomino-prod:deploy
+deploy --deployment //projects/deployments/pleomino/prod:deploy
 ```
 
 ### Stable Selectors And Flags
@@ -66,15 +66,15 @@ deploy --deployment //projects/deployments/pleomino-prod:deploy
 Required selector:
 
 - `--deployment <label>`: choose one deployment target, such as
-  `//projects/deployments/pleomino-prod:deploy`
+  `//projects/deployments/pleomino/prod:deploy`
 
 Common example values:
 
-- `//projects/deployments/pleomino-dev:deploy`
+- `//projects/deployments/pleomino/dev:deploy`
   A shared dev deployment.
-- `//projects/deployments/pleomino-staging:deploy`
+- `//projects/deployments/pleomino/staging:deploy`
   A staging deployment.
-- `//projects/deployments/pleomino-prod:deploy`
+- `//projects/deployments/pleomino/prod:deploy`
   A production deployment.
 
 Discovery and validation:
@@ -251,7 +251,7 @@ Validate one deployment target:
 
 ```bash
 deploy \
-  --deployment //projects/deployments/pleomino-prod:deploy \
+  --deployment //projects/deployments/pleomino/prod:deploy \
   --validate-only
 ```
 
@@ -259,7 +259,7 @@ Submit a normal deploy:
 
 ```bash
 deploy \
-  --deployment //projects/deployments/pleomino-prod:deploy
+  --deployment //projects/deployments/pleomino/prod:deploy
 ```
 
 For a normal deploy, the CLI can usually build and resolve the artifact from
@@ -272,7 +272,7 @@ Submit a preview from an admitted run:
 
 ```bash
 deploy \
-  --deployment //projects/deployments/pleomino-prod:deploy \
+  --deployment //projects/deployments/pleomino/prod:deploy \
   --preview \
   --source-run-id deploy-run-123
 ```
@@ -281,7 +281,7 @@ Replay an exact-artifact rollback:
 
 ```bash
 deploy \
-  --deployment //projects/deployments/pleomino-prod:deploy \
+  --deployment //projects/deployments/pleomino/prod:deploy \
   --publish-only \
   --rollback \
   --source-run-id deploy-run-123
@@ -294,7 +294,7 @@ export VBR_DEPLOY_CONTROL_PLANE_URL='https://deploy.apps.kilty.io'
 export VBR_DEPLOY_CONTROL_PLANE_TOKEN='replace-me'
 
 deploy \
-  --deployment //projects/deployments/pleomino-prod:deploy \
+  --deployment //projects/deployments/pleomino/prod:deploy \
   --control-plane-url "$VBR_DEPLOY_CONTROL_PLANE_URL"
 ```
 
@@ -302,7 +302,7 @@ Read the current status for one service-backed run:
 
 ```bash
 deploy \
-  --deployment //projects/deployments/pleomino-prod:deploy \
+  --deployment //projects/deployments/pleomino/prod:deploy \
   --status \
   --deploy-run-id deploy-run-123 \
   --control-plane-url "$VBR_DEPLOY_CONTROL_PLANE_URL"
@@ -312,7 +312,7 @@ Print only the exact admitted target scope string:
 
 ```bash
 deploy \
-  --deployment //projects/deployments/pleomino-prod:deploy \
+  --deployment //projects/deployments/pleomino/prod:deploy \
   --print-run-lock-scope \
   --deploy-run-id deploy-run-123 \
   --control-plane-url "$VBR_DEPLOY_CONTROL_PLANE_URL"
@@ -322,7 +322,7 @@ Approve an existing waiting run without building the JSON payload yourself:
 
 ```bash
 deploy \
-  --deployment //projects/deployments/pleomino-prod:deploy \
+  --deployment //projects/deployments/pleomino/prod:deploy \
   --approve \
   --deploy-run-id deploy-run-123 \
   --approval-id ticket-123 \
@@ -509,7 +509,7 @@ What they mean, with example values:
   `pleomino-prod`
 - `deploymentLabel`
   The repo label for the deployment. Example:
-  `//projects/deployments/pleomino-prod:deploy`
+  `//projects/deployments/pleomino/prod:deploy`
 - `operationKind`
   The kind of run. Examples:
   `deploy`, `promotion`, `retry`, `rollback`, `preview_cleanup`
@@ -566,7 +566,7 @@ curl \
     "submittedAt": "2026-04-16T12:00:00Z",
     "deployment": {
       "deploymentId": "pleomino-staging",
-      "label": "//projects/deployments/pleomino-staging:deploy",
+      "label": "//projects/deployments/pleomino/staging:deploy",
       "provider": "cloudflare-pages"
     },
     "operationKind": "deploy",
@@ -574,7 +574,7 @@ curl \
       "kind": "client_upload",
       "uploadSessionId": "upload-2026-04-16T12:00:00Z",
       "sourceRevision": "7d3f2c1",
-      "deploymentLabel": "//projects/deployments/pleomino-staging:deploy",
+      "deploymentLabel": "//projects/deployments/pleomino/staging:deploy",
       "buildTarget": "//projects/apps/pleomino:app"
     }
   }'
@@ -1071,7 +1071,7 @@ How to get the right `targetScopes` value:
 
 ```bash
 deploy \
-  --deployment //projects/deployments/pleomino-staging:deploy \
+  --deployment //projects/deployments/pleomino/staging:deploy \
   --print-target-identity
 ```
 
@@ -1081,7 +1081,7 @@ For normal deploys, that value is the right starting point for `targetScopes`.
 
 ```bash
 deploy \
-  --deployment //projects/deployments/pleomino-staging:deploy \
+  --deployment //projects/deployments/pleomino/staging:deploy \
   --print-run-lock-scope \
   --deploy-run-id "$DEPLOY_RUN_ID" \
   --control-plane-url "$VBR_DEPLOY_CONTROL_PLANE_URL"

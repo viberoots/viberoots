@@ -128,7 +128,7 @@ test("jenkins wrapper stages the Pleomino artifact, submits through the control 
       $({
         cwd: tmp,
         env: jenkinsExecEnv(env),
-      })`build-tools/tools/bin/nixos-shared-host-jenkins-deploy --deployment //projects/deployments/pleomino-dev:deploy --admission-evidence-json ${admissionEvidencePath} --idempotency-key jenkins-pleomino-dev-1 --auth-session-id ${sessionId} --profile mini --profile-root ${profileRoot} --artifact-dir ${artifactDir} --ssh-identity-file ${auth.identityFile} --ssh-known-hosts ${auth.knownHostsFile} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(server.port)} --smoke-connect-protocol https:`;
+      })`build-tools/tools/bin/nixos-shared-host-jenkins-deploy --deployment //projects/deployments/pleomino/dev:deploy --admission-evidence-json ${admissionEvidencePath} --idempotency-key jenkins-pleomino-dev-1 --auth-session-id ${sessionId} --profile mini --profile-root ${profileRoot} --artifact-dir ${artifactDir} --ssh-identity-file ${auth.identityFile} --ssh-known-hosts ${auth.knownHostsFile} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(server.port)} --smoke-connect-protocol https:`;
     try {
       const result = await jenkinsCommand(authSessionId);
       const summary = JSON.parse(String(result.stdout));
@@ -190,7 +190,7 @@ test("jenkins wrapper forwards admit-and-deploy so bootstrap deploys can avoid h
     const remoteStatePath = path.join(tmp, "remote-state", "platform-state.json");
     await installReviewedPleominoTargets(tmp);
     await requireServiceAuthForPleomino(tmp);
-    const sharedTargetsPath = path.join(tmp, "projects/deployments/pleomino-shared/TARGETS");
+    const sharedTargetsPath = path.join(tmp, "projects/deployments/pleomino/shared/TARGETS");
     await fsp.writeFile(
       sharedTargetsPath,
       (await fsp.readFile(sharedTargetsPath, "utf8"))
@@ -231,7 +231,7 @@ test("jenkins wrapper forwards admit-and-deploy so bootstrap deploys can avoid h
       const result = await $({
         cwd: tmp,
         env: jenkinsExecEnv(env),
-      })`build-tools/tools/bin/nixos-shared-host-jenkins-deploy --deployment //projects/deployments/pleomino-dev:deploy --admission-evidence-json ${admissionEvidencePath} --admit-and-deploy deploy/pleomino-dev --auth-session-id ${authSessionId} --profile mini --profile-root ${profileRoot} --artifact-dir ${artifactDir} --ssh-identity-file ${auth.identityFile} --ssh-known-hosts ${auth.knownHostsFile} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(server.port)} --smoke-connect-protocol https:`;
+      })`build-tools/tools/bin/nixos-shared-host-jenkins-deploy --deployment //projects/deployments/pleomino/dev:deploy --admission-evidence-json ${admissionEvidencePath} --admit-and-deploy deploy/pleomino-dev --auth-session-id ${authSessionId} --profile mini --profile-root ${profileRoot} --artifact-dir ${artifactDir} --ssh-identity-file ${auth.identityFile} --ssh-known-hosts ${auth.knownHostsFile} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(server.port)} --smoke-connect-protocol https:`;
       const summary = JSON.parse(String(result.stdout));
       assert.equal(summary.ok, true);
       assert.equal(summary.remoteExecution.controlPlane.finalOutcome, "succeeded");

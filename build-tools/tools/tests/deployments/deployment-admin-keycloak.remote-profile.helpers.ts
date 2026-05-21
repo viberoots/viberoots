@@ -78,7 +78,7 @@ async function allocateLoopbackPort(): Promise<number> {
 }
 
 export async function enableInteractivePkceVaultRuntime(tmp: string, issuer: string) {
-  const deployTargetsPath = path.join(tmp, "projects", "deployments", "pleomino-dev", "TARGETS");
+  const deployTargetsPath = path.join(tmp, "projects", "deployments", "pleomino", "dev", "TARGETS");
   const source = await fsp.readFile(deployTargetsPath, "utf8");
   const bindPort = await allocateLoopbackPort();
   const vaultRuntimeBlock = [
@@ -100,9 +100,9 @@ export async function enableInteractivePkceVaultRuntime(tmp: string, issuer: str
   const nextSource = source.includes("vault_runtime = {")
     ? source.replace(/vault_runtime\s*=\s*\{[\s\S]*?\n\s*\},/m, vaultRuntimeBlock)
     : source.replace(
-        '    admission_policy = "//projects/deployments/pleomino-shared:dev_release",\n',
+        '    admission_policy = "//projects/deployments/pleomino/shared:dev_release",\n',
         [
-          '    admission_policy = "//projects/deployments/pleomino-shared:dev_release",',
+          '    admission_policy = "//projects/deployments/pleomino/shared:dev_release",',
           vaultRuntimeBlock,
         ].join("\n"),
       );

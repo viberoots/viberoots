@@ -33,7 +33,7 @@ export async function writeWranglerConfig(filePath: string): Promise<void> {
 export function rebuildDevDeployment(): CloudflarePagesDeployment {
   return cloudflarePagesDeploymentFixture({
     deploymentId: "pleomino-rebuild-dev-pages",
-    label: "//projects/deployments/pleomino-rebuild-dev-pages:deploy",
+    label: "//projects/deployments/pleomino/rebuild-dev-pages:deploy",
     environmentStage: "dev",
     lanePolicyRef: rebuildLanePolicy().ref,
     lanePolicy: rebuildLanePolicy(),
@@ -52,7 +52,7 @@ export function rebuildDevDeployment(): CloudflarePagesDeployment {
 export function rebuildStagingDeployment(): CloudflarePagesDeployment {
   return cloudflarePagesDeploymentFixture({
     deploymentId: "pleomino-rebuild-staging",
-    label: "//projects/deployments/pleomino-rebuild-staging:deploy",
+    label: "//projects/deployments/pleomino/rebuild-staging:deploy",
     lanePolicyRef: rebuildLanePolicy().ref,
     lanePolicy: rebuildLanePolicy(),
     admissionPolicyRef: rebuildStagingAdmissionPolicy().ref,
@@ -113,7 +113,7 @@ export async function createSourceRun(
   const artifactDir = path.join(tmp, "source-artifact");
   await writeCloudflareArtifact(artifactDir, "<html>source release</html>\n");
   await writeWranglerConfig(
-    path.join(tmp, "projects", "deployments", "pleomino-rebuild-dev-pages", "wrangler.jsonc"),
+    path.join(tmp, "projects", "deployments", "pleomino", "rebuild-dev-pages", "wrangler.jsonc"),
   );
   await installCloudflarePagesTargets(tmp, [deployment]);
   await ensureNixosSharedHostReviewedSourceRef(tmp, $, deployment);
@@ -149,10 +149,10 @@ export async function createSourceRun(
 
 function rebuildLanePolicy() {
   return nixosSharedHostLanePolicyFixture({
-    ref: "//projects/deployments/pleomino-rebuild-shared:lane",
+    ref: "//projects/deployments/pleomino/rebuild-shared:lane",
     name: "lane",
     governance: nixosSharedHostLaneGovernanceFixture({
-      ref: "//projects/deployments/pleomino-rebuild-shared:lane_governance",
+      ref: "//projects/deployments/pleomino/rebuild-shared:lane_governance",
       sourceRefPolicies: [
         sourceRefPolicy("dev", "main"),
         sourceRefPolicy("staging", "main"),
@@ -166,7 +166,7 @@ function rebuildLanePolicy() {
 
 function rebuildDevAdmissionPolicy() {
   return nixosSharedHostAdmissionPolicyFixture({
-    ref: "//projects/deployments/pleomino-rebuild-shared:dev_release",
+    ref: "//projects/deployments/pleomino/rebuild-shared:dev_release",
     name: "dev_release",
     requiredChecks: [],
   });
@@ -174,7 +174,7 @@ function rebuildDevAdmissionPolicy() {
 
 function rebuildStagingAdmissionPolicy() {
   return nixosSharedHostAdmissionPolicyFixture({
-    ref: "//projects/deployments/pleomino-rebuild-shared:staging_release",
+    ref: "//projects/deployments/pleomino/rebuild-shared:staging_release",
     name: "staging_release",
     allowedRefs: ["main"],
     requiredChecks: [],

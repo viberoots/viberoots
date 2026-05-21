@@ -125,7 +125,7 @@ SprinkleRef reference check to find missing or unmapped deployment contract refs
 
 ```bash
 sprinkleref --check
-sprinkleref --check --target //projects/deployments/pleomino-staging:deploy
+sprinkleref --check --target //projects/deployments/pleomino/staging:deploy
 ```
 
 The checker inventories `secret://`, `config://`, and `runtime://` refs without
@@ -277,9 +277,9 @@ cloudflare_pages_static_webapp_deployment(
     component = "//projects/apps/pleomino:app",
     account = "web-platform-staging",
     project = "pleomino-staging-pages",
-    lane_policy = "//projects/deployments/pleomino-shared:lane",
+    lane_policy = "//projects/deployments/pleomino/shared:lane",
     environment_stage = "staging",
-    admission_policy = "//projects/deployments/pleomino-shared:staging_release",
+    admission_policy = "//projects/deployments/pleomino/shared:staging_release",
     protection_class = "shared_nonprod",
     secret_requirements = [
         {
@@ -497,7 +497,7 @@ Recommended workflow:
 
 ```bash
 deploy \
-  --deployment //projects/deployments/pleomino-staging:deploy \
+  --deployment //projects/deployments/pleomino/staging:deploy \
   --print-target-identity
 ```
 
@@ -507,7 +507,7 @@ For normal deploy flows, use that exact string in `targetScopes`.
 
 ```bash
 deploy \
-  --deployment //projects/deployments/pleomino-staging:deploy \
+  --deployment //projects/deployments/pleomino/staging:deploy \
   --print-run-lock-scope \
   --deploy-run-id "$DEPLOY_RUN_ID" \
   --control-plane-url "$VBR_DEPLOY_CONTROL_PLANE_URL"
@@ -652,7 +652,7 @@ Example with an explicit local override:
 
 ```bash
 deploy \
-  --deployment //projects/deployments/pleomino-staging:deploy \
+  --deployment //projects/deployments/pleomino/staging:deploy \
   --artifact-dir ./dist
 ```
 
@@ -660,7 +660,7 @@ Example without the override:
 
 ```bash
 deploy \
-  --deployment //projects/deployments/pleomino-staging:deploy
+  --deployment //projects/deployments/pleomino/staging:deploy
 ```
 
 Use the explicit `--artifact-dir ./dist` form when:
@@ -746,12 +746,12 @@ persisting secret values.
 Use the auth commands before a protected/shared deploy when setup is uncertain:
 
 ```bash
-deploy auth doctor --deployment //projects/deployments/pleomino-staging:deploy
-deploy auth explain-vault-role --deployment //projects/deployments/pleomino-staging:deploy
-deploy auth explain-secret-backend --deployment //projects/deployments/pleomino-staging:deploy
-deploy auth explain-infisical-identity --deployment //projects/deployments/pleomino-staging:deploy
-deploy auth print-login --deployment //projects/deployments/pleomino-staging:deploy
-deploy auth print-jenkins-help --deployment //projects/deployments/pleomino-staging:deploy
+deploy auth doctor --deployment //projects/deployments/pleomino/staging:deploy
+deploy auth explain-vault-role --deployment //projects/deployments/pleomino/staging:deploy
+deploy auth explain-secret-backend --deployment //projects/deployments/pleomino/staging:deploy
+deploy auth explain-infisical-identity --deployment //projects/deployments/pleomino/staging:deploy
+deploy auth print-login --deployment //projects/deployments/pleomino/staging:deploy
+deploy auth print-jenkins-help --deployment //projects/deployments/pleomino/staging:deploy
 ```
 
 `deploy auth doctor` is read-only: it reports the selected credential source,
@@ -781,9 +781,9 @@ Use the reviewed admin Vault commands when live Vault auth roles drift from the
 project deployment metadata:
 
 ```bash
-deploy admin vault plan --deployment //projects/deployments/pleomino-staging:deploy
-deploy admin vault check --deployment //projects/deployments/pleomino-staging:deploy
-deploy admin vault sync --deployment //projects/deployments/pleomino-staging:deploy
+deploy admin vault plan --deployment //projects/deployments/pleomino/staging:deploy
+deploy admin vault check --deployment //projects/deployments/pleomino/staging:deploy
+deploy admin vault sync --deployment //projects/deployments/pleomino/staging:deploy
 ```
 
 `plan` is local and read-only. `check` reads live Vault state and exits
@@ -798,9 +798,9 @@ Use the reviewed Infisical admin commands before the first live Infisical-backed
 deployment:
 
 ```bash
-deploy auth explain-secret-backend --deployment //projects/deployments/pleomino-staging:deploy
-deploy admin infisical plan --deployment //projects/deployments/pleomino-staging:deploy
-deploy admin infisical check --deployment //projects/deployments/pleomino-staging:deploy
+deploy auth explain-secret-backend --deployment //projects/deployments/pleomino/staging:deploy
+deploy admin infisical plan --deployment //projects/deployments/pleomino/staging:deploy
+deploy admin infisical check --deployment //projects/deployments/pleomino/staging:deploy
 ```
 
 `plan` is local and read-only. `check` uses the reviewed

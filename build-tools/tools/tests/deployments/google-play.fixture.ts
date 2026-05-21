@@ -20,7 +20,7 @@ export function googlePlayDeploymentFixture(
   const admissionPolicy =
     overrides.admissionPolicy ||
     nixosSharedHostAdmissionPolicyFixture({
-      ref: `//projects/deployments/pleomino-shared:${environmentStage}_release`,
+      ref: `//projects/deployments/pleomino/shared:${environmentStage}_release`,
       name: `${environmentStage}_release`,
       requiredChecks: [],
       allowedRefs: environmentStage === "prod" ? ["refs/tags/release/*"] : ["main"],
@@ -81,9 +81,9 @@ export function googlePlayDeploymentNodeFixture(overrides: Partial<GraphNode> = 
     publisher: "google-play-mobile-release",
     publisher_config: "google-play.jsonc",
     protection_class: "shared_nonprod",
-    lane_policy: "//projects/deployments/pleomino-shared:lane",
+    lane_policy: "//projects/deployments/pleomino/shared:lane",
     environment_stage: "dev",
-    admission_policy: "//projects/deployments/pleomino-shared:dev_release",
+    admission_policy: "//projects/deployments/pleomino/shared:dev_release",
     secret_requirements: [],
     runtime_config_requirements: [],
     provider_target: {
@@ -102,7 +102,7 @@ export function googlePlayAdmissionPolicyNodeFixture(
   overrides: Partial<GraphNode> = {},
 ): GraphNode {
   return nixosSharedHostAdmissionPolicyNodeFixture({
-    name: "//projects/deployments/pleomino-shared:dev_release",
+    name: "//projects/deployments/pleomino/shared:dev_release",
     allowed_refs: ["main"],
     required_checks: [],
     ...overrides,

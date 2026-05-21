@@ -31,7 +31,7 @@ test("deployment bootstrap dry-run with auto sink remains read-only", async () =
         runInfisicalIacBootstrap({
           ...DEFAULT_BOOTSTRAP_ARGS,
           mode: "deployment",
-          target: "//projects/deployments/pleomino-staging:deploy",
+          target: "//projects/deployments/pleomino/staging:deploy",
           apiUrl: `http://127.0.0.1:${port}`,
           cliDomain: `http://127.0.0.1:${port}/api`,
           hostOverride: true,
@@ -102,7 +102,7 @@ async function close(server: http.Server) {
 }
 
 async function writeReviewedMetadata(dir: string) {
-  const file = path.join(dir, "projects/deployments/pleomino-shared/family.bzl");
+  const file = path.join(dir, "projects/deployments/pleomino/shared/family.bzl");
   await fs.mkdir(path.dirname(file), { recursive: true });
   await fs.writeFile(
     file,

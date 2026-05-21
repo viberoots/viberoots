@@ -20,7 +20,7 @@ async function withTempDir<T>(name: string, fn: (tmp: string) => Promise<T>): Pr
 test("deploy admin grant-user auto-syncs stale reviewed realm shape only when authorized", async () => {
   const deployment = cloudflarePagesDeploymentFixture({
     deploymentId: "pleomino-dev",
-    label: "//projects/deployments/pleomino-dev:deploy",
+    label: "//projects/deployments/pleomino/dev:deploy",
     environmentStage: "dev",
   });
   const membershipAdmin = reviewedDeployAdminGroupName("membership_admin", {

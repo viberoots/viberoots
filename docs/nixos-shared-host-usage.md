@@ -54,7 +54,7 @@ Current supported scope:
   - `static-webapp`
   - `ssr-webapp` for the reviewed single-component host slice
 - protection class: `shared_nonprod`
-- example deployment: `//projects/deployments/pleomino-dev:deploy`
+- example deployment: `//projects/deployments/pleomino/dev:deploy`
 
 ## Before You Start
 
@@ -227,7 +227,7 @@ From a dev machine:
 
 ```bash
 direnv exec . build-tools/tools/bin/deploy \
-  --deployment //projects/deployments/pleomino-dev:deploy \
+  --deployment //projects/deployments/pleomino/dev:deploy \
   --profile mini \
   --plan
 ```
@@ -257,7 +257,7 @@ From a dev machine, if `./dist` is your built app output folder:
 
 ```bash
 direnv exec . build-tools/tools/bin/deploy \
-  --deployment //projects/deployments/pleomino-dev:deploy \
+  --deployment //projects/deployments/pleomino/dev:deploy \
   --profile mini \
   --artifact-dir ./dist
 ```
@@ -310,7 +310,7 @@ From Jenkins:
 
 ```bash
 direnv exec . build-tools/tools/bin/nixos-shared-host-jenkins-deploy \
-  --deployment //projects/deployments/pleomino-dev:deploy \
+  --deployment //projects/deployments/pleomino/dev:deploy \
   --profile mini \
   --artifact-dir "$WORKSPACE/projects/apps/pleomino/dist" \
   --ssh-identity-file "$JENKINS_SSH_IDENTITY" \
@@ -376,18 +376,18 @@ For the normal client-driven `mini` workflow, skip manual SSH edits and run:
 
 ```bash
 direnv exec . build-tools/tools/bin/deploy admin identity sync \
-  --deployment //projects/deployments/pleomino-dev:deploy \
+  --deployment //projects/deployments/pleomino/dev:deploy \
   --profile mini \
   --apply-host-dry-run
 
 direnv exec . build-tools/tools/bin/deploy admin identity grant-user \
-  --deployment //projects/deployments/pleomino-dev:deploy \
+  --deployment //projects/deployments/pleomino/dev:deploy \
   --profile mini \
   --action submit \
   --apply-host
 
 direnv exec . build-tools/tools/bin/deploy admin identity grant-user \
-  --deployment //projects/deployments/pleomino-dev:deploy \
+  --deployment //projects/deployments/pleomino/dev:deploy \
   --profile mini \
   --action submit \
   --user-email alice@example.com \
@@ -462,7 +462,7 @@ Use the `deploy` helper to check status through the installed client profile:
 
 ```bash
 direnv exec . build-tools/tools/bin/deploy \
-  --deployment //projects/deployments/pleomino-dev:deploy \
+  --deployment //projects/deployments/pleomino/dev:deploy \
   --profile mini \
   --status \
   --text \
@@ -495,7 +495,7 @@ waiting for human approval. Review that same run first:
 
 ```bash
 direnv exec . build-tools/tools/bin/deploy \
-  --deployment //projects/deployments/pleomino-dev:deploy \
+  --deployment //projects/deployments/pleomino/dev:deploy \
   --profile mini \
   --status \
   --text \
@@ -521,7 +521,7 @@ Then approve that same run:
 
 ```bash
 direnv exec . build-tools/tools/bin/deploy \
-  --deployment //projects/deployments/pleomino-dev:deploy \
+  --deployment //projects/deployments/pleomino/dev:deploy \
   --profile mini \
   --approve \
   --deploy-run-id "$DEPLOY_RUN_ID" \

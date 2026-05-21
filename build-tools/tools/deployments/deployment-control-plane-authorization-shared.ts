@@ -9,12 +9,26 @@ import type {
 import { packagePathFromLabel } from "../lib/labels";
 
 function projectScopeValueForLabel(label: string): string {
-  const packageName = path.posix.basename(packagePathFromLabel(label));
+  const packagePath = packagePathFromLabel(label);
+  const prefix = "projects/deployments/";
+  if (packagePath.startsWith(prefix)) {
+    const parts = packagePath.slice(prefix.length).split("/");
+    if (parts.length === 2) return `${prefix}${parts[0]}`;
+  }
+  const packageName = path.posix.basename(packagePath);
   return `projects/deployments/${packageName}`;
 }
 
 export function projectScopeValueFor(deployment: DeploymentTarget): string {
-  const lanePackage = path.posix.basename(packagePathFromLabel(deployment.lanePolicyRef || ""));
+  const lanePackagePath = packagePathFromLabel(deployment.lanePolicyRef || "");
+  const lanePackage = path.posix.basename(lanePackagePath);
+  const lanePrefix = "projects/deployments/";
+  if (lanePackagePath.startsWith(lanePrefix)) {
+    const laneParts = lanePackagePath.slice(lanePrefix.length).split("/");
+    if (laneParts.length === 2 && laneParts[1] === "shared") {
+      return `${lanePrefix}${laneParts[0]}`;
+    }
+  }
   if (lanePackage.endsWith("-shared")) {
     return `projects/deployments/${lanePackage.slice(0, -"-shared".length)}`;
   }

@@ -7,8 +7,8 @@ import { nixosSharedHostDeploymentFixture } from "./nixos-shared-host.fixture";
 function deployment() {
   return nixosSharedHostDeploymentFixture({
     deploymentId: "pleomino-dev",
-    label: "//projects/deployments/pleomino-dev:deploy",
-    lanePolicyRef: "//projects/deployments/pleomino-shared:lane",
+    label: "//projects/deployments/pleomino/dev:deploy",
+    lanePolicyRef: "//projects/deployments/pleomino/shared:lane",
     environmentStage: "dev",
   });
 }

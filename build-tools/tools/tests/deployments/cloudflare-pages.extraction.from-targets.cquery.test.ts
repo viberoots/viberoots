@@ -38,8 +38,8 @@ function assertCloudflareApiTokenSteps(
 test("cloudflare-pages deployment extraction reads canonical metadata from TARGETS via cquery", async () => {
   await runInTemp("cloudflare-pages-cquery-extraction", async (tmp, _$) => {
     const appTargetsPath = path.join(tmp, "projects/apps/pleomino/TARGETS");
-    const deployTargetsPath = path.join(tmp, "projects/deployments/pleomino-staging/TARGETS");
-    const sharedTargetsPath = path.join(tmp, "projects/deployments/pleomino-shared/TARGETS");
+    const deployTargetsPath = path.join(tmp, "projects/deployments/pleomino/staging/TARGETS");
+    const sharedTargetsPath = path.join(tmp, "projects/deployments/pleomino/shared/TARGETS");
     await fsp.mkdir(path.dirname(appTargetsPath), { recursive: true });
     await fsp.mkdir(path.dirname(deployTargetsPath), { recursive: true });
     await fsp.mkdir(path.dirname(sharedTargetsPath), { recursive: true });
@@ -117,9 +117,9 @@ test("cloudflare-pages deployment extraction reads canonical metadata from TARGE
         '    custom_domain = "staging.pleomino.com",',
         '    custom_domain_zone_id = "zone-pleomino",',
         '    project = "pleomino-staging-pages",',
-        '    lane_policy = "//projects/deployments/pleomino-shared:lane",',
+        '    lane_policy = "//projects/deployments/pleomino/shared:lane",',
         '    environment_stage = "staging",',
-        '    admission_policy = "//projects/deployments/pleomino-shared:staging_release",',
+        '    admission_policy = "//projects/deployments/pleomino/shared:staging_release",',
         "    secret_requirements = [",
         "        {",
         '            "name": "cloudflare_api_token",',
@@ -157,7 +157,7 @@ test("cloudflare-pages deployment extraction reads canonical metadata from TARGE
 
     const attrFlags = ATTRS.flatMap((attr) => ["--output-attribute", attr]);
     const query =
-      "set(//projects/deployments/pleomino-staging:deploy //projects/apps/pleomino:app //projects/deployments/pleomino-shared:lane //projects/deployments/pleomino-shared:defaults //projects/deployments/pleomino-shared:lane_governance //projects/deployments/pleomino-shared:staging_release)";
+      "set(//projects/deployments/pleomino/staging:deploy //projects/apps/pleomino:app //projects/deployments/pleomino/shared:lane //projects/deployments/pleomino/shared:defaults //projects/deployments/pleomino/shared:lane_governance //projects/deployments/pleomino/shared:staging_release)";
     const cquery = await _$({
       cwd: tmp,
       stdio: "pipe",
@@ -171,7 +171,7 @@ test("cloudflare-pages deployment extraction reads canonical metadata from TARGE
     const { deployments, errors } = extractCloudflarePagesDeployments(nodesFromCqueryJson(merged));
     assert.deepEqual(errors, []);
     assert.equal(deployments.length, 1);
-    assert.equal(deployments[0]?.label, "//projects/deployments/pleomino-staging:deploy");
+    assert.equal(deployments[0]?.label, "//projects/deployments/pleomino/staging:deploy");
     assert.equal(deployments[0]?.lanePolicy.defaultClientProfile, "mini");
     assert.deepEqual(deployments[0]?.lanePolicy.sourceRefPolicy, {
       dev: "main",
@@ -205,7 +205,7 @@ test("cloudflare-pages deployment extraction reads canonical metadata from TARGE
 test("concrete Pleomino Cloudflare TARGETS emit publish and cleanup token requirements", async () => {
   const attrFlags = ATTRS.flatMap((attr) => ["--output-attribute", attr]);
   const query =
-    "set(//projects/deployments/pleomino-staging:deploy //projects/deployments/pleomino-prod:deploy //projects/apps/pleomino:app //projects/deployments/pleomino-shared:lane //projects/deployments:defaults //projects/deployments/pleomino-shared:lane_governance //projects/deployments/pleomino-shared:staging_release //projects/deployments/pleomino-shared:prod_release)";
+    "set(//projects/deployments/pleomino/staging:deploy //projects/deployments/pleomino/prod:deploy //projects/apps/pleomino:app //projects/deployments/pleomino/shared:lane //projects/deployments:defaults //projects/deployments/pleomino/shared:lane_governance //projects/deployments/pleomino/shared:staging_release //projects/deployments/pleomino/shared:prod_release)";
   const cquery = await $({
     stdio: "pipe",
     env: {

@@ -1074,11 +1074,11 @@ contract ids, lane governance, provider behavior, and replay guarantees intact.
 
 ### 2. Scope of changes
 
-- Update `//projects/deployments/pleomino-staging:deploy` and
-  `//projects/deployments/pleomino-prod:deploy` so they declare `secret_backend = "infisical/default"`.
-- Preserve `//projects/deployments/pleomino-dev:deploy` on the existing Vault-backed shared-host
+- Update `//projects/deployments/pleomino/staging:deploy` and
+  `//projects/deployments/pleomino/prod:deploy` so they declare `secret_backend = "infisical/default"`.
+- Preserve `//projects/deployments/pleomino/dev:deploy` on the existing Vault-backed shared-host
   path unless a separate plan explicitly moves dev as well.
-- Refactor `projects/deployments/pleomino-shared/family.bzl` so the shared family defaults no
+- Refactor `projects/deployments/pleomino/shared/family.bzl` so the shared family defaults no
   longer force one Vault runtime onto every stage when staging and production need Infisical
   routing metadata.
 - Depend on the containerized control-plane runtime from
@@ -1104,8 +1104,8 @@ contract ids, lane governance, provider behavior, and replay guarantees intact.
 - Add reviewed non-secret `infisical_runtime` metadata for staging and production:
   - `site_url = "https://app.infisical.com"`
   - `project_id`
-  - `environment = "staging"` for `//projects/deployments/pleomino-staging:deploy`
-  - `environment = "prod"` for `//projects/deployments/pleomino-prod:deploy`
+  - `environment = "staging"` for `//projects/deployments/pleomino/staging:deploy`
+  - `environment = "prod"` for `//projects/deployments/pleomino/prod:deploy`
   - `secret_path = "/"`
   - `preferred_credential_source = "infisical_machine_identity_universal_auth"`
   - `machine_identity_client_id_env = "PLEOMINO_STAGING_INFISICAL_CLIENT_ID"` and
@@ -1329,10 +1329,10 @@ documented by the implementation PR.
    - Read-only metadata validation and cquery extraction must not require these credential values.
 
 6. Verify the Infisical setup without printing secret values.
-   - Run `deploy admin infisical plan` for `//projects/deployments/pleomino-staging:deploy` and
+   - Run `deploy admin infisical plan` for `//projects/deployments/pleomino/staging:deploy` and
      confirm it reports the expected site URL, project id, `staging` environment, path, secret name,
      and Universal Auth env-var names.
-   - Run `deploy admin infisical plan` for `//projects/deployments/pleomino-prod:deploy` and
+   - Run `deploy admin infisical plan` for `//projects/deployments/pleomino/prod:deploy` and
      confirm it reports the expected site URL, project id, `prod` environment, path, secret name,
      and Universal Auth env-var names.
    - Run live `deploy admin infisical check` through the deployment control plane or a documented
@@ -1417,8 +1417,8 @@ documented by the implementation PR.
 
 ### 6. Acceptance criteria
 
-- `//projects/deployments/pleomino-staging:deploy` and
-  `//projects/deployments/pleomino-prod:deploy` select Infisical as their deployment secret backend.
+- `//projects/deployments/pleomino/staging:deploy` and
+  `//projects/deployments/pleomino/prod:deploy` select Infisical as their deployment secret backend.
 - Pleomino dev remains Vault-backed.
 - Pleomino staging and production have reviewed, non-secret Infisical Universal Auth env-name
   metadata and pass deployment metadata validation.
@@ -1885,8 +1885,8 @@ use different Infisical accounts or different Vault instances.
   explicit deployment-specific mode or target selection.
 - Require deployment-specific bootstrap to name its scope explicitly with `--target <buck-target>`
   before it can use
-  `projects/deployments/pleomino-infisical/opentofu` or
-  `projects/deployments/pleomino-shared/family.bzl`.
+  `projects/deployments/pleomino/infisical/opentofu` or
+  `projects/deployments/pleomino/shared/family.bzl`.
 - Keep existing Pleomino bootstrap behavior available through the new explicit deployment-specific
   path, without changing the reviewed Pleomino metadata contract.
 - Update dry-run output so repo-wide bootstrap reports no Pleomino paths, projects, or OpenTofu
@@ -1940,7 +1940,7 @@ use different Infisical accounts or different Vault instances.
   - `infisical-bootstrap deployment --target <buck-target> --yes`
 - Update `docs/sprinkleref.md` and `docs/sprinkleref-check.md` with the repo-wide initialization
   workflow before running `sprinkleref --check --config ...`.
-- Update `projects/deployments/pleomino-infisical/README.md` so Pleomino instructions call the
+- Update `projects/deployments/pleomino/infisical/README.md` so Pleomino instructions call the
   explicit deployment-specific bootstrap path and no longer appear to be the default repo-wide
   bootstrap.
 - Update `docs/infisical-design.md` and deployment metadata docs if needed to clarify that
@@ -2950,7 +2950,7 @@ shared infrastructure directories, and future migrations.
   `projects/deployments/<family>/...`.
 - Preserve explicit `deployment_family` as the highest-precedence value. If an explicit family is
   present, use it even when it differs from the inferred directory name.
-- Keep flat legacy deployment packages such as `projects/deployments/pleomino-prod` working with no
+- Keep flat legacy deployment packages such as `projects/deployments/pleomino/prod` working with no
   inferred family unless they explicitly pass `deployment_family`.
 - Keep `environment_stage` explicit. Do not infer stages from target names or directories in this
   PR.
@@ -3180,3 +3180,131 @@ surface will also remain inconsistent with executable permissions, producing avo
 The repo bootstrap path becomes a two-stage operation with more prompts and more live side effects
 by default. Operators who only want resolver/profile setup must learn the new
 `--without-deployments` opt-out.
+
+## PR-33: Canonical deployment family directory migration
+
+### 1. Intent
+
+Move the real deployment packages out of the current flat legacy layout and into canonical
+family-oriented directories so the repository structure matches the family inference model added in
+PR-31. The goal is to make family membership visible in paths, reduce duplicated
+`deployment_family` metadata for canonical packages, and keep Infisical bootstrap fan-out operating
+against the new labels instead of relying on the old `projects/deployments/<family>-<stage>`
+package names.
+
+### 2. Scope of changes
+
+- Migrate Pleomino deployment packages from flat legacy paths such as
+  `projects/deployments/pleomino-staging`, `projects/deployments/pleomino-prod`,
+  `projects/deployments/pleomino-dev`, `projects/deployments/pleomino-shared`, and
+  `projects/deployments/pleomino-infisical` into canonical family paths under
+  `projects/deployments/pleomino/...`.
+- Preserve stable deployment IDs, environment stages, prerequisite IDs, published records, secret
+  contract IDs, and provider-facing resource names. This PR may change Buck labels and source paths,
+  but it must not rename live deployment identities unless a specific existing identity is already
+  label-derived and the migration documents that exception.
+- Remove explicit `deployment_family = "pleomino"` from canonical Pleomino deployment targets when
+  directory inference supplies the same effective value. Keep explicit overrides only where the
+  package is intentionally non-canonical or where shared/provider helper code needs one during the
+  migration.
+- Update every repo-owned reference to the moved Buck labels and paths, including deployment
+  provider tests, SprinkleRef source reporting, Infisical bootstrap target discovery, reviewed
+  metadata paths, docs, examples, and remediation text.
+- Keep compatibility aliases out of the public deployment surface unless they are needed as a
+  temporary internal migration helper for tests. The canonical labels should be the labels that
+  operator-facing docs, bootstrap output, and SprinkleRef reports show.
+- Evaluate other deployment families such as `platform-*` and `data-room-*` during implementation.
+  If they can be migrated with the same mechanical pattern and low risk, include them; otherwise
+  document why this PR intentionally limits the first migration to Pleomino and leaves follow-up
+  family migrations explicit.
+
+### 3. External prerequisites
+
+- None for the code migration itself. This should be a source-tree, Buck label, metadata, docs, and
+  test update.
+- Live provider, Infisical, Vault, OpenTofu, and macOS Keychain access must not be required for the
+  tests in this PR.
+
+### 4. Tests to be added
+
+- Add cquery tests proving the moved canonical Pleomino targets infer `deployment_family =
+"pleomino"` without explicit metadata and retain their expected `environment_stage` values.
+- Add regression tests proving moved targets preserve stable deployment IDs, prerequisite IDs,
+  secret requirement IDs, secret paths, and provider-facing identifiers.
+- Add tests proving Infisical repo bootstrap fan-out discovers and reports the new canonical
+  Pleomino labels, and does not keep hardcoded references to the old flat labels.
+- Add SprinkleRef tests proving missing-value output, `required by:` source details, managed
+  bootstrap output grouping, and target filtering use the new canonical labels and inferred family.
+- Add docs/guard tests or stale-name checks that fail if operator-facing docs still reference the
+  old flat Pleomino deployment package paths except in an intentional migration note.
+- Update existing deployment provider, front-door, promotion, admission, and reviewed-source tests
+  whose fixtures or assertions reference the old labels so they validate the canonical labels
+  instead of preserving stale paths.
+
+### 5. Docs to be added or updated
+
+- Update `docs/infisical-design.md` to state that the real Pleomino deployments now use canonical
+  family directories and that flat packages are only legacy support for not-yet-migrated families.
+- Update `docs/infisical-bootstrap.md`, `infisical-bootstrap.md`, `docs/sprinkleref.md`, and
+  `docs/sprinkleref-check.md` so command examples, retry guidance, and report examples use the new
+  canonical labels.
+- Update any Pleomino deployment README or bootstrap handoff docs that mention
+  `projects/deployments/pleomino-*` paths.
+- Add a short migration note documenting old-to-new path and label mapping for operators and future
+  code reviewers.
+
+### 5.5. Expected regression scope
+
+- `deployment-only`
+- Expect broad deployment test churn because Buck labels and repo paths are visible in fixtures,
+  docs, cquery assertions, SprinkleRef source reports, and bootstrap target discovery. Keep the
+  change mechanical and avoid modifying provider behavior, runtime secret acquisition, resolver
+  semantics, deployment admission policy, or live resource names.
+
+### 6. Acceptance criteria
+
+- Pleomino deployment targets live under canonical `projects/deployments/pleomino/...` family
+  directories, and operator-facing labels use those canonical paths.
+- Canonical Pleomino targets infer `deployment_family = "pleomino"` without duplicate explicit
+  family metadata, while `environment_stage` remains explicit.
+- Stable deployment IDs, prerequisite IDs, secret contract IDs, managed bootstrap output paths, and
+  provider-facing names remain unchanged unless an exception is explicitly justified in the PR.
+- Infisical repo bootstrap fan-out and explicit `deployment --target` retry guidance use the new
+  canonical Pleomino labels.
+- SprinkleRef missing-value and managed-output reports show the inferred family and canonical
+  `required by:` labels.
+- Repo docs no longer present the old flat Pleomino labels as the current command surface.
+- Focused tests and the repository validation suite pass.
+
+### 7. Risks
+
+- Buck label moves can invalidate many tests, docs, and operator muscle memory at once.
+- Existing deployment IDs or provider resource names may accidentally be derived from labels or
+  paths in some older helper, causing unintended live identity churn.
+- Migration aliases could accidentally keep stale labels alive and hide incomplete updates.
+- Moving shared family code can break load paths for all stages if not updated atomically.
+
+### 8. Mitigations
+
+- Start by mapping every old Pleomino path and label to its canonical replacement, then update
+  references mechanically with focused review of any non-mechanical exceptions.
+- Add explicit stable-identity tests before or alongside the move so label churn cannot silently
+  change deployment identities or secret contract paths.
+- Prefer direct canonical label updates over compatibility aliases. If a temporary alias is needed,
+  keep it internal, tested, documented with a removal condition, and absent from operator-facing
+  output.
+- Keep implementation limited to one family if broader `platform-*` or `data-room-*` migration
+  exposes unrelated provider-specific risk.
+
+### 9. Consequences of not implementing this PR
+
+The repository will continue to support family directory inference only in tests and future
+packages, while real deployments remain in the flat legacy layout. Operators will keep seeing
+labels such as `//projects/deployments/pleomino/staging:deploy`, and family membership will remain
+partly duplicated in shared metadata instead of being expressed by the source tree.
+
+### 10. Downsides for implementing this PR
+
+This is mostly mechanical but high-churn. It will touch many tests and docs, and any external
+operator notes, local scripts, or saved commands that use the old flat labels will need to be
+updated to the canonical labels.

@@ -15,7 +15,7 @@ const ATTRS =
 async function writeTargets(tmp: string): Promise<void> {
   await fsp.mkdir(path.join(tmp, "projects/apps/api"), { recursive: true });
   await fsp.mkdir(path.join(tmp, "projects/deployments/api-prod"), { recursive: true });
-  await fsp.mkdir(path.join(tmp, "projects/deployments/pleomino-shared"), { recursive: true });
+  await fsp.mkdir(path.join(tmp, "projects/deployments/pleomino/shared"), { recursive: true });
   await fsp.writeFile(
     path.join(tmp, "projects/apps/api/TARGETS"),
     [
@@ -24,7 +24,7 @@ async function writeTargets(tmp: string): Promise<void> {
     ].join("\n"),
   );
   await fsp.writeFile(
-    path.join(tmp, "projects/deployments/pleomino-shared/TARGETS"),
+    path.join(tmp, "projects/deployments/pleomino/shared/TARGETS"),
     [
       'load("//build-tools/deployments:defs.bzl", "deployment_admission_policy", "deployment_defaults", "deployment_lane_governance", "deployment_lane_policy")',
       'deployment_defaults(name = "defaults", visibility = ["PUBLIC"])',
@@ -43,9 +43,9 @@ async function writeTargets(tmp: string): Promise<void> {
       '    cluster = "prod-us-west",',
       '    namespace = "web",',
       '    release = "api",',
-      '    lane_policy = "//projects/deployments/pleomino-shared:lane",',
+      '    lane_policy = "//projects/deployments/pleomino/shared:lane",',
       '    environment_stage = "prod",',
-      '    admission_policy = "//projects/deployments/pleomino-shared:prod_release",',
+      '    admission_policy = "//projects/deployments/pleomino/shared:prod_release",',
       ")",
       "kubernetes_service_deployment(",
       '    name = "worker",',
@@ -54,9 +54,9 @@ async function writeTargets(tmp: string): Promise<void> {
       '    namespace = "workers",',
       '    release = "jobs",',
       '    service_kind = "worker",',
-      '    lane_policy = "//projects/deployments/pleomino-shared:lane",',
+      '    lane_policy = "//projects/deployments/pleomino/shared:lane",',
       '    environment_stage = "prod",',
-      '    admission_policy = "//projects/deployments/pleomino-shared:prod_release",',
+      '    admission_policy = "//projects/deployments/pleomino/shared:prod_release",',
       ")",
     ].join("\n"),
   );
@@ -67,7 +67,7 @@ test("kubernetes_service_deployment macro extracts web and private worker servic
     await writeTargets(tmp);
     const attrFlags = ATTRS.flatMap((attr) => ["--output-attribute", attr]);
     const query =
-      "set(//projects/deployments/api-prod:web //projects/deployments/api-prod:worker //projects/apps/api:image //projects/deployments/pleomino-shared:lane //projects/deployments/pleomino-shared:defaults //projects/deployments/pleomino-shared:lane_governance //projects/deployments/pleomino-shared:prod_release)";
+      "set(//projects/deployments/api-prod:web //projects/deployments/api-prod:worker //projects/apps/api:image //projects/deployments/pleomino/shared:lane //projects/deployments/pleomino/shared:defaults //projects/deployments/pleomino/shared:lane_governance //projects/deployments/pleomino/shared:prod_release)";
     const cquery = await $({
       cwd: tmp,
       stdio: "pipe",
@@ -108,9 +108,9 @@ test("kubernetes_service_deployment rejects provider_target metadata overrides",
           '    namespace = "web",',
           '    release = "api",',
           '    provider_target = {"namespace": "drift"},',
-          '    lane_policy = "//projects/deployments/pleomino-shared:lane",',
+          '    lane_policy = "//projects/deployments/pleomino/shared:lane",',
           '    environment_stage = "prod",',
-          '    admission_policy = "//projects/deployments/pleomino-shared:prod_release",',
+          '    admission_policy = "//projects/deployments/pleomino/shared:prod_release",',
           ")",
           "",
         ].join("\n"),

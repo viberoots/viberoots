@@ -564,9 +564,9 @@ Fix:
 
 ```text
 OpenTofu plan failed.
-Working directory: projects/deployments/pleomino-infisical/opentofu
+Working directory: projects/deployments/pleomino/infisical/opentofu
 Saved plan: .local/pleomino-infisical.tfplan
-Retry: cd projects/deployments/pleomino-infisical/opentofu && tofu plan -out=.local/pleomino-infisical.tfplan
+Retry: cd projects/deployments/pleomino/infisical/opentofu && tofu plan -out=.local/pleomino-infisical.tfplan
 Cause: provider authorization failed
 ```
 

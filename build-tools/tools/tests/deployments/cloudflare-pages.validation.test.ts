@@ -19,16 +19,16 @@ function staticWebappComponent(label: string): GraphNode {
 
 function deploymentNode(overrides: Partial<GraphNode> = {}): GraphNode {
   return {
-    name: "//projects/deployments/pleomino-staging:deploy",
+    name: "//projects/deployments/pleomino/staging:deploy",
     provider: "cloudflare-pages",
     component: "//projects/apps/pleomino:app",
     component_kind: "static-webapp",
     publisher: "wrangler-pages",
     publisher_config: "wrangler.jsonc",
     protection_class: "shared_nonprod",
-    lane_policy: "//projects/deployments/pleomino-shared:lane",
+    lane_policy: "//projects/deployments/pleomino/shared:lane",
     environment_stage: "staging",
-    admission_policy: "//projects/deployments/pleomino-shared:staging_release",
+    admission_policy: "//projects/deployments/pleomino/shared:staging_release",
     secret_requirements: [],
     runtime_config_requirements: [],
     provider_target: {
@@ -179,7 +179,7 @@ test("validation rejects protected/shared release_actions for cloudflare-pages",
     staticWebappComponent("//projects/apps/pleomino:app"),
     ...policyNodes(),
     deploymentNode({
-      release_actions: ["//projects/deployments/pleomino-staging:cache_warmup"],
+      release_actions: ["//projects/deployments/pleomino/staging:cache_warmup"],
     }),
   ]);
   assert.ok(

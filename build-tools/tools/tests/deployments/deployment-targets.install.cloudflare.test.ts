@@ -39,7 +39,7 @@ test("Cloudflare target install preserves reviewed vault runtime metadata", asyn
     await installCloudflarePagesTargets(tmp, [deployment]);
 
     const targets = await fsp.readFile(
-      path.join(tmp, "projects", "deployments", "pleomino-staging", "TARGETS"),
+      path.join(tmp, "projects", "deployments", "pleomino", "staging", "TARGETS"),
       "utf8",
     );
     for (const expected of [

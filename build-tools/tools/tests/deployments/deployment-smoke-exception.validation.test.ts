@@ -23,16 +23,16 @@ function staticWebappComponent(label: string): GraphNode {
 
 function cloudflareNode(overrides: Partial<GraphNode> = {}): GraphNode {
   return {
-    name: "//projects/deployments/pleomino-staging:deploy",
+    name: "//projects/deployments/pleomino/staging:deploy",
     provider: "cloudflare-pages",
     component: "//projects/apps/pleomino:app",
     component_kind: "static-webapp",
     publisher: "wrangler-pages",
     publisher_config: "wrangler.jsonc",
     protection_class: "shared_nonprod",
-    lane_policy: "//projects/deployments/pleomino-shared:lane",
+    lane_policy: "//projects/deployments/pleomino/shared:lane",
     environment_stage: "staging",
-    admission_policy: "//projects/deployments/pleomino-shared:staging_release",
+    admission_policy: "//projects/deployments/pleomino/shared:staging_release",
     secret_requirements: [],
     runtime_config_requirements: [],
     provider_target: {
@@ -53,9 +53,9 @@ function nixosNode(overrides: Partial<GraphNode> = {}): GraphNode {
     publisher: "nixos-shared-host-static-webapp",
     provisioner: "nixos-shared-host-manifest",
     protection_class: "shared_nonprod",
-    lane_policy: "//projects/deployments/pleomino-shared:lane",
+    lane_policy: "//projects/deployments/pleomino/shared:lane",
     environment_stage: "dev",
-    admission_policy: "//projects/deployments/pleomino-shared:dev_release",
+    admission_policy: "//projects/deployments/pleomino/shared:dev_release",
     secret_requirements: [],
     runtime_config_requirements: [],
     app_name: "demoapp",

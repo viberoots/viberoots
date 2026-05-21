@@ -101,7 +101,7 @@ test("Cloudflare lifecycle resolves provision, publish, and smoke secrets throug
       };
       await writeLifecycleArtifact(artifactDir, `<html>${backend}</html>\n`);
       await writeLifecycleWranglerConfig(
-        path.join(tmp, "projects", "deployments", "pleomino-staging", "wrangler.jsonc"),
+        path.join(tmp, "projects", "deployments", "pleomino", "staging", "wrangler.jsonc"),
       );
       await installCloudflarePagesTargets(tmp, [deployment]);
       await ensureNixosSharedHostReviewedSourceRef(tmp, $, deployment);

@@ -36,7 +36,7 @@ test("remote profile deploy surface keeps missing admission guidance discoverabl
     assert.match(String(result.stderr), /deploy\/pleomino-dev/);
     assert.match(
       String(result.stderr),
-      /Run this instead: deploy --deployment \/\/projects\/deployments\/pleomino-dev:deploy --profile mini .* --admit-and-deploy deploy\/pleomino-dev/,
+      /Run this instead: deploy --deployment \/\/projects\/deployments\/pleomino\/dev:deploy --profile mini .* --admit-and-deploy deploy\/pleomino-dev/,
     );
   });
 });
@@ -60,7 +60,7 @@ test("jenkins wrapper preserves missing admission guidance from the deploy front
     assert.match(String(summary.error.message), /deploy\/pleomino-dev/);
     assert.match(
       String(summary.error.message),
-      /Run this instead: deploy --deployment \/\/projects\/deployments\/pleomino-dev:deploy --profile mini .* --admit-and-deploy deploy\/pleomino-dev/,
+      /Run this instead: deploy --deployment \/\/projects\/deployments\/pleomino\/dev:deploy --profile mini .* --admit-and-deploy deploy\/pleomino-dev/,
     );
   });
 });

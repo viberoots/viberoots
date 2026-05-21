@@ -55,7 +55,7 @@ export function cloudflarePagesDeploymentFixture(
   const admissionPolicy =
     overrides.admissionPolicy ||
     nixosSharedHostAdmissionPolicyFixture({
-      ref: "//projects/deployments/pleomino-shared:staging_release",
+      ref: "//projects/deployments/pleomino/shared:staging_release",
       name: "staging_release",
       allowedRefs: ["main", "refs/tags/release/*"],
       requiredChecks: [],
@@ -70,7 +70,7 @@ export function cloudflarePagesDeploymentFixture(
   };
   return {
     deploymentId: overrides.deploymentId || "pleomino-staging",
-    label: overrides.label || "//projects/deployments/pleomino-staging:deploy",
+    label: overrides.label || "//projects/deployments/pleomino/staging:deploy",
     name: overrides.name || "deploy",
     provider: CLOUDFLARE_PAGES_PROVIDER,
     protectionClass: overrides.protectionClass || "shared_nonprod",
@@ -108,7 +108,7 @@ export function cloudflarePagesAdmissionPolicyNodeFixture(
   overrides: Partial<GraphNode> = {},
 ): GraphNode {
   return nixosSharedHostAdmissionPolicyNodeFixture({
-    name: "//projects/deployments/pleomino-shared:staging_release",
+    name: "//projects/deployments/pleomino/shared:staging_release",
     allowed_refs: ["main", "refs/tags/release/*"],
     required_checks: ["deploy/pleomino-staging"],
     ...overrides,

@@ -12,9 +12,9 @@ const targetScope = "cloudflare-pages:web-platform-staging/pleomino-staging-page
 
 function admittedContext(overrides: Partial<CloudflarePagesAdmittedContext> = {}) {
   return {
-    lanePolicyRef: "//projects/deployments/pleomino-shared:lane",
+    lanePolicyRef: "//projects/deployments/pleomino/shared:lane",
     lanePolicyFingerprint: "sha256:lane",
-    admissionPolicyRef: "//projects/deployments/pleomino-shared:staging_release",
+    admissionPolicyRef: "//projects/deployments/pleomino/shared:staging_release",
     admissionPolicyFingerprint: "sha256:admission",
     environmentStage: "staging",
     secretBackend: "vault",

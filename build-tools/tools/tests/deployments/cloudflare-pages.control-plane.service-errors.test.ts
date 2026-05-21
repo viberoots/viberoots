@@ -38,7 +38,7 @@ test("public cloudflare-pages deploy requires a control-plane URL for protected/
     const artifactDir = path.join(tmp, "artifact");
     await writeCloudflareServiceArtifact(artifactDir, "<html>service-required</html>\n");
     await writeWranglerConfig(
-      path.join(tmp, "projects", "deployments", "pleomino-staging", "wrangler.jsonc"),
+      path.join(tmp, "projects", "deployments", "pleomino", "staging", "wrangler.jsonc"),
     );
     await installCloudflarePagesTargets(tmp, [deployment]);
     await ensureNixosSharedHostReviewedSourceRef(tmp, $, deployment);
@@ -65,7 +65,7 @@ test("public cloudflare-pages deploy rejects mixed service and local records fla
     const recordsRoot = path.join(tmp, "records");
     await writeCloudflareServiceArtifact(artifactDir, "<html>mixed-mode</html>\n");
     await writeWranglerConfig(
-      path.join(tmp, "projects", "deployments", "pleomino-staging", "wrangler.jsonc"),
+      path.join(tmp, "projects", "deployments", "pleomino", "staging", "wrangler.jsonc"),
     );
     await installCloudflarePagesTargets(tmp, [deployment]);
     await ensureNixosSharedHostReviewedSourceRef(tmp, $, deployment);
@@ -142,7 +142,7 @@ test("service terminal admission rejection is reported without deploy-record loo
     submittedAt: "2026-04-30T00:00:00.000Z",
     completedAt: "2026-04-30T00:00:01.000Z",
     deploymentId: "pleomino-staging",
-    deploymentLabel: "//projects/deployments/pleomino-staging:deploy",
+    deploymentLabel: "//projects/deployments/pleomino/staging:deploy",
     operationKind: "deploy",
     providerTargetIdentity: "cloudflare-pages:web-platform-staging/pleomino-staging-pages",
     lockScope: "cloudflare-pages:web-platform-staging/pleomino-staging-pages",
@@ -185,7 +185,7 @@ test("service terminal admission rejection includes concrete rejection details",
     submittedAt: "2026-04-30T00:00:00.000Z",
     completedAt: "2026-04-30T00:00:01.000Z",
     deploymentId: "pleomino-staging",
-    deploymentLabel: "//projects/deployments/pleomino-staging:deploy",
+    deploymentLabel: "//projects/deployments/pleomino/staging:deploy",
     operationKind: "deploy",
     providerTargetIdentity: "cloudflare-pages:web-platform-staging/pleomino-staging-pages",
     lockScope: "cloudflare-pages:web-platform-staging/pleomino-staging-pages",

@@ -6,7 +6,7 @@ import {
   resolveDeploymentImpactSelection,
 } from "../../lib/deployment-impact-selector";
 
-const deploymentTargetLabels = ["//projects/deployments/pleomino-dev:deploy"];
+const deploymentTargetLabels = ["//projects/deployments/pleomino/dev:deploy"];
 
 test("deployment-impact: reviewed deployment-owned build-system paths stay deployment-only", () => {
   const result = resolveDeploymentImpactSelection(
@@ -129,12 +129,12 @@ test("deployment-impact: unknown build-tools paths fail closed to mixed mode", (
 
 test("deployment-impact: deployment project paths trigger deployment and project impact mode", () => {
   const result = resolveDeploymentImpactSelection(
-    ["./projects/deployments/pleomino-dev/TARGETS", "build-tools/deployments/defs.bzl"],
+    ["./projects/deployments/pleomino/dev/TARGETS", "build-tools/deployments/defs.bzl"],
     { deploymentTargetLabels },
   );
 
   assert.equal(
-    isDeploymentProjectPath("projects/deployments/pleomino-dev/TARGETS", ["projects/deployments"]),
+    isDeploymentProjectPath("projects/deployments/pleomino/dev/TARGETS", ["projects/deployments"]),
     true,
   );
   assert.equal(
@@ -144,9 +144,9 @@ test("deployment-impact: deployment project paths trigger deployment and project
   assert.equal(result.mode, "deployment-and-project-impact");
   assert.deepEqual(result.diagnostics.deploymentOwnedPaths, ["build-tools/deployments/defs.bzl"]);
   assert.deepEqual(result.diagnostics.deploymentProjectPaths, [
-    "projects/deployments/pleomino-dev/TARGETS",
+    "projects/deployments/pleomino/dev/TARGETS",
   ]);
-  assert.deepEqual(result.diagnostics.deploymentProjects, ["projects/deployments/pleomino-dev"]);
+  assert.deepEqual(result.diagnostics.deploymentProjects, ["projects/deployments/pleomino/dev"]);
   assert.equal(result.diagnostics.reason, "deployment-project-path-changed");
 });
 
@@ -166,7 +166,7 @@ test("deployment-impact: unrelated paths keep no-deployment-impact mode", () => 
 test("deployment-impact: diagnostics JSON stays normalized and stable", () => {
   const result = resolveDeploymentImpactSelection(
     [
-      "projects\\deployments\\pleomino-dev\\TARGETS",
+      "projects\\deployments\\pleomino\\dev\\TARGETS",
       "build-tools\\deployments\\defs.bzl",
       "build-tools\\deployments\\defs.bzl",
     ],
@@ -182,16 +182,16 @@ test("deployment-impact: diagnostics JSON stays normalized and stable", () => {
       '    "mode": "deployment-and-project-impact",',
       '    "changedPaths": [',
       '      "build-tools/deployments/defs.bzl",',
-      '      "projects/deployments/pleomino-dev/TARGETS"',
+      '      "projects/deployments/pleomino/dev/TARGETS"',
       "    ],",
       '    "deploymentOwnedPaths": [',
       '      "build-tools/deployments/defs.bzl"',
       "    ],",
       '    "deploymentProjectPaths": [',
-      '      "projects/deployments/pleomino-dev/TARGETS"',
+      '      "projects/deployments/pleomino/dev/TARGETS"',
       "    ],",
       '    "deploymentProjects": [',
-      '      "projects/deployments/pleomino-dev"',
+      '      "projects/deployments/pleomino/dev"',
       "    ],",
       '    "sharedBuildSystemPaths": [],',
       '    "unknownBuildSystemPaths": [],',

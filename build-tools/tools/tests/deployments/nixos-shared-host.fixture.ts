@@ -48,7 +48,7 @@ export function nixosSharedHostLanePolicyFixture(overrides: Partial<DeploymentLa
     | DeploymentLanePromotionCompatibility
     | undefined;
   return {
-    ref: overrides.ref || "//projects/deployments/pleomino-shared:lane",
+    ref: overrides.ref || "//projects/deployments/pleomino/shared:lane",
     name: overrides.name || "lane",
     stages: overrides.stages || ["dev", "staging", "prod"],
     sourceRefPolicy: overrides.sourceRefPolicy || {
@@ -73,7 +73,7 @@ export function nixosSharedHostAdmissionPolicyFixture(
   overrides: Partial<DeploymentAdmissionPolicy> = {},
 ) {
   return {
-    ref: overrides.ref || "//projects/deployments/pleomino-shared:dev_release",
+    ref: overrides.ref || "//projects/deployments/pleomino/shared:dev_release",
     name: overrides.name || "dev_release",
     allowedRefs: overrides.allowedRefs || ["main"],
     requiredChecks: overrides.requiredChecks || ["deploy/pleomino-dev"],

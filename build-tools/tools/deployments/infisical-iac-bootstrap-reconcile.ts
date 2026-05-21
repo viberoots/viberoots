@@ -45,7 +45,7 @@ export function reconcileDeploymentMetadata(
         "OpenTofu output reconciliation failed against reviewed Pleomino Infisical metadata.",
         ...mismatches.map((item) => `- ${item}`),
         "Concrete remediation:",
-        "- Update projects/deployments/pleomino-shared/family.bzl reviewed constants:",
+        "- Update projects/deployments/pleomino/shared/family.bzl reviewed constants:",
         "  _INFISICAL_SITE_URL, _INFISICAL_PROJECT_ID, _INFISICAL_MACHINE_IDENTITY_IDS, and _INFISICAL_CREDENTIAL_FILE_NAMES.",
         "- Keep the stable refs in this command's handoff report unchanged unless the reviewed naming convention changes.",
         "- Rerun this bootstrap command after patching metadata; do not attempt a live deployment until reconciliation passes.",

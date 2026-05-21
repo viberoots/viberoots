@@ -83,7 +83,7 @@ test("cloudflare-pages preview publish and explicit preview cleanup run end to e
     await writeArtifact(artifactDir, "<html>pleomino preview</html>\n");
     await writeSecretFixture(fixturePath);
     await writeWranglerConfig(
-      path.join(tmp, "projects", "deployments", "pleomino-staging", "wrangler.jsonc"),
+      path.join(tmp, "projects", "deployments", "pleomino", "staging", "wrangler.jsonc"),
     );
     await installCloudflarePagesTargets(tmp, [deployment]);
     await ensureNixosSharedHostReviewedSourceRef(tmp, $, deployment);

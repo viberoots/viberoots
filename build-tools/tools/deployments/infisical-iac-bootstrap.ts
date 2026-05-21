@@ -35,8 +35,8 @@ import type { BootstrapArgs, Identity } from "./infisical-iac-bootstrap-types";
 import { readSprinkleRefConfig } from "./sprinkleref-config";
 
 const PLEOMINO_DEPLOYMENT_BOOTSTRAP_TARGETS = new Set([
-  "//projects/deployments/pleomino-staging:deploy",
-  "//projects/deployments/pleomino-prod:deploy",
+  "//projects/deployments/pleomino/staging:deploy",
+  "//projects/deployments/pleomino/prod:deploy",
 ]);
 
 export async function runInfisicalIacBootstrap(args: BootstrapArgs) {

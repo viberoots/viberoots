@@ -290,7 +290,7 @@ From the workstation:
 export VBR_DEPLOY_CONTROL_PLANE_TOKEN='...'   # value unchanged from BNX_* days
 
 direnv exec . build-tools/tools/bin/deploy \
-  --deployment //projects/deployments/pleomino-dev:deploy \
+  --deployment //projects/deployments/pleomino/dev:deploy \
   --profile mini \
   --plan
 ```
@@ -299,7 +299,7 @@ Then a real deploy:
 
 ```bash
 direnv exec . build-tools/tools/bin/deploy \
-  --deployment //projects/deployments/pleomino-dev:deploy \
+  --deployment //projects/deployments/pleomino/dev:deploy \
   --profile mini
 ```
 
@@ -336,7 +336,7 @@ environment variables for the service or workers.
 
    ```bash
    direnv exec . build-tools/tools/bin/deploy \
-     --deployment //projects/deployments/pleomino-dev:deploy \
+     --deployment //projects/deployments/pleomino/dev:deploy \
      --profile mini \
      --admit-only
    ```
@@ -505,12 +505,12 @@ From the workstation, regenerate the local profile if needed, then run:
 export VBR_DEPLOY_CONTROL_PLANE_TOKEN='...'
 
 direnv exec . build-tools/tools/bin/deploy \
-  --deployment //projects/deployments/pleomino-dev:deploy \
+  --deployment //projects/deployments/pleomino/dev:deploy \
   --profile mini \
   --plan
 
 direnv exec . build-tools/tools/bin/deploy \
-  --deployment //projects/deployments/pleomino-dev:deploy \
+  --deployment //projects/deployments/pleomino/dev:deploy \
   --profile mini
 ```
 

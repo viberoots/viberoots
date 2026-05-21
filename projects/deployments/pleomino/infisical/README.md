@@ -66,7 +66,7 @@ runs OpenTofu with a saved plan before applying it.
 ```bash
 build-tools/tools/deployments/infisical-bootstrap.ts \
   deployment \
-  --target //projects/deployments/pleomino-staging:deploy \
+  --target //projects/deployments/pleomino/staging:deploy \
   --org-name viberoots \
   --tofu-plan-file .local/pleomino-infisical.tfplan
 ```
@@ -79,7 +79,7 @@ in checked deployment metadata.
 ```bash
 build-tools/tools/deployments/infisical-bootstrap.ts \
   deployment \
-  --target //projects/deployments/pleomino-staging:deploy \
+  --target //projects/deployments/pleomino/staging:deploy \
   --no-login \
   --org-name viberoots \
   --yes \
@@ -118,7 +118,7 @@ applying so the module adopts them instead of trying to create duplicates.
 
 The deterministic bootstrap command consumes these reviewed non-secret inputs:
 Infisical site URL `https://app.infisical.com` by default, organization `viberoots`, OpenTofu directory
-`projects/deployments/pleomino-infisical/opentofu`, project name and slug
+`projects/deployments/pleomino/infisical/opentofu`, project name and slug
 `pleomino-deployments`, environments `staging` and `prod`, secret path `/`,
 secret name `cloudflare_api_token`, machine identity names
 `pleomino-staging-deploy` and `pleomino-prod-deploy`, and the credential-file

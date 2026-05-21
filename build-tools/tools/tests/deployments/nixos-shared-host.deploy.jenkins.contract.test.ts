@@ -31,7 +31,7 @@ test("jenkins wrapper contract", async (t) => {
       const result = await $({
         cwd: tmp,
         env: { ...process.env, IN_NIX_SHELL: "1" },
-      })`build-tools/tools/bin/nixos-shared-host-jenkins-deploy --deployment //projects/deployments/pleomino-dev:deploy --profile mini --profile-root ${profileRoot} --artifact-dir ${artifactDir} --ssh-identity-file ${auth.identityFile} --ssh-known-hosts ${auth.knownHostsFile} --plan`;
+      })`build-tools/tools/bin/nixos-shared-host-jenkins-deploy --deployment //projects/deployments/pleomino/dev:deploy --profile mini --profile-root ${profileRoot} --artifact-dir ${artifactDir} --ssh-identity-file ${auth.identityFile} --ssh-known-hosts ${auth.knownHostsFile} --plan`;
       const summary = JSON.parse(String(result.stdout));
       assert.equal(summary.ok, true);
       assert.equal(summary.planOnly, true);
@@ -50,7 +50,7 @@ test("jenkins wrapper contract", async (t) => {
       const result = await $({
         cwd: tmp,
         env: { ...process.env, IN_NIX_SHELL: "1" },
-      })`build-tools/tools/bin/nixos-shared-host-jenkins-deploy --deployment //projects/deployments/pleomino-dev:deploy --profile mini --profile-root ${profileRoot} --artifact-dir ${path.join(tmp, "missing-artifact")} --ssh-identity-file ${auth.identityFile} --ssh-known-hosts ${auth.knownHostsFile}`.nothrow();
+      })`build-tools/tools/bin/nixos-shared-host-jenkins-deploy --deployment //projects/deployments/pleomino/dev:deploy --profile mini --profile-root ${profileRoot} --artifact-dir ${path.join(tmp, "missing-artifact")} --ssh-identity-file ${auth.identityFile} --ssh-known-hosts ${auth.knownHostsFile}`.nothrow();
       assert.notEqual(result.exitCode, 0);
       const failure = JSON.parse(String(result.stdout));
       assert.equal(failure.ok, false);
@@ -61,7 +61,7 @@ test("jenkins wrapper contract", async (t) => {
       const result = await $({
         cwd: tmp,
         env: { ...process.env, IN_NIX_SHELL: "1" },
-      })`build-tools/tools/bin/nixos-shared-host-jenkins-deploy --deployment //projects/deployments/pleomino-dev:deploy --profile mini --profile-root ${profileRoot} --artifact-dir ${artifactDir} --ssh-identity-file ${auth.identityFile} --ssh-known-hosts ${path.join(tmp, "missing-known-hosts")}`.nothrow();
+      })`build-tools/tools/bin/nixos-shared-host-jenkins-deploy --deployment //projects/deployments/pleomino/dev:deploy --profile mini --profile-root ${profileRoot} --artifact-dir ${artifactDir} --ssh-identity-file ${auth.identityFile} --ssh-known-hosts ${path.join(tmp, "missing-known-hosts")}`.nothrow();
       assert.notEqual(result.exitCode, 0);
       const failure = JSON.parse(String(result.stdout));
       assert.equal(failure.ok, false);
@@ -72,7 +72,7 @@ test("jenkins wrapper contract", async (t) => {
       const result = await $({
         cwd: tmp,
         env: { ...process.env, IN_NIX_SHELL: "1" },
-      })`build-tools/tools/bin/nixos-shared-host-jenkins-deploy --deployment //projects/deployments/pleomino-dev:deploy --profile mini --profile-root ${profileRoot} --artifact-dir ${artifactDir} --ssh-identity-file ${auth.identityFile} --ssh-known-hosts ${auth.knownHostsFile} --apply-host --apply-host-dry-run`.nothrow();
+      })`build-tools/tools/bin/nixos-shared-host-jenkins-deploy --deployment //projects/deployments/pleomino/dev:deploy --profile mini --profile-root ${profileRoot} --artifact-dir ${artifactDir} --ssh-identity-file ${auth.identityFile} --ssh-known-hosts ${auth.knownHostsFile} --apply-host --apply-host-dry-run`.nothrow();
       assert.notEqual(result.exitCode, 0);
       const failure = JSON.parse(String(result.stdout));
       assert.equal(failure.ok, false);
@@ -83,7 +83,7 @@ test("jenkins wrapper contract", async (t) => {
       const result = await $({
         cwd: tmp,
         env: { ...process.env, IN_NIX_SHELL: "1" },
-      })`build-tools/tools/bin/nixos-shared-host-jenkins-deploy --deployment //projects/deployments/pleomino-dev:deploy --profile mini --profile-root ${profileRoot} --artifact-dir ${artifactDir} --ssh-identity-file ${auth.identityFile} --ssh-known-hosts ${auth.knownHostsFile} --control-plane-url http://127.0.0.1:7780`.nothrow();
+      })`build-tools/tools/bin/nixos-shared-host-jenkins-deploy --deployment //projects/deployments/pleomino/dev:deploy --profile mini --profile-root ${profileRoot} --artifact-dir ${artifactDir} --ssh-identity-file ${auth.identityFile} --ssh-known-hosts ${auth.knownHostsFile} --control-plane-url http://127.0.0.1:7780`.nothrow();
       assert.notEqual(result.exitCode, 0);
       const failure = JSON.parse(String(result.stdout));
       assert.equal(failure.ok, false);
@@ -95,7 +95,7 @@ test("jenkins wrapper contract", async (t) => {
       const result = await $({
         cwd: tmp,
         env: { ...process.env, IN_NIX_SHELL: "1" },
-      })`build-tools/tools/bin/nixos-shared-host-jenkins-deploy --deployment //projects/deployments/pleomino-dev:deploy --profile mini --profile-root ${profileRoot} --artifact-dir ${artifactDir} --ssh-identity-file ${auth.identityFile} --ssh-known-hosts ${auth.knownHostsFile} --apply-host`.nothrow();
+      })`build-tools/tools/bin/nixos-shared-host-jenkins-deploy --deployment //projects/deployments/pleomino/dev:deploy --profile mini --profile-root ${profileRoot} --artifact-dir ${artifactDir} --ssh-identity-file ${auth.identityFile} --ssh-known-hosts ${auth.knownHostsFile} --apply-host`.nothrow();
       assert.notEqual(result.exitCode, 0);
       const failure = JSON.parse(String(result.stdout));
       assert.equal(failure.ok, false);

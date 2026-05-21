@@ -80,11 +80,11 @@ test("public s3-static deploy routes deploy, provision-only, retry, and rollback
     await writeArtifact(artifactB, "<html>b</html>\n");
     await installS3StaticTargets(tmp, [deployment]);
     await ensureNixosSharedHostReviewedSourceRef(tmp, $, deployment as any);
-    await fsp.mkdir(path.join(tmp, "projects", "deployments", "pleomino-staging-s3"), {
+    await fsp.mkdir(path.join(tmp, "projects", "deployments", "pleomino", "staging-s3"), {
       recursive: true,
     });
     await fsp.writeFile(
-      path.join(tmp, "projects", "deployments", "pleomino-staging-s3", "aws-s3-sync.jsonc"),
+      path.join(tmp, "projects", "deployments", "pleomino", "staging-s3", "aws-s3-sync.jsonc"),
       '{\n  "distribution": "staging.example.test"\n}\n',
       "utf8",
     );

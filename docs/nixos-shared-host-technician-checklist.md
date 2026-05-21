@@ -160,7 +160,7 @@ branches or hand-maintained release pointers to decide what is live.
 
 ```bash
 direnv exec . build-tools/tools/bin/deploy \
-  --deployment //projects/deployments/pleomino-prod:deploy \
+  --deployment //projects/deployments/pleomino/prod:deploy \
   --profile mini \
   --current-stage-state \
   --text
@@ -170,7 +170,7 @@ For audit and lineage, use the same deployment target:
 
 ```bash
 direnv exec . build-tools/tools/bin/deploy \
-  --deployment //projects/deployments/pleomino-prod:deploy \
+  --deployment //projects/deployments/pleomino/prod:deploy \
   --profile mini \
   --stage-state-audit \
   --text
@@ -189,7 +189,7 @@ instead of submitting a new one. First inspect the run:
 
 ```bash
 direnv exec . build-tools/tools/bin/deploy \
-  --deployment //projects/deployments/pleomino-dev:deploy \
+  --deployment //projects/deployments/pleomino/dev:deploy \
   --profile mini \
   --status \
   --deploy-run-id "$DEPLOY_RUN_ID"
@@ -199,7 +199,7 @@ Then approve it:
 
 ```bash
 direnv exec . build-tools/tools/bin/deploy \
-  --deployment //projects/deployments/pleomino-dev:deploy \
+  --deployment //projects/deployments/pleomino/dev:deploy \
   --profile mini \
   --approve \
   --deploy-run-id "$DEPLOY_RUN_ID" \
@@ -240,7 +240,7 @@ Before handing the system back:
 
 ```bash
 direnv exec . build-tools/tools/bin/deploy \
-  --deployment //projects/deployments/pleomino-dev:deploy \
+  --deployment //projects/deployments/pleomino/dev:deploy \
   --profile mini \
   --plan
 ```

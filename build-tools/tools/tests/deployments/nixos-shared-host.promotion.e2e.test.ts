@@ -60,7 +60,7 @@ function cloudflareDevDeployment() {
   });
   return cloudflarePagesDeploymentFixture({
     deploymentId: "pleomino-dev-pages",
-    label: "//projects/deployments/pleomino-dev-pages:deploy",
+    label: "//projects/deployments/pleomino/dev-pages:deploy",
     lanePolicy,
     lanePolicyRef: lanePolicy.ref,
     environmentStage: "dev",
@@ -78,7 +78,7 @@ function cloudflareDevDeployment() {
 
 function nixosStagingDeployment(lanePolicy = cloudflareDevDeployment().lanePolicy) {
   const admissionPolicy = nixosSharedHostAdmissionPolicyFixture({
-    ref: "//projects/deployments/pleomino-shared:staging_release",
+    ref: "//projects/deployments/pleomino/shared:staging_release",
     name: "staging_release",
     allowedRefs: ["main"],
     requiredChecks: [],
@@ -86,7 +86,7 @@ function nixosStagingDeployment(lanePolicy = cloudflareDevDeployment().lanePolic
   });
   return nixosSharedHostDeploymentFixture({
     deploymentId: "pleomino-staging-host",
-    label: "//projects/deployments/pleomino-staging-host:deploy",
+    label: "//projects/deployments/pleomino/staging-host:deploy",
     lanePolicy,
     lanePolicyRef: lanePolicy.ref,
     environmentStage: "staging",
@@ -122,7 +122,7 @@ test("nixos-shared-host allows reviewed cross-provider same-artifact promotion o
     await writeArtifact(artifactDir, "<html>promoted release</html>\n");
     await writeArtifact(bootstrapArtifactDir, "<html>bootstrap</html>\n");
     await writeWranglerConfig(
-      path.join(tmp, "projects", "deployments", "pleomino-dev-pages", "wrangler.jsonc"),
+      path.join(tmp, "projects", "deployments", "pleomino", "dev-pages", "wrangler.jsonc"),
     );
     await installCloudflarePagesTargets(tmp, [source]);
     await installNixosSharedHostTargets(tmp, [target]);
@@ -196,7 +196,7 @@ test("nixos-shared-host promotion keeps retained source-run eligibility independ
     const sourceJson = path.join(tmp, "pleomino-dev-pages.json");
     await writeArtifact(artifactDir, "<html>eligible source</html>\n");
     await writeWranglerConfig(
-      path.join(tmp, "projects", "deployments", "pleomino-dev-pages", "wrangler.jsonc"),
+      path.join(tmp, "projects", "deployments", "pleomino", "dev-pages", "wrangler.jsonc"),
     );
     await installCloudflarePagesTargets(tmp, [source]);
     await installNixosSharedHostTargets(tmp, [target]);

@@ -1,4 +1,4 @@
-load("//projects/deployments/pleomino-shared:family.bzl", "pleomino_cloudflare_deployment")
+load("//projects/deployments/pleomino/shared:family.bzl", "pleomino_cloudflare_deployment")
 
 pleomino_cloudflare_deployment(
     name = "deploy",

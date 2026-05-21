@@ -75,7 +75,7 @@ test("public cloudflare-pages deploy routes deploy, preview, cleanup, and rollba
     await writeCloudflareServiceArtifact(artifactA, "<html>artifact-a</html>\n");
     await writeCloudflareServiceArtifact(artifactB, "<html>artifact-b</html>\n");
     await writeWranglerConfig(
-      path.join(tmp, "projects", "deployments", "pleomino-staging", "wrangler.jsonc"),
+      path.join(tmp, "projects", "deployments", "pleomino", "staging", "wrangler.jsonc"),
     );
     await installCloudflarePagesTargets(tmp, [deployment]);
     await ensureNixosSharedHostReviewedSourceRef(tmp, $, deployment);

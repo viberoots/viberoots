@@ -20,7 +20,7 @@ import {
 import { waitFor } from "./nixos-shared-host.control-plane.helpers";
 export { installClientProfile } from "./nixos-shared-host.remote-exec.install.helpers";
 
-export const REVIEWED_PLEOMINO_DEPLOYMENT_LABEL = "//projects/deployments/pleomino-dev:deploy";
+export const REVIEWED_PLEOMINO_DEPLOYMENT_LABEL = "//projects/deployments/pleomino/dev:deploy";
 let buckQueryNonce = 0;
 
 export function freshRemoteExecBuckIsolation(tmp: string): string {
@@ -114,7 +114,14 @@ export async function listRunRecords(recordsRoot: string): Promise<string[]> {
 }
 
 export async function requirePleominoDevCheck(tmp: string): Promise<void> {
-  const sharedTargetsPath = path.join(tmp, "projects", "deployments", "pleomino-shared", "TARGETS");
+  const sharedTargetsPath = path.join(
+    tmp,
+    "projects",
+    "deployments",
+    "pleomino",
+    "shared",
+    "TARGETS",
+  );
   const source = await fsp.readFile(sharedTargetsPath, "utf8");
   const nextSource = source
     .replace(
@@ -126,7 +133,7 @@ export async function requirePleominoDevCheck(tmp: string): Promise<void> {
       '$1["deploy/pleomino-dev"]$2',
     );
   if (nextSource === source) {
-    throw new Error("required checks fixture update did not match pleomino-shared TARGETS");
+    throw new Error("required checks fixture update did not match pleomino/shared TARGETS");
   }
   await fsp.writeFile(sharedTargetsPath, nextSource, "utf8");
   const written = await fsp.readFile(sharedTargetsPath, "utf8");
@@ -134,7 +141,7 @@ export async function requirePleominoDevCheck(tmp: string): Promise<void> {
     !written.includes('"required_checks": "deploy/pleomino-dev"') ||
     !written.includes('required_checks = ["deploy/pleomino-dev"]')
   ) {
-    throw new Error("required checks fixture update did not persist to pleomino-shared TARGETS");
+    throw new Error("required checks fixture update did not persist to pleomino/shared TARGETS");
   }
   await waitFor(
     async () => {

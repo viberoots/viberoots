@@ -59,7 +59,7 @@ test("deployment verify scope leaves unrelated paths unclassified", () => {
     "build-tools/tools/tests/scaffolding/template-taxonomy.contract.test.ts",
     "docs/deployment-plan.md",
     "projects/apps/pleomino/TARGETS",
-    "projects/deployments/pleomino-dev/TARGETS",
+    "projects/deployments/pleomino/dev/TARGETS",
   ];
   for (const relPath of unrelatedPaths) {
     assert.equal(isReviewedDeploymentOwnedBuildSystemPath(relPath), false, relPath);

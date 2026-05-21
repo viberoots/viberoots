@@ -21,7 +21,7 @@ export function s3StaticDeploymentFixture(
   const admissionPolicy =
     overrides.admissionPolicy ||
     nixosSharedHostAdmissionPolicyFixture({
-      ref: "//projects/deployments/pleomino-shared:staging_release",
+      ref: "//projects/deployments/pleomino/shared:staging_release",
       name: "staging_release",
       allowedRefs: ["main"],
       requiredChecks: [],
@@ -38,7 +38,7 @@ export function s3StaticDeploymentFixture(
   };
   return {
     deploymentId: overrides.deploymentId || "pleomino-staging-s3",
-    label: overrides.label || "//projects/deployments/pleomino-staging-s3:deploy",
+    label: overrides.label || "//projects/deployments/pleomino/staging-s3:deploy",
     name: overrides.name || "deploy",
     provider: S3_STATIC_PROVIDER,
     protectionClass: overrides.protectionClass || "shared_nonprod",
@@ -73,7 +73,7 @@ export function s3StaticDeploymentFixture(
 
 export function s3StaticAdmissionPolicyNodeFixture(overrides: Partial<GraphNode> = {}): GraphNode {
   return nixosSharedHostAdmissionPolicyNodeFixture({
-    name: "//projects/deployments/pleomino-shared:staging_release",
+    name: "//projects/deployments/pleomino/shared:staging_release",
     allowed_refs: ["main"],
     required_checks: ["deploy/pleomino-staging-s3"],
     ...overrides,

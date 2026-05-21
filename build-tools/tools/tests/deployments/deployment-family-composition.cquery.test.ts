@@ -73,26 +73,26 @@ async function expectBuckFailure(tmp: string, $: any, pattern: RegExp): Promise<
 
 test("concrete deployment families compose defaults into explicit stage targets", async () => {
   const nodes = await runDeploymentCquery(process.cwd(), $, "deployment-family-real-cquery", [
-    "//projects/deployments/pleomino-staging:deploy",
-    "//projects/deployments/pleomino-dev:deploy",
-    "//projects/deployments/pleomino-prod:deploy",
+    "//projects/deployments/pleomino/staging:deploy",
+    "//projects/deployments/pleomino/dev:deploy",
+    "//projects/deployments/pleomino/prod:deploy",
     "//projects/deployments/platform-foundation-dev:deploy",
     "//projects/deployments/platform-foundation-staging:deploy",
     "//projects/deployments/platform-foundation-prod:deploy",
     "//projects/apps/pleomino:app",
-    "//projects/deployments/pleomino-shared:lane",
-    "//projects/deployments/pleomino-shared:dev_release",
-    "//projects/deployments/pleomino-shared:staging_release",
-    "//projects/deployments/pleomino-shared:prod_release",
+    "//projects/deployments/pleomino/shared:lane",
+    "//projects/deployments/pleomino/shared:dev_release",
+    "//projects/deployments/pleomino/shared:staging_release",
+    "//projects/deployments/pleomino/shared:prod_release",
     "//projects/deployments/platform-shared:lane",
     "//projects/deployments/platform-shared:dev_release",
     "//projects/deployments/platform-shared:staging_release",
     "//projects/deployments/platform-shared:prod_release",
     "//projects/deployments/platform-shared:migration_bundle",
   ]);
-  const dev = nodeByName(nodes, "//projects/deployments/pleomino-dev:deploy");
-  const staging = nodeByName(nodes, "//projects/deployments/pleomino-staging:deploy");
-  const prod = nodeByName(nodes, "//projects/deployments/pleomino-prod:deploy");
+  const dev = nodeByName(nodes, "//projects/deployments/pleomino/dev:deploy");
+  const staging = nodeByName(nodes, "//projects/deployments/pleomino/staging:deploy");
+  const prod = nodeByName(nodes, "//projects/deployments/pleomino/prod:deploy");
   const platformDev = nodeByName(nodes, "//projects/deployments/platform-foundation-dev:deploy");
   const platformStaging = nodeByName(
     nodes,
@@ -106,7 +106,7 @@ test("concrete deployment families compose defaults into explicit stage targets"
     "nixos-shared-host:default:pleomino",
   );
   assert.match(String(staging.component), /\/\/projects\/apps\/pleomino:app/);
-  assert.match(String(staging.lane_policy), /\/\/projects\/deployments\/pleomino-shared:lane/);
+  assert.match(String(staging.lane_policy), /\/\/projects\/deployments\/pleomino\/shared:lane/);
   assert.equal(staging.provider_target.project, "pleomino-staging-pages");
   assert.deepEqual(staging.ingress_hostnames, ["staging.pleomino.com"]);
   assert.equal(prod.provider_target.project, "pleomino-prod-pages");
@@ -121,8 +121,8 @@ test("concrete deployment families compose defaults into explicit stage targets"
   assert.deepEqual(platformProd.prerequisites, [
     { deployment_id: "platform-foundation-staging", mode: "ordering_only" },
   ]);
-  await assertWranglerStaysBelowBuckMetadata("projects/deployments/pleomino-staging", staging);
-  await assertWranglerStaysBelowBuckMetadata("projects/deployments/pleomino-prod", prod);
+  await assertWranglerStaysBelowBuckMetadata("projects/deployments/pleomino/staging", staging);
+  await assertWranglerStaysBelowBuckMetadata("projects/deployments/pleomino/prod", prod);
   await assertOpenTofuStackMatchesBuckMetadata(
     "projects/deployments/platform-foundation-dev",
     platformDev,

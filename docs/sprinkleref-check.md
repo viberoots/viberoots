@@ -34,8 +34,8 @@ sprinkleref --check --all
 sprinkleref --check --format json
 sprinkleref --check --config sprinkleref/local.macos.json
 sprinkleref --check --category bootstrap
-sprinkleref --check --target //projects/deployments/pleomino-staging:deploy
-sprinkleref --check --target //projects/deployments/pleomino-staging:deploy --no-deps
+sprinkleref --check --target //projects/deployments/pleomino/staging:deploy
+sprinkleref --check --target //projects/deployments/pleomino/staging:deploy --no-deps
 sprinkleref --check --target //projects/apps/pleomino:app --deps transitive
 ```
 
@@ -103,7 +103,7 @@ target-scoped checks, it should distinguish direct requirements from dependency-
 requirements with separate `Direct refs` and `From dependencies` sections:
 
 ```text
-SprinkleRef check for //projects/deployments/pleomino-staging:deploy
+SprinkleRef check for //projects/deployments/pleomino/staging:deploy
 Deps: transitive
 Refs found: 2
 Summary: present 1, declared 0, missing 1, unmapped 0, invalid 0, unchecked 0
@@ -117,13 +117,13 @@ JSON output should preserve the same distinction:
 
 ```json
 {
-  "target": "//projects/deployments/pleomino-staging:deploy",
+  "target": "//projects/deployments/pleomino/staging:deploy",
   "deps": "transitive",
   "refs": [
     {
       "ref": "secret://deployments/pleomino/cloudflare_api_token",
       "scope": "direct",
-      "requiredBy": ["//projects/deployments/pleomino-staging:deploy"],
+      "requiredBy": ["//projects/deployments/pleomino/staging:deploy"],
       "scheme": "secret",
       "sensitive": true,
       "status": "present"
@@ -210,7 +210,7 @@ JSON output should use the same model:
       "status": "missing",
       "category": "bootstrap",
       "backend": "local-file",
-      "locations": ["projects/deployments/pleomino-shared/family.bzl:12"]
+      "locations": ["projects/deployments/pleomino/shared/family.bzl:12"]
     }
   ]
 }

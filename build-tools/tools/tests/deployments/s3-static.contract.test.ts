@@ -55,7 +55,7 @@ test("extractS3StaticDeployments reads provider target, publisher, and provision
     }),
     s3StaticAdmissionPolicyNodeFixture(),
     {
-      name: "//projects/deployments/pleomino-staging-s3:deploy",
+      name: "//projects/deployments/pleomino/staging-s3:deploy",
       provider: "s3-static",
       component: "//projects/apps/pleomino:app",
       component_kind: "static-webapp",
@@ -63,9 +63,9 @@ test("extractS3StaticDeployments reads provider target, publisher, and provision
       publisher_config: "aws-s3-sync.jsonc",
       provisioner: "terraform-stack",
       protection_class: "shared_nonprod",
-      lane_policy: "//projects/deployments/pleomino-shared:lane",
+      lane_policy: "//projects/deployments/pleomino/shared:lane",
       environment_stage: "staging",
-      admission_policy: "//projects/deployments/pleomino-shared:staging_release",
+      admission_policy: "//projects/deployments/pleomino/shared:staging_release",
       secret_requirements: [],
       runtime_config_requirements: [],
       provider_target: {

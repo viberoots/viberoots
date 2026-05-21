@@ -29,8 +29,8 @@ type FanOutIo = {
 };
 
 const SUPPORTED_TARGETS = new Set([
-  "//projects/deployments/pleomino-staging:deploy",
-  "//projects/deployments/pleomino-prod:deploy",
+  "//projects/deployments/pleomino/staging:deploy",
+  "//projects/deployments/pleomino/prod:deploy",
 ]);
 
 export async function discoverDeploymentBootstrapTargets(

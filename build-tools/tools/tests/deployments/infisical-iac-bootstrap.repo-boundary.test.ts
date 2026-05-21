@@ -86,7 +86,7 @@ test("deployment bootstrap auto credential sink does not create starter resolver
       {
         ...DEFAULT_BOOTSTRAP_ARGS,
         mode: "deployment",
-        target: "//projects/deployments/pleomino-staging:deploy",
+        target: "//projects/deployments/pleomino/staging:deploy",
       },
       {
         platform: "linux",

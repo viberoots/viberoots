@@ -8,7 +8,7 @@ import { writeReviewedLaneAdmissionEvidenceJson } from "./deployment-lane-govern
 import { nixosSharedHostDeploymentFixture } from "./nixos-shared-host.fixture";
 import { createNixosSharedHostInstallFixture } from "./nixos-shared-host.install.fixture";
 
-export const REVIEWED_PLEOMINO_DEPLOYMENT_LABEL = "//projects/deployments/pleomino-dev:deploy";
+export const REVIEWED_PLEOMINO_DEPLOYMENT_LABEL = "//projects/deployments/pleomino/dev:deploy";
 
 export function jenkinsExecEnv(env: Record<string, string>, extra: Record<string, string> = {}) {
   return {
@@ -68,8 +68,15 @@ export async function installClientProfile(
 
 export async function installReviewedPleominoTargets(tmp: string): Promise<void> {
   const appTargetsPath = path.join(tmp, "projects", "apps", "pleomino", "TARGETS");
-  const deployTargetsPath = path.join(tmp, "projects", "deployments", "pleomino-dev", "TARGETS");
-  const sharedTargetsPath = path.join(tmp, "projects", "deployments", "pleomino-shared", "TARGETS");
+  const deployTargetsPath = path.join(tmp, "projects", "deployments", "pleomino", "dev", "TARGETS");
+  const sharedTargetsPath = path.join(
+    tmp,
+    "projects",
+    "deployments",
+    "pleomino",
+    "shared",
+    "TARGETS",
+  );
   await fsp.mkdir(path.dirname(appTargetsPath), { recursive: true });
   await fsp.mkdir(path.dirname(deployTargetsPath), { recursive: true });
   await fsp.mkdir(path.dirname(sharedTargetsPath), { recursive: true });
@@ -138,9 +145,9 @@ export async function installReviewedPleominoTargets(tmp: string): Promise<void>
       "nixos_shared_host_static_webapp_deployment(",
       '    name = "deploy",',
       '    component = "//projects/apps/pleomino:app",',
-      '    lane_policy = "//projects/deployments/pleomino-shared:lane",',
+      '    lane_policy = "//projects/deployments/pleomino/shared:lane",',
       '    environment_stage = "dev",',
-      '    admission_policy = "//projects/deployments/pleomino-shared:dev_release",',
+      '    admission_policy = "//projects/deployments/pleomino/shared:dev_release",',
       '    app_name = "pleomino",',
       "    container_port = 3000,",
       '    health_path = "/healthz",',
@@ -152,7 +159,7 @@ export async function installReviewedPleominoTargets(tmp: string): Promise<void>
 }
 
 export async function requireServiceAuthForPleomino(tmp: string): Promise<void> {
-  const deployTargetsPath = path.join(tmp, "projects", "deployments", "pleomino-dev", "TARGETS");
+  const deployTargetsPath = path.join(tmp, "projects", "deployments", "pleomino", "dev", "TARGETS");
   await fsp.writeFile(
     deployTargetsPath,
     (await fsp.readFile(deployTargetsPath, "utf8")).replace(

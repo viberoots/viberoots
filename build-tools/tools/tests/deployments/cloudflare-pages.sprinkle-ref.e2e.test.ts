@@ -55,7 +55,7 @@ test("cloudflare-pages deploy keeps SprinkleRef-backed Vault values out of recor
     const fake = await installFakeCloudflarePagesWrangler(tmp);
     await writeArtifact(artifactDir, "<html>pleomino staging</html>\n");
     await writeWranglerConfig(
-      path.join(tmp, "projects", "deployments", "pleomino-staging", "wrangler.jsonc"),
+      path.join(tmp, "projects", "deployments", "pleomino", "staging", "wrangler.jsonc"),
     );
     await writeSecretFixture(fixturePath, {
       "secret://deployments/pleomino/cloudflare_api_token": {
@@ -139,7 +139,7 @@ test("cloudflare-pages admission fails closed when a required SprinkleRef contra
     const fake = await installFakeCloudflarePagesWrangler(tmp);
     await writeArtifact(artifactDir, "<html>pleomino staging</html>\n");
     await writeWranglerConfig(
-      path.join(tmp, "projects", "deployments", "pleomino-staging", "wrangler.jsonc"),
+      path.join(tmp, "projects", "deployments", "pleomino", "staging", "wrangler.jsonc"),
     );
     await writeSecretFixture(fixturePath, {});
     await ensureNixosSharedHostReviewedSourceRef(tmp, $, deployment);

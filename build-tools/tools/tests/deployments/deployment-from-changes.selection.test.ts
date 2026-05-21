@@ -31,7 +31,7 @@ function pleominoDeployments() {
   return [
     nixosSharedHostDeploymentFixture({
       deploymentId: "pleomino-dev",
-      label: "//projects/deployments/pleomino-dev:deploy",
+      label: "//projects/deployments/pleomino/dev:deploy",
       component: { kind: "static-webapp", target: "//projects/apps/pleomino:app" },
       runtime: { appName: "pleomino", containerPort: 3000 },
       lanePolicy,
@@ -39,13 +39,13 @@ function pleominoDeployments() {
     }),
     cloudflarePagesDeploymentFixture({
       deploymentId: "pleomino-staging",
-      label: "//projects/deployments/pleomino-staging:deploy",
+      label: "//projects/deployments/pleomino/staging:deploy",
       lanePolicy,
       prerequisites: [{ deploymentId: "pleomino-dev", mode: "ordering_only" }],
     }),
     cloudflarePagesDeploymentFixture({
       deploymentId: "pleomino-prod",
-      label: "//projects/deployments/pleomino-prod:deploy",
+      label: "//projects/deployments/pleomino/prod:deploy",
       environmentStage: "prod",
       providerTarget: {
         account: "web-platform-prod",
@@ -55,10 +55,10 @@ function pleominoDeployments() {
         providerTargetIdentity: "cloudflare-pages:web-platform-prod/pleomino-prod-pages",
       },
       lanePolicy,
-      admissionPolicyRef: "//projects/deployments/pleomino-shared:prod_release",
+      admissionPolicyRef: "//projects/deployments/pleomino/shared:prod_release",
       admissionPolicy: {
         ...cloudflarePagesDeploymentFixture().admissionPolicy,
-        ref: "//projects/deployments/pleomino-shared:prod_release",
+        ref: "//projects/deployments/pleomino/shared:prod_release",
         name: "prod_release",
         allowedRefs: ["refs/tags/release/*"],
       },
@@ -119,7 +119,7 @@ test("from-changes widens only one direct prerequisite edge from changed deploym
     await writeGraph(tmp, [{ name: "//projects/apps/pleomino:app", deps: [] }]);
     const plan = await resolveDeploymentsFromChanges({
       workspaceRoot: tmp,
-      changedPaths: ["projects/deployments/pleomino-dev/TARGETS"],
+      changedPaths: ["projects/deployments/pleomino/dev/TARGETS"],
       deployments: pleominoDeployments(),
     });
 

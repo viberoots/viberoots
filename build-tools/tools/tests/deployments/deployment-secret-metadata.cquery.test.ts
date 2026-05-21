@@ -9,7 +9,7 @@ import { inheritedBuckIsolation, runInTemp } from "../lib/test-helpers";
 test("deployment TARGETS emit Infisical secret backend metadata", async () => {
   await runInTemp("deployment-secret-metadata-cquery", async (tmp, _$) => {
     const appTargetsPath = path.join(tmp, "projects/apps/pleomino/TARGETS");
-    const deployTargetsPath = path.join(tmp, "projects/deployments/pleomino-staging/TARGETS");
+    const deployTargetsPath = path.join(tmp, "projects/deployments/pleomino/staging/TARGETS");
     await fsp.mkdir(path.dirname(appTargetsPath), { recursive: true });
     await fsp.mkdir(path.dirname(deployTargetsPath), { recursive: true });
     await fsp.writeFile(
@@ -54,7 +54,7 @@ test("deployment TARGETS emit Infisical secret backend metadata", async () => {
         HOME: process.env.BUCK2_REAL_HOME || process.env.HOME,
         SSL_CERT_FILE: process.env.SSL_CERT_FILE || process.env.NIX_SSL_CERT_FILE,
       },
-    })`buck2 --isolation-dir ${inheritedBuckIsolation("deployment-secret-metadata-cquery")} cquery --target-platforms prelude//platforms:default //projects/deployments/pleomino-staging:deploy --json ${attrFlags}`.quiet();
+    })`buck2 --isolation-dir ${inheritedBuckIsolation("deployment-secret-metadata-cquery")} cquery --target-platforms prelude//platforms:default //projects/deployments/pleomino/staging:deploy --json ${attrFlags}`.quiet();
     const node = Object.values(JSON.parse(String(cquery.stdout || "{}")))[0] as any;
     assert.equal(node.secret_backend, "infisical/default");
     assert.equal(node.infisical_runtime.project_id, "proj_123");

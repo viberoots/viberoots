@@ -15,7 +15,7 @@ test("promotion compatibility rejects provider and publisher drift", () => {
   const target = nixosSharedHostDeploymentFixture({
     environmentStage: "staging",
     admissionPolicy: nixosSharedHostAdmissionPolicyFixture({
-      ref: "//projects/deployments/pleomino-shared:staging_release",
+      ref: "//projects/deployments/pleomino/shared:staging_release",
       name: "staging_release",
       allowedRefs: ["main"],
       requiredChecks: [],
@@ -35,7 +35,7 @@ test("promotion compatibility allows reviewed cross-provider dev promotion on de
   };
   const sourceDeployment = nixosSharedHostDeploymentFixture({
     deploymentId: "pleomino-dev",
-    label: "//projects/deployments/pleomino-dev:deploy",
+    label: "//projects/deployments/pleomino/dev:deploy",
     lanePolicy,
     lanePolicyRef: lanePolicy.ref,
     component: { kind: "static-webapp", target: "//projects/apps/pleomino:app" },
@@ -78,7 +78,7 @@ test("promotion compatibility rejects provisioner drift inside one lane", () => 
   const target = nixosSharedHostDeploymentFixture({
     environmentStage: "staging",
     admissionPolicy: nixosSharedHostAdmissionPolicyFixture({
-      ref: "//projects/deployments/pleomino-shared:staging_release",
+      ref: "//projects/deployments/pleomino/shared:staging_release",
       name: "staging_release",
       allowedRefs: ["main"],
       requiredChecks: [],
@@ -104,7 +104,7 @@ test("promotion compatibility rejects SSR runtime-contract drift inside one lane
       },
     } as any,
     admissionPolicy: nixosSharedHostAdmissionPolicyFixture({
-      ref: "//projects/deployments/pleomino-shared:staging_release",
+      ref: "//projects/deployments/pleomino/shared:staging_release",
       name: "staging_release",
       allowedRefs: ["main"],
       requiredChecks: [],

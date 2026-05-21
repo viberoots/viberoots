@@ -155,8 +155,8 @@ validation:
 ```bash
 sprinkleref --check
 sprinkleref --check --scheme secret --config sprinkleref/local.file.json
-sprinkleref --check --target //projects/deployments/pleomino-staging:deploy
-sprinkleref --check --target //projects/deployments/pleomino-staging:deploy --no-deps
+sprinkleref --check --target //projects/deployments/pleomino/staging:deploy
+sprinkleref --check --target //projects/deployments/pleomino/staging:deploy --no-deps
 sprinkleref --check --format json
 ```
 

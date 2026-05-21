@@ -39,7 +39,7 @@ Use the deeper docs when needed:
 The public repo-level entrypoint is:
 
 ```bash
-deploy --deployment //projects/deployments/pleomino-prod:deploy
+deploy --deployment //projects/deployments/pleomino/prod:deploy
 ```
 
 Use `--deployment <label>` to choose what you want to deploy.
@@ -47,7 +47,7 @@ Use `--deployment <label>` to choose what you want to deploy.
 If you are new to this repo, you can think of the label as the deployment's
 unique name inside the repo. Example:
 
-- `//projects/deployments/pleomino-prod:deploy`
+- `//projects/deployments/pleomino/prod:deploy`
 
 ## Plain-Language Glossary
 
@@ -70,7 +70,7 @@ unique name inside the repo. Example:
 Normal deploy:
 
 ```bash
-deploy --deployment //projects/deployments/pleomino-prod:deploy
+deploy --deployment //projects/deployments/pleomino/prod:deploy
 ```
 
 For a normal deploy, this is usually enough. The deployment definition tells
@@ -138,7 +138,7 @@ Use this when:
 Preview from an earlier accepted run:
 
 ```bash
-deploy --deployment //projects/deployments/pleomino-prod:deploy \
+deploy --deployment //projects/deployments/pleomino/prod:deploy \
   --preview \
   --source-run-id <deploy-run-id>
 ```
@@ -152,7 +152,7 @@ Use this when:
 Preview cleanup:
 
 ```bash
-deploy --deployment //projects/deployments/pleomino-prod:deploy \
+deploy --deployment //projects/deployments/pleomino/prod:deploy \
   --preview-cleanup \
   --source-run-id <deploy-run-id>
 ```
@@ -165,7 +165,7 @@ Use this when:
 Retry a previous run without rebuilding:
 
 ```bash
-deploy --deployment //projects/deployments/pleomino-prod:deploy \
+deploy --deployment //projects/deployments/pleomino/prod:deploy \
   --publish-only \
   --source-run-id <deploy-run-id>
 ```
@@ -179,7 +179,7 @@ Use this when:
 Rollback one deployment to an earlier run:
 
 ```bash
-deploy --deployment //projects/deployments/pleomino-prod:deploy \
+deploy --deployment //projects/deployments/pleomino/prod:deploy \
   --publish-only \
   --source-run-id <deploy-run-id> \
   --rollback
@@ -193,7 +193,7 @@ Use this when:
 Promote an earlier run to a different deployment:
 
 ```bash
-deploy --deployment //projects/deployments/pleomino-prod:deploy \
+deploy --deployment //projects/deployments/pleomino/prod:deploy \
   --publish-only \
   --source-run-id <deploy-run-id>
 ```
@@ -206,14 +206,14 @@ Use this when:
 
 Example:
 
-- run the command on `//projects/deployments/pleomino-prod:deploy`
+- run the command on `//projects/deployments/pleomino/prod:deploy`
   with a `--source-run-id` that came from an earlier successful
-  `//projects/deployments/pleomino-staging:deploy` run
+  `//projects/deployments/pleomino/staging:deploy` run
 
 Provision infrastructure only:
 
 ```bash
-deploy --deployment //projects/deployments/pleomino-prod:deploy \
+deploy --deployment //projects/deployments/pleomino/prod:deploy \
   --provision-only \
   --source-run-id <deploy-run-id>
 ```
@@ -226,13 +226,13 @@ Use this when:
 Target-transition workflows:
 
 ```bash
-deploy --deployment //projects/deployments/pleomino-prod:deploy \
+deploy --deployment //projects/deployments/pleomino/prod:deploy \
   --retire-target \
   --target-exception-ref <label>
 ```
 
 ```bash
-deploy --deployment //projects/deployments/pleomino-prod:deploy \
+deploy --deployment //projects/deployments/pleomino/prod:deploy \
   --migrate-target \
   --target-exception-ref <label>
 ```
@@ -256,7 +256,7 @@ promotion authority.
 Common example values:
 
 - deployment label:
-  `//projects/deployments/pleomino-prod:deploy`
+  `//projects/deployments/pleomino/prod:deploy`
 - source run id:
   `deploy-run-2026-04-16-abc123`
 - target exception ref:
@@ -281,21 +281,21 @@ For service-backed workflows, the `deploy` CLI also covers the common operator
 inspection commands so you do not need to hand-build HTTP requests:
 
 ```bash
-deploy --deployment //projects/deployments/pleomino-prod:deploy \
+deploy --deployment //projects/deployments/pleomino/prod:deploy \
   --status \
   --deploy-run-id <deploy-run-id> \
   --control-plane-url "$VBR_DEPLOY_CONTROL_PLANE_URL"
 ```
 
 ```bash
-deploy --deployment //projects/deployments/pleomino-prod:deploy \
+deploy --deployment //projects/deployments/pleomino/prod:deploy \
   --print-run-lock-scope \
   --deploy-run-id <deploy-run-id> \
   --control-plane-url "$VBR_DEPLOY_CONTROL_PLANE_URL"
 ```
 
 ```bash
-deploy --deployment //projects/deployments/pleomino-prod:deploy \
+deploy --deployment //projects/deployments/pleomino/prod:deploy \
   --approve \
   --deploy-run-id <deploy-run-id> \
   --approval-id <ticket-or-review-ref> \
@@ -310,14 +310,14 @@ To answer what is currently deployed in a protected/shared stage, use the
 control-plane current-stage helpers rather than Git release-pointer files:
 
 ```bash
-deploy --deployment //projects/deployments/pleomino-prod:deploy \
+deploy --deployment //projects/deployments/pleomino/prod:deploy \
   --current-stage-state \
   --text \
   --control-plane-url "$VBR_DEPLOY_CONTROL_PLANE_URL"
 ```
 
 ```bash
-deploy --deployment //projects/deployments/pleomino-prod:deploy \
+deploy --deployment //projects/deployments/pleomino/prod:deploy \
   --stage-history \
   --control-plane-url "$VBR_DEPLOY_CONTROL_PLANE_URL"
 ```
@@ -362,7 +362,7 @@ stable idempotency key:
 
 ```bash
 build-tools/tools/bin/nixos-shared-host-jenkins-deploy \
-  --deployment //projects/deployments/pleomino-dev:deploy \
+  --deployment //projects/deployments/pleomino/dev:deploy \
   --profile mini \
   --artifact-dir "$WORKSPACE/dist" \
   --admission-evidence-json "$WORKSPACE/deploy-admission.json" \
@@ -383,7 +383,7 @@ to the protected service control plane and keep the idempotency key stable for
 the Jenkins build or promotion attempt:
 
 ```bash
-deploy --deployment //projects/deployments/pleomino-staging:deploy \
+deploy --deployment //projects/deployments/pleomino/staging:deploy \
   --publish-only \
   --source-run-id "$DEV_DEPLOY_RUN_ID" \
   --control-plane-url "$VBR_DEPLOY_CONTROL_PLANE_URL" \
@@ -391,7 +391,7 @@ deploy --deployment //projects/deployments/pleomino-staging:deploy \
 ```
 
 ```bash
-deploy --deployment //projects/deployments/pleomino-prod:deploy \
+deploy --deployment //projects/deployments/pleomino/prod:deploy \
   --publish-only \
   --source-run-id "$STAGING_DEPLOY_RUN_ID" \
   --control-plane-url "$VBR_DEPLOY_CONTROL_PLANE_URL" \
@@ -632,7 +632,7 @@ step instead of editing Keycloak by hand.
 ```bash
 build-tools/tools/deployments/infisical-bootstrap.ts \
   deployment \
-  --target //projects/deployments/pleomino-staging:deploy \
+  --target //projects/deployments/pleomino/staging:deploy \
   --org-name viberoots \
   --yes \
   --tofu-plan-file .local/pleomino-infisical.tfplan
@@ -647,7 +647,7 @@ selector:
 INFISICAL_ACCESS_TOKEN='<redacted>' \
   build-tools/tools/deployments/infisical-bootstrap.ts \
   deployment \
-  --target //projects/deployments/pleomino-staging:deploy \
+  --target //projects/deployments/pleomino/staging:deploy \
   --no-login \
   --org-name viberoots \
   --yes \

@@ -4,20 +4,25 @@ import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import { test } from "node:test";
 import { nodesFromCqueryJson } from "../../buck/exporter/cquery/nodes";
-import { extractCloudflarePagesDeployments } from "../../deployments/contract";
+import {
+  extractCloudflarePagesDeployments,
+  extractNixosSharedHostDeployments,
+} from "../../deployments/contract";
 import { DEPLOYMENT_CQUERY_ATTRS } from "../../deployments/deployment-query-attrs";
 import { inheritedBuckIsolation, runInTemp } from "../lib/test-helpers";
 
 test("Pleomino family metadata is exported for staged deployments", async () => {
   const labels = [
-    "//projects/deployments/pleomino-staging:deploy",
-    "//projects/deployments/pleomino-prod:deploy",
+    "//projects/deployments/pleomino/staging:deploy",
+    "//projects/deployments/pleomino/prod:deploy",
+    "//projects/deployments/pleomino/dev:deploy",
     "//projects/apps/pleomino:app",
-    "//projects/deployments/pleomino-shared:lane",
+    "//projects/deployments/pleomino/shared:lane",
     "//projects/deployments:defaults",
-    "//projects/deployments/pleomino-shared:lane_governance",
-    "//projects/deployments/pleomino-shared:staging_release",
-    "//projects/deployments/pleomino-shared:prod_release",
+    "//projects/deployments/pleomino/shared:lane_governance",
+    "//projects/deployments/pleomino/shared:dev_release",
+    "//projects/deployments/pleomino/shared:staging_release",
+    "//projects/deployments/pleomino/shared:prod_release",
   ];
   const attrFlags = DEPLOYMENT_CQUERY_ATTRS.flatMap((attr) => ["--output-attribute", attr]);
   const result = await $({
@@ -29,18 +34,29 @@ test("Pleomino family metadata is exported for staged deployments", async () => 
     },
   })`buck2 --isolation-dir ${inheritedBuckIsolation("deployment-family-metadata")} cquery --target-platforms prelude//platforms:default ${`set(${labels.join(" ")})`} --json ${attrFlags}`.quiet();
   const nodes = nodesFromCqueryJson(JSON.parse(String(result.stdout || "{}")));
-  const extracted = extractCloudflarePagesDeployments(nodes);
-  assert.deepEqual(extracted.errors, []);
+  const cloudflare = extractCloudflarePagesDeployments(nodes);
+  const nixos = extractNixosSharedHostDeployments(nodes);
+  assert.deepEqual(cloudflare.errors, []);
+  assert.deepEqual(nixos.errors, []);
   assert.deepEqual(
-    extracted.deployments.map((deployment) => [
+    cloudflare.deployments.map((deployment) => [
       deployment.label,
+      deployment.deploymentId,
       deployment.deploymentFamily,
       deployment.environmentStage,
     ]),
     [
-      ["//projects/deployments/pleomino-prod:deploy", "pleomino", "prod"],
-      ["//projects/deployments/pleomino-staging:deploy", "pleomino", "staging"],
+      ["//projects/deployments/pleomino/prod:deploy", "pleomino-prod", "pleomino", "prod"],
+      ["//projects/deployments/pleomino/staging:deploy", "pleomino-staging", "pleomino", "staging"],
     ],
+  );
+  assert.deepEqual(
+    nixos.deployments.map((deployment) => [
+      deployment.label,
+      deployment.deploymentId,
+      deployment.environmentStage,
+    ]),
+    [["//projects/deployments/pleomino/dev:deploy", "pleomino-dev", "dev"]],
   );
 });
 

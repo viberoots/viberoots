@@ -90,7 +90,7 @@ test("Vault-admitted Cloudflare runs remain replayable after Infisical metadata 
     };
     await writeArtifact(artifactDir, "<html>migration replay</html>\n");
     await writeWranglerConfig(
-      path.join(tmp, "projects", "deployments", "pleomino-staging", "wrangler.jsonc"),
+      path.join(tmp, "projects", "deployments", "pleomino", "staging", "wrangler.jsonc"),
     );
     await ensureNixosSharedHostReviewedSourceRef(tmp, $, vaultDeployment);
     const server = await startCloudflarePagesPublicServer({

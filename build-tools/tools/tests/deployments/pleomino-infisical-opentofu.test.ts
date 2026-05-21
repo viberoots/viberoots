@@ -5,7 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
 
-const moduleDir = path.join("projects", "deployments", "pleomino-infisical", "opentofu");
+const moduleDir = path.join("projects", "deployments", "pleomino", "infisical", "opentofu");
 
 async function validateModuleWithProvider() {
   const workDir = await fsp.mkdtemp(path.join(os.tmpdir(), "pleomino-infisical-tofu-"));

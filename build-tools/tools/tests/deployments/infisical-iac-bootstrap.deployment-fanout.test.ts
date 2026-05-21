@@ -13,8 +13,8 @@ import {
   runDeploymentBootstrapFanOut,
 } from "../../deployments/infisical-iac-bootstrap-deployments";
 
-const staging = "//projects/deployments/pleomino-staging:deploy";
-const prod = "//projects/deployments/pleomino-prod:deploy";
+const staging = "//projects/deployments/pleomino/staging:deploy";
+const prod = "//projects/deployments/pleomino/prod:deploy";
 
 test("deployment fan-out discovery uses reviewed graph metadata", async () => {
   const graphPath = await graph([
@@ -71,7 +71,7 @@ test("--yes pre-confirms deployment fan-out and names target failures", async ()
         },
         io: { stderr: () => undefined },
       }),
-    /Repo bootstrap completed[\s\S]*\/\/projects\/deployments\/pleomino-prod:deploy: tofu apply failed[\s\S]*deployment --target <buck-target>/,
+    /Repo bootstrap completed[\s\S]*\/\/projects\/deployments\/pleomino\/prod:deploy: tofu apply failed[\s\S]*deployment --target <buck-target>/,
   );
   assert.deepEqual(seen, [staging, prod]);
 });
@@ -106,7 +106,7 @@ test("confirmed repo bootstrap performs repo setup before deployment fan-out pro
     );
   });
   assert.match(output, /infisical-repo-bootstrap-result@1/);
-  assert.match(output, /Run deployment bootstrap for .*pleomino-staging:deploy\? \[Y\/n\]/);
+  assert.match(output, /Run deployment bootstrap for .*pleomino\/staging:deploy\? \[Y\/n\]/);
   assert.match(output, /Deployment bootstrap fan-out skipped by operator response/);
   assert.ok(output.indexOf("infisical-repo-bootstrap-result@1") < output.indexOf("Run deployment"));
   assert.equal(await fs.readFile(path.join(dir, ".local/bootstrap.json"), "utf8"), "{}\n");

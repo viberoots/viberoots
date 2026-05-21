@@ -20,6 +20,11 @@ This document intentionally redirects to the repo-root bootstrap spec at
 [`infisical-bootstrap.md`](../infisical-bootstrap.md). Keep command examples there and here on the
 same `repo` or `deployment --target <buck-target>` mode vocabulary.
 
+Pleomino deployment targets use canonical family labels such as
+`//projects/deployments/pleomino/staging:deploy`. The old flat
+`projects/deployments/pleomino-*` packages are migration history; see
+[`pleomino-deployment-directory-migration.md`](pleomino-deployment-directory-migration.md).
+
 Token-based `--no-login` bootstrap flows must pass exactly one of `--org-name` or
 `--organization-id`; login-based operator flows may still use interactive or `--yes` single-org
 discovery.

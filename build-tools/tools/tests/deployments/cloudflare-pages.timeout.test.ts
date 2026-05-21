@@ -69,7 +69,7 @@ test("cloudflare-pages publish timeout records the failed step and reports progr
     const fake = await installFakeCloudflarePagesWrangler(tmp);
     await writeCloudflareServiceArtifact(artifactDir, "<html>timeout</html>\n");
     await writeWranglerConfig(
-      path.join(tmp, "projects", "deployments", "pleomino-staging", "wrangler.jsonc"),
+      path.join(tmp, "projects", "deployments", "pleomino", "staging", "wrangler.jsonc"),
     );
     await installCloudflarePagesTargets(tmp, [deployment]);
     await ensureNixosSharedHostReviewedSourceRef(tmp, $, deployment);

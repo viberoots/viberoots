@@ -1,6 +1,6 @@
 import type { BootstrapArgs } from "./infisical-iac-bootstrap-types";
 
-export const DEPLOYMENT_BOOTSTRAP_TOFU_DIR = "projects/deployments/pleomino-infisical/opentofu";
+export const DEPLOYMENT_BOOTSTRAP_TOFU_DIR = "projects/deployments/pleomino/infisical/opentofu";
 
 export const DEFAULT_BOOTSTRAP_ARGS: BootstrapArgs = {
   mode: "repo",

@@ -98,9 +98,9 @@ test("project and environment scoped deploy admin groups stay narrow", async () 
   });
   const dev = cloudflarePagesDeploymentFixture({
     deploymentId: "pleomino-dev",
-    label: "//projects/deployments/pleomino-dev:deploy",
+    label: "//projects/deployments/pleomino/dev:deploy",
     environmentStage: "dev",
-    admissionPolicyRef: "//projects/deployments/pleomino-shared:dev_release",
+    admissionPolicyRef: "//projects/deployments/pleomino/shared:dev_release",
   });
   const membershipProject = adminGroup("membership_admin", { kind: "project", value: "pleomino" });
   const membershipEnv = adminGroup("membership_admin", {
@@ -219,9 +219,9 @@ test("deploy admin sync can refresh an authoritative shared realm artifact", asy
   const staging = cloudflarePagesDeploymentFixture();
   const dev = cloudflarePagesDeploymentFixture({
     deploymentId: "pleomino-dev",
-    label: "//projects/deployments/pleomino-dev:deploy",
+    label: "//projects/deployments/pleomino/dev:deploy",
     environmentStage: "dev",
-    admissionPolicyRef: "//projects/deployments/pleomino-shared:dev_release",
+    admissionPolicyRef: "//projects/deployments/pleomino/shared:dev_release",
   });
   const shapeAdmin = adminGroup("shape_admin", { kind: "project", value: "pleomino" });
   await withTempDir("deploy-admin-keycloak-shared-realm", async (tmp) => {

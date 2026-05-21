@@ -8,13 +8,22 @@ function packageBaseName(label: string): string {
   return path.posix.basename(packagePathFromLabel(label));
 }
 
+function canonicalDeploymentId(label: string): string | undefined {
+  const packagePath = packagePathFromLabel(label);
+  const prefix = "projects/deployments/";
+  if (!packagePath.startsWith(prefix)) return undefined;
+  const parts = packagePath.slice(prefix.length).split("/");
+  if (parts.length !== 2) return undefined;
+  return `${parts[0]}-${parts[1]}`;
+}
+
 export function targetName(label: string): string {
   const parts = label.split(":");
   return parts[1] || parts[0] || "";
 }
 
 export function deploymentIdFromLabel(label: string): string {
-  return packageBaseName(label);
+  return canonicalDeploymentId(label) || packageBaseName(label);
 }
 
 export function requiredDeploymentSourceRef(deployment: {

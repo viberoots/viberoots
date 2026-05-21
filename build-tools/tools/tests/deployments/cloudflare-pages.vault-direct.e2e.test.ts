@@ -49,7 +49,7 @@ test("cloudflare-pages deploy reads Vault directly on the reviewed runtime path"
     );
     await writeArtifact(artifactDir, "<html>pleomino staging</html>\n");
     await writeWranglerConfig(
-      path.join(tmp, "projects", "deployments", "pleomino-staging", "wrangler.jsonc"),
+      path.join(tmp, "projects", "deployments", "pleomino", "staging", "wrangler.jsonc"),
     );
     await ensureNixosSharedHostReviewedSourceRef(tmp, $, deployment);
     const admissionEvidence = deploymentAdmissionEvidenceFixture({

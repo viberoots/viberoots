@@ -22,7 +22,7 @@ async function writeCloudflareSubmission(opts: {
   lifecycleState: "waiting_for_lock" | "running";
 }) {
   const deploymentId = "pleomino-staging";
-  const deploymentLabel = "//projects/deployments/pleomino-staging:deploy";
+  const deploymentLabel = "//projects/deployments/pleomino/staging:deploy";
   const lockScope = "cloudflare-pages:web-platform-staging/pleomino-staging-pages";
   const executionSnapshotPath = path.join(
     opts.recordsRoot,

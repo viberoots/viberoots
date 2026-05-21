@@ -24,7 +24,7 @@ function deploymentNode(overrides: Partial<GraphNode> = {}): GraphNode {
     provisioner: "cdktf-stack",
     provisioner_config: "cdktf/stack.json",
     protection_class: "shared_nonprod",
-    lane_policy: "//projects/deployments/pleomino-shared:lane",
+    lane_policy: "//projects/deployments/pleomino/shared:lane",
     environment_stage: "staging",
     admission_policy: "//projects/deployments/platform-shared:prod_release",
     secret_requirements: [],

@@ -3,7 +3,7 @@ import * as path from "node:path";
 import { canonicalInfisicalApiUrl } from "./infisical-iac-bootstrap-config";
 import type { DeploymentRuntimeMetadata } from "./infisical-iac-bootstrap-types";
 
-export const PLEOMINO_REVIEWED_METADATA_PATH = "projects/deployments/pleomino-shared/family.bzl";
+export const PLEOMINO_REVIEWED_METADATA_PATH = "projects/deployments/pleomino/shared/family.bzl";
 
 export async function readPleominoReviewedMetadata(file = PLEOMINO_REVIEWED_METADATA_PATH) {
   return parsePleominoReviewedMetadata(await fs.readFile(path.resolve(file), "utf8"));

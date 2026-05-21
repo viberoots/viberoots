@@ -9,7 +9,7 @@ export const remoteSshCommandAssemblyPlan: NixosSharedHostRemotePlan = {
   planMode: true,
   remoteExecutionImplemented: true,
   deploymentId: "pleomino-dev",
-  deploymentLabel: "//projects/deployments/pleomino-dev:deploy",
+  deploymentLabel: "//projects/deployments/pleomino/dev:deploy",
   profileName: "mini",
   destination: "mini",
   transportMode: "ssh",

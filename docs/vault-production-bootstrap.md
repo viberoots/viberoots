@@ -102,7 +102,7 @@ Generate the machine-readable bootstrap bundle:
 
 ```bash
 deploy \
-  --deployment //projects/deployments/pleomino-staging:deploy \
+  --deployment //projects/deployments/pleomino/staging:deploy \
   --print-vault-bootstrap \
   --vault-bootstrap-format=json \
   --issuer-url https://identity.apps.kilty.io/realms/deployments \
@@ -116,7 +116,7 @@ Generate the fill-in secret templates:
 
 ```bash
 deploy \
-  --deployment //projects/deployments/pleomino-staging:deploy \
+  --deployment //projects/deployments/pleomino/staging:deploy \
   --print-vault-secret-templates \
   --vault-secret-template-format=files \
   > vault-secret-templates.txt
@@ -127,7 +127,7 @@ policy HCL:
 
 ```bash
 deploy \
-  --deployment //projects/deployments/pleomino-staging:deploy \
+  --deployment //projects/deployments/pleomino/staging:deploy \
   --print-vault-bootstrap \
   --vault-bootstrap-format=shell \
   --issuer-url https://identity.apps.kilty.io/realms/deployments \
@@ -197,7 +197,7 @@ Practical operator workflow:
 
 ```bash
 deploy \
-  --deployment //projects/deployments/pleomino-staging:deploy \
+  --deployment //projects/deployments/pleomino/staging:deploy \
   --print-vault-secret-templates
 ```
 
@@ -209,7 +209,7 @@ identity in `targetScopes`.
 
 ```bash
 deploy \
-  --deployment //projects/deployments/pleomino-staging:deploy \
+  --deployment //projects/deployments/pleomino/staging:deploy \
   --print-vault-secret-templates \
   --deploy-run-id "$DEPLOY_RUN_ID" \
   --control-plane-url "$VBR_DEPLOY_CONTROL_PLANE_URL"
@@ -1019,18 +1019,18 @@ Before you create or troubleshoot groups by hand, inspect the reviewed shape
 derived from deployment metadata:
 
 ```bash
-deploy auth print-groups --deployment //projects/deployments/pleomino-dev:deploy
+deploy auth print-groups --deployment //projects/deployments/pleomino/dev:deploy
 deploy auth explain-groups \
-  --deployment //projects/deployments/pleomino-dev:deploy \
+  --deployment //projects/deployments/pleomino/dev:deploy \
   --action submit
-deploy admin identity plan --deployment //projects/deployments/pleomino-dev:deploy
+deploy admin identity plan --deployment //projects/deployments/pleomino/dev:deploy
 deploy admin identity sync \
-  --deployment //projects/deployments/pleomino-dev:deploy \
+  --deployment //projects/deployments/pleomino/dev:deploy \
   --realm-file ./deployment-host/identity-provider/deployment-auth-realm.json \
   --acting-principal <principal> \
   --admin-group deploy-admin-identity-shape-admin-project-pleomino
 deploy admin identity grant-user \
-  --deployment //projects/deployments/pleomino-dev:deploy \
+  --deployment //projects/deployments/pleomino/dev:deploy \
   --action submit \
   --user-email alice@example.com \
   --membership-file ./deployment-host/identity-provider/deployment-auth-memberships.json \
@@ -1053,16 +1053,16 @@ can update those same config-root artifacts and optionally apply them:
 
 ```bash
 deploy admin identity sync \
-  --deployment //projects/deployments/pleomino-dev:deploy \
+  --deployment //projects/deployments/pleomino/dev:deploy \
   --profile mini \
   --apply-host-dry-run
 deploy admin identity grant-user \
-  --deployment //projects/deployments/pleomino-dev:deploy \
+  --deployment //projects/deployments/pleomino/dev:deploy \
   --profile mini \
   --action submit \
   --apply-host
 deploy admin identity grant-user \
-  --deployment //projects/deployments/pleomino-dev:deploy \
+  --deployment //projects/deployments/pleomino/dev:deploy \
   --profile mini \
   --action submit \
   --user-email alice@example.com \
@@ -1159,7 +1159,7 @@ only that reviewed HCL:
 
 ```bash
 deploy \
-  --deployment //projects/deployments/pleomino-staging:deploy \
+  --deployment //projects/deployments/pleomino/staging:deploy \
   --print-vault-bootstrap \
   --vault-bootstrap-format=hcl \
   --issuer-url https://identity.apps.kilty.io/realms/deployments \
@@ -1243,7 +1243,7 @@ Generate or refresh the templates:
 
 ```bash
 deploy \
-  --deployment //projects/deployments/pleomino-staging:deploy \
+  --deployment //projects/deployments/pleomino/staging:deploy \
   --print-vault-secret-templates \
   --vault-secret-template-format=files \
   > vault-secret-templates.txt
@@ -1454,7 +1454,7 @@ differs for a run:
 
 ```bash
 deploy \
-  --deployment //projects/deployments/pleomino-staging:deploy \
+  --deployment //projects/deployments/pleomino/staging:deploy \
   --vault-audience deployments-vault \
   --deployment-client-id deployment-runner \
   --deployment-environment mini \
@@ -1494,7 +1494,7 @@ withCredentials([string(credentialsId: 'deployment-runner-client-secret', variab
   sh '''
     set +x
     deploy \
-      --deployment //projects/deployments/pleomino-prod:deploy \
+      --deployment //projects/deployments/pleomino/prod:deploy \
       --credential-source jenkins_client_secret \
       --deployment-client-secret-env JENKINS_DEPLOYMENT_CLIENT_SECRET
   '''
@@ -1509,7 +1509,7 @@ withCredentials([string(credentialsId: 'jenkins-deployment-oidc-token', variable
   sh '''
     set +x
     deploy \
-      --deployment //projects/deployments/pleomino-prod:deploy \
+      --deployment //projects/deployments/pleomino/prod:deploy \
       --credential-source external_oidc_token \
       --external-oidc-token-env JENKINS_OIDC_TOKEN
   '''
@@ -1601,7 +1601,7 @@ unset VBR_VAULT_JWT_FILE
 unset VBR_VAULT_AUTH_METHOD
 
 deploy \
-  --deployment //projects/deployments/pleomino-staging:deploy \
+  --deployment //projects/deployments/pleomino/staging:deploy \
   --login-browser auto
 ```
 
@@ -1617,7 +1617,7 @@ unset VBR_VAULT_JWT_FILE
 unset VBR_VAULT_AUTH_METHOD
 
 deploy \
-  --deployment //projects/deployments/pleomino-staging:deploy \
+  --deployment //projects/deployments/pleomino/staging:deploy \
   --profile mini
 ```
 
@@ -1626,7 +1626,7 @@ run, pass it only as an artifact source for the service-backed workflow:
 
 ```bash
 deploy \
-  --deployment //projects/deployments/pleomino-staging:deploy \
+  --deployment //projects/deployments/pleomino/staging:deploy \
   --profile mini \
   --artifact-dir ./dist
 ```
@@ -1646,7 +1646,7 @@ unset VBR_VAULT_JWT_FILE
 unset VBR_VAULT_AUTH_METHOD
 
 nixos-shared-host-jenkins-deploy \
-  --deployment //projects/deployments/pleomino-staging:deploy \
+  --deployment //projects/deployments/pleomino/staging:deploy \
   --profile mini \
   --artifact-dir "$WORKSPACE/projects/apps/pleomino/dist" \
   --ssh-identity-file "$JENKINS_SSH_IDENTITY" \
@@ -1665,7 +1665,7 @@ unset VBR_VAULT_JWT_FILE
 unset VBR_VAULT_AUTH_METHOD
 
 deploy \
-  --deployment //projects/deployments/pleomino-staging:deploy \
+  --deployment //projects/deployments/pleomino/staging:deploy \
   --credential-source jenkins_client_secret \
   --deployment-client-secret-env VBR_DEPLOYER_CLIENT_SECRET
 ```
@@ -1718,7 +1718,7 @@ repo-level contract name should not.
 Start with the read-only doctor:
 
 ```bash
-deploy auth doctor --deployment //projects/deployments/pleomino-staging:deploy
+deploy auth doctor --deployment //projects/deployments/pleomino/staging:deploy
 ```
 
 Use the reported category to choose the next fix:
