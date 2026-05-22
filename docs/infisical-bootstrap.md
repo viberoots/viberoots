@@ -31,7 +31,8 @@ Repo bootstrap materializes backend profile credentials under repo-scoped refs s
 `secret://viberoots/bootstrap/viberoots-iac-bootstrap/client-id`. Pleomino deployment bootstrap
 continues to report only stage-specific managed workload refs under
 `secret://deployments/pleomino/<stage>/...`. If local `sprinkleref/selected.local.json` still
-points profile auth at the old Pleomino bootstrap namespace, rerun `infisical-bootstrap.ts repo`.
+points profile auth at the old Pleomino bootstrap namespace, rerun
+`build-tools/tools/deployments/infisical-bootstrap.ts repo`.
 Existing operator-authored Infisical profiles are preserved once their `projectId` validates in the
 selected organization.
 Bootstrap rewrites only missing profiles, profiles with `generatedBy: "viberoots-repo-bootstrap"`,
@@ -50,6 +51,8 @@ is unset. Repo dry-run mirrors that closed state by reporting the profile in
 Repo dry-run reports the same backend profile set confirmed repo bootstrap will validate or
 materialize: graph-required profiles plus active profiles selected by resolver categories, even when
 the current deployment graph does not require that category-selected backend.
+Deployment graph nodes with secret requirements and omitted `secret_backend` contribute the implicit
+`vault/default` profile to repo bootstrap discovery, matching deployment metadata normalization.
 
 Token-based `--no-login` bootstrap flows must pass exactly one of `--org-name` or
 `--organization-id`; login-based operator flows may still use interactive or `--yes` single-org

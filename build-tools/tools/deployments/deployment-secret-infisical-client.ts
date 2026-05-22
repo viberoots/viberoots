@@ -116,10 +116,10 @@ export async function readInfisicalSecret(opts: {
   }
   const secret = normalizedSecretBody(body);
   return {
-    projectId: stringField(secret, ["projectId", "workspaceId"]) || opts.selector.projectId,
-    environment: stringField(secret, ["environment"]) || opts.selector.environment,
-    secretPath: stringField(secret, ["secretPath", "path"]) || opts.selector.secretPath,
-    secretName: stringField(secret, ["secretName", "key", "name"]) || opts.selector.secretName,
+    projectId: stringField(secret, ["projectId", "workspaceId"]) || "",
+    environment: stringField(secret, ["environment"]) || "",
+    secretPath: stringField(secret, ["secretPath", "path"]) || "",
+    secretName: stringField(secret, ["secretName", "key", "name"]) || "",
     ...(stringField(secret, ["id", "_id", "secretId"])
       ? { id: stringField(secret, ["id", "_id", "secretId"]) }
       : {}),

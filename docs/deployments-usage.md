@@ -638,10 +638,10 @@ build-tools/tools/deployments/infisical-bootstrap.ts \
   --tofu-plan-file .local/pleomino-infisical.tfplan
 ```
 
-The `--yes` flag is required for every non-dry-run bootstrap. Bootstrap checks it before opening
-Infisical, running OpenTofu, creating resolver config files, or writing credential sinks. In CI or a
-non-interactive operator shell, also provide a short-lived admin token and an explicit organization
-selector:
+The `--yes` flag is non-interactive pre-confirmation for mutation-capable bootstrap. Local
+interactive operators may omit it and confirm the prompt before Infisical, OpenTofu, resolver config,
+or credential-sink mutations begin. In CI or a non-interactive operator shell, also provide a
+short-lived admin token and an explicit organization selector:
 
 ```bash
 INFISICAL_ACCESS_TOKEN='<redacted>' \

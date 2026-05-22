@@ -73,7 +73,7 @@ export async function requiredBackendProfiles(graphPath = DEFAULT_GRAPH_PATH) {
   for (const node of nodes) {
     const secretBackend = stringAttr(node, "secret_backend");
     const secretBackendProfile = stringAttr(node, "secret_backend_profile");
-    if (!secretBackend && !secretBackendProfile) continue;
+    if (!secretBackend && !secretBackendProfile && !nodeNeedsSecretBackend(node)) continue;
     const errors = deploymentSecretBackendSelectorErrors({ secretBackend, secretBackendProfile });
     if (errors.length > 0) {
       const label = stringAttr(node, "name") || "<unknown deployment>";
@@ -149,4 +149,13 @@ async function fileExists(file: string) {
 function stringAttr(node: GraphNode, key: string) {
   const value = node[key];
   return typeof value === "string" ? value.trim() : "";
+}
+
+function nodeNeedsSecretBackend(node: GraphNode) {
+  return arrayAttr(node, "secret_requirements").length > 0;
+}
+
+function arrayAttr(node: GraphNode, key: string) {
+  const value = node[key];
+  return Array.isArray(value) ? value : [];
 }

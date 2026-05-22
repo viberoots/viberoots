@@ -408,11 +408,13 @@ For each required binding, admission should:
 1. derive the Infisical secret selector from contract id plus runtime metadata
 2. authenticate using the active deployment secret context
 3. call Infisical with `viewSecretValue=false` when that is sufficient to obtain
-   `id`, `version`, `environment`, `secretPath`, and metadata
+   provider-returned `id`, `projectId`, `environment`, `secretPath`, `secretName`, `version`, and
+   metadata
 4. if Infisical cannot return usable version metadata without the value, call
    the ordinary read endpoint but discard `secretValue` immediately after
    constructing the admitted reference
-5. freeze a `DeploymentSecretAdmittedReference`
+5. freeze a `DeploymentSecretAdmittedReference` from provider-returned non-secret identity evidence,
+   never from selector values supplied by the caller
 
 Admitted reference example:
 

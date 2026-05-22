@@ -34,11 +34,14 @@ import {
 } from "./deployment-secret-infisical-client";
 import { readAdmittedInfisicalSecret } from "./deployment-secret-infisical-admission-read";
 import {
-  deploymentInfisicalBackendRef,
   deploymentInfisicalSelector,
   deploymentInfisicalSelectorRef,
-  parseDeploymentInfisicalBackendRef,
 } from "./deployment-secret-infisical-selectors";
+import {
+  assertInfisicalFrozenReplayEvidence,
+  assertInfisicalReplayEvidence,
+  infisicalProviderBackendRef,
+} from "./deployment-secret-infisical-replay-identity";
 
 function materialFromFixture(
   binding: DeploymentSecretReference,
@@ -103,8 +106,14 @@ function assertUsable(record: InfisicalSecretRecord | undefined, contractId: str
 function assertSelector(
   record: InfisicalSecretRecord,
   admitted: DeploymentSecretAdmittedReference,
+  requestedSelector: ReturnType<typeof deploymentInfisicalSelector>,
 ) {
-  const parsed = parseDeploymentInfisicalBackendRef(admitted.backendRef);
+  const parsed = assertInfisicalFrozenReplayEvidence(admitted);
+  assertInfisicalReplayEvidence({
+    record,
+    contractId: admitted.contractId,
+    requestedSelector,
+  });
   for (const [field, actual, expected] of [
     ["project", record.projectId, parsed.selector.projectId],
     ["environment", record.environment, parsed.selector.environment],
@@ -162,22 +171,18 @@ export async function resolveDeploymentInfisicalAdmittedReferences(opts: {
       continue;
     }
     const usable = assertUsable(record, binding.contractId);
-    if (!usable.version) {
-      throw new Error(
-        `required secret contract ${binding.contractId} missing exact Infisical version`,
-      );
-    }
-    const backendRef = deploymentInfisicalBackendRef(selector, {
-      id: usable.id,
-      reference: usable.reference,
+    const backendRef = infisicalProviderBackendRef({
+      record: usable,
+      contractId: binding.contractId,
+      requestedSelector: selector,
     });
     resolved.push({
       ...binding,
       targetScope: opts.targetScope,
       backendRef,
-      selectorRef: deploymentInfisicalSelectorRef(selector, usable.version),
+      selectorRef: deploymentInfisicalSelectorRef(usable, usable.version!),
       referenceId: `infisical:${backendRef}@${usable.version}`,
-      resolvedVersion: usable.version,
+      resolvedVersion: usable.version!,
       resolvedAt: new Date().toISOString(),
       refreshMode: "none",
       credentialClass: "routine",
@@ -207,7 +212,7 @@ export function createDeploymentInfisicalSecretBackend(
           `required secret contract ${binding.contractId} has no exact Infisical replay reference`,
         );
       }
-      const { selector } = parseDeploymentInfisicalBackendRef(binding.backendRef);
+      const { selector } = assertInfisicalFrozenReplayEvidence(binding);
       const record = assertUsable(
         await readInfisicalSecret({
           credential: context.credential,
@@ -217,7 +222,7 @@ export function createDeploymentInfisicalSecretBackend(
         }),
         binding.contractId,
       );
-      assertSelector(record, binding);
+      assertSelector(record, binding, selector);
       if (typeof record.secretValue !== "string") {
         throw new Error(
           `required secret contract ${binding.contractId} does not expose a string value`,

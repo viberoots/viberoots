@@ -17,21 +17,20 @@ import {
 } from "./deployment-secret-infisical.fixture";
 import { startFakeInfisicalServer } from "./infisical.test-server";
 
+const auth = { clientId: "id", clientSecret: "secret", accessToken: "token" };
+
 test("Infisical admission freezes non-secret selector and runtime reads admitted version", async () => {
-  const server = await startFakeInfisicalServer(
-    { clientId: "id", clientSecret: "secret", accessToken: "token" },
-    [
-      {
-        id: "sec_1",
-        projectId: "proj_123",
-        environment: "prod",
-        secretPath: "/deployments/pleomino",
-        secretName: "cloudflare_api_token",
-        version: "3",
-        secretValue: "token-v3",
-      },
-    ],
-  );
+  const server = await startFakeInfisicalServer(auth, [
+    {
+      id: "sec_1",
+      projectId: "proj_123",
+      environment: "prod",
+      secretPath: "/deployments/pleomino",
+      secretName: "cloudflare_api_token",
+      version: "3",
+      secretValue: "token-v3",
+    },
+  ]);
   const context = infisicalTestContext(server.siteUrl);
   try {
     const admitted = await resolveDeploymentInfisicalAdmittedReferences({
@@ -72,18 +71,16 @@ test("Infisical admission freezes non-secret selector and runtime reads admitted
 });
 
 test("Infisical mapping overrides default path and secret name", async () => {
-  const server = await startFakeInfisicalServer(
-    { clientId: "id", clientSecret: "secret", accessToken: "token" },
-    [
-      {
-        projectId: "proj_123",
-        environment: "prod",
-        secretPath: "/custom",
-        secretName: "api-token",
-        version: "9",
-      },
-    ],
-  );
+  const server = await startFakeInfisicalServer(auth, [
+    {
+      id: "sec_mapped",
+      projectId: "proj_123",
+      environment: "prod",
+      secretPath: "/custom",
+      secretName: "api-token",
+      version: "9",
+    },
+  ]);
   try {
     const admitted = await resolveDeploymentInfisicalAdmittedReferences({
       requirements: [infisicalRequirement],
@@ -99,10 +96,7 @@ test("Infisical mapping overrides default path and secret name", async () => {
 });
 
 test("fake Infisical server rejects the old v3 raw-secret read shape", async () => {
-  const server = await startFakeInfisicalServer(
-    { clientId: "id", clientSecret: "secret", accessToken: "token" },
-    [],
-  );
+  const server = await startFakeInfisicalServer(auth, []);
   try {
     const old = await fetch(`${server.siteUrl}/api/v3/secrets/raw/cloudflare_api_token`);
     assert.equal(old.status, 410);
@@ -116,11 +110,7 @@ test("fake Infisical server rejects the old v3 raw-secret read shape", async () 
 });
 
 test("Infisical missing optional secrets are skipped and required secrets fail", async () => {
-  const server = await startFakeInfisicalServer({
-    clientId: "id",
-    clientSecret: "secret",
-    accessToken: "token",
-  });
+  const server = await startFakeInfisicalServer(auth);
   const context = infisicalTestContext(server.siteUrl);
   try {
     const optional = await resolveDeploymentInfisicalAdmittedReferences({
@@ -146,21 +136,18 @@ test("Infisical missing optional secrets are skipped and required secrets fail",
 });
 
 test("Infisical admission falls back to value read when metadata-only read omits exact version", async () => {
-  const server = await startFakeInfisicalServer(
-    { clientId: "id", clientSecret: "secret", accessToken: "token" },
-    [
-      {
-        id: "sec_1",
-        projectId: "proj_123",
-        environment: "prod",
-        secretPath: "/deployments/pleomino",
-        secretName: "cloudflare_api_token",
-        version: "7",
-        secretValue: "sensitive-fallback-token",
-        metadataResponse: { version: undefined },
-      },
-    ],
-  );
+  const server = await startFakeInfisicalServer(auth, [
+    {
+      id: "sec_1",
+      projectId: "proj_123",
+      environment: "prod",
+      secretPath: "/deployments/pleomino",
+      secretName: "cloudflare_api_token",
+      version: "7",
+      secretValue: "sensitive-fallback-token",
+      metadataResponse: { version: undefined },
+    },
+  ]);
   try {
     const admitted = await resolveDeploymentInfisicalAdmittedReferences({
       requirements: [infisicalRequirement],
@@ -209,20 +196,17 @@ test("Infisical fixture mode uses backend-qualified synthetic references", async
 });
 
 test("Infisical replay mismatch fails without leaking secret values", async () => {
-  const server = await startFakeInfisicalServer(
-    { clientId: "id", clientSecret: "secret", accessToken: "token" },
-    [
-      {
-        id: "sec_1",
-        projectId: "proj_123",
-        environment: "prod",
-        secretPath: "/deployments/pleomino",
-        secretName: "cloudflare_api_token",
-        version: "3",
-        secretValue: "sensitive-runtime-token",
-      },
-    ],
-  );
+  const server = await startFakeInfisicalServer(auth, [
+    {
+      id: "sec_1",
+      projectId: "proj_123",
+      environment: "prod",
+      secretPath: "/deployments/pleomino",
+      secretName: "cloudflare_api_token",
+      version: "3",
+      secretValue: "sensitive-runtime-token",
+    },
+  ]);
   const context = infisicalTestContext(server.siteUrl);
   try {
     const admitted = await resolveDeploymentInfisicalAdmittedReferences({

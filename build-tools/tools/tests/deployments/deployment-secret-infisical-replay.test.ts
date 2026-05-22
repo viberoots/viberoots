@@ -57,7 +57,33 @@ test("Infisical replay rejects name mismatch", async () => {
 
 test("Infisical replay rejects id mismatch and omitted id", async () => {
   await rejectsReplayMismatch({ id: "sec_2" }, "id");
-  await rejectsReplayMismatch({ id: undefined }, "id");
+  await withAdmittedSecret(async (server) => {
+    const admitted = await admitInfisicalSecret(server.siteUrl);
+    server.secrets[0]!.response = { id: undefined };
+    await assert.rejects(
+      () => acquireInfisicalSecret({ siteUrl: server.siteUrl, admitted }),
+      (error) =>
+        error instanceof Error &&
+        error.message.includes("missing Infisical replay identity evidence: provider secret id") &&
+        error.message.includes(
+          "requested selector: proj_123:prod:/deployments/pleomino:cloudflare_api_token",
+        ),
+    );
+  });
+});
+
+test("Infisical replay rejects incomplete frozen identity evidence", async () => {
+  await withAdmittedSecret(async (server) => {
+    const admitted = await admitInfisicalSecret(server.siteUrl);
+    await assert.rejects(
+      () =>
+        acquireInfisicalSecret({
+          siteUrl: server.siteUrl,
+          admitted: { ...admitted, backendRef: admitted.backendRef.replace(/#sec_1$/, "") },
+        }),
+      /incomplete Infisical replay reference: provider secret id/,
+    );
+  });
 });
 
 test("Infisical admission freezes returned reference when present", async () => {

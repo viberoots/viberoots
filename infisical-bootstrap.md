@@ -445,6 +445,8 @@ and materialization: profiles required by the deployment graph plus active resol
 profiles. This can surface an unresolved operator-authored Infisical profile even when the current
 deployment graph only requires another backend, because confirmed bootstrap validates active
 category selections before mutation.
+Deployment graph nodes with secret requirements and omitted `secret_backend` still require the
+implicit `vault/default` profile during repo bootstrap profile discovery and resolver validation.
 
 Deployment bootstrap performs this resolver-config creation or validation before opening Infisical,
 running OpenTofu, or writing any credential sink output. Missing `--yes` and unsafe bootstrap

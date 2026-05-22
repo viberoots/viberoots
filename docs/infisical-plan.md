@@ -3816,3 +3816,126 @@ project packages instead of isolated fixtures.
 This cleanup is high-churn across deployment tests and docs. It may temporarily obscure some
 end-to-end deployment examples until the useful parts are rebuilt as temp-repo fixtures or generic
 illustrations.
+
+## PR-39: Post-cleanup Infisical assessment closure
+
+### 1. Intent
+
+Close the post-PR-38 assessment gaps so the implemented Infisical secret replay and repo bootstrap
+behavior fully match the design documents. Tighten live Infisical replay evidence so incomplete
+provider responses fail closed, restore repo bootstrap parity for implicit `vault/default`
+deployments, and repair remaining operator docs that still describe stale bootstrap confirmation or
+command forms.
+
+### 2. Scope of changes
+
+- Require live Infisical read responses used for admission/runtime replay to include complete
+  non-secret identity evidence before freezing or comparing the backend reference. The required
+  fields are the provider secret id, project id, environment, secret path, secret name, and version
+  when the response shape supports versioned reads.
+- Stop filling missing Infisical response identity fields from the requested selector in a way that
+  makes incomplete live responses indistinguishable from provider-confirmed evidence.
+- Ensure admission fails closed when Infisical does not return the required identity fields for a
+  secret that will later be replayed.
+- Ensure runtime replay compares all frozen identity fields and continues to fail closed on id,
+  project, environment, path, name, reference, or version drift.
+- Update repo bootstrap profile discovery so deployments with omitted `secret_backend` still
+  contribute the implicit `vault/default` profile when they have secret requirements or otherwise
+  need backend materialization.
+- Replace tests that assert missing selectors are ignored with tests that prove omitted selectors
+  resolve to `vault-default` where the deployment graph requires a backend.
+- Keep explicit backend selector behavior from PR-27 through PR-38 unchanged: `vault/<profile>` and
+  `infisical/<profile>` remain the only public selector forms, category-selected Infisical profiles
+  still materialize as designed, and generated profile preservation remains exact.
+- Fix stale docs that still say `--yes` is required for every non-dry-run bootstrap. `--yes` should
+  be documented as non-interactive pre-confirmation, while local interactive operators may confirm
+  at the prompt.
+- Fix shorthand bootstrap command references so operator-facing remediation uses the canonical repo
+  command form, `build-tools/tools/deployments/infisical-bootstrap.ts repo`, with `zx-wrapper` only
+  where the surrounding doc explicitly explains wrapper usage.
+
+### 3. External prerequisites
+
+- None. Tests must use fixture Infisical clients, fixture deployment graph metadata, and hermetic
+  temp workspaces.
+- No live Infisical, Vault, macOS Keychain, OpenTofu, provider, or browser access should be
+  required.
+
+### 4. Tests to be added
+
+- Add Infisical replay tests proving admission rejects live read responses that omit the provider
+  secret id, project id, environment, secret path, secret name, or required version evidence.
+- Add runtime replay tests proving frozen identity fields are compared exactly and that omitted
+  frozen fields cannot silently weaken the replay check.
+- Add client-normalization tests proving selector values are not used as substitutes for missing
+  provider identity evidence in replay-bearing responses.
+- Add repo bootstrap resolver tests proving graph nodes with omitted `secret_backend` and secret
+  requirements resolve to `vault-default`.
+- Update existing unified-selector tests that intentionally ignored omitted selectors so they only
+  ignore graph nodes that truly do not require a secret backend.
+- Add docs regression coverage for the stale `--yes` sentence and shorthand bootstrap command form
+  if an existing docs/stale-name guard can express those checks without broad false positives.
+
+### 5. Docs to be added or updated
+
+- Update `docs/infisical-design.md` to clarify that live Infisical replay evidence must come from
+  the provider response, not from the caller's requested selector, before it can be frozen or
+  compared.
+- Update `docs/infisical-bootstrap.md`, `infisical-bootstrap.md`, and `docs/deployments-usage.md`
+  so `--yes` is consistently described as non-interactive pre-confirmation rather than a mandatory
+  flag for local interactive mutation-capable runs.
+- Replace shorthand `infisical-bootstrap.ts repo` remediation text with the canonical executable
+  path in operator-facing docs.
+- Document that omitted deployment `secret_backend` still means `vault/default`, including in repo
+  bootstrap profile discovery and resolver profile validation.
+
+### 5.5. Expected regression scope
+
+- `deployment-only`
+- Keep changes limited to Infisical secret client/admission replay validation, repo bootstrap
+  resolver profile discovery, targeted deployment tests, and documentation. Do not change Pleomino
+  deployment metadata, live resource names, deployment fan-out ordering, generated profile
+  materialization semantics, provider publish behavior, or the public backend selector syntax.
+
+### 6. Acceptance criteria
+
+- Infisical admission fails closed when provider responses lack complete non-secret identity
+  evidence needed for replay.
+- Runtime replay compares complete frozen Infisical identity evidence and cannot be weakened by
+  absent fields.
+- Repo bootstrap discovers `vault-default` for deployment graph requirements that omit
+  `secret_backend`.
+- Explicit `vault/<profile>` and `infisical/<profile>` selectors continue to work, and no old public
+  selector surface is reintroduced.
+- Operator docs consistently describe `--yes` and the canonical bootstrap command.
+- Focused Infisical replay, bootstrap resolver, docs guard, and deployment validation tests pass.
+- The repository validation suite passes.
+
+### 7. Risks
+
+- Infisical API response shapes may vary by endpoint or CLI/API version, so requiring fields too
+  aggressively could reject otherwise valid reads.
+- Treating omitted backend selectors as implicit Vault may surface missing local Vault config in repo
+  bootstrap runs that previously skipped those graph nodes.
+- Docs guards for command text can become brittle if they scan illustrative snippets too broadly.
+
+### 8. Mitigations
+
+- Centralize Infisical response identity extraction and make the required-field error message name
+  the missing provider field and requested selector.
+- Limit implicit Vault discovery to graph nodes that actually require secret backend resolution.
+- Scope docs regression checks to operator-facing bootstrap/remediation docs instead of all
+  historical planning text.
+
+### 9. Consequences of not implementing this PR
+
+Infisical replay can keep accepting incomplete live identity evidence, repo bootstrap can keep
+missing implicit Vault requirements, and operator docs will continue to contain stale bootstrap
+confirmation guidance.
+
+### 10. Downsides for implementing this PR
+
+The stricter Infisical identity check may require adapting fixtures if the current test client
+omitted fields that real replay should require. Repo bootstrap may also become noisier for
+deployments that still rely on the implicit Vault default and have not configured local Vault
+validation inputs.

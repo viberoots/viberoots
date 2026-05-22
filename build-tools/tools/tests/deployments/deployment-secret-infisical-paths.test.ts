@@ -25,6 +25,7 @@ async function admittedSelector(opts: {
 }) {
   const server = await startFakeInfisicalServer(auth, [
     {
+      id: "sec_path",
       projectId: "proj_123",
       environment: "prod",
       secretPath: opts.expectedPath,
@@ -67,10 +68,13 @@ test("Infisical selector applies runtime secret path prefix without mapping over
     expectedPath: "/deployments/pleomino",
   });
   assert.equal(admitted.selectorRef, "proj_123:prod:/deployments/pleomino:cloudflare_api_token@7");
-  assert.equal(admitted.backendRef, "proj_123:prod:/deployments/pleomino:cloudflare_api_token");
+  assert.equal(
+    admitted.backendRef,
+    "proj_123:prod:/deployments/pleomino:cloudflare_api_token#sec_path",
+  );
   assert.equal(
     admitted.referenceId,
-    "infisical:proj_123:prod:/deployments/pleomino:cloudflare_api_token@7",
+    "infisical:proj_123:prod:/deployments/pleomino:cloudflare_api_token#sec_path@7",
   );
 });
 
@@ -100,6 +104,7 @@ test("Infisical runtime acquire uses admitted prefixed selector and version", as
   const expectedPath = "/deployments/pleomino";
   const server = await startFakeInfisicalServer(auth, [
     {
+      id: "sec_prefixed",
       projectId: "proj_123",
       environment: "prod",
       secretPath: expectedPath,
@@ -109,6 +114,7 @@ test("Infisical runtime acquire uses admitted prefixed selector and version", as
       secretValue: "runtime-token-v7",
     },
     {
+      id: "sec_unprefixed",
       projectId: "proj_123",
       environment: "prod",
       secretPath: "/deployments",
@@ -133,7 +139,7 @@ test("Infisical runtime acquire uses admitted prefixed selector and version", as
     });
     assert.equal(
       admitted[0]?.backendRef,
-      "proj_123:prod:/deployments/pleomino:cloudflare_api_token#reference=prefixed-ref",
+      "proj_123:prod:/deployments/pleomino:cloudflare_api_token#id=sec_prefixed&reference=prefixed-ref",
     );
     assert.equal(
       admitted[0]?.selectorRef,

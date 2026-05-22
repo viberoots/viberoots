@@ -21,8 +21,23 @@ test("repo resolver profile discovery accepts unified backend selectors", async 
   ]);
 });
 
-test("repo resolver profile discovery ignores nodes without backend selectors", async () => {
-  const graphPath = await writeGraph([{ name: "//deployments/app:build" }]);
+test("repo resolver profile discovery maps omitted backend requirements to vault default", async () => {
+  const graphPath = await writeGraph([
+    { name: "//deployments/app:build" },
+    {
+      name: "//deployments/implicit-vault:deploy",
+      secret_requirements: [{ name: "api_token", contract_id: "secret://deployments/api_token" }],
+    },
+  ]);
+  const profiles = await requiredBackendProfiles(graphPath);
+  assert.deepEqual([...profiles], ["vault-default"]);
+});
+
+test("repo resolver profile discovery ignores nodes with no backend need", async () => {
+  const graphPath = await writeGraph([
+    { name: "//deployments/app:build" },
+    { name: "//deployments/no-secrets:deploy", secret_requirements: [] },
+  ]);
   const profiles = await requiredBackendProfiles(graphPath);
   assert.deepEqual([...profiles], []);
 });
