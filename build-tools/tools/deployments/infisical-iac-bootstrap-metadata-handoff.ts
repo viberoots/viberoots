@@ -33,7 +33,7 @@ export function reviewedMetadataReplacements(
   reviewed: Required<DeploymentRuntimeMetadata>,
 ) {
   return [
-    replacement("_INFISICAL_SITE_URL", reviewed.siteUrl, live.siteUrl),
+    replacement("_INFISICAL_SITE_URL", reviewed.siteUrl ?? "", live.siteUrl),
     replacement("_INFISICAL_PROJECT_ID", reviewed.projectId, live.projectId),
     ...reviewed.deploymentCredentials.flatMap((expected) => {
       const actual = live.deploymentCredentials?.find((item) => item.stage === expected.stage);
@@ -63,7 +63,8 @@ export function isFirstBootstrapPlaceholder(value: string) {
 }
 
 function replacement(label: string, before: string, after?: string) {
-  if (!after || before === after) return undefined;
+  if (before === after) return undefined;
+  if (!after) throw new Error(`metadata patch missing live value for ${label}`);
   return { label, before, after };
 }
 

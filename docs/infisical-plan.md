@@ -4182,3 +4182,99 @@ to preserve.
 The patcher becomes more specialized to the current Pleomino reviewed metadata file shape, so future
 metadata layout changes may need a deliberate patcher update rather than benefiting from generic
 value replacement.
+
+## PR-42: Fail closed on incomplete live Infisical handoff output
+
+### 1. Intent
+
+Close the post-PR-41 assessment gap where first-bootstrap handoff can be classified as safe when
+reviewed metadata contains placeholders but OpenTofu did not return the live values needed to
+produce a complete reviewed metadata patch. A handoff is safe only when every required live
+Infisical field is present and can be written into the reviewed metadata patch.
+
+### 2. Scope of changes
+
+- Require exact live OpenTofu output fields before returning or applying
+  `metadata_handoff_required`.
+- Validate that live metadata includes the Infisical project id, site URL when it is part of the
+  handoff patch, each required stage identity id, and each required stage credential file name before
+  generating the handoff patch.
+- Treat missing live values as hard reconciliation failures with clear errors naming the missing
+  field and stage, not as first-bootstrap handoff.
+- Stop silently dropping metadata replacements whose `after` value is absent. Patch generation must
+  either include every required handoff replacement or fail closed before reporting a handoff patch.
+- Preserve PR-41 constant-scoped patch application and PR-40 hard drift behavior.
+- Keep optional or unchanged fields out of the patch when they are not required for the reviewed
+  metadata mismatch, but do not allow required live values for placeholder-reviewed fields to be
+  missing.
+
+### 3. External prerequisites
+
+- None. This is hermetic validation and test work only.
+- No live Infisical, OpenTofu network access, macOS Keychain, Vault, Cloudflare, or browser
+  automation should be required.
+
+### 4. Tests to be added
+
+- Add reconciliation tests proving missing live project id does not produce
+  `metadata_handoff_required` and instead fails closed with an actionable error.
+- Add tests proving missing live stage identity ids fail closed rather than producing partial
+  `_INFISICAL_MACHINE_IDENTITY_IDS` patch entries.
+- Add tests proving missing live credential file names fail closed rather than producing partial
+  `_INFISICAL_CREDENTIAL_FILE_NAMES` patch entries.
+- Add patch-generation tests proving absent `after` values cannot be silently dropped for required
+  handoff replacements.
+- Keep the successful first-bootstrap handoff, metadata gate, repo-flow resume, and constant-scoped
+  patch tests passing.
+
+### 5. Docs to be added or updated
+
+- Update `docs/infisical-design.md` to state that first-bootstrap handoff requires complete live
+  OpenTofu output for every reviewed metadata field being handed off.
+- Update `docs/infisical-bootstrap.md` or `infisical-bootstrap.md` troubleshooting to distinguish
+  incomplete OpenTofu output from ordinary first-bootstrap reviewed metadata handoff.
+
+### 5.5. Expected regression scope
+
+- `deployment-only`
+- Keep changes limited to reconciliation classification, metadata handoff patch generation,
+  targeted tests, and small docs clarifications. Do not change public bootstrap flags, live
+  Infisical resource definitions, constant-scoped patch application, generated artifact policy,
+  deployment fan-out ordering, or secret ref naming.
+
+### 6. Acceptance criteria
+
+- `metadata_handoff_required` is emitted only when all live values needed for the reviewed metadata
+  patch are present.
+- Missing live project id, stage identity id, or credential file name fails closed with clear
+  operator-facing errors.
+- Patch generation no longer silently drops required replacements with missing `after` values.
+- Existing first-bootstrap handoff success, hard drift failure, metadata gate, repo-flow resume, and
+  PR-41 constant-scoped patch tests continue to pass.
+- Focused reconciliation and metadata handoff tests pass.
+- The repository validation suite passes.
+
+### 7. Risks
+
+- Strict live-field validation may expose provider or OpenTofu output shape gaps that previously
+  produced partial handoff reports.
+- If optional fields are treated as required too broadly, legitimate handoffs could fail
+  unnecessarily.
+
+### 8. Mitigations
+
+- Require only fields that are necessary to replace placeholder or empty reviewed metadata values.
+- Include the missing field path and stage in errors so malformed OpenTofu output is easy to
+  diagnose.
+- Keep successful fixture outputs unchanged to avoid widening the behavior beyond the missing-live
+  guard.
+
+### 9. Consequences of not implementing this PR
+
+A malformed or incomplete OpenTofu output can be reported as a normal first-bootstrap handoff even
+though the generated patch is incomplete and cannot make reconciliation pass on rerun.
+
+### 10. Downsides for implementing this PR
+
+Operators may see a hard failure earlier in the bootstrap flow if provider outputs are incomplete,
+but that is preferable to accepting an incomplete reviewed metadata patch.

@@ -20,6 +20,85 @@ test("placeholder reviewed metadata becomes a first-bootstrap handoff patch", ()
   assert.doesNotMatch(result.patch.unifiedDiff, /cloudflare_api_token\n\+/);
 });
 
+test("missing live project id fails closed instead of handoff", () => {
+  const reviewed = parsePleominoReviewedMetadata(FIRST_BOOTSTRAP_SOURCE);
+  assert.throws(
+    () =>
+      reconcileDeploymentMetadata(
+        { ...LIVE_METADATA, projectId: undefined },
+        reviewed,
+        FIRST_BOOTSTRAP_SOURCE,
+      ),
+    /project id: live=<missing> reviewed=proj_pleomino_deployments/,
+  );
+});
+
+test("missing live stage identity id fails closed instead of partial handoff", () => {
+  const reviewed = parsePleominoReviewedMetadata(FIRST_BOOTSTRAP_SOURCE);
+  assert.throws(
+    () =>
+      reconcileDeploymentMetadata(
+        {
+          ...LIVE_METADATA,
+          deploymentCredentials: [{ ...LIVE_METADATA.deploymentCredentials[0], identityId: "" }],
+        },
+        reviewed,
+        FIRST_BOOTSTRAP_SOURCE,
+      ),
+    /staging identity id: live=<missing> reviewed=identity_pleomino_staging_deploy/,
+  );
+});
+
+test("missing live credential file names fail closed instead of partial handoff", () => {
+  const reviewed = parsePleominoReviewedMetadata(FIRST_BOOTSTRAP_SOURCE);
+  assert.throws(
+    () =>
+      reconcileDeploymentMetadata(
+        {
+          ...LIVE_METADATA,
+          deploymentCredentials: [
+            {
+              ...LIVE_METADATA.deploymentCredentials[0],
+              clientIdFileName: undefined,
+              clientSecretFileName: "",
+            },
+          ],
+        },
+        reviewed,
+        FIRST_BOOTSTRAP_SOURCE,
+      ),
+    /staging client id file name: live=<missing> reviewed=<missing>[\s\S]*staging client secret file name: live=<missing> reviewed=<missing>/,
+  );
+});
+
+test("empty reviewed site url requires live output before handoff", () => {
+  const source = FIRST_BOOTSTRAP_SOURCE.replace(
+    '_INFISICAL_SITE_URL = "https://app.infisical.com"',
+    '_INFISICAL_SITE_URL = ""',
+  );
+  const reviewed = parsePleominoReviewedMetadata(source);
+  assert.throws(
+    () => reconcileDeploymentMetadata({ ...LIVE_METADATA, siteUrl: undefined }, reviewed, source),
+    /site url: live=<missing> reviewed=<missing>/,
+  );
+  const result = reconcileDeploymentMetadata(LIVE_METADATA, reviewed, source);
+  assert.equal(result.status, "metadata_handoff_required");
+  assert.match(result.patch.unifiedDiff, /_INFISICAL_SITE_URL = "https:\/\/app\.infisical\.com"/);
+});
+
+test("metadata patch rejects required replacements without live after values", () => {
+  const reviewed = parsePleominoReviewedMetadata(FIRST_BOOTSTRAP_SOURCE);
+  assert.throws(
+    () =>
+      buildMetadataHandoffPatch(
+        { ...LIVE_METADATA, projectId: undefined },
+        reviewed,
+        FIRST_BOOTSTRAP_SOURCE,
+      ),
+    /metadata patch missing live value for _INFISICAL_PROJECT_ID/,
+  );
+});
+
 test("non-placeholder reviewed drift remains a hard reconciliation failure", () => {
   const reviewed = parsePleominoReviewedMetadata(
     FIRST_BOOTSTRAP_SOURCE.replace("proj_pleomino_deployments", "reviewed-live-project"),

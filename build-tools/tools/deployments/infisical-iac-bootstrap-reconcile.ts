@@ -88,11 +88,17 @@ export function reconcileDeploymentMetadata(
 }
 
 function compare(label: string, actual?: string, expected?: string, canHandoff: boolean) {
+  const firstBootstrapField = canHandoff && isFirstBootstrapPlaceholder(expected ?? "");
+  if (firstBootstrapField && !hasLiveValue(actual)) {
+    return [
+      { text: `${label}: live=<missing> reviewed=${displayValue(expected)}`, handoff: false },
+    ];
+  }
   if (actual === expected) return [];
   return [
     {
-      text: `${label}: live=${actual ?? "<missing>"} reviewed=${expected ?? "<missing>"}`,
-      handoff: canHandoff && isFirstBootstrapPlaceholder(expected ?? ""),
+      text: `${label}: live=${displayValue(actual)} reviewed=${displayValue(expected)}`,
+      handoff: firstBootstrapField,
     },
   ];
 }
@@ -104,4 +110,12 @@ function compareHost(label: string, actual?: string, expected?: string, canHando
     canonicalInfisicalApiUrl(expected),
     canHandoff,
   );
+}
+
+function hasLiveValue(value?: string) {
+  return value !== undefined && value !== "";
+}
+
+function displayValue(value?: string) {
+  return hasLiveValue(value) ? value : "<missing>";
 }

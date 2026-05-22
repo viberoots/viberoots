@@ -280,7 +280,10 @@ known first-bootstrap placeholders or empty reviewed values, bootstrap reports
 key rather than by globally replacing matching values. Stable secret refs, environment slugs,
 project name/slug, secret names, duplicate placeholder values outside those constants, and
 Cloudflare requirements remain reviewed constants. Any mismatch against non-placeholder reviewed
-metadata is hard drift and must fail closed.
+metadata is hard drift and must fail closed. The handoff also requires complete live OpenTofu
+output for every reviewed field being patched: project id, site URL when changed, each required
+stage identity id, and each required stage credential file name. Missing live output is an
+incomplete bootstrap result, not a reviewed metadata handoff.
 
 ### Infisical Runtime Metadata
 
