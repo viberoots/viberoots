@@ -71,7 +71,7 @@ test("interactive metadata patch confirmation applies the reviewed patch", async
   await withInteractiveIo("Y\n", () =>
     applyFanOutMetadataHandoff(DEFAULT_BOOTSTRAP_ARGS, fanOutWithPatch(tempPatch)),
   );
-  assert.equal(await fs.readFile(tempPatch.path, "utf8"), 'project = "proj_new"\n');
+  assert.equal(await fs.readFile(tempPatch.path, "utf8"), '_INFISICAL_PROJECT_ID = "proj_new"\n');
 });
 
 test("declined interactive metadata patch confirmation stops before writing", async () => {
@@ -83,7 +83,7 @@ test("declined interactive metadata patch confirmation stops before writing", as
       ),
     /metadata patch application cancelled/,
   );
-  assert.equal(await fs.readFile(tempPatch.path, "utf8"), 'project = "proj_old"\n');
+  assert.equal(await fs.readFile(tempPatch.path, "utf8"), '_INFISICAL_PROJECT_ID = "proj_old"\n');
 });
 
 function fanOutWithPatch(item: MetadataHandoffPatch) {
@@ -99,7 +99,7 @@ function fanOutWithPatch(item: MetadataHandoffPatch) {
 async function patchInTemp(): Promise<MetadataHandoffPatch> {
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), "metadata-gate-"));
   const file = path.join(dir, "family.bzl");
-  await fs.writeFile(file, 'project = "proj_old"\n');
+  await fs.writeFile(file, '_INFISICAL_PROJECT_ID = "proj_old"\n');
   return { ...patch, path: file };
 }
 

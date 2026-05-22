@@ -4085,3 +4085,100 @@ that gets an operator from a clean local state to a usable Infisical-backed depl
 The bootstrap command becomes more stateful and needs careful reporting around phases, generated
 patches, local OpenTofu state, and reruns. The first-bootstrap handoff logic also adds another
 classification path that must be kept narrow so it does not mask real live-resource drift.
+
+## PR-41: Constant-scoped Infisical metadata handoff patching
+
+### 1. Intent
+
+Close the PR-40 assessment gap where the reviewed metadata handoff patch is deterministic in
+content but not deterministic in edit target. The handoff patch must update only the intended
+reviewed Infisical constants in `projects/deployments/pleomino/shared/family.bzl`, even when the
+same placeholder, empty string, site URL, identity id, or credential file name appears elsewhere in
+the file.
+
+### 2. Scope of changes
+
+- Replace value-based metadata handoff patch application with constant-scoped or Starlark-aware
+  edits keyed by the intended reviewed constants.
+- Scope scalar replacements to the exact `_INFISICAL_SITE_URL` and `_INFISICAL_PROJECT_ID`
+  assignments.
+- Scope map replacements to the exact stage entries inside `_INFISICAL_MACHINE_IDENTITY_IDS` and
+  `_INFISICAL_CREDENTIAL_FILE_NAMES`.
+- Preserve `_INFISICAL_PROJECT_NAME`, `_INFISICAL_PROJECT_SLUG`, environment slugs, secret path,
+  Cloudflare secret name, stable secret refs, Vault runtime metadata, comments, unrelated strings,
+  and any future reviewed constants with duplicate values.
+- Fail closed with a clear error if a required constant or stage entry is missing, duplicated in an
+  ambiguous way, or cannot be rewritten without touching unrelated content.
+- Keep the generated patch preview minimal and deterministic, but make its application use the
+  constant/stage path rather than the first matching quoted value.
+- Keep PR-40 handoff classification, metadata gate behavior, fan-out aggregation, final checks, and
+  generated artifact ignore behavior unchanged except where needed to use the safer patcher.
+
+### 3. External prerequisites
+
+- None. This is source-only hardening with hermetic tests.
+- No live Infisical, OpenTofu, macOS Keychain, Vault, Cloudflare, or browser access should be
+  required.
+
+### 4. Tests to be added
+
+- Add a regression test where duplicate placeholder values appear before the intended Infisical
+  constants and prove the patcher updates only the named constants and stage entries.
+- Add a regression test where duplicate live or placeholder values appear in unrelated constants,
+  comments, Vault metadata, or stable secret refs and prove they remain unchanged.
+- Add tests proving missing or ambiguous required constants fail closed with actionable errors.
+- Keep existing metadata handoff, fan-out handoff, repo-flow resume, and metadata gate tests passing
+  against the constant-scoped patcher.
+
+### 5. Docs to be added or updated
+
+- Update `docs/infisical-design.md` to state that first-bootstrap metadata handoff patching is
+  scoped by reviewed constant and stage key, not by globally replacing old values.
+- Update `docs/infisical-bootstrap.md` or `infisical-bootstrap.md` if operator-facing
+  troubleshooting should mention that duplicate placeholder values outside the reviewed Infisical
+  constants are intentionally ignored.
+
+### 5.5. Expected regression scope
+
+- `deployment-only`
+- Keep changes limited to metadata handoff patch construction/application, targeted tests, and small
+  docs clarification. Do not change live Infisical resource creation, reviewed metadata values,
+  public bootstrap flags, deployment fan-out behavior, final SprinkleRef checks, or secret ref
+  naming.
+
+### 6. Acceptance criteria
+
+- Metadata handoff patch application is keyed to reviewed constants and stage entries rather than
+  the first matching quoted value.
+- Duplicate old values elsewhere in `family.bzl` cannot cause the patcher to update the wrong
+  field.
+- Missing or ambiguous metadata structures fail closed with clear errors.
+- Existing PR-40 first-bootstrap handoff behavior, patch gate behavior, repo-flow resume behavior,
+  and final checks continue to work.
+- Focused metadata handoff and repo-flow tests pass.
+- The repository validation suite passes.
+
+### 7. Risks
+
+- A narrow textual patcher can become brittle if `family.bzl` formatting changes.
+- A full Starlark parser or formatter may be excessive for the small reviewed metadata surface.
+- Strict ambiguity checks could reject harmless formatting variations.
+
+### 8. Mitigations
+
+- Use small constant-scoped helpers with explicit tests for the current Starlark shapes instead of
+  broad global replacement.
+- Keep error messages specific to the missing or ambiguous constant/stage path.
+- Preserve original formatting outside the exact quoted value being replaced.
+
+### 9. Consequences of not implementing this PR
+
+First-bootstrap handoff can silently patch the wrong string if duplicate placeholder or reviewed
+values appear earlier in `family.bzl`, weakening the reviewed metadata boundary that PR-40 was meant
+to preserve.
+
+### 10. Downsides for implementing this PR
+
+The patcher becomes more specialized to the current Pleomino reviewed metadata file shape, so future
+metadata layout changes may need a deliberate patcher update rather than benefiting from generic
+value replacement.

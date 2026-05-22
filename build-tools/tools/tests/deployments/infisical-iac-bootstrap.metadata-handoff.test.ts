@@ -31,13 +31,7 @@ test("non-placeholder reviewed drift remains a hard reconciliation failure", () 
 });
 
 test("metadata patch changes only reviewed non-secret handoff constants", async () => {
-  const reviewed = parsePleominoReviewedMetadata(FIRST_BOOTSTRAP_SOURCE);
-  const patch = buildMetadataHandoffPatch(LIVE_METADATA, reviewed, FIRST_BOOTSTRAP_SOURCE);
-  const dir = await fs.mkdtemp(path.join(os.tmpdir(), "infisical-metadata-handoff-"));
-  patch.path = path.join(dir, "family.bzl");
-  await fs.writeFile(patch.path, FIRST_BOOTSTRAP_SOURCE);
-  await applyMetadataHandoffPatch(patch);
-  const applied = await fs.readFile(patch.path, "utf8");
+  const applied = await applyPatchToTemp(FIRST_BOOTSTRAP_SOURCE);
   assert.match(applied, /_INFISICAL_PROJECT_ID = "proj_live"/);
   assert.match(applied, /"staging": "identity_live_staging"/);
   assert.match(applied, /"client_id": "pleomino-staging-client-id"/);
@@ -45,6 +39,82 @@ test("metadata patch changes only reviewed non-secret handoff constants", async 
   assert.match(applied, /_INFISICAL_PROJECT_SLUG = "pleomino-deployments"/);
   assert.match(applied, /_INFISICAL_CLOUDFLARE_SECRET_NAME = "cloudflare_api_token"/);
 });
+
+test("metadata patch ignores duplicate placeholder values before reviewed constants", async () => {
+  const applied = await applyPatchToTemp(`
+_UNRELATED_PLACEHOLDER = "proj_pleomino_deployments"
+_UNRELATED_IDS = {"staging": "identity_pleomino_staging_deploy"}
+_UNRELATED_FILES = {"client_id": "", "client_secret": ""}
+${FIRST_BOOTSTRAP_SOURCE}
+`);
+  assert.match(applied, /_UNRELATED_PLACEHOLDER = "proj_pleomino_deployments"/);
+  assert.match(applied, /_UNRELATED_IDS = \{"staging": "identity_pleomino_staging_deploy"\}/);
+  assert.match(applied, /_UNRELATED_FILES = \{"client_id": "", "client_secret": ""\}/);
+  assert.match(applied, /_INFISICAL_PROJECT_ID = "proj_live"/);
+  assert.match(applied, /"staging": "identity_live_staging"/);
+});
+
+test("metadata patch leaves unrelated duplicate live values unchanged", async () => {
+  const applied = await applyPatchToTemp(`
+${FIRST_BOOTSTRAP_SOURCE}
+_UNRELATED_LIVE_PROJECT = "proj_live"
+_VAULT_RUNTIME = {"project": "proj_pleomino_deployments"}
+# "pleomino-staging-client-id" is only a comment outside reviewed metadata.
+`);
+  assert.match(applied, /_UNRELATED_LIVE_PROJECT = "proj_live"/);
+  assert.match(applied, /_VAULT_RUNTIME = \{"project": "proj_pleomino_deployments"\}/);
+  assert.match(applied, /# "pleomino-staging-client-id" is only a comment/);
+  assert.match(applied, /_INFISICAL_PROJECT_ID = "proj_live"/);
+});
+
+test("metadata patch fails closed when required constants are missing", () => {
+  assert.throws(
+    () => buildPatch(FIRST_BOOTSTRAP_SOURCE.replace(/_INFISICAL_PROJECT_ID = "[^"]+"\n/, "")),
+    /cannot safely rewrite _INFISICAL_PROJECT_ID|missing _INFISICAL_PROJECT_ID/,
+  );
+});
+
+test("metadata patch fails closed when required stage entries are ambiguous", () => {
+  assert.throws(
+    () =>
+      buildPatch(
+        FIRST_BOOTSTRAP_SOURCE.replace(
+          /_INFISICAL_MACHINE_IDENTITY_IDS = \{"staging": "identity_pleomino_staging_deploy"\}/,
+          '_INFISICAL_MACHINE_IDENTITY_IDS = {"staging": "identity_pleomino_staging_deploy", "staging": "identity_pleomino_staging_deploy"}',
+        ),
+      ),
+    /cannot safely rewrite _INFISICAL_MACHINE_IDENTITY_IDS\.staging: expected one/,
+  );
+});
+
+test("metadata patch rejects unsupported reviewed scalar constants", async () => {
+  const patch = buildPatch(FIRST_BOOTSTRAP_SOURCE);
+  patch.replacements = [
+    { label: "_INFISICAL_PROJECT_NAME", before: "pleomino-deployments", after: "renamed" },
+  ];
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), "infisical-metadata-handoff-"));
+  patch.path = path.join(dir, "family.bzl");
+  await fs.writeFile(patch.path, FIRST_BOOTSTRAP_SOURCE);
+  await assert.rejects(() => applyMetadataHandoffPatch(patch), /unsupported reviewed scalar/);
+  assert.match(
+    await fs.readFile(patch.path, "utf8"),
+    /_INFISICAL_PROJECT_NAME = "pleomino-deployments"/,
+  );
+});
+
+async function applyPatchToTemp(source: string) {
+  const patch = buildPatch(source);
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), "infisical-metadata-handoff-"));
+  patch.path = path.join(dir, "family.bzl");
+  await fs.writeFile(patch.path, source);
+  await applyMetadataHandoffPatch(patch);
+  return await fs.readFile(patch.path, "utf8");
+}
+
+function buildPatch(source: string) {
+  const reviewed = parsePleominoReviewedMetadata(source);
+  return buildMetadataHandoffPatch(LIVE_METADATA, reviewed, source);
+}
 
 const LIVE_METADATA = {
   siteUrl: "https://app.infisical.com",

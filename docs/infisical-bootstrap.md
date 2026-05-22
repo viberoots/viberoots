@@ -82,3 +82,6 @@ Troubleshooting:
 - First-bootstrap metadata handoff is expected only when reviewed values are placeholders or empty
   first-bootstrap fields. Drift against already-reviewed project ids, identity ids, environment
   slugs, secret names, or refs requires a human Infisical review before retrying.
+- The generated first-bootstrap patch is applied by reviewed constant and stage key. Duplicate
+  placeholder or live-looking values in comments, Vault metadata, stable refs, or unrelated
+  constants are intentionally ignored.

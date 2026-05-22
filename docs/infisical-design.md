@@ -276,9 +276,11 @@ known first-bootstrap placeholders or empty reviewed values, bootstrap reports
 `metadata_handoff_required` and emits a deterministic, non-secret patch for
 `projects/deployments/pleomino/shared/family.bzl`. That patch may update only
 `_INFISICAL_SITE_URL`, `_INFISICAL_PROJECT_ID`, `_INFISICAL_MACHINE_IDENTITY_IDS`, and
-`_INFISICAL_CREDENTIAL_FILE_NAMES`; stable secret refs, environment slugs, project name/slug,
-secret names, and Cloudflare requirements remain reviewed constants. Any mismatch against
-non-placeholder reviewed metadata is hard drift and must fail closed.
+`_INFISICAL_CREDENTIAL_FILE_NAMES`; application is scoped by the reviewed constant name and stage
+key rather than by globally replacing matching values. Stable secret refs, environment slugs,
+project name/slug, secret names, duplicate placeholder values outside those constants, and
+Cloudflare requirements remain reviewed constants. Any mismatch against non-placeholder reviewed
+metadata is hard drift and must fail closed.
 
 ### Infisical Runtime Metadata
 
