@@ -97,6 +97,8 @@ test("bootstrap args support host shorthands and non-interactive controls", () =
     ".local/plan.tfplan",
     "--no-tofu-apply",
     "--rotate-deployment-credentials",
+    "--machine-label",
+    "ci-builder-1",
     "--apply-metadata-patch",
     "--yes",
   ]);
@@ -106,8 +108,16 @@ test("bootstrap args support host shorthands and non-interactive controls", () =
   assert.equal(args.organizationId, "org_1");
   assert.equal(args.noTofuApply, true);
   assert.equal(args.rotateDeploymentCredentials, true);
+  assert.equal(args.machineLabel, "ci-builder-1");
   assert.equal(args.applyMetadataPatch, true);
   assert.equal(args.yes, true);
+});
+
+test("bootstrap args reject invalid machine labels", () => {
+  assert.throws(
+    () => parseBootstrapArgs(["repo", "--machine-label", "bad\nlabel"]),
+    /--machine-label must be 1-80 characters/,
+  );
 });
 
 test("--no-login requires an explicit organization selector", () => {

@@ -21,6 +21,7 @@ const VALUE_FLAGS = new Set([
   "credential-sink",
   "local-credential-file",
   "sprinkle-category",
+  "machine-label",
   "client-secret-ttl",
   "access-token-ttl",
   "target",
@@ -61,6 +62,7 @@ Options:
   --no-tofu-apply               Stop after saved plan
   --rotate-bootstrap-credentials
   --rotate-deployment-credentials
+  --machine-label <label>       Label created Universal Auth client secrets for this machine
   --credential-sink <auto|local-file|macos-keychain|sprinkleref>
   --yes                         Skip confirmation prompts
   --dry-run                     Print non-secret planned operations
@@ -94,6 +96,7 @@ export function parseBootstrapArgs(argv = getArgvTokens()): BootstrapArgs {
   setString(args, "tofuPlanFile", readFlagStrFromTokens("tofu-plan-file", "", argv));
   setString(args, "localCredentialFile", readFlagStrFromTokens("local-credential-file", "", argv));
   setString(args, "sprinkleCategory", readFlagStrFromTokens("sprinkle-category", "", argv));
+  setString(args, "machineLabel", readFlagStrFromTokens("machine-label", "", argv));
   args.orgRole = enumFlag("org-role", args.orgRole, ["no-access", "member", "admin"], argv);
   args.credentialSink = enumFlag(
     "credential-sink",
@@ -125,10 +128,18 @@ export function parseBootstrapArgs(argv = getArgvTokens()): BootstrapArgs {
   }
   if (args.noLogin && args.forceLogin)
     throw new Error("use only one of --no-login or --force-login");
+  validateMachineLabel(args.machineLabel);
   if (args.mode === "deployment" && !args.target) {
     throw new Error("infisical bootstrap deployment mode requires --target <buck-target>");
   }
   return withDeploymentBootstrapDefaults(args);
+}
+
+function validateMachineLabel(label: string | undefined) {
+  if (!label) return;
+  if (label.length > 80 || /[\r\n\t]/.test(label)) {
+    throw new Error("--machine-label must be 1-80 characters without control whitespace");
+  }
 }
 
 function modeFromArgs(argv: string[]): BootstrapArgs["mode"] | undefined {

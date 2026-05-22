@@ -53,3 +53,21 @@ export async function listClientSecrets(api: InfisicalApi, identityId: string) {
   );
   return result?.clientSecrets ?? result?.clientSecretData ?? [];
 }
+
+export function summarizeClientSecretRecords(records: unknown[]) {
+  return records.flatMap((record) => {
+    if (!record || typeof record !== "object") return [];
+    const item = record as Record<string, unknown>;
+    return [
+      {
+        id: stringField(item.id),
+        description: stringField(item.description),
+        createdAt: stringField(item.createdAt) || stringField(item.created_at),
+      },
+    ];
+  });
+}
+
+function stringField(value: unknown) {
+  return typeof value === "string" && value.trim() ? value : undefined;
+}

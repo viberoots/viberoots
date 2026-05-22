@@ -22,6 +22,7 @@ export const DEFAULT_BOOTSTRAP_ARGS: BootstrapArgs = {
   rotateBootstrapCredentials: false,
   rotateDeploymentCredentials: false,
   forceOverwriteLocalCredentials: false,
+  machineLabel: undefined,
   credentialSink: "auto",
   localCredentialFile: ".local/infisical-bootstrap-credentials.json",
   sprinkleCategory: "bootstrap",

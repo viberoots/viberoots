@@ -1,5 +1,6 @@
 import type { InfisicalApi } from "./infisical-iac-bootstrap-api";
-import { listClientSecrets } from "./infisical-iac-bootstrap-api";
+import { listClientSecrets, summarizeClientSecretRecords } from "./infisical-iac-bootstrap-api";
+import { universalAuthSecretDescription } from "./infisical-iac-machine-label";
 import type {
   BootstrapArgs,
   BootstrapCredential,
@@ -95,31 +96,44 @@ export async function ensureBootstrapCredential(opts: {
   const clientId = await readClientId(opts.api, opts.identity);
   const refs = repoBootstrapCredentialRefs(opts.identity);
   const remoteSecrets = await listClientSecrets(opts.api, opts.identity.id);
+  const remoteSecretSummaries = summarizeClientSecretRecords(remoteSecrets);
   const localSecret = await opts.sink.read(refs.clientSecretRef);
   const localClientId = await opts.sink.read(refs.clientIdRef);
-  if (remoteSecrets.length > 0 && localSecret && !opts.args.rotateBootstrapCredentials) {
+  if (localClientId && localClientId !== clientId && !opts.args.rotateBootstrapCredentials) {
+    throw new Error(bootstrapClientIdMismatchMessage(refs.clientIdRef));
+  }
+  if (localSecret && !opts.args.rotateBootstrapCredentials) {
     await preserveBootstrapClientId(opts.sink, refs.clientIdRef, localClientId, clientId);
-    return { clientId, clientSecret: localSecret };
+    return {
+      clientId,
+      clientSecret: localSecret,
+      status: "reused",
+      remoteClientSecretRecords: remoteSecrets.length,
+      remoteClientSecretRecordSummaries: remoteSecretSummaries,
+    };
   }
-  if (remoteSecrets.length > 0 && !opts.args.rotateBootstrapCredentials) {
+  if (
+    localSecret &&
+    opts.args.rotateBootstrapCredentials &&
+    !opts.args.forceOverwriteLocalCredentials
+  ) {
     throw new Error(
-      `Infisical reports an existing Universal Auth client secret record for ${opts.identity.name}, but the configured ${opts.sink.describe()} credential is missing. Import the existing value or rerun with --rotate-bootstrap-credentials.`,
-    );
-  }
-  if ((localSecret || localClientId) && !opts.args.rotateBootstrapCredentials) {
-    throw new Error(
-      `The configured ${opts.sink.describe()} credential already has a bootstrap client secret for ${opts.identity.name}, but Infisical has no matching usable remote record or rotation was requested. No new remote client secret was created. Preserve the existing value by restoring/importing the remote record, or rerun with --rotate-bootstrap-credentials --force-overwrite-local-credentials to replace it.`,
-    );
-  }
-  if (localSecret && !opts.args.forceOverwriteLocalCredentials) {
-    throw new Error(
-      `The configured ${opts.sink.describe()} credential already has a bootstrap client secret for ${opts.identity.name}, but Infisical has no matching usable remote record or rotation was requested. No new remote client secret was created. Preserve the existing value by restoring/importing the remote record, or rerun with --rotate-bootstrap-credentials --force-overwrite-local-credentials to replace it.`,
+      `The configured ${opts.sink.describe()} credential already has a bootstrap client secret for ${opts.identity.name}. Rerun with --rotate-bootstrap-credentials --force-overwrite-local-credentials to replace this machine's local credential.`,
     );
   }
   if (localClientId && localClientId !== clientId && !opts.args.forceOverwriteLocalCredentials) {
     throw new Error(bootstrapClientIdMismatchMessage(refs.clientIdRef));
   }
-  const clientSecret = await createUniversalAuthClientSecret(opts.api, opts.args, opts.identity);
+  const clientSecret = await createUniversalAuthClientSecret(
+    opts.api,
+    opts.args,
+    opts.identity,
+    universalAuthSecretDescription({
+      args: opts.args,
+      identity: opts.identity,
+      purpose: "repo-bootstrap",
+    }),
+  );
   if (localClientId !== clientId) {
     await opts.sink.write(refs.clientIdRef, clientId, opts.args.forceOverwriteLocalCredentials);
   }
@@ -128,7 +142,13 @@ export async function ensureBootstrapCredential(opts: {
     clientSecret,
     opts.args.forceOverwriteLocalCredentials,
   );
-  return { clientId, clientSecret };
+  return {
+    clientId,
+    clientSecret,
+    status: opts.args.rotateBootstrapCredentials ? "rotated" : "created",
+    remoteClientSecretRecords: remoteSecrets.length,
+    remoteClientSecretRecordSummaries: remoteSecretSummaries,
+  };
 }
 
 export function repoBootstrapCredentialRefs(identity: Pick<Identity, "name">) {

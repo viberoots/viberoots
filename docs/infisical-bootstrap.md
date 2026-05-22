@@ -41,6 +41,10 @@ continues to report only stage-specific managed workload refs under
 `secret://deployments/pleomino/<stage>/...`. If local `sprinkleref/selected.local.json` still
 points profile auth at the old Pleomino bootstrap namespace, rerun
 `build-tools/tools/deployments/infisical-bootstrap.ts repo`.
+Universal Auth client-secret records are per operator machine. Existing local credentials are reused
+by default; a fresh machine creates its own labeled client-secret record and stores it only in the
+selected local sink. Use `--machine-label <label>` when the hostname is not a useful revocation
+label in Infisical.
 Existing operator-authored Infisical profiles are preserved once their `projectId` validates in the
 selected organization.
 Bootstrap rewrites only missing profiles, profiles with `generatedBy: "viberoots-repo-bootstrap"`,
@@ -68,6 +72,18 @@ discovery.
 
 Expected local bootstrap artifacts are ignored and should not be committed: `sprinkleref/`, the
 OpenTofu `.terraform/` directory, `terraform.tfstate*`, and `.terraform.lock.hcl`.
+To intentionally return to a clean local bootstrap state without deleting Infisical cloud
+resources, run:
+
+```bash
+build-tools/tools/deployments/infisical-bootstrap-reset-local.ts --dry-run
+build-tools/tools/deployments/infisical-bootstrap-reset-local.ts
+```
+
+The reset utility prints a loud warning, requires typing `RESET`, removes only generated
+SprinkleRef/OpenTofu local state, and deletes the repo bootstrap plus Pleomino deployment Universal
+Auth entries from the `viberoots-bootstrap` macOS Keychain service. It does not delete Infisical
+projects, identities, Cloudflare secrets, or application secrets.
 
 Troubleshooting:
 
@@ -76,8 +92,8 @@ Troubleshooting:
 --dry-run` to confirm the selected sink, then rotate with `--rotate-bootstrap-credentials` or
   switch to `--credential-sink local-file` if local Keychain access is unavailable.
 - Deleted remote Universal Auth client-secret records are not recoverable from Infisical; the
-  client secret is only available when created. If the remote record was deleted or the local sink no
-  longer has the matching value, rerun repo bootstrap with the appropriate rotation flag instead of
+  client secret is only available when created. A new machine should rerun bootstrap normally. A
+  machine with stale local credentials should rerun with the appropriate rotation flag instead of
   editing reviewed deployment metadata.
 - First-bootstrap metadata handoff is expected only when reviewed values are placeholders or empty
   first-bootstrap fields. Drift against already-reviewed project ids, identity ids, environment

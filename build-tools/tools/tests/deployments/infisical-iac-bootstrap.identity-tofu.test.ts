@@ -45,17 +45,25 @@ test("bootstrap identity lookup rejects duplicate identity names", async () => {
   );
 });
 
-test("bootstrap credential preserve mode refuses unrecoverable missing local secret", async () => {
-  const api = fakeCredentialApi({ remoteSecrets: [{}] });
-  await assert.rejects(
-    () =>
-      ensureBootstrapCredential({
-        api: api as never,
-        args: DEFAULT_BOOTSTRAP_ARGS,
-        identity: { id: "id_1", name: "viberoots-iac-bootstrap" },
-        sink: new MemorySink(),
-      }),
-    /Import the existing value or rerun with --rotate-bootstrap-credentials/,
+test("bootstrap credential creates current-machine secret when local secret is missing", async () => {
+  const api = fakeCredentialApi({
+    remoteSecrets: [{ id: "secret_other", description: "teammate laptop" }],
+  });
+  const sink = new MemorySink();
+  const credential = await ensureBootstrapCredential({
+    api: api as never,
+    args: { ...DEFAULT_BOOTSTRAP_ARGS, machineLabel: "dev-laptop" },
+    identity: { id: "id_1", name: "viberoots-iac-bootstrap" },
+    sink,
+  });
+  assert.equal(credential.status, "created");
+  assert.equal(credential.remoteClientSecretRecords, 1);
+  assert.deepEqual(credential.remoteClientSecretRecordSummaries, [
+    { id: "secret_other", description: "teammate laptop", createdAt: undefined },
+  ]);
+  assert.equal(
+    api.descriptions[0],
+    "viberoots repo-bootstrap Universal Auth identity=viberoots-iac-bootstrap machine=dev-laptop",
   );
 });
 
@@ -70,6 +78,7 @@ test("bootstrap credential rotation creates and stores a new client secret", asy
   });
   assert.equal(credential.clientId, "client-id");
   assert.equal(credential.clientSecret, "new-secret");
+  assert.equal(credential.status, "rotated");
   assert.equal(
     sink.values.get("secret://viberoots/bootstrap/viberoots-iac-bootstrap/client-id"),
     "client-id",
@@ -93,6 +102,7 @@ test("bootstrap credential preserve mode reads the existing local secret", async
     sink,
   });
   assert.equal(credential.clientSecret, "old-secret");
+  assert.equal(credential.status, "reused");
 });
 
 test("OpenTofu default path runs init, saved plan, and saved-plan apply", async () => {
@@ -108,7 +118,13 @@ test("OpenTofu default path runs init, saved plan, and saved-plan apply", async 
   };
   await runOpenTofu({
     args,
-    credential: { clientId: "id", clientSecret: "secret" },
+    credential: {
+      clientId: "id",
+      clientSecret: "secret",
+      status: "reused",
+      remoteClientSecretRecords: 0,
+      remoteClientSecretRecordSummaries: [],
+    },
     reviewedMetadata,
     runner,
     confirmApply: async () => true,
@@ -139,7 +155,13 @@ test("OpenTofu host override reaches provider inputs", async () => {
       tofuPlanFile: ".local/test.tfplan",
       noTofuApply: true,
     },
-    credential: { clientId: "id", clientSecret: "secret" },
+    credential: {
+      clientId: "id",
+      clientSecret: "secret",
+      status: "reused",
+      remoteClientSecretRecords: 0,
+      remoteClientSecretRecordSummaries: [],
+    },
     reviewedMetadata,
     runner: (call) => {
       calls.push(call);
@@ -160,7 +182,13 @@ test("OpenTofu apply prompt cancellation stops before apply", async () => {
           organizationId: "org_1",
           tofuPlanFile: ".local/test.tfplan",
         },
-        credential: { clientId: "id", clientSecret: "secret" },
+        credential: {
+          clientId: "id",
+          clientSecret: "secret",
+          status: "reused",
+          remoteClientSecretRecords: 0,
+          remoteClientSecretRecordSummaries: [],
+        },
         reviewedMetadata,
         runner: (call) => {
           calls.push(call.args[0]);
@@ -188,7 +216,13 @@ test("--no-tofu-apply stops after the saved plan", async () => {
       tofuPlanFile: ".local/test.tfplan",
       noTofuApply: true,
     },
-    credential: { clientId: "id", clientSecret: "secret" },
+    credential: {
+      clientId: "id",
+      clientSecret: "secret",
+      status: "reused",
+      remoteClientSecretRecords: 0,
+      remoteClientSecretRecordSummaries: [],
+    },
     reviewedMetadata,
     runner: (call) => {
       calls.push(call.args[0]);
@@ -200,11 +234,14 @@ test("--no-tofu-apply stops after the saved plan", async () => {
 
 function fakeCredentialApi(opts: { remoteSecrets: unknown[]; clientSecret?: string }) {
   return {
-    request: async (method: string, endpoint: string) => {
+    descriptions: [] as string[],
+    request: async function (method: string, endpoint: string, body?: { description?: string }) {
       if (endpoint.endsWith("/client-secrets") && method === "GET")
         return { clientSecrets: opts.remoteSecrets };
-      if (endpoint.endsWith("/client-secrets") && method === "POST")
-        return { clientSecret: opts.clientSecret };
+      if (endpoint.endsWith("/client-secrets") && method === "POST") {
+        this.descriptions.push(body?.description || "");
+        return { clientSecret: opts.clientSecret ?? "new-secret" };
+      }
       return { identityUniversalAuth: { clientId: "client-id" } };
     },
   };

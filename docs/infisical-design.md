@@ -97,6 +97,11 @@ Repo bootstrap profile credentials are not deployment managed workload credentia
 `secret://viberoots/bootstrap/viberoots-iac-bootstrap/client-id` for Universal Auth materialization.
 Pleomino deployment bootstrap remains responsible for stage-specific workload refs such as
 `secret://deployments/pleomino/staging/infisical-client-id`.
+Infisical identities are shared repo/deployment principals, but Universal Auth client-secret records
+are local-machine credentials. Bootstrap creates a labeled client-secret record for the current
+machine when the selected local sink is missing a secret, reuses existing local credentials by
+default, and rotates only this machine's stored value when an explicit rotation flag is used. Other
+machines' remote client-secret records are left in place for manual revocation.
 
 ## Public Contract Changes
 

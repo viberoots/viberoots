@@ -94,7 +94,7 @@ test("SprinkleRef bootstrap preserve mode refuses client id overwrite even with 
   });
 });
 
-test("SprinkleRef bootstrap refuses force-alone local overwrite before remote create", async () => {
+test("SprinkleRef bootstrap reuses local credential without remote records", async () => {
   const dir = await tmp();
   await fs.writeFile(
     path.join(dir, "bootstrap.json"),
@@ -106,16 +106,13 @@ test("SprinkleRef bootstrap refuses force-alone local overwrite before remote cr
       credentialSink: "sprinkleref",
     });
     const api = bootstrapCredentialApi({ remoteSecrets: [], clientSecret: "new" });
-    await assert.rejects(
-      () =>
-        ensureBootstrapCredential({
-          api: api as never,
-          args: { ...DEFAULT_BOOTSTRAP_ARGS, forceOverwriteLocalCredentials: true },
-          identity,
-          sink,
-        }),
-      /No new remote client secret was created/,
-    );
+    const credential = await ensureBootstrapCredential({
+      api: api as never,
+      args: { ...DEFAULT_BOOTSTRAP_ARGS, forceOverwriteLocalCredentials: true },
+      identity,
+      sink,
+    });
+    assert.equal(credential.status, "reused");
     assert.equal(api.postCount, 0);
     assert.equal((await readStore(path.join(dir, "bootstrap.json")))[clientSecretRef], "old");
   });

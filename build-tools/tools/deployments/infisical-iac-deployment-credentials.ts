@@ -1,5 +1,6 @@
-import { listClientSecrets } from "./infisical-iac-bootstrap-api";
+import { listClientSecrets, summarizeClientSecretRecords } from "./infisical-iac-bootstrap-api";
 import { createUniversalAuthClientSecret, readClientId } from "./infisical-iac-bootstrap-identity";
+import { universalAuthSecretDescription } from "./infisical-iac-machine-label";
 import type { InfisicalApi } from "./infisical-iac-bootstrap-api";
 import type {
   BootstrapArgs,
@@ -30,25 +31,27 @@ async function ensureOneDeploymentCredential(
   const identity = { id: item.identityId, name: item.identityName };
   const clientId = await readClientId(opts.api, identity);
   const remoteSecrets = await listClientSecrets(opts.api, item.identityId);
+  const remoteSecretSummaries = summarizeClientSecretRecords(remoteSecrets);
   const localSecret = await opts.sink.read(item.clientSecretRef);
   const localClientId = await opts.sink.read(item.clientIdRef);
-  if (remoteSecrets.length > 0 && localSecret && !opts.args.rotateDeploymentCredentials) {
+  if (localClientId && localClientId !== clientId && !opts.args.rotateDeploymentCredentials) {
+    throw new Error(clientIdMismatchMessage(item.clientIdRef));
+  }
+  if (localSecret && !opts.args.rotateDeploymentCredentials) {
     await preserveClientId(opts.sink, item.clientIdRef, localClientId, clientId);
-    return lifecycleResult(item, "preserved");
+    return lifecycleResult(item, "reused", remoteSecrets.length, remoteSecretSummaries);
   }
-  if (remoteSecrets.length > 0 && !opts.args.rotateDeploymentCredentials) {
-    throw new Error(missingLocalSecretMessage(opts.sink.describe(), item));
-  }
-  if ((localSecret || localClientId) && !opts.args.rotateDeploymentCredentials) {
-    throw new Error(localWithoutRemoteMessage(opts.sink.describe(), item));
-  }
-  if (localSecret && !opts.args.forceOverwriteLocalCredentials) {
-    throw new Error(localWithoutRemoteMessage(opts.sink.describe(), item));
+  if (
+    localSecret &&
+    opts.args.rotateDeploymentCredentials &&
+    !opts.args.forceOverwriteLocalCredentials
+  ) {
+    throw new Error(rotationOverwriteMessage(opts.sink.describe(), item));
   }
   if (localClientId && localClientId !== clientId && !opts.args.forceOverwriteLocalCredentials) {
     throw new Error(clientIdMismatchMessage(item.clientIdRef));
   }
-  const clientSecret = await createDeploymentClientSecret(opts, identity, item.stage);
+  const clientSecret = await createDeploymentClientSecret(opts, identity, item);
   if (localClientId !== clientId) {
     await opts.sink.write(item.clientIdRef, clientId, opts.args.forceOverwriteLocalCredentials);
   }
@@ -57,7 +60,12 @@ async function ensureOneDeploymentCredential(
     clientSecret,
     opts.args.forceOverwriteLocalCredentials,
   );
-  return lifecycleResult(item, "rotated");
+  return lifecycleResult(
+    item,
+    opts.args.rotateDeploymentCredentials ? "rotated" : "created",
+    remoteSecrets.length,
+    remoteSecretSummaries,
+  );
 }
 
 async function preserveClientId(
@@ -78,19 +86,25 @@ function clientIdMismatchMessage(ref: string) {
 async function createDeploymentClientSecret(
   opts: { api: InfisicalApi; args: BootstrapArgs },
   identity: Identity,
-  stage: string,
+  item: NonNullable<DeploymentRuntimeMetadata["deploymentCredentials"]>[number],
 ) {
   return await createUniversalAuthClientSecret(
     opts.api,
     opts.args,
     identity,
-    `viberoots Pleomino ${stage} deployment`,
+    universalAuthSecretDescription({
+      args: opts.args,
+      identity,
+      purpose: `deployment ${item.stage}`,
+    }),
   );
 }
 
 function lifecycleResult(
   item: NonNullable<DeploymentRuntimeMetadata["deploymentCredentials"]>[number],
   status: DeploymentCredentialLifecycleResult["status"],
+  remoteClientSecretRecords: number,
+  remoteClientSecretRecordSummaries: DeploymentCredentialLifecycleResult["remoteClientSecretRecordSummaries"],
 ) {
   return {
     stage: item.stage,
@@ -99,19 +113,14 @@ function lifecycleResult(
     clientIdRef: item.clientIdRef,
     clientSecretRef: item.clientSecretRef,
     status,
+    remoteClientSecretRecords,
+    remoteClientSecretRecordSummaries,
   };
 }
 
-function missingLocalSecretMessage(
+function rotationOverwriteMessage(
   sinkDescription: string,
   item: NonNullable<DeploymentRuntimeMetadata["deploymentCredentials"]>[number],
 ) {
-  return `Infisical reports an existing Universal Auth client secret record for ${item.identityName}, but the configured ${sinkDescription} credential ${item.clientSecretRef} is missing. Import the existing value or rerun with --rotate-deployment-credentials.`;
-}
-
-function localWithoutRemoteMessage(
-  sinkDescription: string,
-  item: NonNullable<DeploymentRuntimeMetadata["deploymentCredentials"]>[number],
-) {
-  return `The configured ${sinkDescription} credential already has ${item.clientSecretRef}, but Infisical has no matching usable remote record or rotation was requested. No new remote client secret was created. Preserve the existing value by restoring/importing the remote record, or rerun with --rotate-deployment-credentials --force-overwrite-local-credentials to replace it.`;
+  return `The configured ${sinkDescription} credential already has ${item.clientSecretRef}. Rerun with --rotate-deployment-credentials --force-overwrite-local-credentials to replace this machine's local credential.`;
 }

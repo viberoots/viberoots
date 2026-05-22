@@ -24,6 +24,7 @@ export type BootstrapArgs = {
   rotateBootstrapCredentials: boolean;
   rotateDeploymentCredentials: boolean;
   forceOverwriteLocalCredentials: boolean;
+  machineLabel?: string;
   credentialSink: "auto" | "local-file" | "macos-keychain" | "sprinkleref";
   localCredentialFile: string;
   sprinkleCategory: string;
@@ -44,6 +45,9 @@ export type Identity = {
 export type BootstrapCredential = {
   clientId: string;
   clientSecret: string;
+  status: "reused" | "created" | "rotated";
+  remoteClientSecretRecords: number;
+  remoteClientSecretRecordSummaries: ClientSecretRecordSummary[];
 };
 
 export type CommandRunner = (opts: {
@@ -59,6 +63,12 @@ export type CredentialSink = {
   read(ref: string): Promise<string | undefined>;
   write(ref: string, value: string, overwrite: boolean): Promise<void>;
   describe(): string;
+};
+
+export type ClientSecretRecordSummary = {
+  id?: string;
+  description?: string;
+  createdAt?: string;
 };
 
 export type DeploymentCredentialRef = {
@@ -88,7 +98,9 @@ export type DeploymentCredentialLifecycleResult = {
   identityName: string;
   clientIdRef: string;
   clientSecretRef: string;
-  status: "preserved" | "rotated";
+  status: "reused" | "created" | "rotated";
+  remoteClientSecretRecords: number;
+  remoteClientSecretRecordSummaries: ClientSecretRecordSummary[];
 };
 
 export type TofuDeploymentRuntimeStage = {

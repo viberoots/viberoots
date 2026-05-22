@@ -7,6 +7,7 @@ import { materializeRepoBackendProfiles } from "./infisical-iac-bootstrap-profil
 import { ensureRepoBootstrapCredential } from "./infisical-iac-bootstrap-repo-credential";
 import { resolveCredentialSinkSelection } from "./infisical-iac-bootstrap-sink";
 import { materializeBootstrapCredentialSink } from "./infisical-iac-bootstrap-sink-materialize";
+import { repoBootstrapCredentialRefs } from "./infisical-iac-bootstrap-identity";
 import { readSprinkleRefConfig } from "./sprinkleref-config";
 import { runSprinkleRefCheck } from "./sprinkleref-check";
 import type { BootstrapArgs, Identity } from "./infisical-iac-bootstrap-types";
@@ -42,7 +43,7 @@ export async function runRepoBootstrap(
   });
   console.log(
     JSON.stringify(
-      repoReport(args, resolver, sink, materialization, credentialSinkMaterialization),
+      repoReport(args, resolver, sink, materialization, credentialSinkMaterialization, credential),
       null,
       2,
     ),
@@ -61,7 +62,9 @@ function repoReport(
   sink: Awaited<ReturnType<typeof resolveCredentialSinkSelection>>,
   profileMaterialization: unknown,
   credentialSinkMaterialization: unknown,
+  credential?: SharedInfisicalSession,
 ) {
+  const refs = credential?.identity && repoBootstrapCredentialRefs(credential.identity);
   return {
     schemaVersion: "infisical-repo-bootstrap-result@1",
     mode: "repo",
@@ -76,6 +79,18 @@ function repoReport(
     })),
     credentialSink: sink.kind,
     credentialSinkBackend: sink.backend,
+    bootstrapCredentialLifecycle:
+      credential?.bootstrapCredential && refs
+        ? {
+            identityName: credential.identity.name,
+            clientIdRef: refs.clientIdRef,
+            clientSecretRef: refs.clientSecretRef,
+            status: credential.bootstrapCredential.status,
+            remoteClientSecretRecords: credential.bootstrapCredential.remoteClientSecretRecords,
+            remoteClientSecretRecordSummaries:
+              credential.bootstrapCredential.remoteClientSecretRecordSummaries,
+          }
+        : undefined,
     profileMaterialization,
     credentialSinkMaterialization,
     deploymentFanOut: { skipped: args.withoutDeployments, optOutFlag: "--without-deployments" },

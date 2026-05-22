@@ -27,21 +27,18 @@ test("local sink preserves existing bootstrap credential when remote record exis
   assert.equal((await readStore(file))[clientIdRef], "client-id");
 });
 
-test("local sink refuses missing local bootstrap credential when remote record exists", async () => {
+test("local sink creates current-machine credential when local secret is missing", async () => {
   const file = await credentialFile({});
   const api = countingCredentialApi({ remoteSecrets: [{}], clientSecret: "new-secret" });
-  await assert.rejects(
-    () =>
-      ensureBootstrapCredential({
-        api: api as never,
-        args: DEFAULT_BOOTSTRAP_ARGS,
-        identity,
-        sink: new LocalFileCredentialSink(file),
-      }),
-    /Import the existing value or rerun with --rotate-bootstrap-credentials/,
-  );
-  assert.equal(api.postCount, 0);
-  assert.deepEqual(await readStore(file), {});
+  const credential = await ensureBootstrapCredential({
+    api: api as never,
+    args: DEFAULT_BOOTSTRAP_ARGS,
+    identity,
+    sink: new LocalFileCredentialSink(file),
+  });
+  assert.equal(credential.status, "created");
+  assert.equal(api.postCount, 1);
+  assert.equal((await readStore(file))[ref], "new-secret");
 });
 
 test("local sink explicit rotation overwrites only when force overwrite is set", async () => {
@@ -63,19 +60,16 @@ test("local sink explicit rotation overwrites only when force overwrite is set",
   assert.equal((await readStore(file))[ref], "new-secret");
 });
 
-test("bootstrap credential preserve mode refuses local overwrite before remote create", async () => {
+test("bootstrap credential preserve mode reuses local value without remote record", async () => {
   const file = await credentialFile({ [ref]: "old-secret" });
   const api = countingCredentialApi({ remoteSecrets: [], clientSecret: "new-secret" });
-  await assert.rejects(
-    () =>
-      ensureBootstrapCredential({
-        api: api as never,
-        args: DEFAULT_BOOTSTRAP_ARGS,
-        identity,
-        sink: new LocalFileCredentialSink(file),
-      }),
-    /No new remote client secret was created/,
-  );
+  const credential = await ensureBootstrapCredential({
+    api: api as never,
+    args: DEFAULT_BOOTSTRAP_ARGS,
+    identity,
+    sink: new LocalFileCredentialSink(file),
+  });
+  assert.equal(credential.status, "reused");
   assert.equal(api.postCount, 0);
   assert.equal((await readStore(file))[ref], "old-secret");
 });

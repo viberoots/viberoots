@@ -4370,3 +4370,151 @@ fan-out ordering.
 Fan-out can fail in a new hard-stop state if future targets produce equivalent but differently
 ordered patch payloads. That is acceptable until a deterministic merge format is deliberately
 designed.
+
+## PR-44: Per-machine Universal Auth credential bootstrap
+
+### 1. Intent
+
+Replace the current shared-local-secret Universal Auth bootstrap model with a durable per-machine
+local credential model. Infisical identities remain shared deployment or repo identities, but each
+operator machine should get its own labeled client-secret record and store only that machine's
+secret in its local credential sink. A fresh machine should be able to run the top-level setup flow
+and become usable without manually importing another user's secret, without rotating shared
+credentials out from under other machines, and without treating existing remote client-secret
+records as a conflict.
+
+### 2. Scope of changes
+
+- Change repo and deployment bootstrap credential creation so an existing remote Universal Auth
+  client-secret record no longer blocks setup when the current machine has no local secret.
+- Create a new Infisical Universal Auth client-secret record for the current machine when local
+  credentials are missing and the operator confirms or passes the required non-interactive flag.
+- Label created client-secret records with deterministic, human-readable local context such as
+  repo, identity name, credential purpose, operator-supplied machine label, system hostname, and
+  creation timestamp where appropriate.
+- Add a `--machine-label` or equivalent option for operators who want a stable explicit label
+  instead of relying only on hostname-derived descriptions.
+- Store the resulting client id and client secret under the existing stable local SprinkleRef refs
+  for that machine's selected sink. Do not commit machine-specific refs or generated local
+  credential files.
+- Preserve existing local credentials by default. If a valid local secret exists, bootstrap should
+  validate enough remote identity state to proceed without creating a replacement secret.
+- Replace the current remote-record/local-secret mismatch failure with a per-machine branch:
+  create a new local machine secret when local credentials are absent, and reserve hard failures for
+  ambiguous local state, failed creation, missing identity/client id evidence, or explicit drift.
+- Keep rotation explicit. `--rotate-bootstrap-credentials` and `--rotate-deployment-credentials`
+  should rotate the current machine's local credential by creating a new remote client-secret record
+  and overwriting the local sink only after the existing overwrite/confirmation gate passes.
+- Remove the old shared-secret import-oriented public behavior and messages. Backwards
+  compatibility is not required because there are no external users yet.
+- Update the top-level repo bootstrap and any future `i`-invoked secret readiness path so it can
+  ensure required repo and deployment Universal Auth credentials idempotently for the current
+  machine without changing values that already exist for other machines.
+- Keep the reviewed metadata handoff model from PR-40 through PR-43 unchanged. Per-machine client
+  secrets must not change reviewed Infisical project ids, machine identity ids, credential file
+  names, stable secret refs, or deployment family layout.
+- Add clear reporting that distinguishes reused local credentials, newly created current-machine
+  credentials, rotated current-machine credentials, and remote records that belong to other
+  machines.
+- If the Infisical API exposes client-secret record ids or descriptions, surface enough information
+  to help operators revoke stale machine credentials manually without printing secret values.
+
+### 3. External prerequisites
+
+- Live smoke testing requires an Infisical organization and operator login, but automated tests must
+  not require live Infisical, macOS Keychain, OpenTofu network access, Vault, Cloudflare, browser
+  automation, or real host-specific state.
+- Tests may use fixture host labels, fake clocks, temp local sinks, and mocked Infisical Universal
+  Auth client-secret APIs.
+
+### 4. Tests to be added
+
+- Add unit tests proving a missing local secret with existing remote client-secret records creates a
+  new current-machine client secret instead of failing with an import/rotate error.
+- Add tests proving an existing local secret is preserved by default and no new remote
+  client-secret record is created.
+- Add tests proving current-machine rotation creates a replacement remote client-secret record and
+  overwrites only the current local sink after the explicit rotation/overwrite gate.
+- Add CLI tests for the machine label option, interactive confirmation, non-interactive required
+  flags, and failure messages when the label is invalid or required identity evidence is missing.
+- Add tests proving repo bootstrap fan-out reuses a single authenticated operator session where the
+  implementation supports it while still creating separate per-machine Universal Auth client
+  secrets for repo bootstrap and deployment identities.
+- Add idempotency tests proving repeated top-level setup, including any `i`-invoked secret
+  readiness path, leaves existing current-machine credentials unchanged and does not affect other
+  mocked machine records.
+- Keep existing first-bootstrap metadata handoff, constant-scoped patch, incomplete-output,
+  fan-out consistency, SprinkleRef check, and docs regression tests passing.
+
+### 5. Docs to be added or updated
+
+- Update `docs/infisical-design.md` to describe the final credential model: shared Infisical
+  identities, per-machine Universal Auth client-secret records, and local-only storage of the
+  current machine's secret.
+- Update `docs/infisical-bootstrap.md` and `infisical-bootstrap.md` so fresh-start guidance no
+  longer tells operators to import another user's shared secret when remote records already exist.
+- Document how a second user or a second machine should run the top-level setup flow, what gets
+  created remotely, what is stored locally, and why other machines are not affected.
+- Document rotation and revocation semantics for current-machine credentials, including when to use
+  `--machine-label`, when to rotate, and how to clean up stale remote client-secret records in the
+  Infisical UI or API if supported.
+- Update troubleshooting for deleted local credentials, deleted remote client-secret records,
+  hostname changes, and reruns after a local reset.
+
+### 5.5. Expected regression scope
+
+- `deployment-only`
+- Keep changes focused on Universal Auth credential lifecycle, repo/deployment bootstrap
+  orchestration, top-level setup idempotency, reporting, and docs. Do not change public backend
+  selector syntax, reviewed metadata handoff patching, Pleomino project/resource definitions,
+  Cloudflare secret requirements, Vault behavior, or stable secret ref names except where needed to
+  remove the obsolete shared-secret mismatch public behavior.
+
+### 6. Acceptance criteria
+
+- A fresh machine can run the top-level Infisical setup flow when remote client-secret records
+  already exist and receive its own local Universal Auth credentials without manual secret import.
+- Existing local credentials are preserved by default and repeated setup is idempotent for the
+  current machine.
+- Rotation affects only the current machine's local credential and creates a clearly labeled new
+  remote client-secret record.
+- Existing remote client-secret records for other machines are reported as context, not treated as
+  conflicts.
+- Old shared-secret import-oriented errors and public guidance are removed or replaced with the
+  per-machine setup model.
+- Focused repo/deployment bootstrap credential lifecycle tests pass.
+- The repository validation suite passes.
+
+### 7. Risks
+
+- Creating a new client-secret record for every fresh machine can leave stale records in Infisical
+  if operators frequently reset local state or change machine labels.
+- Hostname-derived labels may be unstable across machine renames or CI environments.
+- If Infisical does not expose enough metadata for existing client-secret records, revocation
+  guidance may remain partly manual.
+- Reusing one operator login across repo and deployment fan-out can couple phases if session
+  isolation is handled carelessly.
+
+### 8. Mitigations
+
+- Require explicit current-machine rotation for overwrites and print concise summaries of created
+  client-secret labels.
+- Support an explicit `--machine-label` so operators can choose stable labels independent of
+  hostname.
+- Keep secret values local-only and never print or commit generated secret material.
+- Keep session reuse behind a narrow authenticated-client abstraction with tests proving one login
+  can serve the full top-level flow without leaking local credential values between identities.
+- Document stale-record cleanup as an operator task until an audited revocation command is designed.
+
+### 9. Consequences of not implementing this PR
+
+Every additional machine or user will keep hitting a confusing remote-record/local-secret mismatch:
+the remote Infisical identity has a client-secret record, but the local machine cannot recover the
+secret value and is told to import or rotate shared credentials. That makes the first-run path feel
+fragile and encourages manual sharing of long-lived secrets.
+
+### 10. Downsides for implementing this PR
+
+The bootstrap credential lifecycle becomes more explicit and may create more remote client-secret
+records over time. Operators will need clear cleanup guidance for stale machine credentials, and
+the implementation must avoid presenting per-machine records as reviewed deployment metadata.

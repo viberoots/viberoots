@@ -83,7 +83,13 @@ function fixtureSession(): SharedInfisicalSession {
     organizationId: "org_fixture",
     identity: { id: "identity_fixture", name: "viberoots-iac-bootstrap" },
     api: { request: fixtureRequest } as SharedInfisicalSession["api"],
-    bootstrapCredential: { clientId: "client_fixture", clientSecret: "secret_fixture" },
+    bootstrapCredential: {
+      clientId: "client_fixture",
+      clientSecret: "secret_fixture",
+      status: "reused",
+      remoteClientSecretRecords: 0,
+      remoteClientSecretRecordSummaries: [],
+    },
   };
 }
 

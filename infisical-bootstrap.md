@@ -61,6 +61,18 @@ Generated local bootstrap artifacts stay local: `sprinkleref/`, `.terraform/`,
 `terraform.tfstate*`, and the OpenTofu `.terraform.lock.hcl` are ignored for this repo. Do not
 commit local resolver config, OpenTofu state, or credential material.
 
+To intentionally reset only local bootstrap state before starting fresh, use:
+
+```bash
+build-tools/tools/deployments/infisical-bootstrap-reset-local.ts --dry-run
+build-tools/tools/deployments/infisical-bootstrap-reset-local.ts
+```
+
+The reset utility prints the generated paths and Keychain accounts it will remove, then requires
+typing `RESET` unless `--yes` is passed. It removes only generated SprinkleRef/OpenTofu local state
+and the `viberoots-bootstrap` macOS Keychain bootstrap/deployment Universal Auth entries. It does
+not delete Infisical projects, identities, Cloudflare secrets, or application secrets.
+
 `deployment --target <buck-target>` is the explicit deployment provisioning layer. The existing
 Pleomino Infisical OpenTofu project/environment/identity reconciliation and deployment Universal
 Auth credential lifecycle live behind this mode.
@@ -100,6 +112,7 @@ Key flags:
 --rotate-bootstrap-credentials
 --rotate-deployment-credentials
 --force-overwrite-local-credentials
+--machine-label <label>
 --local-credential-file <path>
 --sprinkle-category <category>
 --credential-sink <auto|sprinkleref|macos-keychain|local-file>
@@ -172,13 +185,17 @@ It must:
 Default credential policy:
 
 - Preserve existing credentials by default.
-- If the remote Universal Auth client secret record exists and the selected SprinkleRef/local sink has a credential, do nothing.
-- If the remote record exists but the local/resolver credential is missing, preserve the remote record and warn that Infisical only reveals client secrets at creation time.
-- To repair that state, the user must either import the existing value into the configured sink or rerun with an explicit rotate flag.
+- Universal Auth identities are shared, but client-secret records are per operator machine.
+- If the selected SprinkleRef/local sink already has this machine's credential, do nothing.
+- If local credentials are missing, create a new labeled client-secret record for this machine and
+  store it only in the selected local sink, even when other remote client-secret records already
+  exist for the same identity.
+- `--machine-label <label>` overrides the hostname-derived label used in newly created
+  client-secret record descriptions.
 
 Rotation:
 
-- `--rotate-bootstrap-credentials` creates a new remote client secret and writes it to the selected sink.
+- `--rotate-bootstrap-credentials` creates a new remote client secret for this machine and writes it to the selected sink.
 - `--force-overwrite-local-credentials` controls local/sink overwrite when a new value is written.
 - Old remote client secret records are not revoked or deleted by default unless a separate safe revocation flow is implemented.
 
@@ -189,10 +206,12 @@ Troubleshooting:
   with `build-tools/tools/deployments/infisical-bootstrap.ts repo --dry-run`, then rerun with
   `--rotate-bootstrap-credentials` or use `--credential-sink local-file` on machines where Keychain
   access is not available.
+- New machines: rerun repo bootstrap normally. The command creates a new per-machine Universal Auth
+  client-secret record when local credentials are absent; users do not import another machine's
+  secret.
 - Deleted remote Universal Auth records: Infisical cannot reveal an existing client secret after
-  creation, and a deleted remote secret record cannot be repaired by editing local resolver config.
-  Rerun repo bootstrap with the relevant rotation flag so a new remote record and local sink value
-  are created together.
+  creation. If this machine's local credential no longer authenticates, rerun repo bootstrap with
+  the relevant rotation flag so a new remote record and local sink value are created together.
 - First-bootstrap metadata handoff: apply the generated `family.bzl` patch only when the mismatch is
   limited to first-bootstrap placeholders or empty reviewed fields. If the command reports drift
   against reviewed non-placeholder metadata, stop and inspect the live Infisical project before
@@ -249,13 +268,16 @@ Default behavior:
 
 - Read OpenTofu outputs for deployment identity IDs and expected credential names/refs.
 - Reconcile those non-secret outputs against checked-in reviewed metadata.
-- Preserve remote deployment client-secret records when the selected sink already has the matching local/resolver credential.
-- Stop with secure remediation when Infisical has an existing remote client-secret record but the local/resolver secret value is missing, because Infisical only reveals client-secret values at creation time.
-- Stop before creating a new remote client secret when a local/resolver secret exists but no usable remote record is visible.
+- Reuse this machine's local/resolver deployment credential when the selected sink already has it.
+- Create a new labeled per-machine deployment client-secret record when the local/resolver value is
+  missing, even when other remote records exist for the same deployment identity.
+- Stop before overwriting this machine's existing local/resolver secret unless explicit rotation and
+  local overwrite are both requested.
 
 Rotation:
 
-- `--rotate-deployment-credentials` creates new remote deployment Universal Auth client secrets and writes the new values to the selected sink.
+- `--rotate-deployment-credentials` creates new remote deployment Universal Auth client secrets for
+  this machine and writes the new values to the selected sink.
 - `--force-overwrite-local-credentials` is required before replacing existing selected-sink credential values.
 - Old remote client-secret records are preserved unless a separate reviewed revocation flow is added.
 

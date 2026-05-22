@@ -42,14 +42,16 @@ test("deployment credentials preserve existing remote and bootstrap category val
   const sink = deploymentSink({
     "secret://deployments/pleomino/staging/infisical-client-secret": "existing-secret",
   });
-  const api = fakeDeploymentCredentialApi({ remoteSecrets: { staging: [{}] } });
+  const api = fakeDeploymentCredentialApi({
+    remoteSecrets: { staging: [{ id: "secret_other", description: "teammate laptop" }] },
+  });
   const result = await ensureDeploymentCredentials({
     api: api as never,
     args: DEFAULT_BOOTSTRAP_ARGS,
     sink,
     metadata: oneStageMetadata("staging"),
   });
-  assert.equal(result[0]?.status, "preserved");
+  assert.equal(result[0]?.status, "reused");
   assert.equal(api.postCount, 0);
   assert.equal(
     sink.values.get("secret://deployments/pleomino/staging/infisical-client-id"),
@@ -57,19 +59,26 @@ test("deployment credentials preserve existing remote and bootstrap category val
   );
 });
 
-test("deployment credentials warn securely when remote exists but local value is missing", async () => {
-  const api = fakeDeploymentCredentialApi({ remoteSecrets: { staging: [{}] } });
-  await assert.rejects(
-    () =>
-      ensureDeploymentCredentials({
-        api: api as never,
-        args: DEFAULT_BOOTSTRAP_ARGS,
-        sink: new MemorySink(),
-        metadata: oneStageMetadata("staging"),
-      }),
-    /existing Universal Auth client secret record[\s\S]*Import the existing value[\s\S]*rotate-deployment-credentials/,
+test("deployment credentials create current-machine secret when local value is missing", async () => {
+  const api = fakeDeploymentCredentialApi({
+    remoteSecrets: { staging: [{ id: "secret_other", description: "teammate laptop" }] },
+  });
+  const result = await ensureDeploymentCredentials({
+    api: api as never,
+    args: { ...DEFAULT_BOOTSTRAP_ARGS, machineLabel: "dev-laptop" },
+    sink: new MemorySink(),
+    metadata: oneStageMetadata("staging"),
+  });
+  assert.equal(result[0]?.status, "created");
+  assert.equal(result[0]?.remoteClientSecretRecords, 1);
+  assert.deepEqual(result[0]?.remoteClientSecretRecordSummaries, [
+    { id: "secret_other", description: "teammate laptop", createdAt: undefined },
+  ]);
+  assert.equal(api.postCount, 1);
+  assert.equal(
+    api.descriptions[0],
+    "viberoots deployment staging Universal Auth identity=pleomino-staging-deploy machine=dev-laptop",
   );
-  assert.equal(api.postCount, 0);
 });
 
 test("deployment credential preserve mode refuses client id overwrite even with force", async () => {
@@ -136,8 +145,8 @@ test("deployment credentials write staging and prod serially into one sink", asy
   assert.deepEqual(
     result.map((item) => [item.stage, item.status]),
     [
-      ["staging", "rotated"],
-      ["prod", "rotated"],
+      ["staging", "created"],
+      ["prod", "created"],
     ],
   );
   assert.equal(
@@ -158,39 +167,33 @@ test("deployment credentials write staging and prod serially into one sink", asy
   );
 });
 
-test("deployment credentials refuse local overwrite before remote create", async () => {
+test("deployment credentials reuse local secret without remote records", async () => {
   const sink = deploymentSink({
     "secret://deployments/pleomino/staging/infisical-client-secret": "existing-secret",
   });
   const api = fakeDeploymentCredentialApi({ remoteSecrets: { staging: [] } });
-  await assert.rejects(
-    () =>
-      ensureDeploymentCredentials({
-        api: api as never,
-        args: DEFAULT_BOOTSTRAP_ARGS,
-        sink,
-        metadata: oneStageMetadata("staging"),
-      }),
-    /No new remote client secret was created/,
-  );
+  const result = await ensureDeploymentCredentials({
+    api: api as never,
+    args: DEFAULT_BOOTSTRAP_ARGS,
+    sink,
+    metadata: oneStageMetadata("staging"),
+  });
+  assert.equal(result[0]?.status, "reused");
   assert.equal(api.postCount, 0);
 });
 
-test("deployment credentials refuse force-alone local overwrite before remote create", async () => {
+test("deployment credentials reuse local secret when force is set without rotation", async () => {
   const sink = deploymentSink({
     "secret://deployments/pleomino/staging/infisical-client-secret": "existing-secret",
   });
   const api = fakeDeploymentCredentialApi({ remoteSecrets: { staging: [] } });
-  await assert.rejects(
-    () =>
-      ensureDeploymentCredentials({
-        api: api as never,
-        args: { ...DEFAULT_BOOTSTRAP_ARGS, forceOverwriteLocalCredentials: true },
-        sink,
-        metadata: oneStageMetadata("staging"),
-      }),
-    /No new remote client secret was created/,
-  );
+  const result = await ensureDeploymentCredentials({
+    api: api as never,
+    args: { ...DEFAULT_BOOTSTRAP_ARGS, forceOverwriteLocalCredentials: true },
+    sink,
+    metadata: oneStageMetadata("staging"),
+  });
+  assert.equal(result[0]?.status, "reused");
   assert.equal(api.postCount, 0);
   assert.equal(
     sink.values.get("secret://deployments/pleomino/staging/infisical-client-secret"),
@@ -222,7 +225,8 @@ function fakeDeploymentCredentialApi(opts: {
   );
   return {
     postCount: 0,
-    request(method: string, endpoint: string) {
+    descriptions: [] as string[],
+    request(method: string, endpoint: string, body?: { description?: string }) {
       const stage =
         [...stageByIdentityId.entries()].find(([identityId]) =>
           endpoint.includes(identityId),
@@ -231,6 +235,7 @@ function fakeDeploymentCredentialApi(opts: {
         return { clientSecrets: opts.remoteSecrets[stage] ?? [] };
       if (endpoint.endsWith("/client-secrets") && method === "POST") {
         this.postCount += 1;
+        this.descriptions.push(body?.description || "");
         return { clientSecret: opts.createdSecret ?? `new-secret-${stage}` };
       }
       return { identityUniversalAuth: { clientId: `client-id-${stage}` } };
