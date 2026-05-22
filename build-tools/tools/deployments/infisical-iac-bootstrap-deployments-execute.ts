@@ -1,4 +1,5 @@
 import { errorMessage } from "./infisical-iac-bootstrap-redaction";
+import { requireConsistentMetadataHandoffs } from "./infisical-iac-bootstrap-handoff-consistency";
 import type { BootstrapArgs } from "./infisical-iac-bootstrap-types";
 import type { MetadataHandoffPatch } from "./infisical-iac-bootstrap-metadata-handoff";
 import type {
@@ -70,10 +71,11 @@ function reportHandoffs(
   stderr: (text: string) => void,
 ) {
   if (handoffs.length === 0) return;
+  const patch = requireConsistentMetadataHandoffs(handoffs)!;
   stderr(
     `First-bootstrap metadata handoff required for: ${handoffs.map((i) => i.target).join(", ")}`,
   );
-  stderr(handoffs[0].patch.unifiedDiff);
+  stderr(patch.unifiedDiff);
 }
 
 function fanOutFailure(failures: Array<{ target: string; message: string }>) {

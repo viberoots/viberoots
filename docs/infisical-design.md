@@ -284,6 +284,9 @@ metadata is hard drift and must fail closed. The handoff also requires complete 
 output for every reviewed field being patched: project id, site URL when changed, each required
 stage identity id, and each required stage credential file name. Missing live output is an
 incomplete bootstrap result, not a reviewed metadata handoff.
+Repo-level deployment fan-out may collapse first-bootstrap handoff summaries only after every
+handoff target produces an identical patch payload. Divergent target patches are a hard stop: the
+repo flow must name the affected targets and must not apply any metadata patch.
 
 ### Infisical Runtime Metadata
 

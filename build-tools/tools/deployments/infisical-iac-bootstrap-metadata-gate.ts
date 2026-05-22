@@ -1,4 +1,5 @@
 import { applyMetadataHandoffPatch } from "./infisical-iac-bootstrap-metadata-handoff";
+import { requireConsistentMetadataHandoffs } from "./infisical-iac-bootstrap-handoff-consistency";
 import { askConfirmation, isAffirmativeConfirmation } from "./infisical-iac-bootstrap-preflight";
 import type { BootstrapArgs } from "./infisical-iac-bootstrap-types";
 import type { DeploymentBootstrapFanOutResult } from "./infisical-iac-bootstrap-deployments";
@@ -7,7 +8,7 @@ export async function applyFanOutMetadataHandoff(
   args: BootstrapArgs,
   fanOut: DeploymentBootstrapFanOutResult,
 ) {
-  const patch = fanOut.metadataHandoffs[0]?.patch;
+  const patch = requireConsistentMetadataHandoffs(fanOut.metadataHandoffs);
   if (!patch) return { status: "not_required" as const };
   if (!args.applyMetadataPatch) await requireInteractiveApproval(patch.unifiedDiff);
   await applyMetadataHandoffPatch(patch);

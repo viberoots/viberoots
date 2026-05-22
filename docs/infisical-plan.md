@@ -4278,3 +4278,95 @@ though the generated patch is incomplete and cannot make reconciliation pass on 
 
 Operators may see a hard failure earlier in the bootstrap flow if provider outputs are incomplete,
 but that is preferable to accepting an incomplete reviewed metadata patch.
+
+## PR-43: Fan-out metadata handoff patch consistency
+
+### 1. Intent
+
+Close the post-PR-42 assessment gap where repo bootstrap deployment fan-out can collect multiple
+metadata handoff patches but report and apply only the first one. Fan-out may collapse duplicate
+handoff messages into one actionable summary only after proving every handoff target produced the
+same reviewed metadata patch, or after deterministically merging compatible patches without
+weakening the reviewed metadata boundary.
+
+### 2. Scope of changes
+
+- Add a fan-out handoff patch consistency check before reporting or applying a repo-level metadata
+  patch.
+- For the current Pleomino fan-out, require every metadata handoff target to produce an identical
+  patch payload before collapsing the handoff into one summary.
+- Fail closed with a clear error naming the divergent targets if fan-out handoff patches differ.
+- Do not apply any metadata patch when divergent handoff patches are detected.
+- Keep duplicate handoff messages collapsed when all patches are identical.
+- Preserve PR-40 through PR-42 behavior for single-target handoff, identical multi-target handoff,
+  metadata patch gating, repo-flow resume, final SprinkleRef checks, constant-scoped patching, and
+  missing-live-output failures.
+
+### 3. External prerequisites
+
+- None. This is hermetic fan-out aggregation and test work only.
+- No live Infisical, OpenTofu network access, macOS Keychain, Vault, Cloudflare, or browser
+  automation should be required.
+
+### 4. Tests to be added
+
+- Add fan-out aggregation tests proving identical handoff patches from multiple targets are
+  collapsed into one actionable metadata handoff summary.
+- Add tests proving divergent handoff patches from different targets fail closed and name the
+  affected targets.
+- Add tests proving the metadata gate does not apply a patch when fan-out handoff patches diverge.
+- Keep repo-flow resume and metadata handoff tests passing for the current identical Pleomino
+  fan-out.
+
+### 5. Docs to be added or updated
+
+- Update `docs/infisical-design.md` to state that repo fan-out collapses first-bootstrap handoff
+  summaries only when the target patches are identical.
+- Update `docs/infisical-bootstrap.md` or `infisical-bootstrap.md` troubleshooting to describe a
+  divergent fan-out handoff as a hard stop requiring operator review.
+
+### 5.5. Expected regression scope
+
+- `deployment-only`
+- Keep changes limited to fan-out handoff aggregation/reporting, metadata gate input validation,
+  targeted tests, and small docs clarification. Do not change OpenTofu resource definitions,
+  constant-scoped patch application, incomplete-live-output validation, public bootstrap flags, or
+  secret ref naming.
+
+### 6. Acceptance criteria
+
+- Repo fan-out applies or reports a metadata handoff patch only when all handoff targets agree on
+  the patch payload.
+- Divergent handoff patches fail closed before metadata patch application and identify the affected
+  targets.
+- Identical multi-target handoffs continue to collapse into one actionable summary.
+- Current Pleomino repo-flow handoff/resume behavior remains unchanged.
+- Focused fan-out handoff and repo-flow tests pass.
+- The repository validation suite passes.
+
+### 7. Risks
+
+- Strict equality could reject harmless formatting or ordering differences in independently
+  generated but semantically equivalent patches.
+- A merge-based approach could accidentally hide real disagreement if it is too permissive.
+
+### 8. Mitigations
+
+- Compare deterministic patch payloads after PR-41 constant-scoped patch generation, not raw console
+  text.
+- Prefer fail-closed identical-patch equality for the current Pleomino fan-out; add a future merge
+  design only if multiple independent deployment families need compatible partial patches.
+- Include target labels in divergence errors so operators can inspect the conflicting OpenTofu
+  outputs.
+
+### 9. Consequences of not implementing this PR
+
+Repo bootstrap can silently apply the first metadata handoff patch when different deployment targets
+reported conflicting reviewed metadata patches, leaving the reviewed metadata boundary dependent on
+fan-out ordering.
+
+### 10. Downsides for implementing this PR
+
+Fan-out can fail in a new hard-stop state if future targets produce equivalent but differently
+ordered patch payloads. That is acceptable until a deterministic merge format is deliberately
+designed.

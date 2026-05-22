@@ -85,6 +85,9 @@ Troubleshooting:
 - Incomplete OpenTofu output is not a handoff. Missing live project ids, stage identity ids, or
   generated credential file names must be fixed by rerunning or repairing the deployment bootstrap
   output path before applying any reviewed metadata patch.
+- Divergent fan-out handoff patches are a hard stop. If repo bootstrap reports that deployment
+  targets disagree on the metadata patch, inspect the named OpenTofu outputs and do not apply a
+  repo-level metadata patch until every target produces the same reviewed patch.
 - The generated first-bootstrap patch is applied by reviewed constant and stage key. Duplicate
   placeholder or live-looking values in comments, Vault metadata, stable refs, or unrelated
   constants are intentionally ignored.
