@@ -72,7 +72,7 @@ test("extractKubernetesDeployments reads shared-platform provider target and rol
       protection_class: "production_facing",
       lane_policy: "//projects/deployments/pleomino/shared:lane",
       environment_stage: "prod",
-      admission_policy: "//projects/deployments/platform-shared:prod_release",
+      admission_policy: "//projects/deployments/pleomino/shared:prod_release",
       secret_requirements: [],
       runtime_config_requirements: [],
       rollout_policy: {
@@ -117,7 +117,7 @@ test("extractKubernetesDeployments accepts first-class web service posture", () 
       protection_class: "production_facing",
       lane_policy: "//projects/deployments/pleomino/shared:lane",
       environment_stage: "prod",
-      admission_policy: "//projects/deployments/platform-shared:prod_release",
+      admission_policy: "//projects/deployments/pleomino/shared:prod_release",
       secret_requirements: [],
       runtime_config_requirements: [],
       provider_target: {
@@ -146,7 +146,7 @@ test("extractKubernetesDeployments rejects worker public ingress and web without
     protection_class: "production_facing",
     lane_policy: "//projects/deployments/pleomino/shared:lane",
     environment_stage: "prod",
-    admission_policy: "//projects/deployments/platform-shared:prod_release",
+    admission_policy: "//projects/deployments/pleomino/shared:prod_release",
     secret_requirements: [],
     runtime_config_requirements: [],
   };

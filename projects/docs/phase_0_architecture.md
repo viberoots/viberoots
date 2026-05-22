@@ -2151,18 +2151,20 @@ projects/
     data-room-test-fixtures/  # Admin / Investor A / Investor B demo seed data,
                               #   tenant-leak fixtures, demo recipe data
 
-  deployments/                # First-class deployment metadata; one directory per
-                              #   (component × environment) pair plus shared/foundation
-    platform-shared/          # Shared lane policy, source-ref policies, governance, admission
-    platform-foundation-{dev,staging,prod}/
+  deployments/                # First-class deployment metadata; canonical directory
+                              #   per approved family, with stage packages added only
+                              #   when that family becomes live inventory
+    <approved-family>/
+      shared/                 # Shared lane policy, source-ref policies, governance, admission
+      foundation/{dev,staging,prod}/
                               # Shared environment infrastructure: DNS, Supabase project,
                               #   buckets, secret path scaffolding, OpenTofu state.
                               #   Provisioner-only deployments (no app artifact).
-    data-room-console-{dev,staging,prod}/
+      console/{dev,staging,prod}/
                               # Vercel publisher + opentofu-stack provisioner
-    data-room-web-{dev,staging,prod}/
+      web/{dev,staging,prod}/
                               # Container runtime publisher + opentofu-stack provisioner
-    data-room-worker-{dev,staging,prod}/
+      worker/{dev,staging,prod}/
                               # Container runtime publisher + opentofu-stack provisioner
 ```
 
@@ -2284,7 +2286,7 @@ The same boundary discipline applies to console REST handlers and worker job han
 The deployment system uses a publisher/provisioner split:
 
 - **Publishers** publish admitted, immutable application artifacts to existing declared provider targets. The Vercel publisher uploads a prebuilt `.vercel/output` artifact (built locally or in CI via the Build Output API and admitted before publish — Vercel git auto-build is **not** the protected/shared production path). The container runtime publisher publishes the `data-room-web` and `data-room-worker` service artifacts to their respective targets.
-- **Provisioners** create or update the infrastructure and provider configuration that makes those targets exist. The `opentofu-stack` provisioner attached to each app deployment manages Vercel project/domain/env wiring or container-runtime service wiring. Foundation deployments (e.g., `platform-foundation-prod`) own shared infrastructure (DNS, Supabase project, secret path scaffolding, OpenTofu state) as **provisioner-only deployments** — no app artifact, just infrastructure plan/diff/apply through admission.
+- **Provisioners** create or update the infrastructure and provider configuration that makes those targets exist. The `opentofu-stack` provisioner attached to each app deployment manages Vercel project/domain/env wiring or container-runtime service wiring. Approved foundation deployments own shared infrastructure (DNS, Supabase project, secret path scaffolding, OpenTofu state) as **provisioner-only deployments** — no app artifact, just infrastructure plan/diff/apply through admission.
 
 Publisher and provisioner responsibilities never overlap: the Vercel publisher does not run OpenTofu, and OpenTofu does not publish application artifacts. The `deploy --deployment <label>` front door sequences and records both for protected/shared targets.
 
@@ -2313,7 +2315,7 @@ The migration runner exposes a Buck target that produces a single ordered bundle
 3. Platform tables that reference data-room tables (e.g., `source_access_grants` references `documents`, `vaults`)
 4. Cross-reference tables and remaining join tables
 
-This order is encoded as Buck dependencies between the migration files, not maintained by hand. Migration-bundle generation is part of the `platform-foundation-*` deployment for protected/shared environments.
+This order is encoded as Buck dependencies between the migration files, not maintained by hand. Migration-bundle generation belongs to the approved foundation deployment for protected/shared environments; unapproved foundation package shapes should stay in temp-repo fixtures until their family is live inventory.
 
 **Constraint migrations as a circularity-avoidance technique.** Because composite tenant-aware FKs cross between platform and data-room tables, it is sometimes cleaner to split FK creation into a later "constraint migration" rather than trying to create every table and FK in one pass. For example:
 
@@ -2365,7 +2367,7 @@ Build:
 - RLS policies on every tenant-scoped table
 - `platform-domain`, `platform-db`, `data-room-domain`, `data-room-db` packages with Buck targets
 - Buck/Nix toolchain configured; every deployable artifact has a Buck target
-- Initial deployment metadata skeletons under `projects/deployments/`: `data-room-console-dev`, `data-room-web-dev`, `data-room-worker-dev`, `platform-foundation-dev`, `platform-shared`
+- Initial deployment metadata skeletons under canonical `projects/deployments/<approved-family>/` directories for approved live families only, including shared policy, foundation, console, web, and worker stage packages when that family becomes live inventory
 - `secret_requirements` declared with `SprinkleRef` contract IDs for the secrets Phase 0 needs (Vercel API token, Supabase service-role key, WorkOS keys, Ragie API key, GitHub App private key, optional GitHub webhook secret, `source_grant_secret` HMAC key, OpenTofu state credentials)
 - `opentofu-stack` provisioner configured for foundation-dev
 - CI runs migrations, RLS tests, and the dependency-boundary lint on every PR. CI also enforces that **nothing in `platform-*` imports from `data-room-*`**, that nothing in `data-room-mcp-tools` imports from `platform-ragie/connect/`, and that nothing imports `resolveReviewPreview` outside console handlers.

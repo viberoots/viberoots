@@ -46,6 +46,9 @@ until a later default repo run or an explicit deployment bootstrap succeeds.
 `deployment --target <buck-target>` is the explicit deployment provisioning layer. The existing
 Pleomino Infisical OpenTofu project/environment/identity reconciliation and deployment Universal
 Auth credential lifecycle live behind this mode.
+Pleomino is currently the only checked-in live deployment family; speculative
+families should stay in temp fixtures until a product-approved plan PR adds
+their real deployment packages.
 
 Defaults:
 

@@ -96,9 +96,9 @@ workers can declare only the app private key and app id:
 ```starlark
 nixos_shared_host_ssr_webapp_deployment(
     name = "deploy",
-    component = "//projects/apps/data-room-web:app",
+    component = "//projects/apps/example-web:app",
     **github_app_requirements(
-        "data-room-web-staging",
+        "example-web-staging",
         webhooks = True,
         webhook_config = True,
     )
@@ -106,8 +106,8 @@ nixos_shared_host_ssr_webapp_deployment(
 
 kubernetes_service_deployment(
     name = "deploy",
-    component = "//projects/apps/data-room-worker:image",
-    **github_app_requirements("data-room-worker-staging")
+    component = "//projects/apps/example-worker:image",
+    **github_app_requirements("example-worker-staging")
 )
 ```
 
@@ -690,103 +690,26 @@ scaf new deployment cloudflare-containers console-ssr-staging --component=//proj
 scaf new deployment cloudflare-containers api-private --component=//projects/apps/api:service_artifact --cloudflare_account_id=0123456789abcdef0123456789abcdef --worker=api-private --ingress_mode=private --shared_package=console-shared --yes
 scaf new deployment cloudflare-containers worker-none --component=//projects/apps/worker:service_artifact --component_kind=third-party-service --cloudflare_account_id=0123456789abcdef0123456789abcdef --worker=worker-none --ingress_mode=none --shared_package=console-shared --yes
 scaf new deployment service api-dev --component=//projects/apps/api:service_artifact --cluster=dev-cluster --shared_package=console-shared --yes
-scaf new deployment opentofu-foundation platform-dev --component=//projects/deployments/platform-shared:migration_bundle --shared_package=platform-shared --yes
+scaf new deployment opentofu-foundation foundation-dev --component=//projects/deployments/example/shared:migration_bundle --shared_package=example-shared --yes
 scaf new deployment opentofu-provisioner api-dev --path=projects/deployments/api-dev --yes
 ```
 
 The generated packages include placeholder secret/runtime config contract IDs and provider config
 files. Replace those placeholders with reviewed provider/account/domain values before admission.
 
-Concrete Phase 0 packages:
+Checked-in live deployment packages are currently limited to Pleomino:
 
-- `//projects/deployments/platform-shared:lane` owns the dev/staging/prod lane,
-  governance policy, admission policies, and `:migration_bundle`
-- `//projects/deployments/platform-foundation-{dev,staging,prod}:deploy` owns
-  provision-only OpenTofu foundation work through provider `opentofu`, publisher
-  `provision-only`, and component `//projects/deployments/platform-shared:migration_bundle`
-- `//projects/deployments/data-room-console-{dev,staging,prod}:deploy` publishes
-  `//projects/apps/data-room-console:vercel_artifact` through Vercel and carries
-  an app-attached `opentofu-stack` provisioner for project, domain, and env setup
-- `//projects/deployments/data-room-web-{dev,staging,prod}:deploy` publishes
-  `//projects/apps/data-room-web:service_artifact` through the container runtime
-- `//projects/deployments/data-room-worker-{dev,staging,prod}:deploy` publishes
-  `//projects/apps/data-room-worker:service_artifact` through the container runtime
+- `//projects/deployments/pleomino/dev:deploy`
+- `//projects/deployments/pleomino/staging:deploy`
+- `//projects/deployments/pleomino/prod:deploy`
 
-The Phase 0 OpenTofu stack layout is package-local:
-`projects/deployments/<deployment-id>/opentofu/{main.tf,plan.json,plan.tfplan,stack.json}`.
-The reviewed migration bundle target combines
-`//projects/libs/platform-db:migrations` before
-`//projects/libs/data-room-db:migrations` and is attached to every
-`platform-foundation-*` deployment as `migration_bundle`.
-Foundation provision-only runs apply that admitted bundle through the same
-reviewed OpenTofu source revision and then run deploy-blocking post-apply checks
-for tenant RLS isolation, composite tenant-aware FK behavior, migration ordering,
-and required Supabase extension/settings posture. The deploy record stores the
-bundle identity, ordered migration targets, dependency-graph fingerprint, target
-Supabase identity, source revision, redacted diagnostics, and post-apply check
-results. Web and worker deployments that depend on `platform-foundation-*` reject
-promotion when that migration evidence is absent, failed, or recorded for a
-different reviewed source revision.
-
-Phase 0 coordinated release promotion is an orchestration policy over these
-normal deployment targets, not a new multi-provider target. The default
-capability-add order is `platform-foundation-*`, `data-room-worker-*`,
-`data-room-web-*`, then `data-room-console-*`; capability removal runs the
-reverse order. Staging and prod packages also keep an `ordering_only`
-prerequisite on the same component in the previous lane stage, so the reviewed
-source revision advances through dev, staging, and prod unless a reviewed
-compatibility-window exception is attached to the release record. Console
-promotion health-gates the matching web deployment so `data-room-web-base-url`,
-web API readiness, smoke evidence, and migration evidence are present before
-the console mutates.
-
-Phase 0 grouped release from changed packages:
-
-```bash
-deploy --from-changes --group \
-  --changed projects/deployments/platform-foundation-prod/TARGETS \
-  --changed projects/deployments/data-room-worker-prod/TARGETS \
-  --changed projects/deployments/data-room-web-prod/TARGETS \
-  --changed projects/deployments/data-room-console-prod/TARGETS
-```
-
-The grouped command still emits ordinary per-deployment runs. Use the resulting
-records as the source-run inputs for explicit stage promotion:
-
-```bash
-deploy --deployment //projects/deployments/platform-foundation-staging:deploy \
-  --source-run-id <platform-foundation-dev-run-id>
-deploy --deployment //projects/deployments/data-room-worker-staging:deploy \
-  --source-run-id <data-room-worker-dev-run-id>
-deploy --deployment //projects/deployments/data-room-web-staging:deploy \
-  --source-run-id <data-room-web-dev-run-id>
-deploy --deployment //projects/deployments/data-room-console-staging:deploy \
-  --source-run-id <data-room-console-dev-run-id>
-```
-
-Retry preserves the same operation, source revision, prerequisite evidence, and
-artifact identity from the selected run:
-
-```bash
-deploy --deployment //projects/deployments/data-room-console-prod:deploy \
-  --source-run-id <failed-console-prod-run-id>
-```
-
-Rollback is also explicit and source-run scoped. Run removal-sensitive rollback
-in reverse capability order: console, web, worker, then foundation cleanup when
-needed.
-
-```bash
-deploy --deployment //projects/deployments/data-room-console-prod:deploy \
-  --rollback \
-  --source-run-id <previous-good-console-prod-run-id>
-deploy --deployment //projects/deployments/data-room-web-prod:deploy \
-  --rollback \
-  --source-run-id <previous-good-web-prod-run-id>
-deploy --deployment //projects/deployments/data-room-worker-prod:deploy \
-  --rollback \
-  --source-run-id <previous-good-worker-prod-run-id>
-```
+Speculative deployment families should not be committed under
+`projects/deployments`. Keep capability coverage for new providers,
+foundation-migration behavior, prerequisite admission, and smoke metadata in
+temp-repo fixtures or purpose-built hermetic test workspaces until the product
+deployment family is approved. When a future family is approved, add its shared
+lane/admission package and concrete stage packages in the same plan PR that
+updates the live-family guard.
 
 Web service example:
 

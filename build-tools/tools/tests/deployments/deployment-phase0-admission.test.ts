@@ -4,7 +4,7 @@ import path from "node:path";
 import { test } from "node:test";
 import type { DeploymentTarget } from "../../deployments/contract";
 import { evaluateDeploymentAdmission } from "../../deployments/deployment-admission-evaluator";
-import { resolveDeploymentFromTarget } from "../../deployments/deployment-query";
+import { validatePhase0ReleaseRecords } from "../../deployments/deployment-phase0-release";
 import { runInTemp } from "../lib/test-helpers";
 import { deploymentAdmissionEvidenceFixture } from "./deployment-admission.fixture";
 import {
@@ -12,16 +12,59 @@ import {
   writeDeploymentPrerequisiteRecord,
 } from "./deployment-admission.prerequisites.helpers";
 
-async function realDeployment(label: string): Promise<DeploymentTarget> {
-  return await resolveDeploymentFromTarget(process.cwd(), label);
+function phase0Deployment(
+  deploymentId: string,
+  provider: string,
+  prerequisites: DeploymentTarget["prerequisites"] = [],
+): DeploymentTarget {
+  return {
+    deploymentId,
+    label: `//fixture/deployments/${deploymentId}:deploy`,
+    name: "deploy",
+    provider,
+    protectionClass: "production_facing",
+    lanePolicyRef: "//fixture/deployments/shared:lane",
+    lanePolicy: {
+      ref: "//fixture/deployments/shared:lane",
+      fingerprint: "sha256:lane",
+      governanceRef: "//fixture/deployments/shared:lane_governance",
+      governance: {
+        scmBackend: "github",
+        repository: "viberoots/viberoots",
+        sourceRefPolicies: [],
+        trustedReporterIdentities: ["app:deploy-bot"],
+        requiredApprovalBoundaries: [],
+        fingerprint: "sha256:governance",
+      },
+    },
+    environmentStage: deploymentId.endsWith("-prod") ? "prod" : "staging",
+    admissionPolicyRef: "//fixture/deployments/shared:prod_release",
+    admissionPolicy: {
+      ref: "//fixture/deployments/shared:prod_release",
+      fingerprint: "sha256:admission",
+      requiredChecks: [],
+      requiredApprovals: [],
+      supplyChainGates: [],
+    },
+    prerequisites,
+    secretRequirements: [],
+    runtimeConfigRequirements: deploymentId.startsWith("data-room-console-")
+      ? [{ name: "data-room-web-base-url", step: "publish", contractId: "runtime://fixture" }]
+      : [],
+    releaseActions: [],
+    targetExceptions: [],
+    component: { kind: "service", target: "//fixture/apps/app:service_artifact" },
+    components: [{ id: "default", kind: "service", target: "//fixture/apps/app:service_artifact" }],
+    publisher: { type: provider === "vercel" ? "vercel-output" : "helm-release" },
+    providerTarget: { providerTargetIdentity: `${provider}:${deploymentId}` },
+  } as DeploymentTarget;
 }
 
-async function expectPhase0AdmissionRejects(
+async function expectAdmissionRejects(
   deployment: DeploymentTarget,
   tmp: string,
   providers: Record<string, string>,
   pattern: RegExp,
-  health: string[] = [],
 ) {
   await assert.rejects(
     evaluateDeploymentAdmission({
@@ -36,208 +79,76 @@ async function expectPhase0AdmissionRejects(
         operationKind: "deploy",
         sourceRevision: "rev-source-123",
         artifactIdentity: "artifact-123",
-        prerequisiteHealth: health.map((deploymentId) => ({ deploymentId })),
       }),
     }),
     pattern,
   );
 }
 
-test("Phase 0 real worker, web, and console admission blocks source revision drift", async () => {
-  const worker = await realDeployment("//projects/deployments/data-room-worker-staging:deploy");
-  const web = await realDeployment("//projects/deployments/data-room-web-prod:deploy");
-  const console = await realDeployment("//projects/deployments/data-room-console-prod:deploy");
-  const workerDev = await realDeployment("//projects/deployments/data-room-worker-dev:deploy");
-  const foundationStaging = await realDeployment(
-    "//projects/deployments/platform-foundation-staging:deploy",
-  );
-  const workerProd = await realDeployment("//projects/deployments/data-room-worker-prod:deploy");
-  const webStaging = await realDeployment("//projects/deployments/data-room-web-staging:deploy");
-  const foundationProd = await realDeployment(
-    "//projects/deployments/platform-foundation-prod:deploy",
-  );
-  const webProd = await realDeployment("//projects/deployments/data-room-web-prod:deploy");
-  const consoleStaging = await realDeployment(
-    "//projects/deployments/data-room-console-staging:deploy",
-  );
-
-  await runInTemp("phase0-real-source-drift", async (tmp) => {
-    await writeDeploymentPrerequisiteRecord(tmp, foundationStaging, "opentofu", {
+test("Phase 0 fixture admission blocks stale foundation migration evidence", async () => {
+  const foundation = phase0Deployment("platform-foundation-staging", "opentofu");
+  const worker = phase0Deployment("data-room-worker-staging", "kubernetes", [
+    { deploymentId: foundation.deploymentId, mode: "health_gated" },
+  ]);
+  await runInTemp("phase0-fixture-foundation-drift", async (tmp) => {
+    await writeDeploymentPrerequisiteRecord(tmp, foundation, "opentofu", {
       foundationMigration: true,
-    });
-    await writeDeploymentPrerequisiteRecord(tmp, workerDev, "kubernetes", {
       sourceRevision: "old-rev",
     });
-    await expectPhase0AdmissionRejects(
+    await expectAdmissionRejects(
       worker,
       tmp,
-      { "platform-foundation-staging": "opentofu", "data-room-worker-dev": "kubernetes" },
-      /data-room-worker-dev source revision differs/,
-    );
-
-    await writeDeploymentPrerequisiteRecord(tmp, workerProd, "kubernetes", {
-      healthUrl: "service://data-room-worker-prod",
-    });
-    await writeDeploymentPrerequisiteRecord(tmp, webStaging, "kubernetes", {
-      sourceRevision: "old-rev",
-    });
-    await expectPhase0AdmissionRejects(
-      web,
-      tmp,
-      { "data-room-worker-prod": "kubernetes", "data-room-web-staging": "kubernetes" },
-      /data-room-web-staging source revision differs/,
-      ["data-room-worker-prod"],
-    );
-
-    await writeDeploymentPrerequisiteRecord(tmp, foundationProd, "opentofu", {
-      foundationMigration: true,
-    });
-    await writeDeploymentPrerequisiteRecord(tmp, webProd, "kubernetes", {
-      healthUrl: "https://web.data-room.example.invalid/healthz",
-    });
-    await writeDeploymentPrerequisiteRecord(tmp, consoleStaging, "vercel", {
-      sourceRevision: "old-rev",
-    });
-    await expectPhase0AdmissionRejects(
-      console,
-      tmp,
-      { "data-room-web-prod": "kubernetes", "data-room-console-staging": "vercel" },
-      /data-room-console-staging source revision differs/,
-      ["data-room-web-prod"],
+      { [foundation.deploymentId]: "opentofu" },
+      /foundation migration evidence is stale/,
     );
   });
 });
 
-test("Phase 0 real console admission blocks missing web readiness and migration evidence", async () => {
-  const console = await realDeployment("//projects/deployments/data-room-console-prod:deploy");
-  const foundationProd = await realDeployment(
-    "//projects/deployments/platform-foundation-prod:deploy",
+test("Phase 0 release records reject source drift without reviewed exception", () => {
+  const errors = validatePhase0ReleaseRecords([
+    {
+      deploymentId: "data-room-web-prod",
+      sourceRevision: "rev-a",
+      lanePolicyRef: "lane",
+      artifactIdentity: "web-artifact",
+      providerTargetIdentity: "kubernetes:web",
+    },
+    {
+      deploymentId: "data-room-console-prod",
+      sourceRevision: "rev-b",
+      lanePolicyRef: "lane",
+      artifactIdentity: "console-artifact",
+      providerTargetIdentity: "vercel:console",
+    },
+  ]);
+  assert.ok(
+    errors.includes("data-room-console-prod source revision differs without reviewed exception"),
   );
-  const webProd = await realDeployment("//projects/deployments/data-room-web-prod:deploy");
-  const consoleStaging = await realDeployment(
-    "//projects/deployments/data-room-console-staging:deploy",
-  );
-
-  await runInTemp("phase0-real-console-prereqs", async (tmp) => {
-    await writeDeploymentPrerequisiteRecord(tmp, webProd, "kubernetes", {
-      healthUrl: "https://web.data-room.example.invalid/healthz",
-    });
-    await writeDeploymentPrerequisiteRecord(tmp, consoleStaging, "vercel");
-    const providers = { "data-room-web-prod": "kubernetes", "data-room-console-staging": "vercel" };
-    await expectPhase0AdmissionRejects(
-      console,
-      tmp,
-      providers,
-      /health_gated prerequisite lacks fresh health evidence: data-room-web-prod/,
-    );
-
-    await writeDeploymentPrerequisiteRecord(tmp, foundationProd, "opentofu");
-    await writeDeploymentPrerequisiteRecord(tmp, webProd, "kubernetes", {
-      healthUrl: "https://web.data-room.example.invalid/healthz",
-    });
-    await expectPhase0AdmissionRejects(
-      console,
-      tmp,
-      providers,
-      /foundation prerequisite lacks successful migration evidence: platform-foundation-prod/,
-      ["data-room-web-prod"],
-    );
-  });
 });
 
-test("Phase 0 real console admission accepts reviewed current hotfix exception", async () => {
-  const console = await realDeployment("//projects/deployments/data-room-console-prod:deploy");
-  const foundationProd = await realDeployment(
-    "//projects/deployments/platform-foundation-prod:deploy",
-  );
-  const webProd = await realDeployment("//projects/deployments/data-room-web-prod:deploy");
-  const consoleStaging = await realDeployment(
-    "//projects/deployments/data-room-console-staging:deploy",
-  );
-
-  await runInTemp("phase0-current-hotfix-exception", async (tmp) => {
-    await writeDeploymentPrerequisiteRecord(tmp, foundationProd, "opentofu", {
-      foundationMigration: true,
-    });
-    await writeDeploymentPrerequisiteRecord(tmp, webProd, "kubernetes", {
-      healthUrl: "https://web.data-room.example.invalid/healthz",
-    });
-    await writeDeploymentPrerequisiteRecord(tmp, consoleStaging, "vercel", {
-      sourceRevision: "staging-hotfix-rev",
-      compatibilityException: {
-        reviewedBy: "release-owner",
-        reason: "staging console record remains compatible",
-        expiresAt: "2099-01-01T00:00:00Z",
-      },
-    });
-    const admittedContext = {
-      ...admittedContextFixture(console),
-      source: { sourceRevision: "hotfix-rev", artifactIdentity: "artifact-123" },
-    };
-    const evaluation = await evaluateDeploymentAdmission({
-      workspaceRoot: tmp,
-      recordsRoot: path.join(tmp, ".local", "deployments", "kubernetes", "records"),
-      deployment: console,
-      prerequisiteProvidersByDeploymentId: {
-        "data-room-web-prod": "kubernetes",
-        "data-room-console-staging": "vercel",
-      },
-      operationKind: "deploy",
-      admittedContext,
-      evidence: deploymentAdmissionEvidenceFixture({
-        deployment: console,
-        operationKind: "deploy",
-        sourceRevision: "hotfix-rev",
-        artifactIdentity: "artifact-123",
-        prerequisiteHealth: [{ deploymentId: "data-room-web-prod" }],
-        phase0CompatibilityException: {
-          reviewedBy: "release-owner",
-          reason: "console hotfix remains compatible with current web release",
-          expiresAt: "2099-01-01T00:00:00Z",
-        },
-      }),
-    });
-
-    assert.deepEqual(
-      evaluation.prerequisites.map((prerequisite) => prerequisite.deploymentId),
-      ["data-room-web-prod", "data-room-console-staging"],
-    );
-    assert.equal(
-      (admittedContext as { phase0CompatibilityException?: { reason?: string } })
-        .phase0CompatibilityException?.reason,
-      "console hotfix remains compatible with current web release",
-    );
-  });
-});
-
-test("Phase 0 real targets stay single-provider and consume existing PR-19 metadata", async () => {
-  const labels = [
-    "//projects/deployments/platform-foundation-prod:deploy",
-    "//projects/deployments/data-room-worker-prod:deploy",
-    "//projects/deployments/data-room-web-prod:deploy",
-    "//projects/deployments/data-room-console-prod:deploy",
-  ];
-  const deployments = await Promise.all(labels.map((label) => realDeployment(label)));
+test("Phase 0 release records accept expiring compatibility exceptions", () => {
   assert.deepEqual(
-    deployments.map((deployment) => deployment.provider),
-    ["opentofu", "kubernetes", "kubernetes", "vercel"],
-  );
-  assert.ok(!deployments.some((deployment) => deployment.provider === "phase0-release"));
-  assert.equal(
-    deployments[0]?.migrationBundleRef,
-    "//projects/deployments/platform-shared:migration_bundle",
-  );
-  assert.ok(
-    deployments[1]?.prerequisites.some(
-      (entry) => entry.deploymentId === "platform-foundation-prod",
-    ),
-  );
-  assert.ok(
-    deployments[2]?.prerequisites.some((entry) => entry.deploymentId === "data-room-worker-prod"),
-  );
-  assert.ok(
-    deployments[3]?.runtimeConfigRequirements.some(
-      (entry) => entry.name === "data-room-web-base-url",
-    ),
+    validatePhase0ReleaseRecords([
+      {
+        deploymentId: "data-room-web-staging",
+        sourceRevision: "rev-a",
+        lanePolicyRef: "lane",
+        artifactIdentity: "web-artifact",
+        providerTargetIdentity: "kubernetes:web",
+      },
+      {
+        deploymentId: "data-room-console-staging",
+        sourceRevision: "hotfix",
+        lanePolicyRef: "lane",
+        artifactIdentity: "console-artifact",
+        providerTargetIdentity: "vercel:console",
+        compatibilityException: {
+          reviewedBy: "release-owner",
+          reason: "console hotfix remains compatible",
+          expiresAt: "2099-05-31T00:00:00Z",
+        },
+      },
+    ]),
+    [],
   );
 });

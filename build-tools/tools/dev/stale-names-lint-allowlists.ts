@@ -34,7 +34,6 @@ export const PLAN_NUMBER_SKIP_PREFIXES = [
   "build-tools/tools/tests/deployments/opentofu-foundation-",
   "build-tools/tools/tests/deployments/phase0-deployments.",
   "build-tools/tools/tests/scaffolding/webapp-",
-  "projects/deployments/platform-shared/",
 ];
 
 export const MIGRATION_LABEL_SKIP_PATHS = new Set([

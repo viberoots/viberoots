@@ -9,19 +9,19 @@ import { deploymentRequirementFixture } from "./deployment-metadata.fixture";
 
 test("github_app profile validates platform app credentials and optional webhook material", () => {
   const errors = validateExternalRequirementProfiles({
-    label: "//projects/deployments/data-room-web-dev:deploy",
+    label: "//fixture/deployments/github-web-dev:deploy",
     profiles: ["github_app"],
     secretRequirements: [
       deploymentRequirementFixture({
         name: "github_app_private_key",
         step: "publish",
-        contractId: "secret://deployments/data-room-web-dev/github/app_private_key",
+        contractId: "secret://deployments/github-web-dev/github/app_private_key",
         source: "secret_runtime",
       }),
       deploymentRequirementFixture({
         name: "github_webhook_secret",
         step: "publish",
-        contractId: "secret://deployments/data-room-web-dev/github/webhook_secret",
+        contractId: "secret://deployments/github-web-dev/github/webhook_secret",
         source: "secret_runtime",
       }),
     ],
@@ -29,13 +29,13 @@ test("github_app profile validates platform app credentials and optional webhook
       deploymentRequirementFixture({
         name: "github_app_id",
         step: "publish",
-        contractId: "runtime://deployments/data-room-web-dev/github/app_id",
+        contractId: "runtime://deployments/github-web-dev/github/app_id",
         source: "runtime_config",
       }),
       deploymentRequirementFixture({
         name: "github_webhook_url",
         step: "publish",
-        contractId: "runtime://deployments/data-room-web-dev/github/webhook_url",
+        contractId: "runtime://deployments/github-web-dev/github/webhook_url",
         source: "runtime_config",
       }),
     ],
@@ -45,13 +45,13 @@ test("github_app profile validates platform app credentials and optional webhook
 
 test("github_app profile fails closed for missing and misplaced platform app requirements", () => {
   const errors = validateExternalRequirementProfiles({
-    label: "//projects/deployments/data-room-worker-dev:deploy",
+    label: "//fixture/deployments/github-worker-dev:deploy",
     profiles: ["github_app"],
     secretRequirements: [
       deploymentRequirementFixture({
         name: "github_app_private_key",
         step: "readiness",
-        contractId: "secret://deployments/data-room-worker-dev/github/app_private_key",
+        contractId: "secret://deployments/github-worker-dev/github/app_private_key",
         source: "secret_runtime",
       }),
     ],
@@ -70,13 +70,13 @@ test("github_app profile fails closed for missing and misplaced platform app req
 
 test("github_app profile rejects runtime product state as deployment requirements", () => {
   const errors = validateExternalRequirementProfiles({
-    label: "//projects/deployments/data-room-worker-dev:deploy",
+    label: "//fixture/deployments/github-worker-dev:deploy",
     profiles: ["github_app"],
     secretRequirements: [
       deploymentRequirementFixture({
         name: "github_app_private_key",
         step: "publish",
-        contractId: "secret://deployments/data-room-worker-dev/github/app_private_key",
+        contractId: "secret://deployments/github-worker-dev/github/app_private_key",
         source: "secret_runtime",
       }),
     ],
@@ -84,13 +84,13 @@ test("github_app profile rejects runtime product state as deployment requirement
       deploymentRequirementFixture({
         name: "github_app_id",
         step: "publish",
-        contractId: "runtime://deployments/data-room-worker-dev/github/app_id",
+        contractId: "runtime://deployments/github-worker-dev/github/app_id",
         source: "runtime_config",
       }),
       deploymentRequirementFixture({
         name: "github_installation_id",
         step: "publish",
-        contractId: "runtime://deployments/data-room-worker-dev/github/installation_id",
+        contractId: "runtime://deployments/github-worker-dev/github/installation_id",
         source: "runtime_config",
       }),
     ],
@@ -104,18 +104,18 @@ test("github_app profile rejects runtime product state as deployment requirement
 
 test("github_app ambient GitHub env vars cannot satisfy secret requirements", () => {
   const errors = ambientProviderEnvBypassErrors({
-    label: "//projects/deployments/data-room-web-dev:deploy",
+    label: "//fixture/deployments/github-web-dev:deploy",
     env: { GITHUB_APP_PRIVATE_KEY: "live-secret" },
     profiles: ["github_app"],
     secretRequirements: [
       deploymentRequirementFixture({
         name: "github_app_private_key",
         step: "publish",
-        contractId: "secret://deployments/data-room-web-dev/github/app_private_key",
+        contractId: "secret://deployments/github-web-dev/github/app_private_key",
       }),
     ],
   });
   assert.deepEqual(errors, [
-    "//projects/deployments/data-room-web-dev:deploy: ambient provider env GITHUB_APP_PRIVATE_KEY cannot satisfy secret_requirements",
+    "//fixture/deployments/github-web-dev:deploy: ambient provider env GITHUB_APP_PRIVATE_KEY cannot satisfy secret_requirements",
   ]);
 });

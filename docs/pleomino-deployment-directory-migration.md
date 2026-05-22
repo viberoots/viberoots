@@ -24,7 +24,7 @@ The migration changes Buck labels and source paths only. Deployment IDs, prerequ
 contract IDs, provider-facing names, managed bootstrap output names, and Infisical credential file
 names remain stable.
 
-`platform-*` and `data-room-*` deployments remain in the legacy flat package layout for now. They
-include separate OpenTofu stack packages and are not part of the Infisical Pleomino bootstrap
-fan-out, so this migration keeps the first canonical-family move limited to the lowest-risk
-Pleomino surface.
+Pleomino is the only checked-in live deployment family. Earlier planning drafts described additional
+Phase 0 families and separate OpenTofu stack packages, but those speculative packages were removed
+from the current deployment inventory. Add future approved deployment families under their own
+canonical family directories in the same change that updates the live-family guard.

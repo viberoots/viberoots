@@ -171,9 +171,9 @@ one deployment secret backend per admitted context.
 authors may set `deployment_family` for legacy packages, shared infrastructure,
 or temporary migrations even when the target path would suggest another family.
 When the field is omitted, targets under canonical
-`projects/deployments/<family>/...` directories infer `<family>`. Flat legacy
-packages such as `projects/deployments/data-room-web-prod` do not infer a family from
-their package name.
+`projects/deployments/<family>/...` directories infer `<family>`. Flat package
+layouts do not infer a family from their package name and should remain limited
+to migration history or temp-repo fixtures.
 
 `environment_stage` remains explicit. Deployment IDs, labels, prerequisites, and
 secret contract IDs stay stable when a family is inferred.
@@ -185,7 +185,8 @@ The real Pleomino deployments use canonical family directories:
 - `//projects/deployments/pleomino/prod:deploy`
 
 The former flat `projects/deployments/pleomino-*` package paths are migration history only.
-Other flat deployment packages remain legacy support until their families are migrated.
+The checked-in live deployment tree is intentionally limited to Pleomino until a
+future plan explicitly approves another deployment family.
 
 ### Backend Selection
 

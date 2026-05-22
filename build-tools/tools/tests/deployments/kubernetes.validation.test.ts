@@ -26,7 +26,7 @@ function deploymentNode(overrides: Partial<GraphNode> = {}): GraphNode {
     protection_class: "shared_nonprod",
     lane_policy: "//projects/deployments/pleomino/shared:lane",
     environment_stage: "staging",
-    admission_policy: "//projects/deployments/platform-shared:prod_release",
+    admission_policy: "//projects/deployments/pleomino/shared:prod_release",
     secret_requirements: [],
     runtime_config_requirements: [],
     provider_target: {

@@ -1213,8 +1213,8 @@ excluded via `PLAN_NUMBER_SKIP_PATHS` or `PLAN_NUMBER_SKIP_PREFIXES` in
 
 Additional deployment and OpenTofu phase0 paths are excluded because `phase0` names the first
 deployment/admission stage in the live deployment model, not a completed planning phase. The same
-operational exception covers deployment OpenTofu `stack.json` phase labels and the reviewed
-`projects/deployments/platform-shared/` phase0 contract helpers.
+operational exception covers deployment OpenTofu `stack.json` phase labels and reviewed deployment
+admission helpers, but not deleted speculative deployment packages.
 
 Active `.md` and `.rst` docs still run plan-number and migration-label enforcement for command-like
 example lines. Historical planning docs and plan documents with structural `PR-N` headings are

@@ -230,8 +230,8 @@ Customer repository owner/name, selected repository IDs, installation IDs, and
 refresh/import state are runtime product data and are rejected as deployment
 requirement profile entries.
 
-Foundation migration records add `foundationMigrationOutcome` for
-`platform-foundation-*` provision-only runs. The field records the migration
+Foundation migration records add `foundationMigrationOutcome` for approved
+foundation provision-only runs. The field records the migration
 bundle identity, ordered migration list, dependency graph fingerprint, target
 Supabase identity, reviewed source revision, apply status, credential env names,
 redacted diagnostics, and post-apply check results. It must not contain Supabase
@@ -377,12 +377,11 @@ OpenTofu plan fingerprint and stack-config fingerprint are bound into admission
 evidence. Routine `deploy` and `--provision-only` flows fail closed on delete,
 replace, or unknown plan actions.
 
-Phase 0 foundation deployments use the reviewed migration bundle
-`//projects/deployments/platform-shared:migration_bundle`. That bundle records
-the Buck dependency order of `//projects/libs/platform-db:migrations` followed
-by `//projects/libs/data-room-db:migrations`, plus an ordered migration-set
-identity list and graph fingerprint; deployment extraction exposes the attached
-bundle through `migration_bundle` so later migration admission can bind evidence.
+Foundation deployments may use a reviewed migration bundle target owned by the
+approved deployment family. That bundle records Buck dependency order, an
+ordered migration-set identity list, and a graph fingerprint; deployment
+extraction exposes the attached bundle through `migration_bundle` so later
+migration admission can bind evidence.
 
 ### `runtime_config_requirements`
 
@@ -522,14 +521,10 @@ Validation rule:
 - prerequisites must stay within the same lane; cross-lane prerequisites are rejected
 - prerequisites must form an acyclic graph before orchestration
 - selectors may widen only by declared direct prerequisite edges; transitive execution order comes from topological sorting, not extra inferred metadata
-- Phase 0 deployment ids (`platform-foundation-*`, `data-room-worker-*`,
-  `data-room-web-*`, `data-room-console-*`) have additional release-policy
-  validation: component prerequisites encode add order as foundation/schema,
-  worker, web, console with `health_gated` edges, staging/prod deployments
-  order after the previous stage for the same component, and release records
-  preserve separate artifact and provider-target identities while binding the
-  group to one source revision unless an expiring reviewed compatibility
-  exception is present
+- Coordinated multi-component release policies may add extra validation for
+  component order, stage promotion, and source-revision compatibility. Keep
+  those policies in deployment tooling and fixtures until the corresponding
+  deployment family is approved as a checked-in live package.
 
 ## 2. Lane Policy Object
 

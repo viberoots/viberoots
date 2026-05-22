@@ -11,13 +11,13 @@ const REQUIRED_APPROVAL_BOUNDARIES = [{ stage: "prod", requiredApprovals: ["rele
 
 export function foundationDeploymentFixture(): OpenTofuDeployment {
   const lanePolicy: any = {
-    ref: "//projects/deployments/platform-shared:lane",
+    ref: "//projects/deployments/pleomino/shared:lane",
     name: "lane",
     stages: ["dev"],
     sourceRefPolicy: { dev: "main" },
     allowedPromotionEdges: [],
     artifactReuseMode: "same_artifact",
-    governanceRef: "//projects/deployments/platform-shared:lane_governance",
+    governanceRef: "//projects/deployments/pleomino/shared:lane_governance",
     governance: {
       scmBackend: "github",
       repository: "viberoots/viberoots",
@@ -29,7 +29,7 @@ export function foundationDeploymentFixture(): OpenTofuDeployment {
     fingerprint: "sha256:lane",
   };
   const admissionPolicy: any = {
-    ref: "//projects/deployments/platform-shared:dev_release",
+    ref: "//fixture/deployments/shared:dev_release",
     name: "dev_release",
     allowedRefs: ["main"],
     requiredChecks: [],
@@ -69,16 +69,16 @@ export function foundationDeploymentFixture(): OpenTofuDeployment {
     runtimeConfigRequirements: [],
     releaseActions: [],
     targetExceptions: [],
-    migrationBundleRef: "//projects/deployments/platform-shared:migration_bundle",
+    migrationBundleRef: "//fixture/deployments/shared:migration_bundle",
     component: {
       kind: "provision-only",
-      target: "//projects/deployments/platform-shared:migration_bundle",
+      target: "//fixture/deployments/shared:migration_bundle",
     },
     components: [
       {
         id: "default",
         kind: "provision-only",
-        target: "//projects/deployments/platform-shared:migration_bundle",
+        target: "//fixture/deployments/shared:migration_bundle",
       },
     ],
     publisher: { type: "provision-only" },

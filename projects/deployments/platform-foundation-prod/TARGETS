@@ -1,9 +1,0 @@
-load("//projects/deployments/platform-shared:family.bzl", "platform_foundation_deployment")
-
-platform_foundation_deployment(
-    name = "deploy",
-    stage = "prod",
-    admission_policy = "prod_release",
-    protection_class = "production_facing",
-    prerequisite = "platform-foundation-staging",
-)

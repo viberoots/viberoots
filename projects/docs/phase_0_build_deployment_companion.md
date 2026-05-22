@@ -97,14 +97,15 @@ projects/
     data-room-test-fixtures/ # Admin / Investor A / Investor B and tenant-leak fixtures
 
   deployments/
-    platform-shared/      # lane policy, admission policy, shared governance
-    platform-foundation-{dev,staging,prod}/
+    <approved-family>/
+      shared/             # lane policy, admission policy, shared governance
+      foundation/{dev,staging,prod}/
                           # provisioner-only deployments: DNS, Supabase, secret paths, state
-    data-room-console-{dev,staging,prod}/
+      console/{dev,staging,prod}/
                           # Vercel publisher + opentofu-stack provisioner (project/domain/env)
-    data-room-web-{dev,staging,prod}/
+      web/{dev,staging,prod}/
                           # container runtime publisher + opentofu-stack provisioner
-    data-room-worker-{dev,staging,prod}/
+      worker/{dev,staging,prod}/
                           # container runtime publisher + opentofu-stack provisioner
 ```
 
@@ -190,57 +191,41 @@ The repo-level `deploy --deployment <label>` command is the front door. For prot
 
 The deployment model is intentionally single-provider per deployment. A system that spans Vercel plus a container runtime is modeled as multiple coordinated deployments, not one cross-provider deployment object.
 
-Infrastructure changes are still part of this model. The usual shape should be a built-in `opentofu-stack` provisioner attached to a deployment, so app release and infrastructure plan/diff are admitted, recorded, approved, and replayed together when appropriate. For infrastructure that has no app artifact, use a dedicated foundation deployment such as `platform-foundation-prod`; if needed, that deployment may use an `opentofu` provider or a no-app deployment shape whose publisher is effectively provision-only. The important rule is that OpenTofu execution remains deployment-owned and reviewed.
+Infrastructure changes are still part of this model. The usual shape should be a built-in `opentofu-stack` provisioner attached to a deployment, so app release and infrastructure plan/diff are admitted, recorded, approved, and replayed together when appropriate. For infrastructure that has no app artifact, use a dedicated foundation deployment inside an approved canonical family; if needed, that deployment may use an `opentofu` provider or a no-app deployment shape whose publisher is effectively provision-only. The important rule is that OpenTofu execution remains deployment-owned and reviewed.
 
 Provider and provisioner responsibilities should not overlap. A publisher such as `vercel` publishes an admitted application artifact to an existing declared provider target. A provisioner such as `opentofu-stack` creates or updates the infrastructure and provider configuration that makes that target exist. The `deploy` workflow sequences and records both; the Vercel publisher should not secretly run OpenTofu, and OpenTofu should not publish application artifacts.
 
 ## 6. Deployment Layout For Phase 0
 
-Represent the runtime as three deployment families:
+This companion originally sketched a broader Phase 0 runtime split across console, web, worker,
+shared policy, and foundation packages. That sketch is historical only. The checked-in live
+deployment inventory is currently limited to the approved Pleomino family under the canonical family
+directory.
 
-```text
-projects/deployments/data-room-console-dev/
-projects/deployments/data-room-console-staging/
-projects/deployments/data-room-console-prod/
-
-projects/deployments/data-room-web-dev/
-projects/deployments/data-room-web-staging/
-projects/deployments/data-room-web-prod/
-
-projects/deployments/data-room-worker-dev/
-projects/deployments/data-room-worker-staging/
-projects/deployments/data-room-worker-prod/
-
-projects/deployments/platform-shared/
-
-projects/deployments/platform-foundation-dev/
-projects/deployments/platform-foundation-staging/
-projects/deployments/platform-foundation-prod/
-```
-
-`platform-shared` should hold the shared lane policy, source-ref policies, governance, and admission policies. The console, web, and worker deployments can then share the same `dev -> staging -> prod` promotion model while remaining separate provider-specific deployments.
-
-`platform-foundation-*` should hold shared environment infrastructure that is not naturally owned by only the console, web, or worker deployment. Examples include base DNS zones, Supabase project resources, shared object buckets, deployment secret path scaffolding, and OpenTofu state configuration. Component-specific infrastructure should stay with the component deployment that owns it.
+Future approved deployment families should add their shared lane policy, source-ref policies,
+governance, admission policies, provider-specific stage packages, and any foundation package under a
+new canonical family directory in the same change that updates the live-family guard. Component
+specific infrastructure should stay with the component deployment that owns it.
 
 Conceptually:
 
 ```text
-data-room-console-prod
+<approved-family>-console-prod
   provider: vercel
-  component: //projects/apps/data-room-console:app
+  component: //projects/apps/example-console:app
   protection_class: production_facing
 
-data-room-web-prod
+<approved-family>-web-prod
   provider: chosen container runtime
-  component: //projects/apps/data-room-web:service
+  component: //projects/apps/example-web:service
   protection_class: production_facing
 
-data-room-worker-prod
+<approved-family>-worker-prod
   provider: chosen container runtime
-  component: //projects/apps/data-room-worker:service
+  component: //projects/apps/example-worker:service
   protection_class: production_facing
 
-platform-foundation-prod
+<approved-family>-foundation-prod
   provider or provisioner: opentofu
   component: none or infra-plan artifact
   protection_class: production_facing
@@ -350,9 +335,9 @@ Recommended deployment metadata shape:
 ```python
 vercel_next_webapp_deployment(
     name = "deploy",
-    component = "//projects/apps/data-room-console:app",
+    component = "//projects/apps/example-console:app",
     team = "company",
-    project = "data-room-console-prod",
+    project = "example-console-prod",
     provisioner = "opentofu-stack",
     provisioner_config = "opentofu/stack.json",
     secret_requirements = [
@@ -379,13 +364,9 @@ In this shape, the Vercel provider uses the `publish` secret to deploy the admit
 
 Some infrastructure does not belong to a single app component. Examples include the Supabase project, shared DNS zones, shared secret path scaffolding, or base container runtime accounts.
 
-For those cases, use dedicated foundation deployments:
-
-```text
-//projects/deployments/platform-foundation-dev:deploy
-//projects/deployments/platform-foundation-staging:deploy
-//projects/deployments/platform-foundation-prod:deploy
-```
+For those cases, use dedicated foundation deployments inside an approved canonical deployment
+family. The historical sketch used separate foundation package labels, but those speculative
+packages are not part of the current checked-in deployment inventory.
 
 These can be modeled as either:
 

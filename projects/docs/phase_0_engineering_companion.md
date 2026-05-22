@@ -198,7 +198,7 @@ Architecture §17 specifies that builds use Buck/Nix and that protected/shared d
 - **Every deployable artifact has a Buck target.** If you need to run something in dev/staging/prod, it has a target under `projects/apps/<app>` and a deployment under `projects/deployments/`. There is no "I just `vercel deploy`'d it from my laptop" path for protected/shared targets.
 - **Vercel git auto-build is not the production path.** The Vercel publisher accepts prebuilt `.vercel/output` artifacts produced by Buck; admission happens before publish; the deployment record carries Vercel deployment ID, URL, and source revision. Local `vercel dev` is fine for inner-loop work; protected/shared deploys use the prebuilt path.
 - **Secrets through `SprinkleRef`/Vault, never in TARGETS or `.env`.** Every secret has a stable contract ID (e.g., `secret://deployments/platform/source_grant_hmac_secret`). Step-specific requirements (`publish`, `provision`, `smoke`) keep audit clear. Local fixtures are explicit non-production overrides.
-- **OpenTofu through deployment-owned `opentofu-stack` provisioners, not a separate `infra/` tree.** Vercel project/domain/env wiring lives with `data-room-console-{env}/`. Container-runtime service wiring lives with `data-room-{web,worker}-{env}/`. Shared infrastructure (DNS, Supabase project, secret path scaffolding) lives in `platform-foundation-{env}/` as provisioner-only deployments.
+- **OpenTofu through deployment-owned `opentofu-stack` provisioners, not a separate `infra/` tree.** Vercel project/domain/env wiring, container-runtime service wiring, and shared infrastructure such as DNS, Supabase project resources, and secret path scaffolding live under approved canonical deployment-family directories. Use temp-repo fixtures for unapproved package shapes rather than committing speculative deployment inventory.
 - **Releases are coordinated, not atomic.** Worker → web → console for adding capabilities; reverse for removing them; schema migrations precede the readers. For risky changes, use feature flags or compatibility windows rather than assuming a cross-provider transaction. See architecture §17.4.
 - **Local development uses framework-native commands.** `next dev` for the console, `tsx watch` (or equivalent) for `data-room-web` against a local Supabase, the Supabase CLI for local Postgres + Storage. The build/deployment machinery does not gate the inner loop; it gates what reaches design partners.
 
@@ -290,11 +290,11 @@ Concrete, measurable. Each item is "done" or "not yet" — no half-credit.
 **Build and deployment rails (architecture §17):**
 
 - [ ] Buck/Nix toolchain configured; `data-room-console`, `data-room-web`, `data-room-worker` each have a Buck target that produces a deployable artifact
-- [ ] Deployment metadata skeletons exist under `projects/deployments/` for `platform-shared`, `platform-foundation-dev`, `data-room-console-dev`, `data-room-web-dev`, `data-room-worker-dev`
+- [ ] Deployment metadata skeletons for approved live families exist under canonical family directories in `projects/deployments/`, with shared policy, foundation, console, web, and worker stage packages added only when that family is approved
 - [ ] `secret_requirements` declared for every Phase 0 secret with stable `SprinkleRef` contract IDs (Vercel API token, Supabase service-role key, WorkOS keys, Ragie API key, `source_grant_secret`, OpenTofu state credentials); Vault is wired as the production backend
-- [ ] `opentofu-stack` provisioner working for `platform-foundation-dev` (DNS, Supabase project, secret path scaffolding, OpenTofu state)
+- [ ] `opentofu-stack` provisioner working for the approved foundation development deployment (DNS, Supabase project, secret path scaffolding, OpenTofu state)
 - [ ] Vercel publisher accepts a prebuilt `.vercel/output` artifact built by Buck; smoke check returns HTTP 200; no Vercel git auto-build is configured for protected/shared targets
-- [ ] Container runtime publisher wires `data-room-web-dev` and `data-room-worker-dev`; web and worker run from the same image with different entry points (or separate artifacts from the same source packages)
+- [ ] Container runtime publisher wires approved web and worker development deployments; web and worker run from the same image with different entry points (or separate artifacts from the same source packages)
 
 **CI checks:**
 

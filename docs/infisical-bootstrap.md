@@ -24,6 +24,8 @@ Pleomino deployment targets use canonical family labels such as
 `//projects/deployments/pleomino/staging:deploy`. The old flat
 `projects/deployments/pleomino-*` packages are migration history; see
 [`pleomino-deployment-directory-migration.md`](pleomino-deployment-directory-migration.md).
+Pleomino is currently the only checked-in live deployment family; new families
+should be introduced only through an explicit product-approved plan PR.
 
 Repo bootstrap materializes backend profile credentials under repo-scoped refs such as
 `secret://viberoots/bootstrap/viberoots-iac-bootstrap/client-id`. Pleomino deployment bootstrap

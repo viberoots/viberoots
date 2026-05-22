@@ -19,14 +19,6 @@ function nodeByName(nodes: any[], name: string): any {
   return found;
 }
 
-function platformFoundationStack(stage: string): string {
-  return ["phase", "0/platform-foundation/", stage].join("");
-}
-
-async function readJsonObject(filePath: string): Promise<Record<string, string>> {
-  return JSON.parse(await fsp.readFile(filePath, "utf8")) as Record<string, string>;
-}
-
 async function assertWranglerStaysBelowBuckMetadata(packagePath: string, node: any) {
   const configPath = path.join(process.cwd(), packagePath, String(node.publisher_config));
   const parsed = parseJsoncObject(await fsp.readFile(configPath, "utf8"), configPath);
@@ -34,19 +26,6 @@ async function assertWranglerStaysBelowBuckMetadata(packagePath: string, node: a
   assert.equal(parsed.account_id, undefined);
   assert.ok(node.provider_target.project);
   assert.ok(node.provider_target.account);
-}
-
-async function assertOpenTofuStackMatchesBuckMetadata(packagePath: string, node: any) {
-  const configPath = path.join(process.cwd(), packagePath, String(node.provisioner_config));
-  const parsed = await readJsonObject(configPath);
-  validateOpenTofuStackConfigFacts({
-    configPath,
-    config: parsed,
-    stackIdentity: String(node.provider_target.stack_identity),
-    stateBackendIdentity: String(node.provider_target.state_backend_identity),
-  });
-  assert.equal(parsed.stack_identity, node.provider_target.stack_identity);
-  assert.equal(parsed.state_backend_identity, node.provider_target.state_backend_identity);
 }
 
 async function writeFamilyDriftFixture(tmp: string, body: string): Promise<void> {
@@ -71,34 +50,20 @@ async function expectBuckFailure(tmp: string, $: any, pattern: RegExp): Promise<
   assert.match(`${String(result.stdout || "")}\n${String(result.stderr || "")}`, pattern);
 }
 
-test("concrete deployment families compose defaults into explicit stage targets", async () => {
+test("concrete Pleomino deployment family composes defaults into explicit stage targets", async () => {
   const nodes = await runDeploymentCquery(process.cwd(), $, "deployment-family-real-cquery", [
     "//projects/deployments/pleomino/staging:deploy",
     "//projects/deployments/pleomino/dev:deploy",
     "//projects/deployments/pleomino/prod:deploy",
-    "//projects/deployments/platform-foundation-dev:deploy",
-    "//projects/deployments/platform-foundation-staging:deploy",
-    "//projects/deployments/platform-foundation-prod:deploy",
     "//projects/apps/pleomino:app",
     "//projects/deployments/pleomino/shared:lane",
     "//projects/deployments/pleomino/shared:dev_release",
     "//projects/deployments/pleomino/shared:staging_release",
     "//projects/deployments/pleomino/shared:prod_release",
-    "//projects/deployments/platform-shared:lane",
-    "//projects/deployments/platform-shared:dev_release",
-    "//projects/deployments/platform-shared:staging_release",
-    "//projects/deployments/platform-shared:prod_release",
-    "//projects/deployments/platform-shared:migration_bundle",
   ]);
   const dev = nodeByName(nodes, "//projects/deployments/pleomino/dev:deploy");
   const staging = nodeByName(nodes, "//projects/deployments/pleomino/staging:deploy");
   const prod = nodeByName(nodes, "//projects/deployments/pleomino/prod:deploy");
-  const platformDev = nodeByName(nodes, "//projects/deployments/platform-foundation-dev:deploy");
-  const platformStaging = nodeByName(
-    nodes,
-    "//projects/deployments/platform-foundation-staging:deploy",
-  );
-  const platformProd = nodeByName(nodes, "//projects/deployments/platform-foundation-prod:deploy");
   assert.equal(dev.provider_target.app_name, "pleomino");
   assert.equal(dev.provider_target.target_group, "default");
   assert.equal(
@@ -111,43 +76,21 @@ test("concrete deployment families compose defaults into explicit stage targets"
   assert.deepEqual(staging.ingress_hostnames, ["staging.pleomino.com"]);
   assert.equal(prod.provider_target.project, "pleomino-prod-pages");
   assert.equal(prod.protection_class, "production_facing");
-  assert.equal(platformDev.provider_target.stack_identity, platformFoundationStack("dev"));
-  assert.equal(platformProd.provider_target.stack_identity, platformFoundationStack("prod"));
-  assert.deepEqual(platformProd.resource_sizing, { profile: "phase0-foundation-baseline" });
-  assert.match(
-    String(platformProd.migration_bundle),
-    /\/\/projects\/deployments\/platform-shared:migration_bundle/,
-  );
-  assert.deepEqual(platformProd.prerequisites, [
-    { deployment_id: "platform-foundation-staging", mode: "ordering_only" },
-  ]);
   await assertWranglerStaysBelowBuckMetadata("projects/deployments/pleomino/staging", staging);
   await assertWranglerStaysBelowBuckMetadata("projects/deployments/pleomino/prod", prod);
-  await assertOpenTofuStackMatchesBuckMetadata(
-    "projects/deployments/platform-foundation-dev",
-    platformDev,
-  );
-  await assertOpenTofuStackMatchesBuckMetadata(
-    "projects/deployments/platform-foundation-staging",
-    platformStaging,
-  );
-  await assertOpenTofuStackMatchesBuckMetadata(
-    "projects/deployments/platform-foundation-prod",
-    platformProd,
-  );
 });
 
 test("OpenTofu stack config fact validation rejects provider-native drift", () => {
   assert.throws(
     () =>
       validateOpenTofuStackConfigFacts({
-        configPath: "projects/deployments/platform-foundation-prod/opentofu/stack.json",
+        configPath: "fixture/deployments/foundation-prod/opentofu/stack.json",
         config: {
           stack_identity: "foundation/shared/staging",
-          state_backend_identity: "s3://state/prod/platform-foundation",
+          state_backend_identity: "s3://state/prod/foundation",
         },
         stackIdentity: "foundation/shared/prod",
-        stateBackendIdentity: "s3://state/prod/platform-foundation",
+        stateBackendIdentity: "s3://state/prod/foundation",
       }),
     /stack_identity foundation\/shared\/staging does not match deployment provider_target\.stack_identity foundation\/shared\/prod/,
   );
