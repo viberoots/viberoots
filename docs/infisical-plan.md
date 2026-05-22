@@ -3939,3 +3939,149 @@ The stricter Infisical identity check may require adapting fixtures if the curre
 omitted fields that real replay should require. Repo bootstrap may also become noisier for
 deployments that still rely on the implicit Vault default and have not configured local Vault
 validation inputs.
+
+## PR-40: First-bootstrap metadata handoff and single-command setup flow
+
+### 1. Intent
+
+Remove the first-run chicken-and-egg failure where deployment bootstrap successfully creates the
+Infisical project and identities, then fails reconciliation because checked-in reviewed metadata
+still contains placeholders. Provide one top-level operator invocation that can take a fresh repo
+from no local resolver config, no bootstrap credentials, and no Pleomino Infisical project to a
+usable reviewed state without requiring operators to reverse-engineer the intermediate outputs.
+
+### 2. Scope of changes
+
+- Add an explicit first-bootstrap metadata handoff state for deployment bootstrap. When OpenTofu
+  creates or adopts Infisical resources and reconciliation only fails because reviewed metadata
+  still contains known placeholder IDs or empty first-bootstrap values, the tool must classify the
+  result as a pending reviewed-metadata handoff rather than an unexpected deployment bootstrap
+  failure.
+- Generate a deterministic, non-secret metadata patch or patch file for
+  `projects/deployments/pleomino/shared/family.bzl` containing the live Infisical project id,
+  machine identity ids, site URL, and credential file names returned by OpenTofu.
+- Keep the stable secret refs unchanged during metadata handoff unless the reviewed naming
+  convention itself changes.
+- Add a single top-level repo bootstrap flow that runs repo resolver/profile setup, repo bootstrap
+  credential creation or rotation, deployment bootstrap fan-out, first-bootstrap metadata handoff,
+  reviewed metadata verification, and final SprinkleRef checks from one operator command.
+- Make the top-level flow pause at an explicit review/apply gate before modifying checked-in
+  reviewed metadata. Interactive local operators should get a clear `[Y/n]` gate; non-interactive
+  use must require an explicit flag for metadata patch application.
+- Ensure the top-level command can resume idempotently after the metadata patch is applied. A second
+  run should treat the same live Infisical resources as expected, avoid duplicate project/identity
+  creation, reuse or rotate credentials according to flags, and continue through final validation.
+- Preserve the strict reconciliation guard for real drift. If live OpenTofu output differs from
+  already-reviewed non-placeholder metadata, the command must still fail closed and require a human
+  decision instead of overwriting reviewed constants.
+- Improve fan-out result reporting so a first-bootstrap handoff is shown separately from hard
+  deployment failures and so duplicate per-target reconciliation messages are collapsed into one
+  actionable handoff summary.
+- Keep standalone `deployment --target <buck-target>` behavior available, but make the repo-level
+  command the recommended first-run path.
+- Keep generated local files, OpenTofu state, and SprinkleRef local resolver config out of git
+  unless an existing repo policy explicitly allows a specific generated file such as a provider lock
+  file.
+
+### 3. External prerequisites
+
+- A live first-bootstrap smoke test requires an Infisical organization and operator login, but
+  automated repository tests must not require live Infisical, macOS Keychain, OpenTofu network
+  access, Vault, Cloudflare, or browser automation.
+- The implementation may use fixture OpenTofu outputs and temp-repo workspaces to prove the
+  first-bootstrap handoff, metadata patching, and resume behavior.
+
+### 4. Tests to be added
+
+- Add unit tests for classifying reconciliation mismatches into first-bootstrap placeholder handoff
+  versus hard drift. Placeholder reviewed IDs should allow handoff; non-placeholder reviewed IDs
+  should fail closed.
+- Add tests proving the generated `family.bzl` metadata patch updates only reviewed non-secret
+  constants: `_INFISICAL_SITE_URL`, `_INFISICAL_PROJECT_ID`,
+  `_INFISICAL_MACHINE_IDENTITY_IDS`, and `_INFISICAL_CREDENTIAL_FILE_NAMES`.
+- Add tests proving stable secret refs, secret names, environment slugs, project name/slug, and
+  Cloudflare secret requirements are not changed by the handoff patch.
+- Add repo bootstrap fan-out tests proving first-bootstrap handoff results are aggregated once and
+  reported separately from hard deployment failures.
+- Add idempotency tests proving the top-level flow can resume after metadata application without
+  trying to recreate existing Infisical resources or re-failing the placeholder reconciliation.
+- Add CLI tests for the new top-level flags and gates, including interactive metadata patch
+  confirmation, non-interactive required flags, `--without-deployments`, and existing rotation
+  flags.
+- Add final-check tests proving the single top-level flow runs or reports the canonical
+  `sprinkleref --check --config sprinkleref/selected.local.json` and bootstrap-category check after
+  reviewed metadata reconciliation succeeds.
+
+### 5. Docs to be added or updated
+
+- Update `docs/infisical-design.md` to describe first-bootstrap as a two-phase reviewed metadata
+  handoff: create/adopt live resources, review/apply non-secret metadata, then re-run or resume
+  reconciliation.
+- Update `docs/infisical-bootstrap.md` and `infisical-bootstrap.md` so the recommended fresh-start
+  path is one repo-level command, with standalone deployment bootstrap documented as an advanced
+  retry/debug path.
+- Document the difference between expected first-bootstrap metadata handoff and unexpected drift,
+  including when it is safe to apply the generated metadata patch and when an operator must stop.
+- Document which generated local files are expected during bootstrap, which files should not be
+  committed, and whether the OpenTofu provider lock file is intentionally tracked or local-only.
+- Update troubleshooting guidance for stale Keychain credentials, deleted remote Universal Auth
+  records, and first-run metadata reconciliation so operators do not confuse expected handoff with a
+  failed bootstrap.
+
+### 5.5. Expected regression scope
+
+- `deployment-only`
+- Keep changes focused on Infisical repo bootstrap orchestration, deployment fan-out result
+  classification, reviewed metadata patch generation, and docs. Do not change public backend
+  selector syntax, Pleomino secret ref naming, Cloudflare deployment semantics, provider publish
+  behavior, Vault behavior, or the Infisical OpenTofu resource model except where required for
+  idempotent first-bootstrap adoption.
+
+### 6. Acceptance criteria
+
+- A fresh Infisical bootstrap that creates the Pleomino project and identities no longer ends with a
+  hard reconciliation error solely because reviewed metadata still contains first-bootstrap
+  placeholders.
+- The tool generates a deterministic reviewed metadata patch or patch file with the live Infisical
+  project and identity IDs and clearly gates applying it.
+- One top-level repo bootstrap invocation can drive resolver setup, credential setup, deployment
+  fan-out, metadata handoff, resume/reconciliation, and final SprinkleRef checks.
+- Real drift against already-reviewed non-placeholder metadata still fails closed and is not
+  auto-applied.
+- Re-running the command after applying the metadata patch is idempotent and reaches final checks
+  without duplicate project or identity creation.
+- Standalone deployment retry remains available for failed individual targets.
+- Focused bootstrap orchestration, metadata handoff, fan-out, docs, and regression tests pass.
+- The repository validation suite passes.
+
+### 7. Risks
+
+- Automatically editing reviewed metadata can weaken the review boundary if the patch gate is too
+  permissive or if hard drift is misclassified as first-bootstrap placeholder replacement.
+- Patch generation for Starlark metadata can become brittle if the family file structure changes.
+- A single top-level flow can hide useful intermediate state if reporting is too terse.
+- OpenTofu local state and generated resolver files can confuse operators if the command does not
+  clearly explain which generated artifacts are expected and which should remain untracked.
+
+### 8. Mitigations
+
+- Only allow automatic handoff for known placeholder or empty first-bootstrap reviewed values, and
+  require exact live output fields from OpenTofu before generating the patch.
+- Generate a minimal textual patch with before/after values and require an explicit review gate
+  before applying it to checked-in metadata.
+- Keep drift errors separate from first-bootstrap handoff errors in code and tests.
+- Print a concise phase summary at the end of the top-level flow showing resolver config, credential
+  sink, deployment resources, metadata patch status, final checks, and generated local artifacts.
+
+### 9. Consequences of not implementing this PR
+
+Every fresh Infisical project bootstrap will keep hitting an expected but alarming reconciliation
+failure after resource creation, forcing operators to manually copy IDs from OpenTofu output into
+reviewed metadata and rerun the command. The repo will also lack a single reliable first-run path
+that gets an operator from a clean local state to a usable Infisical-backed deployment setup.
+
+### 10. Downsides for implementing this PR
+
+The bootstrap command becomes more stateful and needs careful reporting around phases, generated
+patches, local OpenTofu state, and reruns. The first-bootstrap handoff logic also adds another
+classification path that must be kept narrow so it does not mask real live-resource drift.

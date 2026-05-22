@@ -2,10 +2,15 @@ import { DEFAULT_GRAPH_PATH } from "../lib/graph-const";
 import { readGraph, type GraphNode } from "../lib/graph";
 import { normalizeTargetLabel } from "../lib/labels";
 import { resolveAllDeployments } from "./deployment-query";
+import {
+  emptyFanOut,
+  executeDeploymentTargets,
+} from "./infisical-iac-bootstrap-deployments-execute";
 import { askConfirmation, isAffirmativeConfirmation } from "./infisical-iac-bootstrap-preflight";
 import { errorMessage } from "./infisical-iac-bootstrap-redaction";
 import type { BootstrapArgs } from "./infisical-iac-bootstrap-types";
 import type { DeploymentTarget } from "./contract";
+import type { MetadataHandoffPatch } from "./infisical-iac-bootstrap-metadata-handoff";
 
 export type DeploymentBootstrapDiscovery = {
   offeredTargets: string[];
@@ -18,7 +23,12 @@ export type DeploymentBootstrapFanOutResult = {
   offeredTargets: string[];
   skipped: boolean;
   successes: string[];
+  metadataHandoffs: Array<{ target: string; patch: MetadataHandoffPatch }>;
   failures: Array<{ target: string; message: string }>;
+};
+
+export type DeploymentBootstrapExecutionResult = {
+  reconciliation?: { status?: string; patch?: MetadataHandoffPatch };
 };
 
 type FanOutIo = {
@@ -71,7 +81,7 @@ export async function buildDeploymentFanOutDryRunReport(args: BootstrapArgs) {
 
 export async function runDeploymentBootstrapFanOut(opts: {
   args: BootstrapArgs;
-  execute: (args: BootstrapArgs) => Promise<void>;
+  execute: (args: BootstrapArgs) => Promise<DeploymentBootstrapExecutionResult | void>;
   discover?: () => Promise<DeploymentBootstrapDiscovery>;
   io?: FanOutIo;
 }): Promise<DeploymentBootstrapFanOutResult> {
@@ -191,49 +201,6 @@ function reportUnsupportedTargets(
     stderr(`Unsupported deployment bootstrap target: ${item.target} (${item.reason})`);
   }
   if (discovery.warning) stderr(discovery.warning);
-}
-
-function emptyFanOut(
-  discovery: DeploymentBootstrapDiscovery,
-  skipped: boolean,
-): DeploymentBootstrapFanOutResult {
-  return { offeredTargets: discovery.offeredTargets, skipped, successes: [], failures: [] };
-}
-
-async function executeDeploymentTargets(
-  args: BootstrapArgs,
-  targets: string[],
-  execute: (args: BootstrapArgs) => Promise<void>,
-  stderr: (text: string) => void,
-) {
-  const result = emptyFanOut(
-    { offeredTargets: targets, unsupportedTargets: [], source: "graph" },
-    false,
-  );
-  for (const target of targets) {
-    try {
-      await execute({ ...args, mode: "deployment", target, yes: true, withoutDeployments: false });
-      result.successes.push(target);
-      stderr(`Deployment bootstrap succeeded: ${target}`);
-    } catch (error) {
-      const message = errorMessage(error);
-      result.failures.push({ target, message });
-      stderr(`Deployment bootstrap failed: ${target}\n${message}`);
-    }
-  }
-  if (result.failures.length > 0) throw fanOutFailure(result.failures);
-  stderr(`Deployment bootstrap fan-out completed: ${result.successes.join(", ")}`);
-  return result;
-}
-
-function fanOutFailure(failures: Array<{ target: string; message: string }>) {
-  return new Error(
-    [
-      "Repo bootstrap completed, but deployment bootstrap fan-out did not clear all managed outputs.",
-      ...failures.map((failure) => `${failure.target}: ${failure.message}`),
-      "Retry a failed scope with deployment --target <buck-target>.",
-    ].join("\n"),
-  );
 }
 
 function stringAttr(node: GraphNode, key: string) {

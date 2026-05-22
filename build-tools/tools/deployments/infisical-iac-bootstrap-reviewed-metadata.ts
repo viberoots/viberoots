@@ -6,7 +6,11 @@ import type { DeploymentRuntimeMetadata } from "./infisical-iac-bootstrap-types"
 export const PLEOMINO_REVIEWED_METADATA_PATH = "projects/deployments/pleomino/shared/family.bzl";
 
 export async function readPleominoReviewedMetadata(file = PLEOMINO_REVIEWED_METADATA_PATH) {
-  return parsePleominoReviewedMetadata(await fs.readFile(path.resolve(file), "utf8"));
+  return parsePleominoReviewedMetadata(await readPleominoReviewedMetadataSource(file));
+}
+
+export async function readPleominoReviewedMetadataSource(file = PLEOMINO_REVIEWED_METADATA_PATH) {
+  return await fs.readFile(path.resolve(file), "utf8");
 }
 
 export function parsePleominoReviewedMetadata(source: string): Required<DeploymentRuntimeMetadata> {
@@ -60,14 +64,14 @@ export function parsePleominoReviewedMetadata(source: string): Required<Deployme
 }
 
 function stringConstant(source: string, name: string) {
-  const match = source.match(new RegExp(`${name}\\s*=\\s*"([^"]+)"`));
+  const match = source.match(new RegExp(`${name}\\s*=\\s*"([^"]*)"`, "s"));
   return required(match?.[1], name);
 }
 
 function stringMap(source: string, name: string) {
   const body = mapBody(source, name);
   return Object.fromEntries(
-    [...body.matchAll(/"([^"]+)"\s*:\s*"([^"]+)"/g)].map((m) => [m[1], m[2]]),
+    [...body.matchAll(/"([^"]+)"\s*:\s*"([^"]*)"/g)].map((m) => [m[1], m[2]]),
   );
 }
 
@@ -77,7 +81,7 @@ function nestedStringMap(source: string, name: string) {
     [...body.matchAll(/"([^"]+)"\s*:\s*\{([\s\S]*?)\}/g)].map((stage) => [
       stage[1],
       Object.fromEntries(
-        [...stage[2].matchAll(/"([^"]+)"\s*:\s*"([^"]+)"/g)].map((m) => [m[1], m[2]]),
+        [...stage[2].matchAll(/"([^"]+)"\s*:\s*"([^"]*)"/g)].map((m) => [m[1], m[2]]),
       ),
     ]),
   ) as Record<string, Record<string, string>>;
@@ -97,7 +101,7 @@ function mapBody(source: string, name: string) {
 }
 
 function required(value: string | undefined, label: string) {
-  if (!value) throw new Error(`missing ${label} in checked-in Pleomino metadata`);
+  if (value === undefined) throw new Error(`missing ${label} in checked-in Pleomino metadata`);
   return value;
 }
 

@@ -13,6 +13,10 @@ result
 # Local temp artifacts
 .tmp/
 .local/
+sprinkleref/
+projects/deployments/*/infisical/opentofu/.terraform*/
+projects/deployments/*/infisical/opentofu/.terraform.lock.hcl
+projects/deployments/*/infisical/opentofu/terraform.tfstate*
 .claude/worktrees/
 .claude/settings.local.json
 .codex/worktrees/

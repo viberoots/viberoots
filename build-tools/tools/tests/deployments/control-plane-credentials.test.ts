@@ -160,7 +160,7 @@ test("Pleomino Infisical credential files stay deployment scoped", () => {
     const files = directory.resolveInfisicalCredentialFiles({
       deploymentId,
       siteUrl: "https://app.infisical.com",
-      projectId: "proj_pleomino_deployments",
+      projectId: "977f71e8-f40b-44e6-b3bb-de0a7abbd826",
       environment,
     });
     assert.match(files.clientIdFile, new RegExp(`${deploymentId}-infisical-client-id$`));

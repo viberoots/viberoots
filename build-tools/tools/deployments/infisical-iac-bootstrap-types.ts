@@ -17,6 +17,7 @@ export type BootstrapArgs = {
   yes: boolean;
   dryRun: boolean;
   withoutDeployments: boolean;
+  applyMetadataPatch: boolean;
   tofuDir: string;
   noTofuApply: boolean;
   tofuPlanFile?: string;

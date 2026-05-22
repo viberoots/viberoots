@@ -6,43 +6,46 @@ import {
   resolveInfisicalHost,
   withDeploymentBootstrapDefaults,
 } from "./infisical-iac-bootstrap-config";
-import { InfisicalApi } from "./infisical-iac-bootstrap-api";
-import { getAccessToken, spawnCommandRunner } from "./infisical-iac-bootstrap-auth";
+import { spawnCommandRunner } from "./infisical-iac-bootstrap-auth";
 import {
   createCredentialSink,
   resolveCredentialSinkSelection,
 } from "./infisical-iac-bootstrap-sink";
+import { ensureBootstrapCredential, ensureUniversalAuth } from "./infisical-iac-bootstrap-identity";
 import {
-  ensureBootstrapCredential,
-  ensureIdentity,
-  ensureUniversalAuth,
-} from "./infisical-iac-bootstrap-identity";
-import { ensureRepoBootstrapCredential } from "./infisical-iac-bootstrap-repo-credential";
+  createInfisicalSession,
+  type SharedInfisicalSession,
+} from "./infisical-iac-bootstrap-repo-credential";
 import { buildCredentialHandoffReport } from "./infisical-iac-bootstrap-handoff";
 import { buildDryRunGuidance, buildDryRunReport } from "./infisical-iac-bootstrap-dry-run";
-import { runDeploymentBootstrapFanOut } from "./infisical-iac-bootstrap-deployments";
-import { resolveOrganizationId } from "./infisical-iac-bootstrap-org";
+import { runRepoBootstrap } from "./infisical-iac-bootstrap-repo";
 import { readDeploymentRuntimeMetadata, runOpenTofu } from "./infisical-iac-bootstrap-tofu";
 import { confirmBootstrapPreflight } from "./infisical-iac-bootstrap-preflight";
 import { reconcileDeploymentMetadata } from "./infisical-iac-bootstrap-reconcile";
 import { ensureDeploymentCredentials } from "./infisical-iac-deployment-credentials";
-import { readPleominoReviewedMetadata } from "./infisical-iac-bootstrap-reviewed-metadata";
+import {
+  readPleominoReviewedMetadata,
+  readPleominoReviewedMetadataSource,
+} from "./infisical-iac-bootstrap-reviewed-metadata";
 import { errorMessage } from "./infisical-iac-bootstrap-redaction";
-import { ensureRepoResolverConfig } from "./infisical-iac-bootstrap-resolver";
-import { materializeRepoBackendProfiles } from "./infisical-iac-bootstrap-profiles";
-import { materializeBootstrapCredentialSink } from "./infisical-iac-bootstrap-sink-materialize";
-import type { BootstrapArgs, Identity } from "./infisical-iac-bootstrap-types";
-import { readSprinkleRefConfig } from "./sprinkleref-config";
+import type { BootstrapArgs } from "./infisical-iac-bootstrap-types";
 
 const PLEOMINO_DEPLOYMENT_BOOTSTRAP_TARGETS = new Set([
   "//projects/deployments/pleomino/staging:deploy",
   "//projects/deployments/pleomino/prod:deploy",
 ]);
 
-export async function runInfisicalIacBootstrap(args: BootstrapArgs) {
-  if (args.mode === "repo") return await runRepoBootstrap(args);
+export async function runInfisicalIacBootstrap(
+  args: BootstrapArgs,
+  context: { infisicalSession?: SharedInfisicalSession } = {},
+) {
+  if (args.mode === "repo") {
+    if (args.dryRun) return dryRun(args);
+    return await runRepoBootstrap(args, runInfisicalIacBootstrap);
+  }
   const deploymentArgs = withDeploymentBootstrapDefaults(args);
   deploymentScopeFromTarget(deploymentArgs);
+  const reviewedSource = await readPleominoReviewedMetadataSource();
   const reviewedMetadata = await readPleominoReviewedMetadata();
   const effectiveArgs = withReviewedHost(deploymentArgs, reviewedMetadata.siteUrl);
   if (effectiveArgs.dryRun) return dryRun(effectiveArgs);
@@ -50,19 +53,18 @@ export async function runInfisicalIacBootstrap(args: BootstrapArgs) {
   const sinkSelection = await resolveCredentialSinkSelection(effectiveArgs, {
     createMissingResolverConfig: true,
   });
-  const access = await getAccessToken(effectiveArgs);
-  const api = new InfisicalApi({ apiUrl: effectiveArgs.apiUrl, token: access.token });
-  const organizationId = await resolveOrganizationId(api, effectiveArgs);
-  const resolvedArgs = { ...effectiveArgs, organizationId };
-  const identity = await ensureIdentity(api, resolvedArgs);
+  const session =
+    context.infisicalSession?.apiUrl === effectiveArgs.apiUrl
+      ? context.infisicalSession
+      : await createInfisicalSession(effectiveArgs);
+  const api = session.api;
+  const resolvedArgs = { ...effectiveArgs, organizationId: session.organizationId };
+  const identity = session.identity;
   await ensureUniversalAuth(api, resolvedArgs, identity);
   const sink = await createCredentialSink(effectiveArgs);
-  const credential = await ensureBootstrapCredential({
-    api,
-    args: resolvedArgs,
-    identity,
-    sink,
-  });
+  const credential =
+    session.bootstrapCredential ??
+    (await ensureBootstrapCredential({ api, args: resolvedArgs, identity, sink }));
   const tofu = await runOpenTofu({
     args: resolvedArgs,
     credential,
@@ -80,109 +82,31 @@ export async function runInfisicalIacBootstrap(args: BootstrapArgs) {
     return;
   }
   const metadata = readDeploymentRuntimeMetadata(resolvedArgs, spawnCommandRunner);
-  const reconciliation = reconcileDeploymentMetadata(metadata, reviewedMetadata);
+  const reconciliation = reconcileDeploymentMetadata(metadata, reviewedMetadata, reviewedSource);
+  if (reconciliation.status === "metadata_handoff_required") {
+    const result = { reconciliation, deploymentCredentialLifecycle: [], credentialHandoff: null };
+    console.log(JSON.stringify(result, null, 2));
+    return result;
+  }
   const deploymentCredentialLifecycle = await ensureDeploymentCredentials({
     api,
     args: effectiveArgs,
     sink,
     metadata,
   });
-  if (access.cleanupMessage) console.error(access.cleanupMessage);
-  console.log(
-    JSON.stringify(
-      {
-        reconciliation,
-        deploymentCredentialLifecycle,
-        credentialHandoff: buildCredentialHandoffReport({
-          args: effectiveArgs,
-          sinkSelection,
-          sinkDescription: sink.describe(),
-          bootstrapIdentity: identity,
-          metadata: reviewedMetadata,
-        }),
-      },
-      null,
-      2,
-    ),
-  );
-}
-
-async function runRepoBootstrap(args: BootstrapArgs) {
-  if (args.dryRun) return dryRun(args);
-  await confirmBootstrapPreflight(args);
-  const resolver = await ensureRepoResolverConfig({ dryRun: false });
-  const sink = await resolveCredentialSinkSelection(args, { createMissingResolverConfig: true });
-  const credential = (await hasRequiredInfisicalProfile(resolver))
-    ? await ensureRepoBootstrapCredential(args)
-    : undefined;
-  const materialization = await materializeRepoProfiles(args, resolver, credential);
-  const credentialSinkMaterialization = await materializeBootstrapCredentialSink({
-    args,
-    selection: sink,
-  });
-  console.log(
-    JSON.stringify(
-      {
-        schemaVersion: "infisical-repo-bootstrap-result@1",
-        mode: "repo",
-        resolverConfig: resolver.configPath,
-        profiles: resolver.profiles,
-        categories: ["main", "bootstrap"],
-        bootstrapCredentialSinks: resolver.bootstrapCredentialProfiles.map((profile) => ({
-          profile,
-          credentialSink: sink.kind,
-          credentialSinkBackend: sink.backend,
-          category: sink.category || args.sprinkleCategory || "bootstrap",
-        })),
-        credentialSink: sink.kind,
-        credentialSinkBackend: sink.backend,
-        profileMaterialization: materialization,
-        credentialSinkMaterialization,
-        deploymentFanOut: { skipped: args.withoutDeployments, optOutFlag: "--without-deployments" },
-      },
-      null,
-      2,
-    ),
-  );
-  console.error(`Credential sink: ${sink.description}`);
-  printRepoFollowUpCommands(resolver.configPath);
-  await runDeploymentBootstrapFanOut({
-    args,
-    execute: async (deploymentArgs) => runInfisicalIacBootstrap(deploymentArgs),
-  });
-}
-
-async function materializeRepoProfiles(
-  args: BootstrapArgs,
-  resolver: Awaited<ReturnType<typeof ensureRepoResolverConfig>>,
-  credential?: { api: InfisicalApi; organizationId: string; identity: Identity },
-) {
-  if (!(await hasRequiredInfisicalProfile(resolver))) {
-    return await materializeRepoBackendProfiles({
-      args,
-      configPath: resolver.configPath,
-      requiredProfiles: resolver.profiles,
-    });
-  }
-  if (!credential) throw new Error("Infisical bootstrap credential was not prepared");
-  return await materializeRepoBackendProfiles({
-    args,
-    api: credential.api,
-    organizationId: credential.organizationId,
-    identity: credential.identity,
-    configPath: resolver.configPath,
-    requiredProfiles: resolver.profiles,
-  });
-}
-
-async function hasRequiredInfisicalProfile(
-  resolver: Awaited<ReturnType<typeof ensureRepoResolverConfig>>,
-) {
-  const config = await readSprinkleRefConfig(resolver.configPath);
-  return resolver.profiles.some((profile) => {
-    const backend = config.profiles[profile];
-    return profile.startsWith("infisical-") || backend?.backend === "infisical";
-  });
+  const result = {
+    reconciliation,
+    deploymentCredentialLifecycle,
+    credentialHandoff: buildCredentialHandoffReport({
+      args: effectiveArgs,
+      sinkSelection,
+      sinkDescription: sink.describe(),
+      bootstrapIdentity: identity,
+      metadata: reviewedMetadata,
+    }),
+  };
+  console.log(JSON.stringify(result, null, 2));
+  return result;
 }
 
 function deploymentScopeFromTarget(args: BootstrapArgs) {

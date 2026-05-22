@@ -171,6 +171,7 @@ const REVIEWED_ARGS = {
   forceLogin: false,
   yes: true,
   dryRun: false,
+  applyMetadataPatch: false,
   tofuDir: "projects/deployments/pleomino/infisical/opentofu",
   noTofuApply: false,
   rotateBootstrapCredentials: false,

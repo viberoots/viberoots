@@ -6,6 +6,7 @@ The canonical operator entrypoint is:
 build-tools/tools/deployments/infisical-bootstrap.ts repo --dry-run
 build-tools/tools/deployments/infisical-bootstrap.ts repo
 build-tools/tools/deployments/infisical-bootstrap.ts repo --yes
+build-tools/tools/deployments/infisical-bootstrap.ts repo --yes --apply-metadata-patch
 build-tools/tools/deployments/infisical-bootstrap.ts repo --without-deployments
 build-tools/tools/deployments/infisical-bootstrap.ts deployment --target <buck-target> --dry-run
 build-tools/tools/deployments/infisical-bootstrap.ts deployment --target <buck-target> --yes
@@ -15,6 +16,13 @@ Use `--yes` for non-interactive pre-confirmation. Local interactive operators ma
 confirm the repo setup and deployment fan-out prompts; CI and other non-interactive flows must pass
 `--yes`. Use `repo --without-deployments` when only resolver/profile setup should run, then retry a
 single deployment later with `deployment --target <buck-target>`.
+
+Fresh Pleomino Infisical bootstrap is a two-phase reviewed metadata handoff. If OpenTofu creates or
+adopts live resources while `family.bzl` still has first-bootstrap placeholders, repo bootstrap
+prints a non-secret patch for the reviewed constants and pauses before applying it. Interactive
+operators can approve the `[Y/n]` metadata gate; non-interactive runs must add
+`--apply-metadata-patch`. Real drift against already-reviewed non-placeholder values still fails
+closed.
 
 This document intentionally redirects to the repo-root bootstrap spec at
 [`infisical-bootstrap.md`](../infisical-bootstrap.md). Keep command examples there and here on the
@@ -57,3 +65,20 @@ Deployment graph nodes with secret requirements and omitted `secret_backend` con
 Token-based `--no-login` bootstrap flows must pass exactly one of `--org-name` or
 `--organization-id`; login-based operator flows may still use interactive or `--yes` single-org
 discovery.
+
+Expected local bootstrap artifacts are ignored and should not be committed: `sprinkleref/`, the
+OpenTofu `.terraform/` directory, `terraform.tfstate*`, and `.terraform.lock.hcl`.
+
+Troubleshooting:
+
+- Stale macOS Keychain bootstrap credentials usually appear as Universal Auth login failures after
+  repo metadata still validates. Rerun `build-tools/tools/deployments/infisical-bootstrap.ts repo
+--dry-run` to confirm the selected sink, then rotate with `--rotate-bootstrap-credentials` or
+  switch to `--credential-sink local-file` if local Keychain access is unavailable.
+- Deleted remote Universal Auth client-secret records are not recoverable from Infisical; the
+  client secret is only available when created. If the remote record was deleted or the local sink no
+  longer has the matching value, rerun repo bootstrap with the appropriate rotation flag instead of
+  editing reviewed deployment metadata.
+- First-bootstrap metadata handoff is expected only when reviewed values are placeholders or empty
+  first-bootstrap fields. Drift against already-reviewed project ids, identity ids, environment
+  slugs, secret names, or refs requires a human Infisical review before retrying.

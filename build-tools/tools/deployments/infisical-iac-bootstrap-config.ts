@@ -16,6 +16,7 @@ export const DEFAULT_BOOTSTRAP_ARGS: BootstrapArgs = {
   yes: false,
   dryRun: false,
   withoutDeployments: false,
+  applyMetadataPatch: false,
   tofuDir: "",
   noTofuApply: false,
   rotateBootstrapCredentials: false,

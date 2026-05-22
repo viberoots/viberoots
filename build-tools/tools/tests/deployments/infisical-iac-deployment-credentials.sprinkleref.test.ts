@@ -106,9 +106,15 @@ async function readStore(file: string) {
 }
 
 function fakeDeploymentCredentialApi() {
+  const stageByIdentityId = new Map(
+    reviewedMetadata.deploymentCredentials.map((item) => [item.identityId, item.stage]),
+  );
   return {
     request(method: string, endpoint: string) {
-      const stage = endpoint.includes("staging") ? "staging" : "prod";
+      const stage =
+        [...stageByIdentityId.entries()].find(([identityId]) =>
+          endpoint.includes(identityId),
+        )?.[1] || (endpoint.includes("staging") ? "staging" : "prod");
       if (endpoint.endsWith("/client-secrets") && method === "GET") return { clientSecrets: [] };
       if (endpoint.endsWith("/client-secrets") && method === "POST")
         return { clientSecret: `new-secret-${stage}` };

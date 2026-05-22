@@ -7,17 +7,36 @@ import {
 } from "./infisical-iac-bootstrap-identity";
 import { resolveOrganizationId } from "./infisical-iac-bootstrap-org";
 import { createCredentialSink } from "./infisical-iac-bootstrap-sink";
-import type { BootstrapArgs } from "./infisical-iac-bootstrap-types";
+import type { BootstrapArgs, BootstrapCredential, Identity } from "./infisical-iac-bootstrap-types";
+
+export type SharedInfisicalSession = {
+  api: InfisicalApi;
+  apiUrl: string;
+  organizationId: string;
+  identity: Identity;
+  bootstrapCredential?: BootstrapCredential;
+};
 
 export async function ensureRepoBootstrapCredential(args: BootstrapArgs) {
+  const session = await createInfisicalSession(args);
+  const resolvedArgs = { ...args, organizationId: session.organizationId };
+  await ensureUniversalAuth(session.api, resolvedArgs, session.identity);
+  const sink = await createCredentialSink(args);
+  const bootstrapCredential = await ensureBootstrapCredential({
+    api: session.api,
+    args,
+    identity: session.identity,
+    sink,
+  });
+  return { ...session, bootstrapCredential };
+}
+
+export async function createInfisicalSession(args: BootstrapArgs): Promise<SharedInfisicalSession> {
   const access = await getAccessToken(args);
   const api = new InfisicalApi({ apiUrl: args.apiUrl, token: access.token });
   const organizationId = await resolveOrganizationId(api, args);
   const resolvedArgs = { ...args, organizationId };
   const identity = await ensureIdentity(api, resolvedArgs);
-  await ensureUniversalAuth(api, resolvedArgs, identity);
-  const sink = await createCredentialSink(args);
-  await ensureBootstrapCredential({ api, args, identity, sink });
   if (access.cleanupMessage) console.error(access.cleanupMessage);
-  return { api, organizationId, identity };
+  return { api, apiUrl: args.apiUrl, organizationId, identity };
 }

@@ -25,6 +25,7 @@ Primary commands:
 build-tools/tools/deployments/infisical-bootstrap.ts repo --dry-run
 build-tools/tools/deployments/infisical-bootstrap.ts repo
 build-tools/tools/deployments/infisical-bootstrap.ts repo --yes
+build-tools/tools/deployments/infisical-bootstrap.ts repo --yes --apply-metadata-patch
 build-tools/tools/deployments/infisical-bootstrap.ts repo --without-deployments
 build-tools/tools/deployments/infisical-bootstrap.ts deployment --target <buck-target> --dry-run
 build-tools/tools/deployments/infisical-bootstrap.ts deployment --target <buck-target> --yes
@@ -42,6 +43,23 @@ reviewed deployment bootstrap targets discovered from deployment metadata. `--ye
 both the repo setup prompt and this deployment fan-out prompt. Use `repo --without-deployments`
 when you only want resolver/profile setup; managed deployment bootstrap outputs may remain missing
 until a later default repo run or an explicit deployment bootstrap succeeds.
+
+On first bootstrap, OpenTofu may create or adopt the Pleomino Infisical project and machine
+identities while checked-in reviewed metadata still contains first-bootstrap placeholders. That is
+reported as a reviewed metadata handoff, not unexpected drift. The command prints a non-secret patch
+for `projects/deployments/pleomino/shared/family.bzl` covering only `_INFISICAL_SITE_URL`,
+`_INFISICAL_PROJECT_ID`, `_INFISICAL_MACHINE_IDENTITY_IDS`, and
+`_INFISICAL_CREDENTIAL_FILE_NAMES`. Local interactive operators can approve the patch at the
+`[Y/n]` gate. Non-interactive runs must pass `--apply-metadata-patch`; `--yes` alone does not apply
+reviewed metadata. After applying the patch, repo bootstrap reruns deployment fan-out so
+reconciliation and the final SprinkleRef checks can use the reviewed values.
+
+If live OpenTofu output differs from already-reviewed non-placeholder metadata, bootstrap still
+fails closed. Stop and inspect the Infisical resources instead of applying a generated patch.
+
+Generated local bootstrap artifacts stay local: `sprinkleref/`, `.terraform/`,
+`terraform.tfstate*`, and the OpenTofu `.terraform.lock.hcl` are ignored for this repo. Do not
+commit local resolver config, OpenTofu state, or credential material.
 
 `deployment --target <buck-target>` is the explicit deployment provisioning layer. The existing
 Pleomino Infisical OpenTofu project/environment/identity reconciliation and deployment Universal
@@ -72,6 +90,7 @@ Key flags:
 --org-name <exact-name>
 --yes
 --without-deployments
+--apply-metadata-patch
 --no-login
 --force-login
 --access-token-env <env-name>
@@ -162,6 +181,22 @@ Rotation:
 - `--rotate-bootstrap-credentials` creates a new remote client secret and writes it to the selected sink.
 - `--force-overwrite-local-credentials` controls local/sink overwrite when a new value is written.
 - Old remote client secret records are not revoked or deleted by default unless a separate safe revocation flow is implemented.
+
+Troubleshooting:
+
+- Stale macOS Keychain credentials: if repo bootstrap selects the Keychain sink but Universal Auth
+  fails with an otherwise valid client id, treat the local secret as stale. Confirm the selected sink
+  with `build-tools/tools/deployments/infisical-bootstrap.ts repo --dry-run`, then rerun with
+  `--rotate-bootstrap-credentials` or use `--credential-sink local-file` on machines where Keychain
+  access is not available.
+- Deleted remote Universal Auth records: Infisical cannot reveal an existing client secret after
+  creation, and a deleted remote secret record cannot be repaired by editing local resolver config.
+  Rerun repo bootstrap with the relevant rotation flag so a new remote record and local sink value
+  are created together.
+- First-bootstrap metadata handoff: apply the generated `family.bzl` patch only when the mismatch is
+  limited to first-bootstrap placeholders or empty reviewed fields. If the command reports drift
+  against reviewed non-placeholder metadata, stop and inspect the live Infisical project before
+  retrying.
 
 ## Deployment OpenTofu Infisical Stack
 

@@ -32,6 +32,7 @@ const BOOL_FLAGS = new Set([
   "yes",
   "dry-run",
   "without-deployments",
+  "apply-metadata-patch",
   "no-tofu-apply",
   "rotate-bootstrap-credentials",
   "rotate-deployment-credentials",
@@ -64,6 +65,7 @@ Options:
   --yes                         Skip confirmation prompts
   --dry-run                     Print non-secret planned operations
   --without-deployments          Skip repo bootstrap deployment fan-out
+  --apply-metadata-patch         Apply reviewed first-bootstrap metadata patch non-interactively
 `;
 }
 
@@ -104,6 +106,7 @@ export function parseBootstrapArgs(argv = getArgvTokens()): BootstrapArgs {
   args.yes = readFlagBoolFromTokens("yes", argv);
   args.dryRun = readFlagBoolFromTokens("dry-run", argv);
   args.withoutDeployments = readFlagBoolFromTokens("without-deployments", argv);
+  args.applyMetadataPatch = readFlagBoolFromTokens("apply-metadata-patch", argv);
   args.noTofuApply = readFlagBoolFromTokens("no-tofu-apply", argv);
   args.rotateBootstrapCredentials = readFlagBoolFromTokens("rotate-bootstrap-credentials", argv);
   args.rotateDeploymentCredentials = readFlagBoolFromTokens("rotate-deployment-credentials", argv);

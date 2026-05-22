@@ -269,6 +269,17 @@ environments, machine identities, Vault policies/roles, paths, and application
 secrets, but it should not require each deployment to independently solve
 account login or repo-wide default profile setup.
 
+First bootstrap has an explicit two-phase reviewed metadata handoff. OpenTofu may create or adopt
+live Pleomino Infisical resources before reviewed deployment metadata contains the live project id,
+machine identity ids, site URL, or generated credential file names. If every mismatch is limited to
+known first-bootstrap placeholders or empty reviewed values, bootstrap reports
+`metadata_handoff_required` and emits a deterministic, non-secret patch for
+`projects/deployments/pleomino/shared/family.bzl`. That patch may update only
+`_INFISICAL_SITE_URL`, `_INFISICAL_PROJECT_ID`, `_INFISICAL_MACHINE_IDENTITY_IDS`, and
+`_INFISICAL_CREDENTIAL_FILE_NAMES`; stable secret refs, environment slugs, project name/slug,
+secret names, and Cloudflare requirements remain reviewed constants. Any mismatch against
+non-placeholder reviewed metadata is hard drift and must fail closed.
+
 ### Infisical Runtime Metadata
 
 Add an optional `infisical_runtime` metadata dictionary, analogous to

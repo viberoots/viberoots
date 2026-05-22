@@ -3,7 +3,7 @@ import type { DeploymentRuntimeMetadata } from "../../deployments/infisical-iac-
 export const reviewedMetadata: Required<DeploymentRuntimeMetadata> = {
   siteUrl: "https://app.infisical.com",
   projectName: "pleomino-deployments",
-  projectId: "proj_pleomino_deployments",
+  projectId: "977f71e8-f40b-44e6-b3bb-de0a7abbd826",
   projectSlug: "pleomino-deployments",
   secretPath: "/",
   cloudflareSecretName: "cloudflare_api_token",
@@ -14,7 +14,7 @@ export const reviewedMetadata: Required<DeploymentRuntimeMetadata> = {
   deploymentCredentials: [
     {
       stage: "staging",
-      identityId: "identity_pleomino_staging_deploy",
+      identityId: "ae854a19-3537-4d40-8730-8314a74c3d04",
       identityName: "pleomino-staging-deploy",
       clientIdRef: "secret://deployments/pleomino/staging/infisical-client-id",
       clientSecretRef: "secret://deployments/pleomino/staging/infisical-client-secret",
@@ -23,7 +23,7 @@ export const reviewedMetadata: Required<DeploymentRuntimeMetadata> = {
     },
     {
       stage: "prod",
-      identityId: "identity_pleomino_prod_deploy",
+      identityId: "5e302d6c-3ac7-4fbc-a75f-b2312f33809a",
       identityName: "pleomino-prod-deploy",
       clientIdRef: "secret://deployments/pleomino/prod/infisical-client-id",
       clientSecretRef: "secret://deployments/pleomino/prod/infisical-client-secret",

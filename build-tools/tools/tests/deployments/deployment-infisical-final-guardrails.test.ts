@@ -50,6 +50,7 @@ async function walkFiles(
   const out: string[] = [];
   async function visit(dir: string) {
     for (const entry of await fsp.readdir(dir, { withFileTypes: true })) {
+      if (entry.isDirectory() && entry.name === ".terraform") continue;
       const fullPath = path.join(dir, entry.name);
       if (entry.isDirectory()) await visit(fullPath);
       else if (entry.isFile() && predicate(fullPath)) out.push(fullPath);

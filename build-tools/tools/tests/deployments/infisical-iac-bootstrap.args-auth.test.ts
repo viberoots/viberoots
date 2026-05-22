@@ -25,6 +25,7 @@ test("bootstrap usage prints the selected operator command surface", () => {
     text,
     /build-tools\/tools\/deployments\/infisical-bootstrap\.ts repo --without-deployments/,
   );
+  assert.match(text, /--apply-metadata-patch/);
   assert.match(
     text,
     /build-tools\/tools\/deployments\/infisical-bootstrap\.ts deployment --target <buck-target> --dry-run/,
@@ -96,6 +97,7 @@ test("bootstrap args support host shorthands and non-interactive controls", () =
     ".local/plan.tfplan",
     "--no-tofu-apply",
     "--rotate-deployment-credentials",
+    "--apply-metadata-patch",
     "--yes",
   ]);
   assert.equal(args.apiUrl, "https://eu.infisical.com");
@@ -104,6 +106,7 @@ test("bootstrap args support host shorthands and non-interactive controls", () =
   assert.equal(args.organizationId, "org_1");
   assert.equal(args.noTofuApply, true);
   assert.equal(args.rotateDeploymentCredentials, true);
+  assert.equal(args.applyMetadataPatch, true);
   assert.equal(args.yes, true);
 });
 

@@ -24,13 +24,13 @@ import { infisicalTestContext } from "./deployment-secret-infisical.fixture";
 import { startFakeInfisicalServer } from "./infisical.test-server";
 const expectedRuntime = {
   siteUrl: "https://app.infisical.com",
-  projectId: "proj_pleomino_deployments",
+  projectId: "977f71e8-f40b-44e6-b3bb-de0a7abbd826",
   secretPath: "/",
   preferredCredentialSource: "machine_identity_universal_auth",
 };
 const expectedIdentities = {
-  staging: "identity_pleomino_staging_deploy",
-  prod: "identity_pleomino_prod_deploy",
+  staging: "ae854a19-3537-4d40-8730-8314a74c3d04",
+  prod: "5e302d6c-3ac7-4fbc-a75f-b2312f33809a",
 };
 const tokenContract = "secret://deployments/pleomino/cloudflare_api_token";
 const query = `set(${[
