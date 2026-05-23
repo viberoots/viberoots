@@ -12,7 +12,7 @@ export function reconcileDeploymentMetadata(
   opts: { allowReviewedIdHandoff?: boolean } = {},
 ) {
   const mismatches = [
-    ...compareHost("site url", live.siteUrl, reviewed.siteUrl, true, opts),
+    ...compareHost("site url", live.siteUrl, reviewed.siteUrl, true),
     ...compare("project name", live.projectName, reviewed.projectName, false),
     ...compare("project id", live.projectId, reviewed.projectId, true, opts),
     ...compare("project slug", live.projectSlug, reviewed.projectSlug, false),
@@ -59,14 +59,12 @@ export function reconcileDeploymentMetadata(
           actual?.clientIdFileName,
           expected.clientIdFileName,
           true,
-          opts,
         ),
         ...compare(
           `${expected.stage} client secret file name`,
           actual?.clientSecretFileName,
           expected.clientSecretFileName,
           true,
-          opts,
         ),
       ];
     }),

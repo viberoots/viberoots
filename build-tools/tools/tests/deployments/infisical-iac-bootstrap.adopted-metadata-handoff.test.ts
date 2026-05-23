@@ -30,6 +30,28 @@ test("adopted project metadata handoff still requires live ids", () => {
   );
 });
 
+test("adopted project metadata handoff does not relax reviewed file-name drift", () => {
+  const reviewed = parsePleominoReviewedMetadata(SOURCE);
+  assert.throws(
+    () =>
+      reconcileDeploymentMetadata(
+        {
+          ...LIVE_METADATA,
+          deploymentCredentials: [
+            {
+              ...LIVE_METADATA.deploymentCredentials[0],
+              clientIdFileName: "unexpected-client-id-file",
+            },
+          ],
+        },
+        reviewed,
+        SOURCE,
+        { allowReviewedIdHandoff: true },
+      ),
+    /staging client id file name: live=unexpected-client-id-file reviewed=pleomino-staging-client-id/,
+  );
+});
+
 const LIVE_METADATA = {
   siteUrl: "https://app.infisical.com",
   projectName: "pleomino-deployments",
@@ -62,7 +84,10 @@ _INFISICAL_CLOUDFLARE_SECRET_NAME = "cloudflare_api_token"
 _INFISICAL_MACHINE_IDENTITY_IDS = {"staging": "identity_old_staging"}
 _INFISICAL_MACHINE_IDENTITY_NAMES = {"staging": "pleomino-staging-deploy"}
 _INFISICAL_CREDENTIAL_FILE_NAMES = {
-  "staging": {"client_id": "", "client_secret": ""},
+  "staging": {
+    "client_id": "pleomino-staging-client-id",
+    "client_secret": "pleomino-staging-client-secret",
+  },
 }
 _INFISICAL_CREDENTIAL_REFS = {
   "staging": {
