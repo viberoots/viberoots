@@ -1,9 +1,6 @@
 import * as path from "node:path";
 import * as readline from "node:readline/promises";
-import {
-  DEFAULT_BOOTSTRAP_ARGS,
-  withDeploymentBootstrapDefaults,
-} from "./infisical-iac-bootstrap-config";
+import { withDeploymentBootstrapDefaults } from "./infisical-iac-bootstrap-config";
 import type { BootstrapArgs } from "./infisical-iac-bootstrap-types";
 
 type PreflightIo = {
@@ -78,21 +75,6 @@ export function bootstrapRetryCommand(args: BootstrapArgs) {
     "build-tools/tools/deployments/infisical-bootstrap.ts",
     retryArgs.mode,
     ...(retryArgs.mode === "deployment" ? retryFlag("target", retryArgs.target) : []),
-    ...retryFlag("infisical-host", retryArgs.hostOverride ? retryArgs.apiUrl : ""),
-    ...retryFlag("organization-id", retryArgs.organizationId),
-    ...retryFlag("org-name", retryArgs.orgName),
-    ...(retryArgs.mode === "deployment" ? retryFlag("tofu-dir", retryArgs.tofuDir) : []),
-    ...(retryArgs.mode === "deployment" ? retryFlag("tofu-plan-file", retryArgs.tofuPlanFile) : []),
-    ...retryFlag(
-      "credential-sink",
-      retryArgs.credentialSink === "auto" ? "" : retryArgs.credentialSink,
-    ),
-    ...retryFlag(
-      "local-credential-file",
-      retryArgs.localCredentialFile === DEFAULT_BOOTSTRAP_ARGS.localCredentialFile
-        ? ""
-        : retryArgs.localCredentialFile,
-    ),
     ...retryFlag("machine-label", retryArgs.machineLabel),
     ...retryBoolFlag("rotate-bootstrap-credentials", retryArgs.rotateBootstrapCredentials),
     ...retryBoolFlag("rotate-deployment-credentials", retryArgs.rotateDeploymentCredentials),

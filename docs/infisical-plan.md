@@ -4616,3 +4616,110 @@ the operator requested.
 Retry guidance becomes slightly longer when credential-affecting flags are present. The command
 construction also needs a small allowlist that must be updated if future credential lifecycle flags
 are added.
+
+## PR-46: Retry allowlist and setup idempotency closure
+
+### 1. Intent
+
+Close the post-PR-45 assessment gaps by making retry guidance strictly credential-intent-only for
+preserved flags and by proving the top-level per-machine setup path is idempotent across repeated
+runs. Also remove remaining Pleomino Infisical README guidance that still implies operators should
+recover or import old shared local credential values.
+
+### 2. Scope of changes
+
+- Tighten bootstrap retry command construction so it preserves only mode/target selection,
+  credential-affecting PR-44 flags, and the required `--yes` confirmation.
+- Remove `--tofu-dir`, `--tofu-plan-file`, custom `--local-credential-file`, and any other local
+  path flags from generated mutation retry guidance.
+- Keep preserving `--machine-label`, `--rotate-bootstrap-credentials`,
+  `--rotate-deployment-credentials`, and `--force-overwrite-local-credentials` when supplied.
+- Add or adjust tests so generated retry commands prove local/generated path flags are omitted even
+  when the original invocation used custom paths.
+- Add a focused repeated top-level setup test around repo bootstrap plus deployment fan-out proving
+  a second run reuses existing current-machine repo and deployment credentials, creates no new
+  remote client-secret records, and leaves mocked other-machine remote records untouched.
+- Keep the lower-level PR-44 credential lifecycle behavior unchanged.
+- Update `projects/deployments/pleomino/infisical/README.md` so missing local deployment
+  credential guidance matches the per-machine model: rerun top-level setup to create current-machine
+  credentials, rotate explicitly when desired, and do not import another user's shared secret.
+- Preserve the PR-45 docs section in `docs/infisical-plan.md` and add this PR as the only new plan
+  section required by the assessments.
+
+### 3. External prerequisites
+
+- None. This is hermetic retry-command, repo-flow test, and documentation cleanup work.
+- No live Infisical, OpenTofu network access, macOS Keychain, Vault, Cloudflare, browser
+  automation, or real host-specific state should be required.
+
+### 4. Tests to be added
+
+- Add retry-command negative tests proving `--tofu-dir`, `--tofu-plan-file`, and custom
+  `--local-credential-file` are not copied into mutation retry guidance.
+- Keep positive retry-command tests for mode, target, `--machine-label`, rotation flags,
+  overwrite flag, and `--yes`.
+- Add a repeated repo bootstrap fan-out test showing current-machine repo/deployment credentials are
+  reused on rerun and no extra remote client-secret creations occur.
+- In the repeated setup test, include existing mocked other-machine remote records and prove they are
+  not modified or treated as conflicts.
+- Keep focused preflight retry-command, repo-flow, PR-44 credential lifecycle, and taxonomy tests
+  passing.
+
+### 5. Docs to be added or updated
+
+- Update `projects/deployments/pleomino/infisical/README.md` to remove stale import/recover
+  language for missing local Universal Auth credentials.
+- Update `docs/infisical-bootstrap.md` or `infisical-bootstrap.md` only if the implementation
+  changes operator-facing retry or rerun guidance beyond what PR-44 and PR-45 already documented.
+
+### 5.5. Expected regression scope
+
+- `deployment-only`
+- Keep changes limited to retry command allowlisting, top-level setup idempotency tests, and
+  Pleomino Infisical README cleanup. Do not change Universal Auth credential creation semantics,
+  reviewed metadata handoff, deployment resource definitions, public backend selector syntax,
+  stable secret refs, Vault behavior, or Cloudflare secret requirements.
+
+### 6. Acceptance criteria
+
+- Retry commands no longer include `--tofu-dir`, `--tofu-plan-file`, custom
+  `--local-credential-file`, or other local/generated path flags.
+- Retry commands still preserve mode/target selection, `--machine-label`, rotation flags,
+  overwrite flag, and `--yes`.
+- Repeated top-level repo bootstrap plus deployment fan-out reuses existing current-machine
+  credentials without creating new remote client-secret records.
+- Existing mocked other-machine remote records remain untouched and non-conflicting on rerun.
+- Pleomino Infisical README no longer tells operators to recover/import old shared local credential
+  values for the per-machine setup path.
+- Focused retry-command, repo-flow, and docs/taxonomy tests pass.
+- The repository validation suite passes.
+
+### 7. Risks
+
+- Removing local path flags from retry guidance can make advanced debugging retries less exact for
+  operators who intentionally passed custom OpenTofu paths.
+- A top-level rerun test can become fixture-heavy if it tries to simulate too much live bootstrap
+  behavior.
+- README cleanup could accidentally remove useful recovery guidance for unrelated OpenTofu state or
+  application secrets.
+
+### 8. Mitigations
+
+- Keep retry guidance focused on the normal mutation path; advanced local path overrides can remain
+  documented as explicit manual rerun options if needed, but should not be copied automatically.
+- Build the repeated setup test around the narrow repo bootstrap and deployment credential fan-out
+  seams already used by PR-44 tests.
+- Edit only the Universal Auth local credential guidance in the Pleomino README and leave unrelated
+  OpenTofu or application secret guidance intact.
+
+### 9. Consequences of not implementing this PR
+
+Generated retry commands can continue to carry local machine paths forward and the PR-44 top-level
+idempotency guarantee remains indirectly tested. Operators may also keep seeing stale README
+guidance that suggests recovering or importing shared credential values instead of creating
+current-machine credentials.
+
+### 10. Downsides for implementing this PR
+
+The retry command becomes less exhaustive for unusual manual invocations, and the repo-flow tests
+gain another fixture path that must be maintained as bootstrap orchestration changes.

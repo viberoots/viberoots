@@ -82,7 +82,7 @@ test("bootstrap preflight retry command includes deployment target scope", () =>
     message,
     /infisical-bootstrap\.ts deployment --target \/\/projects\/deployments\/pleomino\/staging:deploy .*--yes/,
   );
-  assert.match(message, /--tofu-dir projects\/deployments\/pleomino\/infisical\/opentofu/);
+  assert.doesNotMatch(message, /--tofu-dir|--tofu-plan-file|--local-credential-file/);
 });
 
 test("bootstrap path rejects non-interactive execution before Infisical, OpenTofu, or sink writes", async () => {

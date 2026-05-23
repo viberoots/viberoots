@@ -46,6 +46,32 @@ test("deployment retry command preserves target and credential intent", () => {
   assert.match(command, /--yes$/);
 });
 
+test("deployment retry command omits custom local and generated paths", () => {
+  const command = bootstrapRetryCommand({
+    ...DEFAULT_BOOTSTRAP_ARGS,
+    mode: "deployment",
+    target: "//projects/deployments/pleomino/staging:deploy",
+    tofuDir: "custom/tofu",
+    tofuPlanFile: ".generated/custom.tfplan",
+    credentialSink: "local-file",
+    localCredentialFile: ".local/custom-credentials.json",
+    machineLabel: "ci-builder",
+    rotateBootstrapCredentials: true,
+    rotateDeploymentCredentials: true,
+    forceOverwriteLocalCredentials: true,
+  });
+
+  assert.match(command, /infisical-bootstrap\.ts deployment --target/);
+  assert.match(command, /\/\/projects\/deployments\/pleomino\/staging:deploy/);
+  assert.match(command, /--machine-label ci-builder/);
+  assert.match(command, /--rotate-bootstrap-credentials/);
+  assert.match(command, /--rotate-deployment-credentials/);
+  assert.match(command, /--force-overwrite-local-credentials/);
+  assert.doesNotMatch(command, /--tofu-dir|--tofu-plan-file|custom\/tofu|custom\.tfplan/);
+  assert.doesNotMatch(command, /--credential-sink|--local-credential-file|custom-credentials/);
+  assert.match(command, /--yes$/);
+});
+
 test("retry command omits overwrite intent when it was not supplied", () => {
   const command = bootstrapRetryCommand({
     ...DEFAULT_BOOTSTRAP_ARGS,
@@ -59,6 +85,14 @@ test("retry command omits overwrite intent when it was not supplied", () => {
 test("retry command does not copy dry-run-only or unrelated flags", () => {
   const command = bootstrapRetryCommand({
     ...DEFAULT_BOOTSTRAP_ARGS,
+    apiUrl: "https://custom-infisical.example.test",
+    hostOverride: true,
+    organizationId: "org_custom",
+    orgName: "viberoots",
+    tofuDir: "custom/tofu",
+    tofuPlanFile: ".generated/custom.tfplan",
+    credentialSink: "local-file",
+    localCredentialFile: ".local/custom-credentials.json",
     dryRun: true,
     withoutDeployments: true,
     applyMetadataPatch: true,
@@ -73,5 +107,9 @@ test("retry command does not copy dry-run-only or unrelated flags", () => {
   assert.doesNotMatch(command, /--no-login/);
   assert.doesNotMatch(command, /--force-login/);
   assert.doesNotMatch(command, /--no-tofu-apply/);
+  assert.doesNotMatch(command, /--infisical-host|--organization-id|--org-name/);
+  assert.doesNotMatch(command, /--tofu-dir|--tofu-plan-file|custom\/tofu|custom\.tfplan/);
+  assert.doesNotMatch(command, /--credential-sink/);
   assert.doesNotMatch(command, /--local-credential-file/);
+  assert.doesNotMatch(command, /custom-credentials/);
 });

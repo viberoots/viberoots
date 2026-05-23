@@ -107,14 +107,17 @@ tofu apply -var organization_id='<infisical-organization-id>'
 tofu output -json deployment_runtime_metadata
 ```
 
-The bootstrap Universal Auth client secret must come from the operator
-credential path, not from git. Deployment Universal Auth client secret values
-must be imported into or rotated through the selected `bootstrap` category; if
-Infisical already has a remote record but the selected sink is missing the
-value, rotate explicitly or recover the value from the control-plane credential
-store. If the `pleomino-deployments` project or its environments were created
-manually before OpenTofu was applied, import those objects into state before
-applying so the module adopts them instead of trying to create duplicates.
+The bootstrap Universal Auth client secret must come from the current
+operator's credential path, not from git. Deployment Universal Auth client
+secrets are per-machine values stored through the selected `bootstrap`
+category. If the selected sink is missing a local deployment credential, rerun
+the top-level repo bootstrap to create this machine's own labeled credential,
+or rotate explicitly with the bootstrap rotation flags when replacing a stale
+local value is intentional. Do not import another operator's Universal Auth
+client secret into the current machine's sink. If the `pleomino-deployments`
+project or its environments were created manually before OpenTofu was applied,
+import those objects into state before applying so the module adopts them
+instead of trying to create duplicates.
 
 The deterministic bootstrap command consumes these reviewed non-secret inputs:
 Infisical site URL `https://app.infisical.com` by default, organization `viberoots`, OpenTofu directory
