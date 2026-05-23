@@ -5,6 +5,7 @@ export type InfisicalRepoProject = {
   name: string;
   slug?: string;
   orgId?: string;
+  environmentSlugs?: string[];
 };
 
 export const REPO_INFISICAL_PROJECT_NAME = "viberoots-deployments";
@@ -82,17 +83,9 @@ export async function existingInfisicalEnvironmentSlugs(
   projectId: string,
   slugs: string[],
 ) {
-  const existing: string[] = [];
-  for (const slug of slugs) {
-    const result = await api.request<unknown>(
-      "GET",
-      `/api/v1/workspace/${encodeURIComponent(projectId)}/environments/${encodeURIComponent(slug)}`,
-      undefined,
-      true,
-    );
-    if (result) existing.push(slug);
-  }
-  return existing;
+  const project = await readInfisicalProjectById(api, projectId);
+  const existing = new Set(project?.environmentSlugs ?? []);
+  return slugs.filter((slug) => existing.has(slug));
 }
 
 async function createInfisicalRepoProject(
@@ -120,6 +113,21 @@ type ProjectCreateResponse = {
   project?: unknown;
 };
 
+type ProjectGetResponse = {
+  workspace?: unknown;
+  project?: unknown;
+};
+
+async function readInfisicalProjectById(api: InfisicalApi, projectId: string) {
+  const result = await api.request<ProjectGetResponse>(
+    "GET",
+    `/api/v1/projects/${encodeURIComponent(projectId)}`,
+    undefined,
+    true,
+  );
+  return projectFromUnknown(result?.project || result?.workspace);
+}
+
 function projectsFromResponse(result: ProjectListResponse | undefined) {
   return (result?.workspaces || result?.projects || [])
     .map(projectFromUnknown)
@@ -133,11 +141,22 @@ function projectFromUnknown(value: unknown) {
   const name = stringValue(record.name) || stringValue(record.projectName);
   const slug = stringValue(record.slug) || stringValue(record.projectSlug);
   const orgId = stringValue(record.orgId) || stringValue(record.organizationId);
-  return id && name ? { id, name, slug, orgId } : undefined;
+  const environmentSlugs = environmentSlugsFromUnknown(record.environments);
+  return id && name ? { id, name, slug, orgId, environmentSlugs } : undefined;
 }
 
 function stringValue(value: unknown) {
   return typeof value === "string" && value.trim() ? value.trim() : undefined;
+}
+
+function environmentSlugsFromUnknown(value: unknown) {
+  return Array.isArray(value)
+    ? value.flatMap((entry) => {
+        if (!entry || typeof entry !== "object") return [];
+        const slug = stringValue((entry as Record<string, unknown>).slug);
+        return slug ? [slug] : [];
+      })
+    : [];
 }
 
 function projectListEndpoint() {

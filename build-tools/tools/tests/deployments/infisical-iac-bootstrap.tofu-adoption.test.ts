@@ -20,15 +20,19 @@ test("OpenTofu adopts an existing reviewed Infisical project and environments", 
               name: reviewedMetadata.projectName,
               slug: reviewedMetadata.projectSlug,
               orgId: "org_1",
+              environments: [{ slug: "staging" }, { slug: "prod" }],
             },
           ],
         };
       }
-      if (method === "GET" && endpoint === "/api/v1/workspace/proj_existing/environments/staging") {
-        return { environment: { slug: "staging" } };
-      }
-      if (method === "GET" && endpoint === "/api/v1/workspace/proj_existing/environments/prod") {
-        return { environment: { slug: "prod" } };
+      if (method === "GET" && endpoint === "/api/v1/projects/proj_existing") {
+        return {
+          project: {
+            id: "proj_existing",
+            name: reviewedMetadata.projectName,
+            environments: [{ slug: "staging" }, { slug: "prod" }],
+          },
+        };
       }
       throw new Error(`unexpected request: ${method} ${endpoint}`);
     },
@@ -46,11 +50,7 @@ test("OpenTofu adopts an existing reviewed Infisical project and environments", 
   });
   assert.deepEqual(
     calls.map((call) => call.endpoint),
-    [
-      "/api/v1/projects?type=secret-manager",
-      "/api/v1/workspace/proj_existing/environments/staging",
-      "/api/v1/workspace/proj_existing/environments/prod",
-    ],
+    ["/api/v1/projects?type=secret-manager", "/api/v1/projects/proj_existing"],
   );
 });
 
@@ -70,15 +70,19 @@ test("OpenTofu passes existing resource adoption variables into plan", async () 
               name: reviewedMetadata.projectName,
               slug: reviewedMetadata.projectSlug,
               orgId: "org_1",
+              environments: [{ slug: "staging" }],
             },
           ],
         };
       }
-      if (method === "GET" && endpoint.endsWith("/environments/staging")) {
-        return { environment: { slug: "staging" } };
-      }
-      if (method === "GET" && endpoint.endsWith("/environments/prod")) {
-        return undefined;
+      if (method === "GET" && endpoint === "/api/v1/projects/proj_existing") {
+        return {
+          project: {
+            id: "proj_existing",
+            name: reviewedMetadata.projectName,
+            environments: [{ slug: "staging" }],
+          },
+        };
       }
       throw new Error(`unexpected request: ${method} ${endpoint}`);
     },
