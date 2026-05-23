@@ -5077,3 +5077,86 @@ credential rotation flows.
 The readiness probe needs slightly more precise error classification. That is a small increase in
 complexity, but it preserves the important distinction between partial-clone non-applicability,
 fresh-machine local readiness, and real repository metadata defects.
+
+## PR-50: Adopt existing Infisical deployment projects during lazy bootstrap
+
+### 1. Intent
+
+Fix the live first-run failure where `i` can successfully create local repo bootstrap credentials
+and then fail during deployment fan-out because the reviewed `pleomino-deployments` Infisical
+project already exists remotely but is not present in the local OpenTofu state. Lazy bootstrap should
+be idempotent for both fresh repos and repos where an operator has already created the reviewed
+Infisical project.
+
+### 2. Scope of changes
+
+- Before deployment OpenTofu planning, query Infisical for a project matching the reviewed Pleomino
+  project name or slug in the selected organization.
+- When that project exists, pass its project id into the OpenTofu module and skip creating the
+  `infisical_project` resource.
+- Detect reviewed environments that already exist and skip creating only those environment
+  resources, while still creating missing reviewed environments.
+- Preserve normal create behavior when the reviewed project does not exist.
+- Preserve repo bootstrap credential lifecycle, per-machine Universal Auth secrets, deployment
+  credential storage, metadata handoff, reviewed secret refs, and deployment target discovery.
+
+### 3. External prerequisites
+
+- None beyond the existing authenticated Infisical bootstrap session.
+- The fix must be covered with hermetic tests and must not require a live Infisical account.
+
+### 4. Tests to be added
+
+- Add focused tests proving existing project lookup by reviewed slug/name returns an adoption id and
+  existing environment slugs.
+- Add focused tests proving OpenTofu receives adoption variables and therefore plans against an
+  existing project instead of always attempting `infisical_project` creation.
+- Keep existing bootstrap repo fan-out, metadata handoff, retry command, and OpenTofu failure tests
+  passing.
+
+### 5. Docs to be added or updated
+
+- Update this plan to record the idempotency follow-up.
+- Update operator docs only if user-facing bootstrap output or remediation text changes.
+
+### 5.5. Expected regression scope
+
+- `deployment-only`
+- Changes should be limited to deployment Infisical bootstrap project adoption, the Pleomino
+  OpenTofu module, and targeted tests.
+
+### 6. Acceptance criteria
+
+- If `pleomino-deployments` already exists remotely but is absent from local OpenTofu state, `i`
+  does not fail with `A project with the slug "pleomino-deployments" already exists`.
+- If reviewed `staging` or `prod` environments already exist, bootstrap does not attempt to create
+  duplicates for those environments.
+- If the project does not exist, bootstrap still creates the project and reviewed environments.
+- Focused bootstrap/OpenTofu adoption tests pass.
+- The repository validation suite passes.
+
+### 7. Risks
+
+- Adopting an existing project by name or slug could hide a wrong project if an operator created an
+  unrelated project with the reviewed slug.
+- Skipping existing environments means OpenTofu will not manage already-created environment
+  metadata in state.
+
+### 8. Mitigations
+
+- Only adopt projects in the selected organization that match the reviewed name or slug.
+- Continue reconciling reviewed deployment metadata after apply so wrong project ids still surface
+  as metadata handoff/drift.
+- Keep the adoption path narrow and limited to the reviewed Pleomino bootstrap project and
+  environments.
+
+### 9. Consequences of not implementing this PR
+
+Fresh-machine setup through `i` remains brittle after manual cleanup or partial remote setup. Users
+can hit a remote slug uniqueness error even though the desired reviewed project already exists and
+should be reused.
+
+### 10. Downsides for implementing this PR
+
+The OpenTofu module becomes slightly more conditional because it supports both create and adopt
+paths. This is a reasonable tradeoff for making the single top-level `i` path resilient.

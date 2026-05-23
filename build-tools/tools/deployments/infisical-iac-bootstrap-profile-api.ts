@@ -3,6 +3,7 @@ import type { InfisicalApi } from "./infisical-iac-bootstrap-api";
 export type InfisicalRepoProject = {
   id: string;
   name: string;
+  slug?: string;
   orgId?: string;
 };
 
@@ -62,6 +63,38 @@ export async function findInfisicalRepoProject(
   );
 }
 
+export async function findInfisicalProjectByNameOrSlug(
+  api: InfisicalApi,
+  organizationId: string,
+  opts: { name?: string; slug?: string },
+) {
+  const result = await api.request<ProjectListResponse>("GET", projectListEndpoint());
+  return projectsFromResponse(result).find((project) => {
+    if (!projectMatchesOrganization(project, organizationId)) return false;
+    return Boolean(
+      (opts.slug && project.slug === opts.slug) || (opts.name && project.name === opts.name),
+    );
+  });
+}
+
+export async function existingInfisicalEnvironmentSlugs(
+  api: InfisicalApi,
+  projectId: string,
+  slugs: string[],
+) {
+  const existing: string[] = [];
+  for (const slug of slugs) {
+    const result = await api.request<unknown>(
+      "GET",
+      `/api/v1/workspace/${encodeURIComponent(projectId)}/environments/${encodeURIComponent(slug)}`,
+      undefined,
+      true,
+    );
+    if (result) existing.push(slug);
+  }
+  return existing;
+}
+
 async function createInfisicalRepoProject(
   api: InfisicalApi,
   organizationId: string,
@@ -98,8 +131,9 @@ function projectFromUnknown(value: unknown) {
   const record = value as Record<string, unknown>;
   const id = stringValue(record.id) || stringValue(record.projectId);
   const name = stringValue(record.name) || stringValue(record.projectName);
+  const slug = stringValue(record.slug) || stringValue(record.projectSlug);
   const orgId = stringValue(record.orgId) || stringValue(record.organizationId);
-  return id && name ? { id, name, orgId } : undefined;
+  return id && name ? { id, name, slug, orgId } : undefined;
 }
 
 function stringValue(value: unknown) {

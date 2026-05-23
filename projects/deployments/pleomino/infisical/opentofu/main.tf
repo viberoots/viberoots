@@ -27,9 +27,19 @@ variable "project_slug" {
   default = "pleomino-deployments"
 }
 
+variable "existing_project_id" {
+  type    = string
+  default = ""
+}
+
 variable "environments" {
   type    = list(string)
   default = ["staging", "prod"]
+}
+
+variable "existing_environment_slugs" {
+  type    = list(string)
+  default = []
 }
 
 variable "secret_path" {
@@ -72,6 +82,13 @@ provider "infisical" {
 }
 
 locals {
+  existing_project_id = trimspace(var.existing_project_id)
+  project_id          = local.existing_project_id != "" ? local.existing_project_id : infisical_project.pleomino[0].id
+  missing_environments = toset([
+    for environment in var.environments : environment
+    if !contains(var.existing_environment_slugs, environment)
+  ])
+
   cloudflare_secret_metadata_reconciliation = {
     for environment in var.environments : environment => {
       object_name     = "${var.project_slug}/${environment}${var.secret_path}${var.cloudflare_secret_name}"
@@ -84,6 +101,7 @@ locals {
 }
 
 resource "infisical_project" "pleomino" {
+  count                      = local.existing_project_id == "" ? 1 : 0
   name                       = var.project_name
   slug                       = var.project_slug
   type                       = "secret-manager"
@@ -93,10 +111,10 @@ resource "infisical_project" "pleomino" {
 }
 
 resource "infisical_project_environment" "stage" {
-  for_each   = toset(var.environments)
+  for_each   = local.missing_environments
   name       = each.value
   slug       = each.value
-  project_id = infisical_project.pleomino.id
+  project_id = local.project_id
 }
 
 resource "infisical_identity" "deployment" {
@@ -120,13 +138,13 @@ resource "infisical_identity_universal_auth" "deployment" {
 
 resource "infisical_project_identity" "deployment" {
   for_each    = infisical_identity.deployment
-  project_id  = infisical_project.pleomino.id
+  project_id  = local.project_id
   identity_id = each.value.id
   roles       = [{ role_slug = "viewer" }]
 }
 
 output "project_id" {
-  value = infisical_project.pleomino.id
+  value = local.project_id
 }
 
 output "machine_identity_ids" {
@@ -147,7 +165,7 @@ output "deployment_runtime_metadata" {
       site_url                    = var.infisical_host
       project_name                = var.project_name
       project_slug                = var.project_slug
-      project_id                  = infisical_project.pleomino.id
+      project_id                  = local.project_id
       environment                 = stage
       secret_path                 = var.secret_path
       machine_identity_id         = identity.id

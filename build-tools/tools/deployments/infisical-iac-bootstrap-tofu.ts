@@ -3,6 +3,11 @@ import * as os from "node:os";
 import * as path from "node:path";
 import * as readline from "node:readline/promises";
 import { canonicalInfisicalApiUrl } from "./infisical-iac-bootstrap-config";
+import type { InfisicalApi } from "./infisical-iac-bootstrap-api";
+import {
+  resolveOpenTofuAdoption,
+  type ExistingInfisicalResources,
+} from "./infisical-iac-bootstrap-tofu-adoption";
 import { errorMessage } from "./infisical-iac-bootstrap-redaction";
 import type {
   BootstrapArgs,
@@ -23,19 +28,28 @@ export async function runOpenTofu(opts: {
   credential: BootstrapCredential;
   reviewedMetadata: Required<DeploymentRuntimeMetadata>;
   runner: CommandRunner;
+  api?: InfisicalApi;
   confirmApply?: (savedPlan: string) => Promise<boolean>;
 }) {
   const tofuDir = path.resolve(opts.args.tofuDir);
   const savedPlan = await planFilePath(opts.args);
   await fs.mkdir(path.dirname(savedPlan), { recursive: true });
-  const env = tofuEnv(opts.args, opts.credential, opts.reviewedMetadata);
+  const initEnv = tofuEnv(opts.args, opts.credential, opts.reviewedMetadata);
   runTofuStage("init", {
     args: ["init"],
     tofuDir,
-    env,
+    env: initEnv,
     runner: opts.runner,
     secrets: [opts.credential.clientSecret],
   });
+  const adoption = await resolveOpenTofuAdoption({
+    api: opts.api,
+    args: opts.args,
+    reviewedMetadata: opts.reviewedMetadata,
+    tofuDir,
+    runner: opts.runner,
+  });
+  const env = tofuEnv(opts.args, opts.credential, opts.reviewedMetadata, adoption);
   runTofuStage("plan", {
     args: ["plan", `-out=${savedPlan}`],
     tofuDir,
@@ -174,6 +188,7 @@ function tofuEnv(
   args: BootstrapArgs & { organizationId: string },
   credential: BootstrapCredential,
   reviewed: Required<DeploymentRuntimeMetadata>,
+  existing: ExistingInfisicalResources = {},
 ): NodeJS.ProcessEnv {
   const stages = Object.keys(reviewed.environments);
   return {
@@ -184,6 +199,8 @@ function tofuEnv(
     TF_VAR_organization_id: args.organizationId,
     TF_VAR_project_name: reviewed.projectName,
     TF_VAR_project_slug: reviewed.projectSlug,
+    TF_VAR_existing_project_id: existing.projectId ?? "",
+    TF_VAR_existing_environment_slugs: JSON.stringify(existing.environmentSlugs ?? []),
     TF_VAR_environments: JSON.stringify(stages.map((stage) => reviewed.environments[stage].slug)),
     TF_VAR_secret_path: reviewed.secretPath,
     TF_VAR_cloudflare_secret_name: reviewed.cloudflareSecretName,

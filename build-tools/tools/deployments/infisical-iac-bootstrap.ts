@@ -69,6 +69,7 @@ export async function runInfisicalIacBootstrap(
     args: resolvedArgs,
     credential,
     reviewedMetadata,
+    api,
     runner: spawnCommandRunner,
   });
   if (args.noTofuApply) {
