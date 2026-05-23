@@ -34,6 +34,18 @@ test("OpenTofu adopts an existing reviewed Infisical project and environments", 
           },
         };
       }
+      if (
+        method === "GET" &&
+        endpoint === "/api/v1/projects/proj_existing/memberships/identities/bootstrap_identity"
+      ) {
+        return undefined;
+      }
+      if (
+        method === "POST" &&
+        endpoint === "/api/v1/projects/proj_existing/memberships/identities/bootstrap_identity"
+      ) {
+        return { membership: { id: "membership_1" } };
+      }
       throw new Error(`unexpected request: ${method} ${endpoint}`);
     },
   };
@@ -56,12 +68,14 @@ test("OpenTofu adopts an existing reviewed Infisical project and environments", 
 
 test("OpenTofu passes existing resource adoption variables into plan", async () => {
   const calls: Array<{ args: string[]; env?: NodeJS.ProcessEnv }> = [];
+  const apiCalls: Array<{ method: string; endpoint: string }> = [];
   const runner: CommandRunner = (call) => {
     calls.push(call);
     return "";
   };
   const api = {
     request: async (method: string, endpoint: string) => {
+      apiCalls.push({ method, endpoint });
       if (method === "GET" && endpoint.startsWith("/api/v1/projects?")) {
         return {
           projects: [
@@ -84,6 +98,18 @@ test("OpenTofu passes existing resource adoption variables into plan", async () 
           },
         };
       }
+      if (
+        method === "GET" &&
+        endpoint === "/api/v1/projects/proj_existing/memberships/identities/bootstrap_identity"
+      ) {
+        return undefined;
+      }
+      if (
+        method === "POST" &&
+        endpoint === "/api/v1/projects/proj_existing/memberships/identities/bootstrap_identity"
+      ) {
+        return { membership: { id: "membership_1" } };
+      }
       throw new Error(`unexpected request: ${method} ${endpoint}`);
     },
   };
@@ -96,6 +122,7 @@ test("OpenTofu passes existing resource adoption variables into plan", async () 
       noTofuApply: true,
     },
     api: api as never,
+    bootstrapIdentity: { id: "bootstrap_identity", name: "viberoots-iac-bootstrap" },
     credential: credential(),
     reviewedMetadata,
     runner,
@@ -104,6 +131,15 @@ test("OpenTofu passes existing resource adoption variables into plan", async () 
   const plan = calls.find((call) => call.args[0] === "plan");
   assert.equal(plan?.env?.TF_VAR_existing_project_id, "proj_existing");
   assert.equal(plan?.env?.TF_VAR_existing_environment_slugs, '["staging"]');
+  assert.deepEqual(
+    apiCalls.map((call) => `${call.method} ${call.endpoint}`),
+    [
+      "GET /api/v1/projects?type=secret-manager",
+      "GET /api/v1/projects/proj_existing",
+      "GET /api/v1/projects/proj_existing/memberships/identities/bootstrap_identity",
+      "POST /api/v1/projects/proj_existing/memberships/identities/bootstrap_identity",
+    ],
+  );
 });
 
 test("OpenTofu does not switch to adoption when project is already in local state", async () => {

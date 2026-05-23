@@ -4,6 +4,7 @@ import * as path from "node:path";
 import * as readline from "node:readline/promises";
 import { canonicalInfisicalApiUrl } from "./infisical-iac-bootstrap-config";
 import type { InfisicalApi } from "./infisical-iac-bootstrap-api";
+import { ensureProjectIdentityMembership } from "./infisical-iac-bootstrap-identity";
 import {
   resolveOpenTofuAdoption,
   type ExistingInfisicalResources,
@@ -14,6 +15,7 @@ import type {
   BootstrapCredential,
   CommandRunner,
   DeploymentRuntimeMetadata,
+  Identity,
   TofuDeploymentRuntimeMetadata,
 } from "./infisical-iac-bootstrap-types";
 
@@ -29,6 +31,7 @@ export async function runOpenTofu(opts: {
   reviewedMetadata: Required<DeploymentRuntimeMetadata>;
   runner: CommandRunner;
   api?: InfisicalApi;
+  bootstrapIdentity?: Identity;
   confirmApply?: (savedPlan: string) => Promise<boolean>;
 }) {
   const tofuDir = path.resolve(opts.args.tofuDir);
@@ -49,6 +52,9 @@ export async function runOpenTofu(opts: {
     tofuDir,
     runner: opts.runner,
   });
+  if (adoption.projectId && opts.api && opts.bootstrapIdentity) {
+    await ensureProjectIdentityMembership(opts.api, adoption.projectId, opts.bootstrapIdentity);
+  }
   const env = tofuEnv(opts.args, opts.credential, opts.reviewedMetadata, adoption);
   runTofuStage("plan", {
     args: ["plan", `-out=${savedPlan}`],
