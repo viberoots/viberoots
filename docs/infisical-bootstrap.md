@@ -80,10 +80,10 @@ build-tools/tools/deployments/infisical-bootstrap-reset-local.ts --dry-run
 build-tools/tools/deployments/infisical-bootstrap-reset-local.ts
 ```
 
-The reset utility prints a loud warning, requires typing `RESET`, removes only generated
-SprinkleRef/OpenTofu local state, and deletes the repo bootstrap plus Pleomino deployment Universal
-Auth entries from the `viberoots-bootstrap` macOS Keychain service. It does not delete Infisical
-projects, identities, Cloudflare secrets, or application secrets.
+The reset utility prints a loud warning, requires typing `RESET` or passing `--yes`, removes only
+generated SprinkleRef/OpenTofu local state, and deletes the repo bootstrap plus Pleomino deployment
+Universal Auth entries from the `viberoots-bootstrap` macOS Keychain service. It does not delete
+Infisical projects, identities, Cloudflare secrets, or application secrets.
 
 Troubleshooting:
 

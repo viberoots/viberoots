@@ -112,9 +112,9 @@ operator's credential path, not from git. Deployment Universal Auth client
 secrets are per-machine values stored through the selected `bootstrap`
 category. If the selected sink is missing a local deployment credential, rerun
 the top-level repo bootstrap to create this machine's own labeled credential,
-or rotate explicitly with the bootstrap rotation flags when replacing a stale
-local value is intentional. Do not import another operator's Universal Auth
-client secret into the current machine's sink. If the `pleomino-deployments`
+or rotate explicitly with `--rotate-deployment-credentials` when replacing a
+stale local value is intentional. Do not import another operator's Universal
+Auth client secret into the current machine's sink. If the `pleomino-deployments`
 project or its environments were created manually before OpenTofu was applied,
 import those objects into state before applying so the module adopts them
 instead of trying to create duplicates.
