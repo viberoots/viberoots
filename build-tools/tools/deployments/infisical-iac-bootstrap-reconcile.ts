@@ -9,11 +9,12 @@ export function reconcileDeploymentMetadata(
   live: DeploymentRuntimeMetadata,
   reviewed: Required<DeploymentRuntimeMetadata>,
   reviewedSource?: string,
+  opts: { allowReviewedIdHandoff?: boolean } = {},
 ) {
   const mismatches = [
-    ...compareHost("site url", live.siteUrl, reviewed.siteUrl, true),
+    ...compareHost("site url", live.siteUrl, reviewed.siteUrl, true, opts),
     ...compare("project name", live.projectName, reviewed.projectName, false),
-    ...compare("project id", live.projectId, reviewed.projectId, true),
+    ...compare("project id", live.projectId, reviewed.projectId, true, opts),
     ...compare("project slug", live.projectSlug, reviewed.projectSlug, false),
     ...compare("secret path", live.secretPath, reviewed.secretPath, false),
     ...compare(
@@ -28,7 +29,13 @@ export function reconcileDeploymentMetadata(
     ...reviewed.deploymentCredentials.flatMap((expected) => {
       const actual = live.deploymentCredentials?.find((item) => item.stage === expected.stage);
       return [
-        ...compare(`${expected.stage} identity id`, actual?.identityId, expected.identityId, true),
+        ...compare(
+          `${expected.stage} identity id`,
+          actual?.identityId,
+          expected.identityId,
+          true,
+          opts,
+        ),
         ...compare(
           `${expected.stage} identity name`,
           actual?.identityName,
@@ -52,12 +59,14 @@ export function reconcileDeploymentMetadata(
           actual?.clientIdFileName,
           expected.clientIdFileName,
           true,
+          opts,
         ),
         ...compare(
           `${expected.stage} client secret file name`,
           actual?.clientSecretFileName,
           expected.clientSecretFileName,
           true,
+          opts,
         ),
       ];
     }),
@@ -87,9 +96,20 @@ export function reconcileDeploymentMetadata(
   return { schemaVersion: "infisical-iac-bootstrap-reconciliation@1", status: "ok" as const };
 }
 
-function compare(label: string, actual?: string, expected?: string, canHandoff: boolean) {
+function compare(
+  label: string,
+  actual: string | undefined,
+  expected: string | undefined,
+  canHandoff: boolean,
+  opts: { allowReviewedIdHandoff?: boolean } = {},
+) {
   const firstBootstrapField = canHandoff && isFirstBootstrapPlaceholder(expected ?? "");
   if (firstBootstrapField && !hasLiveValue(actual)) {
+    return [
+      { text: `${label}: live=<missing> reviewed=${displayValue(expected)}`, handoff: false },
+    ];
+  }
+  if (canHandoff && opts.allowReviewedIdHandoff === true && !hasLiveValue(actual)) {
     return [
       { text: `${label}: live=<missing> reviewed=${displayValue(expected)}`, handoff: false },
     ];
@@ -98,17 +118,24 @@ function compare(label: string, actual?: string, expected?: string, canHandoff: 
   return [
     {
       text: `${label}: live=${displayValue(actual)} reviewed=${displayValue(expected)}`,
-      handoff: firstBootstrapField,
+      handoff: firstBootstrapField || (canHandoff && opts.allowReviewedIdHandoff === true),
     },
   ];
 }
 
-function compareHost(label: string, actual?: string, expected?: string, canHandoff: boolean) {
+function compareHost(
+  label: string,
+  actual: string | undefined,
+  expected: string | undefined,
+  canHandoff: boolean,
+  opts: { allowReviewedIdHandoff?: boolean } = {},
+) {
   return compare(
     label,
     canonicalInfisicalApiUrl(actual),
     canonicalInfisicalApiUrl(expected),
     canHandoff,
+    opts,
   );
 }
 

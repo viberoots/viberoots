@@ -84,7 +84,9 @@ export async function runInfisicalIacBootstrap(
     return;
   }
   const metadata = readDeploymentRuntimeMetadata(resolvedArgs, spawnCommandRunner);
-  const reconciliation = reconcileDeploymentMetadata(metadata, reviewedMetadata, reviewedSource);
+  const reconciliation = reconcileDeploymentMetadata(metadata, reviewedMetadata, reviewedSource, {
+    allowReviewedIdHandoff: Boolean(tofu.adoption.projectId),
+  });
   if (reconciliation.status === "metadata_handoff_required") {
     const result = { reconciliation, deploymentCredentialLifecycle: [], credentialHandoff: null };
     console.log(JSON.stringify(result, null, 2));

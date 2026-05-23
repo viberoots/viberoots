@@ -65,7 +65,7 @@ export async function runOpenTofu(opts: {
     secrets: [opts.credential.clientSecret],
   });
   printPlanSummary(tofuDir, savedPlan, opts.args.noTofuApply);
-  if (opts.args.noTofuApply) return { savedPlan };
+  if (opts.args.noTofuApply) return { savedPlan, adoption };
   const confirmed =
     opts.args.yes || (await (opts.confirmApply ?? promptApplyConfirmation)(savedPlan));
   if (!confirmed) throw new Error(`OpenTofu apply cancelled; saved plan remains at ${savedPlan}`);
@@ -77,7 +77,7 @@ export async function runOpenTofu(opts: {
     runner: opts.runner,
     secrets: [opts.credential.clientSecret],
   });
-  return { savedPlan };
+  return { savedPlan, adoption };
 }
 
 function runTofuStage(
