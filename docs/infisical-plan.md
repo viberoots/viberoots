@@ -4978,3 +4978,102 @@ opt-outs even when deployment secrets are irrelevant to their slice.
 The install-deps readiness path gains an additional applicability layer and dynamic import boundary.
 This adds a small amount of complexity, but it keeps the common `i` entrypoint safe for both full
 deployment workspaces and narrow partial clones.
+
+## PR-49: Fail closed on malformed lazy readiness metadata
+
+### 1. Intent
+
+Close the PR-48 assessment gap where lazy `i` secret readiness correctly gates on absent Pleomino
+deployment metadata, but can still collapse malformed present metadata into a generic "missing local
+credentials" state. Once the slice applicability gate has established that
+`projects/deployments/pleomino/shared/family.bzl` is present, parse errors, import errors, and
+malformed reviewed constants must be treated as repository metadata defects rather than as
+not-ready local machine state.
+
+### 2. Scope of changes
+
+- Narrow the `probeLocalSecretReadiness` error handling so only actual resolver/credential absence
+  is reported as local secret readiness missing.
+- Let reviewed metadata parsing failures from
+  `build-tools/tools/deployments/infisical-iac-bootstrap-reviewed-metadata.ts` propagate with their
+  original error messages after the applicability gate passes.
+- Preserve PR-48 absent-metadata behavior: minimized workspaces missing
+  `projects/deployments/pleomino/shared/family.bzl` still skip readiness quietly by default and
+  report a concise not-applicable reason in verbose mode.
+- Preserve PR-47 local readiness behavior for valid full checkouts: missing resolver config or
+  missing current-machine Universal Auth credentials should still prompt or fail with the existing
+  local-credentials remediation.
+- Do not change Universal Auth credential lifecycle, bootstrap resource creation, reviewed metadata
+  handoff semantics, deployment resource definitions, public backend selector syntax, stable secret
+  refs, Vault behavior, Cloudflare secret requirements, or partial-clone language/importer
+  discovery.
+
+### 3. External prerequisites
+
+- None. This is hermetic install-deps error-classification and test work.
+- Automated tests must not require live Infisical, macOS Keychain, OpenTofu network access, Vault,
+  Cloudflare, browser automation, or real host-specific state.
+
+### 4. Tests to be added
+
+- Add an install-deps secret-readiness test with present
+  `projects/deployments/pleomino/shared/family.bzl` containing malformed reviewed metadata, proving
+  the original metadata parse error propagates instead of returning `ready: false`.
+- Add or update a test proving valid present metadata with missing local credentials still reports
+  missing local credentials and triggers the existing prompt/bootstrap path.
+- Keep the PR-48 absent-metadata, verbose not-applicable, metadata access-failure, `--glue-only`,
+  `--dry-run`, and `--without-secrets` tests passing.
+- Keep PR-47 full-checkout tests passing, including ready-machine quiet path, missing resolver
+  prompt, non-interactive `--yes`/environment override, and application-secret absence behavior.
+
+### 5. Docs to be added or updated
+
+- Update `docs/infisical-bootstrap.md`, `infisical-bootstrap.md`, or concise onboarding docs only if
+  operator-facing troubleshooting text needs to distinguish malformed checked-in metadata from
+  missing local credentials.
+- Keep existing partial-clone and `--without-secrets` documentation unchanged unless the error text
+  changes.
+
+### 5.5. Expected regression scope
+
+- `deployment-only`
+- Keep changes limited to lazy install-deps secret-readiness error classification, targeted tests,
+  and any necessary troubleshooting doc clarification.
+
+### 6. Acceptance criteria
+
+- In a full checkout where `family.bzl` is present but reviewed Infisical metadata is malformed,
+  `i`/install-deps fails with a metadata/configuration error rather than prompting for local
+  credentials or invoking repo bootstrap.
+- In a minimized checkout where `family.bzl` is absent, `i`/install-deps still treats Infisical
+  readiness as not applicable.
+- In a valid full checkout with missing local resolver or Universal Auth credentials,
+  `i`/install-deps still follows the PR-47 prompt/bootstrap path.
+- Focused install-deps secret-readiness tests pass.
+- The repository validation suite passes.
+
+### 7. Risks
+
+- Over-tightening error handling could turn genuine local credential absence into a hard metadata
+  error, making fresh-machine setup harder.
+- Over-broad error propagation could leak implementation details in user-facing `i` output.
+
+### 8. Mitigations
+
+- Classify errors at the narrowest seam: metadata parsing/import failures propagate, while explicit
+  resolver and credential lookup absence remains a local readiness miss.
+- Assert both malformed-metadata and missing-local-credential cases in focused tests so the two
+  paths cannot regress into each other.
+- Keep user-facing error messages concise and non-secret.
+
+### 9. Consequences of not implementing this PR
+
+Malformed checked-in Pleomino Infisical metadata can be masked as a local machine setup problem.
+That makes repository defects harder to diagnose and can send users into unnecessary bootstrap or
+credential rotation flows.
+
+### 10. Downsides for implementing this PR
+
+The readiness probe needs slightly more precise error classification. That is a small increase in
+complexity, but it preserves the important distinction between partial-clone non-applicability,
+fresh-machine local readiness, and real repository metadata defects.

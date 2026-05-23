@@ -88,43 +88,40 @@ export async function probeLocalSecretReadiness(repoRoot = process.cwd()) {
   } = await loadDeploymentReadinessModules();
   const configPath =
     process.env.SPRINKLEREF_CONFIG || path.join(repoRoot, resolverConfigRelativePath);
+  const metadata = await readPleominoReviewedMetadata(
+    path.join(repoRoot, pleominoFamilyMetadataPath),
+  );
   try {
     await readSprinkleRefConfig(configPath);
-  } catch {
+  } catch (error) {
+    if (!isFileAbsenceError(error)) throw error;
     return { ready: false, reason: "missing resolver config" };
   }
-  try {
-    const args = {
-      ...DEFAULT_BOOTSTRAP_ARGS,
-      yes: true,
-      localCredentialFile: path.join(repoRoot, DEFAULT_BOOTSTRAP_ARGS.localCredentialFile),
-    };
-    const selection = await resolveCredentialSinkSelection(args, {
-      createMissingResolverConfig: false,
-      env: { ...process.env, SPRINKLEREF_CONFIG: configPath },
-    });
-    const sink = await sinkFromSelection(args, selection, repoRoot, {
-      LocalFileCredentialSink,
-      createSprinkleRefStore,
-      readSprinkleRefConfig,
-      resolveBootstrapAccessCredentialSinkBackend,
-    });
-    const repoRefs = repoBootstrapCredentialRefs({ name: args.identityName });
-    const requiredRefs = [repoRefs.clientIdRef, repoRefs.clientSecretRef];
-    const metadata = await readPleominoReviewedMetadata(
-      path.join(repoRoot, pleominoFamilyMetadataPath),
-    );
-    for (const item of metadata.deploymentCredentials) {
-      requiredRefs.push(item.clientIdRef, item.clientSecretRef);
-    }
-    for (const ref of requiredRefs) {
-      if (!(await sink.has(ref)))
-        return { ready: false, reason: "missing local Universal Auth credentials" };
-    }
-    return { ready: true, reason: "ready" };
-  } catch {
-    return { ready: false, reason: "missing local Universal Auth credentials" };
+  const args = {
+    ...DEFAULT_BOOTSTRAP_ARGS,
+    yes: true,
+    localCredentialFile: path.join(repoRoot, DEFAULT_BOOTSTRAP_ARGS.localCredentialFile),
+  };
+  const selection = await resolveCredentialSinkSelection(args, {
+    createMissingResolverConfig: false,
+    env: { ...process.env, SPRINKLEREF_CONFIG: configPath },
+  });
+  const sink = await sinkFromSelection(args, selection, repoRoot, {
+    LocalFileCredentialSink,
+    createSprinkleRefStore,
+    readSprinkleRefConfig,
+    resolveBootstrapAccessCredentialSinkBackend,
+  });
+  const repoRefs = repoBootstrapCredentialRefs({ name: args.identityName });
+  const requiredRefs = [repoRefs.clientIdRef, repoRefs.clientSecretRef];
+  for (const item of metadata.deploymentCredentials) {
+    requiredRefs.push(item.clientIdRef, item.clientSecretRef);
   }
+  for (const ref of requiredRefs) {
+    if (!(await sink.has(ref)))
+      return { ready: false, reason: "missing local Universal Auth credentials" };
+  }
+  return { ready: true, reason: "ready" };
 }
 
 export async function isInstallSecretReadinessApplicable(repoRoot = process.cwd()) {
