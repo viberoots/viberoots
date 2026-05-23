@@ -34,6 +34,11 @@ credential, and the Pleomino deployment Universal Auth credentials for this mach
 full `sprinkleref --check` and does not require application secrets such as Cloudflare tokens to
 exist.
 
+The readiness phase is capability-gated by checked-out deployment metadata. Partial clones or
+minimized workspaces that do not include `projects/deployments/pleomino/shared/family.bzl` skip
+Infisical readiness automatically and do not need `--without-secrets`. Full checkouts can still use
+`--without-secrets` or `INSTALL_DEPS_WITHOUT_SECRETS=1` as an explicit dependency-only opt-out.
+
 Ready machines produce no extra setup output unless verbose diagnostics are enabled. If local
 readiness is missing, interactive `i` asks once before running repo bootstrap with deployment fan-out
 enabled. Non-interactive `i` fails with remediation unless `--yes` or

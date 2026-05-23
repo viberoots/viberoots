@@ -4864,3 +4864,117 @@ for multi-user lazy setup.
 making dependency installation depend on live deployment services. Some advanced operators may also
 need to learn `--without-secrets` when they intentionally want dependency setup without any secret
 readiness checks.
+
+## PR-48: Slice-safe lazy Infisical readiness
+
+### 1. Intent
+
+Close the PR-47 sliceability gap so adding lazy Infisical readiness to `i` does not make dependency
+installation fail in minimized, sparse, or partial-clone workspaces that do not include the
+Pleomino deployment family or Infisical bootstrap implementation files. Secret readiness should be
+capability-gated by checked-out deployment metadata: if the checkout does not contain the Infisical
+deployment family, `i` should treat secret readiness as not applicable rather than missing.
+
+### 2. Scope of changes
+
+- Add an applicability check before any Infisical/deployment-specific readiness imports or file
+  reads. The check should use cheap filesystem probes for the deployment metadata needed by PR-47,
+  especially `projects/deployments/pleomino/shared/family.bzl`.
+- If the required deployment metadata is absent, skip the lazy Infisical readiness phase without
+  error. In non-verbose mode this should be quiet; in verbose mode it may print a concise
+  "not applicable in this checkout" diagnostic.
+- Ensure `i --glue-only`, `i --dry-run`, and `i --without-secrets` continue to skip the readiness
+  phase before any deployment-specific imports or probes that could fail in partial clones.
+- Convert static deployment/Infisical imports in the install-deps readiness path to dynamic imports
+  after the applicability gate, or otherwise isolate them so sparse clones missing deployment-owned
+  files do not fail at module load time.
+- Keep full checkout behavior unchanged: when the Pleomino deployment metadata is present,
+  PR-47 readiness should still check resolver config and current-machine Universal Auth credentials,
+  prompt or bootstrap when missing, and ignore application secret completeness.
+- Preserve PR-44 through PR-46 credential lifecycle and retry behavior. This PR is only about making
+  the PR-47 lazy integration safe for slices that do not contain deployment metadata.
+- Keep any existing partial-clone language/importer discovery behavior intact. Do not broaden
+  install-deps language discovery, provider sync, or dependency setup scope.
+
+### 3. External prerequisites
+
+- None. This is hermetic install-deps gating and test work.
+- Automated tests must not require live Infisical, macOS Keychain, OpenTofu network access, Vault,
+  Cloudflare, browser automation, or a full repository checkout.
+
+### 4. Tests to be added
+
+- Add a temp partial-clone or minimized-workspace test where `projects/deployments/pleomino/` is
+  absent and `i` or the install-deps secret-readiness phase succeeds without `sprinkleref`,
+  Infisical credentials, deployment metadata, or bootstrap files.
+- Add a test proving the absent-deployment-metadata path does not call the readiness probe,
+  credential sink, or bootstrap invocation seam.
+- Add a verbose-mode test proving the absent-deployment-metadata path reports a concise
+  not-applicable diagnostic without treating the checkout as misconfigured.
+- Add tests proving `--glue-only`, `--dry-run`, and `--without-secrets` skip before dynamic
+  deployment imports.
+- Keep PR-47 full-checkout tests passing, including ready-machine quiet path, missing resolver
+  prompt, non-interactive `--yes`/environment override, and application-secret absence behavior.
+- Keep existing partial-clone/importer discovery tests passing.
+
+### 5. Docs to be added or updated
+
+- Update `docs/infisical-bootstrap.md`, `infisical-bootstrap.md`, or concise onboarding docs to
+  state that lazy `i` secret readiness is capability-gated by checked-out deployment metadata.
+- Document that partial clones or minimized workspaces without the Pleomino Infisical deployment
+  family skip Infisical readiness automatically and do not require `--without-secrets`.
+- Keep `--without-secrets` documented as an explicit opt-out for full checkouts or automation that
+  intentionally wants dependency setup without secret readiness.
+
+### 5.5. Expected regression scope
+
+- `deployment-only`
+- Keep changes limited to install-deps secret-readiness applicability gating, dynamic import or
+  module-boundary isolation, targeted partial-clone tests, and small docs updates. Do not change
+  Universal Auth credential lifecycle, bootstrap resource creation, reviewed metadata handoff,
+  deployment resource definitions, public backend selector syntax, stable secret refs, Vault
+  behavior, Cloudflare secret requirements, or language/importer discovery semantics.
+
+### 6. Acceptance criteria
+
+- A partial clone or minimized workspace without `projects/deployments/pleomino/shared/family.bzl`
+  can run `i`/install-deps without Infisical readiness errors.
+- The absent-deployment-metadata path is quiet by default and does not prompt, open browser login,
+  read credential sinks, or call repo bootstrap.
+- Verbose mode reports a concise not-applicable reason when readiness is skipped because deployment
+  metadata is absent.
+- `i --glue-only`, `i --dry-run`, and `i --without-secrets` skip secret readiness before
+  deployment-specific imports.
+- Full checkout PR-47 behavior remains unchanged.
+- Focused partial-clone and install-deps readiness tests pass.
+- The repository validation suite passes.
+
+### 7. Risks
+
+- A too-broad applicability gate could skip secret readiness in a full checkout where deployment
+  metadata exists but local resolver or credential state is actually missing.
+- Dynamic imports can make errors less obvious if import failures are accidentally swallowed after
+  the feature is applicable.
+- Partial-clone tests can become brittle if they depend on an exact sparse workspace fixture shape.
+
+### 8. Mitigations
+
+- Gate only on clear absence of the reviewed deployment metadata file or directory, not on missing
+  local resolver config or credentials.
+- After the applicability gate passes, treat import failures and malformed metadata as real
+  readiness/setup errors instead of not-applicable skips.
+- Keep the partial-clone fixture minimal and assert behavior through the install-deps readiness seam
+  rather than depending on unrelated language providers.
+
+### 9. Consequences of not implementing this PR
+
+PR-47 can make `i` less partial-clone-friendly than the existing install flow by assuming Pleomino
+deployment metadata and Infisical bootstrap modules exist in every checkout. That would break the
+repo's sliceability expectations and force users of minimized workspaces to learn secret-specific
+opt-outs even when deployment secrets are irrelevant to their slice.
+
+### 10. Downsides for implementing this PR
+
+The install-deps readiness path gains an additional applicability layer and dynamic import boundary.
+This adds a small amount of complexity, but it keeps the common `i` entrypoint safe for both full
+deployment workspaces and narrow partial clones.

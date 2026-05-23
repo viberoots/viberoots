@@ -16,6 +16,11 @@ non-interactive pre-confirmation, `--without-secrets` for dependency-only automa
 can also set `INSTALL_DEPS_WITHOUT_SECRETS=1`; non-interactive setup may be explicitly allowed with
 `INSTALL_DEPS_SETUP_SECRETS=1`.
 
+Lazy `i` secret readiness is capability-gated by checked-out deployment metadata. Partial clones or
+minimized workspaces without `projects/deployments/pleomino/shared/family.bzl` skip Infisical
+readiness automatically and do not require `--without-secrets`; full checkouts can still use
+`--without-secrets` or `INSTALL_DEPS_WITHOUT_SECRETS=1` as an explicit dependency-only opt-out.
+
 Deep bootstrap commands remain available for advanced recovery and debugging:
 
 ```bash

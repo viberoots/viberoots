@@ -1,23 +1,9 @@
+import * as fsp from "node:fs/promises";
 import * as readline from "node:readline/promises";
 import path from "node:path";
 import process from "node:process";
-import { DEFAULT_BOOTSTRAP_ARGS } from "../../deployments/infisical-iac-bootstrap-config";
-import { repoBootstrapCredentialRefs } from "../../deployments/infisical-iac-bootstrap-identity";
-import { resolverConfigPath } from "../../deployments/infisical-iac-bootstrap-preflight";
-import { readPleominoReviewedMetadata } from "../../deployments/infisical-iac-bootstrap-reviewed-metadata";
-import {
-  LocalFileCredentialSink,
-  resolveCredentialSinkSelection,
-  type CredentialSinkSelection,
-} from "../../deployments/infisical-iac-bootstrap-sink";
-import { resolveBootstrapAccessCredentialSinkBackend } from "../../deployments/sprinkleref-bootstrap-guard";
-import { readSprinkleRefConfig } from "../../deployments/sprinkleref-config";
-import { createSprinkleRefStore } from "../../deployments/sprinkleref-store";
-import type {
-  BootstrapArgs,
-  CredentialSink,
-} from "../../deployments/infisical-iac-bootstrap-types";
 import { runNodeWithZx } from "../../lib/node-run";
+import { loadDeploymentReadinessModules, sinkFromSelection } from "./secret-readiness-modules";
 
 export type SecretReadinessFlags = {
   withoutSecrets: boolean;
@@ -32,7 +18,16 @@ export type SecretReadinessDeps = {
   isInteractive?: () => boolean;
   prompt?: (message: string) => Promise<boolean>;
   bootstrap?: (args: string[]) => Promise<void>;
+  probe?: (repoRoot: string) => Promise<SecretReadinessProbe>;
 };
+
+type SecretReadinessProbe = {
+  ready: boolean;
+  reason: string;
+};
+
+const pleominoFamilyMetadataPath = "projects/deployments/pleomino/shared/family.bzl";
+const resolverConfigRelativePath = path.join("sprinkleref", "selected.local.json");
 
 export async function ensureInstallSecretReadiness(opts: {
   repoRoot: string;
@@ -45,7 +40,13 @@ export async function ensureInstallSecretReadiness(opts: {
     if (opts.verbose) console.log("[install-deps] skipping Infisical secret readiness");
     return;
   }
-  const probe = await probeLocalSecretReadiness(opts.repoRoot);
+  if (!(await isInstallSecretReadinessApplicable(opts.repoRoot))) {
+    if (opts.verbose) {
+      console.log("[install-deps] Infisical secret readiness not applicable in this checkout");
+    }
+    return;
+  }
+  const probe = await (opts.deps?.probe || probeLocalSecretReadiness)(opts.repoRoot);
   if (probe.ready) {
     if (opts.verbose) console.log("[install-deps] Infisical local secret readiness ok");
     if (hasRotationRequest(opts.flags)) {
@@ -72,7 +73,21 @@ export async function ensureInstallSecretReadiness(opts: {
 }
 
 export async function probeLocalSecretReadiness(repoRoot = process.cwd()) {
-  const configPath = process.env.SPRINKLEREF_CONFIG || path.join(repoRoot, resolverConfigPath());
+  if (!(await isInstallSecretReadinessApplicable(repoRoot))) {
+    return { ready: true, reason: "not applicable in this checkout" };
+  }
+  const {
+    DEFAULT_BOOTSTRAP_ARGS,
+    LocalFileCredentialSink,
+    createSprinkleRefStore,
+    readPleominoReviewedMetadata,
+    readSprinkleRefConfig,
+    repoBootstrapCredentialRefs,
+    resolveBootstrapAccessCredentialSinkBackend,
+    resolveCredentialSinkSelection,
+  } = await loadDeploymentReadinessModules();
+  const configPath =
+    process.env.SPRINKLEREF_CONFIG || path.join(repoRoot, resolverConfigRelativePath);
   try {
     await readSprinkleRefConfig(configPath);
   } catch {
@@ -88,11 +103,16 @@ export async function probeLocalSecretReadiness(repoRoot = process.cwd()) {
       createMissingResolverConfig: false,
       env: { ...process.env, SPRINKLEREF_CONFIG: configPath },
     });
-    const sink = await sinkFromSelection(args, selection, repoRoot);
+    const sink = await sinkFromSelection(args, selection, repoRoot, {
+      LocalFileCredentialSink,
+      createSprinkleRefStore,
+      readSprinkleRefConfig,
+      resolveBootstrapAccessCredentialSinkBackend,
+    });
     const repoRefs = repoBootstrapCredentialRefs({ name: args.identityName });
     const requiredRefs = [repoRefs.clientIdRef, repoRefs.clientSecretRef];
     const metadata = await readPleominoReviewedMetadata(
-      path.join(repoRoot, "projects/deployments/pleomino/shared/family.bzl"),
+      path.join(repoRoot, pleominoFamilyMetadataPath),
     );
     for (const item of metadata.deploymentCredentials) {
       requiredRefs.push(item.clientIdRef, item.clientSecretRef);
@@ -107,39 +127,19 @@ export async function probeLocalSecretReadiness(repoRoot = process.cwd()) {
   }
 }
 
-async function sinkFromSelection(
-  args: BootstrapArgs,
-  selection: CredentialSinkSelection,
-  repoRoot: string,
-): Promise<CredentialSink> {
-  if (selection.kind === "local-file") {
-    return new LocalFileCredentialSink(args.localCredentialFile);
+export async function isInstallSecretReadinessApplicable(repoRoot = process.cwd()) {
+  try {
+    await fsp.access(path.join(repoRoot, pleominoFamilyMetadataPath));
+    return true;
+  } catch (error) {
+    if (isFileAbsenceError(error)) return false;
+    throw error;
   }
-  const config = await readSprinkleRefConfig(selection.configPath);
-  const resolved = resolveBootstrapAccessCredentialSinkBackend(
-    config,
-    selection.category || args.sprinkleCategory || "bootstrap",
-  );
-  const store = createSprinkleRefStore(absolutizeLocalFileBackend(resolved.backend, repoRoot));
-  return {
-    describe: () => store.describe(),
-    has: (ref) => store.has(ref),
-    read: (ref) => store.read(ref),
-    write: async (ref, value, overwrite) => {
-      if (overwrite && (await store.has(ref))) return await store.update(ref, value);
-      await store.add(ref, value);
-    },
-  };
 }
 
-function absolutizeLocalFileBackend<T extends { backend: string; file?: string }>(
-  backend: T,
-  repoRoot: string,
-): T {
-  if (backend.backend !== "local-file" || !backend.file || path.isAbsolute(backend.file)) {
-    return backend;
-  }
-  return { ...backend, file: path.join(repoRoot, backend.file) };
+function isFileAbsenceError(error: unknown) {
+  const code = (error as NodeJS.ErrnoException).code;
+  return code === "ENOENT" || code === "ENOTDIR";
 }
 
 function bootstrapArgs(flags: SecretReadinessFlags) {
