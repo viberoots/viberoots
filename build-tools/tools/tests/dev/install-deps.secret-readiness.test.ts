@@ -215,10 +215,10 @@ async function writeCredentials(repoRoot: string) {
   const refs = [
     "secret://viberoots/bootstrap/viberoots-iac-bootstrap/client-id",
     "secret://viberoots/bootstrap/viberoots-iac-bootstrap/client-secret",
-    "secret://deployments/pleomino/staging/infisical-client-id",
-    "secret://deployments/pleomino/staging/infisical-client-secret",
-    "secret://deployments/pleomino/prod/infisical-client-id",
-    "secret://deployments/pleomino/prod/infisical-client-secret",
+    "secret://deployments/fixture/staging/infisical-client-id",
+    "secret://deployments/fixture/staging/infisical-client-secret",
+    "secret://deployments/fixture/prod/infisical-client-id",
+    "secret://deployments/fixture/prod/infisical-client-secret",
   ];
   const store = Object.fromEntries(refs.map((ref) => [ref, "present"]));
   await fsp.mkdir(path.join(repoRoot, ".local"), { recursive: true });
@@ -226,14 +226,14 @@ async function writeCredentials(repoRoot: string) {
 }
 
 async function writeFamily(repoRoot: string) {
-  await fsp.mkdir(path.join(repoRoot, "projects/deployments/pleomino/shared"), { recursive: true });
+  await fsp.mkdir(path.join(repoRoot, "projects/deployments/fixture/shared"), { recursive: true });
   await fsp.writeFile(
-    path.join(repoRoot, "projects/deployments/pleomino/shared/family.bzl"),
+    path.join(repoRoot, "projects/deployments/fixture/shared/family.bzl"),
     `
 _INFISICAL_SITE_URL = "https://app.infisical.com"
 _INFISICAL_PROJECT_ID = "project"
-_INFISICAL_PROJECT_NAME = "Pleomino"
-_INFISICAL_PROJECT_SLUG = "pleomino"
+_INFISICAL_PROJECT_NAME = "fixture"
+_INFISICAL_PROJECT_SLUG = "fixture"
 _INFISICAL_ENVIRONMENT_SLUGS = {"staging": "staging", "prod": "prod"}
 _INFISICAL_SECRET_PATH = "/"
 _INFISICAL_CLOUDFLARE_SECRET_NAME = "cloudflare_api_token"
@@ -241,8 +241,8 @@ _INFISICAL_MACHINE_IDENTITY_IDS = {"staging": "id_staging", "prod": "id_prod"}
 _INFISICAL_MACHINE_IDENTITY_NAMES = {"staging": "staging", "prod": "prod"}
 _INFISICAL_CREDENTIAL_FILE_NAMES = {"staging": {"client_id": "staging-client-id", "client_secret": "staging-client-secret"}, "prod": {"client_id": "prod-client-id", "client_secret": "prod-client-secret"}}
 _INFISICAL_CREDENTIAL_REFS = {
-    "staging": {"client_id": "secret://deployments/pleomino/staging/infisical-client-id", "client_secret": "secret://deployments/pleomino/staging/infisical-client-secret"},
-    "prod": {"client_id": "secret://deployments/pleomino/prod/infisical-client-id", "client_secret": "secret://deployments/pleomino/prod/infisical-client-secret"},
+    "staging": {"client_id": "secret://deployments/fixture/staging/infisical-client-id", "client_secret": "secret://deployments/fixture/staging/infisical-client-secret"},
+    "prod": {"client_id": "secret://deployments/fixture/prod/infisical-client-id", "client_secret": "secret://deployments/fixture/prod/infisical-client-secret"},
 }
 `,
   );

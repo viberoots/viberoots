@@ -1,4 +1,5 @@
 import * as fsp from "node:fs/promises";
+import type { Dirent } from "node:fs";
 import * as readline from "node:readline/promises";
 import path from "node:path";
 import process from "node:process";
@@ -26,7 +27,8 @@ type SecretReadinessProbe = {
   reason: string;
 };
 
-const pleominoFamilyMetadataPath = "projects/deployments/pleomino/shared/family.bzl";
+const deploymentMetadataRoot = path.join("projects", "deployments");
+const familyMetadataSuffix = path.join("shared", "family.bzl");
 const resolverConfigRelativePath = path.join("sprinkleref", "selected.local.json");
 
 export async function ensureInstallSecretReadiness(opts: {
@@ -88,9 +90,7 @@ export async function probeLocalSecretReadiness(repoRoot = process.cwd()) {
   } = await loadDeploymentReadinessModules();
   const configPath =
     process.env.SPRINKLEREF_CONFIG || path.join(repoRoot, resolverConfigRelativePath);
-  const metadata = await readPleominoReviewedMetadata(
-    path.join(repoRoot, pleominoFamilyMetadataPath),
-  );
+  const metadataPaths = await discoverDeploymentFamilyMetadataPaths(repoRoot);
   try {
     await readSprinkleRefConfig(configPath);
   } catch (error) {
@@ -114,8 +114,11 @@ export async function probeLocalSecretReadiness(repoRoot = process.cwd()) {
   });
   const repoRefs = repoBootstrapCredentialRefs({ name: args.identityName });
   const requiredRefs = [repoRefs.clientIdRef, repoRefs.clientSecretRef];
-  for (const item of metadata.deploymentCredentials) {
-    requiredRefs.push(item.clientIdRef, item.clientSecretRef);
+  for (const metadataPath of metadataPaths) {
+    const metadata = await readPleominoReviewedMetadata(metadataPath);
+    for (const item of metadata.deploymentCredentials) {
+      requiredRefs.push(item.clientIdRef, item.clientSecretRef);
+    }
   }
   for (const ref of requiredRefs) {
     if (!(await sink.has(ref)))
@@ -125,12 +128,35 @@ export async function probeLocalSecretReadiness(repoRoot = process.cwd()) {
 }
 
 export async function isInstallSecretReadinessApplicable(repoRoot = process.cwd()) {
+  return (await discoverDeploymentFamilyMetadataPaths(repoRoot)).length > 0;
+}
+
+async function discoverDeploymentFamilyMetadataPaths(repoRoot: string) {
+  const deploymentsRoot = path.join(repoRoot, deploymentMetadataRoot);
+  const found: string[] = [];
+  await walkDeployments(deploymentsRoot, found);
+  return found.sort();
+}
+
+async function walkDeployments(dir: string, found: string[]) {
+  let entries: Dirent[];
   try {
-    await fsp.access(path.join(repoRoot, pleominoFamilyMetadataPath));
-    return true;
+    entries = await fsp.readdir(dir, { withFileTypes: true });
   } catch (error) {
-    if (isFileAbsenceError(error)) return false;
+    if (isFileAbsenceError(error)) return;
     throw error;
+  }
+  for (const entry of entries) {
+    if (!entry.isDirectory()) continue;
+    const child = path.join(dir, entry.name);
+    const metadataPath = path.join(child, familyMetadataSuffix);
+    try {
+      await fsp.access(metadataPath);
+      found.push(metadataPath);
+    } catch (error) {
+      if (!isFileAbsenceError(error)) throw error;
+    }
+    await walkDeployments(child, found);
   }
 }
 

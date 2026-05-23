@@ -1,57 +1,53 @@
 #!/usr/bin/env zx-wrapper
 import assert from "node:assert/strict";
-import * as fs from "node:fs/promises";
 import { test } from "node:test";
 import { InfisicalApi } from "../../deployments/infisical-iac-bootstrap-api";
 import { buildDryRunReport } from "../../deployments/infisical-iac-bootstrap-dry-run";
 import { buildCredentialHandoffReport } from "../../deployments/infisical-iac-bootstrap-handoff";
 import { canonicalInfisicalApiUrl } from "../../deployments/infisical-iac-bootstrap-config";
-import {
-  parsePleominoReviewedMetadata,
-  PLEOMINO_REVIEWED_METADATA_PATH,
-  readPleominoReviewedMetadata,
-} from "../../deployments/infisical-iac-bootstrap-reviewed-metadata";
+import { parsePleominoReviewedMetadata } from "../../deployments/infisical-iac-bootstrap-reviewed-metadata";
 import { reconcileDeploymentMetadata } from "../../deployments/infisical-iac-bootstrap-reconcile";
 import { errorMessage } from "../../deployments/infisical-iac-bootstrap-redaction";
 
-test("reconciliation accepts checked-in reviewed non-secret OpenTofu outputs", async () => {
-  const reviewed = await readPleominoReviewedMetadata();
+test("reconciliation accepts reviewed non-secret OpenTofu outputs", () => {
+  const reviewed = parsePleominoReviewedMetadata(METADATA_FIXTURE);
   const result = reconcileDeploymentMetadata(reviewed, reviewed);
   assert.equal(result.status, "ok");
 });
 
-test("reviewed metadata is parsed from the checked-in Pleomino source of truth", async () => {
-  const source = await fs.readFile(PLEOMINO_REVIEWED_METADATA_PATH, "utf8");
-  const reviewed = parsePleominoReviewedMetadata(source);
+test("reviewed metadata parser reflects fixture source values", () => {
+  const reviewed = parsePleominoReviewedMetadata(METADATA_FIXTURE);
   assert.equal(
     reviewed.siteUrl,
-    canonicalInfisicalApiUrl(stringConstant(source, "_INFISICAL_SITE_URL")),
+    canonicalInfisicalApiUrl(stringConstant(METADATA_FIXTURE, "_INFISICAL_SITE_URL")),
   );
-  assert.equal(reviewed.projectId, stringConstant(source, "_INFISICAL_PROJECT_ID"));
-  assert.equal(reviewed.projectName, stringConstant(source, "_INFISICAL_PROJECT_NAME"));
-  assert.equal(reviewed.projectSlug, stringConstant(source, "_INFISICAL_PROJECT_SLUG"));
-  assert.equal(reviewed.secretPath, stringConstant(source, "_INFISICAL_SECRET_PATH"));
+  assert.equal(reviewed.projectId, stringConstant(METADATA_FIXTURE, "_INFISICAL_PROJECT_ID"));
+  assert.equal(reviewed.projectName, stringConstant(METADATA_FIXTURE, "_INFISICAL_PROJECT_NAME"));
+  assert.equal(reviewed.projectSlug, stringConstant(METADATA_FIXTURE, "_INFISICAL_PROJECT_SLUG"));
+  assert.equal(reviewed.secretPath, stringConstant(METADATA_FIXTURE, "_INFISICAL_SECRET_PATH"));
   assert.equal(
     reviewed.cloudflareSecretName,
-    stringConstant(source, "_INFISICAL_CLOUDFLARE_SECRET_NAME"),
+    stringConstant(METADATA_FIXTURE, "_INFISICAL_CLOUDFLARE_SECRET_NAME"),
   );
   for (const item of reviewed.deploymentCredentials) {
     assert.equal(
-      source.includes(`"${item.stage}": "${reviewed.environments[item.stage].slug}"`),
+      METADATA_FIXTURE.includes(`"${item.stage}": "${reviewed.environments[item.stage].slug}"`),
       true,
     );
-    assert.equal(source.includes(`"${item.stage}": "${item.identityId}"`), true);
-    assert.equal(source.includes(`"${item.stage}": "${item.identityName}"`), true);
-    assert.equal(source.includes(`"client_id": "${item.clientIdRef}"`), true);
-    assert.equal(source.includes(`"client_secret": "${item.clientSecretRef}"`), true);
-    assert.equal(source.includes(`"client_id": "${item.clientIdFileName}"`), true);
-    assert.equal(source.includes(`"client_secret": "${item.clientSecretFileName}"`), true);
+    assert.equal(METADATA_FIXTURE.includes(`"${item.stage}": "${item.identityId}"`), true);
+    assert.equal(METADATA_FIXTURE.includes(`"${item.stage}": "${item.identityName}"`), true);
+    assert.equal(METADATA_FIXTURE.includes(`"client_id": "${item.clientIdRef}"`), true);
+    assert.equal(METADATA_FIXTURE.includes(`"client_secret": "${item.clientSecretRef}"`), true);
+    assert.equal(METADATA_FIXTURE.includes(`"client_id": "${item.clientIdFileName}"`), true);
+    assert.equal(
+      METADATA_FIXTURE.includes(`"client_secret": "${item.clientSecretFileName}"`),
+      true,
+    );
   }
 });
 
-test("parser reflects checked-in reviewed input drift instead of a duplicate copy", async () => {
-  const source = await fs.readFile(PLEOMINO_REVIEWED_METADATA_PATH, "utf8");
-  const changedProject = source.replace(
+test("parser reflects reviewed input drift instead of a duplicate copy", () => {
+  const changedProject = METADATA_FIXTURE.replace(
     /_INFISICAL_SITE_URL = "[^"]+"/,
     '_INFISICAL_SITE_URL = "https://drifted.infisical.example"',
   );
@@ -59,28 +55,28 @@ test("parser reflects checked-in reviewed input drift instead of a duplicate cop
     parsePleominoReviewedMetadata(changedProject).siteUrl,
     "https://drifted.infisical.example",
   );
-  const changedProjectId = source.replace(
+  const changedProjectId = METADATA_FIXTURE.replace(
     /_INFISICAL_PROJECT_ID = "[^"]+"/,
     '_INFISICAL_PROJECT_ID = "proj_drifted"',
   );
   assert.equal(parsePleominoReviewedMetadata(changedProjectId).projectId, "proj_drifted");
-  const changedSlug = source.replace(
+  const changedSlug = METADATA_FIXTURE.replace(
     /_INFISICAL_PROJECT_SLUG = "[^"]+"/,
     '_INFISICAL_PROJECT_SLUG = "slug-drifted"',
   );
   assert.equal(parsePleominoReviewedMetadata(changedSlug).projectSlug, "slug-drifted");
-  const changedRef = source.replace(
-    "secret://deployments/pleomino/staging/infisical-client-id",
-    "secret://deployments/pleomino/staging/drifted-client-id",
+  const changedRef = METADATA_FIXTURE.replace(
+    "secret://deployments/fixture/staging/infisical-client-id",
+    "secret://deployments/fixture/staging/drifted-client-id",
   );
   assert.equal(
     parsePleominoReviewedMetadata(changedRef).deploymentCredentials[0]?.clientIdRef,
-    "secret://deployments/pleomino/staging/drifted-client-id",
+    "secret://deployments/fixture/staging/drifted-client-id",
   );
 });
 
-test("reconciliation mismatch fails with non-secret patch guidance", async () => {
-  const reviewed = await readPleominoReviewedMetadata();
+test("reconciliation mismatch fails with non-secret patch guidance", () => {
+  const reviewed = parsePleominoReviewedMetadata(METADATA_FIXTURE);
   assert.equal(
     reconcileDeploymentMetadata({ ...reviewed, siteUrl: `${reviewed.siteUrl}/api/` }, reviewed)
       .status,
@@ -88,7 +84,7 @@ test("reconciliation mismatch fails with non-secret patch guidance", async () =>
   );
   assert.throws(
     () => reconcileDeploymentMetadata({ ...reviewed, siteUrl: "https://wrong.example" }, reviewed),
-    /site url: live=https:\/\/wrong\.example reviewed=https:\/\/app\.infisical\.com[\s\S]*projects\/deployments\/pleomino\/shared\/family\.bzl/,
+    /site url: live=https:\/\/wrong\.example reviewed=https:\/\/app\.infisical\.com[\s\S]*reviewed constants/,
   );
 });
 
@@ -131,7 +127,7 @@ test("Infisical API errors redact response-body tokens and secret values", async
 });
 
 test("credential handoff report emits stable refs without secret values", () => {
-  const metadata = parsePleominoReviewedMetadata(CHECKED_IN_METADATA_FIXTURE);
+  const metadata = parsePleominoReviewedMetadata(METADATA_FIXTURE);
   const report = buildCredentialHandoffReport({
     args: REVIEWED_ARGS,
     sinkSelection: {
@@ -146,8 +142,8 @@ test("credential handoff report emits stable refs without secret values", () => 
   const text = JSON.stringify(report);
   assert.match(text, /secret:\/\/viberoots\/bootstrap\/viberoots-iac-bootstrap\/client-id/);
   assert.match(text, /secret:\/\/viberoots\/bootstrap\/viberoots-iac-bootstrap\/client-secret/);
-  assert.doesNotMatch(text, /secret:\/\/deployments\/pleomino\/bootstrap/);
-  assert.match(text, /secret:\/\/deployments\/pleomino\/staging\/infisical-client-secret/);
+  assert.doesNotMatch(text, /secret:\/\/deployments\/fixture\/bootstrap/);
+  assert.match(text, /secret:\/\/deployments\/fixture\/staging\/infisical-client-secret/);
   assert.match(text, /"status":"managed"/);
   assert.match(text, /infisical-iac-bootstrap/);
   assert.doesNotMatch(text, /handoff-only|deployment credential lifecycle migration/);
@@ -172,7 +168,7 @@ const REVIEWED_ARGS = {
   yes: true,
   dryRun: false,
   applyMetadataPatch: false,
-  tofuDir: "projects/deployments/pleomino/infisical/opentofu",
+  tofuDir: "tmp/deployments/fixture/infisical/opentofu",
   noTofuApply: false,
   rotateBootstrapCredentials: false,
   rotateDeploymentCredentials: false,
@@ -188,11 +184,11 @@ function stringConstant(source: string, name: string) {
   return source.match(new RegExp(`${name}\\s*=\\s*"([^"]+)"`))?.[1];
 }
 
-const CHECKED_IN_METADATA_FIXTURE = `
+const METADATA_FIXTURE = `
 _INFISICAL_PROJECT_ID = "proj_fixture"
 _INFISICAL_SITE_URL = "https://app.infisical.com"
-_INFISICAL_PROJECT_NAME = "pleomino-deployments"
-_INFISICAL_PROJECT_SLUG = "pleomino-deployments"
+_INFISICAL_PROJECT_NAME = "fixture-deployments"
+_INFISICAL_PROJECT_SLUG = "fixture-deployments"
 _INFISICAL_ENVIRONMENT_SLUGS = {
     "staging": "staging",
 }
@@ -201,9 +197,7 @@ _INFISICAL_CLOUDFLARE_SECRET_NAME = "cloudflare_api_token"
 _INFISICAL_MACHINE_IDENTITY_IDS = {
     "staging": "identity_fixture_staging",
 }
-_INFISICAL_MACHINE_IDENTITY_NAMES = {
-    "staging": "pleomino-staging-deploy",
-}
+_INFISICAL_MACHINE_IDENTITY_NAMES = {"staging": "fixture-staging-deploy"}
 _INFISICAL_CREDENTIAL_FILE_NAMES = {
     "staging": {
         "client_id": "fixture-client-id",
@@ -212,8 +206,8 @@ _INFISICAL_CREDENTIAL_FILE_NAMES = {
 }
 _INFISICAL_CREDENTIAL_REFS = {
     "staging": {
-        "client_id": "secret://deployments/pleomino/staging/infisical-client-id",
-        "client_secret": "secret://deployments/pleomino/staging/infisical-client-secret",
+        "client_id": "secret://deployments/fixture/staging/infisical-client-id",
+        "client_secret": "secret://deployments/fixture/staging/infisical-client-secret",
     },
 }
 `;

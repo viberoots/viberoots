@@ -48,15 +48,15 @@ test("adopted project metadata handoff does not relax reviewed file-name drift",
         SOURCE,
         { allowReviewedIdHandoff: true },
       ),
-    /staging client id file name: live=unexpected-client-id-file reviewed=pleomino-staging-client-id/,
+    /staging client id file name: live=unexpected-client-id-file reviewed=fixture-staging-client-id/,
   );
 });
 
 const LIVE_METADATA = {
   siteUrl: "https://app.infisical.com",
-  projectName: "pleomino-deployments",
+  projectName: "fixture-deployments",
   projectId: "proj_live",
-  projectSlug: "pleomino-deployments",
+  projectSlug: "fixture-deployments",
   secretPath: "/",
   cloudflareSecretName: "cloudflare_api_token",
   environments: { staging: { slug: "staging" } },
@@ -64,11 +64,11 @@ const LIVE_METADATA = {
     {
       stage: "staging",
       identityId: "identity_live_staging",
-      identityName: "pleomino-staging-deploy",
-      clientIdRef: "secret://deployments/pleomino/staging/infisical-client-id",
-      clientSecretRef: "secret://deployments/pleomino/staging/infisical-client-secret",
-      clientIdFileName: "pleomino-staging-client-id",
-      clientSecretFileName: "pleomino-staging-client-secret",
+      identityName: "fixture-staging-deploy",
+      clientIdRef: "secret://deployments/fixture/staging/infisical-client-id",
+      clientSecretRef: "secret://deployments/fixture/staging/infisical-client-secret",
+      clientIdFileName: "fixture-staging-client-id",
+      clientSecretFileName: "fixture-staging-client-secret",
     },
   ],
 };
@@ -76,23 +76,23 @@ const LIVE_METADATA = {
 const SOURCE = `
 _INFISICAL_SITE_URL = "https://app.infisical.com"
 _INFISICAL_PROJECT_ID = "proj_old"
-_INFISICAL_PROJECT_NAME = "pleomino-deployments"
-_INFISICAL_PROJECT_SLUG = "pleomino-deployments"
+_INFISICAL_PROJECT_NAME = "fixture-deployments"
+_INFISICAL_PROJECT_SLUG = "fixture-deployments"
 _INFISICAL_ENVIRONMENT_SLUGS = {"staging": "staging"}
 _INFISICAL_SECRET_PATH = "/"
 _INFISICAL_CLOUDFLARE_SECRET_NAME = "cloudflare_api_token"
 _INFISICAL_MACHINE_IDENTITY_IDS = {"staging": "identity_old_staging"}
-_INFISICAL_MACHINE_IDENTITY_NAMES = {"staging": "pleomino-staging-deploy"}
+_INFISICAL_MACHINE_IDENTITY_NAMES = {"staging": "fixture-staging-deploy"}
 _INFISICAL_CREDENTIAL_FILE_NAMES = {
   "staging": {
-    "client_id": "pleomino-staging-client-id",
-    "client_secret": "pleomino-staging-client-secret",
+    "client_id": "fixture-staging-client-id",
+    "client_secret": "fixture-staging-client-secret",
   },
 }
 _INFISICAL_CREDENTIAL_REFS = {
   "staging": {
-    "client_id": "secret://deployments/pleomino/staging/infisical-client-id",
-    "client_secret": "secret://deployments/pleomino/staging/infisical-client-secret",
+    "client_id": "secret://deployments/fixture/staging/infisical-client-id",
+    "client_secret": "secret://deployments/fixture/staging/infisical-client-secret",
   },
 }
 `;
