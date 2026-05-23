@@ -469,6 +469,43 @@ test("verify cleanup: stale verify state files remove registered temp roots", as
   }
 });
 
+test("verify cleanup: orphan registered temp repo cleanup caps root work", async () => {
+  const originalUser = process.env.USER;
+  const user = `verify-stale-cap-${process.pid}-${Date.now()}`;
+  const scanRoot = path.resolve("/tmp", `viberoots-verify-${user}.noindex`);
+  const scanDir = path.join(scanRoot, "tmpdir");
+  const stateFile = path.join(scanDir, "viberoots-buck-reaper-v-999998-1700000000000.txt");
+  const roots = await Promise.all(
+    Array.from({ length: 3 }, async () => {
+      const root = await fsp.mkdtemp(path.join(os.tmpdir(), "verify-owned-capped-root-"));
+      await fsp.writeFile(path.join(root, "owned.txt"), "owned\n", "utf8");
+      return root;
+    }),
+  );
+  try {
+    process.env.USER = user;
+    await fsp.mkdir(scanDir, { recursive: true });
+    await fsp.writeFile(stateFile, `${roots.join("\n")}\n`, "utf8");
+
+    const result = await cleanupOrphanRegisteredTempRepos({ maxKills: 10, maxRoots: 1 });
+
+    assert.equal(result.candidates, 1);
+    await assert.rejects(fsp.access(roots[0]));
+    await fsp.access(roots[1]);
+    await fsp.access(roots[2]);
+  } finally {
+    if (originalUser === undefined) {
+      delete process.env.USER;
+    } else {
+      process.env.USER = originalUser;
+    }
+    await fsp.rm(scanRoot, { recursive: true, force: true }).catch(() => {});
+    await Promise.all(roots.map((root) => fsp.rm(root, { recursive: true, force: true }))).catch(
+      () => {},
+    );
+  }
+});
+
 test("verify cleanup: prunes dead-owner state files with missing roots despite pid fallback reuse", async () => {
   const originalUser = process.env.USER;
   const user = `verify-stale-prune-${process.pid}-${Date.now()}`;

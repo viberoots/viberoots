@@ -15,6 +15,7 @@ import {
 import type { ForkserverProc } from "./buck-orphan-cleanup-lib";
 import { parseVerifyOwnedState } from "./owned-process-state";
 import { registeredIsolationProcessPidsFromLines } from "./registered-buck-cleanup";
+import { uniqueRegisteredRoots } from "./registered-temp-repo-roots";
 import { cleanupTempRepoProcesses } from "./temp-repo-process-cleanup";
 import {
   listCandidateStateFiles,
@@ -102,6 +103,7 @@ async function pruneDefinitelyStaleRegisteredStateFiles(
 export async function cleanupOrphanRegisteredTempRepos(opts: {
   log?: (line: string) => Promise<void>;
   maxKills?: number;
+  maxRoots?: number;
 }): Promise<{ scanned: number; candidates: number; killed: number }> {
   const listedStateFiles = await listCandidateStateFiles();
   const { stateFiles, pruned } = await pruneDefinitelyStaleRegisteredStateFiles(listedStateFiles);
@@ -111,27 +113,25 @@ export async function cleanupOrphanRegisteredTempRepos(opts: {
   let candidates = 0;
   let killed = 0;
   const maxKills = Math.max(0, opts.maxKills ?? 200);
+  let remainingRoots = Math.max(0, opts.maxRoots ?? 200);
   for (const stateFile of stateFiles) {
-    if (killed >= maxKills) break;
+    if (killed >= maxKills || remainingRoots <= 0) break;
     const txt = await fsp.readFile(stateFile, "utf8").catch(() => "");
-    const parsed = parseVerifyOwnedState(txt);
-    const roots = parsed.roots
-      .map((root) => root.trim())
-      .filter(Boolean)
-      .map((root) => path.resolve(root))
-      .filter((root) => root.length > 1);
+    const roots = uniqueRegisteredRoots(parseVerifyOwnedState(txt).roots);
     if (roots.length === 0) continue;
-    candidates += new Set(roots).size;
+    candidates += Math.min(roots.length, remainingRoots);
     const res = await cleanupRegisteredTempRepos({
       stateFile,
       log: opts.log,
       maxKills: Math.max(0, maxKills - killed),
+      maxRoots: remainingRoots,
       removeRoots: true,
     });
     killed += res.killed;
+    remainingRoots -= res.roots;
     if (opts.log) {
       await opts.log(
-        `[verify] orphan registered temp repo cleanup: state=${stateFile} roots=${res.roots} killed=${res.killed}`,
+        `[verify] orphan registered temp repo cleanup: state=${stateFile} roots=${res.roots} skipped_roots=${res.skippedRoots} killed=${res.killed}`,
       );
     }
   }
@@ -142,19 +142,20 @@ export async function cleanupRegisteredTempRepos(opts: {
   stateFile: string;
   log?: (line: string) => Promise<void>;
   maxKills?: number;
+  maxRoots?: number;
   removeRoots?: boolean;
-}): Promise<{ roots: number; killed: number }> {
+}): Promise<{ roots: number; killed: number; skippedRoots: number }> {
   const stateFile = String(opts.stateFile || "").trim();
-  if (!stateFile) return { roots: 0, killed: 0 };
+  if (!stateFile) return { roots: 0, killed: 0, skippedRoots: 0 };
   const txt = await fsp.readFile(stateFile, "utf8").catch(() => "");
-  const parsed = parseVerifyOwnedState(txt);
-  const roots = parsed.roots
-    .map((l) => l.trim())
-    .filter(Boolean)
-    .map((p) => path.resolve(p))
-    .filter((p) => p.length > 1);
-  const uniqueRoots = Array.from(new Set(roots));
-  if (uniqueRoots.length === 0) return { roots: 0, killed: 0 };
+  const allRoots = uniqueRegisteredRoots(parseVerifyOwnedState(txt).roots);
+  if (allRoots.length === 0) return { roots: 0, killed: 0, skippedRoots: 0 };
+  const maxRoots = Math.max(0, opts.maxRoots ?? allRoots.length);
+  const uniqueRoots = allRoots.slice(0, maxRoots);
+  if (uniqueRoots.length === 0) {
+    return { roots: 0, killed: 0, skippedRoots: allRoots.length };
+  }
+  const skippedRoots = Math.max(0, allRoots.length - uniqueRoots.length);
 
   let forks = parseForkservers(await psLines(2000));
   let killed = 0;
@@ -241,5 +242,5 @@ export async function cleanupRegisteredTempRepos(opts: {
       await fsp.rm(root, { recursive: true, force: true }).catch(() => {});
     }
   }
-  return { roots: uniqueRoots.length, killed };
+  return { roots: uniqueRoots.length, killed, skippedRoots };
 }
