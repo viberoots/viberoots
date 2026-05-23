@@ -19,7 +19,28 @@ It must not manage application secrets such as `cloudflare_api_token`. Those bel
 
 ## Command Shape
 
-Primary commands:
+Primary local setup:
+
+```bash
+i
+i --yes
+i --without-secrets
+i --machine-label <label>
+```
+
+`i` is the normal first-run and daily-run entrypoint. After dependency setup, it performs a narrow
+local readiness check for `sprinkleref/selected.local.json`, the repo bootstrap Universal Auth
+credential, and the Pleomino deployment Universal Auth credentials for this machine. It does not run
+full `sprinkleref --check` and does not require application secrets such as Cloudflare tokens to
+exist.
+
+Ready machines produce no extra setup output unless verbose diagnostics are enabled. If local
+readiness is missing, interactive `i` asks once before running repo bootstrap with deployment fan-out
+enabled. Non-interactive `i` fails with remediation unless `--yes` or
+`INSTALL_DEPS_SETUP_SECRETS=1` explicitly allows setup. Use `i --without-secrets` or
+`INSTALL_DEPS_WITHOUT_SECRETS=1` for dependency-only automation.
+
+Advanced recovery and debug commands:
 
 ```bash
 build-tools/tools/deployments/infisical-bootstrap.ts repo --dry-run
@@ -43,6 +64,11 @@ reviewed deployment bootstrap targets discovered from deployment metadata. `--ye
 both the repo setup prompt and this deployment fan-out prompt. Use `repo --without-deployments`
 when you only want resolver/profile setup; managed deployment bootstrap outputs may remain missing
 until a later default repo run or an explicit deployment bootstrap succeeds.
+
+`i --machine-label <label>` forwards the label to repo bootstrap. Credential lifecycle flags such as
+`--rotate-bootstrap-credentials`, `--rotate-deployment-credentials`, and
+`--force-overwrite-local-credentials` are also forwarded when an operator intentionally invokes them
+through `i`.
 
 On first bootstrap, OpenTofu may create or adopt the Pleomino Infisical project and machine
 identities while checked-in reviewed metadata still contains first-bootstrap placeholders. That is
@@ -147,6 +173,9 @@ CI/non-interactive behavior:
 
 - `--no-login` requires a token from `--access-token-env`, default `INFISICAL_ACCESS_TOKEN`.
 - `--no-login` must also provide exactly one of `--organization-id` or `--org-name`.
+- Routine CI dependency setup should use `i --without-secrets` or
+  `INSTALL_DEPS_WITHOUT_SECRETS=1`. Jobs that intentionally prepare local Infisical credentials
+  may use `i --yes` or `INSTALL_DEPS_SETUP_SECRETS=1`.
 - CI and other non-interactive non-dry-run bootstrap must provide `--yes`; local interactive
   operators may instead confirm the `Y/n` prompt. Missing confirmation fails before any Infisical,
   OpenTofu, resolver-config, or credential-sink mutation.
@@ -201,17 +230,19 @@ Rotation:
 
 Troubleshooting:
 
-- Stale macOS Keychain credentials: if repo bootstrap selects the Keychain sink but Universal Auth
-  fails with an otherwise valid client id, treat the local secret as stale. Confirm the selected sink
-  with `build-tools/tools/deployments/infisical-bootstrap.ts repo --dry-run`, then rerun with
-  `--rotate-bootstrap-credentials` or use `--credential-sink local-file` on machines where Keychain
-  access is not available.
-- New machines: rerun repo bootstrap normally. The command creates a new per-machine Universal Auth
-  client-secret record when local credentials are absent; users do not import another machine's
-  secret.
+- Fresh machines: run `i` and accept the lazy setup prompt. The command creates a new per-machine
+  Universal Auth client-secret record when local credentials are absent; users do not import another
+  machine's secret.
+- Stale macOS Keychain credentials: if local readiness fails or Universal Auth fails with an
+  otherwise valid client id, treat the local secret as stale. Rerun
+  `i --rotate-bootstrap-credentials --force-overwrite-local-credentials` so lazy setup creates a
+  matching remote record and local sink value. If Keychain access is not available, use the advanced
+  bootstrap command with `--credential-sink local-file`.
 - Deleted remote Universal Auth records: Infisical cannot reveal an existing client secret after
-  creation. If this machine's local credential no longer authenticates, rerun repo bootstrap with
-  the relevant rotation flag so a new remote record and local sink value are created together.
+  creation. If this machine's local credential no longer authenticates, rerun
+  `i --rotate-bootstrap-credentials --force-overwrite-local-credentials` for repo bootstrap
+  credentials or `i --rotate-deployment-credentials --force-overwrite-local-credentials` for
+  deployment credentials so a new remote record and local sink value are created together.
 - First-bootstrap metadata handoff: apply the generated `family.bzl` patch only when the mismatch is
   limited to first-bootstrap placeholders or empty reviewed fields. If the command reports drift
   against reviewed non-placeholder metadata, stop and inspect the live Infisical project before

@@ -4723,3 +4723,144 @@ current-machine credentials.
 
 The retry command becomes less exhaustive for unusual manual invocations, and the repo-flow tests
 gain another fixture path that must be maintained as bootstrap orchestration changes.
+
+## PR-47: Lazy Infisical readiness from install-deps
+
+### 1. Intent
+
+Make `i` the normal first-run and daily-run entrypoint for local Infisical readiness so operators do
+not need to know or type deep bootstrap script paths. The install step should lazily ensure only
+local resolver and per-machine Universal Auth readiness, prompt to run repo bootstrap only when
+those local prerequisites are missing, and remain fast and non-surprising once the machine is ready.
+
+### 2. Scope of changes
+
+- Add a narrow secret-readiness phase to `build-tools/tools/dev/install-deps.ts` after normal
+  dependency setup or at another low-surprise point in the `i` flow.
+- The readiness phase must check only local setup needed for repo/deployment secret resolution:
+  `sprinkleref/selected.local.json` or equivalent resolver config, repo bootstrap Universal Auth
+  credentials in the selected local sink, and Pleomino deployment Universal Auth credentials for the
+  current machine.
+- Do not use full `sprinkleref --check` as the lazy readiness gate. Application secrets such as
+  Cloudflare tokens may still be intentionally missing and must not force `i` to fail or bootstrap.
+- If the local readiness check passes, `i` should produce no extra noisy output beyond optional
+  verbose diagnostics and should not run browser/login-capable bootstrap.
+- If local readiness is missing and the shell is interactive, prompt once with a concise `[Y/n]`
+  gate to run the repo bootstrap flow internally.
+- If confirmed, invoke the existing repo bootstrap implementation as an internal helper in repo mode
+  with deployment fan-out enabled by default so it can create this machine's repo and deployment
+  Universal Auth credentials.
+- Reuse PR-44 through PR-46 per-machine behavior: existing local credentials are preserved, missing
+  current-machine credentials are created, other-machine records are not conflicts, and retry
+  guidance preserves credential intent without local path leakage.
+- If local readiness is missing in a non-interactive shell, fail with a short actionable message
+  unless the operator supplied an explicit install flag such as `i --yes` or an environment variable
+  explicitly allowing setup.
+- Add install-deps flags for secret readiness control:
+  `--without-secrets` to skip the readiness/setup phase, `--yes` to allow non-interactive setup,
+  `--machine-label <label>` to forward the per-machine label, and rotation flags only if they are
+  explicitly useful from `i`.
+- Forward credential-affecting flags from `i` to the internal repo bootstrap call; do not expose or
+  require deep bootstrap script paths for normal use.
+- Keep the deep `build-tools/tools/deployments/infisical-bootstrap.ts` commands available as
+  advanced/debug entrypoints, but make docs treat `i` as the canonical setup path.
+- Ensure CI, test workers, and non-deployment-focused local runs can opt out cleanly with
+  `--without-secrets` or a documented environment variable so ordinary dependency setup does not
+  unexpectedly require Infisical access.
+
+### 3. External prerequisites
+
+- Live first-run smoke testing requires an Infisical organization and operator login, but automated
+  tests must not require live Infisical, macOS Keychain, OpenTofu network access, Vault, Cloudflare,
+  browser automation, or real host-specific state.
+- Tests may use fake local sinks, temp repo workspaces, mocked readiness probes, and mocked
+  bootstrap invocation seams.
+
+### 4. Tests to be added
+
+- Add install-deps tests proving a ready machine skips bootstrap and produces minimal output.
+- Add tests proving missing local resolver config or missing per-machine Universal Auth credentials
+  triggers an interactive prompt and, when confirmed, calls repo bootstrap with deployment fan-out.
+- Add tests proving declining the prompt leaves dependency install successful or failed according to
+  the chosen UX, but prints a clear command-free remediation path through `i`.
+- Add non-interactive tests proving missing readiness fails with a concise message unless `--yes` or
+  the documented environment override is supplied.
+- Add tests proving `--without-secrets` skips readiness and bootstrap calls entirely.
+- Add tests proving `--machine-label`, rotation flags if supported, and `--yes` are forwarded to the
+  internal repo bootstrap call without forwarding local path or debug-only flags.
+- Add tests proving full application secret absence does not trigger or fail the `i` readiness phase
+  when resolver config and local Universal Auth credentials are present.
+- Keep existing install-deps dependency setup tests, PR-44 credential lifecycle tests, PR-45/46 retry
+  tests, and bootstrap repo-flow tests passing.
+
+### 5. Docs to be added or updated
+
+- Update `docs/infisical-bootstrap.md`, `infisical-bootstrap.md`, and any concise onboarding docs so
+  the recommended local setup path is `i`, not the deep bootstrap script path.
+- Document `i --without-secrets`, `i --yes`, and `i --machine-label <label>` behavior.
+- Keep deep bootstrap commands documented as advanced recovery/debug commands, not the normal new
+  user path.
+- Document that `i` checks only local resolver and per-machine Universal Auth readiness, not
+  application secret completeness.
+- Update troubleshooting for fresh machines, missing local Keychain entries, stale local
+  credentials, and CI/non-interactive runs to point at the new lazy `i` behavior.
+
+### 5.5. Expected regression scope
+
+- `deployment-only`
+- Keep changes focused on `i`/install-deps orchestration, a narrow local secret-readiness helper,
+  bootstrap invocation wiring, tests, and docs. Do not change Universal Auth credential lifecycle,
+  reviewed metadata handoff, deployment resource definitions, public backend selector syntax,
+  stable secret refs, Vault behavior, Cloudflare secret requirements, or the normal build/verify
+  behavior beyond the explicit lazy readiness phase.
+
+### 6. Acceptance criteria
+
+- A fresh interactive machine can run `i`, accept the prompt, complete Infisical repo bootstrap, and
+  end with local resolver plus current-machine repo/deployment Universal Auth credentials ready.
+- A ready machine can run `i` repeatedly without prompting, opening browser login, creating new
+  credentials, or producing noisy secret setup output.
+- Non-interactive `i` fails clearly when local secret readiness is missing unless explicitly allowed
+  with `--yes` or the documented override.
+- `i --without-secrets` skips all secret readiness and bootstrap work.
+- `i` never fails merely because application secrets such as Cloudflare tokens are absent.
+- Machine label and any supported credential lifecycle flags are forwarded to repo bootstrap.
+- Deep bootstrap commands remain available for advanced recovery.
+- Focused install-deps and bootstrap orchestration tests pass.
+- The repository validation suite passes.
+
+### 7. Risks
+
+- Adding secret readiness to `i` can make a high-frequency command feel surprising if prompts appear
+  too often or checks are too slow.
+- The boundary between local credential readiness and full application secret completeness can be
+  confusing if output is not precise.
+- CI and temp-repo tests can break if the readiness phase is not easy to disable or mock.
+- Invoking browser/login-capable bootstrap from `i` can be disruptive if the interactivity check is
+  too permissive.
+
+### 8. Mitigations
+
+- Make the readiness probe local and cheap, and print nothing on the happy path unless verbose mode
+  is enabled.
+- Keep bootstrap behind an explicit interactive `[Y/n]` gate or an explicit non-interactive allow
+  flag.
+- Provide `--without-secrets` and a documented environment opt-out for automation.
+- Test the readiness phase through a small injected seam so install-deps tests do not require live
+  Infisical or real keychain state.
+- Make operator-facing messages distinguish "local credentials are not ready" from "application
+  secrets are missing."
+
+### 9. Consequences of not implementing this PR
+
+New users will still need to discover and run a deep deployment bootstrap script before ordinary
+repo validation works against Infisical-backed deployment tooling. That keeps the setup path
+unnecessarily procedural even though PR-44 through PR-46 made the underlying credential model safe
+for multi-user lazy setup.
+
+### 10. Downsides for implementing this PR
+
+`i` becomes responsible for one more local readiness concern and will need careful tests to avoid
+making dependency installation depend on live deployment services. Some advanced operators may also
+need to learn `--without-secrets` when they intentionally want dependency setup without any secret
+readiness checks.

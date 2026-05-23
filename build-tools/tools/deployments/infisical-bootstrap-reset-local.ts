@@ -5,6 +5,7 @@ import * as path from "node:path";
 import { pathToFileURL } from "node:url";
 import { askConfirmation } from "./infisical-iac-bootstrap-preflight";
 import { macosKeychainCommand } from "./sprinkleref-keychain";
+import { getArgvTokens } from "../lib/argv";
 
 const KEYCHAIN_SERVICE = "viberoots-bootstrap";
 
@@ -54,10 +55,7 @@ Options:
 `;
 }
 
-export async function runInfisicalBootstrapResetLocal(
-  argv = process.argv.slice(2),
-  io: ResetIo = {},
-) {
+export async function runInfisicalBootstrapResetLocal(argv = getArgvTokens(), io: ResetIo = {}) {
   const stdout = io.stdout || console.log;
   const stderr = io.stderr || console.error;
   if (argv.includes("--help") || argv.includes("-h")) {

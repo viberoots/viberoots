@@ -3,6 +3,22 @@
 The canonical operator entrypoint is:
 
 ```bash
+i
+i --yes
+i --without-secrets
+i --machine-label <label>
+```
+
+`i` checks only local resolver config plus repo and Pleomino deployment Universal Auth credentials
+for this machine. It does not require application secrets such as Cloudflare tokens. Use `--yes` for
+non-interactive pre-confirmation, `--without-secrets` for dependency-only automation, and
+`--machine-label <label>` when the hostname is not a useful Infisical revocation label. Automation
+can also set `INSTALL_DEPS_WITHOUT_SECRETS=1`; non-interactive setup may be explicitly allowed with
+`INSTALL_DEPS_SETUP_SECRETS=1`.
+
+Deep bootstrap commands remain available for advanced recovery and debugging:
+
+```bash
 build-tools/tools/deployments/infisical-bootstrap.ts repo --dry-run
 build-tools/tools/deployments/infisical-bootstrap.ts repo
 build-tools/tools/deployments/infisical-bootstrap.ts repo --yes
@@ -11,11 +27,6 @@ build-tools/tools/deployments/infisical-bootstrap.ts repo --without-deployments
 build-tools/tools/deployments/infisical-bootstrap.ts deployment --target <buck-target> --dry-run
 build-tools/tools/deployments/infisical-bootstrap.ts deployment --target <buck-target> --yes
 ```
-
-Use `--yes` for non-interactive pre-confirmation. Local interactive operators may omit `--yes` and
-confirm the repo setup and deployment fan-out prompts; CI and other non-interactive flows must pass
-`--yes`. Use `repo --without-deployments` when only resolver/profile setup should run, then retry a
-single deployment later with `deployment --target <buck-target>`.
 
 Fresh Pleomino Infisical bootstrap is a two-phase reviewed metadata handoff. If OpenTofu creates or
 adopts live resources while `family.bzl` still has first-bootstrap placeholders, repo bootstrap
@@ -87,14 +98,22 @@ Infisical projects, identities, Cloudflare secrets, or application secrets.
 
 Troubleshooting:
 
+- Fresh machines should run `i` and accept the lazy setup prompt. The command creates this
+  machine's repo and Pleomino deployment Universal Auth credentials without importing another
+  machine's secret.
 - Stale macOS Keychain bootstrap credentials usually appear as Universal Auth login failures after
-  repo metadata still validates. Rerun `build-tools/tools/deployments/infisical-bootstrap.ts repo
---dry-run` to confirm the selected sink, then rotate with `--rotate-bootstrap-credentials` or
-  switch to `--credential-sink local-file` if local Keychain access is unavailable.
+  repo metadata still validates. Rerun
+  `i --rotate-bootstrap-credentials --force-overwrite-local-credentials` so the lazy setup path
+  creates a new local value with the matching remote record. If Keychain access is unavailable, use
+  the advanced bootstrap command with `--credential-sink local-file`.
+- CI and other non-interactive dependency setup should use `i --without-secrets` or
+  `INSTALL_DEPS_WITHOUT_SECRETS=1` unless the job intentionally performs local setup with `i --yes`
+  or `INSTALL_DEPS_SETUP_SECRETS=1`.
 - Deleted remote Universal Auth client-secret records are not recoverable from Infisical; the
-  client secret is only available when created. A new machine should rerun bootstrap normally. A
-  machine with stale local credentials should rerun with the appropriate rotation flag instead of
-  editing reviewed deployment metadata.
+  client secret is only available when created. A machine with stale local credentials should rerun
+  `i --rotate-bootstrap-credentials --force-overwrite-local-credentials` for repo bootstrap
+  credentials or `i --rotate-deployment-credentials --force-overwrite-local-credentials` for
+  deployment credentials instead of editing reviewed deployment metadata.
 - First-bootstrap metadata handoff is expected only when reviewed values are placeholders or empty
   first-bootstrap fields. Drift against already-reviewed project ids, identity ids, environment
   slugs, secret names, or refs requires a human Infisical review before retrying.

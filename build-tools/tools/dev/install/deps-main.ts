@@ -2,8 +2,7 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
-import { getFlagBool, hasShortFlag } from "../../lib/cli";
-import { runNodeWithZx } from "../../lib/node-run";
+import { getFlagBool, getFlagStr, hasShortFlag } from "../../lib/cli";
 import {
   warnNodeDepsInLocal,
   warnNodePatchRequirementsInLocal,
@@ -17,8 +16,10 @@ import { withExclusiveInstallLock } from "./lock";
 import { syncModuleContractsForWebapps } from "./module-contracts";
 import { runUvRefreshAll } from "./uv";
 import { ensureToolchainPathsFiles } from "../toolchain-paths";
-import { discoverImportersWithLock, sharedUnifiedStorePath } from "./importers";
+import { discoverImportersWithLock } from "./importers";
 import { pruneNodeModulesHashesJson } from "../update-pnpm-hash/hashes-json";
+import { ensureInstallSecretReadiness } from "./secret-readiness";
+import { prewarmUnifiedPnpmStore } from "./unified-pnpm-prewarm";
 
 type Flags = {
   force: boolean;
@@ -27,6 +28,12 @@ type Flags = {
   skipGlue: boolean;
   glueOnly: boolean;
   skipGoTidy: boolean;
+  withoutSecrets: boolean;
+  yes: boolean;
+  machineLabel: string;
+  rotateBootstrapCredentials: boolean;
+  rotateDeploymentCredentials: boolean;
+  forceOverwriteLocalCredentials: boolean;
 };
 // Resolve absolute workspace root path without requiring callers to run from repo root.
 async function resolveWorkspaceRoot(): Promise<string> {
@@ -49,13 +56,33 @@ async function resolveWorkspaceRoot(): Promise<string> {
 console.log("Installing dependencies...");
 const envDryRun = process.env.INSTALL_DEPS_DRY_RUN === "1";
 const envSkipGoTidy = process.env.INSTALL_DEPS_SKIP_GO_TIDY === "1";
-const { force, dryRun, verbose, skipGlue, glueOnly, skipGoTidy } = {
+const {
+  force,
+  dryRun,
+  verbose,
+  skipGlue,
+  glueOnly,
+  skipGoTidy,
+  withoutSecrets,
+  yes,
+  machineLabel,
+  rotateBootstrapCredentials,
+  rotateDeploymentCredentials,
+  forceOverwriteLocalCredentials,
+} = {
   force: getFlagBool("force"),
   dryRun: getFlagBool("dry-run") || envDryRun,
   verbose: getFlagBool("verbose") || hasShortFlag("v"),
   skipGlue: getFlagBool("skip-glue"),
   glueOnly: getFlagBool("glue-only"),
   skipGoTidy: getFlagBool("skip-go-tidy") || envSkipGoTidy,
+  withoutSecrets:
+    getFlagBool("without-secrets") || process.env.INSTALL_DEPS_WITHOUT_SECRETS === "1",
+  yes: getFlagBool("yes"),
+  machineLabel: getFlagStr("machine-label", ""),
+  rotateBootstrapCredentials: getFlagBool("rotate-bootstrap-credentials"),
+  rotateDeploymentCredentials: getFlagBool("rotate-deployment-credentials"),
+  forceOverwriteLocalCredentials: getFlagBool("force-overwrite-local-credentials"),
 } satisfies Flags;
 // In glue-only mode, default to skipping go mod tidy unless explicitly overridden
 const effSkipGoTidy =
@@ -198,53 +225,18 @@ if (!skipGlue) {
 } else if (verbose) {
   console.log("[skip] node deps enforcement");
 }
-// Prewarm unified PNPM store as part of install-deps so verify/build/test paths
-// can consume it without blocking on first-use setup.
-if (!dryRun) {
-  try {
-    const liveRepoRoot = String(process.env.REPO_ROOT || "").trim();
-    const shouldPreferSharedPrewarm = !!liveRepoRoot && path.resolve(liveRepoRoot) !== repoRoot;
-    let skippedForSharedStore = false;
-    if (shouldPreferSharedPrewarm) {
-      const shared = await sharedUnifiedStorePath(liveRepoRoot);
-      if (shared) {
-        if (verbose) {
-          console.log(
-            `[install-deps] skipping temp-workspace unified prewarm; using shared store marker from ${liveRepoRoot}`,
-          );
-        }
-        skippedForSharedStore = true;
-      }
-    }
-    if (!skippedForSharedStore) {
-      const zxInitPath = path.join(repoRoot, "build-tools", "tools", "dev", "zx-init.mjs");
-      if (verbose) {
-        console.log("[install-deps] prewarming unified pnpm store");
-      }
-      await runNodeWithZx({
-        cwd: repoRoot,
-        script: path.join(repoRoot, "build-tools/tools/dev/require-unified-pnpm-store.ts"),
-        args: [],
-        zxInitPath,
-        stdio: verbose ? "inherit" : "pipe",
-        timeoutMs:
-          Number.parseInt(process.env.INSTALL_UNIFIED_PNPM_TIMEOUT_MS || "180000", 10) || 180000,
-      });
-    }
-  } catch (e: any) {
-    const msg = e?.message ? String(e.message) : String(e);
-    const lockPath = path.join(repoRoot, "buck-out", ".unified-pnpm-store", "require.lock");
-    console.warn(
-      [
-        `[install-deps] unified pnpm prewarm skipped: ${msg}`,
-        "[install-deps] To recover:",
-        `  1) remove stale lock if present: rm -f "${lockPath}"`,
-        "  2) rerun: i",
-        "  3) retry verify/build command",
-      ].join("\n"),
-    );
-  }
-} else if (verbose) {
-  console.log("[install-deps] skipping unified pnpm prewarm in --dry-run mode");
-}
+await prewarmUnifiedPnpmStore({ repoRoot, dryRun, verbose });
+await ensureInstallSecretReadiness({
+  repoRoot,
+  dryRun,
+  verbose,
+  flags: {
+    withoutSecrets,
+    yes,
+    machineLabel,
+    rotateBootstrapCredentials,
+    rotateDeploymentCredentials,
+    forceOverwriteLocalCredentials,
+  },
+});
 console.log("Dependencies installed and node_modules linked.");
