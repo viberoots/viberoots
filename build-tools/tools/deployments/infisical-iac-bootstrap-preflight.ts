@@ -1,6 +1,9 @@
 import * as path from "node:path";
 import * as readline from "node:readline/promises";
-import { withDeploymentBootstrapDefaults } from "./infisical-iac-bootstrap-config";
+import {
+  DEFAULT_BOOTSTRAP_ARGS,
+  withDeploymentBootstrapDefaults,
+} from "./infisical-iac-bootstrap-config";
 import type { BootstrapArgs } from "./infisical-iac-bootstrap-types";
 
 type PreflightIo = {
@@ -84,7 +87,16 @@ export function bootstrapRetryCommand(args: BootstrapArgs) {
       "credential-sink",
       retryArgs.credentialSink === "auto" ? "" : retryArgs.credentialSink,
     ),
-    ...retryFlag("local-credential-file", retryArgs.localCredentialFile),
+    ...retryFlag(
+      "local-credential-file",
+      retryArgs.localCredentialFile === DEFAULT_BOOTSTRAP_ARGS.localCredentialFile
+        ? ""
+        : retryArgs.localCredentialFile,
+    ),
+    ...retryFlag("machine-label", retryArgs.machineLabel),
+    ...retryBoolFlag("rotate-bootstrap-credentials", retryArgs.rotateBootstrapCredentials),
+    ...retryBoolFlag("rotate-deployment-credentials", retryArgs.rotateDeploymentCredentials),
+    ...retryBoolFlag("force-overwrite-local-credentials", retryArgs.forceOverwriteLocalCredentials),
     "--yes",
   ].join(" ");
 }
@@ -93,6 +105,10 @@ function retryFlag(name: string, value?: string) {
   const trimmed = String(value || "").trim();
   if (!trimmed) return [];
   return [`--${name}`, quoteShell(trimmed)];
+}
+
+function retryBoolFlag(name: string, enabled: boolean) {
+  return enabled ? [`--${name}`] : [];
 }
 
 function quoteShell(value: string) {

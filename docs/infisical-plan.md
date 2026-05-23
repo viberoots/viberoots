@@ -4518,3 +4518,101 @@ fragile and encourages manual sharing of long-lived secrets.
 The bootstrap credential lifecycle becomes more explicit and may create more remote client-secret
 records over time. Operators will need clear cleanup guidance for stale machine credentials, and
 the implementation must avoid presenting per-machine records as reviewed deployment metadata.
+
+## PR-45: Bootstrap retry command preserves credential intent
+
+### 1. Intent
+
+Close the post-PR-44 assessment gap where bootstrap preflight retry guidance can drop the
+operator's credential intent. A retry command printed after a blocked non-interactive run must
+preserve PR-44 credential lifecycle flags such as the machine label, bootstrap credential rotation,
+deployment credential rotation, and local overwrite confirmation so following the command cannot
+silently switch to a different per-machine credential setup path.
+
+### 2. Scope of changes
+
+- Update bootstrap retry command construction so it carries forward credential-affecting flags from
+  the original invocation when suggesting a mutation-capable retry.
+- Preserve `--machine-label <value>` in generated retry commands when the operator supplied one.
+- Preserve `--rotate-bootstrap-credentials`, `--rotate-deployment-credentials`, and
+  `--force-overwrite-local-credentials` when those flags were present on the original command.
+- Continue adding the required `--yes` confirmation for non-interactive mutation-capable retry
+  guidance.
+- Preserve existing mode and target behavior for `repo` and `deployment --target ...` retry
+  commands.
+- Do not include dry-run-only flags, generated local paths, secret values, environment variable
+  values, or unrelated diagnostic options in retry guidance.
+- Keep PR-44 per-machine credential lifecycle behavior unchanged; this PR only fixes retry command
+  fidelity and coverage.
+
+### 3. External prerequisites
+
+- None. This is hermetic command-construction and test work.
+- No live Infisical, OpenTofu network access, macOS Keychain, Vault, Cloudflare, browser
+  automation, or real host-specific state should be required.
+
+### 4. Tests to be added
+
+- Add preflight retry-command tests proving `--machine-label` is preserved with proper argument
+  quoting/escaping.
+- Add tests proving bootstrap and deployment rotation flags are preserved in retry guidance.
+- Add tests proving `--force-overwrite-local-credentials` is preserved only when supplied.
+- Add tests for both repo mode and deployment target mode so target/mode behavior stays intact.
+- Add negative tests proving dry-run-only or unrelated flags are not copied into mutation retry
+  guidance.
+- Keep existing preflight resolver, args-auth, PR-44 credential lifecycle, and repo-flow tests
+  passing.
+
+### 5. Docs to be added or updated
+
+- Update `docs/infisical-bootstrap.md` or `infisical-bootstrap.md` troubleshooting if the retry
+  command examples mention machine labels or rotation flags.
+- No broad design-doc rewrite is expected unless implementation reveals a new retry-command
+  invariant that should be captured.
+
+### 5.5. Expected regression scope
+
+- `deployment-only`
+- Keep changes limited to bootstrap retry command construction, targeted tests, and small docs
+  clarification if needed. Do not change Universal Auth credential creation, local sink storage,
+  reviewed metadata handoff, deployment fan-out execution, public backend selector syntax, stable
+  secret refs, or Infisical OpenTofu resource definitions.
+
+### 6. Acceptance criteria
+
+- A blocked bootstrap run that includes `--machine-label` prints a retry command with the same
+  machine label and required `--yes`.
+- A blocked bootstrap run that includes credential rotation or local overwrite flags prints a retry
+  command preserving those credential-affecting flags.
+- Retry commands still preserve repo/deployment mode and deployment target selection.
+- Retry commands do not copy dry-run-only, secret-bearing, or unrelated flags.
+- Focused preflight retry-command tests pass.
+- The repository validation suite passes.
+
+### 7. Risks
+
+- Copying too many original flags can make retry guidance noisy or accidentally expose local-only
+  paths.
+- Copying too few flags can keep producing semantic drift between the original invocation and the
+  suggested retry.
+- Shell quoting can become brittle for machine labels containing spaces or punctuation.
+
+### 8. Mitigations
+
+- Maintain an explicit allowlist of retry-preserved flags instead of copying arbitrary argv.
+- Treat credential-affecting flags as the only PR-44-specific retry-preserved flags.
+- Reuse the existing retry command quoting helper or add focused tests for labels that require
+  quoting.
+
+### 9. Consequences of not implementing this PR
+
+Operators can follow a generated retry command after a blocked non-interactive bootstrap and
+accidentally omit the machine label or rotation intent from their original command. That can create
+or rotate per-machine credentials under a different label or with different lifecycle semantics than
+the operator requested.
+
+### 10. Downsides for implementing this PR
+
+Retry guidance becomes slightly longer when credential-affecting flags are present. The command
+construction also needs a small allowlist that must be updated if future credential lifecycle flags
+are added.
