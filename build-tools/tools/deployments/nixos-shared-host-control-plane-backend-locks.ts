@@ -10,12 +10,27 @@ function keyHash(value: string): string {
   return crypto.createHash("sha256").update(value).digest("hex");
 }
 
+async function backendSubmissionExists(
+  backend: NixosSharedHostControlPlaneBackendTarget,
+  submissionId: string,
+) {
+  const row = (
+    await queryBackend<{ submission_id?: string }>(
+      backend,
+      "SELECT submission_id FROM submissions WHERE submission_id = $1",
+      [submissionId],
+    )
+  ).rows[0];
+  return row?.submission_id === submissionId;
+}
+
 export async function resolveBackendIdempotency(opts: {
   backend: NixosSharedHostControlPlaneBackendTarget;
   kind: "submit" | "run_action";
   key: string;
   requestFingerprint: string;
   targetId: string;
+  recoverMissingSubmitTarget?: boolean;
 }) {
   const hashedKey = keyHash(opts.key);
   const inserted = (
@@ -44,7 +59,15 @@ export async function resolveBackendIdempotency(opts: {
   if (row.request_fingerprint !== opts.requestFingerprint) {
     throw new Error(`idempotency key ${opts.key} does not match the previous request`);
   }
-  return { mode: "reused" as const, targetId: String(row.target_id || opts.targetId) };
+  const targetId = String(row.target_id || opts.targetId);
+  if (
+    opts.recoverMissingSubmitTarget &&
+    opts.kind === "submit" &&
+    !(await backendSubmissionExists(opts.backend, targetId))
+  ) {
+    return { mode: "created" as const, targetId };
+  }
+  return { mode: "reused" as const, targetId };
 }
 
 export async function syncBackendRunAction(

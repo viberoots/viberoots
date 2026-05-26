@@ -5,6 +5,7 @@ import path from "node:path";
 import { newDb } from "pg-mem";
 import pg from "pg";
 import { NIXOS_SHARED_HOST_CONTROL_PLANE_BACKEND_SCHEMA_SQL } from "./nixos-shared-host-control-plane-backend-schema";
+import { validateManagedPostgresFeatures } from "./nixos-shared-host-control-plane-backend-features";
 
 export type NixosSharedHostControlPlaneBackendTarget = {
   recordsRoot: string;
@@ -36,6 +37,12 @@ const LOCAL_BACKEND_URL_PREFIX = "pgmem://";
 const backendPools = new Map<string, Promise<BackendPool>>();
 const Pool = pg.Pool;
 
+function envInt(name: string, fallback: number): number {
+  const raw = String(process.env[name] || "").trim();
+  const parsed = Number(raw);
+  return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : fallback;
+}
+
 export function isLocalHarnessDatabaseUrl(databaseUrl: string): boolean {
   return databaseUrl.startsWith(LOCAL_BACKEND_URL_PREFIX);
 }
@@ -59,7 +66,10 @@ async function createBackendPool(databaseUrl: string): Promise<BackendPool> {
   }
   return new Pool({
     connectionString: databaseUrl,
-    max: 10,
+    max: envInt("VBR_DEPLOY_CONTROL_PLANE_DB_POOL_MAX", 10),
+    connectionTimeoutMillis: envInt("VBR_DEPLOY_CONTROL_PLANE_DB_CONNECT_TIMEOUT_MS", 10_000),
+    idleTimeoutMillis: envInt("VBR_DEPLOY_CONTROL_PLANE_DB_IDLE_TIMEOUT_MS", 30_000),
+    application_name: "viberoots-deployment-control-plane",
   }) as BackendPool;
 }
 
@@ -68,6 +78,14 @@ async function backendPoolFor(databaseUrl: string): Promise<BackendPool> {
   if (!poolPromise) {
     poolPromise = (async () => {
       const pool = await createBackendPool(databaseUrl);
+      if (!isLocalHarnessDatabaseUrl(databaseUrl)) {
+        const client = await pool.connect();
+        try {
+          await validateManagedPostgresFeatures(client);
+        } finally {
+          client.release();
+        }
+      }
       await initializeBackendSchema(pool);
       return pool;
     })();

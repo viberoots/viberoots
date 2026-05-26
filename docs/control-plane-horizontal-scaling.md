@@ -46,3 +46,23 @@ mutation authority.
 If a host uses local fixture mode, file-backed mirrors and local locks are test conveniences only.
 Production container profiles must use the database-backed queue, locks, idempotency, stage-state,
 audit, and artifact records.
+
+## Managed Postgres Conformance
+
+External Postgres backends must pass the startup conformance check before schema initialization. The
+check uses temporary table data only and verifies the SQL features the control plane relies on:
+
+- Postgres 12 or newer via `server_version_num`.
+- `jsonb` payload storage and `jsonb_build_object`.
+- common table expressions with `UPDATE ... RETURNING`.
+- atomic queue-claim shape with `FOR UPDATE SKIP LOCKED`.
+- idempotent write shape with `INSERT ... ON CONFLICT`.
+
+The default fixture suite covers this contract without live credentials. To run the optional live
+check against a throwaway managed database, set both values below; do not point them at production:
+
+```bash
+VBR_CONTROL_PLANE_LIVE_POSTGRES_CONFORMANCE=1 \
+VBR_CONTROL_PLANE_LIVE_POSTGRES_DATABASE_URL='postgres://...' \
+v //build-tools/tools/tests/deployments:control-plane-coordination-hardening
+```

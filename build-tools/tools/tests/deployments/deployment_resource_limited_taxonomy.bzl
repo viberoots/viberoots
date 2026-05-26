@@ -113,6 +113,7 @@ RESOURCE_LIMITED_DEPLOYMENT_TESTS = {
     "build-tools/tools/tests/deployments/nixos-shared-host.challenged-submit-transaction.test.ts": True,
     "build-tools/tools/tests/deployments/nixos-shared-host.control-plane-service-env.test.ts": True,
     "build-tools/tools/tests/deployments/control-plane-coordination-audit.test.ts": True,
+    "build-tools/tools/tests/deployments/control-plane-coordination-hardening-idempotency.test.ts": True,
     "build-tools/tools/tests/deployments/control-plane-coordination-hardening.test.ts": True,
     "build-tools/tools/tests/deployments/control-plane-coordination-progressive-backend.test.ts": True,
     "build-tools/tools/tests/deployments/control-plane-coordination-review-fencing.test.ts": True,

@@ -2,6 +2,7 @@
 import assert from "node:assert/strict";
 import path from "node:path";
 import { test } from "node:test";
+import pg from "pg";
 import {
   acquireBackendControlPlaneLock,
   claimBackendQueuedSubmission,
@@ -12,12 +13,14 @@ import {
   writeBackendSubmissionDoc,
 } from "../../deployments/nixos-shared-host-control-plane-backend";
 import { CLAIM_BACKEND_QUEUED_SUBMISSION_SQL } from "../../deployments/nixos-shared-host-control-plane-backend-queue";
+import { validateManagedPostgresFeatures } from "../../deployments/nixos-shared-host-control-plane-backend-features";
 import { writeCurrentStageStateForDeployRecord } from "../../deployments/deployment-current-stage-state";
 import {
   withBackendClient,
   type NixosSharedHostControlPlaneBackendTarget,
 } from "../../deployments/nixos-shared-host-control-plane-backend-db";
 import { runInTemp } from "../lib/test-helpers";
+import { managedPostgresFeatureMock } from "./control-plane-postgres-feature-mock";
 
 function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -173,3 +176,58 @@ test("stage-state writes support compare-and-swap expected-run guards", async ()
     });
   });
 });
+
+test("managed Postgres feature checks cover the coordination SQL contract", async () => {
+  const { client, queries } = managedPostgresFeatureMock();
+  const result = await validateManagedPostgresFeatures(client);
+  assert.equal(result.serverVersionNum, 160000);
+  assert.ok(result.checkedFeatures.includes("FOR UPDATE SKIP LOCKED"));
+  assert.deepEqual(queries.slice(0, 2), ["BEGIN", "SHOW server_version_num"]);
+  assert.equal(queries.at(-1), "COMMIT");
+  assert.ok(queries.some((sql) => sql.includes("CREATE TEMP TABLE")));
+  assert.ok(queries.some((sql) => sql.includes("FOR UPDATE SKIP LOCKED")));
+  assert.ok(queries.some((sql) => sql.includes("ON CONFLICT")));
+  assert.ok(queries.some((sql) => sql.includes("jsonb_build_object")));
+});
+
+test("managed Postgres feature checks fail closed on unsupported backends", async () => {
+  await assert.rejects(
+    validateManagedPostgresFeatures({
+      query: async (sql: string) => {
+        if (sql === "SHOW server_version_num") {
+          return { rows: [{ server_version_num: "110000" }] };
+        }
+        return { rows: [] };
+      },
+    }),
+    (error: any) => {
+      assert.equal(error.code, "managed_postgres_conformance_failed");
+      assert.match(error.message, /managed Postgres conformance check failed/);
+      return true;
+    },
+  );
+});
+
+test(
+  "live managed Postgres conformance uses temporary schema only",
+  {
+    skip:
+      process.env.VBR_CONTROL_PLANE_LIVE_POSTGRES_CONFORMANCE !== "1" ||
+      !process.env.VBR_CONTROL_PLANE_LIVE_POSTGRES_DATABASE_URL,
+  },
+  async () => {
+    const pool = new pg.Pool({
+      connectionString: process.env.VBR_CONTROL_PLANE_LIVE_POSTGRES_DATABASE_URL,
+      max: 1,
+      application_name: "viberoots-control-plane-live-conformance",
+    });
+    const client = await pool.connect();
+    try {
+      const result = await validateManagedPostgresFeatures(client);
+      assert.ok(result.serverVersionNum >= 120000);
+    } finally {
+      client.release();
+      await pool.end();
+    }
+  },
+);

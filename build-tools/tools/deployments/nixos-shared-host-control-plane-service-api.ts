@@ -35,10 +35,8 @@ import type { ReviewedSourceCredentialFiles } from "./nixos-shared-host-reviewed
 export { readControlPlaneCurrentStageState, readControlPlaneRecord, readControlPlaneStageHistory, readControlPlaneStatus } from "./nixos-shared-host-control-plane-service-read";
 // prettier-ignore
 export { handleControlPlaneRunAction, type ServiceRunActionRequest } from "./deployment-control-plane-run-action-api";
-type ServiceSubmitRequest =
-  | NixosSharedHostControlPlaneSubmitRequest
-  | CloudflarePagesControlPlaneSubmitRequest
-  | DeploymentProviderServiceSubmitRequest;
+// prettier-ignore
+type ServiceSubmitRequest = NixosSharedHostControlPlaneSubmitRequest | CloudflarePagesControlPlaneSubmitRequest | DeploymentProviderServiceSubmitRequest;
 export async function handleControlPlaneSubmit(
   request: ServiceSubmitRequest,
   opts: {
@@ -143,6 +141,7 @@ export async function handleControlPlaneSubmit(
     key: idempotencyKey,
     requestFingerprint,
     targetId: request.submissionId,
+    recoverMissingSubmitTarget: true,
   });
   const reviewedSourceCredentials = opts.reviewedSourceCredentials;
   if (dedupe.mode === "reused")
@@ -156,7 +155,7 @@ export async function handleControlPlaneSubmit(
             deployment: resolvedRequest.deployment,
             paths: opts.paths,
             backend: opts.backend,
-            submissionId: resolvedRequest.submissionId,
+            submissionId: dedupe.targetId,
             dedupe: {
               mode: dedupe.mode,
               requestFingerprint,

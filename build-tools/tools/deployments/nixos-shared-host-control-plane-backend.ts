@@ -4,6 +4,10 @@ export {
   type NixosSharedHostControlPlaneBackendTarget,
 } from "./nixos-shared-host-control-plane-backend-db";
 export {
+  validateManagedPostgresFeatures,
+  type ManagedPostgresConformanceResult,
+} from "./nixos-shared-host-control-plane-backend-features";
+export {
   enqueueBackendSubmission,
   readBackendSnapshotBySubmissionId,
   readBackendSubmissionByDeployRunId,
