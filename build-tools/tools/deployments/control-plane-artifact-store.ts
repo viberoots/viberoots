@@ -74,6 +74,24 @@ function assertStoredMetadata(
   }
 }
 
+function isMissingArtifactObjectError(error: unknown): boolean {
+  const message = String((error as any)?.message || error);
+  return /artifact object failed .*: 404|missing fake object/.test(message);
+}
+
+async function objectAlreadyMatches(opts: {
+  store: ControlPlaneArtifactStore;
+  object: ControlPlaneArtifactObject;
+}): Promise<boolean> {
+  try {
+    await verifyArtifactObject(opts);
+    return true;
+  } catch (error) {
+    if (isMissingArtifactObjectError(error)) return false;
+    throw error;
+  }
+}
+
 export async function artifactStoreFromRuntimeConfig(config: ControlPlaneRuntimeConfig) {
   const store = config.storage.artifactStore;
   const readSecret = async (filePath: string) => (await fsp.readFile(filePath, "utf8")).trim();
@@ -115,6 +133,7 @@ export async function putVerifiedArtifactObject(opts: {
     contentType: opts.contentType || CONTROL_PLANE_ARTIFACT_CONTENT_TYPE,
     provenance,
   };
+  if (await objectAlreadyMatches({ store: opts.store, object })) return object;
   await opts.store.putObject({
     key: object.key,
     body: opts.body,
@@ -158,6 +177,7 @@ export async function putImmutableArtifactObject(opts: {
   if (digest !== opts.object.digest || opts.body.byteLength !== opts.object.size) {
     throw new Error(`artifact object payload conflicts with immutable key ${opts.object.key}`);
   }
+  if (await objectAlreadyMatches({ store: opts.store, object: opts.object })) return;
   await opts.store.putObject({
     key: opts.object.key,
     body: opts.body,

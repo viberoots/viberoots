@@ -20,11 +20,21 @@ function encodeKey(key: string): string {
     .join("/");
 }
 
+function physicalKey(config: ControlPlaneArtifactStoreConfig, key: string): string {
+  const prefix = (config.keyPrefix || "").replace(/^\/+|\/+$/g, "");
+  return prefix ? `${prefix}/${key}` : key;
+}
+
 function objectUrl(config: ControlPlaneArtifactStoreConfig, key: string): URL {
-  const endpoint = new URL(config.endpoint);
+  const endpoint = new URL(config.endpoint.replace("{bucket}", encodeURIComponent(config.bucket)));
+  const encodedKey = encodeKey(physicalKey(config, key));
+  if (config.endpoint.includes("{bucket}")) {
+    endpoint.pathname = `${endpoint.pathname.replace(/\/$/, "")}/${encodedKey}`;
+    return endpoint;
+  }
   endpoint.pathname = `${endpoint.pathname.replace(/\/$/, "")}/${encodeURIComponent(
     config.bucket,
-  )}/${encodeKey(key)}`;
+  )}/${encodedKey}`;
   return endpoint;
 }
 

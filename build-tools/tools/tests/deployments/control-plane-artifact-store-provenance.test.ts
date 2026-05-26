@@ -3,6 +3,8 @@ import assert from "node:assert/strict";
 import path from "node:path";
 import { test } from "node:test";
 import { putVerifiedArtifactObject } from "../../deployments/control-plane-artifact-store";
+import { writeBackendArtifactObjectMetadata } from "../../deployments/control-plane-artifact-metadata";
+import type { ControlPlaneArtifactObject } from "../../deployments/control-plane-artifact-store-types";
 import {
   enqueueBackendSubmission,
   localHarnessControlPlaneDatabaseUrl,
@@ -110,6 +112,67 @@ test("same payload with different admitted-run provenance uses distinct immutabl
     payloadKind: "artifact",
     submissionId: "submit-b",
   });
+});
+
+test("duplicate object writes are idempotent only when stored bytes and metadata match", async () => {
+  const store = memoryControlPlaneArtifactStore();
+  let writes = 0;
+  const countingStore = {
+    ...store,
+    putObject: async (input: Parameters<typeof store.putObject>[0]) => {
+      writes += 1;
+      await store.putObject(input);
+    },
+  };
+  const input = {
+    store: countingStore,
+    body: Buffer.from("same payload"),
+    payloadKind: "artifact" as const,
+    provenance: { deploymentId: "deploy", submissionId: "sub", artifactIdentity: "identity" },
+  };
+  const object = await putVerifiedArtifactObject(input);
+  assert.equal((await putVerifiedArtifactObject(input)).key, object.key);
+  assert.equal(writes, 1);
+  store.objects.get(object.key)!.body = Buffer.from("tampered");
+  await assert.rejects(() => putVerifiedArtifactObject(input), /digest mismatch|size mismatch/);
+});
+
+test("database artifact metadata accepts matching duplicate keys and rejects conflicts", async () => {
+  const rows = new Map<string, any>();
+  const backend = {
+    query: async (sql: string, params: unknown[]) => {
+      if (sql.startsWith("INSERT") && !rows.has(String(params[0]))) {
+        rows.set(String(params[0]), {
+          object_key: params[0],
+          bucket: params[1],
+          digest: params[2],
+          size_bytes: params[3],
+          content_type: params[4],
+          provenance_json: params[5],
+        });
+      }
+      return { rows: [rows.get(String(params[0]))].filter(Boolean) };
+    },
+  };
+  const object: ControlPlaneArtifactObject = {
+    storeKind: "s3-compatible",
+    bucket: "deploy-artifacts",
+    key: "control-plane/artifact/sha256/abc",
+    digest: "sha256:abc",
+    size: 7,
+    contentType: "application/octet-stream",
+    provenance: { payloadKind: "artifact", deploymentId: "deploy" },
+  };
+  await writeBackendArtifactObjectMetadata({ backend, object });
+  await writeBackendArtifactObjectMetadata({ backend, object });
+  await assert.rejects(
+    () =>
+      writeBackendArtifactObjectMetadata({
+        backend,
+        object: { ...object, digest: "sha256:def" },
+      }),
+    /metadata conflicts with immutable key/,
+  );
 });
 
 test("worker fails closed on object provenance mismatch before provider execution", async () => {

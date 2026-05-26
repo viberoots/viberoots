@@ -843,6 +843,8 @@ Rationale:
 - Multi-replica service and worker behavior depends on every queue, lock, lease, stage-state, and
   idempotency path using the database-backed backend. Any remaining file-backed authority must be
   found and removed or explicitly scoped to single-replica mode.
-- S3-compatible stores have subtly different consistency and endpoint behavior. The implementation
-  should verify put/read/list assumptions against the chosen first backend and rely on direct object
-  key reads plus digests, not eventually consistent listing, for correctness.
+- S3-compatible stores have subtly different consistency, custom metadata, HEAD, endpoint, and
+  signing-region behavior. The implementation verifies PUT, GET, HEAD, content type, metadata,
+  digest, and duplicate-write behavior against fixtures and should record a live conformance result
+  before selecting Supabase Storage S3, Cloudflare R2, AWS S3, or another backend for production.
+  Correctness relies on direct object key reads plus digests, never eventually consistent listing.

@@ -36,4 +36,5 @@ export type ControlPlaneArtifactStoreConfig = {
   region: string;
   accessKeyId: string;
   secretAccessKey: string;
+  keyPrefix?: string;
 };

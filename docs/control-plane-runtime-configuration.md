@@ -172,6 +172,25 @@ admitted run metadata. Workers read objects by direct key and verify the recorde
 provenance before materializing a temporary execution copy. Object listing is not a correctness
 mechanism.
 
+Duplicate writes are accepted only when the existing object body, digest, content type, and custom
+metadata already match the durable artifact record. A mismatching object or metadata record is a
+closed failure, not an overwrite opportunity.
+
+| Candidate backend        | Endpoint form                                           | Region notes                                              | Status                                                |
+| ------------------------ | ------------------------------------------------------- | --------------------------------------------------------- | ----------------------------------------------------- |
+| Supabase Storage S3      | path-style endpoint such as `/storage/v1/s3`            | use the project S3 region value                           | live conformance required before production selection |
+| Cloudflare R2            | path-style account endpoint                             | usually signs with `auto`                                 | live conformance required before production selection |
+| AWS S3                   | path-style endpoint or `{bucket}` virtual-host endpoint | signs with the bucket region                              | live conformance required before production selection |
+| MinIO-compatible fixture | path-style endpoint                                     | local fixture region is arbitrary but signed consistently | fixture-only unless separately reviewed               |
+
+Run the live-gated compatibility test only against temporary buckets or temporary prefixes:
+`VBR_ARTIFACT_STORE_LIVE_ENDPOINT`, `VBR_ARTIFACT_STORE_LIVE_BUCKET`,
+`VBR_ARTIFACT_STORE_LIVE_REGION`, `VBR_ARTIFACT_STORE_LIVE_ACCESS_KEY_ID`,
+`VBR_ARTIFACT_STORE_LIVE_SECRET_ACCESS_KEY`, and optional
+`VBR_ARTIFACT_STORE_LIVE_PREFIX`. A signature or authentication failure that mentions credential
+scope, `AuthorizationHeaderMalformed`, or an unexpected signing region usually means the endpoint
+and configured region do not agree.
+
 Production container mode requires this object store path. Local filesystem artifact storage is only
 for tests, local fixture mode, or temporary staging directories that are scrubbed after worker use.
 Shared POSIX filesystems must not be used as the production artifact authority.

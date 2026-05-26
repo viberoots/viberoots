@@ -1,5 +1,6 @@
 #!/usr/bin/env zx-wrapper
 import assert from "node:assert/strict";
+import crypto from "node:crypto";
 import * as fsp from "node:fs/promises";
 import http from "node:http";
 import os from "node:os";
@@ -9,6 +10,7 @@ import {
   artifactStoreFromRuntimeConfig,
   putVerifiedArtifactObject,
 } from "../../deployments/control-plane-artifact-store";
+import { createS3CompatibleArtifactStore } from "../../deployments/control-plane-artifact-store-http";
 
 async function withFakeS3(fn: (endpoint: string, authHeaders: string[]) => Promise<void>) {
   const authHeaders: string[] = [];
@@ -147,3 +149,39 @@ test("artifact-store credentials are read from runtime files and errors stay red
     }
   });
 });
+
+test(
+  "live-gated S3-compatible artifact store conformance uses a temporary object prefix",
+  {
+    skip:
+      !process.env.VBR_ARTIFACT_STORE_LIVE_ENDPOINT ||
+      !process.env.VBR_ARTIFACT_STORE_LIVE_BUCKET ||
+      !process.env.VBR_ARTIFACT_STORE_LIVE_REGION ||
+      !process.env.VBR_ARTIFACT_STORE_LIVE_ACCESS_KEY_ID ||
+      !process.env.VBR_ARTIFACT_STORE_LIVE_SECRET_ACCESS_KEY,
+  },
+  async () => {
+    const store = createS3CompatibleArtifactStore({
+      endpoint: process.env.VBR_ARTIFACT_STORE_LIVE_ENDPOINT!,
+      bucket: process.env.VBR_ARTIFACT_STORE_LIVE_BUCKET!,
+      region: process.env.VBR_ARTIFACT_STORE_LIVE_REGION!,
+      accessKeyId: process.env.VBR_ARTIFACT_STORE_LIVE_ACCESS_KEY_ID!,
+      secretAccessKey: process.env.VBR_ARTIFACT_STORE_LIVE_SECRET_ACCESS_KEY!,
+      keyPrefix: process.env.VBR_ARTIFACT_STORE_LIVE_PREFIX || "tmp/vbr-control-plane-live",
+    });
+    const object = await putVerifiedArtifactObject({
+      store,
+      body: Buffer.from(`live conformance ${Date.now()}`),
+      payloadKind: "artifact",
+      provenance: {
+        deploymentId: "live-conformance",
+        submissionId: crypto.randomUUID(),
+        artifactIdentity: "static-webapp:live-conformance",
+      },
+    });
+    assert.equal(
+      await store.getObjectMetadata({ key: object.key }).then((meta) => meta.metadata.digest),
+      object.digest,
+    );
+  },
+);
