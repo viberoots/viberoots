@@ -25,6 +25,10 @@ export type SprinkleRefCheckEntry = {
   locations: string[];
   requiredBy: string[];
   backendEnvironment?: string;
+  backendHost?: string;
+  backendProjectId?: string;
+  backendProjectName?: string;
+  backendSecretPath?: string;
   category?: string;
   backend?: string;
   deploymentFamily?: string;

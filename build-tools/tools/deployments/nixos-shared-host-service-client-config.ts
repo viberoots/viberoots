@@ -73,11 +73,14 @@ export function resolveServiceClientFromManifest(
   env: NodeJS.ProcessEnv = process.env,
 ): NixosSharedHostResolvedServiceClient {
   const plan = serviceClientPlanFromManifest(manifest, env);
+  const controlPlaneToken = requireServiceTokenFromEnv(
+    plan.controlPlaneTokenEnv,
+    `profile "${manifest.profileName}" control-plane service`,
+    env,
+  );
   return {
     controlPlaneUrl: plan.controlPlaneUrl,
-    ...(plan.controlPlaneTokenEnv
-      ? { controlPlaneToken: resolveServiceTokenFromEnv(plan.controlPlaneTokenEnv, env) }
-      : {}),
+    ...(controlPlaneToken ? { controlPlaneToken } : {}),
     plan,
   };
 }

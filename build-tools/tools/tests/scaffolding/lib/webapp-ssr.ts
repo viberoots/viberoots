@@ -86,6 +86,11 @@ export async function scaffoldAndPrepareWorkspace(
     stdio: "inherit",
     env: { ...process.env, NIX_PNPM_ALLOW_GENERATE: "1" },
   })`zx-wrapper build-tools/tools/dev/update-pnpm-hash.ts --lockfile ${`${appRel}/pnpm-lock.yaml`}`;
+  await stageTempRepoPaths({
+    tmp,
+    _$,
+    explicitPaths: ["build-tools/tools/nix/node-modules.hashes.json"],
+  });
 }
 
 export async function buildSelectedSsr(

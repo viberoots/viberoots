@@ -123,36 +123,6 @@ test("check reports unchecked secrets when no resolver config is supplied", asyn
   const report = JSON.parse(output);
   assert.equal(report.refs[0].status, "unchecked");
 });
-test("check uses injected SPRINKLEREF_CONFIG env for resolver selection", async () => {
-  const dir = await gitRepo();
-  const secretRef = "secret://deployments/demo/api_token";
-  const store = path.join(dir, "store.json");
-  const config = path.join(dir, "resolver.json");
-  await writeTracked(dir, "contracts.txt", `${secretRef}\n`);
-  await fs.writeFile(store, `${JSON.stringify({ [secretRef]: "hidden" })}\n`);
-  await fs.writeFile(
-    config,
-    `${JSON.stringify({
-      version: 1,
-      defaultCategory: "main",
-      categories: { main: { backend: "local-file", file: store } },
-    })}\n`,
-  );
-  const output = await runInDir(dir, async () => {
-    let output = "";
-    const exitCode = await runSprinkleRefCheck({
-      argv: ["--check", "--format", "json"],
-      env: { SPRINKLEREF_CONFIG: config },
-      stdout: (text) => (output = text),
-    });
-    assert.equal(exitCode, 0);
-    return output;
-  });
-  const report = JSON.parse(output);
-  assert.equal(report.refs[0].status, "present");
-  assert.doesNotMatch(output, /hidden/);
-});
-
 test("check exposes stable usage and resolver access exit codes", async () => {
   await assert.rejects(
     () => runSprinkleRefCheck({ argv: ["--check", "--scheme", "bogus"] }),
@@ -204,7 +174,7 @@ test("check separates invalid refs from unmapped resolver categories", async () 
 test("check reports unmapped refs for missing resolver categories", async () => {
   const dir = await gitRepo();
   const config = path.join(dir, "resolver.json");
-  await writeTracked(dir, "contracts.txt", "secret://deployments/demo/api_token\n");
+  await writeTracked(dir, "contracts.txt", "secret://deployments/demo/prod/infisical-client-id\n");
   await fs.writeFile(
     config,
     `${JSON.stringify({

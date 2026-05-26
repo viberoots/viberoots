@@ -89,7 +89,17 @@ export class SprinkleRefInfisicalStore implements SprinkleRefStore {
         Authorization: `Bearer ${token.accessToken}`,
         ...(secretValue === undefined ? {} : { "Content-Type": "application/json" }),
       },
-      ...(secretValue === undefined ? {} : { body: JSON.stringify({ secretValue }) }),
+      ...(secretValue === undefined
+        ? {}
+        : {
+            body: JSON.stringify({
+              projectId: this.projectId(),
+              environment: this.config.defaultEnvironment || "",
+              secretPath: this.config.defaultPath || "/",
+              type: "shared",
+              secretValue,
+            }),
+          }),
     });
   }
 

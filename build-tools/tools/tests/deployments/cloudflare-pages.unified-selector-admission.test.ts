@@ -1,5 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import assert from "node:assert/strict";
+import * as fsp from "node:fs/promises";
+import path from "node:path";
 import { test } from "node:test";
 import { createCloudflarePagesControlPlaneSnapshot } from "../../deployments/cloudflare-pages-control-plane-snapshot";
 import { activateDeploymentSecretContext } from "../../deployments/deployment-secret-context";
@@ -17,6 +19,7 @@ import {
   infisicalTestContext,
 } from "./deployment-secret-infisical.fixture";
 import { startFakeInfisicalServer } from "./infisical.test-server";
+import { runInTemp } from "../lib/test-helpers";
 
 const clientSecret = "client-secret-value";
 
@@ -63,41 +66,61 @@ function parsedDeployment(siteUrl: string): CloudflarePagesDeployment {
   return deployments[0]!;
 }
 
+async function prepareReviewedSourceWorkspace(tmp: string, $: any): Promise<void> {
+  await $({ cwd: tmp, stdio: "pipe" })`git init`;
+  await $({ cwd: tmp, stdio: "pipe" })`git config user.email test@example.invalid`;
+  await $({ cwd: tmp, stdio: "pipe" })`git config user.name Test`;
+  await $({ cwd: tmp, stdio: "pipe" })`git config commit.gpgsign false`;
+  await fsp.writeFile(path.join(tmp, ".reviewed-source-marker"), "reviewed\n", "utf8");
+  await $({ cwd: tmp, stdio: "pipe" })`git add .reviewed-source-marker`;
+  await $({ cwd: tmp, stdio: "pipe" })`git commit -m reviewed-source`;
+  await $({ cwd: tmp, stdio: "pipe" })`git checkout -B main`;
+}
+
 test("unified selector parsing flows into admitted context and secret references", async () => {
-  const server = await startFakeInfisicalServer(
-    { clientId: "id", clientSecret, accessToken: "token" },
-    [infisicalSecret()],
-  );
-  const restore = activateDeploymentSecretContext(
-    infisicalTestContext(server.siteUrl, { clientSecret }),
-  );
-  try {
-    const snapshot = await createCloudflarePagesControlPlaneSnapshot(
-      {
-        workspaceRoot: process.cwd(),
-        deployment: parsedDeployment(server.siteUrl),
-        recordsRoot: "/tmp/cloudflare-unified-selector-admission-records",
-        operationKind: "promotion",
-        artifact: {
-          kind: "static-webapp",
-          identity: "static-webapp:source-artifact",
-          storedArtifactPath: "/records/artifacts/source-artifact",
-          provenancePath: "/records/artifacts/source-artifact.json",
-        },
-        source: {
-          record: { deployRunId: "deploy-source-1", deploymentId: "pleomino-dev" },
-          replaySnapshotPath: "/records/replay/deploy-source-1/snapshot.json",
-        },
-      },
-      "submission-unified-selector-admission",
+  await runInTemp("cloudflare-unified-selector-admission", async (tmp, $) => {
+    await prepareReviewedSourceWorkspace(tmp, $);
+    const recordsRoot = path.join(tmp, "records");
+    const server = await startFakeInfisicalServer(
+      { clientId: "id", clientSecret, accessToken: "token" },
+      [infisicalSecret()],
     );
-    const admitted = snapshot.admittedContext.admittedSecretReferences[0];
-    assert.equal(snapshot.admittedContext.secretBackend, "infisical");
-    assert.equal(snapshot.admittedContext.secretBackendProfile, "infisical-regulated");
-    assert.equal(admitted?.backend, "infisical");
-    assert.equal(admitted?.backendProfile, "infisical-regulated");
-  } finally {
-    restore();
-    await server.close();
-  }
+    const restore = activateDeploymentSecretContext(
+      infisicalTestContext(server.siteUrl, { clientSecret }),
+    );
+    try {
+      const snapshot = await createCloudflarePagesControlPlaneSnapshot(
+        {
+          workspaceRoot: tmp,
+          deployment: parsedDeployment(server.siteUrl),
+          recordsRoot,
+          operationKind: "promotion",
+          artifact: {
+            kind: "static-webapp",
+            identity: "static-webapp:source-artifact",
+            storedArtifactPath: path.join(recordsRoot, "artifacts", "source-artifact"),
+            provenancePath: path.join(recordsRoot, "artifacts", "source-artifact.json"),
+          },
+          source: {
+            record: { deployRunId: "deploy-source-1", deploymentId: "pleomino-dev" },
+            replaySnapshotPath: path.join(
+              recordsRoot,
+              "replay",
+              "deploy-source-1",
+              "snapshot.json",
+            ),
+          },
+        },
+        "submission-unified-selector-admission",
+      );
+      const admitted = snapshot.admittedContext.admittedSecretReferences[0];
+      assert.equal(snapshot.admittedContext.secretBackend, "infisical");
+      assert.equal(snapshot.admittedContext.secretBackendProfile, "infisical-regulated");
+      assert.equal(admitted?.backend, "infisical");
+      assert.equal(admitted?.backendProfile, "infisical-regulated");
+    } finally {
+      restore();
+      await server.close();
+    }
+  });
 });

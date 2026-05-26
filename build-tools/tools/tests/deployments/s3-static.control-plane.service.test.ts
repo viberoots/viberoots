@@ -110,13 +110,17 @@ test("public s3-static deploy routes deploy, provision-only, retry, and rollback
           const profileRoot = await installHarnessClientProfile($, tmp, harness.controlPlane.url);
           const runtimeContract = reviewedRuntimeContractFor("s3-static");
           const lockScope = deployment.providerTarget.providerTargetIdentity;
+          const clientEnv = {
+            ...process.env,
+            VBR_DEPLOY_CONTROL_PLANE_TOKEN: "test-control-plane-token",
+          };
           const first = JSON.parse(
             String(
               (
                 await $({
                   cwd: tmp,
                   stdio: "pipe",
-                  env: { ...process.env },
+                  env: clientEnv,
                 })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment ${deployment.label} --artifact-dir ${artifactA} --admission-evidence-json ${evidence} --profile-root ${profileRoot} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(server.port)} --smoke-connect-protocol https:`
               ).stdout,
             ),
@@ -130,7 +134,7 @@ test("public s3-static deploy routes deploy, provision-only, retry, and rollback
                 await $({
                   cwd: tmp,
                   stdio: "pipe",
-                  env: { ...process.env },
+                  env: clientEnv,
                 })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment ${deployment.label} --provision-only --admission-evidence-json ${evidence} --control-plane-url ${harness.controlPlane.url}`
               ).stdout,
             ),

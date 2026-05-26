@@ -8,6 +8,8 @@
   runtimeRoot = "/var/lib/deployment-control-plane/runtime";
   serviceContainerName = "deployment-control-plane-service";
   workerContainerNamePrefix = "deployment-control-plane-worker";
+  containerUid = "10001";
+  containerGid = "10001";
   servicePort = 7780;
   bindAddress = "127.0.0.1";
   containerRuntime = "podman";
@@ -15,6 +17,7 @@
   webUiBasePath = "/";
   mcpBasePath = "/mcp";
   artifactStoreKind = "s3-compatible";
+  artifactStoreRegion = "us-east-1";
   artifactEndpointCredential = "artifact-store-endpoint";
   artifactAccessKeyIdCredential = "artifact-store-access-key-id";
   artifactSecretAccessKeyCredential = "artifact-store-secret-access-key";

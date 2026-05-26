@@ -21,11 +21,21 @@ import {
 } from "../../deployments/deployment-auth-redaction";
 import { renderDeploymentJenkinsHelp } from "../../deployments/deployment-auth-matrix";
 import { resolveDeploymentVaultRuntimePlan } from "../../deployments/deployment-vault-runtime-plan";
+import { runInTemp } from "../lib/test-helpers";
+import {
+  CUTOVER_DEV,
+  CUTOVER_FAMILY,
+  writeCutoverDeploymentFixture,
+} from "./infisical-cutover.fixture";
 
-const DEPLOYMENT = "//projects/deployments/pleomino/dev:deploy";
-
+let cachedDeployment: Awaited<ReturnType<typeof resolveDeploymentFromTarget>> | undefined;
 async function fixtureDeployment() {
-  return await resolveDeploymentFromTarget(process.cwd(), DEPLOYMENT);
+  if (cachedDeployment) return cachedDeployment;
+  cachedDeployment = await runInTemp("deployment-auth-diagnostics-fixture", async (tmp) => {
+    await writeCutoverDeploymentFixture(tmp);
+    return await resolveDeploymentFromTarget(tmp, CUTOVER_DEV);
+  });
+  return cachedDeployment;
 }
 
 test("auth doctor reports source selection and missing Jenkins binding without minting", async () => {
@@ -54,7 +64,7 @@ test("vault role explanation exposes routing metadata without secret material", 
   const explanation = buildVaultRole(deployment);
   assert.equal(explanation.schemaVersion, "deployment-auth-vault-role@1");
   assert.equal(explanation.vault.expectedAudience, "deployments-vault");
-  assert.equal(explanation.vault.roleName, "deploy-pleomino-read");
+  assert.equal(explanation.vault.roleName, "deploy-cutover-read");
   assert.deepEqual(explanation.vault.boundClaimKeys, ["deployment_environment", "repository"]);
   assert.doesNotMatch(JSON.stringify(explanation), /access_token|refresh_token|client_secret/i);
 });
@@ -101,14 +111,14 @@ test("auth group summary prints reviewed human groups and automation patterns", 
   const groups = buildDeploymentAuthGroupSummary(deployment, ["jenkins"]);
   assert.equal(groups.schemaVersion, "deployment-auth-groups@1");
   assert.deepEqual(groups.humanGroups, [
-    "deploy-submitters-pleomino-dev",
-    "deploy-approvers-pleomino-dev",
-    "deploy-admission-reporters-pleomino-dev",
+    `deploy-submitters-${CUTOVER_FAMILY}-dev`,
+    `deploy-approvers-${CUTOVER_FAMILY}-dev`,
+    `deploy-admission-reporters-${CUTOVER_FAMILY}-dev`,
   ]);
   assert.match(groups.automationGroupPatterns.join("\n"), /deploy-automation-<principal>/);
   assert.deepEqual(groups.automationGroupsByPrincipal[0]?.groups.slice(0, 2), [
-    "deploy-automation-jenkins-submitters-project-pleomino",
-    "deploy-automation-jenkins-approvers-project-pleomino",
+    `deploy-automation-jenkins-submitters-project-${CUTOVER_FAMILY}`,
+    `deploy-automation-jenkins-approvers-project-${CUTOVER_FAMILY}`,
   ]);
 });
 
@@ -117,11 +127,11 @@ test("auth action summary and realm export stay aligned on reviewed group names"
   const action = buildDeploymentAuthActionSummary(deployment, "approve", ["jenkins"]);
   const realm = buildDeploymentAuthKeycloakRealm([deployment], ["jenkins"]);
   assert.equal(action.requiredRole, "approver");
-  assert.equal(action.humanGroup, "deploy-approvers-pleomino-dev");
+  assert.equal(action.humanGroup, `deploy-approvers-${CUTOVER_FAMILY}-dev`);
   assert.match(action.nextStep, /deploy auth explain-groups/);
   assert.deepEqual(realm.groups.map((group) => group.name).slice(0, 4), [
-    "deploy-admission-reporters-pleomino-dev",
-    "deploy-approvers-pleomino-dev",
+    `deploy-admission-reporters-${CUTOVER_FAMILY}-dev`,
+    `deploy-approvers-${CUTOVER_FAMILY}-dev`,
     "deploy-automation-jenkins-admission-reporters-all-deployments",
     "deploy-automation-jenkins-admission-reporters-dev",
   ]);

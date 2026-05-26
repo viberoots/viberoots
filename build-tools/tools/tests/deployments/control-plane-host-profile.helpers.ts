@@ -40,6 +40,7 @@ export async function loadNixosRenderedConfig(): Promise<
             image = "registry.example.com/platform/deployment-control-plane@sha256:reviewed";
             credentials = {
               control-plane-database-url.source = "/run/secrets/db";
+              control-plane-token.source = "/run/secrets/control-plane-token";
               reviewed-source-ssh-key.source = "/run/secrets/ssh";
               artifact-store-endpoint.source = "/run/secrets/endpoint";
               artifact-store-access-key-id.source = "/run/secrets/access";

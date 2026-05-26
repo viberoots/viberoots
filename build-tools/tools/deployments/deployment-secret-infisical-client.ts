@@ -82,6 +82,17 @@ function stringField(body: Record<string, unknown>, keys: string[]): string | un
   return undefined;
 }
 
+function nestedStringField(
+  body: Record<string, unknown>,
+  key: string,
+  nestedKeys: string[],
+): string | undefined {
+  const nested = body[key];
+  if (typeof nested === "string" && nested.trim()) return nested.trim();
+  if (!nested || typeof nested !== "object" || Array.isArray(nested)) return undefined;
+  return stringField(nested as Record<string, unknown>, nestedKeys);
+}
+
 async function readJson(response: Response, secrets: readonly string[]) {
   const text = await response.text();
   try {
@@ -116,10 +127,13 @@ export async function readInfisicalSecret(opts: {
   }
   const secret = normalizedSecretBody(body);
   return {
-    projectId: stringField(secret, ["projectId", "workspaceId"]) || "",
+    projectId:
+      stringField(secret, ["projectId", "workspaceId"]) ||
+      nestedStringField(secret, "workspace", ["id", "_id", "workspaceId"]) ||
+      "",
     environment: stringField(secret, ["environment"]) || "",
     secretPath: stringField(secret, ["secretPath", "path"]) || "",
-    secretName: stringField(secret, ["secretName", "key", "name"]) || "",
+    secretName: stringField(secret, ["secretName", "secretKey", "key", "name"]) || "",
     ...(stringField(secret, ["id", "_id", "secretId"])
       ? { id: stringField(secret, ["id", "_id", "secretId"]) }
       : {}),

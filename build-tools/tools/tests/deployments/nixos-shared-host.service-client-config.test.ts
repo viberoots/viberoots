@@ -5,7 +5,10 @@ import {
   LOCAL_FIXTURE_SERVICE_ENV,
   validateProtectedSharedServiceTransport,
 } from "../../deployments/deployment-service-transport-policy";
-import { resolveServiceClientFromFlags } from "../../deployments/nixos-shared-host-service-client-config";
+import {
+  resolveServiceClientFromFlags,
+  resolveServiceClientFromManifest,
+} from "../../deployments/nixos-shared-host-service-client-config";
 
 test("nixos shared-host service client resolves the reviewed mini remote alias", () => {
   assert.equal(
@@ -73,5 +76,35 @@ test("nixos shared-host service client rejects insecure protected transport", ()
         env: { NODE_TLS_REJECT_UNAUTHORIZED: "0" },
       }),
     /TLS certificate validation/,
+  );
+});
+
+test("nixos shared-host service profile requires its configured token env", () => {
+  const manifest = {
+    schemaVersion: "nixos-shared-host-client@1",
+    tool: "nixos-shared-host-install",
+    toolFingerprint: "test",
+    profileName: "mini",
+    destination: "mini",
+    remoteRepoPath: "/srv/viberoots",
+    remoteStatePath: "/etc/nixos/deployment-host/platform-state.json",
+    remoteRuntimeRoot: "/var/lib/deployment-host/runtime",
+    remoteRecordsRoot: "/var/lib/deployment-host/records",
+    sshMode: "ssh",
+    serviceClient: {
+      controlPlaneUrl: "https://deploy.apps.kilty.io",
+      controlPlaneTokenEnv: "VBR_DEPLOY_CONTROL_PLANE_TOKEN",
+    },
+    localManagedPaths: [],
+  } as const;
+  assert.throws(
+    () => resolveServiceClientFromManifest(manifest, {}),
+    /requires VBR_DEPLOY_CONTROL_PLANE_TOKEN to be set/,
+  );
+  assert.equal(
+    resolveServiceClientFromManifest(manifest, {
+      VBR_DEPLOY_CONTROL_PLANE_TOKEN: " service-token ",
+    }).controlPlaneToken,
+    "service-token",
   );
 });

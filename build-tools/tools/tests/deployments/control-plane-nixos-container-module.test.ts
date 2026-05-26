@@ -2,58 +2,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
-
-type EvalOut = Record<string, unknown>;
-
-const credentialConfig = `
-  credentials = {
-    control-plane-database-url.source = "/run/secrets/db";
-    control-plane-token.source = "/run/secrets/control-plane-token";
-    reviewed-source-ssh-key.source = "/run/secrets/ssh";
-    artifact-store-endpoint.source = "/run/secrets/endpoint";
-    artifact-store-access-key-id.source = "/run/secrets/access";
-    artifact-store-secret-access-key.source = "/run/secrets/secret";
-  };
-`;
-
-async function evalModule(
-  tmp: string,
-  $: any,
-  moduleConfig: string,
-  body: string,
-  base: { image?: boolean; bucket?: boolean; credentials?: string } = {},
-): Promise<EvalOut> {
-  const includeImage = base.image ?? true;
-  const includeBucket = base.bucket ?? true;
-  const credentials = base.credentials ?? credentialConfig;
-  const expr = `
-    let
-      lib = import <nixpkgs/lib>;
-      system = import <nixpkgs/nixos> {
-        configuration = {
-          nixpkgs.hostPlatform = "x86_64-linux";
-          imports = [ ./build-tools/tools/nix/deployment-control-plane-container-module.nix ];
-          system.stateVersion = "24.11";
-          services.viberoots.deploymentControlPlaneContainer = {
-            enable = true;
-            instanceId = "mini";
-            publicUrl = "https://deploy.example.test";
-            ${includeBucket ? `artifactStore.bucket = "deployment-artifacts";` : ""}
-            ${
-              includeImage
-                ? `image = "registry.example.com/platform/deployment-control-plane@sha256:reviewed";`
-                : ""
-            }
-            ${credentials}
-            ${moduleConfig}
-          };
-        };
-      };
-    in ${body}
-  `;
-  const { stdout } = await $({ cwd: tmp })`nix eval --impure --expr ${expr} --json`;
-  return JSON.parse(String(stdout || "{}")) as EvalOut;
-}
+import { evalModule } from "./control-plane-nixos-container-module.helpers";
 
 test("control-plane NixOS container module defaults to Podman service plus two workers", async () => {
   await runInTemp("control-plane-nixos-container-defaults", async (tmp, $) => {
@@ -82,7 +31,6 @@ test("control-plane NixOS container module defaults to Podman service plus two w
       volumes: string[];
     };
     assert.deepEqual(service.cmd, [
-      "deployment-control-plane",
       "service",
       "--config",
       "/etc/deployment-control-plane/config.yaml",
@@ -91,20 +39,27 @@ test("control-plane NixOS container module defaults to Podman service plus two w
     assert.ok(service.extraOptions.some((option) => option.startsWith("--health-cmd=")));
     assert.ok(
       service.volumes.includes(
-        "/run/secrets/db:/run/deployment-control-plane/credentials/control-plane-database-url:ro",
+        "/run/deployment-control-plane-container-credentials/deployment-control-plane-service:/run/deployment-control-plane/credentials:ro",
+      ),
+    );
+    assert.ok(
+      service.volumes.includes(
+        "/etc/deployment-control-plane/github-known-hosts:/etc/deployment-control-plane/github-known-hosts:ro",
       ),
     );
     const rendered = JSON.parse(String(out.configText));
     assert.equal(rendered.instanceId, "mini");
+    assert.equal(rendered.service.host, "0.0.0.0");
     assert.equal(
       rendered.service.tokenFile,
       "/run/deployment-control-plane/credentials/control-plane-token",
     );
     assert.equal(rendered.storage.artifactStore.bucket, "deployment-artifacts");
+    assert.equal(rendered.storage.artifactStore.region, "us-east-1");
     assert.equal(rendered.webUi.enabled, true);
     assert.ok(
       (out.tmpfiles as string[]).includes(
-        "d /var/lib/deployment-control-plane/records 0750 deployment-control-plane deployment-control-plane -",
+        "d /var/lib/deployment-control-plane/records 0750 10001 10001 -",
       ),
     );
   });
@@ -121,8 +76,12 @@ test("control-plane NixOS container module preserves mounts when Docker is selec
       containers = builtins.attrNames system.config.virtualisation.oci-containers.containers;
       serviceLoadCredential =
         system.config.systemd.services.docker-deployment-control-plane-service.serviceConfig.LoadCredential;
+      servicePreStart =
+        system.config.systemd.services.docker-deployment-control-plane-service.preStart;
       workerLoadCredential =
         system.config.systemd.services.docker-deployment-control-plane-worker-1.serviceConfig.LoadCredential;
+      workerPreStart =
+        system.config.systemd.services.docker-deployment-control-plane-worker-1.preStart;
       service = system.config.virtualisation.oci-containers.containers.deployment-control-plane-service;
       worker = system.config.virtualisation.oci-containers.containers.deployment-control-plane-worker-1;
     }`,
@@ -138,21 +97,68 @@ test("control-plane NixOS container module preserves mounts when Docker is selec
         "control-plane-database-url:/run/secrets/db",
       ),
     );
+    assert.match(String(out.servicePreStart), /install -d -m 0500 -o 10001 -g 10001/);
+    assert.match(
+      String(out.workerPreStart),
+      new RegExp(
+        "deployment-control-plane-container-credentials/deployment-control-plane-worker-1",
+      ),
+    );
     const service = out.service as {
       environment: Record<string, string>;
       extraOptions: string[];
       ports: string[];
     };
     assert.deepEqual(service.ports, ["127.0.0.1:7780:7780"]);
-    assert.deepEqual(service.environment, {});
+    assert.deepEqual(service.environment, {
+      TMPDIR: "/var/lib/deployment-control-plane/runtime/tmp",
+      VBR_DEPLOY_REVIEWED_SOURCE_SSH_KEY_FILE:
+        "/run/deployment-control-plane/credentials/reviewed-source-ssh-key",
+      VBR_DEPLOY_REVIEWED_SOURCE_SSH_KNOWN_HOSTS_FILE:
+        "/etc/deployment-control-plane/github-known-hosts",
+      WORKSPACE_ROOT: "/var/lib/deployment-control-plane/runtime/workspace",
+    });
     assert.ok(service.extraOptions.includes("--health-interval=30s"));
     const worker = out.worker as { cmd: string[]; volumes: string[] };
-    assert.deepEqual(worker.cmd.slice(0, 2), ["deployment-control-plane", "worker"]);
+    assert.deepEqual(worker.cmd.slice(0, 1), ["worker"]);
     assert.ok(
       worker.volumes.includes(
-        "/run/secrets/secret:/run/deployment-control-plane/credentials/artifact-store-secret-access-key:ro",
+        "/run/deployment-control-plane-container-credentials/deployment-control-plane-worker-1:/run/deployment-control-plane/credentials:ro",
       ),
     );
+  });
+});
+
+test("control-plane NixOS container module can use host networking with loopback service bind", async () => {
+  await runInTemp("control-plane-nixos-container-host-network", async (tmp, $) => {
+    const out = await evalModule(
+      tmp,
+      $,
+      `
+      containerRuntime = "docker";
+      networkMode = "host";
+      serviceHost = "127.0.0.1";
+      workerReplicas = 1;
+    `,
+      `{
+      service = system.config.virtualisation.oci-containers.containers.deployment-control-plane-service;
+      worker = system.config.virtualisation.oci-containers.containers.deployment-control-plane-worker-1;
+      configText = system.config.environment.etc."deployment-control-plane/config.yaml".text;
+    }`,
+    );
+    const service = out.service as {
+      extraOptions: string[];
+      ports: string[];
+    };
+    const worker = out.worker as {
+      extraOptions: string[];
+      ports?: string[];
+    };
+    assert.deepEqual(service.ports, []);
+    assert.ok(service.extraOptions.includes("--network=host"));
+    assert.ok(worker.extraOptions.includes("--network=host"));
+    const rendered = JSON.parse(String(out.configText));
+    assert.equal(rendered.service.host, "127.0.0.1");
   });
 });
 

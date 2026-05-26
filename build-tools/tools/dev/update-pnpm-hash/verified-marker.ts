@@ -112,12 +112,29 @@ export async function readSharedHashCache(opts: {
   }
 }
 
-export async function currentVerifiedMarkerFingerprint(repoRoot: string): Promise<string> {
+export async function currentVerifiedMarkerFingerprint(
+  repoRoot: string,
+  importer = ".",
+): Promise<string> {
   const hash = crypto.createHash("sha256");
   hash.update(`platform=${process.platform}\n`);
   hash.update(`arch=${process.arch}\n`);
   for (const rel of pnpmStoreBuilderFingerprintFiles) {
     hash.update(`file=${rel}\n`);
+    try {
+      hash.update(await fsp.readFile(path.join(repoRoot, rel), "utf8"));
+    } catch {
+      hash.update("<missing>");
+    }
+    hash.update("\n");
+  }
+  const importerRoot = importer === "." ? "" : importer.replace(/\\/g, "/").replace(/\/+$/g, "");
+  hash.update(`importer=${importerRoot || "."}\n`);
+  for (const rel of [
+    importerRoot ? `${importerRoot}/package.json` : "package.json",
+    importerRoot ? `${importerRoot}/.npmrc` : ".npmrc",
+  ]) {
+    hash.update(`importer-file=${rel}\n`);
     try {
       hash.update(await fsp.readFile(path.join(repoRoot, rel), "utf8"));
     } catch {

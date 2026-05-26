@@ -24,9 +24,6 @@ let
     ]
     ++ configuredCredentialNames
   );
-  credentialMounts = map
-    (name: "${credentialSource name}:${cfg.credentialDirectory}/${name}:ro")
-    credentialNames;
   loadCredentials = map (name: "${name}:${credentialSource name}") credentialNames;
   requiredCredentialNames = [
     cfg.databaseUrlCredential
@@ -41,11 +38,22 @@ let
     requiredCredentialNames;
   nullCredentialNames = lib.filter (name: credentialSource name == null) configuredCredentialNames;
   credentialFile = name: "${cfg.credentialDirectory}/${name}";
+  credentialRuntimeRoot = "/run/deployment-control-plane-container-credentials";
+  credentialRuntimeDirectory = name: "${credentialRuntimeRoot}/${name}";
+  credentialStageScript = name: ''
+    set -euo pipefail
+    dst=${credentialRuntimeDirectory name}
+    rm -rf "$dst"
+    install -d -m 0500 -o ${defaults.containerUid} -g ${defaults.containerGid} "$dst"
+    ${lib.concatMapStringsSep "\n" (credentialName: ''
+      install -m 0400 -o ${defaults.containerUid} -g ${defaults.containerGid} ${lib.escapeShellArg (credentialSource credentialName)} "$dst/${credentialName}"
+    '') credentialNames}
+  '';
   renderedConfig = {
     instanceId = cfg.instanceId;
     mode = "protected-shared";
     service = {
-      host = "0.0.0.0";
+      host = cfg.serviceHost;
       port = cfg.port;
       publicUrl = cfg.publicUrl;
       tokenFile = credentialFile cfg.controlPlaneTokenCredential;
@@ -57,6 +65,7 @@ let
       artifactStore = {
         kind = cfg.artifactStore.kind;
         bucket = cfg.artifactStore.bucket;
+        region = cfg.artifactStore.region;
         endpointFile = credentialFile cfg.artifactStore.endpointCredential;
         accessKeyIdFile = credentialFile cfg.artifactStore.accessKeyIdCredential;
         secretAccessKeyFile = credentialFile cfg.artifactStore.secretAccessKeyCredential;
@@ -79,25 +88,32 @@ let
   };
   baseVolumes = [
     "${configFile}:${configFile}:ro"
+    "${cfg.reviewedSourceKnownHostsFile}:${cfg.reviewedSourceKnownHostsFile}:ro"
     "${cfg.recordsRoot}:${defaults.recordsRoot}:rw"
     "${cfg.artifactStagingRoot}:${defaults.artifactStagingRoot}:rw"
     "${cfg.runtimeRoot}:${defaults.runtimeRoot}:rw"
-  ] ++ credentialMounts;
-  containerFor = mode: {
+  ];
+  containerFor = name: mode: {
     image = imageRef;
     autoStart = true;
-    volumes = baseVolumes;
+    volumes = baseVolumes ++ [ "${credentialRuntimeDirectory name}:${cfg.credentialDirectory}:ro" ];
     environment = lib.optionalAttrs (cfg.imageDigest != null) {
       VBR_CONTROL_PLANE_IMAGE_DIGEST = cfg.imageDigest;
+    } // {
+      WORKSPACE_ROOT = "${defaults.runtimeRoot}/workspace";
+      TMPDIR = "${defaults.runtimeRoot}/tmp";
+      VBR_DEPLOY_REVIEWED_SOURCE_SSH_KEY_FILE = credentialFile cfg.reviewedSourceSshKeyCredential;
+      VBR_DEPLOY_REVIEWED_SOURCE_SSH_KNOWN_HOSTS_FILE = cfg.reviewedSourceKnownHostsFile;
     };
-    cmd = [ "deployment-control-plane" mode "--config" configFile ];
+    cmd = [ mode "--config" configFile ];
   };
   healthCmd =
     "node -e 'fetch(\"http://127.0.0.1:${toString cfg.port}/healthz\")"
     + ".then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))'";
-  serviceContainer = containerFor "service" // {
-    ports = [ "${cfg.bindAddress}:${toString cfg.port}:${toString cfg.port}" ];
-    extraOptions = [
+  networkExtraOptions = lib.optionals (cfg.networkMode == "host") [ "--network=host" ];
+  serviceContainer = containerFor defaults.serviceContainerName "service" // {
+    ports = lib.optionals (cfg.networkMode == "bridge") [ "${cfg.bindAddress}:${toString cfg.port}:${toString cfg.port}" ];
+    extraOptions = networkExtraOptions ++ [
       "--health-cmd=${healthCmd}"
       "--health-interval=30s"
       "--health-timeout=5s"
@@ -107,13 +123,14 @@ let
   workerIndexes = lib.range 1 cfg.workerReplicas;
   workerNames = map (index: "${defaults.workerContainerNamePrefix}-${toString index}") workerIndexes;
   workerContainers = lib.listToAttrs (
-    map (name: lib.nameValuePair name (containerFor "worker")) workerNames
+    map (name: lib.nameValuePair name (containerFor name "worker" // { extraOptions = networkExtraOptions; })) workerNames
   );
   allContainerNames = [ defaults.serviceContainerName ] ++ workerNames;
   systemdCredentialServices = lib.listToAttrs (
     map
       (name: lib.nameValuePair "${cfg.containerRuntime}-${name}" {
         serviceConfig.LoadCredential = loadCredentials;
+        preStart = credentialStageScript name;
       })
       allContainerNames
   );
@@ -128,8 +145,10 @@ in
     imageDigest = opt nullStr null "Immutable image digest when image is assembled from parts.";
     publicUrl = opt nullStr null "Externally routed service URL.";
     publicHostName = opt nullStr null "Optional hostname for managed nginx.";
+    serviceHost = opt lib.types.str "0.0.0.0" "Container service bind host.";
     bindAddress = opt lib.types.str defaults.bindAddress "Host bind address.";
     port = opt lib.types.port defaults.servicePort "Host and container service port.";
+    networkMode = opt (lib.types.enum [ "bridge" "host" ]) "bridge" "OCI network mode.";
     containerRuntime = opt (lib.types.enum [ "podman" "docker" ]) defaults.containerRuntime "OCI runtime.";
     workerReplicas = opt lib.types.ints.positive defaults.workerReplicas "Worker container count.";
     webUi.enable = opt lib.types.bool true "Whether the web UI is enabled.";
@@ -147,6 +166,7 @@ in
     artifactStore = {
       kind = opt (lib.types.enum [ "s3-compatible" ]) defaults.artifactStoreKind "Artifact store kind.";
       bucket = opt nullStr null "Artifact store bucket.";
+      region = opt lib.types.str defaults.artifactStoreRegion "S3-compatible artifact store signing region.";
       endpointCredential = opt lib.types.str defaults.artifactEndpointCredential "Endpoint credential name.";
       accessKeyIdCredential = opt lib.types.str defaults.artifactAccessKeyIdCredential "Access key credential name.";
       secretAccessKeyCredential = opt lib.types.str defaults.artifactSecretAccessKeyCredential "Secret key credential name.";
@@ -176,7 +196,7 @@ in
       group = defaults.group;
     };
     systemd.tmpfiles.rules = map
-      (path: "d ${path} 0750 ${defaults.user} ${defaults.group} -")
+      (path: "d ${path} 0750 ${defaults.containerUid} ${defaults.containerGid} -")
       [ cfg.recordsRoot cfg.artifactStagingRoot cfg.runtimeRoot ];
     environment.etc.${configEtcName}.text = builtins.toJSON renderedConfig + "\n";
     virtualisation.oci-containers.backend = cfg.containerRuntime;

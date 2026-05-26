@@ -1,7 +1,11 @@
 #!/usr/bin/env zx-wrapper
+import { execFile } from "node:child_process";
 import fs from "node:fs";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
+import { promisify } from "node:util";
+
+const execFileAsync = promisify(execFile);
 
 export async function pathExists(p: string): Promise<boolean> {
   try {
@@ -28,9 +32,12 @@ export async function findRepoRoot(start: string): Promise<string> {
     }
   }
   try {
-    const { stdout } = await $({
-      stdio: "pipe",
-    })`git -C ${candidates[0] || start} rev-parse --show-toplevel`.nothrow();
+    const { stdout } = await execFileAsync("git", [
+      "-C",
+      candidates[0] || start,
+      "rev-parse",
+      "--show-toplevel",
+    ]);
     const p = String(stdout || "").trim();
     if (p) return p;
   } catch {}

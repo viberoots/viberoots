@@ -29,6 +29,24 @@ function normalizeText(value: unknown): string {
   return typeof value === "string" ? value.replace(/\s+/g, " ").trim() : "";
 }
 
+function hasUnsafeSecretValue(text: string): boolean {
+  const withoutSafeCloudflareTokenGuidance = text.replace(
+    /Cloudflare API token [A-Za-z0-9: ,._/-]+/gi,
+    "Cloudflare API credential has reviewed provider permissions",
+  );
+  return SECRET_VALUE_PATTERN.test(withoutSafeCloudflareTokenGuidance);
+}
+
+function sanitizeKnownDiagnostic(text: string): string {
+  return text
+    .replace(/\/accounts\/[a-f0-9]{16,64}\b/gi, "/accounts/(account)")
+    .replace(/\b(account[_-]?id)\s*[:=]\s*[a-f0-9]{16,64}\b/gi, "$1=(account)")
+    .replace(/\b(?:api[_-]?key|token)\s*[:=]\s*\S+/gi, "credential=(redacted)")
+    .replace(/[^\w .,:;_/#()+\-"'\[\]@?=>]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 function summarizeRedacted(text: string, fingerprint: string): string {
   return SECRET_PATTERN.test(text)
     ? `sensitive payload redacted (${fingerprint})`
@@ -39,18 +57,23 @@ export function redactOperatorText(value: unknown): DeploymentOperatorVisiblePay
   const text = normalizeText(value);
   if (!text) return undefined;
   const fingerprint = fingerprintValue(text);
+  const diagnosticSummary = SAFE_DIAGNOSTIC_PREFIX_PATTERN.test(text)
+    ? sanitizeKnownDiagnostic(text)
+    : "";
   const isKnownSafeDiagnostic =
-    text.length <= 800 &&
-    SAFE_DIAGNOSTIC_PREFIX_PATTERN.test(text) &&
-    SAFE_DIAGNOSTIC_PATTERN.test(text) &&
-    !SECRET_VALUE_PATTERN.test(text);
+    diagnosticSummary.length > 0 &&
+    diagnosticSummary.length <= 800 &&
+    SAFE_DIAGNOSTIC_PREFIX_PATTERN.test(diagnosticSummary) &&
+    SAFE_DIAGNOSTIC_PATTERN.test(diagnosticSummary) &&
+    !hasUnsafeSecretValue(text) &&
+    !hasUnsafeSecretValue(diagnosticSummary);
   const isClearlySafe =
     text.length <= 160 && SAFE_TEXT_PATTERN.test(text) && !SECRET_PATTERN.test(text);
   return isClearlySafe || isKnownSafeDiagnostic
     ? {
         classification: "display_safe",
         redacted: false,
-        summary: text,
+        summary: isKnownSafeDiagnostic ? diagnosticSummary : text,
         fingerprint,
       }
     : {

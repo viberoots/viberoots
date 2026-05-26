@@ -190,7 +190,10 @@ async function seedReplaySource(tmp: string, recordsRoot: string, deployment: Ve
 }
 
 function clientEnv(): NodeJS.ProcessEnv {
-  const env = { ...process.env };
+  const env = {
+    ...process.env,
+    VBR_DEPLOY_CONTROL_PLANE_TOKEN: "test-control-plane-token",
+  };
   delete env[DEPLOYMENT_SECRET_FIXTURE_PATH_ENV];
   return env;
 }

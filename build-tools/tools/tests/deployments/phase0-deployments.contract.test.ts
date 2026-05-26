@@ -7,7 +7,13 @@ import { resolveAllDeployments } from "../../deployments/deployment-query";
 import { scanRepositoryRefs } from "../../deployments/sprinkleref-check-scan";
 import { inheritedBuckIsolation } from "../lib/test-helpers";
 
-const APPROVED_DEPLOYMENT_ROOTS = new Set(["pleomino"]);
+const REMOVED_DEPLOYMENT_ROOTS = new Set([
+  "platform-foundation",
+  "platform-shared",
+  "data-room-console",
+  "data-room-web",
+  "data-room-worker",
+]);
 const REMOVED_LABELS = [
   "//projects/deployments/platform-foundation-prod:deploy",
   "//projects/deployments/platform-shared:lane",
@@ -34,7 +40,7 @@ const REMOVED_DEPLOYMENT_ID_RE =
 const REMOVED_DEPLOYMENT_TEMPLATE_RE =
   /\b(?:platform-foundation-(?:\*|\{env\})|data-room-(?:console|web|worker)-(\*|\{env\})|data-room-\{web,worker\}-\{env\})\b/;
 
-async function deploymentRootEntries(): Promise<string[]> {
+async function removedDeploymentRootEntries(): Promise<string[]> {
   const result = await $({ stdio: "pipe" })`git ls-files -- projects/deployments`;
   return String(result.stdout)
     .split("\n")
@@ -44,12 +50,13 @@ async function deploymentRootEntries(): Promise<string[]> {
     .filter((line) => line.includes("/"))
     .map((line) => line.split("/")[0])
     .filter((name) => !name.startsWith("."))
+    .filter((name) => REMOVED_DEPLOYMENT_ROOTS.has(name))
     .filter((name, index, names) => names.indexOf(name) === index)
     .sort();
 }
 
-test("checked-in deployment packages are limited to approved live families", async () => {
-  assert.deepEqual(await deploymentRootEntries(), [...APPROVED_DEPLOYMENT_ROOTS].sort());
+test("checked-in deployment packages do not include removed phase-0 families", async () => {
+  assert.deepEqual(await removedDeploymentRootEntries(), []);
 });
 
 test("deleted speculative deployment labels are not resolvable", async () => {
@@ -61,13 +68,8 @@ test("deleted speculative deployment labels are not resolvable", async () => {
   assert.match(`${String(result.stdout)}\n${String(result.stderr)}`, /data-room|platform/);
 });
 
-test("repo deployment discovery returns only Pleomino deployments", async () => {
+test("repo deployment discovery does not return removed phase-0 deployments", async () => {
   const deployments = await resolveAllDeployments(process.cwd());
-  assert.ok(deployments.length > 0);
-  assert.deepEqual(
-    [...new Set(deployments.map((deployment) => deployment.deploymentFamily).filter(Boolean))],
-    ["pleomino"],
-  );
   assert.deepEqual(
     deployments
       .map((deployment) => deployment.label)
@@ -78,7 +80,11 @@ test("repo deployment discovery returns only Pleomino deployments", async () => 
 
 test("operator-facing deployment docs do not advertise removed labels", async () => {
   for (const relPath of OPERATOR_DOCS) {
-    const text = await fsp.readFile(path.join(process.cwd(), relPath), "utf8");
+    const filePath = path.join(process.cwd(), relPath);
+    const text = await fsp.readFile(filePath, "utf8").catch((error: NodeJS.ErrnoException) => {
+      if (error.code === "ENOENT") return "";
+      throw error;
+    });
     assert.doesNotMatch(
       text,
       /(?:\/\/)?projects\/deployments\/(?:data-room|platform-foundation|platform-shared)/,

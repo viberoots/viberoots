@@ -38,6 +38,20 @@ test("cloudflare-pages deploy summarizes Cloudflare API auth failures safely", (
   assert.ok(summary.length <= 500);
 });
 
+test("cloudflare-pages deploy strips account ids from Cloudflare API paths", () => {
+  const stderr = `
+\u001b[31m✘ [ERROR] A request to the Cloudflare API (/accounts/1b911846f80a89272c0dbaf44f5c810f/pages/projects/pleomino-staging-pages/deployments) failed.\u001b[0m
+
+  Authentication error (status: 403) [code: 10000]
+`;
+  const summary = summarizeWranglerPagesDeployError("", stderr);
+  assert.equal(
+    summary,
+    "wrangler pages deploy failed: Cloudflare API /accounts/(account)/pages/projects/pleomino-staging-pages/deployments: Authentication error (status: 403) [code: 10000]",
+  );
+  assert.ok(!summary.includes("1b911846f80a89272c0dbaf44f5c810f"));
+});
+
 test("cloudflare-pages deploy ignores Wrangler update banner in summarized failures", () => {
   const stderr = `
 wrangler 4.17.0 (update available 4.87.0)

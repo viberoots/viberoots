@@ -89,6 +89,11 @@ async function buildSsrWebappOutPath(
     stdio: "inherit",
     env,
   })`zx-wrapper build-tools/tools/dev/update-pnpm-hash.ts --lockfile ${lockfile}`;
+  await stageTempRepoPaths({
+    tmp,
+    _$,
+    explicitPaths: ["build-tools/tools/nix/node-modules.hashes.json"],
+  });
   const attr = sanitizeImporterForNixAttr(importer);
   const built = await _$({
     cwd: tmp,

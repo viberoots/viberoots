@@ -20,6 +20,7 @@ NixOS hosts can import the repo-owned module and provide a small host-local conf
 
     credentials = {
       control-plane-database-url.source = "/run/secrets/deploy-control-plane-database-url";
+      control-plane-token.source = "/run/secrets/deploy-control-plane-token";
       reviewed-source-ssh-key.source = "/run/secrets/deploy-reviewed-source-ssh-key";
       artifact-store-endpoint.source = "/run/secrets/deploy-artifact-store-endpoint";
       artifact-store-access-key-id.source =
@@ -41,6 +42,8 @@ Defaults:
 - `workerReplicas = 2`
 - `bindAddress = "127.0.0.1"`
 - `port = 7780`
+- `networkMode = "bridge"`
+- `serviceHost = "0.0.0.0"`
 - `webUi.enable = true`, `webUi.basePath = "/"`
 - `mcp.enable = true`, `mcp.basePath = "/mcp"`
 - scratch and state roots live under `/var/lib/deployment-control-plane`
@@ -55,8 +58,8 @@ Required host-local parameters:
 - `publicUrl`
 - reviewed immutable image reference or registry/repository/digest parts
 - `artifactStore.bucket`
-- credential source files for the database URL, reviewed-source SSH key, artifact-store endpoint,
-  artifact-store access key id, and artifact-store secret access key
+- credential source files for the database URL, bearer token, reviewed-source SSH key,
+  artifact-store endpoint, artifact-store access key id, and artifact-store secret access key
 
 Credential source paths are host paths such as `/run/secrets/...`. They can come from SOPS-nix,
 agenix, manually provisioned files, or another secret system. The module wires those paths through
@@ -66,6 +69,10 @@ the generated non-secret config file. Secret values must not be placed in Nix op
 Set `containerRuntime = "docker"` only on hosts where Docker preserves the same mounts, credential
 file behavior, health semantics, and loopback service bind. Podman is the NixOS default because it
 fits the systemd and `virtualisation.oci-containers` path directly.
+
+Use `networkMode = "host"` only when the container must reach host-loopback dependencies such as a
+local Postgres or MinIO instance. Pair host networking with `serviceHost = "127.0.0.1"` when the
+control plane should remain reachable only through the host's local reverse proxy.
 
 `manageNginx = true` only emits nginx config when `publicHostName` is set. Otherwise TLS and public
 routing remain explicit host concerns.

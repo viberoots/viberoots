@@ -59,8 +59,8 @@ test("human check output points unchecked secrets at interactive repo bootstrap"
     summary: summarize([unchecked]),
   });
   assert.match(text, /Unchecked secrets: 1/);
-  assert.match(text, /infisical-bootstrap\.ts repo --dry-run/);
-  assert.match(text, /infisical-bootstrap\.ts repo, or sprinkleref --init sprinkleref/);
+  assert.match(text, /pass --config, set SPRINKLEREF_CONFIG/);
+  assert.match(text, /sprinkleref\/selected\.local\.json/);
   assert.doesNotMatch(text, /infisical-bootstrap\.ts repo --yes/);
 });
 

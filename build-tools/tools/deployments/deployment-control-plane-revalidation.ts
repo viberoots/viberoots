@@ -86,6 +86,9 @@ export async function revalidateControlPlaneAdmission(opts: {
       workspaceRoot: opts.workspaceRoot,
       revision: targetRef,
       purpose: "control-plane revalidation target ref",
+      scmBackend: opts.deployment.lanePolicy.governance.scmBackend,
+      repository: opts.deployment.lanePolicy.governance.repository,
+      checkout: true,
     }));
   if (
     opts.admittedContext.targetEnvironment?.targetRevision &&

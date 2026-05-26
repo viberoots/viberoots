@@ -141,6 +141,7 @@ test("public kubernetes deploy routes deploy, provision-only, retry, and rollbac
             const clientEnv = (() => {
               const e = { ...process.env };
               delete e[DEPLOYMENT_SECRET_FIXTURE_PATH_ENV];
+              e.VBR_DEPLOY_CONTROL_PLANE_TOKEN = "test-control-plane-token";
               return e;
             })();
             const first = JSON.parse(

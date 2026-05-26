@@ -13,6 +13,10 @@ async function main() {
 
 main().catch((error) => {
   const message = error instanceof Error ? error.message : String(error);
+  if (process.env.VBR_DEBUG_STACK && error instanceof Error && error.stack) {
+    console.error(error.stack);
+    process.exit(1);
+  }
   console.error(`Error: ${message}`);
   process.exit(1);
 });

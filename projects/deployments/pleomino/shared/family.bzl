@@ -4,7 +4,7 @@ load("//build-tools/deployments:family_defs.bzl", "compose_deployment_family_kwa
 _ACCOUNT_ID = "1b911846f80a89272c0dbaf44f5c810f"
 _ZONE_ID = "9411ac5903acb1c2e29b3d4c04ef7e6f"
 _INFISICAL_SITE_URL = "https://app.infisical.com"
-_INFISICAL_PROJECT_ID = "977f71e8-f40b-44e6-b3bb-de0a7abbd826"
+_INFISICAL_PROJECT_ID = "5a927a1a-e78d-433e-affc-17cc051780c0"
 _INFISICAL_PROJECT_NAME = "pleomino-deployments"
 _INFISICAL_PROJECT_SLUG = "pleomino-deployments"
 _INFISICAL_ENVIRONMENT_SLUGS = {
@@ -15,8 +15,8 @@ _INFISICAL_SECRET_PATH = "/"
 _INFISICAL_CLOUDFLARE_SECRET_NAME = "cloudflare_api_token"
 _INFISICAL_CLOUDFLARE_SECRET_REF = "secret://deployments/pleomino/cloudflare_api_token"
 _INFISICAL_MACHINE_IDENTITY_IDS = {
-    "staging": "ae854a19-3537-4d40-8730-8314a74c3d04",
-    "prod": "5e302d6c-3ac7-4fbc-a75f-b2312f33809a",
+    "staging": "8b9bc77a-ad32-459f-82a9-b72cd7a3530d",
+    "prod": "ceca24df-0e8b-457e-a5a8-cf20a122d2da",
 }
 _INFISICAL_MACHINE_IDENTITY_NAMES = {
     "staging": "pleomino-staging-deploy",
@@ -104,6 +104,8 @@ def _pleomino_infisical_runtime(stage):
     return {
         "site_url": _INFISICAL_SITE_URL,
         "project_id": _INFISICAL_PROJECT_ID,
+        "project_name": _INFISICAL_PROJECT_NAME,
+        "project_slug": _INFISICAL_PROJECT_SLUG,
         "environment": _INFISICAL_ENVIRONMENT_SLUGS[stage],
         "secret_path": _INFISICAL_SECRET_PATH,
         "preferred_credential_source": "infisical_machine_identity_universal_auth",

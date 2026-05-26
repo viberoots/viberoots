@@ -1,9 +1,11 @@
 { pkgs, nodeMods, repoSnapshot }:
 let
   version = "0.1.0";
-  sourceRevision = "source-${builtins.substring 0 12 (builtins.hashString "sha256" (builtins.toString repoSnapshot))}";
+  runtimePackagingRevision = "cjs-bundle-3-real-wrangler-ca";
+  sourceRevision = "source-${builtins.substring 0 12 (builtins.hashString "sha256" "${builtins.toString repoSnapshot}:${runtimePackagingRevision}")}";
   imageDigest = "unknown";
   rootNodeModules = nodeMods.node-modules;
+  wranglerCli = "${rootNodeModules}/node_modules/wrangler/bin/wrangler.js";
   runtimeTools = [
     pkgs.nodejs_22
     pkgs.git
@@ -28,23 +30,49 @@ let
         --platform=node \
         --target=node22 \
         --bundle \
-        --format=esm \
+        --format=cjs \
         --packages=bundle \
         --legal-comments=none \
-        --outfile=dist/deployment-control-plane.mjs
+        --outfile=dist/deployment-control-plane.cjs
+      cat > dist/deployment-control-plane-wrapper.cjs <<'EOF'
+const { runDeploymentControlPlaneCommand } = require("./deployment-control-plane.cjs");
+runDeploymentControlPlaneCommand()
+  .then((processHandle) => {
+    if (processHandle?.url) console.log(JSON.stringify({ url: processHandle.url }, null, 2));
+    for (const signal of ["SIGINT", "SIGTERM"]) {
+      process.once(signal, async () => {
+        await processHandle?.close?.();
+        process.exit(0);
+      });
+    }
+    if ((process.argv[2] || "") === "worker") return new Promise(() => {});
+  })
+  .catch((error) => {
+    console.error(error);
+    process.exit(1);
+  });
+EOF
+      node --check dist/deployment-control-plane-wrapper.cjs
     '';
     installPhase = ''
       set -euo pipefail
       mkdir -p "$out/bin" "$out/share/deployment-control-plane"
-      install -m0755 dist/deployment-control-plane.mjs \
-        "$out/share/deployment-control-plane/deployment-control-plane.mjs"
-      ln -s ${rootNodeModules}/node_modules/.bin/wrangler "$out/bin/wrangler"
+      install -m0644 dist/deployment-control-plane.cjs \
+        "$out/share/deployment-control-plane/deployment-control-plane.cjs"
+      install -m0755 dist/deployment-control-plane-wrapper.cjs \
+        "$out/share/deployment-control-plane/deployment-control-plane-wrapper.cjs"
+      resolved_wrangler_cli="$(${pkgs.coreutils}/bin/realpath ${wranglerCli})"
+      cat > "$out/bin/wrangler" <<EOF
+#!${pkgs.runtimeShell}
+exec ${pkgs.nodejs_22}/bin/node "$resolved_wrangler_cli" "\$@"
+EOF
+      chmod 0755 "$out/bin/wrangler"
       cat > "$out/bin/deployment-control-plane" <<EOF
 #!${pkgs.runtimeShell}
 export VBR_CONTROL_PLANE_VERSION="${version}"
 export VBR_CONTROL_PLANE_SOURCE_REVISION="\''${VBR_CONTROL_PLANE_SOURCE_REVISION:-${sourceRevision}}"
 export VBR_CONTROL_PLANE_IMAGE_DIGEST="\''${VBR_CONTROL_PLANE_IMAGE_DIGEST:-${imageDigest}}"
-exec ${pkgs.nodejs_22}/bin/node "$out/share/deployment-control-plane/deployment-control-plane.mjs" "\$@"
+exec ${pkgs.nodejs_22}/bin/node "$out/share/deployment-control-plane/deployment-control-plane-wrapper.cjs" "\$@"
 EOF
       chmod 0755 "$out/bin/deployment-control-plane"
     '';
@@ -101,7 +129,9 @@ EOF
       Entrypoint = contract.entrypoint;
       Env = [
         "PATH=${pathValue}"
+        "HOME=/home/deployment-control-plane"
         "SSL_CERT_FILE=${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt"
+        "NODE_EXTRA_CA_CERTS=${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt"
         "VBR_CONTROL_PLANE_VERSION=${version}"
         "VBR_CONTROL_PLANE_SOURCE_REVISION=${sourceRevision}"
         "VBR_CONTROL_PLANE_IMAGE_DIGEST=${imageDigest}"
@@ -114,7 +144,15 @@ EOF
       };
     };
     extraCommands = ''
-      mkdir -p etc/deployment-control-plane var/lib/deployment-control-plane run/deployment-control-plane
+      mkdir -p etc/deployment-control-plane var/lib/deployment-control-plane run/deployment-control-plane home/deployment-control-plane
+      cat > etc/passwd <<'EOF'
+root:x:0:0:root:/root:/bin/sh
+deployment-control-plane:x:10001:10001:deployment-control-plane:/home/deployment-control-plane:/bin/sh
+EOF
+      cat > etc/group <<'EOF'
+root:x:0:
+deployment-control-plane:x:10001:
+EOF
     '';
   };
 in

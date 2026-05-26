@@ -69,6 +69,40 @@ test("managed bootstrap outputs do not require a resolver config", async () => {
   assert.equal(report.refs[0].managedFamily, "pleomino");
 });
 
+test("bootstrap category check ignores application secret refs", async () => {
+  const dir = await gitRepo();
+  const managed = "secret://deployments/pleomino/prod/infisical-client-id";
+  const appSecret = "secret://deployments/pleomino/cloudflare_api_token";
+  const config = path.join(dir, "resolver.json");
+  const store = path.join(dir, "store.json");
+  await writeTracked(dir, "contracts.txt", [managed, appSecret]);
+  await fs.writeFile(store, JSON.stringify({ [managed]: "client-id" }));
+  await fs.writeFile(
+    config,
+    `${JSON.stringify({
+      version: 1,
+      defaultCategory: "main",
+      categories: {
+        main: { backend: "local-file", file: path.join(dir, "unused.json") },
+        bootstrap: { backend: "local-file", file: store },
+      },
+    })}\n`,
+  );
+
+  const output = await runInDir(dir, async () => {
+    let output = "";
+    const exitCode = await runSprinkleRefCheck({
+      argv: ["--check", "--category", "bootstrap", "--config", config],
+      stdout: (text) => (output = text),
+    });
+    assert.equal(exitCode, 0);
+    return output;
+  });
+
+  assert.match(output, /Summary: .*present 1, declared 1/);
+  assert.doesNotMatch(output, /Missing values:/);
+});
+
 async function gitRepo(): Promise<string> {
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), "sprinkleref-check-managed-"));
   await $({ cwd: dir })`git init`.quiet();

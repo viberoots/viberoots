@@ -8,6 +8,10 @@ import { writeTempListedDeploymentWorkspace } from "./deploy.front-door.fixture"
 import { runInTemp } from "../lib/test-helpers";
 
 const deploymentLabel = "//sandbox/deployments/demo-dev:deploy";
+const controlPlaneFixtureEnv = {
+  [LOCAL_FIXTURE_SERVICE_ENV]: "1",
+  VBR_DEPLOY_CONTROL_PLANE_TOKEN: "test-control-plane-token",
+};
 
 type MockControlPlaneConfig = {
   onStatus?: (url: URL) => unknown;
@@ -83,7 +87,7 @@ test("deploy --status and --print-run-lock-scope read service-backed run details
     try {
       const statusResult = await $({
         cwd: tmp,
-        env: { ...process.env, [LOCAL_FIXTURE_SERVICE_ENV]: "1" },
+        env: { ...process.env, ...controlPlaneFixtureEnv },
         stdio: "pipe",
       })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment ${deploymentLabel} --status --submission-id submission-123 --control-plane-url ${mock.url}`;
       const status = JSON.parse(String(statusResult.stdout));
@@ -92,7 +96,7 @@ test("deploy --status and --print-run-lock-scope read service-backed run details
 
       const lockScopeResult = await $({
         cwd: tmp,
-        env: { ...process.env, [LOCAL_FIXTURE_SERVICE_ENV]: "1" },
+        env: { ...process.env, ...controlPlaneFixtureEnv },
         stdio: "pipe",
       })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment ${deploymentLabel} --print-run-lock-scope --deploy-run-id deploy-run-123 --control-plane-url ${mock.url}`;
       assert.equal(String(lockScopeResult.stdout).trim(), "nixos-shared-host:default:demoapp");
@@ -117,7 +121,7 @@ test("deploy --record reads the finalized run record through the control-plane h
     try {
       const recordResult = await $({
         cwd: tmp,
-        env: { ...process.env, [LOCAL_FIXTURE_SERVICE_ENV]: "1" },
+        env: { ...process.env, ...controlPlaneFixtureEnv },
         stdio: "pipe",
       })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment ${deploymentLabel} --record --deploy-run-id deploy-run-123 --control-plane-url ${mock.url}`;
       const record = JSON.parse(String(recordResult.stdout));
@@ -192,12 +196,12 @@ test("deploy --approve uses the installed profile and status bindings instead of
     try {
       await $({
         cwd: tmp,
-        env: { ...process.env, [LOCAL_FIXTURE_SERVICE_ENV]: "1" },
+        env: { ...process.env, ...controlPlaneFixtureEnv },
         stdio: "pipe",
       })`zx-wrapper build-tools/tools/deployments/nixos-shared-host-install.ts client install --output-root ${profileRoot} --profile mini --destination mini --remote-repo-path /srv/viberoots --remote-state-path /etc/nixos/deployment-host/platform-state.json --remote-runtime-root /var/lib/deployment-host/runtime --remote-records-root /var/lib/deployment-host/records --ssh-mode ssh --control-plane-url ${mock.url}`;
       const approveResult = await $({
         cwd: tmp,
-        env: { ...process.env, [LOCAL_FIXTURE_SERVICE_ENV]: "1" },
+        env: { ...process.env, ...controlPlaneFixtureEnv },
         stdio: "pipe",
       })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment ${deploymentLabel} --profile mini --profile-root ${profileRoot} --approve --deploy-run-id deploy-run-approval-123 --approval-id ticket-123 --requested-by-principal user:reviewer`;
       const approved = JSON.parse(String(approveResult.stdout));

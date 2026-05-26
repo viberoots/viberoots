@@ -99,6 +99,7 @@ async function backfillMissingAdmission(opts: {
   snapshot: CloudflarePagesControlPlaneSnapshot;
   workspaceRoot: string;
   recordsRoot: string;
+  backendDatabaseUrl?: string;
   governanceResolver?: DeploymentLaneGovernanceResolver;
 }) {
   if (!opts.snapshot.admittedContext || opts.snapshot.admittedContext.policyEvaluation) {
@@ -110,6 +111,7 @@ async function backfillMissingAdmission(opts: {
       workspaceRoot: opts.workspaceRoot,
       recordsRoot: opts.recordsRoot,
       deployment: opts.request.deployment,
+      backendDatabaseUrl: opts.backendDatabaseUrl,
       operationKind: opts.snapshot.operationKind as any,
       admittedContext: opts.snapshot.admittedContext,
       evidence: opts.request.admissionEvidence,
@@ -155,6 +157,7 @@ export async function prepareBackendCloudflarePagesControlPlaneRun(opts: {
         snapshot: snapshot as CloudflarePagesControlPlaneSnapshot,
         workspaceRoot: opts.workspaceRoot,
         recordsRoot: opts.recordsRoot,
+        backendDatabaseUrl: opts.backend.databaseUrl,
         governanceResolver: opts.governanceResolver,
       });
       if (opts.objectStore) {

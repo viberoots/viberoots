@@ -1,0 +1,126 @@
+#!/usr/bin/env zx-wrapper
+import * as fsp from "node:fs/promises";
+import path from "node:path";
+
+export const CLOUDFLARE_EXTRACTION_QUERY =
+  "set(//projects/deployments/pleomino/staging:deploy //projects/apps/pleomino:app //projects/deployments/pleomino/shared:lane //projects/deployments/pleomino/shared:defaults //projects/deployments/pleomino/shared:lane_governance //projects/deployments/pleomino/shared:staging_release)";
+
+export async function writeCloudflarePagesExtractionFixture(tmp: string): Promise<void> {
+  const appTargetsPath = path.join(tmp, "projects/apps/pleomino/TARGETS");
+  const deployTargetsPath = path.join(tmp, "projects/deployments/pleomino/staging/TARGETS");
+  const sharedTargetsPath = path.join(tmp, "projects/deployments/pleomino/shared/TARGETS");
+  await fsp.mkdir(path.dirname(appTargetsPath), { recursive: true });
+  await fsp.mkdir(path.dirname(deployTargetsPath), { recursive: true });
+  await fsp.mkdir(path.dirname(sharedTargetsPath), { recursive: true });
+  await fsp.writeFile(
+    appTargetsPath,
+    [
+      'load("@prelude//:rules.bzl", "genrule")',
+      "",
+      "genrule(",
+      '    name = "app",',
+      '    out = "app.txt",',
+      '    cmd = "printf pleomino > $OUT",',
+      '    labels = ["kind:app", "webapp:static"],',
+      '    visibility = ["PUBLIC"],',
+      ")",
+      "",
+    ].join("\n"),
+    "utf8",
+  );
+  await fsp.writeFile(
+    sharedTargetsPath,
+    [
+      'load("//build-tools/deployments:defs.bzl", "deployment_admission_policy", "deployment_defaults", "deployment_lane_governance", "deployment_lane_policy")',
+      "",
+      "deployment_defaults(",
+      '    name = "defaults",',
+      '    default_client_profile = "mini",',
+      '    visibility = ["PUBLIC"],',
+      ")",
+      "",
+      "deployment_lane_governance(",
+      '    name = "lane_governance",',
+      '    scm_backend = "github",',
+      '    repository = "viberoots/viberoots",',
+      "    source_ref_policies = [",
+      '        {"stage": "dev", "allowed_refs": "main", "required_checks": "deploy/pleomino-dev"},',
+      '        {"stage": "staging", "allowed_refs": "main,refs/tags/release/*", "required_checks": "deploy/pleomino-staging"},',
+      '        {"stage": "prod", "allowed_refs": "refs/tags/release/*", "required_checks": "deploy/pleomino-prod"},',
+      "    ],",
+      '    trusted_reporter_identities = ["app:deploy-bot", "ci:jenkins"],',
+      '    required_approval_boundaries = [{"stage": "prod", "required_approvals": "release-owner"}],',
+      '    visibility = ["PUBLIC"],',
+      ")",
+      "",
+      "deployment_lane_policy(",
+      '    name = "lane",',
+      '    defaults = ":defaults",',
+      '    stages = ["dev", "staging", "prod"],',
+      '    source_ref_policy = {"dev": "main", "staging": "main", "prod": "refs/tags/release/*"},',
+      '    allowed_promotion_edges = ["dev->staging", "staging->prod"],',
+      '    promotion_compatibility = """{"cross_provider_promotion_edges":["dev->staging"]}""",',
+      '    governance_policy = ":lane_governance",',
+      '    visibility = ["PUBLIC"],',
+      ")",
+      "",
+      "deployment_admission_policy(",
+      '    name = "staging_release",',
+      '    allowed_refs = ["main", "refs/tags/release/*"],',
+      '    required_checks = ["deploy/pleomino-staging"],',
+      '    visibility = ["PUBLIC"],',
+      ")",
+      "",
+    ].join("\n"),
+    "utf8",
+  );
+  await fsp.writeFile(
+    deployTargetsPath,
+    [
+      'load("//build-tools/deployments:defs.bzl", "cloudflare_pages_static_webapp_deployment")',
+      "",
+      "cloudflare_pages_static_webapp_deployment(",
+      '    name = "deploy",',
+      '    component = "//projects/apps/pleomino:app",',
+      '    account = "web-platform-staging",',
+      '    custom_domain = "staging.pleomino.com",',
+      '    custom_domain_zone_id = "zone-pleomino",',
+      '    project = "pleomino-staging-pages",',
+      '    lane_policy = "//projects/deployments/pleomino/shared:lane",',
+      '    environment_stage = "staging",',
+      '    admission_policy = "//projects/deployments/pleomino/shared:staging_release",',
+      "    secret_requirements = [",
+      "        {",
+      '            "name": "cloudflare_api_token",',
+      '            "step": "provision",',
+      '            "contract_id": "secret://deployments/pleomino/cloudflare_api_token",',
+      '            "required": "true",',
+      "        },",
+      "        {",
+      '            "name": "cloudflare_api_token",',
+      '            "step": "publish",',
+      '            "contract_id": "secret://deployments/pleomino/cloudflare_api_token",',
+      '            "required": "true",',
+      "        },",
+      "        {",
+      '            "name": "cloudflare_api_token",',
+      '            "step": "preview_cleanup",',
+      '            "contract_id": "secret://deployments/pleomino/cloudflare_api_token",',
+      '            "required": "true",',
+      "        },",
+      "    ],",
+      "    runtime_config_requirements = [],",
+      "    preview = {",
+      '        "target_derivation": "provider_managed_source_run",',
+      '        "isolation_class": "isolated",',
+      '        "identity_selector": "source_run",',
+      '        "cleanup_ttl": "7d",',
+      '        "smoke_target": "preview_url",',
+      '        "lock_scope": "shared",',
+      "    },",
+      ")",
+      "",
+    ].join("\n"),
+    "utf8",
+  );
+}

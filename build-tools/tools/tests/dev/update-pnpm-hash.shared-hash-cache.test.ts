@@ -10,7 +10,7 @@ import {
   writeSharedHashCache,
 } from "../../dev/update-pnpm-hash/verified-marker";
 
-test("shared pnpm-store hash cache is keyed by lock hash and builder fingerprint", async () => {
+test("shared pnpm-store hash cache is keyed by lock hash and importer-aware builder fingerprint", async () => {
   const repoRoot = await fsp.mkdtemp(path.join(os.tmpdir(), "pnpm-shared-cache-"));
   const prevRepoRoot = process.env.REPO_ROOT;
   process.env.REPO_ROOT = repoRoot;

@@ -36,7 +36,10 @@ async function inner() {
   const timeoutSec = String(process.env.NIX_PNPM_FETCH_TIMEOUT || "600").trim();
   const lockAbs = path.join(repoRoot, relLock);
   const markerPath = verifiedMarker.verifiedMarkerPath(repoRoot, importer);
-  const builderFingerprint = await verifiedMarker.currentVerifiedMarkerFingerprint(repoRoot);
+  const builderFingerprint = await verifiedMarker.currentVerifiedMarkerFingerprint(
+    repoRoot,
+    importer,
+  );
   const key = relLock;
   const placeholderHash = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
   if (force) await hashesJson.updateNodeModulesHashesJson(key, placeholderHash);

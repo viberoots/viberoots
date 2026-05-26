@@ -9,50 +9,67 @@ import {
   resolveDeploymentFromTarget,
 } from "../../deployments/deployment-query";
 import type { GraphNode } from "../../lib/graph";
+import { runInTemp } from "../lib/test-helpers";
+import {
+  CUTOVER_APP,
+  CUTOVER_DEV,
+  CUTOVER_SHARED,
+  CUTOVER_STAGING,
+  minimalWranglerConfig,
+  writeCutoverDeploymentFixture,
+} from "./infisical-cutover.fixture";
 
-const STAGING = "//projects/deployments/pleomino/staging:deploy";
-const PROD = "//projects/deployments/pleomino/prod:deploy";
-const SCAFFOLD_WRANGLER = `{
-  "$schema": "../../../node_modules/wrangler/config-schema.json",
-  "compatibility_date": "2026-03-18",
-}
-`;
-
-test("real pleomino Cloudflare deployments declare typed external requirement profiles", async () => {
-  for (const label of [STAGING, PROD]) {
-    const deployment = await resolveDeploymentFromTarget(process.cwd(), label);
-    assert.deepEqual(deployment.externalRequirementProfiles, ["cloudflare_provider"]);
-  }
-});
-
-test("real pleomino Cloudflare profile fails closed when a lifecycle secret is missing", async () => {
-  const nodes = await queryDeploymentNodes(process.cwd(), [
-    STAGING,
-    "//projects/apps/pleomino:app",
-    "//projects/deployments/pleomino/dev:deploy",
-    "//projects/deployments/pleomino/shared:lane",
-    "//projects/deployments:defaults",
-    "//projects/deployments/pleomino/shared:lane_governance",
-    "//projects/deployments/pleomino/shared:staging_release",
-  ]);
-  const mutated = nodes.map((node): GraphNode => {
-    if (node.name !== STAGING) return node;
-    return {
-      ...node,
-      secret_requirements: [],
-    };
+test("fixture Cloudflare deployments declare typed external requirement profiles", async () => {
+  await runInTemp("requirement-profiles-fixture", async (tmp) => {
+    await writeCutoverDeploymentFixture(tmp);
+    for (const label of [CUTOVER_STAGING]) {
+      const deployment = await resolveDeploymentFromTarget(tmp, label);
+      assert.deepEqual(deployment.externalRequirementProfiles, ["cloudflare_provider"]);
+    }
   });
-  const { errors } = extractDeployments(mutated);
-  assert.ok(
-    errors.some((entry) =>
-      entry.includes("cloudflare_provider missing secret_requirements cloudflare_api_token"),
-    ),
-  );
 });
 
-test("real pleomino Cloudflare wrangler configs match the scaffolded minimal shape", async () => {
-  for (const stage of ["staging", "prod"]) {
-    const wranglerPath = path.join("projects", "deployments", "pleomino", stage, "wrangler.jsonc");
-    assert.equal(await fsp.readFile(wranglerPath, "utf8"), SCAFFOLD_WRANGLER);
-  }
+test("fixture Cloudflare profile fails closed when a lifecycle secret is missing", async () => {
+  await runInTemp("requirement-profiles-missing-secret", async (tmp) => {
+    await writeCutoverDeploymentFixture(tmp);
+    const nodes = await queryDeploymentNodes(tmp, [
+      CUTOVER_STAGING,
+      CUTOVER_APP,
+      CUTOVER_DEV,
+      `${CUTOVER_SHARED}:defaults`,
+      `${CUTOVER_SHARED}:lane`,
+      `${CUTOVER_SHARED}:lane_governance`,
+      `${CUTOVER_SHARED}:staging_release`,
+    ]);
+    const mutated = nodes.map((node): GraphNode => {
+      if (node.name !== CUTOVER_STAGING) return node;
+      return {
+        ...node,
+        secret_requirements: [],
+      };
+    });
+    const { errors } = extractDeployments(mutated);
+    assert.ok(
+      errors.some((entry) =>
+        entry.includes("cloudflare_provider missing secret_requirements cloudflare_api_token"),
+      ),
+    );
+  });
+});
+
+test("fixture Cloudflare wrangler configs match the scaffolded minimal shape", async () => {
+  await runInTemp("requirement-profiles-wrangler", async (tmp) => {
+    await writeCutoverDeploymentFixture(tmp);
+    for (const stage of ["staging", "prod"]) {
+      const wranglerPath = path.join(
+        tmp,
+        "projects",
+        "deployments",
+        "cutover-demo",
+        stage,
+        "wrangler.jsonc",
+      );
+      assert.equal(await fsp.readFile(wranglerPath, "utf8"), minimalWranglerConfig());
+    }
+  });
 });

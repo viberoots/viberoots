@@ -51,13 +51,20 @@ export type CloudflarePagesArtifactInput =
       artifactIdentity?: string;
     };
 
-async function verifySourceRevision(workspaceRoot: string, sourceRevision: string) {
+async function verifySourceRevision(
+  workspaceRoot: string,
+  deployment: CloudflarePagesDeployment,
+  sourceRevision: string,
+) {
   const revision = sourceRevision.trim();
   if (!revision) throw new Error("artifact input requires sourceRevision");
   await resolveDeploymentGitCommit({
     workspaceRoot,
     revision,
     purpose: "artifact input source revision",
+    scmBackend: deployment.lanePolicy.governance.scmBackend,
+    repository: deployment.lanePolicy.governance.repository,
+    checkout: true,
   });
 }
 
@@ -117,7 +124,7 @@ async function admitServerBuild(opts: {
   objectStore?: ControlPlaneArtifactStore;
   submissionId: string;
 }): Promise<AdmittedStaticWebappArtifact> {
-  await verifySourceRevision(opts.workspaceRoot, opts.input.sourceRevision);
+  await verifySourceRevision(opts.workspaceRoot, opts.deployment, opts.input.sourceRevision);
   const outPath = await buildSelectedOutPath(opts.workspaceRoot, opts.input.buildTarget);
   const artifactDir = artifactDirFromBuiltOutPath(opts.deployment.component.kind, outPath);
   return await admitStaticWebappArtifact({
@@ -159,7 +166,7 @@ export async function resolveCloudflarePagesArtifactInput(opts: {
     if (input.sourceDirty) {
       throw new Error("client_upload artifact input must come from a clean reviewed source state");
     }
-    await verifySourceRevision(opts.workspaceRoot, input.sourceRevision);
+    await verifySourceRevision(opts.workspaceRoot, opts.deployment, input.sourceRevision);
     return await admitStaticWebappUploadSession({
       recordsRoot: opts.recordsRoot,
       ...(opts.backend ? { backend: opts.backend } : {}),
@@ -173,7 +180,7 @@ export async function resolveCloudflarePagesArtifactInput(opts: {
     });
   }
   if (input.kind === "ci_attested") {
-    await verifySourceRevision(opts.workspaceRoot, input.sourceRevision);
+    await verifySourceRevision(opts.workspaceRoot, opts.deployment, input.sourceRevision);
     return await admitBundleRef({
       recordsRoot: opts.recordsRoot,
       artifactRef: input.artifactRef,

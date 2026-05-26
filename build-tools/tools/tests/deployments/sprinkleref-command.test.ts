@@ -70,6 +70,41 @@ test("sprinkleref prompt fallback and dry-run do not read secret values", async 
   assert.equal((await readStore(dir))[ref], "hidden-secret");
 });
 
+test("sprinkleref get fingerprint prints only digest metadata", async () => {
+  const dir = await tmp();
+  const config = await localConfig(dir);
+  const ref = "secret://deployments/pleomino/staging/cloudflare-api-token";
+  const output: string[] = [];
+  await run(["--config", config, "--add", ref, "--value-env", "TOKEN"], {
+    TOKEN: "hidden-secret",
+  });
+  await runSprinkleRefCli({
+    argv: ["--config", config, "--get", ref, "--fingerprint", "--format", "json"],
+    stdout: (text) => output.push(text),
+  });
+  const parsed = JSON.parse(output.join("\n")) as Record<string, unknown>;
+  assert.equal(parsed.schemaVersion, "sprinkleref-fingerprint@1");
+  assert.equal(parsed.secretValuePrinted, false);
+  assert.equal(parsed.ref, ref);
+  assert.equal(parsed.category, "main");
+  assert.equal(parsed.algorithm, "sha256");
+  assert.equal(parsed.digest, "c29a301753a4fd1157ee789cf37ae49fc7b2b914448aafcaf0217baa5ffb6755");
+  assert.doesNotMatch(output.join("\n"), /hidden-secret/);
+});
+
+test("sprinkleref get refuses to print a raw secret", async () => {
+  const dir = await tmp();
+  const config = await localConfig(dir);
+  const ref = "secret://deployments/pleomino/staging/cloudflare-api-token";
+  await run(["--config", config, "--add", ref, "--value-env", "TOKEN"], {
+    TOKEN: "hidden-secret",
+  });
+  await assert.rejects(
+    () => runSprinkleRefCli({ argv: ["--config", config, "--get", ref], stdout: () => undefined }),
+    /--get requires --fingerprint/,
+  );
+});
+
 test("sprinkleref add fails non-interactively when value input is missing", async () => {
   const dir = await tmp();
   const config = await localConfig(dir);

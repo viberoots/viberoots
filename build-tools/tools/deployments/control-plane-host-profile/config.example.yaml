@@ -14,6 +14,7 @@ storage:
   artifactStore:
     kind: s3-compatible
     bucket: deployment-control-plane-artifacts
+    region: us-east-1
     endpointFile: /run/deployment-control-plane/credentials/artifact-store-endpoint
     accessKeyIdFile: /run/deployment-control-plane/credentials/artifact-store-access-key-id
     secretAccessKeyFile: /run/deployment-control-plane/credentials/artifact-store-secret-access-key

@@ -1,0 +1,268 @@
+{
+  "tasks": [
+    {
+      "num": 1,
+      "title": "Infisical Secrets Provider",
+      "summary": "Complete the Infisical backend integration so deployments use Infisical as the secrets backend, with Universal Auth workload credentials and SprinkleRef backend-neutral references.",
+      "depends_on": []
+    },
+    {
+      "num": 2,
+      "title": "Supabase Project Provisioning",
+      "summary": "Create and configure the Supabase project(s) that serve as the external Postgres database and optional auth backend for the deployment control plane, and register all connection credentials in Infisical.",
+      "depends_on": []
+    },
+    {
+      "num": 3,
+      "title": "Kubernetes Cluster Provisioning",
+      "summary": "Provision a Kubernetes cluster and prepare it with the namespaces, RBAC, and cluster add-ons required to host the containerized control plane.",
+      "depends_on": []
+    },
+    {
+      "num": 4,
+      "title": "Containerize Control Plane + Move to Cloud",
+      "summary": "Transform the deployment control plane from a self-hosted service into a cloud-portable, horizontally scalable containerized runtime, then migrate it off the current personal server to an external cloud host.",
+      "depends_on": [2]
+    },
+    {
+      "num": 5,
+      "title": "Simple Kubernetes / OpenTofu Deployment to Bundle Control Plane",
+      "summary": "Deploy the containerized control plane to a Kubernetes cluster using the existing Helm-based provider and OpenTofu-managed infrastructure, replacing the current personal server as the primary control-plane host.",
+      "depends_on": [3, 4]
+    },
+    {
+      "num": 6,
+      "title": "Supabase/WorkOS Auth Provider",
+      "summary": "Replace the current file-backed single bearer token with an OIDC-based identity provider (Supabase Auth or WorkOS) for human access to the control plane API, web UI, and MCP surface.",
+      "depends_on": [4, 5]
+    },
+    {
+      "num": 7,
+      "title": "Auth Provisioning IaC",
+      "summary": "Declaratively manage all identity infrastructure \u2014 Infisical projects/identities, WorkOS/Supabase tenants, and CI submitter identities \u2014 using OpenTofu so auth state is reproducible and auditable.",
+      "depends_on": [1, 6]
+    },
+    {
+      "num": 8,
+      "title": "Container Deployment Provider",
+      "summary": "Wire a container deployment provider into a live, admission-gated path that can push a Nix-built OCI image and produce a complete, auditable deploy record.",
+      "depends_on": [4]
+    },
+    {
+      "num": 9,
+      "title": "Vercel Build Target",
+      "summary": "Validate, stabilize, and document the existing `node_vercel_next_artifact` Buck/Nix build target so Next.js apps reliably produce a hermetic `.vercel/output` artifact with a stable content-addressed identity.",
+      "depends_on": []
+    },
+    {
+      "num": 10,
+      "title": "Vercel Deployment Provider",
+      "summary": "Cut the first live protected/shared Vercel deployment by creating a deployment package under `projects/deployments/`, provisioning real provider credentials, and validating the end-to-end admission-to-publish flow.",
+      "depends_on": [4, 9]
+    },
+    {
+      "num": 11,
+      "title": "Backend Service Build Template(s)",
+      "summary": "Add a service scaffold template so new backend services get a ready-to-build entrypoint, health endpoint stub, Buck target, and test scaffold with a single `scaf new` command.",
+      "depends_on": []
+    },
+    {
+      "num": 12,
+      "title": "Backend Service Deployment Template",
+      "summary": "Wire the existing per-provider and shared governance scaffold templates into a single compound invocation that generates dev/staging/prod TARGETS and lane policy stubs for a new backend service.",
+      "depends_on": [11, 8]
+    },
+    {
+      "num": 13,
+      "title": "Supabase DB Deployment",
+      "summary": "Decide whether the Supabase project is provisioned by OpenTofu or out-of-band, then wire the existing Buck migration bundle machinery to apply schema migrations on each protected/shared deploy.",
+      "depends_on": [2, 5, 6]
+    },
+    {
+      "num": 14,
+      "title": "Unified Health/Readiness Contract for Services",
+      "summary": "Extract the existing control-plane `/healthz`/`/readyz` implementation into a shared contract document and reusable helper, enforce path names in the Kubernetes posture validator, and wire stubs into the service scaffold.",
+      "depends_on": [11]
+    },
+    {
+      "num": 15,
+      "title": "Local Stack Deployment",
+      "summary": "Define a Buck2-backed local stack target that generates Compose config from the same deployment metadata used in production, running Postgres, a lightweight S3-compatible service, and the control plane locally so developers can exercise full deployment flows without cloud access.",
+      "depends_on": [4]
+    },
+    {
+      "num": 16,
+      "title": "Centralized Structured Logging",
+      "summary": "Add structured JSON logging to the control plane service and worker (currently bare `console.log` or silent), define the shared field schema and redaction rules, and wire a configurable log destination into the runtime config.",
+      "depends_on": [4, 11]
+    },
+    {
+      "num": 17,
+      "title": "Unified Audit Logging",
+      "summary": "Close gaps in the existing audit schema by adding missing event types, binding actor identity to the authenticated principal once #4 lands, and exposing audit records via a service API endpoint.",
+      "depends_on": [4, 6]
+    },
+    {
+      "num": 18,
+      "title": "Simple Monitoring (Prometheus / OpenTelemetry / Tracing / Status Page)",
+      "summary": "Wire control plane metrics into a Prometheus scrape endpoint, deploy a minimal OTel collector, add distributed tracing to the control plane, and publish a status page aggregating health and alert state.",
+      "depends_on": [4, 14, 16]
+    },
+    {
+      "num": 19,
+      "title": "Common Dead-Letter Queue Strategy",
+      "summary": "Add a `worker_attempt_count` guard to the Postgres queue so submissions that repeatedly crash workers before writing a terminal state are capped, surfaced as a `dlq_depth` metric, and alertable.",
+      "depends_on": [4]
+    },
+    {
+      "num": 20,
+      "title": "PR/Preview Deployments",
+      "summary": "Add Jenkins PR open/close triggers that automatically submit and clean up a preview deployment using the existing Cloudflare Pages preview machinery, reporting the preview URL as a PR comment.",
+      "depends_on": [4, 8, 10]
+    },
+    {
+      "num": 21,
+      "title": "Control Plane MCP Surface",
+      "summary": "Promote the existing read-only MCP implementation to production-ready: harden auth under #4's principal model, wire the config toggle, cover all MCP v1 tools with a no-mutation regression test, and document the endpoint for external integrations.",
+      "depends_on": [4, 6]
+    },
+    {
+      "num": 22,
+      "title": "Simple Control Plane Webapp",
+      "summary": "Implement a read-only same-origin web UI on the control plane service: deployment list, queue depth, recent run history, and current stage state, protected by the same session/CSRF/grant model as the API.",
+      "depends_on": [4, 6]
+    },
+    {
+      "num": 23,
+      "title": "Get Bob Set Up with viberoots-Based Monorepo",
+      "summary": "Stand up a working viberoots-based monorepo for Bob: devshell, first successful build, first local deploy, and a short operator runbook covering the recurring development and deployment workflow.",
+      "depends_on": [11, 12]
+    },
+    {
+      "num": 24,
+      "title": "Dry Run Deployment Flow with Bob / Iterate",
+      "summary": "Walk Bob through a full protected/shared deploy against a real target, document every friction point, and iterate on CLI error messages, docs, and tooling until the flow is self-service from the runbook.",
+      "depends_on": [12, 23, 4]
+    },
+    {
+      "num": 25,
+      "title": "Rollout Strategy (Blue/Green vs. Canary vs. Simple Replace)",
+      "summary": "Decide which progressive rollout modes to support beyond `all_at_once` for each provider, define the `rollout_policy` declaration requirements, and implement at least one progressive mode for a provider that supports it.",
+      "depends_on": [8]
+    },
+    {
+      "num": 26,
+      "title": "Artifact Cache / Retention Tools and Policy",
+      "summary": "Implement a batch GC command applying the existing per-run retention eligibility functions across all artifact objects, add `deleteObject` to the store interface, and sweep expired upload sessions whose S3 objects were never admitted.",
+      "depends_on": [4]
+    },
+    {
+      "num": 27,
+      "title": "Simple ADR Process / Conventions",
+      "summary": "Write `docs/adrs/README.md` documenting the numbering convention, required format, four valid statuses, authorship and review expectations, and when to write an ADR vs. just committing code.",
+      "depends_on": []
+    },
+    {
+      "num": 28,
+      "title": "Document Simple SDLC",
+      "summary": "Write `docs/handbook/sdlc.md` covering the full development lifecycle as it actually works: local dev with the nix devshell, Conventional Commits, the Jenkins CI stage pipeline, code review, merge, and the path to production.",
+      "depends_on": [24]
+    },
+    {
+      "num": 29,
+      "title": "Multi-Tenant Isolation Invariants / Design",
+      "summary": "Produce a design document and follow-on ADR addressing open design questions for multi-tenant control plane operation: tenant identity, database isolation, API scoping, artifact namespace, Infisical credential boundaries, audit isolation, web UI scoping, and provisioning model.",
+      "depends_on": [4, 6]
+    },
+    {
+      "num": 30,
+      "title": "Migration/Versioning Conventions for Infra + DB",
+      "summary": "Define and document consistent conventions across migration surfaces: SQL application migrations, the control plane Postgres schema, versioned JSON payloads, and NixOS module option deprecations.",
+      "depends_on": [4, 5]
+    },
+    {
+      "num": 31,
+      "title": "Decide Forking Strategy for unfairly / viberoots",
+      "summary": "Evaluate and decide the repository relationship between viberoots (platform) and unfairly (product) \u2014 single monorepo, separate repos, or GitHub template \u2014 and document the chosen model and its implications for CI, secrets, and deployment identity.",
+      "depends_on": [23, 24]
+    },
+    {
+      "num": 32,
+      "title": "Internal PKI / Service Auth Strategy",
+      "summary": "Decide how services authenticate to each other (cert-manager, Infisical PKI, or SPIFFE/SPIRE), provision PKI certificates via OpenTofu, and update the control plane credential mount contract to support mTLS alongside the existing bearer token.",
+      "depends_on": [4, 5, 7]
+    },
+    {
+      "num": 33,
+      "title": "Secret Rotation Policy & Workflows",
+      "summary": "Define rotation schedules and procedures for all credential classes, then implement the `--rotate-*` tooling and `refreshMode` semantics that make rotation safe for in-flight admitted runs without breaking replay or rollback.",
+      "depends_on": [1, 7]
+    },
+    {
+      "num": 34,
+      "title": "Webhook Signature Verification Framework",
+      "summary": "Extract the existing HMAC/`timingSafeEqual` pattern from artifact binding into a shared webhook verification helper, apply it to GitHub App webhook routes on the control plane, and register the webhook secret via SprinkleRef.",
+      "depends_on": [4]
+    },
+    {
+      "num": 35,
+      "title": "SBOM Generation",
+      "summary": "Generate an SPDX or CycloneDX SBOM from the Nix-built control plane OCI image at CI build time and attach it to the admitted artifact record via the existing `sbomRefs` field in `DeploymentCiAdmissionEvidence`.",
+      "depends_on": [4]
+    },
+    {
+      "num": 36,
+      "title": "Supply-Chain Scanning",
+      "summary": "Add a `supply-chain-scan` CI stage running `govulncheck` on Go, `pnpm audit` on Node, and `grype`/`trivy` on the Nix-built OCI image, emitting evidence conforming to the existing `DeploymentCiAdmissionEvidence` supply-chain gate schema.",
+      "depends_on": [4, 35]
+    },
+    {
+      "num": 37,
+      "title": "Validated Backup/Restore/Disaster Recovery Procedures",
+      "summary": "Write and validate runbooks for Postgres PITR, S3 object replication, and Infisical credential backup against defined resilience targets, with restoration drills that include running a fixture deployment through the restored state.",
+      "depends_on": [4, 5, 30]
+    },
+    {
+      "num": 38,
+      "title": "Test Remote Execution of Builds & Tests",
+      "summary": "Assess whether Buck2 remote execution is worth pursuing at current repo scale, evaluate at least two RE providers against the pinned Buck2 commit, and either configure a trial or produce a documented decision record for deferral.",
+      "depends_on": [4, 5]
+    },
+    {
+      "num": 39,
+      "title": "Ragie Provisioning / Simple Integration",
+      "summary": "Bootstrap the Ragie account, register the API key in Infisical via SprinkleRef, create `projects/libs/platform-ragie/` with the partition-per-tenant client, and validate ACL filter semantics against a live partition.",
+      "depends_on": [4, 13]
+    },
+    {
+      "num": 40,
+      "title": "Explore Enabling Cloud-Run Agents",
+      "summary": "Design the authorization model for AI agents operating over the read-only MCP surface, evaluate at least two agent frameworks, and build a narrow prototype demonstrating end-to-end audit traceability through `control_plane_audit_events`.",
+      "depends_on": [21, 6]
+    },
+    {
+      "num": 41,
+      "title": "Autoscaling Policy & Tools",
+      "summary": "Define the HPA policy for control plane workers (min 2 replicas, scale on `queue_depth` via KEDA or Prometheus Adapter), implement it as OpenTofu resources in the k8s stack, and set `terminationGracePeriodSeconds` conservatively to avoid mid-execution scale-down.",
+      "depends_on": [5, 18]
+    },
+    {
+      "num": 42,
+      "title": "Clean Up / Organize viberoots Docs",
+      "summary": "Archive stale content (`build-history/`, `design-history/`, completed migration runbooks), add a `docs/README.md` navigation index, update the top-level `README.md` with a project overview, and remove the committed `.DS_Store`.",
+      "depends_on": []
+    },
+    {
+      "num": 43,
+      "title": "Make viberoots Public",
+      "summary": "Complete the pre-flight checklist before setting the repo to public: entropy-based history audit, `LICENSE` file, responsible disclosure policy, resolve `kiltyj` namespace references in auth config, CC BY-SA 4.0 attribution for `METHODOLOGY.XML`, and harden fork-PR CI secret exposure.",
+      "depends_on": [27, 28, 32, 33, 35, 36, 37, 42]
+    },
+    {
+      "num": 44,
+      "title": "Changelog Generation",
+      "summary": "Configure `git-cliff` with a `cliff.toml`, define the release tagging convention, add a CI stage that generates the changelog on tagged commits, and optionally surface `changelogRef` in `DeploymentCiAdmissionEvidence`.",
+      "depends_on": [28, 43]
+    }
+  ]
+}

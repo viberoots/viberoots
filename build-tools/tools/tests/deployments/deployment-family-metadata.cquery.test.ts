@@ -10,54 +10,55 @@ import {
 } from "../../deployments/contract";
 import { DEPLOYMENT_CQUERY_ATTRS } from "../../deployments/deployment-query-attrs";
 import { inheritedBuckIsolation, runInTemp } from "../lib/test-helpers";
+import {
+  CUTOVER_APP,
+  CUTOVER_DEV,
+  CUTOVER_FAMILY,
+  CUTOVER_PROD,
+  CUTOVER_QUERY_LABELS,
+  CUTOVER_STAGING,
+  writeCutoverDeploymentFixture,
+} from "./infisical-cutover.fixture";
 
-test("Pleomino family metadata is exported for staged deployments", async () => {
-  const labels = [
-    "//projects/deployments/pleomino/staging:deploy",
-    "//projects/deployments/pleomino/prod:deploy",
-    "//projects/deployments/pleomino/dev:deploy",
-    "//projects/apps/pleomino:app",
-    "//projects/deployments/pleomino/shared:lane",
-    "//projects/deployments:defaults",
-    "//projects/deployments/pleomino/shared:lane_governance",
-    "//projects/deployments/pleomino/shared:dev_release",
-    "//projects/deployments/pleomino/shared:staging_release",
-    "//projects/deployments/pleomino/shared:prod_release",
-  ];
-  const attrFlags = DEPLOYMENT_CQUERY_ATTRS.flatMap((attr) => ["--output-attribute", attr]);
-  const result = await $({
-    stdio: "pipe",
-    env: {
-      ...process.env,
-      HOME: process.env.BUCK2_REAL_HOME || process.env.HOME,
-      SSL_CERT_FILE: process.env.SSL_CERT_FILE || process.env.NIX_SSL_CERT_FILE,
-    },
-  })`buck2 --isolation-dir ${inheritedBuckIsolation("deployment-family-metadata")} cquery --target-platforms prelude//platforms:default ${`set(${labels.join(" ")})`} --json ${attrFlags}`.quiet();
-  const nodes = nodesFromCqueryJson(JSON.parse(String(result.stdout || "{}")));
-  const cloudflare = extractCloudflarePagesDeployments(nodes);
-  const nixos = extractNixosSharedHostDeployments(nodes);
-  assert.deepEqual(cloudflare.errors, []);
-  assert.deepEqual(nixos.errors, []);
-  assert.deepEqual(
-    cloudflare.deployments.map((deployment) => [
-      deployment.label,
-      deployment.deploymentId,
-      deployment.deploymentFamily,
-      deployment.environmentStage,
-    ]),
-    [
-      ["//projects/deployments/pleomino/prod:deploy", "pleomino-prod", "pleomino", "prod"],
-      ["//projects/deployments/pleomino/staging:deploy", "pleomino-staging", "pleomino", "staging"],
-    ],
-  );
-  assert.deepEqual(
-    nixos.deployments.map((deployment) => [
-      deployment.label,
-      deployment.deploymentId,
-      deployment.environmentStage,
-    ]),
-    [["//projects/deployments/pleomino/dev:deploy", "pleomino-dev", "dev"]],
-  );
+test("fixture family metadata is exported for staged deployments", async () => {
+  await runInTemp("deployment-family-metadata", async (tmp, _$) => {
+    await writeCutoverDeploymentFixture(tmp);
+    const attrFlags = DEPLOYMENT_CQUERY_ATTRS.flatMap((attr) => ["--output-attribute", attr]);
+    const result = await _$({
+      cwd: tmp,
+      stdio: "pipe",
+      env: buckEnv(),
+    })`buck2 --isolation-dir ${inheritedBuckIsolation("deployment-family-metadata")} cquery --target-platforms prelude//platforms:default ${`set(${CUTOVER_QUERY_LABELS.join(" ")})`} --json ${attrFlags}`.quiet();
+    const nodes = nodesFromCqueryJson(JSON.parse(String(result.stdout || "{}")));
+    const cloudflare = extractCloudflarePagesDeployments(nodes);
+    const nixos = extractNixosSharedHostDeployments(nodes);
+    assert.deepEqual(cloudflare.errors, []);
+    assert.deepEqual(nixos.errors, []);
+    assert.deepEqual(
+      cloudflare.deployments.map((deployment) => [
+        deployment.label,
+        deployment.deploymentId,
+        deployment.deploymentFamily,
+        deployment.environmentStage,
+      ]),
+      [
+        [CUTOVER_PROD, `${CUTOVER_FAMILY}-prod`, CUTOVER_FAMILY, "prod"],
+        [CUTOVER_STAGING, `${CUTOVER_FAMILY}-staging`, CUTOVER_FAMILY, "staging"],
+      ],
+    );
+    assert.deepEqual(
+      nixos.deployments.map((deployment) => [
+        deployment.label,
+        deployment.deploymentId,
+        deployment.environmentStage,
+      ]),
+      [[CUTOVER_DEV, `${CUTOVER_FAMILY}-dev`, "dev"]],
+    );
+    assert.equal(
+      nodes.some((node) => node.name === CUTOVER_APP),
+      true,
+    );
+  });
 });
 
 test("deployment family is inferred only from canonical family directories", async () => {

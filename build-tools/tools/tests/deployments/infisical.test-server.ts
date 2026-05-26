@@ -1,5 +1,6 @@
 #!/usr/bin/env zx-wrapper
 import http from "node:http";
+import { json, readBody, sameSecret, validateSecretWriteBody } from "./infisical.test-server-http";
 
 export type FakeInfisicalAuthLogin = {
   clientId: string;
@@ -31,21 +32,6 @@ export type FakeInfisicalSecret = {
   errorBody?: Record<string, unknown>;
 };
 
-function sameSecret(
-  entry: FakeInfisicalSecret,
-  params: URLSearchParams,
-  secretName: string,
-  version = "",
-) {
-  return (
-    entry.projectId === params.get("projectId") &&
-    entry.environment === params.get("environment") &&
-    entry.secretPath === params.get("secretPath") &&
-    entry.secretName === secretName &&
-    (!version || entry.version === version)
-  );
-}
-
 export type FakeInfisicalServerOptions = {
   projectId?: string;
   environment?: string;
@@ -57,18 +43,6 @@ export type FakeInfisicalServerOptions = {
   machineIdentityAccess?: boolean;
   machineIdentityAccessStatus?: number;
 };
-
-async function readBody(request: http.IncomingMessage): Promise<Record<string, unknown>> {
-  const chunks: Buffer[] = [];
-  for await (const chunk of request) chunks.push(Buffer.from(chunk));
-  const text = Buffer.concat(chunks).toString("utf8");
-  return text ? (JSON.parse(text) as Record<string, unknown>) : {};
-}
-
-function json(response: http.ServerResponse, status: number, body: unknown) {
-  response.writeHead(status, { "Content-Type": "application/json" });
-  response.end(JSON.stringify(body));
-}
 
 function handleUniversalAuthLoginBody(
   response: http.ServerResponse,
@@ -194,6 +168,8 @@ export async function startFakeInfisicalServer(
       );
       if (request.method === "POST" || request.method === "PATCH") {
         const body = await readBody(request);
+        const invalidWriteBody = validateSecretWriteBody(body, url.searchParams);
+        if (invalidWriteBody) return json(response, 422, invalidWriteBody);
         if (!found) {
           secrets.push({
             projectId: url.searchParams.get("projectId") || "",

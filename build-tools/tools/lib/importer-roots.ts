@@ -13,7 +13,15 @@ type RawImporterRootsContract = Partial<{
 
 const DEFAULT_WORKSPACE_ROOTS = ["projects/apps", "projects/libs"];
 
-const CONTRACT_JSON_PATH = fileURLToPath(new URL("./importer-roots.json", import.meta.url));
+function importerRootsContractJsonPath(): string {
+  try {
+    return fileURLToPath(new URL("./importer-roots.json", import.meta.url));
+  } catch {
+    return "";
+  }
+}
+
+const CONTRACT_JSON_PATH = importerRootsContractJsonPath();
 
 let cached: ImporterRootsContract | null = null;
 
@@ -38,13 +46,20 @@ export function getImporterRootsContract(): ImporterRootsContract {
   if (cached) return cached;
 
   let rawTxt = "";
-  try {
-    rawTxt = fs.readFileSync(CONTRACT_JSON_PATH, "utf8");
-  } catch (e) {
-    throw new Error(
-      `importer-roots contract missing/unreadable at ${CONTRACT_JSON_PATH}. ` +
-        `Expected build-tools/tools/lib/importer-roots.json to exist. Original error: ${String(e)}`,
-    );
+  if (CONTRACT_JSON_PATH) {
+    try {
+      rawTxt = fs.readFileSync(CONTRACT_JSON_PATH, "utf8");
+    } catch (e) {
+      throw new Error(
+        `importer-roots contract missing/unreadable at ${CONTRACT_JSON_PATH}. ` +
+          `Expected build-tools/tools/lib/importer-roots.json to exist. Original error: ${String(e)}`,
+      );
+    }
+  } else {
+    rawTxt = JSON.stringify({
+      allowDotImporter: true,
+      workspaceRoots: DEFAULT_WORKSPACE_ROOTS,
+    });
   }
 
   let parsed: RawImporterRootsContract = {};

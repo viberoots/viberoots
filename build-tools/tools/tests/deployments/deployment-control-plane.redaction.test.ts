@@ -149,6 +149,65 @@ test("record helpers still redact concrete token values in Cloudflare diagnostic
   assert.match(String(cloudflareRecord.errorFingerprint), /^sha256:/);
 });
 
+test("record helpers preserve sanitized Wrangler Cloudflare API diagnostics", () => {
+  const cloudflareRecord = createCloudflarePagesDeployRecord(cloudflarePagesDeploymentFixture(), {
+    deployRunId: "deploy-wrangler-safe",
+    finalOutcome: "publish_failed",
+    failedStep: "publish",
+    admittedContext: {
+      lanePolicyRef: "//build-tools/deployments/lanes:staging",
+      lanePolicyFingerprint: "sha256:lane",
+      admissionPolicyRef: "//build-tools/deployments/policies:staging",
+      admissionPolicyFingerprint: "sha256:policy",
+      environmentStage: "staging",
+      source: { mode: "reviewed_source_ref", sourceRef: "main", sourceRevision: "abc123" },
+      targetEnvironment: {
+        mode: "reviewed_source_snapshot",
+        targetRef: "main",
+        targetRevision: "abc123",
+        providerTargetIdentity: "target-cf",
+        lockScope: "target-cf",
+      },
+    },
+    error:
+      "wrangler pages deploy failed: Cloudflare API /accounts/(account)/pages/projects/pleomino-staging-pages/deployments: Authentication error (status: 403) [code: 10000]",
+  });
+
+  assert.match(String(cloudflareRecord.error), /wrangler pages deploy failed/);
+  assert.match(String(cloudflareRecord.error), /\/accounts\/\(account\)\//);
+  assert.equal(cloudflareRecord.errorFingerprint, undefined);
+});
+
+test("record helpers sanitize noisy Wrangler diagnostics before display", () => {
+  const cloudflareRecord = createCloudflarePagesDeployRecord(cloudflarePagesDeploymentFixture(), {
+    deployRunId: "deploy-wrangler-noisy",
+    finalOutcome: "publish_failed",
+    failedStep: "publish",
+    admittedContext: {
+      lanePolicyRef: "//build-tools/deployments/lanes:staging",
+      lanePolicyFingerprint: "sha256:lane",
+      admissionPolicyRef: "//build-tools/deployments/policies:staging",
+      admissionPolicyFingerprint: "sha256:policy",
+      environmentStage: "staging",
+      source: { mode: "reviewed_source_ref", sourceRef: "main", sourceRevision: "abc123" },
+      targetEnvironment: {
+        mode: "reviewed_source_snapshot",
+        targetRef: "main",
+        targetRevision: "abc123",
+        providerTargetIdentity: "target-cf",
+        lockScope: "target-cf",
+      },
+    },
+    error:
+      "wrangler pages deploy failed: Cloudflare API /accounts/1b911846f80a89272c0dbaf44f5c810f/pages/projects/pleomino-staging-pages: token does not have Pages write permission!",
+  });
+
+  assert.match(String(cloudflareRecord.error), /\/accounts\/\(account\)\//);
+  assert.match(String(cloudflareRecord.error), /token does not have Pages write permission/);
+  assert.ok(!String(cloudflareRecord.error).includes("1b911846f80a89272c0dbaf44f5c810f"));
+  assert.equal(cloudflareRecord.errorFingerprint, undefined);
+});
+
 test("observability views keep referenced artifacts secret-safe by exposing reference-only payloads", async () => {
   await runInTemp("deployment-control-plane-redaction", async (tmp) => {
     const recordsRoot = path.join(tmp, "records");

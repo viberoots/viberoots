@@ -134,7 +134,7 @@ async function hasFreshVerifiedMarker(lockfileRel: string): Promise<boolean> {
   if (!marker) return false;
   const lockHash = await sha256File(path.join(repoRoot, lockfileRel));
   if (!lockHash) return false;
-  const builderFingerprint = await currentVerifiedMarkerFingerprint(repoRoot);
+  const builderFingerprint = await currentVerifiedMarkerFingerprint(repoRoot, importer);
   return (
     marker.importer === importer &&
     marker.lockfile === lockfileRel &&
@@ -163,11 +163,7 @@ async function ensurePnpmStoreHash(lockfileRel: string): Promise<void> {
     );
     process.exit(2);
   }
-  const hashFile = path.join(flakeRoot, "build-tools", "tools", "nix", "node-modules.hashes.json");
-  try {
-    await fsp.access(hashFile);
-    await $({ cwd: flakeRoot })`git add ${hashFile}`.nothrow();
-  } catch {}
+  await stageNodeModulesHashesJson();
 }
 
 async function runPnpmHashUpdater(lockfileRel: string, force = false) {
@@ -185,6 +181,15 @@ async function forceRefreshPnpmStoreHash(lockfileRel: string): Promise<void> {
     if (update.stderr) console.error(String(update.stderr).trim());
     process.exit(2);
   }
+  await stageNodeModulesHashesJson();
+}
+
+async function stageNodeModulesHashesJson(): Promise<void> {
+  const hashFile = path.join(flakeRoot, "build-tools", "tools", "nix", "node-modules.hashes.json");
+  try {
+    await fsp.access(hashFile);
+    await $({ cwd: flakeRoot })`git add ${hashFile}`.nothrow();
+  } catch {}
 }
 // Fast path: if output is already realized in the store, prefer path-info
 let outPath = "";

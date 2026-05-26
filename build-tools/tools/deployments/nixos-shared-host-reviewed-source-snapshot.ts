@@ -1,23 +1,22 @@
 #!/usr/bin/env zx-wrapper
-import * as fsp from "node:fs/promises";
-import os from "node:os";
-import path from "node:path";
-import { shSingleQuote } from "../lib/shell-quote";
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
 import type { DeploymentTarget } from "./contract";
 import { DeploymentAdmissionError } from "./deployment-control-plane-errors";
 import { deploymentGitStdout } from "./deployment-git-stdout";
 import { requestedDeploymentReviewedSourceRef } from "./deployment-reviewed-source-ref";
 import { explicitReviewedCommitSha } from "./deployment-source-ref-policy";
 import { explicitReviewedCommitSnapshot } from "./deployment-reviewed-source-snapshot-explicit";
+import {
+  ensureReviewedSourceGitRepo,
+  gitFetchEnvForReviewedRemote,
+  resolveReviewedRemoteName,
+  reviewedFetchTargetFor,
+  trim,
+} from "./nixos-shared-host-reviewed-source-git";
 
-const GITHUB_KNOWN_HOSTS = [
-  "github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl",
-  "github.com ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBEmKSENjQEezOmxkZMy7opKgwFB9nkt5YRrYMjNuG5N87uRgg6CLrbo5wAdT/y6v0mKV0U2w0WZ2YB/++Tpockg=",
-  "github.com ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQCj7ndNxQowgcQnjshcLrqPEiiphnt+VTTvDP6mHBL9j1aNUkY4Ue1gvwnGLVlOhGeYrnZaMgRK6+PKCUXaDbC7qtbW8gIkhL7aGCsOr/C56SJMy/BCZfxd1nWzAOxSDPgVsmerOBYfNqltV9/hWCqBywINIR+5dIg6JTJ72pcEpEjcYgXkE2YEFXV1JHnsKgbLWNlhScqb2UmyRkQyytRLtL+38TGxkxCflmO+5Z8CSSNY7GidjMIZ7Q4zMjA2n1nGrlTDkzwDCsw+wqFPGQA179cnfGWOWRVruj16z6XyvxvjJwbz0wQZ75XK5tKSb7FNyeIEs4TT4jk+S4dhPeAUC5y+bDYirYgM4GC7uEnztnZyaVWQ7B381AK4Qdrwt51ZqExKbQpTUNn+EjqoTwvqNj4kqx5QUCI0ThS/YkOxJCXmPUWZbhjpCg56i+2aB6CmK2JGhn57K5mj0MNdBXA4/WnwH6XoPWJzK5Nyu2zB3nAZp+S5hpQs+p1vN1/wsjk=",
-].join("\n");
-
-const REVIEWED_SOURCE_SSH_KEY_FILE_ENV = "VBR_DEPLOY_REVIEWED_SOURCE_SSH_KEY_FILE";
-const REVIEWED_SOURCE_SSH_KNOWN_HOSTS_FILE_ENV = "VBR_DEPLOY_REVIEWED_SOURCE_SSH_KNOWN_HOSTS_FILE";
+const execFileAsync = promisify(execFile);
+export { gitFetchEnvForReviewedRemote } from "./nixos-shared-host-reviewed-source-git";
 
 export type DeploymentReviewedSourceSnapshot = {
   reviewedRef: string;
@@ -41,122 +40,8 @@ type ReviewedSourceCarrier =
       };
     };
 
-function trim(value: unknown): string {
-  return typeof value === "string" ? value.trim() : "";
-}
-
-function repositorySlug(remoteUrl: string): string {
-  return trim(remoteUrl)
-    .replace(/\.git$/i, "")
-    .replace(/^https?:\/\/[^/]+\//i, "")
-    .replace(/^ssh:\/\/[^@]+@[^/]+\//i, "")
-    .replace(/^[^@]+@[^:]+:/, "");
-}
-
-function githubSshRemoteForRepository(repository: string): string {
-  if (!/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(repository)) {
-    throw new Error(`github governance repository must be owner/repo: ${repository}`);
-  }
-  return `git@github.com:${repository}.git`;
-}
-
-function reviewedFetchTargetFor(deployment: DeploymentTarget, remoteName: string): string {
-  const scmBackend = trim(deployment.lanePolicy.governance.scmBackend).toLowerCase();
-  const repository = trim(deployment.lanePolicy.governance.repository);
-  if (scmBackend === "github" && repository) return githubSshRemoteForRepository(repository);
-  return remoteName;
-}
-
-async function resolveReviewedRemoteName(
-  workspaceRoot: string,
-  deployment: DeploymentTarget,
-): Promise<string> {
-  const remotes = (
-    await deploymentGitStdout(workspaceRoot, ["remote"])
-      .then((value) =>
-        value
-          .split("\n")
-          .map((entry) => entry.trim())
-          .filter(Boolean),
-      )
-      .catch(() => [])
-  ).filter(Boolean);
-  if (remotes.length === 0) {
-    throw new Error(
-      `control-plane repo is missing a git remote for reviewed source ${requestedDeploymentReviewedSourceRef({ deployment }).ref}`,
-    );
-  }
-  const expectedRepository = trim(deployment.lanePolicy.governance.repository);
-  if (expectedRepository) {
-    for (const remoteName of remotes) {
-      const remoteUrl = await deploymentGitStdout(workspaceRoot, [
-        "remote",
-        "get-url",
-        remoteName,
-      ]).catch(() => "");
-      if (repositorySlug(remoteUrl) === expectedRepository) {
-        return remoteName;
-      }
-    }
-  }
-  if (remotes.includes("origin")) return "origin";
-  if (remotes.includes("github")) return "github";
-  if (remotes.length === 1) return remotes[0] || "";
-  throw new Error(
-    `could not resolve a reviewed git remote for ${expectedRepository || "<unknown repository>"}; available remotes: ${remotes.join(", ")}`,
-  );
-}
-
 function snapshotRefFor(submissionId: string, reviewedRef: string): string {
   return `refs/vbr/reviewed-source/${submissionId}/${reviewedRef}`;
-}
-
-function isGithubSshRemote(remoteUrl: string): boolean {
-  return (
-    /^git@github\.com:/i.test(remoteUrl) ||
-    /^ssh:\/\/(?:[^@]+@)?github\.com(?::\d+)?\//i.test(remoteUrl)
-  );
-}
-
-function isRemoteUrl(value: string): boolean {
-  return /^(?:https?|ssh):\/\//i.test(value) || /^[^@]+@[^:]+:/i.test(value);
-}
-
-export async function gitFetchEnvForReviewedRemote(
-  workspaceRoot: string,
-  fetchTarget: string,
-): Promise<{ env?: NodeJS.ProcessEnv; cleanup: () => Promise<void> }> {
-  if (String(process.env.GIT_SSH_COMMAND || "").trim()) {
-    return { cleanup: async () => {} };
-  }
-  const remoteUrl = isRemoteUrl(fetchTarget)
-    ? fetchTarget
-    : await deploymentGitStdout(workspaceRoot, ["remote", "get-url", fetchTarget]).catch(() => "");
-  if (!isGithubSshRemote(remoteUrl)) return { cleanup: async () => {} };
-  const configuredKnownHostsFile = trim(process.env[REVIEWED_SOURCE_SSH_KNOWN_HOSTS_FILE_ENV]);
-  const tmpDir = configuredKnownHostsFile
-    ? ""
-    : await fsp.mkdtemp(path.join(os.tmpdir(), "vbr-github-known-hosts-"));
-  const knownHostsFile = configuredKnownHostsFile || path.join(tmpDir, "known_hosts");
-  if (!configuredKnownHostsFile) {
-    await fsp.writeFile(knownHostsFile, `${GITHUB_KNOWN_HOSTS}\n`, "utf8");
-  }
-  const sshKeyFile = trim(process.env[REVIEWED_SOURCE_SSH_KEY_FILE_ENV]);
-  return {
-    env: {
-      ...process.env,
-      GIT_SSH_COMMAND: [
-        "ssh",
-        "-o BatchMode=yes",
-        ...(sshKeyFile ? [`-i ${shSingleQuote(sshKeyFile)}`, "-o IdentitiesOnly=yes"] : []),
-        "-o StrictHostKeyChecking=yes",
-        `-o UserKnownHostsFile=${shSingleQuote(knownHostsFile)}`,
-      ].join(" "),
-    },
-    cleanup: async () => {
-      if (tmpDir) await fsp.rm(tmpDir, { recursive: true, force: true });
-    },
-  };
 }
 
 export async function snapshotReviewedSourceForSubmission(opts: {
@@ -181,6 +66,7 @@ export async function snapshotReviewedSourceForSubmission(opts: {
         : {}),
     });
   }
+  await ensureReviewedSourceGitRepo(opts.workspaceRoot, opts.deployment);
   const remoteName = await resolveReviewedRemoteName(opts.workspaceRoot, opts.deployment);
   const snapshotRef = snapshotRefFor(opts.submissionId, reviewedRef);
   const fetchTarget = reviewedFetchTargetFor(opts.deployment, remoteName);
@@ -198,9 +84,12 @@ export async function snapshotReviewedSourceForSubmission(opts: {
     "rev-parse",
     `${snapshotRef}^{commit}`,
   ]);
+  await execFileAsync("git", ["checkout", "--quiet", "--detach", sourceRevision], {
+    cwd: opts.workspaceRoot,
+  });
   const expectedSourceRevision = trim(opts.expectedSourceRevision);
   if (expectedSourceRevision && expectedSourceRevision !== sourceRevision) {
-    await $({ cwd: opts.workspaceRoot, stdio: "pipe" })`git update-ref -d ${snapshotRef}`.nothrow();
+    await deleteGitRef(opts.workspaceRoot, snapshotRef);
     throw new DeploymentAdmissionError(
       "no_longer_admitted",
       [
@@ -245,5 +134,11 @@ export async function cleanupReviewedSourceSnapshot(
   const snapshot = reviewedSourceSnapshotFrom(value);
   const snapshotRef = trim(snapshot?.snapshotRef);
   if (!snapshotRef) return;
-  await $({ cwd: workspaceRoot, stdio: "pipe" })`git update-ref -d ${snapshotRef}`.nothrow();
+  await deleteGitRef(workspaceRoot, snapshotRef);
+}
+
+async function deleteGitRef(workspaceRoot: string, ref: string): Promise<void> {
+  try {
+    await execFileAsync("git", ["update-ref", "-d", ref], { cwd: workspaceRoot });
+  } catch {}
 }

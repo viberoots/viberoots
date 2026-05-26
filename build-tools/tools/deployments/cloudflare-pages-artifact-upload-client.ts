@@ -1,7 +1,11 @@
 #!/usr/bin/env zx-wrapper
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
 import { createStaticWebappArtifactBundleBytes } from "./static-webapp-artifact-bundle";
 import type { CloudflarePagesArtifactInput } from "./cloudflare-pages-artifact-input";
 import type { CloudflarePagesDeployment } from "./contract";
+
+const execFileAsync = promisify(execFile);
 
 type UploadResponse = {
   uploadSessionId: string;
@@ -30,11 +34,12 @@ async function readUploadResponse(response: Response): Promise<UploadResponse> {
 }
 
 async function gitStdout(workspaceRoot: string, args: string[]): Promise<string> {
-  const out = await $({ cwd: workspaceRoot, stdio: "pipe" })`git ${args}`.nothrow();
-  if ((out as any).exitCode !== 0) {
+  try {
+    const { stdout } = await execFileAsync("git", args, { cwd: workspaceRoot });
+    return String(stdout || "").trim();
+  } catch {
     throw new Error(`git ${args.join(" ")} failed in ${workspaceRoot}`);
   }
-  return String((out as any).stdout || "").trim();
 }
 
 async function sourceState(workspaceRoot: string) {

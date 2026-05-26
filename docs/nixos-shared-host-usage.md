@@ -326,6 +326,11 @@ service, and must keep reviewed known-hosts or host-key pinning for SSH
 staging. If the hosted token is missing or rejected, the service fails the
 challenge or submit request closed and still cleans staged artifacts or records
 bounded janitor metadata itself.
+Current client profiles fail before submit when their configured token env var
+is unset. If a local run reports `unauthorized` without a more specific
+submitter or admission-reporter message, verify that
+`VBR_DEPLOY_CONTROL_PLANE_TOKEN` is set and reinstall any stale `mini` profile
+that still points at an old control-plane token environment variable name.
 
 Do not pass `--control-plane-url`, `--apply-host`, or `--apply-host-dry-run`
 to those wrappers. They read that information from the installed profile.
@@ -434,14 +439,19 @@ deployments. The required order is:
    fingerprint
 4. run `deploy admin identity sync --profile mini --apply-host` so the current
    `viberoots` service identity owns the reviewed submit and worker boundary
-5. only then add server-local Infisical Universal Auth env names referenced by
-   `infisical_runtime`, such as `VBR_MINI_INFISICAL_CLIENT_ID` and
-   `VBR_MINI_INFISICAL_CLIENT_SECRET`, to the worker's host-local environment
+5. for the containerized control plane, provision deployment-scoped Infisical
+   Universal Auth credential files and wire them through
+   `services.viberoots.deploymentControlPlaneContainer.credentials`; do not set
+   host-local `VBR_MINI_INFISICAL_CLIENT_ID` or
+   `VBR_MINI_INFISICAL_CLIENT_SECRET` for the containerized service or workers
 
-The execution snapshot stores only non-secret Infisical routing metadata and
-the reviewed env variable names. The Universal Auth client secret remains a
-server-local worker input and must not be copied into the client profile,
-deployment metadata, records, or checked-in host config.
+The execution snapshot stores only non-secret Infisical routing metadata,
+reviewed env names, and reviewed credential-file names. The Universal Auth
+client secret remains a server-local worker input mounted from the credential
+directory and must not be copied into the client profile, deployment metadata,
+records, or checked-in host config. Legacy non-container workers may still
+consume the reviewed env names from server-local environment, but that is not
+the steady-state `mini` path.
 
 To discover the reviewed check names for a target before you submit, run
 `direnv exec . build-tools/tools/bin/deploy --deployment <label> --validate-only`

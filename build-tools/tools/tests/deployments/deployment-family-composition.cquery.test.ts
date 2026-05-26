@@ -7,6 +7,16 @@ import { parseJsoncObject } from "../../deployments/cloudflare-pages-config";
 import { validateOpenTofuStackConfigFacts } from "../../deployments/opentofu-stack";
 import { runInTemp } from "../lib/test-helpers";
 import {
+  CUTOVER_APP,
+  CUTOVER_DEV,
+  CUTOVER_FAMILY,
+  CUTOVER_PROD,
+  CUTOVER_QUERY_LABELS,
+  CUTOVER_SHARED,
+  CUTOVER_STAGING,
+  writeCutoverDeploymentFixture,
+} from "./infisical-cutover.fixture";
+import {
   ensureParentDir,
   runDeploymentCquery,
   writeSharedLaneTargets,
@@ -19,8 +29,8 @@ function nodeByName(nodes: any[], name: string): any {
   return found;
 }
 
-async function assertWranglerStaysBelowBuckMetadata(packagePath: string, node: any) {
-  const configPath = path.join(process.cwd(), packagePath, String(node.publisher_config));
+async function assertWranglerStaysBelowBuckMetadata(root: string, packagePath: string, node: any) {
+  const configPath = path.join(root, packagePath, String(node.publisher_config));
   const parsed = parseJsoncObject(await fsp.readFile(configPath, "utf8"), configPath);
   assert.equal(parsed.name, undefined);
   assert.equal(parsed.account_id, undefined);
@@ -50,35 +60,42 @@ async function expectBuckFailure(tmp: string, $: any, pattern: RegExp): Promise<
   assert.match(`${String(result.stdout || "")}\n${String(result.stderr || "")}`, pattern);
 }
 
-test("concrete Pleomino deployment family composes defaults into explicit stage targets", async () => {
-  const nodes = await runDeploymentCquery(process.cwd(), $, "deployment-family-real-cquery", [
-    "//projects/deployments/pleomino/staging:deploy",
-    "//projects/deployments/pleomino/dev:deploy",
-    "//projects/deployments/pleomino/prod:deploy",
-    "//projects/apps/pleomino:app",
-    "//projects/deployments/pleomino/shared:lane",
-    "//projects/deployments/pleomino/shared:dev_release",
-    "//projects/deployments/pleomino/shared:staging_release",
-    "//projects/deployments/pleomino/shared:prod_release",
-  ]);
-  const dev = nodeByName(nodes, "//projects/deployments/pleomino/dev:deploy");
-  const staging = nodeByName(nodes, "//projects/deployments/pleomino/staging:deploy");
-  const prod = nodeByName(nodes, "//projects/deployments/pleomino/prod:deploy");
-  assert.equal(dev.provider_target.app_name, "pleomino");
-  assert.equal(dev.provider_target.target_group, "default");
-  assert.equal(
-    dev.provider_target.deployment_target_identity,
-    "nixos-shared-host:default:pleomino",
-  );
-  assert.match(String(staging.component), /\/\/projects\/apps\/pleomino:app/);
-  assert.match(String(staging.lane_policy), /\/\/projects\/deployments\/pleomino\/shared:lane/);
-  assert.equal(staging.provider_target.project, "pleomino-staging-pages");
-  assert.deepEqual(staging.ingress_hostnames, ["staging.pleomino.com"]);
-  assert.equal(prod.provider_target.project, "pleomino-prod-pages");
-  assert.equal(prod.protection_class, "production_facing");
-  await assertWranglerStaysBelowBuckMetadata("projects/deployments/pleomino/staging", staging);
-  await assertWranglerStaysBelowBuckMetadata("projects/deployments/pleomino/prod", prod);
+test("deployment family fixture composes defaults into explicit stage targets", async () => {
+  await runInTemp("deployment-family-fixture-cquery", async (tmp, _$) => {
+    await writeCutoverDeploymentFixture(tmp);
+    const nodes = await runDeploymentCquery(
+      tmp,
+      _$,
+      "deployment-family-fixture-cquery",
+      CUTOVER_QUERY_LABELS,
+    );
+    const dev = nodeByName(nodes, CUTOVER_DEV);
+    const staging = nodeByName(nodes, CUTOVER_STAGING);
+    const prod = nodeByName(nodes, CUTOVER_PROD);
+    assert.equal(dev.app_name, CUTOVER_FAMILY);
+    assert.equal(dev.target_group, "");
+    assert.match(String(staging.component), new RegExp(escapeRegExp(CUTOVER_APP)));
+    assert.match(String(staging.lane_policy), new RegExp(escapeRegExp(`${CUTOVER_SHARED}:lane`)));
+    assert.equal(staging.provider_target.project, `${CUTOVER_FAMILY}-staging-pages`);
+    assert.equal(staging.provider_target.custom_domain, `staging.${CUTOVER_FAMILY}.example.test`);
+    assert.equal(prod.provider_target.project, `${CUTOVER_FAMILY}-prod-pages`);
+    assert.equal(prod.protection_class, "production_facing");
+    await assertWranglerStaysBelowBuckMetadata(
+      tmp,
+      `projects/deployments/${CUTOVER_FAMILY}/staging`,
+      staging,
+    );
+    await assertWranglerStaysBelowBuckMetadata(
+      tmp,
+      `projects/deployments/${CUTOVER_FAMILY}/prod`,
+      prod,
+    );
+  });
 });
+
+function escapeRegExp(text: string): string {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
 
 test("OpenTofu stack config fact validation rejects provider-native drift", () => {
   assert.throws(

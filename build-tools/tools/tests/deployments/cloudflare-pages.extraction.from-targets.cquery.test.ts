@@ -1,11 +1,22 @@
 #!/usr/bin/env zx-wrapper
 import assert from "node:assert/strict";
-import * as fsp from "node:fs/promises";
-import path from "node:path";
 import { test } from "node:test";
 import { nodesFromCqueryJson } from "../../buck/exporter/cquery/nodes";
 import { extractCloudflarePagesDeployments } from "../../deployments/contract";
 import { inheritedBuckIsolation, runInTemp } from "../lib/test-helpers";
+import {
+  CLOUDFLARE_EXTRACTION_QUERY,
+  writeCloudflarePagesExtractionFixture,
+} from "./cloudflare-pages.extraction.fixture";
+import {
+  CUTOVER_APP,
+  CUTOVER_FAMILY,
+  CUTOVER_PROD,
+  CUTOVER_SHARED,
+  CUTOVER_STAGING,
+  CUTOVER_TOKEN_CONTRACT,
+  writeCutoverDeploymentFixture,
+} from "./infisical-cutover.fixture";
 
 const ATTRS =
   "name,rule_type,buck.type,provider,component,component_kind,publisher,publisher_config,protection_class,lane_policy,environment_stage,admission_policy,provider_target,vault_runtime,preview,prerequisites,secret_requirements,runtime_config_requirements,release_actions,target_exceptions,governance_policy,defaults,default_client_profile,scm_backend,repository,source_ref_policies,trusted_reporter_identities,required_approval_boundaries,stages,source_ref_policy,allowed_promotion_edges,artifact_reuse_mode,promotion_compatibility,allowed_refs,required_checks,required_approvals,retry_branch_policy,retry_approval_reuse,artifact_attestation_mode,labels".split(
@@ -22,10 +33,9 @@ function assertCloudflareApiTokenSteps(
     }>;
   },
   expectedSteps = ["preview_cleanup", "publish"],
+  expectedContractId = "secret://deployments/pleomino/cloudflare_api_token",
 ) {
-  const expected = expectedSteps
-    .map((step) => [step, "secret://deployments/pleomino/cloudflare_api_token", true])
-    .sort();
+  const expected = expectedSteps.map((step) => [step, expectedContractId, true]).sort();
   assert.deepEqual(
     deployment.secretRequirements
       .filter((requirement) => requirement.name === "cloudflare_api_token")
@@ -37,127 +47,9 @@ function assertCloudflareApiTokenSteps(
 
 test("cloudflare-pages deployment extraction reads canonical metadata from TARGETS via cquery", async () => {
   await runInTemp("cloudflare-pages-cquery-extraction", async (tmp, _$) => {
-    const appTargetsPath = path.join(tmp, "projects/apps/pleomino/TARGETS");
-    const deployTargetsPath = path.join(tmp, "projects/deployments/pleomino/staging/TARGETS");
-    const sharedTargetsPath = path.join(tmp, "projects/deployments/pleomino/shared/TARGETS");
-    await fsp.mkdir(path.dirname(appTargetsPath), { recursive: true });
-    await fsp.mkdir(path.dirname(deployTargetsPath), { recursive: true });
-    await fsp.mkdir(path.dirname(sharedTargetsPath), { recursive: true });
-    await fsp.writeFile(
-      appTargetsPath,
-      [
-        'load("@prelude//:rules.bzl", "genrule")',
-        "",
-        "genrule(",
-        '    name = "app",',
-        '    out = "app.txt",',
-        '    cmd = "printf pleomino > $OUT",',
-        '    labels = ["kind:app", "webapp:static"],',
-        '    visibility = ["PUBLIC"],',
-        ")",
-        "",
-      ].join("\n"),
-      "utf8",
-    );
-    await fsp.writeFile(
-      sharedTargetsPath,
-      [
-        'load("//build-tools/deployments:defs.bzl", "deployment_admission_policy", "deployment_defaults", "deployment_lane_governance", "deployment_lane_policy")',
-        "",
-        "deployment_defaults(",
-        '    name = "defaults",',
-        '    default_client_profile = "mini",',
-        '    visibility = ["PUBLIC"],',
-        ")",
-        "",
-        "deployment_lane_governance(",
-        '    name = "lane_governance",',
-        '    scm_backend = "github",',
-        '    repository = "viberoots/viberoots",',
-        "    source_ref_policies = [",
-        '        {"stage": "dev", "allowed_refs": "main", "required_checks": "deploy/pleomino-dev"},',
-        '        {"stage": "staging", "allowed_refs": "main,refs/tags/release/*", "required_checks": "deploy/pleomino-staging"},',
-        '        {"stage": "prod", "allowed_refs": "refs/tags/release/*", "required_checks": "deploy/pleomino-prod"},',
-        "    ],",
-        '    trusted_reporter_identities = ["app:deploy-bot", "ci:jenkins"],',
-        '    required_approval_boundaries = [{"stage": "prod", "required_approvals": "release-owner"}],',
-        '    visibility = ["PUBLIC"],',
-        ")",
-        "",
-        "deployment_lane_policy(",
-        '    name = "lane",',
-        '    defaults = ":defaults",',
-        '    stages = ["dev", "staging", "prod"],',
-        '    source_ref_policy = {"dev": "main", "staging": "main", "prod": "refs/tags/release/*"},',
-        '    allowed_promotion_edges = ["dev->staging", "staging->prod"],',
-        '    promotion_compatibility = """{"cross_provider_promotion_edges":["dev->staging"]}""",',
-        '    governance_policy = ":lane_governance",',
-        '    visibility = ["PUBLIC"],',
-        ")",
-        "",
-        "deployment_admission_policy(",
-        '    name = "staging_release",',
-        '    allowed_refs = ["main", "refs/tags/release/*"],',
-        '    required_checks = ["deploy/pleomino-staging"],',
-        '    visibility = ["PUBLIC"],',
-        ")",
-        "",
-      ].join("\n"),
-      "utf8",
-    );
-    await fsp.writeFile(
-      deployTargetsPath,
-      [
-        'load("//build-tools/deployments:defs.bzl", "cloudflare_pages_static_webapp_deployment")',
-        "",
-        "cloudflare_pages_static_webapp_deployment(",
-        '    name = "deploy",',
-        '    component = "//projects/apps/pleomino:app",',
-        '    account = "web-platform-staging",',
-        '    custom_domain = "staging.pleomino.com",',
-        '    custom_domain_zone_id = "zone-pleomino",',
-        '    project = "pleomino-staging-pages",',
-        '    lane_policy = "//projects/deployments/pleomino/shared:lane",',
-        '    environment_stage = "staging",',
-        '    admission_policy = "//projects/deployments/pleomino/shared:staging_release",',
-        "    secret_requirements = [",
-        "        {",
-        '            "name": "cloudflare_api_token",',
-        '            "step": "provision",',
-        '            "contract_id": "secret://deployments/pleomino/cloudflare_api_token",',
-        '            "required": "true",',
-        "        },",
-        "        {",
-        '            "name": "cloudflare_api_token",',
-        '            "step": "publish",',
-        '            "contract_id": "secret://deployments/pleomino/cloudflare_api_token",',
-        '            "required": "true",',
-        "        },",
-        "        {",
-        '            "name": "cloudflare_api_token",',
-        '            "step": "preview_cleanup",',
-        '            "contract_id": "secret://deployments/pleomino/cloudflare_api_token",',
-        '            "required": "true",',
-        "        },",
-        "    ],",
-        "    runtime_config_requirements = [],",
-        "    preview = {",
-        '        "target_derivation": "provider_managed_source_run",',
-        '        "isolation_class": "isolated",',
-        '        "identity_selector": "source_run",',
-        '        "cleanup_ttl": "7d",',
-        '        "smoke_target": "preview_url",',
-        '        "lock_scope": "shared",',
-        "    },",
-        ")",
-        "",
-      ].join("\n"),
-      "utf8",
-    );
+    await writeCloudflarePagesExtractionFixture(tmp);
 
     const attrFlags = ATTRS.flatMap((attr) => ["--output-attribute", attr]);
-    const query =
-      "set(//projects/deployments/pleomino/staging:deploy //projects/apps/pleomino:app //projects/deployments/pleomino/shared:lane //projects/deployments/pleomino/shared:defaults //projects/deployments/pleomino/shared:lane_governance //projects/deployments/pleomino/shared:staging_release)";
     const cquery = await _$({
       cwd: tmp,
       stdio: "pipe",
@@ -166,7 +58,7 @@ test("cloudflare-pages deployment extraction reads canonical metadata from TARGE
         HOME: process.env.BUCK2_REAL_HOME || process.env.HOME,
         SSL_CERT_FILE: process.env.SSL_CERT_FILE || process.env.NIX_SSL_CERT_FILE,
       },
-    })`buck2 --isolation-dir ${inheritedBuckIsolation("cloudflare-pages-cquery")} cquery --target-platforms prelude//platforms:default ${query} --json ${attrFlags}`.quiet();
+    })`buck2 --isolation-dir ${inheritedBuckIsolation("cloudflare-pages-cquery")} cquery --target-platforms prelude//platforms:default ${CLOUDFLARE_EXTRACTION_QUERY} --json ${attrFlags}`.quiet();
     const merged = JSON.parse(String(cquery.stdout || "")) as Record<string, any>;
     const { deployments, errors } = extractCloudflarePagesDeployments(nodesFromCqueryJson(merged));
     assert.deepEqual(errors, []);
@@ -202,38 +94,65 @@ test("cloudflare-pages deployment extraction reads canonical metadata from TARGE
   });
 });
 
-test("concrete Pleomino Cloudflare TARGETS emit publish and cleanup token requirements", async () => {
-  const attrFlags = ATTRS.flatMap((attr) => ["--output-attribute", attr]);
-  const query =
-    "set(//projects/deployments/pleomino/staging:deploy //projects/deployments/pleomino/prod:deploy //projects/apps/pleomino:app //projects/deployments/pleomino/shared:lane //projects/deployments:defaults //projects/deployments/pleomino/shared:lane_governance //projects/deployments/pleomino/shared:staging_release //projects/deployments/pleomino/shared:prod_release)";
-  const cquery = await $({
-    stdio: "pipe",
-    env: {
-      ...process.env,
-      HOME: process.env.BUCK2_REAL_HOME || process.env.HOME,
-      SSL_CERT_FILE: process.env.SSL_CERT_FILE || process.env.NIX_SSL_CERT_FILE,
-    },
-  })`buck2 --isolation-dir ${inheritedBuckIsolation("cloudflare-pages-pleomino-cquery")} cquery --target-platforms prelude//platforms:default ${query} --json ${attrFlags}`.quiet();
-  const merged = JSON.parse(String(cquery.stdout || "")) as Record<string, any>;
-  const { deployments, errors } = extractCloudflarePagesDeployments(nodesFromCqueryJson(merged));
-  assert.deepEqual(errors, []);
-  assert.equal(deployments.length, 2);
-  assert.equal(
-    deployments.find((deployment) => deployment.deploymentId === "pleomino-staging")?.providerTarget
-      .accountId,
-    "1b911846f80a89272c0dbaf44f5c810f",
-  );
-  for (const deployment of deployments)
-    assert.equal(deployment.lanePolicy.defaultClientProfile, "mini");
-  const staging = deployments.find((deployment) => deployment.deploymentId === "pleomino-staging");
-  const prod = deployments.find((deployment) => deployment.deploymentId === "pleomino-prod");
-  assert.equal(staging?.providerTarget.customDomain, "staging.pleomino.com");
-  assert.equal(staging?.providerTarget.customDomainZoneId, "9411ac5903acb1c2e29b3d4c04ef7e6f");
-  assert.equal(staging?.providerTarget.canonicalUrl, "https://staging.pleomino.com/");
-  assert.equal(prod?.providerTarget.accountId, "1b911846f80a89272c0dbaf44f5c810f");
-  assert.equal(prod?.providerTarget.customDomain, "pleomino.com");
-  assert.equal(prod?.providerTarget.customDomainZoneId, "9411ac5903acb1c2e29b3d4c04ef7e6f");
-  assert.equal(prod?.providerTarget.canonicalUrl, "https://pleomino.com/");
-  assertCloudflareApiTokenSteps(staging!, ["preview_cleanup", "provision", "publish"]);
-  assertCloudflareApiTokenSteps(prod!, ["preview_cleanup", "provision", "publish"]);
+test("cutover fixture Cloudflare TARGETS emit publish and cleanup token requirements", async () => {
+  await runInTemp("cloudflare-pages-cutover-cquery", async (tmp, _$) => {
+    await writeCutoverDeploymentFixture(tmp);
+
+    const attrFlags = ATTRS.flatMap((attr) => ["--output-attribute", attr]);
+    const query = `set(${[
+      CUTOVER_STAGING,
+      CUTOVER_PROD,
+      CUTOVER_APP,
+      `${CUTOVER_SHARED}:lane`,
+      `${CUTOVER_SHARED}:defaults`,
+      `${CUTOVER_SHARED}:lane_governance`,
+      `${CUTOVER_SHARED}:staging_release`,
+      `${CUTOVER_SHARED}:prod_release`,
+    ].join(" ")})`;
+    const cquery = await _$({
+      cwd: tmp,
+      stdio: "pipe",
+      env: {
+        ...process.env,
+        HOME: process.env.BUCK2_REAL_HOME || process.env.HOME,
+        SSL_CERT_FILE: process.env.SSL_CERT_FILE || process.env.NIX_SSL_CERT_FILE,
+      },
+    })`buck2 --isolation-dir ${inheritedBuckIsolation("cloudflare-pages-cutover-cquery")} cquery --target-platforms prelude//platforms:default ${query} --json ${attrFlags}`.quiet();
+    const merged = JSON.parse(String(cquery.stdout || "")) as Record<string, any>;
+    const { deployments, errors } = extractCloudflarePagesDeployments(nodesFromCqueryJson(merged));
+    assert.deepEqual(errors, []);
+    assert.equal(deployments.length, 2);
+    for (const deployment of deployments)
+      assert.equal(deployment.lanePolicy.defaultClientProfile, "mini");
+
+    const staging = deployments.find(
+      (deployment) => deployment.deploymentId === `${CUTOVER_FAMILY}-staging`,
+    );
+    const prod = deployments.find(
+      (deployment) => deployment.deploymentId === `${CUTOVER_FAMILY}-prod`,
+    );
+    assert.equal(staging?.label, CUTOVER_STAGING);
+    assert.equal(staging?.providerTarget.accountId, "11111111111111111111111111111111");
+    assert.equal(staging?.providerTarget.customDomain, `staging.${CUTOVER_FAMILY}.example.test`);
+    assert.equal(staging?.providerTarget.customDomainZoneId, "zone-cutover");
+    assert.equal(
+      staging?.providerTarget.canonicalUrl,
+      `https://staging.${CUTOVER_FAMILY}.example.test/`,
+    );
+    assert.equal(prod?.label, CUTOVER_PROD);
+    assert.equal(prod?.providerTarget.accountId, "11111111111111111111111111111111");
+    assert.equal(prod?.providerTarget.customDomain, `prod.${CUTOVER_FAMILY}.example.test`);
+    assert.equal(prod?.providerTarget.customDomainZoneId, "zone-cutover");
+    assert.equal(prod?.providerTarget.canonicalUrl, `https://prod.${CUTOVER_FAMILY}.example.test/`);
+    assertCloudflareApiTokenSteps(
+      staging!,
+      ["preview_cleanup", "provision", "publish"],
+      CUTOVER_TOKEN_CONTRACT,
+    );
+    assertCloudflareApiTokenSteps(
+      prod!,
+      ["preview_cleanup", "provision", "publish"],
+      CUTOVER_TOKEN_CONTRACT,
+    );
+  });
 });

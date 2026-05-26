@@ -106,6 +106,7 @@ test("public cloudflare-pages deploy routes deploy, preview, cleanup, and rollba
         try {
           const env = { ...process.env, ...fakeCloudflareOverrides(fake) };
           delete env.VBR_WORKER_OIDC_TOKEN;
+          env.VBR_DEPLOY_CONTROL_PLANE_TOKEN = "test-control-plane-token";
           const profileRoot = await installHarnessClientProfile($, tmp, harness.controlPlane.url);
           const firstRun = await $({
             cwd: tmp,

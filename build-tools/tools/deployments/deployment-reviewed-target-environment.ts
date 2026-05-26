@@ -68,6 +68,9 @@ export async function resolveDeploymentReviewedTargetEnvironment(opts: {
       workspaceRoot: opts.workspaceRoot,
       revision: targetRef,
       purpose: "deployment reviewed target ref",
+      scmBackend: opts.deployment.lanePolicy.governance.scmBackend,
+      repository: opts.deployment.lanePolicy.governance.repository,
+      checkout: true,
     }));
   const expected = opts.expectedSourceRevision?.trim();
   if (expected && expected !== targetRevision) {

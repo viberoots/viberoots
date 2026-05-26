@@ -85,6 +85,38 @@ test("Infisical admission rejects incomplete provider replay identity evidence",
   }
 });
 
+test("Infisical client reads v4 workspace object and secretKey replay evidence", async () => {
+  const server = await startFakeInfisicalServer(auth, [
+    infisicalSecret({
+      response: {
+        projectId: undefined,
+        workspaceId: undefined,
+        workspace: { id: "proj_123" },
+        secretName: undefined,
+        secretKey: "cloudflare_api_token",
+      },
+    }),
+  ]);
+  try {
+    const admitted = await resolveDeploymentInfisicalAdmittedReferences({
+      requirements: [infisicalRequirement],
+      targetScope: infisicalTargetScope,
+      runtime: { ...infisicalRuntime, siteUrl: server.siteUrl },
+      secretContext: infisicalTestContext(server.siteUrl),
+    });
+    assert.equal(
+      admitted[0]?.referenceId,
+      "infisical:proj_123:prod:/deployments/pleomino:cloudflare_api_token#sec_1@3",
+    );
+    assert.equal(
+      admitted[0]?.selectorRef,
+      "proj_123:prod:/deployments/pleomino:cloudflare_api_token@3",
+    );
+  } finally {
+    await server.close();
+  }
+});
+
 function infisicalSecret(overrides: Partial<FakeInfisicalSecret>): FakeInfisicalSecret {
   return {
     id: "sec_1",

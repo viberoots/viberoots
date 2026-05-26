@@ -14,6 +14,7 @@ const ATTRS = [
   "component",
   "deployment_family",
   "environment_stage",
+  "infisical_runtime",
   "secret_requirements",
   "runtime_config_requirements",
 ];
@@ -25,6 +26,10 @@ export type TargetRef = {
   scope: SprinkleRefScope;
   locations: string[];
   backendEnvironment?: string;
+  backendHost?: string;
+  backendProjectId?: string;
+  backendProjectName?: string;
+  backendSecretPath?: string;
   deploymentFamily?: string;
 };
 
@@ -138,8 +143,13 @@ function isAppTarget(target: string): boolean {
 function refsFromNode(node: GraphNode, direct: Set<string>): TargetRef[] {
   const label = normalizeTargetLabel(String(node.name || ""));
   const scope: SprinkleRefScope = direct.has(label) ? "direct" : "dependency";
+  const runtime = readStringRecord(node, "infisical_runtime");
   const common = {
-    backendEnvironment: readString(node, "environment_stage"),
+    backendEnvironment: runtime.environment || readString(node, "environment_stage"),
+    backendHost: runtime.site_url,
+    backendProjectId: runtime.project_id,
+    backendProjectName: runtime.project_name,
+    backendSecretPath: runtime.secret_path,
     deploymentFamily: readString(node, "deployment_family"),
   };
   return [
@@ -165,6 +175,17 @@ function refsFromNode(node: GraphNode, direct: Set<string>): TargetRef[] {
 function readString(node: GraphNode, key: string): string | undefined {
   const value = node[key];
   return typeof value === "string" && value.trim() ? value.trim() : undefined;
+}
+
+function readStringRecord(node: GraphNode, key: string): Record<string, string> {
+  const value = node[key];
+  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+  return Object.fromEntries(
+    Object.entries(value as Record<string, unknown>)
+      .filter((entry): entry is [string, string] => typeof entry[1] === "string")
+      .map(([entryKey, entryValue]) => [entryKey, entryValue.trim()])
+      .filter(([, entryValue]) => entryValue !== ""),
+  );
 }
 
 async function locateTargetRef(cwd: string, entry: TargetRef): Promise<TargetRef> {

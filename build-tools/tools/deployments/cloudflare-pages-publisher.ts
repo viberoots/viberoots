@@ -1,9 +1,13 @@
 #!/usr/bin/env zx-wrapper
+import { execFile } from "node:child_process";
 import * as fsp from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import { promisify } from "node:util";
 import type { CloudflarePagesDeployment } from "./contract";
 import { scrubDeploymentSecretEnv } from "./deployment-secret-env";
+
+const execFileAsync = promisify(execFile);
 
 type CloudflarePagesPublishResult = {
   publicUrl: string;
@@ -93,7 +97,12 @@ function meaningfulWranglerErrorLines(text: string): string[] {
 }
 
 function safeWranglerError(text: string): string {
-  const safe = text.replace(/[^\w .,:;_/#()+\-"'\[\]@]/g, "").trim();
+  const safe = text
+    .replace(/\/accounts\/[a-f0-9]{16,64}\b/gi, "/accounts/(account)")
+    .replace(/\b(account[_-]?id)\s*[:=]\s*[a-f0-9]{16,64}\b/gi, "$1=(account)")
+    .replace(/\b(?:api[_-]?key|token)\s*[:=]\s*\S+/gi, "credential=(redacted)")
+    .replace(/[^\w .,:;_/#()+\-"'\[\]@=]/g, "")
+    .trim();
   return safe.length > MAX_WRANGLER_ERROR_LENGTH
     ? `${safe.slice(0, MAX_WRANGLER_ERROR_LENGTH - 3).trimEnd()}...`
     : safe;
@@ -160,19 +169,39 @@ export async function publishCloudflarePagesStaticWebapp(opts: {
   const effectiveRunTarget = opts.effectiveRunTarget || opts.deployment.providerTarget;
   const wranglerWorkDir = await withPagesWranglerConfig(opts.renderedConfigPath, opts.artifactDir);
   try {
-    const command = $({
-      cwd: wranglerWorkDir,
-      stdio: "pipe",
-      env: {
-        ...scrubDeploymentSecretEnv(),
-        ...(opts.apiToken ? { CLOUDFLARE_API_TOKEN: opts.apiToken } : {}),
-        ...cloudflareAccountEnv(opts.deployment),
-      },
-    })`${wranglerBin()} pages deploy ${path.resolve(opts.artifactDir)} --project-name ${opts.deployment.providerTarget.project} ${effectiveRunTarget.previewBranch ? ["--branch", effectiveRunTarget.previewBranch] : []}`;
-    const result = await (opts.timeoutMs ? command.timeout(opts.timeoutMs) : command).nothrow();
-    const stdout = String((result as any).stdout || "");
-    const stderr = String((result as any).stderr || "");
-    if ((result as any).exitCode !== 0) {
+    let stdout = "";
+    let stderr = "";
+    try {
+      const result = await execFileAsync(
+        wranglerBin(),
+        [
+          "pages",
+          "deploy",
+          path.resolve(opts.artifactDir),
+          "--project-name",
+          opts.deployment.providerTarget.project,
+          ...(effectiveRunTarget.previewBranch
+            ? ["--branch", effectiveRunTarget.previewBranch]
+            : []),
+        ],
+        {
+          cwd: wranglerWorkDir,
+          env: {
+            ...scrubDeploymentSecretEnv(),
+            HOME: wranglerWorkDir,
+            NODE_EXTRA_CA_CERTS:
+              process.env.NODE_EXTRA_CA_CERTS || process.env.SSL_CERT_FILE || undefined,
+            ...(opts.apiToken ? { CLOUDFLARE_API_TOKEN: opts.apiToken } : {}),
+            ...cloudflareAccountEnv(opts.deployment),
+          },
+          ...(opts.timeoutMs ? { timeout: opts.timeoutMs } : {}),
+        },
+      );
+      stdout = String(result.stdout || "");
+      stderr = String(result.stderr || "");
+    } catch (error) {
+      stdout = String((error as any)?.stdout || "");
+      stderr = String((error as any)?.stderr || "");
       throw new Error(commandError(stdout, stderr));
     }
     const providerReleaseId = maybeProviderReleaseId(`${stdout}\n${stderr}`);

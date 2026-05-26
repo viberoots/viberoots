@@ -4,6 +4,8 @@ import { deploymentError } from "./contract-extract-shared";
 const ALLOWED_INFISICAL_RUNTIME_KEYS = [
   "site_url",
   "project_id",
+  "project_name",
+  "project_slug",
   "environment",
   "secret_path",
   "secret_path_prefix",

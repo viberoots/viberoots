@@ -331,21 +331,32 @@ environment variables for the service or workers.
    `services.viberoots.deploymentControlPlaneContainer.credentials`
 4. restart the containerized control-plane units after changing credential
    sources
-5. run a plan or admit-only check for the Infisical-backed target through the
+5. run a validate-only check for the Infisical-backed target through the
    regenerated profile:
 
    ```bash
    direnv exec . build-tools/tools/bin/deploy \
-     --deployment //projects/deployments/pleomino/dev:deploy \
+     --deployment //projects/deployments/pleomino/staging:deploy \
      --profile mini \
-     --admit-only
+     --validate-only
    ```
 
-6. verify the execution snapshot contains `infisicalRuntime` with the reviewed
-   env variable names, but does not contain the Universal Auth client secret,
-   an Infisical access token, or `INFISICAL_TOKEN`
+6. before the deploy, validate that SprinkleRef resolves the target from the
+   Infisical backend and can report a non-secret fingerprint:
 
-This post-check proves the upgraded control-plane metadata points at
+   ```bash
+   sprinkleref --check \
+     --target //projects/deployments/pleomino/staging:deploy
+
+   sprinkleref --get secret://deployments/pleomino/cloudflare_api_token \
+     --target //projects/deployments/pleomino/staging:deploy \
+     --fingerprint
+   ```
+
+The later admitted execution snapshot should contain `infisicalRuntime` with
+the reviewed env names and credential-file names, but must not contain the
+Universal Auth client secret, an Infisical access token, or `INFISICAL_TOKEN`.
+Together, these post-checks prove the upgraded control-plane metadata points at
 `viberoots/viberoots`, the service identity is the current `viberoots` service
 path, and the worker secret-context wiring can activate Infisical from mounted
 credential files after the pre-`viberoots` migration.
@@ -436,6 +447,10 @@ Add the repo-owned module to the `mini` NixOS config:
     manageNginx = true;
 
     containerRuntime = "podman";
+    # Use host networking only if mini's Postgres or S3-compatible artifact
+    # store remain bound to host loopback during cutover.
+    # networkMode = "host";
+    # serviceHost = "127.0.0.1";
     workerReplicas = 2;
     webUi.enable = true;
     mcp.enable = true;
@@ -463,7 +478,7 @@ Add the repo-owned module to the `mini` NixOS config:
 }
 ```
 
-The module defaults to binding the service on `127.0.0.1:7780`, enabling the web
+The module defaults to mapping the service to host `127.0.0.1:7780`, enabling the web
 UI at `/`, enabling MCP at `/mcp`, and creating state roots under
 `/var/lib/deployment-control-plane`. Keep the old
 `/var/lib/deployment-host` tree available for rollback until the cutover is
@@ -505,18 +520,20 @@ From the workstation, regenerate the local profile if needed, then run:
 export VBR_DEPLOY_CONTROL_PLANE_TOKEN='...'
 
 direnv exec . build-tools/tools/bin/deploy \
-  --deployment //projects/deployments/pleomino/dev:deploy \
+  --deployment //projects/deployments/pleomino/staging:deploy \
   --profile mini \
-  --plan
+  --validate-only
 
 direnv exec . build-tools/tools/bin/deploy \
-  --deployment //projects/deployments/pleomino/dev:deploy \
-  --profile mini
+  --deployment //projects/deployments/pleomino/staging:deploy \
+  --profile mini \
+  --admit-and-deploy deploy/admission \
+  --admit-for-commit main
 ```
 
 Success requires all of the following:
 
-- the plan and deploy use `https://deploy.apps.kilty.io`
+- the validate-only and deploy paths use `https://deploy.apps.kilty.io`
 - the service and both worker containers remain healthy
 - worker heartbeats and run records appear in the shared database
 - artifact uploads land in the configured S3-compatible store

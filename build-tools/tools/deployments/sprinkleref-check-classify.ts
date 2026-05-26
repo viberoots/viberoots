@@ -11,6 +11,10 @@ export type CheckableRef = Pick<
   | "requiredBy"
   | "source"
   | "backendEnvironment"
+  | "backendHost"
+  | "backendProjectId"
+  | "backendProjectName"
+  | "backendSecretPath"
   | "deploymentFamily"
 >;
 
@@ -22,6 +26,10 @@ export function consolidateRefs(refs: CheckableRef[]): CheckableRef[] {
       entry.scope,
       entry.source || "",
       entry.backendEnvironment || "",
+      entry.backendHost || "",
+      entry.backendProjectId || "",
+      entry.backendProjectName || "",
+      entry.backendSecretPath || "",
       entry.deploymentFamily || "",
     ]);
     const current = entries.get(key);
@@ -37,10 +45,26 @@ export function consolidateRefs(refs: CheckableRef[]): CheckableRef[] {
 
 export function backendForEntry(
   backend: Parameters<typeof createSprinkleRefStore>[0],
-  entry: Pick<SprinkleRefCheckEntry, "backendEnvironment">,
+  entry: Pick<
+    SprinkleRefCheckEntry,
+    | "backendEnvironment"
+    | "backendHost"
+    | "backendProjectId"
+    | "backendProjectName"
+    | "backendSecretPath"
+  >,
 ) {
-  if (backend.backend !== "infisical" || !entry.backendEnvironment) return backend;
-  return { ...backend, defaultEnvironment: entry.backendEnvironment };
+  if (backend.backend !== "infisical") return backend;
+  return {
+    ...backend,
+    ...(entry.backendHost ? { host: entry.backendHost } : {}),
+    ...(entry.backendProjectId
+      ? { projectId: entry.backendProjectId, projectIdEnv: undefined }
+      : {}),
+    ...(entry.backendProjectName ? { projectName: entry.backendProjectName } : {}),
+    ...(entry.backendEnvironment ? { defaultEnvironment: entry.backendEnvironment } : {}),
+    ...(entry.backendSecretPath ? { defaultPath: entry.backendSecretPath } : {}),
+  };
 }
 
 export function managedBootstrapOutput(ref: string):
