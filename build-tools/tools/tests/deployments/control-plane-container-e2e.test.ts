@@ -57,7 +57,7 @@ test("containerized control plane processes one fixture deployment through servi
   };
   await runInTemp("control-plane-container-e2e", async (tmp) => {
     const port = await freePort();
-    const mounts = await writeContainerSmokeRuntimeTree(tmp, port);
+    const mounts = await writeContainerSmokeRuntimeTree(tmp, port, E2E_TOKEN);
     const workspace = await writeWorkspace(tmp);
     await writeE2eConfig(mounts.configPath, port);
     await loadImage(runtime, image);

@@ -4,35 +4,9 @@ import { test } from "node:test";
 import { localHarnessControlPlaneDatabaseUrl } from "../../deployments/nixos-shared-host-control-plane-backend";
 import { startNixosSharedHostControlPlaneServer } from "../../deployments/nixos-shared-host-control-plane-server";
 import { runInTemp } from "../lib/test-helpers";
-import { resolveControlPlaneServiceToken } from "../../deployments/nixos-shared-host-control-plane-service";
-
-test("control-plane service token falls back to VBR_DEPLOY_CONTROL_PLANE_TOKEN", () => {
-  assert.equal(
-    resolveControlPlaneServiceToken({
-      tokenFlag: "",
-      env: { VBR_DEPLOY_CONTROL_PLANE_TOKEN: " env-token \n" } as NodeJS.ProcessEnv,
-    }),
-    "env-token",
-  );
-  assert.equal(
-    resolveControlPlaneServiceToken({
-      tokenFlag: " flag-token ",
-      env: { VBR_DEPLOY_CONTROL_PLANE_TOKEN: "env-token" } as NodeJS.ProcessEnv,
-    }),
-    "flag-token",
-  );
-  assert.equal(
-    resolveControlPlaneServiceToken({ tokenFlag: "", env: {} as NodeJS.ProcessEnv }),
-    undefined,
-  );
-  assert.equal(
-    resolveControlPlaneServiceToken({
-      tokenFlag: "",
-      env: { BNX_DEPLOY_CONTROL_PLANE_TOKEN: "legacy-token" } as NodeJS.ProcessEnv,
-    }),
-    undefined,
-  );
-});
+import { loadControlPlaneRuntimeConfig } from "../../deployments/control-plane-runtime-config";
+import { startControlPlaneServiceFromRuntimeConfig } from "../../deployments/nixos-shared-host-control-plane-service";
+import { writeRuntimeConfig } from "./control-plane-process-entrypoints.helpers";
 
 test("control-plane service requires a reviewed token unless fixture mode is explicit", async () => {
   await runInTemp("nixos-control-plane-service-token-required", async (tmp) => {
@@ -59,5 +33,21 @@ test("control-plane service requires a reviewed token unless fixture mode is exp
       env,
     });
     await fixture.close();
+  });
+});
+
+test("control-plane service runtime config reads mounted token file", async () => {
+  await runInTemp("nixos-control-plane-service-token-file", async (tmp) => {
+    const fixture = await writeRuntimeConfig(tmp);
+    const runtimeConfig = await loadControlPlaneRuntimeConfig({
+      configPath: fixture.configPath,
+      repoRoot: tmp,
+    });
+    const service = await startControlPlaneServiceFromRuntimeConfig({
+      workspaceRoot: tmp,
+      runtimeConfig,
+    });
+    assert.match(service.url, /^http:\/\/127\.0\.0\.1:/);
+    await service.close();
   });
 });

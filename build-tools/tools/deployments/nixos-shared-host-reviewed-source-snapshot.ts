@@ -13,6 +13,7 @@ import {
   resolveReviewedRemoteName,
   reviewedFetchTargetFor,
   trim,
+  type ReviewedSourceCredentialFiles,
 } from "./nixos-shared-host-reviewed-source-git";
 
 const execFileAsync = promisify(execFile);
@@ -50,6 +51,7 @@ export async function snapshotReviewedSourceForSubmission(opts: {
   submissionId: string;
   expectedSourceRevision?: string;
   requestedSourceRef?: string;
+  reviewedSourceCredentials?: ReviewedSourceCredentialFiles;
 }): Promise<DeploymentReviewedSourceSnapshot> {
   const reviewedRef = requestedDeploymentReviewedSourceRef({
     deployment: opts.deployment,
@@ -70,7 +72,11 @@ export async function snapshotReviewedSourceForSubmission(opts: {
   const remoteName = await resolveReviewedRemoteName(opts.workspaceRoot, opts.deployment);
   const snapshotRef = snapshotRefFor(opts.submissionId, reviewedRef);
   const fetchTarget = reviewedFetchTargetFor(opts.deployment, remoteName);
-  const fetchEnv = await gitFetchEnvForReviewedRemote(opts.workspaceRoot, fetchTarget);
+  const fetchEnv = await gitFetchEnvForReviewedRemote(
+    opts.workspaceRoot,
+    fetchTarget,
+    opts.reviewedSourceCredentials,
+  );
   try {
     await deploymentGitStdout(
       opts.workspaceRoot,

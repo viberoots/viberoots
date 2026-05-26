@@ -30,6 +30,7 @@ export async function startControlPlaneWorkerFromRuntimeConfig(opts: {
     backendDatabaseUrl: (await fsp.readFile(opts.runtimeConfig.database.urlFile, "utf8")).trim(),
     objectStore,
     credentialDirectory,
+    reviewedSourceCredentials: opts.runtimeConfig.reviewedSource,
     instanceId: opts.runtimeConfig.instanceId,
     ...(opts.pollMs ? { pollMs: opts.pollMs } : {}),
     ...(opts.workerId ? { workerId: opts.workerId } : {}),

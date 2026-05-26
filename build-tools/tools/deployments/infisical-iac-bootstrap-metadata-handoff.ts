@@ -1,4 +1,5 @@
 import * as fs from "node:fs/promises";
+import { exactInfisicalCredentialFileName } from "./infisical-credential-file-contract";
 import { PLEOMINO_REVIEWED_METADATA_PATH } from "./infisical-iac-bootstrap-reviewed-metadata";
 import type { DeploymentRuntimeMetadata } from "./infisical-iac-bootstrap-types";
 
@@ -46,12 +47,12 @@ export function reviewedMetadataReplacements(
         replacement(
           `_INFISICAL_CREDENTIAL_FILE_NAMES.${expected.stage}.client_id`,
           expected.clientIdFileName || "",
-          actual?.clientIdFileName,
+          exactInfisicalCredentialFileName(actual, "client_id"),
         ),
         replacement(
           `_INFISICAL_CREDENTIAL_FILE_NAMES.${expected.stage}.client_secret`,
           expected.clientSecretFileName || "",
-          actual?.clientSecretFileName,
+          exactInfisicalCredentialFileName(actual, "client_secret"),
         ),
       ];
     }),

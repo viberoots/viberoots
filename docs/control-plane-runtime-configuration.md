@@ -53,6 +53,7 @@ service:
   host: 0.0.0.0
   port: 7780
   publicUrl: https://deploy.apps.example.com
+  tokenFile: /run/deployment-control-plane/credentials/control-plane-token
 
 storage:
   recordsRoot: /var/lib/deployment-control-plane/records
@@ -88,10 +89,11 @@ mcp:
   basePath: /mcp
 ```
 
-Required fields are `instanceId`, `service.publicUrl`, `storage.artifactStore.bucket`,
-artifact-store credential files, `database.urlFile`, `credentials.directory`, and reviewed-source
-SSH files. Defaults are the values shown above for `mode`, service host and port, local scratch
-roots, artifact-store kind and region, Infisical filename patterns, web UI, and MCP.
+Required fields are `instanceId`, `service.publicUrl`, `service.tokenFile`,
+`storage.artifactStore.bucket`, artifact-store credential files, `database.urlFile`,
+`credentials.directory`, and reviewed-source SSH files. Defaults are the values shown above for
+`mode`, service host and port, local scratch roots, artifact-store kind and region, Infisical
+filename patterns, web UI, and MCP.
 
 `webUi.basePath` controls both the browser UI and the same-origin read APIs used by that UI. The
 base path can be `/` or a reverse-proxy prefix such as `/deploy-control-plane`; the service strips
@@ -107,11 +109,12 @@ mode.
 
 The loader validates shape, enum values, URL base paths, and credential path policy before service
 or worker startup proceeds. Startup then checks required file-backed credentials exist as files.
-Missing database URL, artifact-store, reviewed-source key, or known-hosts files fail closed.
+Missing database URL, service token, artifact-store, reviewed-source key, or known-hosts files fail
+closed.
 
-Credential paths for database and artifact-store secrets must be under `credentials.directory`.
-Reviewed-source SSH paths are explicit reviewed paths and may live outside that directory, such as
-known-hosts files under `/etc/deployment-control-plane`.
+Credential paths for database, service token, artifact-store, and Infisical secrets must be under
+`credentials.directory`. Reviewed-source SSH paths are explicit reviewed paths and may live outside
+that directory, such as known-hosts files under `/etc/deployment-control-plane`.
 
 Credential paths are rejected when they point into:
 
@@ -138,6 +141,19 @@ Reviewed deployment metadata may override these filenames for one deployment, bu
 plain filenames resolved inside `credentials.directory`. There are no global Infisical tenant,
 project, site URL, environment, client id, or client secret defaults in the runtime config.
 
+Credential file manifest:
+
+| Purpose                            | Required filename                        |
+| ---------------------------------- | ---------------------------------------- |
+| Database URL                       | `control-plane-database-url`             |
+| Service bearer token               | `control-plane-token`                    |
+| Artifact-store endpoint            | `artifact-store-endpoint`                |
+| Artifact-store access key id       | `artifact-store-access-key-id`           |
+| Artifact-store secret access key   | `artifact-store-secret-access-key`       |
+| Reviewed-source SSH key            | `reviewed-source-ssh-key`                |
+| Deployment Infisical client id     | `{deploymentId}-infisical-client-id`     |
+| Deployment Infisical client secret | `{deploymentId}-infisical-client-secret` |
+
 ## Artifact Store Contract
 
 `storage.artifactStore` points at an S3-compatible bucket. The endpoint, access key id, and secret
@@ -162,10 +178,14 @@ Shared POSIX filesystems must not be used as the production artifact authority.
 
 ## Environment Boundary
 
-Long-running service and worker processes read credentials from configured files. Child process
-environments are scrubbed of database URLs, service tokens, ambient Vault/Infisical/provider tokens,
-and Kubernetes/AWS secrets by default. Provider operations may add only reviewed operation-specific
-credential variables for the command they invoke.
+Long-running service and worker processes read credentials from configured files. Production startup
+fails closed when database URLs, service tokens, reviewed-source tokens, artifact-store keys,
+Infisical credentials, Vault credentials, AWS/MinIO keys, or provider tokens are present in ambient
+environment variables. Local fixture mode may opt out explicitly for tests.
+
+Child process environments are scrubbed of database URLs, service tokens, ambient
+Vault/Infisical/provider tokens, and Kubernetes/AWS secrets by default. Provider operations may add
+only reviewed operation-specific credential variables for the command they invoke.
 
 ## CI Boundary
 

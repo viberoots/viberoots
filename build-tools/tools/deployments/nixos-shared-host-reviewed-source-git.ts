@@ -19,6 +19,11 @@ const REVIEWED_SOURCE_SSH_KEY_FILE_ENV = "VBR_DEPLOY_REVIEWED_SOURCE_SSH_KEY_FIL
 const REVIEWED_SOURCE_SSH_KNOWN_HOSTS_FILE_ENV = "VBR_DEPLOY_REVIEWED_SOURCE_SSH_KNOWN_HOSTS_FILE";
 const execFileAsync = promisify(execFile);
 
+export type ReviewedSourceCredentialFiles = {
+  sshKeyFile: string;
+  sshKnownHostsFile: string;
+};
+
 export function trim(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
 }
@@ -125,21 +130,25 @@ function isRemoteUrl(value: string): boolean {
 export async function gitFetchEnvForReviewedRemote(
   workspaceRoot: string,
   fetchTarget: string,
+  credentials?: ReviewedSourceCredentialFiles,
 ): Promise<{ env?: NodeJS.ProcessEnv; cleanup: () => Promise<void> }> {
-  if (String(process.env.GIT_SSH_COMMAND || "").trim()) {
+  if (!credentials && String(process.env.GIT_SSH_COMMAND || "").trim()) {
     return { cleanup: async () => {} };
   }
   const remoteUrl = isRemoteUrl(fetchTarget)
     ? fetchTarget
     : await deploymentGitStdout(workspaceRoot, ["remote", "get-url", fetchTarget]).catch(() => "");
   if (!isGithubSshRemote(remoteUrl)) return { cleanup: async () => {} };
-  const configuredKnownHostsFile = trim(process.env[REVIEWED_SOURCE_SSH_KNOWN_HOSTS_FILE_ENV]);
+  const configuredKnownHostsFile =
+    trim(credentials?.sshKnownHostsFile) ||
+    trim(process.env[REVIEWED_SOURCE_SSH_KNOWN_HOSTS_FILE_ENV]);
   const tmpDir = configuredKnownHostsFile
     ? ""
     : await fsp.mkdtemp(path.join(os.tmpdir(), "vbr-github-known-hosts-"));
   const knownHostsFile = configuredKnownHostsFile || path.join(tmpDir, "known_hosts");
   if (!configuredKnownHostsFile) await fsp.writeFile(knownHostsFile, `${GITHUB_KNOWN_HOSTS}\n`);
-  const sshKeyFile = trim(process.env[REVIEWED_SOURCE_SSH_KEY_FILE_ENV]);
+  const sshKeyFile =
+    trim(credentials?.sshKeyFile) || trim(process.env[REVIEWED_SOURCE_SSH_KEY_FILE_ENV]);
   return {
     env: {
       ...process.env,

@@ -15,6 +15,7 @@ function configYaml(
 instanceId: mini
 service:
   publicUrl: https://deploy.example.test
+  tokenFile: ${credentials}/control-plane-token
 storage:
   artifactStore:
     bucket: deploy-artifacts
@@ -86,7 +87,7 @@ test("infisical defaults derive deployment-scoped credential files", () => {
   );
 });
 
-test("reviewed infisical overrides remain deployment-scoped filenames", () => {
+test("reviewed infisical overrides must match exact deployment-scoped filenames", () => {
   const config = parseControlPlaneRuntimeConfig(
     configYaml("/run/deployment-control-plane/credentials"),
   );
@@ -96,17 +97,39 @@ test("reviewed infisical overrides remain deployment-scoped filenames", () => {
     siteUrl: "https://infisical.example.test",
     projectId: "project-staging",
     environment: "staging",
-    clientIdFileName: "pleomino-staging-client-id",
-    clientSecretFileName: "pleomino-staging-client-secret",
+    clientIdFileName: "pleomino-staging-infisical-client-id",
+    clientSecretFileName: "pleomino-staging-infisical-client-secret",
   });
 
   assert.equal(
     files.clientIdFile,
-    "/run/deployment-control-plane/credentials/pleomino-staging-client-id",
+    "/run/deployment-control-plane/credentials/pleomino-staging-infisical-client-id",
   );
   assert.equal(
     files.clientSecretFile,
-    "/run/deployment-control-plane/credentials/pleomino-staging-client-secret",
+    "/run/deployment-control-plane/credentials/pleomino-staging-infisical-client-secret",
+  );
+  assert.throws(
+    () =>
+      directory.resolveInfisicalCredentialFiles({
+        deploymentId: "pleomino-staging",
+        siteUrl: "https://infisical.example.test",
+        projectId: "project",
+        environment: "staging",
+        clientIdFileName: "pleomino-staging-client-id",
+      }),
+    /clientIdFileName must be exactly pleomino-staging-infisical-client-id/,
+  );
+  assert.throws(
+    () =>
+      directory.resolveInfisicalCredentialFiles({
+        deploymentId: "pleomino-staging",
+        siteUrl: "https://infisical.example.test",
+        projectId: "project",
+        environment: "staging",
+        clientSecretFileName: "pleomino-staging-client-secret",
+      }),
+    /clientSecretFileName must be exactly pleomino-staging-infisical-client-secret/,
   );
   assert.throws(
     () =>
@@ -117,7 +140,7 @@ test("reviewed infisical overrides remain deployment-scoped filenames", () => {
         environment: "prod",
         clientIdFileName: "../global-client-id",
       }),
-    /plain filename/,
+    /clientIdFileName must be exactly bad-infisical-client-id/,
   );
 });
 
@@ -137,15 +160,13 @@ test("multi-tenant infisical lookup keeps account and project facts per deployme
     siteUrl: "https://infisical.account-b.example",
     projectId: "project-b",
     environment: "staging",
-    clientIdFileName: "ops-staging-ua-client-id",
-    clientSecretFileName: "ops-staging-ua-client-secret",
   });
 
   assert.notEqual(first.siteUrl, second.siteUrl);
   assert.notEqual(first.projectId, second.projectId);
   assert.notEqual(first.clientIdFile, second.clientIdFile);
   assert.match(first.clientSecretFile, /storefront-prod-infisical-client-secret$/);
-  assert.match(second.clientSecretFile, /ops-staging-ua-client-secret$/);
+  assert.match(second.clientSecretFile, /ops-staging-infisical-client-secret$/);
 });
 
 test("Pleomino Infisical credential files stay deployment scoped", () => {

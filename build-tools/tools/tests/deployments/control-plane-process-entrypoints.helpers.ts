@@ -36,10 +36,11 @@ export async function writeRuntimeConfig(
   await fsp.mkdir(tmp, { recursive: true });
   await fsp.mkdir(credentials, { recursive: true });
   const files = {
-    db: path.join(credentials, "db-url"),
-    endpoint: path.join(credentials, "artifact-endpoint"),
-    access: path.join(credentials, "artifact-access-key"),
-    secret: path.join(credentials, "artifact-secret-key"),
+    db: path.join(credentials, "control-plane-database-url"),
+    token: path.join(credentials, "control-plane-token"),
+    endpoint: path.join(credentials, "artifact-store-endpoint"),
+    access: path.join(credentials, "artifact-store-access-key-id"),
+    secret: path.join(credentials, "artifact-store-secret-access-key"),
     ssh: path.join(credentials, "reviewed-source-ssh-key"),
     knownHosts: path.join(credentials, "reviewed-source-known-hosts"),
   };
@@ -50,6 +51,9 @@ export async function writeRuntimeConfig(
   if (!omitted.has("db")) {
     await fsp.writeFile(files.db, `${localHarnessControlPlaneDatabaseUrl(recordsRoot)}\n`, "utf8");
   }
+  if (!omitted.has("endpoint")) {
+    await fsp.writeFile(files.endpoint, "http://127.0.0.1:9\n", "utf8");
+  }
   const configPath = path.join(tmp, "control-plane.yaml");
   await fsp.writeFile(
     configPath,
@@ -59,6 +63,7 @@ export async function writeRuntimeConfig(
       "  host: 127.0.0.1",
       `  port: ${opts.port || (await availablePort())}`,
       "  publicUrl: http://127.0.0.1",
+      `  tokenFile: ${files.token}`,
       "storage:",
       `  recordsRoot: ${recordsRoot}`,
       `  artifactStagingRoot: ${artifactRoot}`,

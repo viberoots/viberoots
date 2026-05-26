@@ -12,24 +12,13 @@ import { loadControlPlaneRuntimeConfig } from "./control-plane-runtime-config";
 import { startNixosSharedHostControlPlaneServer } from "./nixos-shared-host-control-plane-server";
 import type { ControlPlaneRuntimeConfig } from "./control-plane-runtime-config-types";
 
-export function resolveControlPlaneServiceToken(opts: {
-  tokenFlag: string;
-  env?: NodeJS.ProcessEnv;
-}): string | undefined {
-  return (
-    opts.tokenFlag.trim() ||
-    String((opts.env || process.env).VBR_DEPLOY_CONTROL_PLANE_TOKEN || "").trim() ||
-    undefined
-  );
-}
-
 export async function startControlPlaneServiceFromRuntimeConfig(opts: {
   workspaceRoot: string;
   runtimeConfig: ControlPlaneRuntimeConfig;
-  token?: string;
 }) {
   const objectStore = await artifactStoreFromRuntimeConfig(opts.runtimeConfig);
   assertProductionArtifactStore({ objectStore });
+  const token = (await fsp.readFile(opts.runtimeConfig.service.tokenFile, "utf8")).trim();
   return await startNixosSharedHostControlPlaneServer({
     workspaceRoot: opts.workspaceRoot,
     paths: {
@@ -45,7 +34,8 @@ export async function startControlPlaneServiceFromRuntimeConfig(opts: {
     instanceId: opts.runtimeConfig.instanceId,
     webUi: opts.runtimeConfig.webUi,
     mcp: opts.runtimeConfig.mcp,
-    ...(opts.token ? { token: opts.token } : {}),
+    reviewedSourceCredentials: opts.runtimeConfig.reviewedSource,
+    ...(token ? { token } : {}),
   });
 }
 
@@ -66,12 +56,15 @@ async function main() {
   );
   const port = Number(getFlagStr("port", "7780").trim() || "7780");
   const host = getFlagStr("host", "127.0.0.1").trim() || "127.0.0.1";
-  const token = resolveControlPlaneServiceToken({ tokenFlag: getFlagStr("token", "") });
   if (runtimeConfig && !getFlagStr("host-root", "").trim()) {
+    if (getFlagStr("token", "").trim()) {
+      throw new Error(
+        "production service mode with --config requires service.tokenFile, not --token",
+      );
+    }
     const server = await startControlPlaneServiceFromRuntimeConfig({
       workspaceRoot,
       runtimeConfig,
-      ...(token ? { token } : {}),
     });
     console.log(JSON.stringify({ url: server.url }, null, 2));
     return server;
@@ -85,6 +78,10 @@ async function main() {
       "shared control-plane service requires --control-plane-database-url or VBR_DEPLOY_CONTROL_PLANE_DATABASE_URL",
     );
   }
+  const token =
+    getFlagStr("token", "").trim() ||
+    String(process.env.VBR_DEPLOY_CONTROL_PLANE_TOKEN || "").trim() ||
+    undefined;
   assertProductionArtifactStore({ objectStore });
   const server = await startNixosSharedHostControlPlaneServer({
     workspaceRoot,

@@ -23,6 +23,7 @@ import { materializeSnapshotArtifacts } from "./control-plane-artifact-materiali
 import type { ControlPlaneArtifactStore } from "./control-plane-artifact-store-types";
 import { acquireBackendNixosSharedHostLocks } from "./nixos-shared-host-control-plane-worker-locks";
 import type { ControlPlaneCredentialDirectory } from "./control-plane-credentials";
+import type { ReviewedSourceCredentialFiles } from "./nixos-shared-host-reviewed-source-git";
 export { startNixosSharedHostControlPlaneWorkerLoop } from "./nixos-shared-host-control-plane-worker-runtime";
 
 export async function runNixosSharedHostControlPlaneWorkerOnce(opts: {
@@ -32,6 +33,7 @@ export async function runNixosSharedHostControlPlaneWorkerOnce(opts: {
   workerId: string;
   objectStore?: ControlPlaneArtifactStore;
   credentialDirectory?: ControlPlaneCredentialDirectory;
+  reviewedSourceCredentials?: ReviewedSourceCredentialFiles;
 }) {
   const backend = {
     recordsRoot: opts.recordsRoot,
@@ -162,6 +164,9 @@ export async function runNixosSharedHostControlPlaneWorkerOnce(opts: {
           ...(args.shouldAbort ? { shouldAbort: args.shouldAbort } : {}),
         }),
       ...(opts.credentialDirectory ? { credentialDirectory: opts.credentialDirectory } : {}),
+      ...(opts.reviewedSourceCredentials
+        ? { reviewedSourceCredentials: opts.reviewedSourceCredentials }
+        : {}),
     });
   } finally {
     try {

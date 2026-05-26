@@ -16,6 +16,7 @@ function configYaml(credentials: string, extras = "") {
 instanceId: mini
 service:
   publicUrl: https://deploy.example.test
+  tokenFile: ${credentials}/control-plane-token
 storage:
   artifactStore:
     bucket: deploy-artifacts
@@ -26,6 +27,9 @@ database:
   urlFile: ${credentials}/control-plane-database-url
 credentials:
   directory: ${credentials}
+  defaults:
+    infisicalClientIdFilePattern: "{deploymentId}-infisical-client-id"
+    infisicalClientSecretFilePattern: "{deploymentId}-infisical-client-secret"
 reviewedSource:
   sshKeyFile: ${credentials}/reviewed-source-ssh-key
   sshKnownHostsFile: /etc/deployment-control-plane/github-known-hosts
@@ -118,10 +122,13 @@ test("loader accepts mounted config override when all required files exist", asy
       "artifact-store-access-key-id",
       "artifact-store-secret-access-key",
       "control-plane-database-url",
+      "control-plane-token",
       "reviewed-source-ssh-key",
     ]) {
       await fsp.writeFile(path.join(credentials, name), `${name}-value`, "utf8");
     }
+    await fsp.writeFile(path.join(credentials, "artifact-store-endpoint"), "https://s3.test");
+    await fsp.writeFile(path.join(credentials, "control-plane-database-url"), "pgmem://config");
     await fsp.writeFile(knownHosts, "github.com ssh-ed25519 AAAA", "utf8");
     await fsp.writeFile(
       configPath,
@@ -135,18 +142,79 @@ test("loader accepts mounted config override when all required files exist", asy
     const config = await loadControlPlaneRuntimeConfig({
       configPath,
       repoRoot: path.join(tmp, "repo"),
+      env: {},
     });
     assert.equal(config.instanceId, "mini");
   });
 });
 
+test("production loader rejects ambient credential environment variables", async () => {
+  await withScratchTemp("control-plane-runtime-config-ambient-env", async (tmp) => {
+    const credentials = path.join(tmp, "credentials");
+    const configPath = path.join(tmp, "config.yaml");
+    await fsp.mkdir(credentials, { recursive: true });
+    for (const name of [
+      "artifact-store-endpoint",
+      "artifact-store-access-key-id",
+      "artifact-store-secret-access-key",
+      "control-plane-database-url",
+      "control-plane-token",
+      "reviewed-source-ssh-key",
+      "reviewed-source-known-hosts",
+    ]) {
+      await fsp.writeFile(path.join(credentials, name), `${name}-value`, "utf8");
+    }
+    await fsp.writeFile(path.join(credentials, "artifact-store-endpoint"), "https://s3.test");
+    await fsp.writeFile(path.join(credentials, "control-plane-database-url"), "pgmem://config");
+    await fsp.writeFile(
+      configPath,
+      configYaml(credentials).replace(
+        "/etc/deployment-control-plane/github-known-hosts",
+        path.join(credentials, "reviewed-source-known-hosts"),
+      ),
+      "utf8",
+    );
+
+    await assert.rejects(
+      () =>
+        loadControlPlaneRuntimeConfig({
+          configPath,
+          repoRoot: path.join(tmp, "repo"),
+          env: {
+            VBR_DEPLOY_CONTROL_PLANE_DATABASE_URL: "postgres://user:secret@example/db",
+            AWS_SECRET_ACCESS_KEY: "secret-access-key-value",
+            VBR_DEPLOY_REVIEWED_SOURCE_SSH_KEY_FILE: "/tmp/reviewed-source-key",
+            VBR_DEPLOY_REVIEWED_SOURCE_SSH_KNOWN_HOSTS_FILE: "/tmp/reviewed-source-hosts",
+            GIT_SSH_COMMAND: "ssh -i /tmp/ambient-key",
+          },
+        }),
+      (error) =>
+        error instanceof Error &&
+        error.message.includes("VBR_DEPLOY_CONTROL_PLANE_DATABASE_URL") &&
+        error.message.includes("AWS_SECRET_ACCESS_KEY") &&
+        error.message.includes("VBR_DEPLOY_REVIEWED_SOURCE_SSH_KEY_FILE") &&
+        error.message.includes("VBR_DEPLOY_REVIEWED_SOURCE_SSH_KNOWN_HOSTS_FILE") &&
+        error.message.includes("GIT_SSH_COMMAND") &&
+        !error.message.includes("secret-access-key-value"),
+    );
+    const fixture = await loadControlPlaneRuntimeConfig({
+      configPath,
+      repoRoot: path.join(tmp, "repo"),
+      runtimeMode: "local-fixture",
+      env: { AWS_SECRET_ACCESS_KEY: "fixture-secret" },
+    });
+    assert.equal(fixture.instanceId, "mini");
+  });
+});
+
 test("redaction helper removes inline credential values from diagnostics", () => {
   const redacted = redactConfigDiagnostic(
-    "startup failed token=abc123 clientSecret=swordfish -----BEGIN PRIVATE KEY-----\nsecret\n-----END PRIVATE KEY-----",
+    "startup failed postgres://user:pass@db token=abc123 clientSecret=swordfish -----BEGIN PRIVATE KEY-----\nsecret\n-----END PRIVATE KEY-----",
   );
 
   assert.ok(!redacted.includes("abc123"));
   assert.ok(!redacted.includes("swordfish"));
+  assert.ok(!redacted.includes("user:pass"));
   assert.ok(!redacted.includes("PRIVATE KEY"));
 });
 

@@ -23,7 +23,6 @@ import {
 } from "./nixos-shared-host-control-plane-submit-finalize";
 import type { NixosSharedHostDeployRecord } from "./nixos-shared-host-records";
 import { cleanupReviewedSourceSnapshot } from "./nixos-shared-host-reviewed-source-snapshot";
-
 export async function executeSubmittedNixosSharedHostControlPlaneRun(opts: {
   submission: NixosSharedHostControlPlaneSubmission;
   submissionPath: string;
@@ -43,10 +42,8 @@ export async function executeSubmittedNixosSharedHostControlPlaneRun(opts: {
   persistRecord?: (record: NixosSharedHostDeployRecord, recordPath: string) => Promise<void>;
   assertCurrentAuthority?: () => Promise<void>;
   credentialDirectory?: import("./control-plane-credentials").ControlPlaneCredentialDirectory;
-  recoverSubmission?: (args: {
-    submissionPath: string;
-    recordsRoot: string;
-  }) => Promise<NixosSharedHostControlPlaneSubmission>;
+  reviewedSourceCredentials?: import("./nixos-shared-host-reviewed-source-git").ReviewedSourceCredentialFiles;
+  recoverSubmission?: (args: any) => Promise<NixosSharedHostControlPlaneSubmission>;
   acquireLocks?: (args: {
     recordsRoot: string;
     deployment: any;
@@ -60,6 +57,7 @@ export async function executeSubmittedNixosSharedHostControlPlaneRun(opts: {
   let lock: Awaited<ReturnType<typeof acquireNixosSharedHostControlPlaneLocks>> | undefined;
   const cleanupReviewedSource = async () =>
     await cleanupReviewedSourceSnapshot(opts.workspaceRoot, opts.snapshot);
+  const reviewedSourceCredentials = opts.reviewedSourceCredentials;
   const assertAuthority = async () => {
     await lock?.assertCurrentAuthority?.();
     await opts.assertCurrentAuthority?.();
@@ -123,6 +121,7 @@ export async function executeSubmittedNixosSharedHostControlPlaneRun(opts: {
           admittedContext: opts.snapshot.admittedContext,
           recordsRoot: opts.recordsRoot,
           ...(opts.backendDatabaseUrl ? { backendDatabaseUrl: opts.backendDatabaseUrl } : {}),
+          ...(reviewedSourceCredentials ? { reviewedSourceCredentials } : {}),
         });
       }
     } catch (error) {

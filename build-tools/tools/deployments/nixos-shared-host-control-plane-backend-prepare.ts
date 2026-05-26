@@ -49,6 +49,7 @@ import { requestedReviewedSourceFromEvidence } from "./deployment-source-revisio
 import { putVerifiedArtifactObject } from "./control-plane-artifact-store";
 import { writeBackendSnapshotArtifactObjects } from "./control-plane-artifact-snapshot-metadata";
 import type { ControlPlaneArtifactStore } from "./control-plane-artifact-store-types";
+import type { ReviewedSourceCredentialFiles } from "./nixos-shared-host-reviewed-source-git";
 
 function assertExpectedArtifactIdentities(
   snapshot: NixosSharedHostControlPlaneSnapshot,
@@ -116,11 +117,13 @@ export async function prepareBackendNixosSharedHostControlPlaneRun(opts: {
   persistMode?: "immediate" | "defer";
   serviceInstance?: DeploymentControlPlaneServiceInstance;
   objectStore?: ControlPlaneArtifactStore;
+  reviewedSourceCredentials?: ReviewedSourceCredentialFiles;
 }) {
   const submissionId = opts.submissionId || createNixosSharedHostSubmissionId();
   const requestedBy =
     opts.requestedBy || opts.admissionEvidence?.requestedBy || defaultRequestedBy();
   const requestedReviewedSource = requestedReviewedSourceFromEvidence(opts.admissionEvidence);
+  const reviewedSourceCredentials = opts.reviewedSourceCredentials;
   const reviewedSourceSnapshot =
     opts.operationKind !== "explicit_removal"
       ? await snapshotReviewedSourceForSubmission({
@@ -133,6 +136,7 @@ export async function prepareBackendNixosSharedHostControlPlaneRun(opts: {
           ...(requestedReviewedSource?.ref
             ? { requestedSourceRef: requestedReviewedSource.ref }
             : {}),
+          ...(reviewedSourceCredentials ? { reviewedSourceCredentials } : {}),
         })
       : undefined;
   const snapshot = await createNixosSharedHostControlPlaneSnapshot(

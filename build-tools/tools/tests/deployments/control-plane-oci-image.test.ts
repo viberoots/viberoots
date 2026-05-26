@@ -99,13 +99,7 @@ test("control-plane image runs service and worker with mounted config and creden
         name: serviceName,
         mounts,
         publishPort: port,
-        command: [
-          "service",
-          "--config",
-          "/etc/deployment-control-plane/config.yaml",
-          "--token",
-          "container-smoke-token",
-        ],
+        command: ["service", "--config", "/etc/deployment-control-plane/config.yaml"],
       });
       await waitForHealth(port);
       await assertContainerUser(runtime, serviceName);

@@ -195,7 +195,7 @@ test("non-NixOS local smoke profile runs service and workers when OCI runtime is
         name: serviceName,
         mounts,
         publishPort: port,
-        command: ["service", "--config", CONFIG_PATH, "--token", "host-profile-token"],
+        command: ["service", "--config", CONFIG_PATH],
       });
       await waitForHealth(port);
       assert.equal((await fetch(`http://127.0.0.1:${port}/`)).status, 404);

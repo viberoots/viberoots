@@ -28,7 +28,7 @@ import { readJsonBody, readRawBody, writeJson } from "./control-plane-http";
 import { handleControlPlanePresentationRoutes } from "./nixos-shared-host-control-plane-presentation-routes";
 import { requireReviewedBearerToken } from "./deployment-control-plane-service-token";
 import { readControlPlaneImageMetadata } from "./control-plane-image-metadata";
-
+import type { ReviewedSourceCredentialFiles } from "./nixos-shared-host-reviewed-source-git";
 export async function startNixosSharedHostControlPlaneServer(opts: {
   workspaceRoot: string;
   paths: NixosSharedHostControlPlanePaths;
@@ -42,6 +42,7 @@ export async function startNixosSharedHostControlPlaneServer(opts: {
   instanceId?: string;
   webUi?: { enabled: boolean; basePath: string };
   mcp?: { enabled: boolean; basePath: string };
+  reviewedSourceCredentials?: ReviewedSourceCredentialFiles;
 }) {
   assertReviewedServiceTokenConfigured({
     serviceToken: opts.token,
@@ -128,6 +129,9 @@ export async function startNixosSharedHostControlPlaneServer(opts: {
             localFixture: opts.localFixture,
             env: opts.env,
             objectStore: opts.objectStore,
+            ...(opts.reviewedSourceCredentials
+              ? { reviewedSourceCredentials: opts.reviewedSourceCredentials }
+              : {}),
           }),
         );
         return;

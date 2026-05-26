@@ -10,8 +10,6 @@ import {
 } from "./control-plane-process-entrypoints.helpers";
 import { runInTemp } from "../lib/test-helpers";
 
-const TOKEN = "process-entrypoint-token";
-
 test("deployment-control-plane command validates mode config overrides and credentials", async () => {
   await runInTemp("control-plane-cli-config", async (tmp) => {
     await assert.rejects(
@@ -30,7 +28,7 @@ test("deployment-control-plane command validates mode config overrides and crede
     await fsp.writeFile(malformedPath, "not: [valid\n", "utf8");
     await assert.rejects(
       () =>
-        withControlPlaneArgv(["service", "--config", malformedPath, "--token", TOKEN], async () => {
+        withControlPlaneArgv(["service", "--config", malformedPath], async () => {
           await runDeploymentControlPlaneCommand();
         }),
       /Flow sequence in block collection/,
@@ -47,8 +45,16 @@ test("deployment-control-plane command validates mode config overrides and crede
       /missing required credential files/,
     );
     const serviceConfig = await writeRuntimeConfig(path.join(tmp, "service"));
+    await assert.rejects(
+      () =>
+        withControlPlaneArgv(
+          ["service", "--config", serviceConfig.configPath, "--token", "argv-secret"],
+          runDeploymentControlPlaneCommand,
+        ),
+      /requires service\.tokenFile, not --token/,
+    );
     const service = await withControlPlaneArgv(
-      ["service", "--config", serviceConfig.configPath, "--token", TOKEN],
+      ["service", "--config", serviceConfig.configPath],
       runDeploymentControlPlaneCommand,
     );
     assert.match((service as any).url, /^http:\/\/127\.0\.0\.1:/);

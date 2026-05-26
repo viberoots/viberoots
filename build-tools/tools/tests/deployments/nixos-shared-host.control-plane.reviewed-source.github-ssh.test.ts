@@ -5,6 +5,7 @@ import { test } from "node:test";
 import { prepareBackendNixosSharedHostControlPlaneRun } from "../../deployments/nixos-shared-host-control-plane-backend-prepare";
 import { localHarnessControlPlaneDatabaseUrl } from "../../deployments/nixos-shared-host-control-plane-backend";
 import { cleanupReviewedSourceSnapshot } from "../../deployments/nixos-shared-host-reviewed-source-snapshot";
+import { gitFetchEnvForReviewedRemote } from "../../deployments/nixos-shared-host-reviewed-source-git";
 import { reviewedLaneAdmissionEvidenceFixture } from "./deployment-lane-governance.fixture";
 import { writeDemoArtifact } from "./nixos-shared-host.control-plane.helpers";
 import {
@@ -56,6 +57,31 @@ test("github reviewed-source snapshots fetch the declared repository over SSH", 
       );
     } finally {
       await cleanupReviewedSourceSnapshot(tmp, prepared.snapshot);
+    }
+  });
+});
+
+test("github reviewed-source fetch env uses mounted credentials over ambient ssh env", async () => {
+  await runInTemp("nixos-reviewed-source-mounted-ssh", async (tmp) => {
+    const key = path.join(tmp, "reviewed-source-ssh-key");
+    const knownHosts = path.join(tmp, "reviewed-source-known-hosts");
+    const previous = process.env.GIT_SSH_COMMAND;
+    process.env.GIT_SSH_COMMAND = "ssh -i /tmp/ambient-key";
+    try {
+      const result = await gitFetchEnvForReviewedRemote(tmp, "git@github.com:owner/repo.git", {
+        sshKeyFile: key,
+        sshKnownHostsFile: knownHosts,
+      });
+      assert.match(result.env?.GIT_SSH_COMMAND || "", new RegExp(`-i '${key}'`));
+      assert.match(
+        result.env?.GIT_SSH_COMMAND || "",
+        new RegExp(`UserKnownHostsFile='${knownHosts}'`),
+      );
+      assert.doesNotMatch(result.env?.GIT_SSH_COMMAND || "", /ambient-key/);
+      await result.cleanup();
+    } finally {
+      if (previous === undefined) delete process.env.GIT_SSH_COMMAND;
+      else process.env.GIT_SSH_COMMAND = previous;
     }
   });
 });

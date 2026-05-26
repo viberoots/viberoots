@@ -30,12 +30,11 @@ import { resolveServiceSubmitRequest } from "./nixos-shared-host-control-plane-s
 import { handleProtectedChallengedNixosServiceSubmit } from "./nixos-shared-host-control-plane-service-protected-submit";
 import { resolveNixosSharedHostSubmitContext } from "./nixos-shared-host-control-plane-submit-context";
 import { assertProductionArtifactStore } from "./control-plane-artifact-store";
+import type { ReviewedSourceCredentialFiles } from "./nixos-shared-host-reviewed-source-git";
 // prettier-ignore
 export { readControlPlaneCurrentStageState, readControlPlaneRecord, readControlPlaneStageHistory, readControlPlaneStatus } from "./nixos-shared-host-control-plane-service-read";
-
 // prettier-ignore
 export { handleControlPlaneRunAction, type ServiceRunActionRequest } from "./deployment-control-plane-run-action-api";
-
 type ServiceSubmitRequest =
   | NixosSharedHostControlPlaneSubmitRequest
   | CloudflarePagesControlPlaneSubmitRequest
@@ -52,15 +51,15 @@ export async function handleControlPlaneSubmit(
     localFixture?: boolean;
     env?: NodeJS.ProcessEnv;
     objectStore?: any;
+    reviewedSourceCredentials?: ReviewedSourceCredentialFiles;
   },
 ) {
   if (
     request.schemaVersion !== NIXOS_SHARED_HOST_CONTROL_PLANE_SUBMIT_REQUEST_SCHEMA &&
     request.schemaVersion !== CLOUDFLARE_PAGES_CONTROL_PLANE_SUBMIT_REQUEST_SCHEMA &&
     !isDeploymentProviderServiceSubmitRequest(request)
-  ) {
+  )
     throw new Error(`unsupported schema version: ${request.schemaVersion}`);
-  }
   assertNoProtectedSharedClientIdentityFields({
     deployment: request.deployment,
     request,
@@ -145,6 +144,7 @@ export async function handleControlPlaneSubmit(
     requestFingerprint,
     targetId: request.submissionId,
   });
+  const reviewedSourceCredentials = opts.reviewedSourceCredentials;
   if (dedupe.mode === "reused")
     return await reusedBackendSubmitResponse(opts.backend, dedupe.targetId);
   try {
@@ -216,11 +216,11 @@ export async function handleControlPlaneSubmit(
             governanceResolver,
             ...(serviceInstance ? { serviceInstance } : {}),
             ...(opts.objectStore ? { objectStore: opts.objectStore } : {}),
+            ...(reviewedSourceCredentials ? { reviewedSourceCredentials } : {}),
           })
         : await prepareBackendCloudflarePagesControlPlaneRun({
             workspaceRoot: opts.workspaceRoot,
             recordsRoot: opts.paths.recordsRoot,
-            backend: opts.backend,
             backend: opts.backend,
             request,
             resolved: resolvedRequest,

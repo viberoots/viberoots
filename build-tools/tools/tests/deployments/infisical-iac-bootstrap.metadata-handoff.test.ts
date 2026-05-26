@@ -113,7 +113,7 @@ test("metadata patch changes only reviewed non-secret handoff constants", async 
   const applied = await applyPatchToTemp(FIRST_BOOTSTRAP_SOURCE);
   assert.match(applied, /_INFISICAL_PROJECT_ID = "proj_live"/);
   assert.match(applied, /"staging": "identity_live_staging"/);
-  assert.match(applied, /"client_id": "pleomino-staging-client-id"/);
+  assert.match(applied, /"client_id": "pleomino-staging-infisical-client-id"/);
   assert.match(applied, /secret:\/\/deployments\/pleomino\/staging\/infisical-client-id/);
   assert.match(applied, /_INFISICAL_PROJECT_SLUG = "pleomino-deployments"/);
   assert.match(applied, /_INFISICAL_CLOUDFLARE_SECRET_NAME = "cloudflare_api_token"/);
@@ -138,11 +138,11 @@ test("metadata patch leaves unrelated duplicate live values unchanged", async ()
 ${FIRST_BOOTSTRAP_SOURCE}
 _UNRELATED_LIVE_PROJECT = "proj_live"
 _VAULT_RUNTIME = {"project": "proj_pleomino_deployments"}
-# "pleomino-staging-client-id" is only a comment outside reviewed metadata.
+# "pleomino-staging-infisical-client-id" is only a comment outside reviewed metadata.
 `);
   assert.match(applied, /_UNRELATED_LIVE_PROJECT = "proj_live"/);
   assert.match(applied, /_VAULT_RUNTIME = \{"project": "proj_pleomino_deployments"\}/);
-  assert.match(applied, /# "pleomino-staging-client-id" is only a comment/);
+  assert.match(applied, /# "pleomino-staging-infisical-client-id" is only a comment/);
   assert.match(applied, /_INFISICAL_PROJECT_ID = "proj_live"/);
 });
 
@@ -210,8 +210,8 @@ const LIVE_METADATA = {
       identityName: "pleomino-staging-deploy",
       clientIdRef: "secret://deployments/pleomino/staging/infisical-client-id",
       clientSecretRef: "secret://deployments/pleomino/staging/infisical-client-secret",
-      clientIdFileName: "pleomino-staging-client-id",
-      clientSecretFileName: "pleomino-staging-client-secret",
+      clientIdFileName: "pleomino-staging-infisical-client-id",
+      clientSecretFileName: "pleomino-staging-infisical-client-secret",
     },
   ],
 };

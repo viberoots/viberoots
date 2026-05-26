@@ -59,7 +59,7 @@ export async function startControlPlaneService(
     publishPort: port,
     env: { WORKSPACE_ROOT: "/workspace" },
     extraMounts: [`type=bind,source=${workspace},target=/workspace`],
-    command: ["service", "--config", CONFIG_PATH, "--token", E2E_TOKEN],
+    command: ["service", "--config", CONFIG_PATH],
   });
 }
 

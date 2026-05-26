@@ -1,5 +1,4 @@
 import * as fsp from "node:fs/promises";
-import path from "node:path";
 import YAML from "yaml";
 import {
   DEFAULT_CONTROL_PLANE_CONFIG_PATH,
@@ -12,11 +11,21 @@ import {
   normalizeAbsolutePath,
   validateBasePath,
 } from "./control-plane-runtime-config-paths";
+import {
+  redactConfigDiagnostic,
+  validateControlPlaneCredentialContract,
+  validateControlPlaneProductionEnv,
+  validateControlPlaneRuntimeConfigFiles,
+} from "./control-plane-runtime-config-validation";
+
+export { redactConfigDiagnostic, validateControlPlaneRuntimeConfigFiles };
 
 type LoadOptions = {
   configPath?: string;
   repoRoot?: string;
   validateFiles?: boolean;
+  runtimeMode?: "production" | "local-fixture";
+  env?: NodeJS.ProcessEnv;
 };
 
 export async function loadControlPlaneRuntimeConfig(
@@ -25,6 +34,9 @@ export async function loadControlPlaneRuntimeConfig(
   const configPath = options.configPath ?? DEFAULT_CONTROL_PLANE_CONFIG_PATH;
   const raw = await fsp.readFile(configPath, "utf8");
   const parsed = parseControlPlaneRuntimeConfig(raw, { repoRoot: options.repoRoot });
+  if (options.runtimeMode !== "local-fixture") {
+    validateControlPlaneProductionEnv(options.env);
+  }
   if (options.validateFiles !== false) await validateControlPlaneRuntimeConfigFiles(parsed);
   return parsed;
 }
@@ -46,16 +58,14 @@ export function parseControlPlaneRuntimeConfig(
   );
   const policy = { credentialDirectory: directory, repoRoot: options.repoRoot };
   const config = withDefaults(value, directory);
-  return {
+  const parsed = {
     ...config,
     database: {
       urlFile: assertCredentialDirectoryPath(config.database.urlFile, policy),
     },
     service: {
       ...config.service,
-      ...(config.service.tokenFile
-        ? { tokenFile: assertCredentialDirectoryPath(config.service.tokenFile, policy) }
-        : {}),
+      tokenFile: assertCredentialDirectoryPath(config.service.tokenFile, policy),
     },
     storage: {
       ...config.storage,
@@ -83,42 +93,8 @@ export function parseControlPlaneRuntimeConfig(
       ),
     },
   };
-}
-
-export async function validateControlPlaneRuntimeConfigFiles(
-  config: ControlPlaneRuntimeConfig,
-): Promise<void> {
-  const required = [
-    ["database.urlFile", config.database.urlFile],
-    ...(config.service.tokenFile
-      ? ([["service.tokenFile", config.service.tokenFile]] as const)
-      : []),
-    ["storage.artifactStore.endpointFile", config.storage.artifactStore.endpointFile],
-    ["storage.artifactStore.accessKeyIdFile", config.storage.artifactStore.accessKeyIdFile],
-    ["storage.artifactStore.secretAccessKeyFile", config.storage.artifactStore.secretAccessKeyFile],
-    ["reviewedSource.sshKeyFile", config.reviewedSource.sshKeyFile],
-    ["reviewedSource.sshKnownHostsFile", config.reviewedSource.sshKnownHostsFile],
-  ] as const;
-  const missing: string[] = [];
-  for (const [fieldName, filePath] of required) {
-    try {
-      const stat = await fsp.stat(filePath);
-      if (!stat.isFile()) missing.push(`${fieldName}: ${filePath}`);
-    } catch {
-      missing.push(`${fieldName}: ${filePath}`);
-    }
-  }
-  if (missing.length > 0)
-    throw new Error(`missing required credential files: ${missing.join(", ")}`);
-}
-
-export function redactConfigDiagnostic(value: unknown): string {
-  return String(value)
-    .replace(
-      /(client[_-]?secret|secret[_-]?access[_-]?key|password|token|authorization)=\S+/gi,
-      "$1=<redacted>",
-    )
-    .replace(/-----BEGIN [^-]+-----[\s\S]*?-----END [^-]+-----/g, "<redacted-pem>");
+  validateControlPlaneCredentialContract(parsed);
+  return parsed;
 }
 
 function withDefaults(
@@ -139,9 +115,7 @@ function withDefaults(
       host: stringValue(service.host ?? "0.0.0.0", "service.host"),
       port: numberValue(service.port ?? 7780, "service.port"),
       publicUrl: stringValue(service.publicUrl, "service.publicUrl"),
-      ...(service.tokenFile
-        ? { tokenFile: stringValue(service.tokenFile, "service.tokenFile") }
-        : {}),
+      tokenFile: stringValue(service.tokenFile, "service.tokenFile"),
     },
     storage: {
       recordsRoot: absoluteDefault(

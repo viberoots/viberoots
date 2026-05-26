@@ -18,6 +18,7 @@ function configYaml(credentials: string) {
 instanceId: pleomino
 service:
   publicUrl: https://deploy.example.test
+  tokenFile: ${credentials}/control-plane-token
 storage:
   artifactStore:
     bucket: deploy-artifacts

@@ -48,7 +48,7 @@ test("adopted project metadata handoff does not relax reviewed file-name drift",
         SOURCE,
         { allowReviewedIdHandoff: true },
       ),
-    /staging client id file name: live=unexpected-client-id-file reviewed=fixture-staging-client-id/,
+    /staging client id file name: live=unexpected-client-id-file reviewed=fixture-staging-infisical-client-id/,
   );
 });
 
@@ -67,8 +67,8 @@ const LIVE_METADATA = {
       identityName: "fixture-staging-deploy",
       clientIdRef: "secret://deployments/fixture/staging/infisical-client-id",
       clientSecretRef: "secret://deployments/fixture/staging/infisical-client-secret",
-      clientIdFileName: "fixture-staging-client-id",
-      clientSecretFileName: "fixture-staging-client-secret",
+      clientIdFileName: "fixture-staging-infisical-client-id",
+      clientSecretFileName: "fixture-staging-infisical-client-secret",
     },
   ],
 };
@@ -85,8 +85,8 @@ _INFISICAL_MACHINE_IDENTITY_IDS = {"staging": "identity_old_staging"}
 _INFISICAL_MACHINE_IDENTITY_NAMES = {"staging": "fixture-staging-deploy"}
 _INFISICAL_CREDENTIAL_FILE_NAMES = {
   "staging": {
-    "client_id": "fixture-staging-client-id",
-    "client_secret": "fixture-staging-client-secret",
+    "client_id": "fixture-staging-infisical-client-id",
+    "client_secret": "fixture-staging-infisical-client-secret",
   },
 }
 _INFISICAL_CREDENTIAL_REFS = {

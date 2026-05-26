@@ -12,6 +12,7 @@ import { readBackendDeployRecordByDeployRunId } from "./nixos-shared-host-contro
 import { resolveDeploymentGitCommit } from "./deployment-git-ref";
 import { requiredDeploymentReviewedSourceRef } from "./deployment-reviewed-source-ref";
 import { explicitReviewedCommitSha } from "./deployment-source-ref-policy";
+import type { ReviewedSourceCredentialFiles } from "./nixos-shared-host-reviewed-source-git";
 
 type RevalidationContext = {
   targetEnvironment?: {
@@ -74,6 +75,7 @@ export async function revalidateControlPlaneAdmission(opts: {
   admittedContext: RevalidationContext;
   recordsRoot?: string;
   backendDatabaseUrl?: string;
+  reviewedSourceCredentials?: ReviewedSourceCredentialFiles;
 }): Promise<void> {
   const evaluation = requirePolicyEvaluation(opts.admittedContext);
   const targetRef =
@@ -89,6 +91,9 @@ export async function revalidateControlPlaneAdmission(opts: {
       scmBackend: opts.deployment.lanePolicy.governance.scmBackend,
       repository: opts.deployment.lanePolicy.governance.repository,
       checkout: true,
+      ...(opts.reviewedSourceCredentials
+        ? { reviewedSourceCredentials: opts.reviewedSourceCredentials }
+        : {}),
     }));
   if (
     opts.admittedContext.targetEnvironment?.targetRevision &&

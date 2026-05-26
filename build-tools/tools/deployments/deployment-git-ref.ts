@@ -1,6 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import { gitFetchEnvForReviewedRemote } from "./nixos-shared-host-reviewed-source-snapshot";
 import type { DeploymentGitRemoteSource } from "./deployment-git-ref-helpers";
+import type { ReviewedSourceCredentialFiles } from "./nixos-shared-host-reviewed-source-git";
 import {
   ensureGithubRemoteRepo,
   execGit,
@@ -49,6 +50,7 @@ async function ensureDeploymentGitRepo(
   opts: {
     workspaceRoot: string;
     remoteName?: string;
+    reviewedSourceCredentials?: ReviewedSourceCredentialFiles;
   } & DeploymentGitRemoteSource,
 ): Promise<void> {
   await ensureGithubRemoteRepo(opts);
@@ -63,7 +65,11 @@ async function fetchDeploymentGitRemoteRefs(
   await ensureDeploymentGitRepo(opts);
   const remoteName = await preferredDeploymentGitRemote(opts.workspaceRoot, opts.remoteName);
   if (!remoteName) return undefined;
-  const fetchEnv = await gitFetchEnvForReviewedRemote(opts.workspaceRoot, remoteName);
+  const fetchEnv = await gitFetchEnvForReviewedRemote(
+    opts.workspaceRoot,
+    remoteName,
+    opts.reviewedSourceCredentials,
+  );
   try {
     await deploymentGitStdout(
       opts.workspaceRoot,
@@ -121,6 +127,7 @@ export async function resolveDeploymentGitCommit(
     purpose?: string;
     fetchMode?: DeploymentGitFetchMode;
     remoteName?: string;
+    reviewedSourceCredentials?: ReviewedSourceCredentialFiles;
   } & DeploymentGitRemoteSource,
 ): Promise<string> {
   const revision = opts.revision.trim();
@@ -135,6 +142,9 @@ export async function resolveDeploymentGitCommit(
       remoteName: opts.remoteName,
       scmBackend: opts.scmBackend,
       repository: opts.repository,
+      ...(opts.reviewedSourceCredentials
+        ? { reviewedSourceCredentials: opts.reviewedSourceCredentials }
+        : {}),
     });
   }
 
@@ -156,6 +166,9 @@ export async function resolveDeploymentGitCommit(
         remoteName: opts.remoteName,
         scmBackend: opts.scmBackend,
         repository: opts.repository,
+        ...(opts.reviewedSourceCredentials
+          ? { reviewedSourceCredentials: opts.reviewedSourceCredentials }
+          : {}),
       }));
   } catch (error) {
     throw new Error(

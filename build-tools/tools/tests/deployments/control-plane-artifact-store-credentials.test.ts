@@ -70,7 +70,12 @@ function runtimeConfigForTest(tmp: string, credentials: string, endpointFile: st
   return {
     instanceId: "mini",
     mode: "protected-shared" as const,
-    service: { host: "127.0.0.1", port: 7780, publicUrl: "https://deploy.test" },
+    service: {
+      host: "127.0.0.1",
+      port: 7780,
+      publicUrl: "https://deploy.test",
+      tokenFile: path.join(credentials, "control-plane-token"),
+    },
     storage: {
       recordsRoot: path.join(tmp, "records"),
       artifactStagingRoot: path.join(tmp, "artifacts"),
@@ -80,8 +85,8 @@ function runtimeConfigForTest(tmp: string, credentials: string, endpointFile: st
         bucket: "deploy-artifacts",
         region: "us-test-1",
         endpointFile,
-        accessKeyIdFile: path.join(credentials, "access"),
-        secretAccessKeyFile: path.join(credentials, "secret"),
+        accessKeyIdFile: path.join(credentials, "artifact-store-access-key-id"),
+        secretAccessKeyFile: path.join(credentials, "artifact-store-secret-access-key"),
       },
     },
     database: { urlFile: path.join(credentials, "database") },
@@ -105,8 +110,16 @@ test("artifact-store credentials are read from runtime files and errors stay red
       const credentials = path.join(tmp, "credentials");
       await fsp.mkdir(credentials, { recursive: true });
       await fsp.writeFile(path.join(credentials, "endpoint"), endpoint, "utf8");
-      await fsp.writeFile(path.join(credentials, "access"), "file-access-key", "utf8");
-      await fsp.writeFile(path.join(credentials, "secret"), "file-secret-key", "utf8");
+      await fsp.writeFile(
+        path.join(credentials, "artifact-store-access-key-id"),
+        "file-access-key",
+        "utf8",
+      );
+      await fsp.writeFile(
+        path.join(credentials, "artifact-store-secret-access-key"),
+        "file-secret-key",
+        "utf8",
+      );
       const store = await artifactStoreFromRuntimeConfig(
         runtimeConfigForTest(tmp, credentials, path.join(credentials, "endpoint")),
       );

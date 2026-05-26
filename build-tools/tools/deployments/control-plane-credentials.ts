@@ -9,7 +9,7 @@ import {
   assertCredentialDirectoryPath,
   resolveCredentialFileName,
 } from "./control-plane-runtime-config-paths";
-import { redactConfigDiagnostic } from "./control-plane-runtime-config";
+import { redactConfigDiagnostic } from "./control-plane-runtime-config-validation";
 
 export type ControlPlaneCredentialDirectory = {
   directory: string;
@@ -28,18 +28,18 @@ export function createControlPlaneCredentialDirectory(
   return {
     directory,
     resolveInfisicalCredentialFiles(request) {
-      const clientIdName =
-        request.clientIdFileName ??
-        applyDeploymentPattern(
-          config.credentials.defaults.infisicalClientIdFilePattern,
-          request.deploymentId,
-        );
-      const clientSecretName =
-        request.clientSecretFileName ??
-        applyDeploymentPattern(
-          config.credentials.defaults.infisicalClientSecretFilePattern,
-          request.deploymentId,
-        );
+      const clientIdName = exactInfisicalCredentialFileName(
+        request.clientIdFileName,
+        config.credentials.defaults.infisicalClientIdFilePattern,
+        request.deploymentId,
+        "clientIdFileName",
+      );
+      const clientSecretName = exactInfisicalCredentialFileName(
+        request.clientSecretFileName,
+        config.credentials.defaults.infisicalClientSecretFilePattern,
+        request.deploymentId,
+        "clientSecretFileName",
+      );
       return {
         ...request,
         clientIdFile: assertCredentialDirectoryPath(
@@ -63,6 +63,19 @@ export function createControlPlaneCredentialDirectory(
       }
     },
   };
+}
+
+function exactInfisicalCredentialFileName(
+  requestedName: string | undefined,
+  pattern: string,
+  deploymentId: string,
+  fieldName: string,
+): string {
+  const expected = applyDeploymentPattern(pattern, deploymentId);
+  if (requestedName !== undefined && requestedName !== expected) {
+    throw new Error(`${fieldName} must be exactly ${expected}`);
+  }
+  return expected;
 }
 
 function applyDeploymentPattern(pattern: string, deploymentId: string): string {

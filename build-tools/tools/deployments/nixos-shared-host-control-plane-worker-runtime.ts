@@ -1,6 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import type { ControlPlaneArtifactStore } from "./control-plane-artifact-store-types";
 import type { ControlPlaneCredentialDirectory } from "./control-plane-credentials";
+import type { ReviewedSourceCredentialFiles } from "./nixos-shared-host-reviewed-source-git";
 import {
   type ControlPlaneWorkerHeartbeatStatus,
   writeWorkerHeartbeat,
@@ -19,6 +20,7 @@ export function startNixosSharedHostControlPlaneWorkerLoop(opts: {
   pollMs?: number;
   objectStore?: ControlPlaneArtifactStore;
   credentialDirectory?: ControlPlaneCredentialDirectory;
+  reviewedSourceCredentials?: ReviewedSourceCredentialFiles;
   onError?: (error: unknown) => void;
   instanceId?: string;
   heartbeatMs?: number;
@@ -51,6 +53,9 @@ export function startNixosSharedHostControlPlaneWorkerLoop(opts: {
             workerId,
             ...(opts.objectStore ? { objectStore: opts.objectStore } : {}),
             ...(opts.credentialDirectory ? { credentialDirectory: opts.credentialDirectory } : {}),
+            ...(opts.reviewedSourceCredentials
+              ? { reviewedSourceCredentials: opts.reviewedSourceCredentials }
+              : {}),
           });
           if (!claimed) break;
         } catch (error) {

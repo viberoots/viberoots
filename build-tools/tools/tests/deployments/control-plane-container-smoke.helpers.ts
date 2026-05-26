@@ -35,7 +35,11 @@ export async function findContainerRuntime(): Promise<Runtime | null> {
   return null;
 }
 
-export async function writeContainerSmokeRuntimeTree(root: string, port: number) {
+export async function writeContainerSmokeRuntimeTree(
+  root: string,
+  port: number,
+  token = "container-smoke-token",
+) {
   const configDir = path.join(root, "config");
   const knownHostsPath = path.join(configDir, "github-known-hosts");
   const credentialsDir = path.join(root, "credentials");
@@ -51,6 +55,7 @@ export async function writeContainerSmokeRuntimeTree(root: string, port: number)
     "artifact-store-access-key-id": "smoke-access-key",
     "artifact-store-secret-access-key": "smoke-secret-key",
     "control-plane-database-url": "pgmem://container-smoke-secret-database-url",
+    "control-plane-token": token,
     "reviewed-source-ssh-key": [
       "-----BEGIN OPENSSH PRIVATE KEY-----",
       "smoke-ssh-key",
@@ -73,6 +78,7 @@ export async function writeContainerSmokeRuntimeTree(root: string, port: number)
       "  host: 0.0.0.0",
       `  port: ${port}`,
       "  publicUrl: http://127.0.0.1",
+      "  tokenFile: /run/deployment-control-plane/credentials/control-plane-token",
       "storage:",
       "  recordsRoot: /var/lib/deployment-control-plane/records",
       "  artifactStagingRoot: /var/lib/deployment-control-plane/artifacts",
