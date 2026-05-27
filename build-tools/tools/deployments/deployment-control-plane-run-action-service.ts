@@ -17,6 +17,7 @@ import type { NixosSharedHostControlPlaneSnapshot } from "./nixos-shared-host-co
 import { readControlPlaneJson } from "./nixos-shared-host-control-plane-store";
 import { queryBackend } from "./nixos-shared-host-control-plane-backend-db";
 import type { ServiceRunActionRequest } from "./nixos-shared-host-control-plane-service-api";
+import type { DeploymentAuthProviderConfig } from "./deployment-auth-provider-config";
 
 function failureSummary(error: unknown) {
   const err = error as { code?: unknown; message?: unknown };
@@ -25,7 +26,12 @@ function failureSummary(error: unknown) {
 
 export async function handleControlPlaneRunActionService(
   request: ServiceRunActionRequest,
-  opts: { backend: NixosSharedHostControlPlaneBackendTarget; workspaceRoot: string },
+  opts: {
+    backend: NixosSharedHostControlPlaneBackendTarget;
+    workspaceRoot: string;
+    authProvider?: DeploymentAuthProviderConfig;
+    authorizationHeader?: string | string[];
+  },
 ) {
   const envelope = request.submissionId
     ? await readBackendSubmissionEnvelopeBySubmissionId(opts.backend, request.submissionId)
@@ -51,6 +57,8 @@ export async function handleControlPlaneRunActionService(
       request,
       authorization: request.authorization,
       requestedBy: request.requestedBy,
+      authProvider: opts.authProvider,
+      authorizationHeader: opts.authorizationHeader,
     });
     const response = await submitDeploymentControlPlaneRunAction({
       workspaceRoot: opts.workspaceRoot,

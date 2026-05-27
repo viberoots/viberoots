@@ -118,6 +118,26 @@ scratch directories. Artifact payloads and execution snapshots are immutable obj
 artifact store. Deployment records, queue state, locks, heartbeats, stage state, and audit rows live
 in Postgres.
 
+## Hosted Identity Providers
+
+The control plane treats Supabase Auth, WorkOS, and the current local identity provider as
+interchangeable OIDC/JWKS identity substrates. Runtime configuration names the issuer, audience,
+JWKS URL, supported token shape, claim names, role/group mappings, service-principal mappings, CLI
+login mode, and callback host/path. Hosted providers authenticate operators and service principals;
+they do not decide deployment authorization and they do not mutate deployment providers.
+
+The control-plane service verifies tokens, maps reviewed claims into the existing submitter,
+approver, admission reporter, deploy-admin, and automation-principal grants, and records the stable
+audit principal. Missing issuer, wrong audience, stale JWKS keys, expired tokens, and missing role
+claims fail closed. The same callback contract must work behind mini nginx, a cloud load balancer,
+or another reviewed ingress as long as the external callback hostname and path match the configured
+provider redirect URI.
+
+Adjacent cache administration may use the same operator identity to issue narrowly scoped Attic
+tokens after a separate reviewed workflow authorizes that action. Browser SSO sessions, hosted auth
+provider credentials, deployment worker credentials, provider API credentials, and cache-service
+tokens remain separate credential classes.
+
 ## Orchestration Authority
 
 The Buck2-based deployment system may orchestrate every component in this topology only through

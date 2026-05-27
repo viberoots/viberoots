@@ -15,6 +15,8 @@ import {
   consumeDeploymentAuthSessionAuthorization,
   readDeploymentAuthSessionAuthorization,
 } from "./deployment-auth-session-service";
+import { authenticateDeploymentAuthProviderToken } from "./deployment-auth-provider";
+import type { DeploymentAuthProviderConfig } from "./deployment-auth-provider-config";
 import type { NixosSharedHostControlPlaneBackendTarget } from "./nixos-shared-host-control-plane-backend";
 
 type ClientAuthFields = {
@@ -37,6 +39,30 @@ function assertNoClientIdentityFields(request: ClientAuthFields) {
       "auth-required protected/shared submissions must not supply requestedBy or authorization grants",
     );
   }
+}
+
+function bearerToken(authorizationHeader: string | string[] | undefined): string | undefined {
+  const header = Array.isArray(authorizationHeader)
+    ? authorizationHeader.find((entry) => entry.trim())
+    : authorizationHeader;
+  const match = /^Bearer\s+(.+)$/i.exec(String(header || "").trim());
+  return match?.[1]?.trim() || undefined;
+}
+
+async function authorizationFromProviderToken(opts: {
+  authProvider?: DeploymentAuthProviderConfig;
+  authorizationHeader?: string | string[];
+  deployment: DeploymentTarget;
+}): Promise<DeploymentControlPlaneAuthorization | undefined> {
+  if (!opts.authProvider || opts.authProvider.kind !== "generic-oidc-jwks") return undefined;
+  const token = bearerToken(opts.authorizationHeader);
+  if (!token) return undefined;
+  const auth = await authenticateDeploymentAuthProviderToken({
+    config: opts.authProvider,
+    deployment: opts.deployment,
+    token,
+  });
+  return auth.authorization;
 }
 
 function evidenceWithPrincipal(
@@ -73,6 +99,8 @@ export async function resolveSubmitAuthorizationBoundary(opts: {
   requestedBy?: DeploymentControlPlaneAuthorization["requestedBy"];
   admissionEvidence?: DeploymentAdmissionEvidence;
   consumeAuthSession?: boolean;
+  authProvider?: DeploymentAuthProviderConfig;
+  authorizationHeader?: string | string[];
 }) {
   if (!requiresServerDerivedAuthorization(opts.deployment)) {
     assertAdmissionReportEvidenceAuthorization(
@@ -88,6 +116,19 @@ export async function resolveSubmitAuthorizationBoundary(opts: {
   }
   assertNoClientIdentityFields(opts.request);
   if (!opts.authSessionId) {
+    const providerAuthorization = await authorizationFromProviderToken(opts);
+    if (providerAuthorization) {
+      assertAdmissionReportEvidenceAuthorization(
+        opts.deployment,
+        providerAuthorization,
+        opts.admissionEvidence,
+      );
+      return {
+        authorization: providerAuthorization,
+        requestedBy: providerAuthorization.requestedBy,
+        admissionEvidence: evidenceWithPrincipal(opts.admissionEvidence, providerAuthorization),
+      };
+    }
     throw unauthorized("auth-required protected/shared submissions require authSessionId");
   }
   const resolveAuthorization =
@@ -122,6 +163,8 @@ export async function resolveRunActionAuthorizationBoundary(opts: {
   request: ClientAuthFields;
   authorization?: DeploymentControlPlaneAuthorization;
   requestedBy?: DeploymentControlPlaneAuthorization["requestedBy"];
+  authProvider?: DeploymentAuthProviderConfig;
+  authorizationHeader?: string | string[];
 }): Promise<{
   decision?: DeploymentControlPlaneAuthorizationDecision;
   authorizationSnapshot?: DeploymentControlPlaneAuthorization;
@@ -143,6 +186,18 @@ export async function resolveRunActionAuthorizationBoundary(opts: {
   }
   assertNoClientIdentityFields(opts.request);
   if (!opts.authSessionId) {
+    const providerAuthorization = await authorizationFromProviderToken(opts);
+    if (providerAuthorization) {
+      return {
+        decision: authorizeControlPlaneRunAction({
+          deployment: opts.deployment,
+          action: opts.action,
+          authorization: providerAuthorization,
+        }),
+        authorizationSnapshot: providerAuthorization,
+        requestedBy: providerAuthorization.requestedBy,
+      };
+    }
     throw unauthorized("auth-required run actions require authSessionId");
   }
   const authorization = await consumeDeploymentAuthSessionAuthorization({

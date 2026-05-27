@@ -6,6 +6,7 @@ import type {
 } from "./deployment-control-plane-contract";
 import type { DeploymentPrincipal } from "./deployment-admission-evidence";
 import type { NixosSharedHostControlPlaneBackendTarget } from "./nixos-shared-host-control-plane-backend";
+import type { DeploymentAuthProviderConfig } from "./deployment-auth-provider-config";
 
 export type ServiceRunActionRequest = DeploymentControlPlaneRunActionRequest & {
   deployRunId?: string;
@@ -16,7 +17,12 @@ export type ServiceRunActionRequest = DeploymentControlPlaneRunActionRequest & {
 
 export async function handleControlPlaneRunAction(
   request: ServiceRunActionRequest,
-  opts: { backend: NixosSharedHostControlPlaneBackendTarget; workspaceRoot: string },
+  opts: {
+    backend: NixosSharedHostControlPlaneBackendTarget;
+    workspaceRoot: string;
+    authProvider?: DeploymentAuthProviderConfig;
+    authorizationHeader?: string | string[];
+  },
 ) {
   return await handleControlPlaneRunActionService(request, opts);
 }

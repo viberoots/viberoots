@@ -22,6 +22,7 @@ import { resolveNixosSharedHostSubmitContext } from "./nixos-shared-host-control
 import { assertProductionArtifactStore } from "./control-plane-artifact-store";
 import type { ReviewedSourceCredentialFiles } from "./nixos-shared-host-reviewed-source-git";
 import { miniMigrationPreflightForNixosSubmit } from "./control-plane-mini-migration-submit";
+import type { DeploymentAuthProviderConfig } from "./deployment-auth-provider-config";
 // prettier-ignore
 export { readControlPlaneCurrentStageState, readControlPlaneRecord, readControlPlaneStageHistory, readControlPlaneStatus } from "./nixos-shared-host-control-plane-service-read";
 // prettier-ignore
@@ -42,6 +43,7 @@ export async function handleControlPlaneSubmit(
     objectStore?: any;
     reviewedSourceCredentials?: ReviewedSourceCredentialFiles;
     miniMigrationPreflight?: { enabled: boolean };
+    authProvider?: DeploymentAuthProviderConfig;
   },
 ) {
   if (
@@ -50,10 +52,7 @@ export async function handleControlPlaneSubmit(
     !isDeploymentProviderServiceSubmitRequest(request)
   )
     throw new Error(`unsupported schema version: ${request.schemaVersion}`);
-  assertNoProtectedSharedClientIdentityFields({
-    deployment: request.deployment,
-    request,
-  });
+  assertNoProtectedSharedClientIdentityFields({ deployment: request.deployment, request });
   assertProductionArtifactStore({
     localFixture: opts.localFixture,
     objectStore: opts.objectStore,
@@ -100,9 +99,8 @@ export async function handleControlPlaneSubmit(
       governanceResolver,
       ...(serviceInstance ? { serviceInstance } : {}),
       ...(opts.objectStore ? { objectStore: opts.objectStore } : {}),
-      ...(opts.miniMigrationPreflight
-        ? { miniMigrationPreflight: opts.miniMigrationPreflight }
-        : {}),
+      miniMigrationPreflight: opts.miniMigrationPreflight,
+      authProvider: opts.authProvider,
     });
   }
   const boundary =
@@ -116,6 +114,8 @@ export async function handleControlPlaneSubmit(
           authorization: resolvedRequest.authorization,
           requestedBy: resolvedRequest.requestedBy,
           admissionEvidence: resolvedRequest.admissionEvidence,
+          authProvider: opts.authProvider,
+          authorizationHeader: opts.authorizationHeader,
         })
       : {
           authorization: resolvedRequest.authorization,

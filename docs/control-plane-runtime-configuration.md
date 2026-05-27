@@ -91,6 +91,32 @@ webUi:
 mcp:
   enabled: true
   basePath: /mcp
+
+authProvider:
+  kind: generic-oidc-jwks
+  issuer: https://auth.example.com
+  audience:
+    - deployments-control-plane
+  jwksUrl: https://auth.example.com/.well-known/jwks.json
+  tokenSupport: jwt
+  cliLoginMode: pkce-public-callback
+  callback:
+    externalHost: deploy-auth.apps.example.com
+    externalPath: /oidc/callback
+  claims:
+    userIdClaim: sub
+    emailClaim: email
+    roleClaim: groups
+    servicePrincipalClaim: azp
+  roleGroups:
+    deployer:
+      - deployers
+    admissionReporter:
+      - admission-reporters
+    admin:
+      - deploy-admins
+  servicePrincipals:
+    ci-deployer: jenkins
 ```
 
 Required fields are `instanceId`, `service.publicUrl`, `service.tokenFile`,
@@ -108,6 +134,17 @@ that prefix before routing UI assets and `/api/v1/read/*` requests.
 inspection. See [Deployment Control Plane MCP](/Users/kiltyj/Code/viberoots/docs/control-plane-mcp.md)
 for the v1 tool list, authentication requirements, audit behavior, and fixture-only unauthenticated
 mode.
+
+`authProvider` describes the identity provider that authenticates operators and service principals.
+When omitted, the loader keeps the existing local OIDC identity-provider adapter defaults. Cloud
+hosts should configure `generic-oidc-jwks` with a reviewed issuer, audience, JWKS URL, explicit
+claim names, role/group mapping, service-principal mapping, CLI login mode, and public callback
+host/path. Supabase Auth and WorkOS are valid identity-provider candidates after live review, but
+they are not deployment providers and do not receive mutation authority.
+
+Auth providers only authenticate and return claims. The deployment control-plane service remains
+the authority that turns mapped claims into deployer, admission reporter, admin, or service
+principal grants; workers and provider clients do not consume browser SSO sessions directly.
 
 ## Startup Validation
 

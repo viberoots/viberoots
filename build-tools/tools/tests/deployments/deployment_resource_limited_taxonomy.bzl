@@ -49,6 +49,7 @@ RESOURCE_LIMITED_DEPLOYMENT_TESTS = {
     "build-tools/tools/tests/deployments/deployment-admission.supply-chain.replay.test.ts": True,
     "build-tools/tools/tests/deployments/deployment-phase0-admission.test.ts": True,
     "build-tools/tools/tests/deployments/deployment-artifact-proof-keys.test.ts": True,
+    "build-tools/tools/tests/deployments/deployment-auth-provider.service.test.ts": True,
     "build-tools/tools/tests/deployments/deployment-auth-session.derived-grants.service.test.ts": True,
     "build-tools/tools/tests/deployments/deployment-auth-session.admin-groups-principal.service.test.ts": True,
     "build-tools/tools/tests/deployments/deployment-auth-session.service.test.ts": True,

@@ -3,11 +3,7 @@ import http from "node:http";
 import { URL } from "node:url";
 import type { NixosSharedHostControlPlaneBackendTarget } from "./nixos-shared-host-control-plane-backend";
 import type { NixosSharedHostControlPlanePaths } from "./nixos-shared-host-control-plane-contract";
-import {
-  handleControlPlaneRunAction,
-  handleControlPlaneSubmit,
-  type ServiceRunActionRequest,
-} from "./nixos-shared-host-control-plane-service-api";
+import { handleControlPlaneSubmit } from "./nixos-shared-host-control-plane-service-api";
 import { handleControlPlaneArtifactChallenge } from "./nixos-shared-host-control-plane-service-challenge";
 import {
   handleControlPlaneReadRoute,
@@ -15,9 +11,9 @@ import {
 } from "./deployment-control-plane-read-routes";
 import {
   createDeploymentAuthLoginSession,
-  handleDeploymentAuthCallback,
   readPublicDeploymentAuthSession,
 } from "./deployment-auth-session-service";
+import { handleDeploymentAuthCallbackRoute } from "./deployment-auth-callback-route";
 import { redactDeploymentAuthText } from "./deployment-auth-redaction";
 import { createStaticWebappUploadSession } from "./static-webapp-upload-sessions";
 import type { ControlPlaneArtifactStore } from "./control-plane-artifact-store-types";
@@ -29,6 +25,8 @@ import { handleControlPlanePresentationRoutes } from "./nixos-shared-host-contro
 import { requireReviewedBearerToken } from "./deployment-control-plane-service-token";
 import { readControlPlaneImageMetadata } from "./control-plane-image-metadata";
 import type { ReviewedSourceCredentialFiles } from "./nixos-shared-host-reviewed-source-git";
+import type { DeploymentAuthProviderConfig } from "./deployment-auth-provider-config";
+import { handleDeploymentRunActionRoute } from "./deployment-run-action-route";
 export async function startNixosSharedHostControlPlaneServer(opts: {
   workspaceRoot: string;
   paths: NixosSharedHostControlPlanePaths;
@@ -44,6 +42,7 @@ export async function startNixosSharedHostControlPlaneServer(opts: {
   mcp?: { enabled: boolean; basePath: string };
   reviewedSourceCredentials?: ReviewedSourceCredentialFiles;
   miniMigrationPreflight?: { enabled: boolean };
+  authProvider?: DeploymentAuthProviderConfig;
 }) {
   assertReviewedServiceTokenConfigured({
     serviceToken: opts.token,
@@ -55,23 +54,17 @@ export async function startNixosSharedHostControlPlaneServer(opts: {
   const server = http.createServer(async (request, response) => {
     try {
       const url = new URL(request.url || "/", "http://127.0.0.1");
-      if (request.method === "GET" && url.pathname === "/oidc/callback") {
-        const code = url.searchParams.get("code") || "";
-        const state = url.searchParams.get("state") || "";
-        if (!code || !state) {
-          writeJson(response, 400, { error: "OIDC callback missing code or state" });
-          return;
-        }
-        writeJson(
+      const authCallbackPath = opts.authProvider?.callback.externalPath || "/oidc/callback";
+      if (
+        await handleDeploymentAuthCallbackRoute({
+          request,
           response,
-          200,
-          await handleDeploymentAuthCallback({
-            recordsRoot: opts.paths.recordsRoot,
-            backend,
-            code,
-            state,
-          }),
-        );
+          url,
+          callbackPath: authCallbackPath,
+          recordsRoot: opts.paths.recordsRoot,
+          backend,
+        })
+      ) {
         return;
       }
       if (request.method === "GET" && url.pathname === "/healthz") {
@@ -131,6 +124,7 @@ export async function startNixosSharedHostControlPlaneServer(opts: {
             env: opts.env,
             objectStore: opts.objectStore,
             miniMigrationPreflight: opts.miniMigrationPreflight,
+            authProvider: opts.authProvider,
             ...(opts.reviewedSourceCredentials
               ? { reviewedSourceCredentials: opts.reviewedSourceCredentials }
               : {}),
@@ -186,6 +180,7 @@ export async function startNixosSharedHostControlPlaneServer(opts: {
             recordsRoot: opts.paths.recordsRoot,
             backend,
             request: await readJsonBody(request),
+            authProvider: opts.authProvider,
           }),
         );
         return;
@@ -215,16 +210,19 @@ export async function startNixosSharedHostControlPlaneServer(opts: {
         writeJson(response, route.statusCode, route.body);
         return;
       }
-      if (request.method === "POST" && url.pathname === "/api/v1/run-actions") {
-        if (!requireReviewedBearerToken(request, response, opts)) return;
-        writeJson(
+      if (
+        await handleDeploymentRunActionRoute({
+          request,
           response,
-          200,
-          await handleControlPlaneRunAction(await readJsonBody<ServiceRunActionRequest>(request), {
-            backend,
-            workspaceRoot: opts.workspaceRoot,
-          }),
-        );
+          url,
+          backend,
+          workspaceRoot: opts.workspaceRoot,
+          token: opts.token,
+          localFixture: opts.localFixture,
+          env: opts.env,
+          authProvider: opts.authProvider,
+        })
+      ) {
         return;
       }
       writeJson(response, 404, { error: "not found" });

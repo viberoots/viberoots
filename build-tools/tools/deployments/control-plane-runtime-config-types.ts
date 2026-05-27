@@ -1,3 +1,5 @@
+import type { DeploymentAuthProviderConfig } from "./deployment-auth-provider-config";
+
 export const DEFAULT_CONTROL_PLANE_CONFIG_PATH = "/etc/deployment-control-plane/config.yaml";
 
 export type ControlPlaneMode = "protected-shared" | "dedicated";
@@ -46,6 +48,7 @@ export type ControlPlaneRuntimeConfig = {
     enabled: boolean;
     basePath: string;
   };
+  authProvider: DeploymentAuthProviderConfig;
   miniMigrationPreflight: {
     enabled: boolean;
   };

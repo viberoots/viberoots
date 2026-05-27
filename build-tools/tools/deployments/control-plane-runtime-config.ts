@@ -1,5 +1,6 @@
 import * as fsp from "node:fs/promises";
 import YAML from "yaml";
+import { normalizeAuthProviderConfig } from "./deployment-auth-provider-config";
 import {
   DEFAULT_CONTROL_PLANE_CONFIG_PATH,
   type ControlPlaneRuntimeConfig,
@@ -175,6 +176,7 @@ function withDefaults(
     },
     webUi: sectionWithBasePath(value.webUi, "webUi", "/", true),
     mcp: sectionWithBasePath(value.mcp, "mcp", "/mcp", true),
+    authProvider: normalizeAuthProviderConfig(value.authProvider),
     miniMigrationPreflight: {
       enabled: booleanValue(
         objectValue(value.miniMigrationPreflight ?? {}, "miniMigrationPreflight").enabled ?? false,

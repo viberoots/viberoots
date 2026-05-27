@@ -47,7 +47,7 @@ REVIEWED_DEPLOYMENT_TEST_OWNERSHIP = {
     "build-tools/tools/tests/deployments/deployment-auth-session.service.test.ts": True,
     "build-tools/tools/tests/deployments/deployment-auth-session.derived-grants.service.test.ts": True,
     "build-tools/tools/tests/deployments/deployment-auth-session.admin-groups-principal.service.test.ts": True,
-    "build-tools/tools/tests/deployments/deployment-auth-session.claim-mapping.test.ts": True,
+    "build-tools/tools/tests/deployments/deployment-auth-session.claim-mapping.test.ts": True, "build-tools/tools/tests/deployments/deployment-auth-provider.jwks.test.ts": True, "build-tools/tools/tests/deployments/deployment-auth-provider.service.test.ts": True,
     "build-tools/tools/tests/deployments/deployment-admin-keycloak.test.ts": True,
     "build-tools/tools/tests/deployments/deployment-admin-keycloak.realm-shape.test.ts": True,
     "build-tools/tools/tests/deployments/deployment-admin-keycloak.remote-profile.test.ts": True,

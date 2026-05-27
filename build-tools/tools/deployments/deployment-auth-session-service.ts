@@ -34,6 +34,7 @@ import {
   reviewedIdentityAdminGroupsFromOidcClaims,
 } from "./deployment-auth-session-reviewed-identity";
 import { normalizeAuthorizationSnapshot } from "./deployment-control-plane-authz";
+import type { DeploymentAuthProviderConfig } from "./deployment-auth-provider-config";
 
 const DEFAULT_SESSION_MS = 5 * 60 * 1000;
 type AuthStoreOptions = { recordsRoot: string; backend?: NixosSharedHostControlPlaneBackendTarget };
@@ -68,6 +69,7 @@ export async function createDeploymentAuthLoginSession(
   opts: AuthStoreOptions & {
     request: DeploymentAuthLoginRequest;
     env?: NodeJS.ProcessEnv;
+    authProvider?: DeploymentAuthProviderConfig;
   },
 ) {
   const store = authStore(opts);
@@ -84,7 +86,7 @@ export async function createDeploymentAuthLoginSession(
   const nonce = randomSecret();
   const now = Date.now();
   const expiresAt = new Date(now + (opts.request.expiresInMs || DEFAULT_SESSION_MS)).toISOString();
-  const redirectUri = publicRedirectUri(opts.request);
+  const redirectUri = publicRedirectUri(opts.request, opts.authProvider);
   const credentialSource = opts.request.credentialSource || "interactive_pkce";
   const session: DeploymentAuthSessionRecord = {
     schemaVersion: DEPLOYMENT_AUTH_SESSION_RECORD_SCHEMA,

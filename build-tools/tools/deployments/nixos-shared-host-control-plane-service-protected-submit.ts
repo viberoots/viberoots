@@ -6,11 +6,15 @@ import type { NixosSharedHostControlPlaneBackendTarget } from "./nixos-shared-ho
 import type { NixosSharedHostControlPlanePaths } from "./nixos-shared-host-control-plane-contract";
 import type { NixosSharedHostControlPlaneSubmitRequest } from "./nixos-shared-host-control-plane-api-contract";
 import { cleanupThenRethrowRejectedNixosSubmit } from "./nixos-shared-host-control-plane-rejection-cleanup";
-import { assertReviewedServiceBearerToken } from "./nixos-shared-host-control-plane-service-auth";
+import {
+  assertReviewedServiceBearerToken,
+  requestHasReviewedBearerToken,
+} from "./nixos-shared-host-control-plane-service-auth";
 import type { DeploymentLaneGovernanceResolver } from "./deployment-lane-governance-resolution";
 import type { DeploymentControlPlaneServiceInstance } from "./deployment-control-plane-contract";
 import type { ControlPlaneArtifactStore } from "./control-plane-artifact-store-types";
 import { miniMigrationPreflightForNixosSubmit } from "./control-plane-mini-migration-submit";
+import type { DeploymentAuthProviderConfig } from "./deployment-auth-provider-config";
 
 export async function handleProtectedChallengedNixosServiceSubmit(opts: {
   workspaceRoot: string;
@@ -28,14 +32,25 @@ export async function handleProtectedChallengedNixosServiceSubmit(opts: {
   serviceInstance?: DeploymentControlPlaneServiceInstance;
   objectStore?: ControlPlaneArtifactStore;
   miniMigrationPreflight?: { enabled: boolean };
+  authProvider?: DeploymentAuthProviderConfig;
 }) {
   try {
-    assertReviewedServiceBearerToken({
-      authorizationHeader: opts.authorizationHeader,
-      serviceToken: opts.serviceToken,
-      localFixture: opts.localFixture,
-      env: opts.env,
-    });
+    if (
+      !opts.authProvider ||
+      requestHasReviewedBearerToken({
+        authorizationHeader: opts.authorizationHeader,
+        serviceToken: opts.serviceToken,
+        localFixture: opts.localFixture,
+        env: opts.env,
+      })
+    ) {
+      assertReviewedServiceBearerToken({
+        authorizationHeader: opts.authorizationHeader,
+        serviceToken: opts.serviceToken,
+        localFixture: opts.localFixture,
+        env: opts.env,
+      });
+    }
     const boundary = await resolveSubmitAuthorizationBoundary({
       recordsRoot: opts.paths.recordsRoot,
       backend: opts.backend,
@@ -46,6 +61,8 @@ export async function handleProtectedChallengedNixosServiceSubmit(opts: {
       authorization: opts.resolvedRequest.authorization,
       requestedBy: opts.resolvedRequest.requestedBy,
       admissionEvidence: opts.resolvedRequest.admissionEvidence,
+      authProvider: opts.authProvider,
+      authorizationHeader: opts.authorizationHeader,
     });
     const authorization = boundary.authorization
       ? authorizeControlPlaneSubmit({
