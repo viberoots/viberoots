@@ -2,6 +2,7 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import type { DeploymentTarget } from "./contract";
+import { scrubControlPlaneChildEnv } from "./control-plane-process-env";
 import type {
   DeploymentAdmissionEvidence,
   DeploymentReviewedSourceEvidence,
@@ -13,7 +14,10 @@ const execFileAsync = promisify(execFile);
 
 async function gitRevision(workspaceRoot: string, revision: string): Promise<string | undefined> {
   try {
-    const { stdout } = await execFileAsync("git", ["rev-parse", revision], { cwd: workspaceRoot });
+    const { stdout } = await execFileAsync("git", ["rev-parse", revision], {
+      cwd: workspaceRoot,
+      env: scrubControlPlaneChildEnv(),
+    });
     const resolved = String(stdout || "").trim();
     return resolved || undefined;
   } catch {

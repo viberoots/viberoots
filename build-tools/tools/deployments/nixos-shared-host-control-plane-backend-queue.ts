@@ -173,6 +173,7 @@ export function startBackendSubmissionClaimLease(opts: {
   claimToken: string;
   claimMs?: number;
   heartbeatMs?: number;
+  abortSignal?: AbortSignal;
 }) {
   const claimMs = opts.claimMs ?? claimLeaseMs();
   const heartbeatMs = opts.heartbeatMs ?? claimHeartbeatMs();
@@ -193,14 +194,30 @@ export function startBackendSubmissionClaimLease(opts: {
     Math.max(25, heartbeatMs),
   );
   heartbeat.unref?.();
+  const stop = async () => {
+    if (stopped) return;
+    stopped = true;
+    clearInterval(heartbeat);
+  };
+  if (opts.abortSignal?.aborted) void stop();
+  opts.abortSignal?.addEventListener("abort", () => void stop(), { once: true });
+  const assertActive = () => {
+    if (!stopped) return;
+    throw Object.assign(
+      new Error(`shared control-plane worker ownership stopped for ${opts.submissionId}`),
+      { code: "worker_ownership_lost" },
+    );
+  };
   return {
     assertCurrentAuthority: async () => {
+      assertActive();
       const current = await currentSubmissionClaim({
         backend: opts.backend,
         submissionId: opts.submissionId,
         workerId: opts.workerId,
         claimToken: opts.claimToken,
       });
+      assertActive();
       if (!current || !(await refresh())) {
         throw Object.assign(
           new Error(`shared control-plane worker ownership lost for ${opts.submissionId}`),
@@ -208,10 +225,6 @@ export function startBackendSubmissionClaimLease(opts: {
         );
       }
     },
-    stop: async () => {
-      if (stopped) return;
-      stopped = true;
-      clearInterval(heartbeat);
-    },
+    stop,
   };
 }

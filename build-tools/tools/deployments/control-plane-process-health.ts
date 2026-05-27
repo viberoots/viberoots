@@ -45,16 +45,26 @@ export async function checkControlPlaneReadiness(opts: {
   backend: NixosSharedHostControlPlaneBackendTarget;
   objectStore?: ControlPlaneArtifactStore;
 }) {
-  await queryBackend(opts.backend, "SELECT 1");
+  const database = await checkDatabaseReadiness(opts.backend);
   const artifactStore = opts.objectStore
     ? await checkArtifactStoreReadiness(opts.objectStore)
     : { ok: false, reason: "not_configured" };
+  const workers = database.ok ? await readWorkerHeartbeats(opts.backend) : [];
   return {
-    ok: artifactStore.ok,
-    database: { ok: true },
+    ok: database.ok && artifactStore.ok,
+    database,
     artifactStore,
-    workers: await readWorkerHeartbeats(opts.backend),
+    workers,
   };
+}
+
+async function checkDatabaseReadiness(backend: NixosSharedHostControlPlaneBackendTarget) {
+  try {
+    await queryBackend(backend, "SELECT 1");
+    return { ok: true };
+  } catch {
+    return { ok: false, reason: "connectivity_check_failed" };
+  }
 }
 
 async function checkArtifactStoreReadiness(store: ControlPlaneArtifactStore) {

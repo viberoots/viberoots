@@ -1,5 +1,5 @@
 #!/usr/bin/env zx-wrapper
-import { scrubDeploymentSecretEnv } from "./deployment-secret-env";
+import { scrubControlPlaneChildEnv } from "./control-plane-process-env";
 import type { OpenTofuApplyAdapter, OpenTofuApplyAdapterResult } from "./opentofu-apply";
 
 export function createProductionOpenTofuApplyAdapter(
@@ -18,11 +18,10 @@ export function createProductionOpenTofuApplyAdapter(
       const run = await $({
         cwd: args.stackDirectory,
         stdio: "pipe",
-        env: {
-          ...scrubDeploymentSecretEnv(),
+        env: scrubControlPlaneChildEnv({
           ...args.credentialEnv,
           TF_IN_AUTOMATION: "1",
-        },
+        }),
       })`${binary} ${commandArgs}`.nothrow();
       return {
         command: {

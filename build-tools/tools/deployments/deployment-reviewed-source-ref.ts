@@ -2,6 +2,7 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import type { DeploymentTarget } from "./contract";
+import { scrubControlPlaneChildEnv } from "./control-plane-process-env";
 import {
   explicitReviewedCommitSha,
   isStaleEnvironmentBranchRef,
@@ -90,7 +91,10 @@ export async function resolveReviewedSourceRevision(opts: {
 }
 
 export async function localGitRevision(workspaceRoot: string, revision: string): Promise<string> {
-  const { stdout } = await execFileAsync("git", ["rev-parse", revision], { cwd: workspaceRoot });
+  const { stdout } = await execFileAsync("git", ["rev-parse", revision], {
+    cwd: workspaceRoot,
+    env: scrubControlPlaneChildEnv(),
+  });
   const resolved = String(stdout || "").trim();
   if (!resolved) throw new Error(`empty git revision for ${revision}`);
   return resolved;

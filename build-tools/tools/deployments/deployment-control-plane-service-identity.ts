@@ -7,6 +7,7 @@ import type { DeploymentControlPlaneServiceInstance } from "./deployment-control
 import { CLOUDFLARE_PAGES_CONTROL_PLANE_SUBMIT_REQUEST_SCHEMA } from "./cloudflare-pages-control-plane-api-contract";
 import { NIXOS_SHARED_HOST_CONTROL_PLANE_SUBMIT_REQUEST_SCHEMA } from "./nixos-shared-host-control-plane-api-contract";
 import { requiredDeploymentSourceRef, type DeploymentTarget } from "./contract";
+import { scrubControlPlaneChildEnv } from "./control-plane-process-env";
 
 const execFileAsync = promisify(execFile);
 
@@ -15,7 +16,10 @@ function trim(value: unknown): string {
 }
 
 async function gitStdout(workspaceRoot: string, args: string[]): Promise<string> {
-  const { stdout } = await execFileAsync("git", args, { cwd: workspaceRoot });
+  const { stdout } = await execFileAsync("git", args, {
+    cwd: workspaceRoot,
+    env: scrubControlPlaneChildEnv(),
+  });
   const resolved = trim(stdout);
   if (!resolved) throw new Error(`git ${args.join(" ")} returned empty output`);
   return resolved;

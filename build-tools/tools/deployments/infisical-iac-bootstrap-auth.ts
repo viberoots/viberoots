@@ -3,11 +3,12 @@ import * as os from "node:os";
 import * as path from "node:path";
 import { spawnSync } from "node:child_process";
 import type { BootstrapArgs, CommandRunner } from "./infisical-iac-bootstrap-types";
+import { scrubControlPlaneChildEnv } from "./control-plane-process-env";
 
 export const spawnCommandRunner: CommandRunner = (opts) => {
   const result = spawnSync(opts.command, opts.args, {
     cwd: opts.cwd,
-    env: { ...process.env, ...opts.env },
+    env: scrubControlPlaneChildEnv(opts.env),
     encoding: "utf8",
     stdio: opts.capture ? ["inherit", "pipe", "pipe"] : "inherit",
   });

@@ -77,6 +77,8 @@ RESOURCE_LIMITED_DEPLOYMENT_TESTS = {
     "build-tools/tools/tests/deployments/control-plane-oci-image.test.ts": True,
     "build-tools/tools/tests/deployments/control-plane-process-cli.test.ts": True,
     "build-tools/tools/tests/deployments/control-plane-process-entrypoints.test.ts": True,
+    "build-tools/tools/tests/deployments/control-plane-process-lifecycle.test.ts": True,
+    "build-tools/tools/tests/deployments/control-plane-process-shutdown-env.test.ts": True,
     "build-tools/tools/tests/deployments/control-plane-web-ui.test.ts": True,
     "build-tools/tools/tests/deployments/deployment-control-plane.restore.kubernetes.test.ts": True,
     "build-tools/tools/tests/deployments/deployment-control-plane.restore.test.ts": True,

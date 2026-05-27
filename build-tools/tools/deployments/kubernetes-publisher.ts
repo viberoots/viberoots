@@ -3,7 +3,7 @@ import * as fsp from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import type { KubernetesDeployment } from "./contract";
-import { scrubDeploymentSecretEnv } from "./deployment-secret-env";
+import { scrubControlPlaneChildEnv } from "./control-plane-process-env";
 import {
   assertKubernetesLiveStateMatchesDeployment,
   type KubernetesLiveDriftCheck,
@@ -80,8 +80,7 @@ export async function publishKubernetesComponent(opts: {
     return await $({
       cwd: opts.workspaceRoot,
       stdio: "pipe",
-      env: {
-        ...scrubDeploymentSecretEnv(),
+      env: scrubControlPlaneChildEnv({
         ...(opts.publishCredentialEnv || {}),
         HOME: paths.homePath,
         KUBECONFIG: paths.kubeconfigPath,
@@ -91,7 +90,7 @@ export async function publishKubernetesComponent(opts: {
         VBR_KUBERNETES_COMPONENT_ID: opts.componentId,
         VBR_KUBERNETES_COMPONENT_ARTIFACT: opts.artifactPath,
         VBR_KUBERNETES_RENDERED_CONFIG: opts.renderedConfigPath,
-      },
+      }),
     })`${helmBin} ${resolvedCommand}`.nothrow();
   });
   const stdout = String((run as any).stdout || "");

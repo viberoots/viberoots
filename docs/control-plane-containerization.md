@@ -131,6 +131,17 @@ The service and worker should run as two containers from one reviewed image:
 Administrative operations should run either through the service API or as tightly scoped one-shot
 containers from the same image. They should not require a third long-lived admin daemon.
 
+Service and worker containers emit structured lifecycle logs with correlation ids. `/healthz`
+remains a liveness probe and does not require database or artifact-store connectivity. `/readyz`
+returns `503` when the database, artifact store, or worker heartbeat dependency checks are not
+usable, with secret-bearing connection details redacted from the response and logs.
+
+Orchestrators should send `SIGTERM` for normal termination and allow the worker grace period to run
+before forcing the container down. Worker shutdown stops polling and stops renewal for any active
+queue-claim lease immediately; it then waits for the fenced execution path to return. A replacement
+worker must wait for the old lease expiry before claiming the submission, and the existing claim
+token, provider lock, and fencing checks still reject stale mutations from the terminated worker.
+
 The service container should serve a minimal web UI from the same HTTP origin as the control-plane
 API. This UI is intentionally basic in v1 and exists to establish browser connectivity,
 authentication/session wiring, static asset serving, and read-only API access.

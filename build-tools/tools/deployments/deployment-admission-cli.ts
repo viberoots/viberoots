@@ -4,6 +4,7 @@ import * as fsp from "node:fs/promises";
 import { promisify } from "node:util";
 import { getFlagList, getFlagStr, hasFlag } from "../lib/cli";
 import type { DeploymentTarget } from "./contract";
+import { scrubControlPlaneChildEnv } from "./control-plane-process-env";
 import {
   admitSubjectMismatchMessage,
   missingAdmitValueMessage,
@@ -79,7 +80,10 @@ function readAdmitCommitOverride(): string | undefined {
 }
 
 async function resolveGitRevision(workspaceRoot: string, revision: string): Promise<string> {
-  const { stdout } = await execFileAsync("git", ["rev-parse", revision], { cwd: workspaceRoot });
+  const { stdout } = await execFileAsync("git", ["rev-parse", revision], {
+    cwd: workspaceRoot,
+    env: scrubControlPlaneChildEnv(),
+  });
   const resolved = String(stdout || "").trim();
   if (!resolved) throw new Error(`empty git revision for ${revision}`);
   return resolved;

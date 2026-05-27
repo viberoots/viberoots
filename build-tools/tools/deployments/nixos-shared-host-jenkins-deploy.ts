@@ -4,7 +4,7 @@ import path from "node:path";
 import { getFlagBool, getFlagStr, hasFlag } from "../lib/cli";
 import { runNodeWithZx } from "../lib/node-run";
 import { findRepoRoot } from "../lib/repo";
-import { scrubDeploymentSecretEnv } from "./deployment-secret-env";
+import { scrubControlPlaneChildEnv } from "./control-plane-process-env";
 import {
   REMOTE_SSH_IDENTITY_FILE_ENV,
   REMOTE_SSH_KNOWN_HOSTS_FILE_ENV,
@@ -106,12 +106,11 @@ async function runDeployChild<T>(
       script: path.join(ctx.repoRoot, "build-tools/tools/deployments/deploy.ts"),
       args,
       cwd: process.cwd(),
-      env: {
-        ...scrubDeploymentSecretEnv(),
+      env: scrubControlPlaneChildEnv({
         ...(controlPlaneToken ? { VBR_DEPLOY_CONTROL_PLANE_TOKEN: controlPlaneToken } : {}),
         [REMOTE_SSH_IDENTITY_FILE_ENV]: ctx.sshIdentityFile,
         [REMOTE_SSH_KNOWN_HOSTS_FILE_ENV]: ctx.sshKnownHostsFile,
-      },
+      }),
       zxInitPath: path.join(ctx.repoRoot, "build-tools/tools/dev/zx-init.mjs"),
       stdio: "pipe",
     });

@@ -5,7 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
 import type { CloudflarePagesDeployment } from "./contract";
-import { scrubDeploymentSecretEnv } from "./deployment-secret-env";
+import { scrubControlPlaneChildEnv } from "./control-plane-process-env";
 
 const execFileAsync = promisify(execFile);
 
@@ -186,14 +186,13 @@ export async function publishCloudflarePagesStaticWebapp(opts: {
         ],
         {
           cwd: wranglerWorkDir,
-          env: {
-            ...scrubDeploymentSecretEnv(),
+          env: scrubControlPlaneChildEnv({
             HOME: wranglerWorkDir,
             NODE_EXTRA_CA_CERTS:
               process.env.NODE_EXTRA_CA_CERTS || process.env.SSL_CERT_FILE || undefined,
             ...(opts.apiToken ? { CLOUDFLARE_API_TOKEN: opts.apiToken } : {}),
             ...cloudflareAccountEnv(opts.deployment),
-          },
+          }),
           ...(opts.timeoutMs ? { timeout: opts.timeoutMs } : {}),
         },
       );

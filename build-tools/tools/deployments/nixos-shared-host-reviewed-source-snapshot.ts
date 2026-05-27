@@ -4,6 +4,7 @@ import { promisify } from "node:util";
 import type { DeploymentTarget } from "./contract";
 import { DeploymentAdmissionError } from "./deployment-control-plane-errors";
 import { deploymentGitStdout } from "./deployment-git-stdout";
+import { scrubControlPlaneChildEnv } from "./control-plane-process-env";
 import { requestedDeploymentReviewedSourceRef } from "./deployment-reviewed-source-ref";
 import { explicitReviewedCommitSha } from "./deployment-source-ref-policy";
 import { explicitReviewedCommitSnapshot } from "./deployment-reviewed-source-snapshot-explicit";
@@ -92,6 +93,7 @@ export async function snapshotReviewedSourceForSubmission(opts: {
   ]);
   await execFileAsync("git", ["checkout", "--quiet", "--detach", sourceRevision], {
     cwd: opts.workspaceRoot,
+    env: scrubControlPlaneChildEnv(),
   });
   const expectedSourceRevision = trim(opts.expectedSourceRevision);
   if (expectedSourceRevision && expectedSourceRevision !== sourceRevision) {
@@ -145,6 +147,9 @@ export async function cleanupReviewedSourceSnapshot(
 
 async function deleteGitRef(workspaceRoot: string, ref: string): Promise<void> {
   try {
-    await execFileAsync("git", ["update-ref", "-d", ref], { cwd: workspaceRoot });
+    await execFileAsync("git", ["update-ref", "-d", ref], {
+      cwd: workspaceRoot,
+      env: scrubControlPlaneChildEnv(),
+    });
   } catch {}
 }

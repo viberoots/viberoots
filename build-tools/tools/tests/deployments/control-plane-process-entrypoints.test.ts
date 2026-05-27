@@ -154,7 +154,7 @@ test("claim leases stop renewing after graceful worker shutdown", async () => {
     await lease.stop();
     await new Promise((resolve) => setTimeout(resolve, 600));
     assert.equal(await readQueueClaimExpiry(backend, claimed.submissionId), renewed);
-    await assert.rejects(lease.assertCurrentAuthority, /worker ownership lost/);
+    await assert.rejects(lease.assertCurrentAuthority, { code: "worker_ownership_lost" });
   });
 });
 

@@ -29,9 +29,13 @@ Service probes:
   heartbeat visibility.
 - `GET /api/v1/worker-heartbeats` returns authenticated worker heartbeat summaries.
 
-Workers write heartbeat rows while starting, running, stopping, and stopped. Graceful shutdown stops
-the poll loop and waits for the current fenced execution attempt to release its lease before the
-process exits.
+Workers write heartbeat rows while starting, running, stopping, and stopped. `SIGTERM` and
+`SIGINT` trigger the same graceful shutdown path as an explicit runtime close. Shutdown stops the
+poll loop, aborts the active worker run, and stops queue-claim lease renewal immediately. The worker
+still waits for the current fenced execution attempt to return before the process exits, but it no
+longer extends authority while waiting. Replacement workers may claim the submission only after the
+last renewed lease expires and must still pass claim-token and fencing checks before mutating
+provider state.
 
 Image metadata is non-secret and comes from the reviewed image/runtime environment:
 

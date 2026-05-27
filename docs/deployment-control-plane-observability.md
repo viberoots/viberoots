@@ -7,6 +7,8 @@ deployment control-plane records under `build-tools/tools/deployments`.
 
 - Derived operator view: `build-tools/tools/deployments/deployment-control-plane-observability.ts`
 - Shared redaction boundary: `build-tools/tools/deployments/deployment-control-plane-redaction.ts`
+- Process lifecycle logs:
+  `build-tools/tools/deployments/control-plane-process-logging.ts`
 - Durable deploy records:
   - `build-tools/tools/deployments/nixos-shared-host-records.ts`
   - `build-tools/tools/deployments/cloudflare-pages-records.ts`
@@ -59,6 +61,15 @@ Operator-visible payloads use one of these reviewed classes:
 
 This boundary applies to operator-visible deploy errors and referenced artifacts such as replay
 snapshots, execution snapshots, plan artifacts, and break-glass evidence.
+
+## Process Lifecycle Logs
+
+Long-running service and worker processes emit JSON lifecycle logs with schema
+`deployment-control-plane-process-log@1`. Each entry includes a `correlationId`, process `mode`,
+and the non-secret `instanceId` or `workerId` when available. Worker startup, shutdown, and
+execution errors use the same redaction boundary as operator-visible control-plane records, so
+provider tokens, database URLs, artifact-store keys, and secret-bearing diagnostic text are not
+logged directly.
 
 ## Operator Expectations
 

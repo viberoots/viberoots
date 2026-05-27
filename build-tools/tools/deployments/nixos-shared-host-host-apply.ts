@@ -2,7 +2,7 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { getFlagBool, getFlagList, getFlagStr, hasFlag } from "../lib/cli";
-import { scrubDeploymentSecretEnv } from "./deployment-secret-env";
+import { scrubControlPlaneChildEnv } from "./control-plane-process-env";
 import {
   defaultManagedRoot,
   hostPath,
@@ -106,7 +106,7 @@ async function runApply(argv: string[]): Promise<void> {
   try {
     await execFileAsync(file, args, {
       encoding: "utf8",
-      env: scrubDeploymentSecretEnv(),
+      env: scrubControlPlaneChildEnv(),
       maxBuffer: APPLY_MAX_BUFFER,
     });
   } catch (error: any) {
@@ -131,7 +131,7 @@ async function restartService(service: string): Promise<void> {
   try {
     await execFileAsync(file, args, {
       encoding: "utf8",
-      env: scrubDeploymentSecretEnv(),
+      env: scrubControlPlaneChildEnv(),
       maxBuffer: APPLY_MAX_BUFFER,
     });
   } catch (error: any) {

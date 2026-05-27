@@ -3,6 +3,7 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { getArgvTokens, getFlagStr, hasFlag } from "../lib/cli";
 import type { DeploymentTarget } from "./contract";
+import { scrubControlPlaneChildEnv } from "./control-plane-process-env";
 import {
   localGitRevision,
   requiredDeploymentReviewedSourceRef,
@@ -55,7 +56,10 @@ export type DeploymentAdmissionRequirementsForCli = {
 
 async function listGitRemotes(workspaceRoot: string): Promise<string[]> {
   try {
-    const { stdout } = await execFileAsync("git", ["remote"], { cwd: workspaceRoot });
+    const { stdout } = await execFileAsync("git", ["remote"], {
+      cwd: workspaceRoot,
+      env: scrubControlPlaneChildEnv(),
+    });
     return String(stdout || "")
       .split("\n")
       .map((line) => line.trim())
@@ -107,10 +111,13 @@ export async function resolveDeploymentRequiredCheckSubject(opts: {
       opts.deployment.lanePolicy.sourceRefPolicy[opts.deployment.environmentStage] ||
       "";
     const detail = firstGitErrorLine(gitErrorDetail(error));
+    const fetchCommand = await renderFetchReviewedRefCommand(opts.workspaceRoot, ref);
     throw new Error(
       [
         `deployment source ref ${ref} is not available in this git workspace for ${opts.deployment.label}`,
-        remotesMissingLine(await renderFetchReviewedRefCommand(opts.workspaceRoot, ref)),
+        fetchCommand.includes("<remote>")
+          ? `Run this first (replace <remote> with your git remote): ${fetchCommand}`
+          : `Run this first: ${fetchCommand}`,
         `Then retry: ${renderDeployCommand(currentDeployCommandArgs(opts.deployment))}`,
         "Or rerun with --admit-for-commit <sha> if you already know the reviewed commit.",
         `git detail: ${detail}`,
@@ -240,10 +247,4 @@ function stripAdmissionShortcutArgs(deployment: DeploymentTarget): string[] {
 
 function renderDeployCommand(args: string[]): string {
   return ["deploy", ...args].join(" ");
-}
-
-function remotesMissingLine(fetchCommand: string): string {
-  return fetchCommand.includes("<remote>")
-    ? `Run this first (replace <remote> with your git remote): ${fetchCommand}`
-    : `Run this first: ${fetchCommand}`;
 }

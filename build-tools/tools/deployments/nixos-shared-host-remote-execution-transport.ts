@@ -4,7 +4,7 @@ import { promisify } from "node:util";
 import { requiredDeploymentSourceRef, type DeploymentTarget } from "./contract";
 import type { DeploymentAdmissionEvidence } from "./deployment-admission-evidence";
 import { deploymentAuthMissingGrantHint, type DeploymentAuthRole } from "./deployment-auth-groups";
-import { scrubDeploymentSecretEnv } from "./deployment-secret-env";
+import { scrubControlPlaneChildEnv } from "./control-plane-process-env";
 import { redactDeploymentAuthText } from "./deployment-auth-redaction";
 import { runNixosSharedHostDirectServiceMutation } from "./nixos-shared-host-control-plane-service-front-door";
 
@@ -40,7 +40,7 @@ export async function runCommand(argv: string[]): Promise<CommandResult> {
     const { stdout, stderr } = await execFileAsync(file, args, {
       encoding: "utf8",
       maxBuffer: TRANSPORT_MAX_BUFFER,
-      env: scrubDeploymentSecretEnv(),
+      env: scrubControlPlaneChildEnv(),
     });
     return { exitCode: 0, stdout: String(stdout || ""), stderr: String(stderr || "") };
   } catch (error: any) {

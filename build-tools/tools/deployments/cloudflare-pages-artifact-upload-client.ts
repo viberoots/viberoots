@@ -4,6 +4,7 @@ import { promisify } from "node:util";
 import { createStaticWebappArtifactBundleBytes } from "./static-webapp-artifact-bundle";
 import type { CloudflarePagesArtifactInput } from "./cloudflare-pages-artifact-input";
 import type { CloudflarePagesDeployment } from "./contract";
+import { scrubControlPlaneChildEnv } from "./control-plane-process-env";
 
 const execFileAsync = promisify(execFile);
 
@@ -35,7 +36,10 @@ async function readUploadResponse(response: Response): Promise<UploadResponse> {
 
 async function gitStdout(workspaceRoot: string, args: string[]): Promise<string> {
   try {
-    const { stdout } = await execFileAsync("git", args, { cwd: workspaceRoot });
+    const { stdout } = await execFileAsync("git", args, {
+      cwd: workspaceRoot,
+      env: scrubControlPlaneChildEnv(),
+    });
     return String(stdout || "").trim();
   } catch {
     throw new Error(`git ${args.join(" ")} failed in ${workspaceRoot}`);

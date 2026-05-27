@@ -6,6 +6,7 @@ import path from "node:path";
 import { promisify } from "node:util";
 import { shSingleQuote } from "../lib/shell-quote";
 import type { DeploymentTarget } from "./contract";
+import { scrubControlPlaneChildEnv } from "./control-plane-process-env";
 import { deploymentGitStdout } from "./deployment-git-stdout";
 import { requestedDeploymentReviewedSourceRef } from "./deployment-reviewed-source-ref";
 
@@ -52,7 +53,7 @@ export function reviewedFetchTargetFor(deployment: DeploymentTarget, remoteName:
 
 async function gitCommandSucceeds(workspaceRoot: string, args: string[]): Promise<boolean> {
   try {
-    await execFileAsync("git", args, { cwd: workspaceRoot });
+    await execFileAsync("git", args, { cwd: workspaceRoot, env: scrubControlPlaneChildEnv() });
     return true;
   } catch {
     return false;
@@ -69,12 +70,18 @@ export async function ensureReviewedSourceGitRepo(
   if (scmBackend !== "github" || !repository) return;
 
   await fsp.mkdir(workspaceRoot, { recursive: true });
-  await execFileAsync("git", ["init"], { cwd: workspaceRoot });
+  await execFileAsync("git", ["init"], { cwd: workspaceRoot, env: scrubControlPlaneChildEnv() });
   const remoteUrl = githubSshRemoteForRepository(repository);
   if (await gitCommandSucceeds(workspaceRoot, ["remote", "get-url", "origin"])) {
-    await execFileAsync("git", ["remote", "set-url", "origin", remoteUrl], { cwd: workspaceRoot });
+    await execFileAsync("git", ["remote", "set-url", "origin", remoteUrl], {
+      cwd: workspaceRoot,
+      env: scrubControlPlaneChildEnv(),
+    });
   } else {
-    await execFileAsync("git", ["remote", "add", "origin", remoteUrl], { cwd: workspaceRoot });
+    await execFileAsync("git", ["remote", "add", "origin", remoteUrl], {
+      cwd: workspaceRoot,
+      env: scrubControlPlaneChildEnv(),
+    });
   }
 }
 
@@ -133,12 +140,14 @@ export async function gitFetchEnvForReviewedRemote(
   credentials?: ReviewedSourceCredentialFiles,
 ): Promise<{ env?: NodeJS.ProcessEnv; cleanup: () => Promise<void> }> {
   if (!credentials && String(process.env.GIT_SSH_COMMAND || "").trim()) {
-    return { cleanup: async () => {} };
+    return { env: scrubControlPlaneChildEnv(), cleanup: async () => {} };
   }
   const remoteUrl = isRemoteUrl(fetchTarget)
     ? fetchTarget
     : await deploymentGitStdout(workspaceRoot, ["remote", "get-url", fetchTarget]).catch(() => "");
-  if (!isGithubSshRemote(remoteUrl)) return { cleanup: async () => {} };
+  if (!isGithubSshRemote(remoteUrl)) {
+    return { env: scrubControlPlaneChildEnv(), cleanup: async () => {} };
+  }
   const configuredKnownHostsFile =
     trim(credentials?.sshKnownHostsFile) ||
     trim(process.env[REVIEWED_SOURCE_SSH_KNOWN_HOSTS_FILE_ENV]);
@@ -150,8 +159,7 @@ export async function gitFetchEnvForReviewedRemote(
   const sshKeyFile =
     trim(credentials?.sshKeyFile) || trim(process.env[REVIEWED_SOURCE_SSH_KEY_FILE_ENV]);
   return {
-    env: {
-      ...process.env,
+    env: scrubControlPlaneChildEnv({
       GIT_SSH_COMMAND: [
         "ssh",
         "-o BatchMode=yes",
@@ -159,7 +167,7 @@ export async function gitFetchEnvForReviewedRemote(
         "-o StrictHostKeyChecking=yes",
         `-o UserKnownHostsFile=${shSingleQuote(knownHostsFile)}`,
       ].join(" "),
-    },
+    }),
     cleanup: async () => {
       if (tmpDir) await fsp.rm(tmpDir, { recursive: true, force: true });
     },

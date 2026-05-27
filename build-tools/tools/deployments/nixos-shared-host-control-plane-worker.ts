@@ -11,6 +11,7 @@ import {
 import { loadControlPlaneRuntimeConfig } from "./control-plane-runtime-config";
 import type { ControlPlaneRuntimeConfig } from "./control-plane-runtime-config-types";
 import { createControlPlaneCredentialDirectory } from "./control-plane-credentials";
+import type { ControlPlaneProcessLogger } from "./control-plane-process-logging";
 import { startNixosSharedHostControlPlaneWorkerLoop } from "./nixos-shared-host-control-plane-worker-loop";
 
 export async function startControlPlaneWorkerFromRuntimeConfig(opts: {
@@ -18,6 +19,8 @@ export async function startControlPlaneWorkerFromRuntimeConfig(opts: {
   runtimeConfig: ControlPlaneRuntimeConfig;
   pollMs?: number;
   workerId?: string;
+  logger?: ControlPlaneProcessLogger;
+  correlationId?: string;
 }) {
   const objectStore = await artifactStoreFromRuntimeConfig(opts.runtimeConfig);
   const credentialDirectory = createControlPlaneCredentialDirectory(opts.runtimeConfig, {
@@ -32,6 +35,8 @@ export async function startControlPlaneWorkerFromRuntimeConfig(opts: {
     credentialDirectory,
     reviewedSourceCredentials: opts.runtimeConfig.reviewedSource,
     instanceId: opts.runtimeConfig.instanceId,
+    ...(opts.logger ? { logger: opts.logger } : {}),
+    ...(opts.correlationId ? { correlationId: opts.correlationId } : {}),
     ...(opts.pollMs ? { pollMs: opts.pollMs } : {}),
     ...(opts.workerId ? { workerId: opts.workerId } : {}),
   });

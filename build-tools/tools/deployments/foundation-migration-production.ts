@@ -1,6 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import { spawn } from "node:child_process";
 import type { FoundationMigrationAdapter, FoundationPostApplyCheck } from "./foundation-migration";
+import { scrubControlPlaneChildEnv } from "./control-plane-process-env";
 
 const FALLBACK_FAILED_CHECK = "rls_tenant_isolation";
 
@@ -18,7 +19,7 @@ function runRuntime(opts: {
 }): Promise<{ exitCode: number; stdout: string; stderr: string }> {
   return new Promise((resolve, reject) => {
     const child = spawn(runtimeBin(), opts.args, {
-      env: { ...process.env, ...opts.credentialEnv },
+      env: scrubControlPlaneChildEnv(opts.credentialEnv),
       stdio: ["ignore", "pipe", "pipe"],
     });
     let stdout = "";

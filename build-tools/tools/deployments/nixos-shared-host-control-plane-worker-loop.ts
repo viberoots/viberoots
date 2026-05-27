@@ -34,6 +34,8 @@ export async function runNixosSharedHostControlPlaneWorkerOnce(opts: {
   objectStore?: ControlPlaneArtifactStore;
   credentialDirectory?: ControlPlaneCredentialDirectory;
   reviewedSourceCredentials?: ReviewedSourceCredentialFiles;
+  abortSignal?: AbortSignal;
+  onClaimed?: (claimed: Awaited<ReturnType<typeof claimBackendQueuedSubmission>>) => Promise<void>;
 }) {
   const backend = {
     recordsRoot: opts.recordsRoot,
@@ -46,7 +48,10 @@ export async function runNixosSharedHostControlPlaneWorkerOnce(opts: {
     submissionId: claimed.submissionId,
     workerId: opts.workerId,
     claimToken: claimed.claimToken,
+    ...(opts.abortSignal ? { abortSignal: opts.abortSignal } : {}),
   });
+  await opts.onClaimed?.(claimed);
+  if (opts.abortSignal?.aborted) return true;
   let materialized: Awaited<ReturnType<typeof materializeBackendControlPlaneFiles>> | undefined;
   let materializedArtifactsRoot: string | undefined;
   let shouldPersistMaterialized = false;

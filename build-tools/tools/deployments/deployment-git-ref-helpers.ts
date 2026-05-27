@@ -2,6 +2,7 @@
 import { execFile } from "node:child_process";
 import * as fsp from "node:fs/promises";
 import { promisify } from "node:util";
+import { scrubControlPlaneChildEnv } from "./control-plane-process-env";
 
 const execFileAsync = promisify(execFile);
 
@@ -28,7 +29,10 @@ export async function execGitStdout(
   env?: NodeJS.ProcessEnv,
 ): Promise<string> {
   try {
-    const { stdout } = await execFileAsync("git", args, { cwd: workspaceRoot, env });
+    const { stdout } = await execFileAsync("git", args, {
+      cwd: workspaceRoot,
+      env: scrubControlPlaneChildEnv({}, env),
+    });
     return String(stdout || "").trim();
   } catch (error) {
     const stderr = String((error as any)?.stderr || "").trim();
@@ -40,7 +44,7 @@ export async function execGitStdout(
 
 export async function execGitSucceeds(workspaceRoot: string, args: string[]): Promise<boolean> {
   try {
-    await execFileAsync("git", args, { cwd: workspaceRoot });
+    await execFileAsync("git", args, { cwd: workspaceRoot, env: scrubControlPlaneChildEnv() });
     return true;
   } catch {
     return false;
@@ -48,7 +52,7 @@ export async function execGitSucceeds(workspaceRoot: string, args: string[]): Pr
 }
 
 export async function execGit(workspaceRoot: string, args: string[]): Promise<void> {
-  await execFileAsync("git", args, { cwd: workspaceRoot });
+  await execFileAsync("git", args, { cwd: workspaceRoot, env: scrubControlPlaneChildEnv() });
 }
 
 export async function ensureGithubRemoteRepo(

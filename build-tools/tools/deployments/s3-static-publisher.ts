@@ -2,7 +2,7 @@
 import path from "node:path";
 import { packagePathFromLabel } from "../lib/labels";
 import type { S3StaticDeployment } from "./contract";
-import { scrubDeploymentSecretEnv } from "./deployment-secret-env";
+import { scrubControlPlaneChildEnv } from "./control-plane-process-env";
 
 function awsBin(): string {
   return process.env.VBR_S3_STATIC_AWS_BIN?.trim() || "aws";
@@ -35,11 +35,10 @@ export async function publishS3StaticWebapp(opts: {
   const result = await $({
     cwd: packageDirFor(opts.workspaceRoot, opts.deployment),
     stdio: "pipe",
-    env: {
-      ...scrubDeploymentSecretEnv(),
+    env: scrubControlPlaneChildEnv({
       AWS_DEFAULT_REGION: opts.deployment.providerTarget.region,
       VBR_S3_STATIC_RENDERED_CONFIG: path.resolve(opts.renderedConfigPath),
-    },
+    }),
   })`${awsBin()} s3 sync ${path.resolve(opts.artifactDir)} s3://${opts.deployment.providerTarget.bucket} --delete --exact-timestamps`.nothrow();
   const stdout = String((result as any).stdout || "");
   const stderr = String((result as any).stderr || "");
