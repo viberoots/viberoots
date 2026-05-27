@@ -1187,3 +1187,275 @@ The project would have cloud-capable components but no safe operational migratio
 ### 10. Downsides for implementing this PR
 
 Cutover discipline adds operational ceremony and requires maintaining rollback documentation.
+
+## PR-15: Runtime credential and generated profile closure
+
+### 1. Intent
+
+Close the remaining gap between production runtime validation, NixOS container wiring, and generated
+host-profile bundles so every generated production profile can actually start one service and at
+least two workers from mounted config, file-backed credentials, and scratch state.
+
+### 2. Scope of changes
+
+- Make production runtime validation require deployment-scoped Infisical credential files for every
+  configured deployment that needs Infisical access:
+  - `{deploymentId}-infisical-client-id`
+  - `{deploymentId}-infisical-client-secret`
+- Ensure missing, unreadable, malformed, or mismatched Infisical credential files fail closed with
+  redacted diagnostics.
+- Remove the NixOS container module conflict where production containers export reviewed-source SSH
+  credential env vars that runtime config rejects.
+- Ensure NixOS module credentials are staged through `LoadCredential=` and referenced from config
+  files rather than ambient env.
+- Expand generated setup host profiles so each supported mode can start:
+  - one service
+  - at least two workers
+  - mounted runtime config
+  - mounted credential manifest files
+  - mounted scratch/cache/state paths with expected ownership
+- Make Compose/Podman, NixOS, SaaS OCI, and AWS EC2 generated profiles structurally complete rather
+  than placeholder-only where the setup command claims they are runnable.
+- Keep generated files secret-free; only paths, placeholders, and evidence references may appear.
+
+### 3. External prerequisites
+
+- None for default tests.
+- Optional local container runtime for profile smoke checks that execute generated Compose/Podman
+  profiles.
+
+### 4. Tests to be added
+
+- Add production runtime config tests that fail when required Infisical credential files are missing,
+  malformed, unreadable, or mismatched to deployment IDs.
+- Add regression tests proving NixOS container module output no longer injects
+  `VBR_DEPLOY_REVIEWED_SOURCE_SSH_KEY_FILE` or
+  `VBR_DEPLOY_REVIEWED_SOURCE_SSH_KNOWN_HOSTS_FILE` into production containers.
+- Add structural tests proving each generated profile mode includes one service and at least two
+  workers with config, credential, scratch, and digest-pinned image wiring.
+- Add generated-profile smoke tests or render-only assertions for Compose/Podman, NixOS, SaaS OCI,
+  and AWS EC2 modes.
+- Add negative tests proving incomplete generated profiles cannot be marked protected/shared-ready.
+
+### 5. Docs to be added or updated
+
+- Update `docs/control-plane-runtime-configuration.md` with required production Infisical files.
+- Update `docs/control-plane-nixos-container-module.md` with the env-free reviewed-source credential
+  staging model.
+- Update `docs/cloud-control-setup.md` with complete generated profile contents for each mode and
+  the minimum service/worker topology.
+
+### 5.5. Expected regression scope
+
+- `deployment-only`
+- If shared Nix profile helpers need changes outside deployment-owned paths, update this plan before
+  widening scope.
+
+### 6. Acceptance criteria
+
+- Production runtime config cannot start without required Infisical credential files.
+- NixOS generated containers do not export rejected reviewed-source credential env vars.
+- Every generated setup profile mode contains enough concrete files to run one service and at least
+  two workers with mounted config, credentials, and scratch state.
+- Tests fail if setup profile artifacts regress to placeholder-only service definitions.
+
+### 7. Risks
+
+- Tightening credential validation can break fixture profiles that intentionally omit Infisical.
+- Expanding generated profiles can duplicate logic already present in hand-authored host profiles.
+
+### 8. Mitigations
+
+- Keep explicit fixture/local mode separate from production validation.
+- Reuse existing profile render helpers and structural test utilities instead of maintaining parallel
+  templates.
+
+### 9. Consequences of not implementing this PR
+
+Operators could generate profiles that pass setup tests but fail at runtime or omit required worker
+capacity.
+
+### 10. Downsides for implementing this PR
+
+The setup generator becomes stricter and must track runtime credential requirements more closely.
+
+## PR-16: GitHub App reviewed-source adapter and image digest contract
+
+### 1. Intent
+
+Implement the remaining reviewed-source and image metadata contract so cloud profiles can use either
+SSH deploy keys or GitHub App credentials, and image metadata no longer reports an unknown digest.
+
+### 2. Scope of changes
+
+- Add a runtime reviewed-source adapter for GitHub App credentials:
+  - `reviewed-source-github-app-id`
+  - `reviewed-source-github-app-installation-id`
+  - `reviewed-source-github-app-private-key`
+- Extend runtime config parsing and types so reviewed-source mode is explicit and supports SSH and
+  GitHub App modes.
+- Make setup generation allow `--reviewed-source-mode github-app` only when it emits a runtime
+  consumable profile.
+- Ensure GitHub App credentials are file-backed, redacted in errors, and never converted to ambient
+  env secrets.
+- Add token/exchange or clone/fetch helper logic needed for the existing reviewed-source fetch path
+  to operate from GitHub App credentials.
+- Replace the built OCI image contract's `imageDigest = "unknown"` with a real digest or a separate
+  verified digest field produced during image build/publication.
+- Ensure image labels, contract artifacts, tests, publication evidence, and host-profile digest
+  pinning agree on the immutable image digest semantics.
+
+### 3. External prerequisites
+
+- None for default tests.
+- Optional live GitHub App credentials for live-gated reviewed-source fetch smoke.
+- Optional local image build/publish tooling for live-gated digest verification.
+
+### 4. Tests to be added
+
+- Add fixture tests for GitHub App reviewed-source config parsing, credential-file validation,
+  redaction, and missing-file failures.
+- Add reviewed-source fetch tests using a fake GitHub App token exchange or fixture adapter.
+- Add setup tests proving GitHub App mode emits only GitHub App credential files and produces a
+  runtime-consumable config.
+- Add image contract tests proving digest labels and contract fields are not `unknown`.
+- Add publication tests proving the published digest matches the contract digest or records an
+  explicit build-vs-publication digest relationship.
+- Add live-gated GitHub App fetch and image digest verification tests, skipped by default.
+
+### 5. Docs to be added or updated
+
+- Update `docs/cloud-control-setup.md` and runtime config docs with GitHub App credential filenames,
+  setup flow, and fallback to SSH mode.
+- Update image/containerization docs with the digest contract and how publication evidence relates to
+  image labels.
+
+### 5.5. Expected regression scope
+
+- `deployment-only`
+- If Nix image build internals outside deployment-owned package wiring must change, update this plan
+  before broadening scope.
+
+### 6. Acceptance criteria
+
+- GitHub App reviewed-source mode is accepted by setup only when the runtime can consume it.
+- SSH and GitHub App reviewed-source modes are both fully file-backed and mutually exclusive.
+- Image contract metadata reports a verified digest rather than `unknown`.
+- Host-profile digest pinning, publication evidence, and image contract metadata agree.
+
+### 7. Risks
+
+- GitHub App token exchange can introduce network and clock-skew edge cases.
+- Image digest availability can differ before and after registry publication.
+
+### 8. Mitigations
+
+- Keep default tests fixture-based and live GitHub/App registry checks gated.
+- Represent build digest and registry digest separately if they are genuinely different artifacts.
+
+### 9. Consequences of not implementing this PR
+
+Cloud setup remains SSH-only for reviewed source, and image metadata remains weaker than the
+production digest-pinning design.
+
+### 10. Downsides for implementing this PR
+
+Reviewed-source setup and image publication gain additional moving parts and evidence files.
+
+## PR-17: Concrete provider-capability implementations for the recommended topology
+
+### 1. Intent
+
+Move the recommended AWS/Supabase/Cloudflare/Vercel topology from placeholder provider-capability
+declarations to concrete reviewed capability definitions that can gate protected/shared use.
+
+### 2. Scope of changes
+
+- Replace generic provider-capability placeholders for selected topology components with concrete
+  declarations that include:
+  - target identity
+  - credential source
+  - lock scope
+  - preview/diff behavior
+  - mutation sequence
+  - smoke checks
+  - rollback procedure
+  - replay semantics
+  - audit evidence
+  - protected/shared eligibility
+- Add concrete capability definitions for:
+  - `aws-ec2-control-plane-host`
+  - `aws-attic-cache-service`
+  - `aws-s3-artifact-store`
+  - `aws-network-foundation`
+  - `supabase-managed-postgres`
+  - `supabase-privatelink-prerequisite`
+  - `cloudflare-edge`
+  - `vercel-operator-ui`
+  - `remote-build-worker-fleet`
+- Wire generated setup and cutover validation to require these concrete declarations when the
+  corresponding topology component is selected.
+- Support reviewed IaC or provider CLI hooks only through capability declarations with preview,
+  apply, evidence capture, rollback, and redacted output contracts.
+- Represent support-mediated or manual prerequisites as gated evidence steps rather than hidden
+  provider state.
+- Keep deployment control-plane orchestration separate from Buck2 remote execution and Nix remote
+  builder scheduling.
+
+### 3. External prerequisites
+
+- None for fixture tests.
+- Optional provider credentials for live-gated preview/smoke of individual capabilities.
+
+### 4. Tests to be added
+
+- Add structural tests for each concrete provider-capability declaration.
+- Add negative tests for missing lock scope, credential source, preview/diff, mutation sequence,
+  smoke checks, rollback, replay semantics, audit evidence, or protected/shared eligibility.
+- Add setup and cutover tests proving selected topology components cannot use placeholder
+  declarations.
+- Add tests proving raw dashboard state, raw IaC state, or manual notes do not satisfy protected/shared
+  readiness without control-plane evidence.
+- Add live-gated provider preview/smoke tests for selected capabilities, skipped by default.
+
+### 5. Docs to be added or updated
+
+- Update `docs/cloud-control-design.md` with the concrete capability catalog.
+- Update `docs/cloud-control-setup.md` and `docs/cloud-control-cutover.md` with how operators review,
+  provide evidence for, and gate each capability.
+- Document which capabilities are fully automated and which are gated prerequisites requiring manual
+  or support-mediated evidence.
+
+### 5.5. Expected regression scope
+
+- `deployment-only`
+- If provider-specific IaC modules are added outside deployment-owned paths, update this plan with
+  the expanded regression scope first.
+
+### 6. Acceptance criteria
+
+- The recommended topology cannot be generated or marked protected/shared-ready with placeholder
+  provider-capability declarations.
+- Every selected external component has a concrete capability declaration and control-plane evidence
+  contract.
+- Cutover validation rejects dashboard-only, raw-IaC-only, or unrelated capability evidence.
+- Live provider checks remain explicitly gated and safe for non-production verification.
+
+### 7. Risks
+
+- Concrete provider capabilities can accidentally encode provider-specific assumptions too early.
+- IaC/provider command hooks can expand the trusted surface of the deployment control plane.
+
+### 8. Mitigations
+
+- Keep provider actions fixture-tested by default and live-gated by provider.
+- Require redacted preview/diff and explicit rollback evidence before protected/shared eligibility.
+
+### 9. Consequences of not implementing this PR
+
+The setup and cutover tools can require provider-capability evidence but still rely on placeholder
+capabilities that do not describe real mutation authority.
+
+### 10. Downsides for implementing this PR
+
+The provider capability catalog becomes a maintained API for infrastructure and edge topology work.
