@@ -12,6 +12,8 @@ Profile files live in
 - `config.example.yaml` is the production-shaped mounted config.
 - `config.local-smoke.yaml` is a local fixture config that disables web UI and MCP exposure.
 - `podman-run.example.txt` shows equivalent direct Podman commands when Compose is unavailable.
+- `saas-oci-profile.md` describes the generic SaaS OCI substrate contract.
+- `substrate-conformance.ts` checks runtime behavior that the image cannot pin.
 
 ## Required Host Inputs
 
@@ -66,6 +68,54 @@ Compose, Docker, and Podman are only runtime substrates. They must preserve:
 Podman direct commands are included for hosts that do not run Compose. Docker-compatible Compose is
 valid only when it preserves the same mounts, commands, loopback bind, and credential semantics.
 
+## SaaS Host Capability Matrix
+
+| Substrate capability | Valid profile                                                   | Unsupported profile                |
+| -------------------- | --------------------------------------------------------------- | ---------------------------------- |
+| Image reference      | Digest-pinned OCI image                                         | Tag-only image selection           |
+| Secrets              | Mounted files under `/run/deployment-control-plane/credentials` | Secret env vars only               |
+| Scratch state        | Persistent writable mounts for records, artifacts, and runtime  | Ephemeral-only storage             |
+| Ingress              | HTTPS to the service container through reviewed routing         | Direct public container port       |
+| Egress               | Git, Infisical, Postgres, object storage, and provider APIs     | Closed or allowlist-missing egress |
+| Shutdown             | SIGTERM/SIGINT grace period before forced stop                  | Immediate kill-only lifecycle      |
+
+Platforms that cannot mount credential files are rejected for production control-plane hosting. They
+may run unrelated workloads, but they are not a valid protected/shared control-plane substrate.
+
+Selected SaaS OCI substrates:
+
+| Platform                    | Applicability                                                                                                                                                                                                      | Limitation                                                                                                                                              |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Render Docker services      | Valid when using Docker secret files, persistent disks, digest-pinned images, and one disk per service or worker profile. Secret files must be available under the configured credential directory before startup. | Render's default filesystem is ephemeral; a persistent disk is required for each scratch root that must survive restarts.                               |
+| Northflank services or jobs | Valid when using uploaded secret files, persistent volumes, digest-pinned images, and explicit service plus worker components.                                                                                     | Northflank secret files may be root-owned by default, so the profile must prove the running container user can read only the intended credential files. |
+| Google Cloud Run services   | Conditionally valid only with Secret Manager volume mounts for credentials and NFS or Cloud Storage FUSE volumes for persistent scratch state.                                                                     | Plain env-var secrets or default ephemeral instance filesystems are unsupported for the protected/shared control plane.                                 |
+
+Fly.io Machines, Railway, and tag-only app hosts are not selected production substrates for this
+profile unless a future review proves they can avoid secret env vars, provide persistent scratch
+ownership for the runtime user, and pass the same conformance suite.
+
+## Substrate Conformance
+
+Run the conformance checker from inside the candidate runtime after mounting the real production
+shape, using temporary or staging credentials only:
+
+```bash
+zx-wrapper build-tools/tools/deployments/control-plane-host-profile/substrate-conformance.ts \
+  --credential-dir /run/deployment-control-plane/credentials \
+  --scratch-dir /var/lib/deployment-control-plane/records,/var/lib/deployment-control-plane/artifacts,/var/lib/deployment-control-plane/runtime \
+  --expected-uid 10001 \
+  --expected-gid 10001 \
+  --platform render \
+  --outbound-host github.com,app.infisical.com \
+  --reference-time "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+```
+
+The checker validates cgroup visibility, active seccomp mode, mounted credential-file permissions,
+writable persistent scratch directories, scratch owner uid/gid, unsafe filesystem permission bits,
+DNS resolution, selected SaaS platform profile, and optional clock skew. Run the same tool with
+`--signal-marker <path>` as a canary command, stop the task, and confirm the marker records SIGTERM
+or SIGINT before forced termination.
+
 ## Local Smoke Hook
 
 For local fixture smoke checks, use the same image and mount `config.local-smoke.yaml` through
@@ -86,4 +136,9 @@ artifact object materialization, and redaction.
 The test skips with a clear reason when no usable OCI runtime is available. The default scenario
 uses fixture credentials and does not call live providers or Infisical. Optional live smoke remains
 disabled unless the operator explicitly sets all `VBR_CONTROL_PLANE_LIVE_*` inputs named by the
-test.
+test. SaaS substrate conformance is similarly gated by platform-specific variables such as
+`VBR_CONTROL_PLANE_LIVE_RENDER_SUBSTRATE=1`,
+`VBR_CONTROL_PLANE_LIVE_NORTHFLANK_SUBSTRATE=1`, or
+`VBR_CONTROL_PLANE_LIVE_GOOGLE_CLOUD_RUN_SUBSTRATE=1`. Run those checks from inside the named
+candidate substrate with temporary credential files, scratch mounts, expected uid/gid, and outbound
+host settings using the same variable prefix.

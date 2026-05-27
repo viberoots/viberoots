@@ -174,6 +174,12 @@ test("non-NixOS host profile docs preserve Docker and Podman boundaries", async 
   assert.match(doc, /End-To-End Fixture/i);
   assert.match(doc, /deployments_control_plane_container_e2e/);
   assert.match(doc, /one service container and two worker containers/i);
+  assert.match(doc, /SaaS Host Capability Matrix/i);
+  assert.match(doc, /Render Docker services/);
+  assert.match(doc, /Northflank services or jobs/);
+  assert.match(doc, /Google Cloud Run services/);
+  assert.match(doc, /VBR_CONTROL_PLANE_LIVE_RENDER_SUBSTRATE/);
+  assert.match(doc, /Platforms that cannot mount credential files are rejected/i);
 });
 
 test("non-NixOS local smoke profile runs service and workers when OCI runtime is available", async (t) => {
