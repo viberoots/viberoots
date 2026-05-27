@@ -1,9 +1,10 @@
 #!/usr/bin/env zx-wrapper
-import { checkControlPlaneReadiness } from "./control-plane-process-health";
+import { checkControlPlaneReadiness, readWorkerHeartbeats } from "./control-plane-process-health";
 import { readControlPlaneImageMetadata } from "./control-plane-image-metadata";
 import type { ControlPlaneArtifactStore } from "./control-plane-artifact-store-types";
 import { statusFromSubmission } from "./deployment-control-plane-status";
 import { redactControlPlaneReadModel } from "./deployment-control-plane-read-redaction";
+import { readBackendControlPlaneAuditEvents } from "./deployment-control-plane-audit";
 import {
   decodeBackendJson,
   queryBackend,
@@ -59,21 +60,32 @@ export async function readControlPlaneQueueSummary(
   });
 }
 
+export async function readControlPlaneWorkerHeartbeatSummary(
+  backend: NixosSharedHostControlPlaneBackendTarget,
+) {
+  return redactControlPlaneReadModel({
+    schemaVersion: "control-plane-read-worker-heartbeats@1",
+    workers: await readWorkerHeartbeats(backend),
+  });
+}
+
 export async function readControlPlaneDeploymentDetail(
   backend: NixosSharedHostControlPlaneBackendTarget,
   deploymentId: string,
 ) {
-  const [latest, stages] = await Promise.all([
+  const [latest, stages, auditEvents] = await Promise.all([
     readBackendLatestDeployRecordEnvelopeByDeploymentId(backend, { deploymentId }),
     readBackendCurrentStageStates(backend, { deploymentId }),
+    readBackendControlPlaneAuditEvents(backend, deploymentId),
   ]);
+  const latestRecord = latest?.record as Record<string, any> | undefined;
   return redactControlPlaneReadModel({
     schemaVersion: "control-plane-read-deployment@1",
     deploymentId,
     currentStages: stages,
-    latestRun: latest
-      ? publicDeployRecordSummary(latest.record as Record<string, any>, latest.updatedAt)
-      : null,
+    auditSummary: auditEvents.slice(-25),
+    artifactReferences: artifactReferencesFor(latestRecord),
+    latestRun: latest ? publicDeployRecordSummary(latestRecord || {}, latest.updatedAt) : null,
   });
 }
 
@@ -103,6 +115,36 @@ function publicDeployRecordSummary(record: Record<string, any>, updatedAt: strin
     releaseLineageId: record.releaseLineageId,
     deploymentMetadataFingerprint: record.deploymentMetadataFingerprint,
     progressiveRollout: record.progressiveRollout,
+  };
+}
+
+function artifactReferencesFor(record?: Record<string, any>) {
+  if (!record) return [];
+  const refs = [
+    artifactReference(record.artifact),
+    artifactReference(record.artifactObject),
+    artifactReference(record.artifactReference),
+  ].filter((ref): ref is Record<string, unknown> => Boolean(ref));
+  if (record.artifactIdentity || record.artifactLineageId) {
+    refs.unshift({
+      artifactIdentity: record.artifactIdentity || record.artifactLineageId,
+      artifactLineageId: record.artifactLineageId,
+    });
+  }
+  return refs;
+}
+
+function artifactReference(value: unknown): Record<string, unknown> | null {
+  if (!value || typeof value !== "object") return null;
+  const object = value as Record<string, unknown>;
+  return {
+    identity: object.identity || object.artifactIdentity,
+    lineageId: object.artifactLineageId,
+    digest: object.digest,
+    objectKey: object.key || object.objectKey,
+    bucket: object.bucket,
+    contentType: object.contentType,
+    sizeBytes: object.sizeBytes,
   };
 }
 

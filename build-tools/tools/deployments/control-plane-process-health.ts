@@ -37,8 +37,12 @@ export async function readWorkerHeartbeats(backend: NixosSharedHostControlPlaneB
     workerId: row.worker_id,
     instanceId: row.instance_id,
     status: row.status,
-    lastSeenAt: row.last_seen_at,
+    lastSeenAt: timestampString(row.last_seen_at),
   }));
+}
+
+function timestampString(value: unknown): string {
+  return value instanceof Date ? value.toISOString() : String(value);
 }
 
 export async function checkControlPlaneReadiness(opts: {

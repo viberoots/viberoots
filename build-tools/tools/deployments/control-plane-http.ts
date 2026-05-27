@@ -19,7 +19,15 @@ export async function readJsonBody<T>(request: http.IncomingMessage): Promise<T>
   return JSON.parse((await readRawBody(request)).toString("utf8")) as T;
 }
 
-export function writeJson(response: http.ServerResponse, statusCode: number, value: unknown) {
-  response.writeHead(statusCode, { "content-type": "application/json; charset=utf-8" });
+export function writeJson(
+  response: http.ServerResponse,
+  statusCode: number,
+  value: unknown,
+  headers: http.OutgoingHttpHeaders = {},
+) {
+  response.writeHead(statusCode, {
+    "content-type": "application/json; charset=utf-8",
+    ...headers,
+  });
   response.end(JSON.stringify(value, null, 2) + "\n");
 }
