@@ -70,6 +70,18 @@ Environment scope:
 - any narrower local-only experimentation should use a different provider family or target class rather
   than treating `mini` shared-dev targets as workstation-local mutation
 
+Cloud cutover standby scope:
+
+- after cloud-primary cutover, `mini` may stay attached to the same external Postgres and artifact
+  store as a standby host
+- `processMode: service-only` keeps mini readable while blocking workers during cutover
+- `processMode: worker-only` is reserved for reviewed recovery workflows where service ingress stays
+  elsewhere
+- `processMode: fully-disabled` preserves config and credentials while preventing accidental service
+  or worker startup
+- run [Cloud Control Cutover](/Users/kiltyj/Code/viberoots/docs/cloud-control-cutover.md)
+  validation before re-enabling workers or returning traffic to mini
+
 Provider scope:
 
 - the platform is a single `mini` host

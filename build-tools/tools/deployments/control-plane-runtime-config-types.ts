@@ -4,9 +4,16 @@ export const DEFAULT_CONTROL_PLANE_CONFIG_PATH = "/etc/deployment-control-plane/
 
 export type ControlPlaneMode = "protected-shared" | "dedicated";
 
+export type ControlPlaneProcessMode =
+  | "fully-enabled"
+  | "service-only"
+  | "worker-only"
+  | "fully-disabled";
+
 export type ControlPlaneRuntimeConfig = {
   instanceId: string;
   mode: ControlPlaneMode;
+  processMode: ControlPlaneProcessMode;
   service: {
     host: string;
     port: number;

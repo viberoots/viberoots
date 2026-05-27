@@ -1,0 +1,69 @@
+# Cloud Control Cutover, Rollback, Restore, and Break Glass
+
+Use `deployment-control-plane cutover` before moving protected/shared traffic to a cloud-primary
+host, returning traffic to mini, validating a restore, or using break-glass controls.
+
+The command consumes a JSON evidence file and refuses missing, stale, host-mismatched, or
+dashboard-only evidence:
+
+```bash
+deployment-control-plane cutover \
+  --evidence ./cloud-cutover-evidence.json \
+  --expected-host-profile aws-ec2 \
+  --expected-region us-east-1 \
+  --selected-capability aws-ec2-control-plane-host,aws-s3-artifact-store \
+  --out ./cloud-cutover-report.json
+```
+
+Required cutover evidence:
+
+- cloud service health, readiness, worker heartbeats, database connectivity, artifact-store
+  read/write/head compatibility, auth callback reachability, UI reads, and MCP reads
+- latest non-production deployment evidence from the same host profile proving traffic/ingress was
+  pointed at the cloud host and a protected/shared staging deployment succeeded through that
+  cloud-primary path
+- provider-capability audit identity, rollback procedure, and smoke evidence for every selected
+  external component
+- standby mode evidence proving mini service/worker controls prevent double execution
+- operation-specific audit evidence for cutover, rollback, restore, or break-glass use
+
+For AWS EC2 profiles, the evidence must also include selected subnets, security groups, TLS/DNS or
+ALB/NLB health, database connectivity path, Supabase PrivateLink validation when selected, and AWS
+S3 VPC endpoint evidence unless a reviewed alternate artifact backend is selected.
+
+AWS cutover evidence is conditional on the selected artifact, database, and edge paths:
+
+- ALB/NLB, TLS, and DNS health evidence is always required for AWS EC2 cutover.
+- AWS S3 is the default artifact backend. Omitting `artifactBackend` still requires AWS S3 VPC
+  endpoint evidence. Alternate S3-compatible backends must be explicitly selected and include
+  reviewed alternate backend evidence.
+- Database connectivity must declare `privatelink` or `public`. PrivateLink requires Supabase
+  PrivateLink endpoint evidence; public connectivity requires explicit TLS-validated connectivity
+  proof from the cloud host.
+- When Cloudflare edge is selected, include DNS proxy, TLS mode, WAF/rate-limit posture when used,
+  and auth callback route evidence. Cloudflare remains an edge prerequisite, not the deployment
+  authority.
+- When Vercel edge or an operator UI is selected, include project, domain, and auth callback route
+  evidence. Vercel edge settings remain browser/API routing inputs and do not own deployment
+  mutation authority.
+- When `atticd` cache service or remote build/test worker fleets are part of the topology, include
+  their provider-capability audit identity, smoke evidence, and rollback procedure. These adjacent
+  systems stay separate from the deployment control plane: `atticd` is cache infrastructure and
+  remote build/test fleets execute build-system work under Buck/Nix policy, while the deployment
+  control plane only orchestrates reviewed deployment state.
+
+Restore evidence must be tied to exported runtime config and durable state references. A restore
+report should identify database records, artifact objects, image digest, exported config digest,
+credential manifest, auth configuration, and durable submission/artifact references used for the
+drill.
+
+Mini standby modes are controlled by `processMode` in the runtime config, with CLI override via
+`--process-mode`:
+
+- `fully-enabled`: service and worker may start
+- `service-only`: service may start, worker is blocked
+- `worker-only`: worker may start, service is blocked
+- `fully-disabled`: both service and worker are blocked
+
+Break-glass evidence must prove emergency access can inspect status and pause workers while
+preserving audit records and blocking provider mutation outside normal worker authority.

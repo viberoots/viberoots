@@ -173,6 +173,11 @@ evidence. The default `aws-s3` backend still requires `--aws-vpc-endpoint`.
    Live smoke for this topology must also attach EC2-runtime evidence that proves the same
    digest-pinned service/worker image and runtime config use the selected public or PrivateLink
    Postgres path and selected S3 endpoint path before any staging deploy smoke is accepted.
+8. Before moving traffic, run the cutover validator described in
+   [Cloud Control Cutover](/Users/kiltyj/Code/viberoots/docs/cloud-control-cutover.md). The
+   validator must see fresh host-matched evidence, selected provider-capability audit evidence,
+   standby controls, restore checks, and rollback checks. Keep live staging smoke explicitly gated
+   and non-production until this report passes.
 
 ## Provider Capabilities
 

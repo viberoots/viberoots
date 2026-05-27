@@ -52,6 +52,7 @@ need to infer identity from a mutable image tag.
 ```yaml
 instanceId: mini
 mode: protected-shared
+processMode: fully-enabled
 
 service:
   host: 0.0.0.0
@@ -124,6 +125,16 @@ Required fields are `instanceId`, `service.publicUrl`, `service.tokenFile`,
 `credentials.directory`, and reviewed-source SSH files. Defaults are the values shown above for
 `mode`, service host and port, local scratch roots, artifact-store kind and region, Infisical
 filename patterns, web UI, and MCP.
+
+`processMode` controls standby behavior during cloud cutover and rollback drills:
+
+- `fully-enabled` allows both `service` and `worker` commands.
+- `service-only` allows reads and status through the service while refusing worker startup.
+- `worker-only` allows workers while refusing service startup.
+- `fully-disabled` refuses both long-running commands.
+
+Operators may pass `--process-mode` to a process command for a reviewed one-off override, but the
+same mode gate is applied before the service binds or a worker claims queue entries.
 
 `webUi.basePath` controls both the browser UI and the same-origin read APIs used by that UI. The
 base path can be `/` or a reverse-proxy prefix such as `/deploy-control-plane`; the service strips

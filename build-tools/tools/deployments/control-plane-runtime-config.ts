@@ -3,6 +3,7 @@ import YAML from "yaml";
 import { normalizeAuthProviderConfig } from "./deployment-auth-provider-config";
 import {
   DEFAULT_CONTROL_PLANE_CONFIG_PATH,
+  type ControlPlaneProcessMode,
   type ControlPlaneRuntimeConfig,
 } from "./control-plane-runtime-config-types";
 import {
@@ -61,6 +62,7 @@ export function parseControlPlaneRuntimeConfig(
   const config = withDefaults(value, directory);
   const parsed = {
     ...config,
+    processMode: processModeValue(config.processMode, "processMode"),
     database: {
       urlFile: assertCredentialDirectoryPath(config.database.urlFile, policy),
     },
@@ -112,6 +114,11 @@ function withDefaults(
   return {
     instanceId: stringValue(value.instanceId, "instanceId"),
     mode: enumValue(value.mode ?? "protected-shared", ["protected-shared", "dedicated"], "mode"),
+    processMode: enumValue(
+      value.processMode ?? "fully-enabled",
+      ["fully-enabled", "service-only", "worker-only", "fully-disabled"],
+      "processMode",
+    ),
     service: {
       host: stringValue(service.host ?? "0.0.0.0", "service.host"),
       port: numberValue(service.port ?? 7780, "service.port"),
@@ -228,4 +235,15 @@ function enumValue<T extends string>(value: unknown, choices: T[], fieldName: st
   if (typeof value !== "string" || !choices.includes(value as T))
     throw new Error(`${fieldName} has unsupported value`);
   return value as T;
+}
+
+function processModeValue(
+  value: ControlPlaneProcessMode,
+  fieldName: string,
+): ControlPlaneProcessMode {
+  return enumValue(
+    value,
+    ["fully-enabled", "service-only", "worker-only", "fully-disabled"],
+    fieldName,
+  );
 }

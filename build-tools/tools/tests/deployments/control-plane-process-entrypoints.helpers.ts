@@ -27,7 +27,7 @@ async function availablePort(): Promise<number> {
 
 export async function writeRuntimeConfig(
   tmp: string,
-  opts: { port?: number; omit?: string[] } = {},
+  opts: { port?: number; omit?: string[]; processMode?: string } = {},
 ) {
   const credentials = await fsp.mkdtemp(path.join(os.tmpdir(), "control-plane-creds-"));
   const runtimeRoot = path.join(tmp, "runtime");
@@ -59,6 +59,7 @@ export async function writeRuntimeConfig(
     configPath,
     [
       "instanceId: test-instance",
+      `processMode: ${opts.processMode || "fully-enabled"}`,
       "service:",
       "  host: 127.0.0.1",
       `  port: ${opts.port || (await availablePort())}`,

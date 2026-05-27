@@ -3,6 +3,10 @@ import { pathToFileURL } from "node:url";
 import { getFlagBool, getFlagStr, getPositionalsWithValueFlags } from "../lib/cli";
 import { findRepoRoot } from "../lib/repo";
 import { loadControlPlaneRuntimeConfig } from "./control-plane-runtime-config";
+import type {
+  ControlPlaneProcessMode,
+  ControlPlaneRuntimeConfig,
+} from "./control-plane-runtime-config-types";
 import {
   createControlPlaneCorrelationId,
   writeControlPlaneProcessLog,
@@ -10,8 +14,9 @@ import {
 import { startControlPlaneServiceFromRuntimeConfig } from "./nixos-shared-host-control-plane-service";
 import { startControlPlaneWorkerFromRuntimeConfig } from "./nixos-shared-host-control-plane-worker";
 import { runCloudControlSetupCommand } from "./cloud-control-setup";
+import { runCloudControlCutoverCommand } from "./cloud-control-cutover-cli";
 
-function command(): "service" | "worker" | "setup" {
+function command(): "service" | "worker" | "setup" | "cutover" {
   const [mode] = getPositionalsWithValueFlags([
     "artifact-backend",
     "artifact-backend-evidence",
@@ -25,7 +30,14 @@ function command(): "service" | "worker" | "setup" {
     "instance-id",
     "out",
     "poll-ms",
+    "process-mode",
     "public-url",
+    "evidence",
+    "expected-host-profile",
+    "expected-region",
+    "max-age-minutes",
+    "operation",
+    "selected-capability",
     "reviewed-source-mode",
     "service-replicas",
     "tls-evidence",
@@ -33,8 +45,10 @@ function command(): "service" | "worker" | "setup" {
     "worker-id",
     "worker-replicas",
   ]);
-  if (mode !== "service" && mode !== "worker" && mode !== "setup") {
-    throw new Error("usage: deployment-control-plane <service|worker|setup> --config <path>");
+  if (mode !== "service" && mode !== "worker" && mode !== "setup" && mode !== "cutover") {
+    throw new Error(
+      "usage: deployment-control-plane <service|worker|setup|cutover> --config <path>",
+    );
   }
   return mode;
 }
@@ -49,6 +63,10 @@ export async function runDeploymentControlPlaneCommand() {
     await runCloudControlSetupCommand();
     return undefined;
   }
+  if (mode === "cutover") {
+    await runCloudControlCutoverCommand();
+    return undefined;
+  }
   const correlationId = createControlPlaneCorrelationId(mode);
   const configPath = getFlagStr("config", "").trim();
   if (!configPath) throw new Error(`${mode} mode requires --config <path>`);
@@ -57,6 +75,8 @@ export async function runDeploymentControlPlaneCommand() {
     configPath,
     repoRoot: workspaceRoot,
   });
+  const processMode = selectedProcessMode(runtimeConfig);
+  assertProcessAllowed(mode, processMode);
   writeControlPlaneProcessLog(undefined, {
     event: "process_starting",
     correlationId,
@@ -96,6 +116,25 @@ export async function runDeploymentControlPlaneCommand() {
     instanceId: runtimeConfig.instanceId,
   });
   return worker;
+}
+
+function selectedProcessMode(runtimeConfig: ControlPlaneRuntimeConfig): ControlPlaneProcessMode {
+  const override = getFlagStr("process-mode", "").trim();
+  if (!override) return runtimeConfig.processMode;
+  if (!["fully-enabled", "service-only", "worker-only", "fully-disabled"].includes(override)) {
+    throw new Error(`unsupported process mode ${override}`);
+  }
+  return override as ControlPlaneProcessMode;
+}
+
+function assertProcessAllowed(mode: "service" | "worker", processMode: ControlPlaneProcessMode) {
+  if (processMode === "fully-disabled") throw new Error("control-plane process mode is disabled");
+  if (mode === "service" && processMode === "worker-only") {
+    throw new Error("service mode is disabled by processMode worker-only");
+  }
+  if (mode === "worker" && processMode === "service-only") {
+    throw new Error("worker mode is disabled by processMode service-only");
+  }
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {

@@ -101,6 +101,63 @@ test("deployment-control-plane setup writes a cloud host profile bundle", async 
   });
 });
 
+test("deployment-control-plane standby process modes gate service and workers", async () => {
+  await runInTemp("control-plane-cli-standby", async (tmp) => {
+    const serviceOnly = await writeRuntimeConfig(path.join(tmp, "service-only"), {
+      processMode: "service-only",
+    });
+    await assert.rejects(
+      () =>
+        withControlPlaneArgv(
+          ["worker", "--config", serviceOnly.configPath, "--worker-id", "blocked"],
+          runDeploymentControlPlaneCommand,
+        ),
+      /worker mode is disabled/,
+    );
+    const workerOnly = await writeRuntimeConfig(path.join(tmp, "worker-only"), {
+      processMode: "worker-only",
+    });
+    await assert.rejects(
+      () =>
+        withControlPlaneArgv(["service", "--config", workerOnly.configPath], async () => {
+          await runDeploymentControlPlaneCommand();
+        }),
+      /service mode is disabled/,
+    );
+    const disabled = await writeRuntimeConfig(path.join(tmp, "disabled"), {
+      processMode: "fully-disabled",
+    });
+    await assert.rejects(
+      () =>
+        withControlPlaneArgv(
+          ["worker", "--config", disabled.configPath, "--process-mode", "fully-disabled"],
+          runDeploymentControlPlaneCommand,
+        ),
+      /process mode is disabled/,
+    );
+    const reenabled = await withControlPlaneArgv(
+      [
+        "worker",
+        "--config",
+        disabled.configPath,
+        "--process-mode",
+        "fully-enabled",
+        "--worker-id",
+        "reenabled-worker",
+      ],
+      runDeploymentControlPlaneCommand,
+    );
+    assert.equal((reenabled as any).workerId, "reenabled-worker");
+    await (reenabled as any).close();
+    const service = await withControlPlaneArgv(
+      ["service", "--config", disabled.configPath, "--process-mode", "fully-enabled"],
+      runDeploymentControlPlaneCommand,
+    );
+    assert.match((service as any).url, /^http:\/\/127\.0\.0\.1:/);
+    await (service as any).close();
+  });
+});
+
 async function exists(file: string): Promise<boolean> {
   return await fsp
     .access(file)

@@ -49,6 +49,7 @@ function renderRuntimeConfig(input: CloudControlSetupInput): string {
   return YAML.stringify({
     instanceId: input.instanceId,
     mode: "protected-shared",
+    processMode: "fully-enabled",
     service: {
       host: "0.0.0.0",
       port: 7780,

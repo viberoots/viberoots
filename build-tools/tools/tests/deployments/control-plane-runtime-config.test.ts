@@ -42,6 +42,7 @@ test("runtime config parser applies container defaults", () => {
   );
 
   assert.equal(config.mode, "protected-shared");
+  assert.equal(config.processMode, "fully-enabled");
   assert.equal(config.service.host, "0.0.0.0");
   assert.equal(config.service.port, 7780);
   assert.equal(config.storage.recordsRoot, "/var/lib/deployment-control-plane/records");
@@ -62,6 +63,7 @@ test("runtime config parser accepts explicit values", () => {
       "/run/deployment-control-plane/credentials",
       `
 mode: dedicated
+processMode: service-only
 webUi:
   enabled: false
   basePath: /ui/
@@ -75,6 +77,7 @@ miniMigrationPreflight:
   );
 
   assert.equal(config.mode, "dedicated");
+  assert.equal(config.processMode, "service-only");
   assert.deepEqual(config.webUi, { enabled: false, basePath: "/ui" });
   assert.deepEqual(config.mcp, { enabled: false, basePath: "/agent-mcp" });
   assert.equal(config.miniMigrationPreflight.enabled, true);
@@ -87,6 +90,13 @@ test("runtime config parser rejects invalid enum values, base paths, and malform
         configYaml("/run/deployment-control-plane/credentials", "mode: global\n"),
       ),
     /mode has unsupported value/,
+  );
+  assert.throws(
+    () =>
+      parseControlPlaneRuntimeConfig(
+        configYaml("/run/deployment-control-plane/credentials", "processMode: ghost\n"),
+      ),
+    /processMode has unsupported value/,
   );
   assert.throws(
     () =>
