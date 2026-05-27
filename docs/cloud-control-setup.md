@@ -232,6 +232,22 @@ preview, apply, smoke, evidence, and rollback records. `supabase-privatelink-pre
 gated prerequisite when support approval is required; support tickets or dashboard notes must be
 attached as control-plane evidence and cannot replace it.
 
+Run hooks through the generated commands, replacing `<label>` with the selected deployment label:
+
+```bash
+deploy --deployment <label> --preview --provider-capability aws-ec2-control-plane-host
+deploy --deployment <label> --provider-capability aws-ec2-control-plane-host
+deploy --deployment <label> --record --provider-capability aws-ec2-control-plane-host
+deploy --deployment <label> --smoke --provider-capability aws-ec2-control-plane-host
+deploy --deployment <label> --rollback --provider-capability aws-ec2-control-plane-host
+```
+
+The command output is the reviewed hook evidence payload. It is redacted before display and names the
+capability id, target identity, credential source, lock scope, replay semantics, and audit evidence
+refs that readiness and cutover validation will accept only for that same capability. Static
+declarations, copied audit evidence refs, and hand-written JSON without the hook evidence schema do
+not satisfy protected/shared readiness.
+
 Provider dashboards, raw IaC state, and manual support actions are evidence inputs, not hidden
 deployment authority. Placeholder declarations, dashboard-only state, raw IaC state, and manual
 notes cannot mark a profile protected/shared-ready.

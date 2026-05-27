@@ -50,5 +50,6 @@ export type ProviderCapabilityDeclaration = {
     applyCommand: string;
     smokeCommand: string;
     evidenceCommand: string;
+    rollbackCommand: string;
   };
 };

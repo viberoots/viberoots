@@ -1,4 +1,8 @@
 import { capabilityDeclaration } from "../../deployments/cloud-control-setup-contract";
+import {
+  CLOUD_PROVIDER_CAPABILITY_HOOK_EVIDENCE_SCHEMA,
+  CLOUD_PROVIDER_CAPABILITY_HOOK_EVIDENCE_SOURCE,
+} from "../../deployments/cloud-control-provider-capability-hook-contract";
 
 export function evidence(overrides: Record<string, unknown> = {}) {
   return {
@@ -61,12 +65,22 @@ export function evidence(overrides: Record<string, unknown> = {}) {
 export function capabilityEvidence(id = "aws-ec2-control-plane-host") {
   const declaration = capabilityDeclaration(id);
   return {
+    schemaVersion: CLOUD_PROVIDER_CAPABILITY_HOOK_EVIDENCE_SCHEMA,
+    source: CLOUD_PROVIDER_CAPABILITY_HOOK_EVIDENCE_SOURCE,
     capabilityId: id,
+    phase: "smoke",
     declaration,
     auditEvidence: [...declaration.auditEvidence],
     auditIdentity: "operator-1",
     rollbackProcedure: true,
     smokeEvidence: true,
+    hook: { adapter: "fixture-reviewed-hook", automated: true, manualPrerequisite: false },
+    output: {
+      classification: "redact_before_display",
+      redacted: true,
+      summary: "payload redacted (sha256:fixture)",
+      fingerprint: "sha256:fixture",
+    },
   };
 }
 

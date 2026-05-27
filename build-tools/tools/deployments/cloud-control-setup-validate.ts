@@ -14,6 +14,12 @@ import {
   REQUIRED_CAPABILITY_FIELDS,
   SSH_REVIEWED_SOURCE_FILENAMES,
 } from "./cloud-control-setup-contract";
+import {
+  hookEvidenceDeclaration,
+  hookEvidenceRefs,
+  providerCapabilityHookEvidenceRecord,
+  validateProviderCapabilityHookEvidenceShape,
+} from "./cloud-control-provider-capability-hook-contract";
 
 const IMAGE_DIGEST_PATTERN = /^[a-z0-9][a-z0-9._:-]*(\/[a-z0-9][a-z0-9._-]*)+@sha256:[a-f0-9]{64}$/;
 const SECRET_PATTERN = /(secret|token|password|private.key|access.key|database.url)=/i;
@@ -131,22 +137,38 @@ function matchesConcreteCapability(
 
 export function validateProviderCapabilityEvidence(
   declarations: ProviderCapabilityDeclaration[],
-  evidenceByCapability: Record<string, string[]>,
+  evidenceByCapability: Record<string, unknown>,
 ): string[] {
   const errors: string[] = [];
   for (const declaration of declarations) {
     errors.push(...validateProviderCapabilityDeclaration(declaration));
-    const evidence = evidenceByCapability[declaration.id] || [];
-    if (evidence.length === 0) {
-      errors.push(`${declaration.id}: protected/shared readiness requires attached evidence`);
+    const evidence = providerCapabilityHookEvidenceRecord(evidenceByCapability[declaration.id]);
+    if (!evidence) {
+      errors.push(`${declaration.id}: protected/shared readiness requires hook evidence`);
       continue;
     }
-    const invalidEvidence = evidence.find((item) => INVALID_EVIDENCE_SOURCE.test(item));
+    errors.push(
+      ...validateProviderCapabilityHookEvidenceShape(declaration.id, evidence, {
+        allowedPhases: ["evidence"],
+      }),
+    );
+    const evidenceDeclaration = hookEvidenceDeclaration(evidence);
+    if (!evidenceDeclaration) {
+      errors.push(`${declaration.id}: missing hook declaration evidence`);
+    } else if (!matchesConcreteCapability(evidenceDeclaration, declaration)) {
+      errors.push(`${declaration.id}: hook declaration does not match selected capability`);
+    }
+    const refs = hookEvidenceRefs(evidence);
+    if (refs.length === 0) {
+      errors.push(`${declaration.id}: protected/shared readiness requires hook audit evidence`);
+      continue;
+    }
+    const invalidEvidence = refs.find((item) => INVALID_EVIDENCE_SOURCE.test(item));
     if (invalidEvidence) {
       errors.push(`${declaration.id}: ${invalidEvidence} is not control-plane audit evidence`);
     }
     for (const required of declaration.auditEvidence) {
-      if (!evidence.includes(required)) {
+      if (!refs.includes(required)) {
         errors.push(`${declaration.id}: missing evidence "${required}"`);
       }
     }

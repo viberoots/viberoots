@@ -1,6 +1,10 @@
 import type { CutoverEvidence } from "./cloud-control-cutover-types";
 import type { ProviderCapabilityDeclaration } from "./cloud-control-setup-types";
 import { validateProviderCapabilityDeclaration } from "./cloud-control-setup-validate";
+import {
+  hookEvidenceRefs,
+  validateProviderCapabilityHookEvidenceShape,
+} from "./cloud-control-provider-capability-hook-contract";
 
 const INVALID_SOURCE = /\b(dashboard-only|raw-iac-only|manual-notes?)\b/i;
 
@@ -25,9 +29,11 @@ function validateCapability(id: string, capability: Record<string, unknown>): st
       `${id}: raw dashboard or IaC state, or manual notes, is not control-plane audit evidence`,
     );
   }
-  if (String(capability.capabilityId || id) !== id) {
-    errors.push(`${id}: provider-capability evidence is attached to an unrelated capability`);
-  }
+  errors.push(
+    ...validateProviderCapabilityHookEvidenceShape(id, capability, {
+      allowedPhases: ["smoke"],
+    }),
+  );
   if (!declaration) {
     errors.push(`${id}: missing concrete provider-capability declaration evidence`);
   } else {
@@ -35,7 +41,7 @@ function validateCapability(id: string, capability: Record<string, unknown>): st
       errors.push(`${id}: concrete declaration belongs to unrelated capability ${declaration.id}`);
     }
     errors.push(...validateProviderCapabilityDeclaration(declaration));
-    errors.push(...validateEvidenceContract(id, declaration, evidenceRefs(capability)));
+    errors.push(...validateEvidenceContract(id, declaration, hookEvidenceRefs(capability)));
   }
   if (!capability.auditIdentity) errors.push(`${id}: missing provider-capability audit identity`);
   if (!capability.rollbackProcedure) errors.push(`${id}: missing rollback procedure evidence`);
@@ -60,12 +66,4 @@ function validateEvidenceContract(
 function providerDeclaration(value: unknown): ProviderCapabilityDeclaration | undefined {
   if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
   return value as ProviderCapabilityDeclaration;
-}
-
-function evidenceRefs(capability: Record<string, unknown>): string[] {
-  for (const name of ["auditEvidence", "evidenceRefs", "evidence"]) {
-    const value = capability[name];
-    if (Array.isArray(value)) return value.map(String).filter(Boolean);
-  }
-  return [];
 }

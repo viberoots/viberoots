@@ -35,7 +35,13 @@ test("provider capability validation rejects every required missing contract fie
 
 test("provider capability validation rejects missing reviewed hook commands", () => {
   const capability = capabilityDeclaration("aws-ec2-control-plane-host");
-  for (const field of ["previewCommand", "applyCommand", "smokeCommand", "evidenceCommand"]) {
+  for (const field of [
+    "previewCommand",
+    "applyCommand",
+    "smokeCommand",
+    "evidenceCommand",
+    "rollbackCommand",
+  ]) {
     assert.match(
       validateProviderCapabilityDeclaration({
         ...capability,

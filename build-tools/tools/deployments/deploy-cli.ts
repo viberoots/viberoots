@@ -25,6 +25,7 @@ import {
   isVercelDeployment,
 } from "./contract";
 import { runProviderDeployFrontDoor } from "./deploy-cli-provider-dispatch";
+import { maybeRunProviderCapabilityHookForCli } from "./deploy-cli-provider-capability";
 
 function requireFlag(name: string): string {
   const value = getFlagStr(name, "").trim();
@@ -90,6 +91,7 @@ export async function runDeployCli(opts: {
     publicFrontDoor: opts.publicFrontDoor,
     vaultRuntimeInputs: flags.vaultRuntimeInputs,
   });
+  if (await maybeRunProviderCapabilityHookForCli({ deployment })) return;
   if (flags.preview && flags.previewCleanup) {
     throw new Error("--preview and --preview-cleanup are mutually exclusive");
   }

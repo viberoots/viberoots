@@ -662,6 +662,13 @@ Concrete capability declarations for this topology are generated from the review
 `deployment-control-plane setup`. Each declaration defines a non-placeholder target identity shape,
 file-backed or support-mediated credential source, lock scope, redacted preview command, apply and
 smoke hooks, rollback evidence, replay semantics, audit evidence, and protected/shared eligibility.
+The hook commands are executable dispatch contracts, not placeholder shell snippets: `deploy
+--deployment <label> --provider-capability <id>` runs the reviewed adapter for the selected phase
+(`--preview`, apply by default, `--record`, `--smoke`, or `--rollback`). Each invocation records the
+concrete capability id, target identity, credential source, lock scope, replay semantics, and declared
+audit evidence before output can be used for readiness or cutover evidence. Protected/shared
+readiness and cutover reject static audit-reference lists and require
+`cloud-provider-capability-hook-evidence@1` evidence from the hook dispatcher.
 The current catalog is:
 
 - `aws-ec2-control-plane-host`: automated through reviewed AWS host-profile IaC or provider CLI

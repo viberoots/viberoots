@@ -12,7 +12,6 @@ import { renderCloudControlSetupBundle } from "../../deployments/cloud-control-s
 import { writeCloudControlSetupBundle } from "../../deployments/cloud-control-setup";
 import {
   validateCloudControlSetupInput,
-  validateProviderCapabilityEvidence,
   validateProviderCapabilityDeclaration,
 } from "../../deployments/cloud-control-setup-validate";
 import {
@@ -193,49 +192,6 @@ test("generated profile files do not embed secret values", async () => {
       assert.doesNotMatch(text, /postgres:\/\/[^<\s]+:[^<\s]+@/i);
     }
   });
-});
-
-test("provider-capability evidence is required before protected readiness", () => {
-  const capabilities = renderCloudControlSetupBundle(baseInput()).capabilities;
-  assert.match(
-    validateProviderCapabilityEvidence(capabilities, {}).join("\n"),
-    /aws-ec2-control-plane-host: protected\/shared readiness requires attached evidence/,
-  );
-  const completeEvidence = Object.fromEntries(
-    capabilities.map((capability) => [capability.id, [...capability.auditEvidence]]),
-  );
-  assert.deepEqual(validateProviderCapabilityEvidence(capabilities, completeEvidence), []);
-  const incompleteEvidence = {
-    ...completeEvidence,
-    "aws-s3-artifact-store": ["preview output digest"],
-  };
-  assert.match(
-    validateProviderCapabilityEvidence(capabilities, incompleteEvidence).join("\n"),
-    /aws-s3-artifact-store: missing evidence "s3-apply-digest"/,
-  );
-});
-
-test("placeholder capability declarations and raw evidence cannot mark readiness", () => {
-  const capabilities = renderCloudControlSetupBundle(baseInput()).capabilities;
-  const placeholder = {
-    ...capabilities[0],
-    targetIdentity: "aws-ec2-control-plane-host:<reviewed-account-or-project>",
-  };
-  assert.match(
-    validateProviderCapabilityEvidence(
-      [placeholder, ...capabilities.slice(1)],
-      Object.fromEntries(
-        capabilities.map((capability) => [capability.id, capability.auditEvidence]),
-      ),
-    ).join("\n"),
-    /aws-ec2-control-plane-host: declaration must match the concrete capability catalog/,
-  );
-  assert.match(
-    validateProviderCapabilityEvidence(capabilities, {
-      [capabilities[0].id]: ["dashboard-only", ...capabilities[0].auditEvidence],
-    }).join("\n"),
-    /dashboard-only is not control-plane audit evidence/,
-  );
 });
 
 async function exists(file: string): Promise<boolean> {

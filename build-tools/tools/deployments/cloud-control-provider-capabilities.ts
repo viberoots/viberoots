@@ -149,6 +149,7 @@ function cap(
       applyCommand: `${RUN} --provider-capability ${id}`,
       smokeCommand: `${RUN} --smoke --provider-capability ${id}`,
       evidenceCommand: `${RUN} --record --provider-capability ${id}`,
+      rollbackCommand: `${RUN} --rollback --provider-capability ${id}`,
     },
   };
 }
