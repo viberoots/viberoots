@@ -9,11 +9,32 @@ import {
 } from "./control-plane-process-logging";
 import { startControlPlaneServiceFromRuntimeConfig } from "./nixos-shared-host-control-plane-service";
 import { startControlPlaneWorkerFromRuntimeConfig } from "./nixos-shared-host-control-plane-worker";
+import { runCloudControlSetupCommand } from "./cloud-control-setup";
 
-function command(): "service" | "worker" {
-  const [mode] = getPositionalsWithValueFlags(["config", "token", "poll-ms", "worker-id"]);
-  if (mode !== "service" && mode !== "worker") {
-    throw new Error("usage: deployment-control-plane <service|worker> --config <path>");
+function command(): "service" | "worker" | "setup" {
+  const [mode] = getPositionalsWithValueFlags([
+    "artifact-backend",
+    "artifact-backend-evidence",
+    "artifact-bucket",
+    "artifact-region",
+    "auth-callback-host",
+    "auth-callback-path",
+    "config",
+    "host-mode",
+    "image",
+    "instance-id",
+    "out",
+    "poll-ms",
+    "public-url",
+    "reviewed-source-mode",
+    "service-replicas",
+    "tls-evidence",
+    "token",
+    "worker-id",
+    "worker-replicas",
+  ]);
+  if (mode !== "service" && mode !== "worker" && mode !== "setup") {
+    throw new Error("usage: deployment-control-plane <service|worker|setup> --config <path>");
   }
   return mode;
 }
@@ -22,6 +43,10 @@ export async function runDeploymentControlPlaneCommand() {
   const mode = command();
   if (getFlagBool("help")) {
     console.log(`usage: deployment-control-plane ${mode} --config <path>`);
+    return undefined;
+  }
+  if (mode === "setup") {
+    await runCloudControlSetupCommand();
     return undefined;
   }
   const correlationId = createControlPlaneCorrelationId(mode);

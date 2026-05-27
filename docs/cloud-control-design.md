@@ -193,6 +193,12 @@ profiles keep provider choice explicit, validate Supabase Postgres, Supabase Sto
 R2, or another S3-compatible store before use, and record compatibility evidence without storing
 secret values.
 
+Cloud host-profile setup starts with
+[`docs/cloud-control-setup.md`](cloud-control-setup.md) and the reviewed
+`deployment-control-plane setup` command. The generator writes runtime config, credential
+manifest, service and worker commands, validation commands, and provider-capability declarations
+without embedding secret values.
+
 This work is the prerequisite for later cloud tasks:
 
 - Kubernetes or OpenTofu deployment of the control plane itself

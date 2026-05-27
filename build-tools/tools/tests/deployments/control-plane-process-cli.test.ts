@@ -10,6 +10,9 @@ import {
 } from "./control-plane-process-entrypoints.helpers";
 import { runInTemp } from "../lib/test-helpers";
 
+const SETUP_IMAGE =
+  "registry.example.com/platform/deployment-control-plane@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+
 test("deployment-control-plane command validates mode config overrides and credentials", async () => {
   await runInTemp("control-plane-cli-config", async (tmp) => {
     await assert.rejects(
@@ -68,3 +71,39 @@ test("deployment-control-plane command validates mode config overrides and crede
     await (worker as any).close();
   });
 });
+
+test("deployment-control-plane setup writes a cloud host profile bundle", async () => {
+  await runInTemp("control-plane-cli-setup", async (tmp) => {
+    const out = path.join(tmp, "profile");
+    await withControlPlaneArgv(
+      [
+        "setup",
+        "--out",
+        out,
+        "--host-mode",
+        "aws-ec2",
+        "--image",
+        SETUP_IMAGE,
+        "--aws-vpc-endpoint",
+        "--aws-subnet-id",
+        "subnet-123",
+        "--aws-security-group-id",
+        "sg-123",
+        "--tls-evidence",
+        "alb-listener-dns-reviewed",
+      ],
+      runDeploymentControlPlaneCommand,
+    );
+    assert.ok(await exists(path.join(out, "config.yaml")));
+    assert.ok(await exists(path.join(out, "credential-manifest.json")));
+    assert.ok(await exists(path.join(out, "provider-capabilities.json")));
+    assert.match(await fsp.readFile(path.join(out, "aws-ec2-profile.md"), "utf8"), /AWS S3/);
+  });
+});
+
+async function exists(file: string): Promise<boolean> {
+  return await fsp
+    .access(file)
+    .then(() => true)
+    .catch(() => false);
+}
