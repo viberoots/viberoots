@@ -32,7 +32,7 @@ credentials:
     infisicalClientSecretFilePattern: "{deploymentId}-infisical-client-secret"
 reviewedSource:
   sshKeyFile: ${credentials}/reviewed-source-ssh-key
-  sshKnownHostsFile: /etc/deployment-control-plane/github-known-hosts
+  sshKnownHostsFile: ${credentials}/reviewed-source-known-hosts
 ${extras}`;
 }
 
@@ -48,6 +48,7 @@ test("runtime config parser applies container defaults", () => {
   assert.equal(config.storage.recordsRoot, "/var/lib/deployment-control-plane/records");
   assert.equal(config.storage.artifactStore.kind, "s3-compatible");
   assert.equal(config.storage.artifactStore.region, "auto");
+  assert.equal(config.reviewedSource.mode, "ssh");
   assert.equal(
     config.credentials.defaults.infisicalClientIdFilePattern,
     "{deploymentId}-infisical-client-id",
@@ -129,8 +130,6 @@ test("loader accepts mounted config override when all required files exist", asy
     const credentials = path.join(tmp, "credentials");
     const configPath = path.join(tmp, "config.yaml");
     await fsp.mkdir(credentials, { recursive: true });
-    await fsp.mkdir("/tmp/deployment-control-plane-known-hosts", { recursive: true });
-    const knownHosts = "/tmp/deployment-control-plane-known-hosts/github-known-hosts";
     for (const name of [
       "artifact-store-endpoint",
       "artifact-store-access-key-id",
@@ -138,20 +137,13 @@ test("loader accepts mounted config override when all required files exist", asy
       "control-plane-database-url",
       "control-plane-token",
       "reviewed-source-ssh-key",
+      "reviewed-source-known-hosts",
     ]) {
       await fsp.writeFile(path.join(credentials, name), `${name}-value`, "utf8");
     }
     await fsp.writeFile(path.join(credentials, "artifact-store-endpoint"), "https://s3.test");
     await fsp.writeFile(path.join(credentials, "control-plane-database-url"), "pgmem://config");
-    await fsp.writeFile(knownHosts, "github.com ssh-ed25519 AAAA", "utf8");
-    await fsp.writeFile(
-      configPath,
-      configYaml(credentials).replace(
-        "/etc/deployment-control-plane/github-known-hosts",
-        knownHosts,
-      ),
-      "utf8",
-    );
+    await fsp.writeFile(configPath, configYaml(credentials), "utf8");
 
     const config = await loadControlPlaneRuntimeConfig({
       configPath,
@@ -197,6 +189,8 @@ test("production loader rejects ambient credential environment variables", async
           env: {
             VBR_DEPLOY_CONTROL_PLANE_DATABASE_URL: "postgres://user:secret@example/db",
             AWS_SECRET_ACCESS_KEY: "secret-access-key-value",
+            GITHUB_APP_ID: "12345",
+            GITHUB_APP_INSTALLATION_ID: "67890",
             VBR_DEPLOY_REVIEWED_SOURCE_SSH_KEY_FILE: "/tmp/reviewed-source-key",
             VBR_DEPLOY_REVIEWED_SOURCE_SSH_KNOWN_HOSTS_FILE: "/tmp/reviewed-source-hosts",
             GIT_SSH_COMMAND: "ssh -i /tmp/ambient-key",
@@ -206,6 +200,8 @@ test("production loader rejects ambient credential environment variables", async
         error instanceof Error &&
         error.message.includes("VBR_DEPLOY_CONTROL_PLANE_DATABASE_URL") &&
         error.message.includes("AWS_SECRET_ACCESS_KEY") &&
+        error.message.includes("GITHUB_APP_ID") &&
+        error.message.includes("GITHUB_APP_INSTALLATION_ID") &&
         error.message.includes("VBR_DEPLOY_REVIEWED_SOURCE_SSH_KEY_FILE") &&
         error.message.includes("VBR_DEPLOY_REVIEWED_SOURCE_SSH_KNOWN_HOSTS_FILE") &&
         error.message.includes("GIT_SSH_COMMAND") &&

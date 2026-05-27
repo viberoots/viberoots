@@ -8,10 +8,13 @@ import {
 import {
   assertCredentialDirectory,
   assertCredentialDirectoryPath,
-  assertReviewedCredentialPath,
   normalizeAbsolutePath,
   validateBasePath,
 } from "./control-plane-runtime-config-paths";
+import {
+  normalizeRuntimeReviewedSource,
+  resolveRuntimeReviewedSource,
+} from "./control-plane-runtime-reviewed-source";
 import {
   redactConfigDiagnostic,
   validateControlPlaneCredentialContract,
@@ -92,13 +95,7 @@ export function parseControlPlaneRuntimeConfig(
         ),
       },
     },
-    reviewedSource: {
-      sshKeyFile: assertReviewedCredentialPath(config.reviewedSource.sshKeyFile, policy),
-      sshKnownHostsFile: assertReviewedCredentialPath(
-        config.reviewedSource.sshKnownHostsFile,
-        policy,
-      ),
-    },
+    reviewedSource: resolveRuntimeReviewedSource(config.reviewedSource, policy),
   };
   validateControlPlaneCredentialContract(parsed);
   return parsed;
@@ -114,7 +111,6 @@ function withDefaults(
   const database = objectValue(value.database, "database");
   const credentials = objectValue(value.credentials, "credentials");
   const defaults = objectValue(credentials.defaults ?? {}, "credentials.defaults");
-  const reviewedSource = objectValue(value.reviewedSource, "reviewedSource");
   return {
     instanceId: stringValue(value.instanceId, "instanceId"),
     mode: enumValue(value.mode ?? "protected-shared", ["protected-shared", "dedicated"], "mode"),
@@ -179,13 +175,7 @@ function withDefaults(
       },
       infisicalDeployments: deploymentInfisicalCredentialRequests(credentials.infisicalDeployments),
     },
-    reviewedSource: {
-      sshKeyFile: stringValue(reviewedSource.sshKeyFile, "reviewedSource.sshKeyFile"),
-      sshKnownHostsFile: stringValue(
-        reviewedSource.sshKnownHostsFile,
-        "reviewedSource.sshKnownHostsFile",
-      ),
-    },
+    reviewedSource: normalizeRuntimeReviewedSource(value.reviewedSource),
     webUi: sectionWithBasePath(value.webUi, "webUi", "/", true),
     mcp: sectionWithBasePath(value.mcp, "mcp", "/mcp", true),
     authProvider: normalizeAuthProviderConfig(value.authProvider),

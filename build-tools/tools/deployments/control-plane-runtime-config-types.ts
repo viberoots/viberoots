@@ -44,10 +44,7 @@ export type ControlPlaneRuntimeConfig = {
     };
     infisicalDeployments: DeploymentInfisicalCredentialRequest[];
   };
-  reviewedSource: {
-    sshKeyFile: string;
-    sshKnownHostsFile: string;
-  };
+  reviewedSource: ControlPlaneReviewedSourceConfig;
   webUi: {
     enabled: boolean;
     basePath: string;
@@ -61,6 +58,19 @@ export type ControlPlaneRuntimeConfig = {
     enabled: boolean;
   };
 };
+
+export type ControlPlaneReviewedSourceConfig =
+  | {
+      mode: "ssh";
+      sshKeyFile: string;
+      sshKnownHostsFile: string;
+    }
+  | {
+      mode: "github-app";
+      githubAppIdFile: string;
+      githubAppInstallationIdFile: string;
+      githubAppPrivateKeyFile: string;
+    };
 
 export type DeploymentInfisicalCredentialRequest = {
   deploymentId: string;

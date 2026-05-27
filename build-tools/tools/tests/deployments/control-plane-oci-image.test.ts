@@ -48,7 +48,14 @@ test("control-plane image contract exposes service and worker entrypoints withou
     image.config.config.Labels["org.opencontainers.image.revision"],
     first.contract.sourceRevision,
   );
-  assert.equal(image.config.config.Labels["org.opencontainers.image.digest"], "unknown");
+  assert.match(first.contract.imageBuildIdentity, /^nix-source-[a-f0-9]{64}$/);
+  assert.equal(first.contract.publicationDigest, null);
+  assert.equal(
+    image.config.config.Labels["org.viberoots.control-plane.image-build-identity"],
+    first.contract.imageBuildIdentity,
+  );
+  assert.equal(image.config.config.Labels["org.opencontainers.image.digest"], undefined);
+  assert.notEqual(first.contract.imageBuildIdentity, "unknown");
   assert.match(first.contract.sourceRevision, /^source-[a-z0-9]{12}$/);
   assert.deepEqual(first.contract.commands, [
     "deployment-control-plane service --config /etc/deployment-control-plane/config.yaml",

@@ -9,7 +9,7 @@ import { parseControlPlaneRuntimeConfig } from "../../deployments/control-plane-
 
 function configYaml(
   credentials: string,
-  knownHosts = "/etc/deployment-control-plane/github-known-hosts",
+  knownHosts = `${credentials}/reviewed-source-known-hosts`,
 ) {
   return `
 instanceId: mini

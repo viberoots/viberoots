@@ -72,6 +72,7 @@ test("cloud setup bundle renders runtime, credentials, commands, and capabilitie
   assert.equal(config.credentials.infisicalDeployments[0].deploymentId, "pleomino-staging");
   assert.ok(manifest.requiredFiles.includes("reviewed-source-ssh-key"));
   assert.ok(manifest.requiredFiles.includes("reviewed-source-known-hosts"));
+  assert.equal(config.reviewedSource.mode, "ssh");
   assert.equal(
     config.reviewedSource.sshKnownHostsFile,
     "/run/deployment-control-plane/credentials/reviewed-source-known-hosts",
@@ -140,15 +141,23 @@ test("every generated profile mode has runnable service and worker structure", (
   );
 });
 
-test("GitHub App reviewed-source mode is rejected until runtime adapter support exists", () => {
-  assert.match(
-    validateCloudControlSetupInput(baseInput({ reviewedSourceMode: "github-app" })).join("\n"),
-    /requires a runtime adapter/,
+test("GitHub App reviewed-source mode emits runtime-consumable credential files", () => {
+  const bundle = renderCloudControlSetupBundle(baseInput({ reviewedSourceMode: "github-app" }));
+  const config = YAML.parse(bundle.files["config.yaml"]!);
+  const manifest = JSON.parse(bundle.files["credential-manifest.json"]!);
+  assert.deepEqual(
+    validateCloudControlSetupInput(baseInput({ reviewedSourceMode: "github-app" })),
+    [],
   );
-  assert.throws(
-    () => renderCloudControlSetupBundle(baseInput({ reviewedSourceMode: "github-app" })),
-    /requires a runtime adapter/,
+  assert.equal(config.reviewedSource.mode, "github-app");
+  assert.equal(
+    config.reviewedSource.githubAppPrivateKeyFile,
+    "/run/deployment-control-plane/credentials/reviewed-source-github-app-private-key",
   );
+  assert.ok(manifest.requiredFiles.includes("reviewed-source-github-app-id"));
+  assert.ok(manifest.requiredFiles.includes("reviewed-source-github-app-installation-id"));
+  assert.ok(manifest.requiredFiles.includes("reviewed-source-github-app-private-key"));
+  assert.ok(!manifest.requiredFiles.includes("reviewed-source-ssh-key"));
 });
 
 test("cloud setup validation rejects tag-only images, weak topology, and missing AWS evidence", () => {

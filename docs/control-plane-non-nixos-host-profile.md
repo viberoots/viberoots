@@ -25,7 +25,8 @@ Real hosts must provide:
 - an external Postgres database URL credential file
 - an S3-compatible artifact-store bucket and credential files
 - a reviewed-source SSH key credential file
-- a reviewed-source known-hosts file mounted at `/etc/deployment-control-plane/github-known-hosts`
+- a reviewed-source known-hosts credential file mounted under
+  `/run/deployment-control-plane/credentials`
 - host directories for records, artifact scratch, and runtime scratch
 - explicit reverse proxy, TLS, and public routing outside this profile
 
@@ -45,6 +46,7 @@ artifact-store-access-key-id
 artifact-store-secret-access-key
 control-plane-database-url
 reviewed-source-ssh-key
+reviewed-source-known-hosts
 ```
 
 Deployment-scoped Infisical credentials keep the same defaults as the NixOS profile:

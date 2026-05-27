@@ -120,10 +120,7 @@ test("managed dependency profile is concrete and parser-compatible", () => {
 test("input validation rejects unsupported substrates and env-var-only secret modes", () => {
   const badMode = input({ mode: "fargate" as CloudProfileMode });
   assert.match(validateCloudControlSetupInput(badMode).join("\n"), /unsupported host substrate/);
-  assert.match(
-    validateCloudControlSetupInput(input({ reviewedSourceMode: "github-app" })).join("\n"),
-    /requires a runtime adapter/,
-  );
+  assert.deepEqual(validateCloudControlSetupInput(input({ reviewedSourceMode: "github-app" })), []);
   assert.match(
     validateCredentialManifestFiles(["env:DATABASE_URL", "control-plane-token"]).join("\n"),
     /missing control-plane-database-url.*env-var-only/s,

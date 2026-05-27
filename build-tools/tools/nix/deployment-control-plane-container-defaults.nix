@@ -25,6 +25,9 @@
   controlPlaneTokenCredential = "control-plane-token";
   reviewedSourceSshKeyCredential = "reviewed-source-ssh-key";
   reviewedSourceKnownHostsCredential = "reviewed-source-known-hosts";
+  reviewedSourceGithubAppIdCredential = "reviewed-source-github-app-id";
+  reviewedSourceGithubAppInstallationIdCredential = "reviewed-source-github-app-installation-id";
+  reviewedSourceGithubAppPrivateKeyCredential = "reviewed-source-github-app-private-key";
   infisicalClientIdPattern = "{deploymentId}-infisical-client-id";
   infisicalClientSecretPattern = "{deploymentId}-infisical-client-secret";
 }

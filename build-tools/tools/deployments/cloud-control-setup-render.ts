@@ -146,12 +146,14 @@ function renderReadme(input: CloudControlSetupInput): string {
 function reviewedSource(input: CloudControlSetupInput) {
   if (input.reviewedSourceMode === "github-app") {
     return {
+      mode: "github-app",
       githubAppIdFile: cred("reviewed-source-github-app-id"),
       githubAppInstallationIdFile: cred("reviewed-source-github-app-installation-id"),
       githubAppPrivateKeyFile: cred("reviewed-source-github-app-private-key"),
     };
   }
   return {
+    mode: "ssh",
     sshKeyFile: cred("reviewed-source-ssh-key"),
     sshKnownHostsFile: cred("reviewed-source-known-hosts"),
   };

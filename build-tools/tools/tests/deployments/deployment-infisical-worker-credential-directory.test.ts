@@ -31,7 +31,7 @@ credentials:
   directory: ${credentials}
 reviewedSource:
   sshKeyFile: ${credentials}/reviewed-source-ssh-key
-  sshKnownHostsFile: /etc/deployment-control-plane/github-known-hosts
+  sshKnownHostsFile: ${credentials}/reviewed-source-known-hosts
 `;
 }
 

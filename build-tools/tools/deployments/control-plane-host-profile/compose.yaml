@@ -16,10 +16,6 @@ services:
         target: /etc/deployment-control-plane/config.yaml
         read_only: true
       - type: bind
-        source: ${VBR_CONTROL_PLANE_KNOWN_HOSTS:-./github-known-hosts}
-        target: /etc/deployment-control-plane/github-known-hosts
-        read_only: true
-      - type: bind
         source: ${VBR_CONTROL_PLANE_CREDENTIALS:-./credentials}
         target: /run/deployment-control-plane/credentials
         read_only: true
@@ -46,10 +42,6 @@ services:
       - type: bind
         source: ${VBR_CONTROL_PLANE_CONFIG:-./config.example.yaml}
         target: /etc/deployment-control-plane/config.yaml
-        read_only: true
-      - type: bind
-        source: ${VBR_CONTROL_PLANE_KNOWN_HOSTS:-./github-known-hosts}
-        target: /etc/deployment-control-plane/github-known-hosts
         read_only: true
       - type: bind
         source: ${VBR_CONTROL_PLANE_CREDENTIALS:-./credentials}

@@ -14,6 +14,7 @@ deployment-control-plane setup \
   --artifact-backend aws-s3 \
   --artifact-bucket deployment-control-plane-artifacts \
   --artifact-region us-east-1 \
+  --reviewed-source-mode ssh \
   --aws-vpc-endpoint \
   --aws-subnet-id subnet-123,subnet-456 \
   --aws-security-group-id sg-123 \
@@ -65,6 +66,34 @@ under `/run/deployment-control-plane/credentials`.
 9. Treat the host as protected/shared-ready only after every entry in
    `conformance-checklist.json` passes and the evidence is attached to the selected provider
    capabilities.
+
+## Reviewed Source Modes
+
+The setup bundle defaults to SSH reviewed source and emits only:
+
+- `reviewed-source-ssh-key`
+- `reviewed-source-known-hosts`
+
+Use `--reviewed-source-mode github-app` when the reviewed repository should be fetched through a
+GitHub App installation. The generated runtime config then emits only:
+
+- `reviewed-source-github-app-id`
+- `reviewed-source-github-app-installation-id`
+- `reviewed-source-github-app-private-key`
+
+Both modes are fully file-backed. Do not replace these files with `GITHUB_TOKEN`,
+`GITHUB_APP_PRIVATE_KEY`, `GIT_SSH_COMMAND`, or other production environment variables.
+
+The optional live GitHub App fetch smoke is skipped by default. Enable it only against a reviewed
+non-production installation:
+
+```text
+VBR_REVIEWED_SOURCE_GITHUB_APP_LIVE=1
+VBR_REVIEWED_SOURCE_GITHUB_REPOSITORY=owner/repo
+VBR_REVIEWED_SOURCE_GITHUB_APP_ID_FILE=/run/deployment-control-plane/credentials/reviewed-source-github-app-id
+VBR_REVIEWED_SOURCE_GITHUB_APP_INSTALLATION_ID_FILE=/run/deployment-control-plane/credentials/reviewed-source-github-app-installation-id
+VBR_REVIEWED_SOURCE_GITHUB_APP_PRIVATE_KEY_FILE=/run/deployment-control-plane/credentials/reviewed-source-github-app-private-key
+```
 
 ## Fixture E2E Validation
 
@@ -200,13 +229,17 @@ a gated prerequisite with evidence.
 
 ## Reviewed Source
 
-`--reviewed-source-mode ssh` generates the initial SSH file contract. Stage
-`reviewed-source-ssh-key` and `reviewed-source-known-hosts` in the generated credential directory.
-`--reviewed-source-mode github-app` is rejected until the runtime parser and reviewed-source
-adapter support the GitHub App credential contract. When that adapter exists, the expected
-credential filenames are `reviewed-source-github-app-id`,
-`reviewed-source-github-app-installation-id`, and `reviewed-source-github-app-private-key`.
-Neither mode may rely on laptop or CI credentials for protected/shared deploys.
+`--reviewed-source-mode ssh` generates the SSH file contract. Stage `reviewed-source-ssh-key` and
+`reviewed-source-known-hosts` in the generated credential directory.
+
+`--reviewed-source-mode github-app` generates the GitHub App file contract now supported by the
+runtime parser and reviewed-source fetch adapter. Stage `reviewed-source-github-app-id`,
+`reviewed-source-github-app-installation-id`, and `reviewed-source-github-app-private-key` in the
+generated credential directory. The runtime exchanges those mounted files for a short-lived
+installation token during reviewed-source fetches.
+
+The two modes are mutually exclusive in generated config and runtime validation. Neither mode may
+rely on laptop or CI credentials for protected/shared deploys.
 
 ## Non-Default Substrates
 

@@ -3,6 +3,10 @@ import path from "node:path";
 import { applyDeploymentPattern } from "./control-plane-credentials";
 import type { ControlPlaneRuntimeConfig } from "./control-plane-runtime-config-types";
 import {
+  reviewedSourceCredentialFiles,
+  validateReviewedSourceFilenameContract,
+} from "./control-plane-runtime-reviewed-source-validation";
+import {
   assertCredentialDirectoryPath,
   resolveCredentialFileName,
 } from "./control-plane-runtime-config-paths";
@@ -15,6 +19,8 @@ export const CONTROL_PLANE_PRODUCTION_CREDENTIAL_ENV_NAMES = [
   "VBR_DEPLOY_CONTROL_PLANE_DATABASE_URL",
   "VBR_DEPLOY_CONTROL_PLANE_TOKEN",
   "GITHUB_TOKEN",
+  "GITHUB_APP_ID",
+  "GITHUB_APP_INSTALLATION_ID",
   "GITHUB_APP_PRIVATE_KEY",
   "INFISICAL_CLIENT_ID",
   "INFISICAL_CLIENT_SECRET",
@@ -45,8 +51,7 @@ export async function validateControlPlaneRuntimeConfigFiles(
     ["storage.artifactStore.endpointFile", config.storage.artifactStore.endpointFile],
     ["storage.artifactStore.accessKeyIdFile", config.storage.artifactStore.accessKeyIdFile],
     ["storage.artifactStore.secretAccessKeyFile", config.storage.artifactStore.secretAccessKeyFile],
-    ["reviewedSource.sshKeyFile", config.reviewedSource.sshKeyFile],
-    ["reviewedSource.sshKnownHostsFile", config.reviewedSource.sshKnownHostsFile],
+    ...reviewedSourceCredentialFiles(config),
     ...infisicalCredentialFiles(config),
   ] as const;
   const missing: string[] = [];
@@ -100,6 +105,7 @@ export function validateControlPlaneCredentialContract(config: ControlPlaneRunti
     "credentials.defaults.infisicalClientSecretFilePattern",
     INFISICAL_CLIENT_SECRET_PATTERN,
   );
+  validateReviewedSourceFilenameContract(config);
 }
 
 export function redactConfigDiagnostic(value: unknown): string {
@@ -132,6 +138,9 @@ async function validateCredentialFileContents(config: ControlPlaneRuntimeConfig)
     config.storage.artifactStore.secretAccessKeyFile,
     "storage.artifactStore.secretAccessKeyFile",
   );
+  for (const [fieldName, filePath] of reviewedSourceCredentialFiles(config)) {
+    await assertNonEmptyCredential(filePath, fieldName);
+  }
   for (const [fieldName, filePath] of infisicalCredentialFiles(config)) {
     await assertNonEmptyCredential(filePath, fieldName);
   }

@@ -75,20 +75,27 @@ function nixosExample(input: CloudControlSetupInput): string {
       `      ${deploymentId}-infisical-client-secret.source = "/run/secrets/${deploymentId}-infisical-client-secret";`,
     ])
     .join("\n");
+  const reviewedSourceCredentialSources =
+    input.reviewedSourceMode === "github-app"
+      ? `      reviewed-source-github-app-id.source = "/run/secrets/reviewed-source-github-app-id";
+      reviewed-source-github-app-installation-id.source = "/run/secrets/reviewed-source-github-app-installation-id";
+      reviewed-source-github-app-private-key.source = "/run/secrets/reviewed-source-github-app-private-key";`
+      : `      reviewed-source-ssh-key.source = "/run/secrets/reviewed-source-ssh-key";
+      reviewed-source-known-hosts.source = "/run/secrets/reviewed-source-known-hosts";`;
   return `{
   services.viberoots.deploymentControlPlaneContainer = {
     enable = true;
     image = "${input.image}";
     instanceId = "${input.instanceId}";
     publicUrl = "${input.publicUrl}";
+    reviewedSourceMode = "${input.reviewedSourceMode}";
     workerReplicas = 2;
     infisicalDeploymentIds = [ ${input.deploymentIds.map((id) => `"${id}"`).join(" ")} ];
     artifactStore.bucket = "${input.artifactBucket}";
     credentials = {
       control-plane-database-url.source = "/run/secrets/control-plane-database-url";
       control-plane-token.source = "/run/secrets/control-plane-token";
-      reviewed-source-ssh-key.source = "/run/secrets/reviewed-source-ssh-key";
-      reviewed-source-known-hosts.source = "/run/secrets/reviewed-source-known-hosts";
+${reviewedSourceCredentialSources}
       artifact-store-endpoint.source = "/run/secrets/artifact-store-endpoint";
       artifact-store-access-key-id.source = "/run/secrets/artifact-store-access-key-id";
       artifact-store-secret-access-key.source = "/run/secrets/artifact-store-secret-access-key";

@@ -92,7 +92,9 @@ not a baked-in default. Production hosts should consume an immutable digest refe
 registry.example.com/platform/deployment-control-plane@sha256:<digest>
 ```
 
-Do not deploy mutable tags such as `latest` as the runtime identity. Pass the same digest into
+Do not deploy mutable tags such as `latest` as the runtime identity. The Nix image contract records
+a non-`unknown` `nix-source-<hash>` build identity, not a verified OCI digest. Publication evidence
+records the registry manifest digest that hosts pin after registry inspection. Pass the pinned registry digest into
 `VBR_CONTROL_PLANE_IMAGE_DIGEST` so `/healthz`, the web UI status API, and MCP status report the
 reviewed image identity without reading mutable registry tags.
 
@@ -112,7 +114,9 @@ The resulting manifest shape is:
 {
   "image": "registry.example.com/platform/deployment-control-plane@sha256:<digest>",
   "sourceRevision": "source-<reviewed-revision>",
+  "imageBuildIdentity": "nix-source-<reviewed-build-identity>",
   "digest": "sha256:<digest>",
+  "inspectedDigest": "sha256:<digest>",
   "tag": "registry.example.com/platform/deployment-control-plane:source-<reviewed-revision>"
 }
 ```
@@ -122,9 +126,8 @@ The optional live registry test is skipped by default; enable it only against a 
 repository with:
 
 ```text
-VBR_CONTROL_PLANE_IMAGE_LIVE_REGISTRY=1
+VBR_CONTROL_PLANE_IMAGE_LIVE_DIGEST_VERIFY=1
 VBR_CONTROL_PLANE_IMAGE_REPOSITORY=registry.example.com/platform/deployment-control-plane
-VBR_CONTROL_PLANE_IMAGE_EXPECTED_DIGEST=sha256:<digest>
 ```
 
 Required mounted paths:
@@ -236,7 +239,7 @@ credentials:
 
 reviewedSource:
   sshKeyFile: /run/deployment-control-plane/credentials/reviewed-source-ssh-key
-  sshKnownHostsFile: /etc/deployment-control-plane/github-known-hosts
+  sshKnownHostsFile: /run/deployment-control-plane/credentials/reviewed-source-known-hosts
 
 webUi:
   enabled: true

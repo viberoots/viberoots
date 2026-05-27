@@ -3,7 +3,7 @@ let
   version = "0.1.0";
   runtimePackagingRevision = "cjs-bundle-3-real-wrangler-ca";
   sourceRevision = "source-${builtins.substring 0 12 (builtins.hashString "sha256" "${builtins.toString repoSnapshot}:${runtimePackagingRevision}")}";
-  imageDigest = "unknown";
+  imageBuildIdentity = "nix-source-${builtins.hashString "sha256" "${sourceRevision}:${runtimePackagingRevision}"}";
   rootNodeModules = nodeMods.node-modules;
   wranglerCli = "${rootNodeModules}/node_modules/wrangler/bin/wrangler.js";
   runtimeTools = [
@@ -71,16 +71,16 @@ EOF
 #!${pkgs.runtimeShell}
 export VBR_CONTROL_PLANE_VERSION="${version}"
 export VBR_CONTROL_PLANE_SOURCE_REVISION="\''${VBR_CONTROL_PLANE_SOURCE_REVISION:-${sourceRevision}}"
-export VBR_CONTROL_PLANE_IMAGE_DIGEST="\''${VBR_CONTROL_PLANE_IMAGE_DIGEST:-${imageDigest}}"
+export VBR_CONTROL_PLANE_IMAGE_DIGEST="\''${VBR_CONTROL_PLANE_IMAGE_DIGEST:-unpublished}"
 exec ${pkgs.nodejs_22}/bin/node "$out/share/deployment-control-plane/deployment-control-plane-wrapper.cjs" "\$@"
 EOF
       chmod 0755 "$out/bin/deployment-control-plane"
     '';
   };
-
   contract = {
     imageName = "deployment-control-plane";
-    inherit version sourceRevision imageDigest;
+    inherit version sourceRevision imageBuildIdentity;
+    publicationDigest = null;
     user = "10001:10001";
     entrypoint = [ "/bin/deployment-control-plane" ];
     commands = [
@@ -136,13 +136,13 @@ EOF
         "NODE_EXTRA_CA_CERTS=${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt"
         "VBR_CONTROL_PLANE_VERSION=${version}"
         "VBR_CONTROL_PLANE_SOURCE_REVISION=${sourceRevision}"
-        "VBR_CONTROL_PLANE_IMAGE_DIGEST=${imageDigest}"
+        "VBR_CONTROL_PLANE_IMAGE_DIGEST=unpublished"
       ];
       Labels = {
         "org.opencontainers.image.title" = "deployment-control-plane";
         "org.opencontainers.image.version" = version;
         "org.opencontainers.image.revision" = sourceRevision;
-        "org.opencontainers.image.digest" = imageDigest;
+        "org.viberoots.control-plane.image-build-identity" = imageBuildIdentity;
       };
     };
     extraCommands = ''

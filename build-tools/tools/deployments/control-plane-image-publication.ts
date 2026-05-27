@@ -1,7 +1,9 @@
 export type ControlPlaneImagePublicationInput = {
   repository: string;
   sourceRevision: string;
+  imageBuildIdentity: string;
   digest: string;
+  inspectedDigest: string;
   imageTarball: string;
   tag?: string;
 };
@@ -15,7 +17,9 @@ export type ControlPlaneImagePublicationPlan = {
   manifest: {
     image: string;
     sourceRevision: string;
+    imageBuildIdentity: string;
     digest: string;
+    inspectedDigest: string;
     tag: string;
   };
   commands: string[];
@@ -28,15 +32,30 @@ export function controlPlaneImagePublicationPlan(
 ): ControlPlaneImagePublicationPlan {
   const repository = cleanRepository(input.repository);
   const sourceRevision = required("sourceRevision", input.sourceRevision);
+  const imageBuildIdentity = cleanImageBuildIdentity(input.imageBuildIdentity);
   const digest = required("digest", input.digest).toLowerCase();
+  const inspectedDigest = required("inspectedDigest", input.inspectedDigest).toLowerCase();
   const imageTarball = required("imageTarball", input.imageTarball);
   if (!DIGEST_PATTERN.test(digest)) {
     throw new Error("published control-plane image digest must be sha256:<64 lowercase hex>");
   }
+  if (!DIGEST_PATTERN.test(inspectedDigest)) {
+    throw new Error("inspected control-plane image digest must be sha256:<64 lowercase hex>");
+  }
+  if (inspectedDigest !== digest) {
+    throw new Error("published control-plane image digest must match registry inspect evidence");
+  }
   const tag = cleanTag(input.tag || sourceRevision);
   const tagRef = `${repository}:${tag}`;
   const digestRef = `${repository}@${digest}`;
-  const manifest = { image: digestRef, sourceRevision, digest, tag: tagRef };
+  const manifest = {
+    image: digestRef,
+    sourceRevision,
+    imageBuildIdentity,
+    digest,
+    inspectedDigest,
+    tag: tagRef,
+  };
   return {
     repository,
     sourceRevision,
@@ -81,6 +100,17 @@ function cleanTag(value: string): string {
     throw new Error("control-plane image convenience tag must not be latest");
   }
   return tag;
+}
+
+function cleanImageBuildIdentity(value: string): string {
+  const identity = required("imageBuildIdentity", value);
+  if (DIGEST_PATTERN.test(identity)) {
+    throw new Error("image build identity must not masquerade as a verified OCI digest");
+  }
+  if (!/^nix-source-[a-f0-9]{64}$/.test(identity)) {
+    throw new Error("image build identity must be nix-source-<64 lowercase hex>");
+  }
+  return identity;
 }
 
 function required(name: string, value: string): string {

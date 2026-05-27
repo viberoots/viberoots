@@ -78,6 +78,7 @@ RESOURCE_LIMITED_DEPLOYMENT_TESTS = {
     "build-tools/tools/tests/deployments/control-plane-mini-cloud-profile.test.ts": True,
     "build-tools/tools/tests/deployments/control-plane-mini-live-validation.test.ts": True,
     "build-tools/tools/tests/deployments/control-plane-mini-migration-preflight.test.ts": True,
+    "build-tools/tools/tests/deployments/control-plane-nixos-container-module-github-app.test.ts": True,
     "build-tools/tools/tests/deployments/control-plane-nixos-container-module-image-digest.test.ts": True,
     "build-tools/tools/tests/deployments/control-plane-nixos-container-module.test.ts": True,
     "build-tools/tools/tests/deployments/control-plane-oci-image.test.ts": True,

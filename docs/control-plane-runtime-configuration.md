@@ -43,9 +43,11 @@ Image metadata is non-secret and comes from the reviewed image/runtime environme
 - `VBR_CONTROL_PLANE_SOURCE_REVISION`
 - `VBR_CONTROL_PLANE_IMAGE_DIGEST`
 
-Operators should set `VBR_CONTROL_PLANE_IMAGE_DIGEST` from the pinned image reference used by the
-host module, Compose file, or Podman invocation. Status APIs report this value so operators do not
-need to infer identity from a mutable image tag.
+The reviewed image contract records a deterministic `nix-source-<hash>` build identity, not a
+verified OCI digest. Registry publication evidence records the immutable registry manifest digest
+after `skopeo inspect`, and host profiles pin that registry digest. Status APIs report the digest
+supplied by the running image or host profile so operators do not need to infer identity from a
+mutable image tag.
 
 ## YAML Shape
 
@@ -87,8 +89,9 @@ credentials:
       environment: production
 
 reviewedSource:
+  mode: ssh
   sshKeyFile: /run/deployment-control-plane/credentials/reviewed-source-ssh-key
-  sshKnownHostsFile: /etc/deployment-control-plane/github-known-hosts
+  sshKnownHostsFile: /run/deployment-control-plane/credentials/reviewed-source-known-hosts
 
 webUi:
   enabled: true
@@ -127,9 +130,20 @@ authProvider:
 
 Required fields are `instanceId`, `service.publicUrl`, `service.tokenFile`,
 `storage.artifactStore.bucket`, artifact-store credential files, `database.urlFile`,
-`credentials.directory`, and reviewed-source SSH files. Defaults are the values shown above for
+`credentials.directory`, and one reviewed-source credential mode. Defaults are the values shown above for
 `mode`, service host and port, local scratch roots, artifact-store kind and region, Infisical
-filename patterns, web UI, and MCP.
+filename patterns, reviewed-source mode, web UI, and MCP.
+
+Reviewed source supports two mutually exclusive file-backed modes:
+
+- SSH: `mode: ssh`, `reviewed-source-ssh-key`, and `reviewed-source-known-hosts`.
+- GitHub App: `mode: github-app`, `reviewed-source-github-app-id`,
+  `reviewed-source-github-app-installation-id`, and
+  `reviewed-source-github-app-private-key`.
+
+GitHub App mode exchanges the mounted app credentials for a short-lived installation token only
+inside the reviewed-source fetch helper. The raw app id, installation id, private key, and token are
+not accepted from production ambient environment variables.
 
 `processMode` controls standby behavior during cloud cutover and rollback drills:
 

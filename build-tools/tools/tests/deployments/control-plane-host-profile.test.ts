@@ -20,19 +20,12 @@ import { loadNixosDefaults, loadNixosRenderedConfig } from "./control-plane-host
 import { runInTemp } from "../lib/test-helpers";
 const PROFILE_DIR = "build-tools/tools/deployments/control-plane-host-profile";
 const CONFIG_PATH = "/etc/deployment-control-plane/config.yaml";
-const KNOWN_HOSTS_PATH = "/etc/deployment-control-plane/github-known-hosts";
 const CREDENTIAL_DIR = "/run/deployment-control-plane/credentials";
+const KNOWN_HOSTS_PATH = `${CREDENTIAL_DIR}/reviewed-source-known-hosts`;
 const RECORDS_ROOT = "/var/lib/deployment-control-plane/records";
 const ARTIFACTS_ROOT = "/var/lib/deployment-control-plane/artifacts";
 const RUNTIME_ROOT = "/var/lib/deployment-control-plane/runtime";
-const REQUIRED_MOUNTS = [
-  CONFIG_PATH,
-  KNOWN_HOSTS_PATH,
-  CREDENTIAL_DIR,
-  RECORDS_ROOT,
-  ARTIFACTS_ROOT,
-  RUNTIME_ROOT,
-];
+const REQUIRED_MOUNTS = [CONFIG_PATH, CREDENTIAL_DIR, RECORDS_ROOT, ARTIFACTS_ROOT, RUNTIME_ROOT];
 const SECRET_ENV_PATTERN = /(secret|token|password|credential|database|access.key|ssh)/i;
 const COMPOSE_IMAGE_REF =
   "${VBR_CONTROL_PLANE_IMAGE_REGISTRY:?set image registry}/${VBR_CONTROL_PLANE_IMAGE_REPOSITORY:?set image repository}@${VBR_CONTROL_PLANE_IMAGE_DIGEST:?set immutable sha256 image digest}";
@@ -65,10 +58,6 @@ function assertMounts(service: ComposeService) {
   const mounts = new Set((service.volumes || []).map((volume) => volume.target));
   for (const mount of REQUIRED_MOUNTS) assert.ok(mounts.has(mount), `missing mount ${mount}`);
   assert.equal(service.volumes?.find((volume) => volume.target === CONFIG_PATH)?.read_only, true);
-  assert.equal(
-    service.volumes?.find((volume) => volume.target === KNOWN_HOSTS_PATH)?.read_only,
-    true,
-  );
   assert.equal(
     service.volumes?.find((volume) => volume.target === CREDENTIAL_DIR)?.read_only,
     true,

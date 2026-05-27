@@ -20,28 +20,34 @@ let
   credentialSource = name:
     if builtins.hasAttr name cfg.credentials then cfg.credentials.${name}.source else cfg.extraCredentialFiles.${name};
   configuredCredentialNames = lib.unique (builtins.attrNames cfg.credentials ++ builtins.attrNames cfg.extraCredentialFiles);
+  reviewedSourceCredentialNames =
+    if cfg.reviewedSourceMode == "github-app" then [
+      cfg.reviewedSourceGithubAppIdCredential
+      cfg.reviewedSourceGithubAppInstallationIdCredential
+      cfg.reviewedSourceGithubAppPrivateKeyCredential
+    ] else [
+      cfg.reviewedSourceSshKeyCredential
+      cfg.reviewedSourceKnownHostsCredential
+    ];
   credentialNames = lib.unique (
     [
       cfg.databaseUrlCredential
       cfg.controlPlaneTokenCredential
-      cfg.reviewedSourceSshKeyCredential
-      cfg.reviewedSourceKnownHostsCredential
       cfg.artifactStore.endpointCredential
       cfg.artifactStore.accessKeyIdCredential
       cfg.artifactStore.secretAccessKeyCredential
     ]
+    ++ reviewedSourceCredentialNames
     ++ configuredCredentialNames
   );
   loadCredentials = map (name: "${name}:${credentialSource name}") credentialNames;
   requiredCredentialNames = [
     cfg.databaseUrlCredential
     cfg.controlPlaneTokenCredential
-    cfg.reviewedSourceSshKeyCredential
-    cfg.reviewedSourceKnownHostsCredential
     cfg.artifactStore.endpointCredential
     cfg.artifactStore.accessKeyIdCredential
     cfg.artifactStore.secretAccessKeyCredential
-  ] ++ infisicalCredentialNames;
+  ] ++ reviewedSourceCredentialNames ++ infisicalCredentialNames;
   infisicalCredentialNames = lib.flatten (
     map
       (deploymentId: [
@@ -68,52 +74,7 @@ let
       install -m 0400 -o ${defaults.containerUid} -g ${defaults.containerGid} "$CREDENTIALS_DIRECTORY/${credentialName}" "$dst/${credentialName}"
     '') credentialNames}
   '';
-  renderedConfig = {
-    instanceId = cfg.instanceId;
-    mode = "protected-shared";
-    service = {
-      host = cfg.serviceHost;
-      port = cfg.port;
-      publicUrl = cfg.publicUrl;
-      tokenFile = credentialFile cfg.controlPlaneTokenCredential;
-    };
-    storage = {
-      recordsRoot = defaults.recordsRoot;
-      artifactStagingRoot = defaults.artifactStagingRoot;
-      runtimeRoot = defaults.runtimeRoot;
-      artifactStore = {
-        kind = cfg.artifactStore.kind;
-        bucket = cfg.artifactStore.bucket;
-        region = cfg.artifactStore.region;
-        endpointFile = credentialFile cfg.artifactStore.endpointCredential;
-        accessKeyIdFile = credentialFile cfg.artifactStore.accessKeyIdCredential;
-        secretAccessKeyFile = credentialFile cfg.artifactStore.secretAccessKeyCredential;
-      };
-    };
-    database.urlFile = credentialFile cfg.databaseUrlCredential;
-    credentials = {
-      directory = cfg.credentialDirectory;
-      defaults = {
-        infisicalClientIdFilePattern = cfg.infisicalCredentialFilePattern.clientId;
-        infisicalClientSecretFilePattern = cfg.infisicalCredentialFilePattern.clientSecret;
-      };
-      infisicalDeployments = map
-        (deploymentId: {
-          inherit deploymentId;
-          siteUrl = cfg.infisicalSiteUrl;
-          projectId = "${deploymentId}-infisical-project";
-          environment = cfg.infisicalEnvironment;
-        })
-        cfg.infisicalDeploymentIds;
-    };
-    reviewedSource = {
-      sshKeyFile = credentialFile cfg.reviewedSourceSshKeyCredential;
-      sshKnownHostsFile = credentialFile cfg.reviewedSourceKnownHostsCredential;
-    };
-    webUi = { enabled = cfg.webUi.enable; basePath = cfg.webUi.basePath; };
-    mcp = { enabled = cfg.mcp.enable; basePath = cfg.mcp.basePath; };
-    miniMigrationPreflight = { enabled = cfg.miniMigrationPreflight.enable; };
-  };
+  renderedConfig = import ./deployment-control-plane-container-config.nix { inherit cfg credentialFile; };
   baseVolumes = [
     "${configFile}:${configFile}:ro"
     "${cfg.recordsRoot}:${defaults.recordsRoot}:rw"
@@ -187,8 +148,12 @@ in
     credentialDirectory = opt lib.types.str defaults.credentialDirectory "Container credential directory.";
     databaseUrlCredential = opt lib.types.str defaults.databaseUrlCredential "Database credential name.";
     controlPlaneTokenCredential = opt lib.types.str defaults.controlPlaneTokenCredential "Reviewed service bearer token credential name.";
+    reviewedSourceMode = opt (lib.types.enum [ "ssh" "github-app" ]) "ssh" "Reviewed-source credential mode.";
     reviewedSourceSshKeyCredential = opt lib.types.str defaults.reviewedSourceSshKeyCredential "SSH key credential name.";
     reviewedSourceKnownHostsCredential = opt lib.types.str defaults.reviewedSourceKnownHostsCredential "SSH known-hosts credential name.";
+    reviewedSourceGithubAppIdCredential = opt lib.types.str defaults.reviewedSourceGithubAppIdCredential "GitHub App id credential name.";
+    reviewedSourceGithubAppInstallationIdCredential = opt lib.types.str defaults.reviewedSourceGithubAppInstallationIdCredential "GitHub App installation id credential name.";
+    reviewedSourceGithubAppPrivateKeyCredential = opt lib.types.str defaults.reviewedSourceGithubAppPrivateKeyCredential "GitHub App private key credential name.";
     artifactStore = {
       kind = opt (lib.types.enum [ "s3-compatible" ]) defaults.artifactStoreKind "Artifact store kind.";
       bucket = opt nullStr null "Artifact store bucket.";

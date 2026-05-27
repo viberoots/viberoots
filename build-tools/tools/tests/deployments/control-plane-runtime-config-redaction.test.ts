@@ -68,6 +68,48 @@ test("runtime config parser enforces exact credential filename contract", () => 
       ),
     /service\.tokenFile must be a non-empty string/,
   );
+  assert.throws(
+    () =>
+      parseControlPlaneRuntimeConfig(
+        base.replace("reviewed-source-ssh-key", "wrong-reviewed-source-ssh-key"),
+      ),
+    /reviewedSource\.sshKeyFile must use credential filename reviewed-source-ssh-key/,
+  );
+});
+
+test("GitHub App reviewed-source credential diagnostics stay redacted", async () => {
+  await withCredentialFixture("runtime-config-github-app-redaction", async (credentials) => {
+    await fsp.rm(path.join(credentials, "reviewed-source-github-app-private-key"));
+    const config = parseControlPlaneRuntimeConfig(`
+instanceId: mini
+service:
+  publicUrl: https://deploy.example.test
+  tokenFile: ${credentials}/control-plane-token
+storage:
+  artifactStore:
+    bucket: deploy-artifacts
+    endpointFile: ${credentials}/artifact-store-endpoint
+    accessKeyIdFile: ${credentials}/artifact-store-access-key-id
+    secretAccessKeyFile: ${credentials}/artifact-store-secret-access-key
+database:
+  urlFile: ${credentials}/control-plane-database-url
+credentials:
+  directory: ${credentials}
+reviewedSource:
+  mode: github-app
+  githubAppIdFile: ${credentials}/reviewed-source-github-app-id
+  githubAppInstallationIdFile: ${credentials}/reviewed-source-github-app-installation-id
+  githubAppPrivateKeyFile: ${credentials}/reviewed-source-github-app-private-key
+`);
+    await assert.rejects(
+      () => validateControlPlaneRuntimeConfigFiles(config),
+      (error) =>
+        error instanceof Error &&
+        error.message.includes("reviewedSource.githubAppPrivateKeyFile") &&
+        error.message.includes("reviewed-source-github-app-private-key") &&
+        !error.message.includes("PRIVATE KEY"),
+    );
+  });
 });
 
 test("missing credential-file diagnostics stay redacted", async () => {
@@ -152,6 +194,10 @@ async function writeValidCredentials(credentials: string): Promise<void> {
     "control-plane-token": "service-token",
     "reviewed-source-ssh-key": "ssh-key",
     "reviewed-source-known-hosts": "github.com ssh-ed25519 AAAA",
+    "reviewed-source-github-app-id": "12345",
+    "reviewed-source-github-app-installation-id": "67890",
+    "reviewed-source-github-app-private-key":
+      "-----BEGIN PRIVATE KEY-----\nredacted\n-----END PRIVATE KEY-----",
   };
   for (const [name, value] of Object.entries(values)) {
     await fsp.writeFile(path.join(credentials, name), value, "utf8");

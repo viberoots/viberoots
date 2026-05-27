@@ -30,11 +30,6 @@ export function validateCloudControlSetupInput(input: CloudControlSetupInput): s
   if (!REVIEWED_SOURCE_MODES.includes(input.reviewedSourceMode)) {
     errors.push(`unsupported reviewed-source mode ${input.reviewedSourceMode}`);
   }
-  if (input.reviewedSourceMode === "github-app") {
-    errors.push(
-      "GitHub App reviewed-source mode requires a runtime adapter before setup can generate a profile",
-    );
-  }
   for (const [name, value] of Object.entries(input)) {
     if (typeof value === "string" && SECRET_PATTERN.test(`${name}=${value}`)) {
       errors.push(`${name} must be a placeholder or file path, not a secret value`);

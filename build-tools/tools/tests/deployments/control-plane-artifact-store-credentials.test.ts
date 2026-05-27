@@ -99,7 +99,7 @@ function runtimeConfigForTest(tmp: string, credentials: string, endpointFile: st
         infisicalClientSecretFilePattern: "{deploymentId}-infisical-client-secret",
       },
     },
-    reviewedSource: { sshKeyFile: "unused", sshKnownHostsFile: "unused" },
+    reviewedSource: { mode: "ssh", sshKeyFile: "unused", sshKnownHostsFile: "unused" },
     webUi: { enabled: true, basePath: "/" },
     mcp: { enabled: true, basePath: "/mcp" },
   };

@@ -9,6 +9,11 @@ import type { DeploymentTarget } from "./contract";
 import { scrubControlPlaneChildEnv } from "./control-plane-process-env";
 import { deploymentGitStdout } from "./deployment-git-stdout";
 import { requestedDeploymentReviewedSourceRef } from "./deployment-reviewed-source-ref";
+import {
+  githubAppGitFetchEnv,
+  type GithubAppTokenExchange,
+  type ReviewedSourceGithubAppCredentialFiles,
+} from "./nixos-shared-host-reviewed-source-github-app";
 
 const GITHUB_KNOWN_HOSTS = [
   "github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl",
@@ -20,10 +25,13 @@ const REVIEWED_SOURCE_SSH_KEY_FILE_ENV = "VBR_DEPLOY_REVIEWED_SOURCE_SSH_KEY_FIL
 const REVIEWED_SOURCE_SSH_KNOWN_HOSTS_FILE_ENV = "VBR_DEPLOY_REVIEWED_SOURCE_SSH_KNOWN_HOSTS_FILE";
 const execFileAsync = promisify(execFile);
 
-export type ReviewedSourceCredentialFiles = {
-  sshKeyFile: string;
-  sshKnownHostsFile: string;
-};
+export type ReviewedSourceCredentialFiles =
+  | {
+      mode?: "ssh";
+      sshKeyFile: string;
+      sshKnownHostsFile: string;
+    }
+  | ReviewedSourceGithubAppCredentialFiles;
 
 export function trim(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
@@ -138,6 +146,7 @@ export async function gitFetchEnvForReviewedRemote(
   workspaceRoot: string,
   fetchTarget: string,
   credentials?: ReviewedSourceCredentialFiles,
+  options: { githubAppTokenExchange?: GithubAppTokenExchange } = {},
 ): Promise<{ env?: NodeJS.ProcessEnv; cleanup: () => Promise<void> }> {
   if (!credentials && String(process.env.GIT_SSH_COMMAND || "").trim()) {
     return { env: scrubControlPlaneChildEnv(), cleanup: async () => {} };
@@ -147,6 +156,13 @@ export async function gitFetchEnvForReviewedRemote(
     : await deploymentGitStdout(workspaceRoot, ["remote", "get-url", fetchTarget]).catch(() => "");
   if (!isGithubSshRemote(remoteUrl)) {
     return { env: scrubControlPlaneChildEnv(), cleanup: async () => {} };
+  }
+  if (credentials?.mode === "github-app") {
+    const githubAppEnv = await githubAppGitFetchEnv(credentials, options.githubAppTokenExchange);
+    return {
+      env: scrubControlPlaneChildEnv(githubAppEnv.env),
+      cleanup: githubAppEnv.cleanup,
+    };
   }
   const configuredKnownHostsFile =
     trim(credentials?.sshKnownHostsFile) ||
