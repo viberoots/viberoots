@@ -223,9 +223,18 @@ scope, preview/diff behavior, mutation sequence, smoke checks, rollback procedur
 audit evidence, and protected/shared eligibility. Provider CLIs or IaC apply commands are allowed
 only through the control-plane admission, locking, credential, audit, and rollback model.
 
+The recommended topology uses concrete declarations for `aws-ec2-control-plane-host`,
+`aws-attic-cache-service`, `aws-s3-artifact-store`, `aws-network-foundation`,
+`supabase-managed-postgres`, `supabase-privatelink-prerequisite`, `cloudflare-edge`,
+`vercel-operator-ui`, and `remote-build-worker-fleet`. AWS, Cloudflare, Vercel, S3, Attic, and
+remote-worker capabilities are automated only through reviewed IaC/provider hooks with redacted
+preview, apply, smoke, evidence, and rollback records. `supabase-privatelink-prerequisite` is a
+gated prerequisite when support approval is required; support tickets or dashboard notes must be
+attached as control-plane evidence and cannot replace it.
+
 Provider dashboards, raw IaC state, and manual support actions are evidence inputs, not hidden
-deployment authority. Support-mediated setup, such as parts of Supabase PrivateLink, is recorded as
-a gated prerequisite with evidence.
+deployment authority. Placeholder declarations, dashboard-only state, raw IaC state, and manual
+notes cannot mark a profile protected/shared-ready.
 
 ## Reviewed Source
 

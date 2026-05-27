@@ -229,6 +229,13 @@ test("provider capability validation rejects missing fields, ambient credentials
     }).join("\n"),
     /iac.applyCommand must use reviewed deploy admission/,
   );
+  assert.match(
+    validateProviderCapabilityDeclaration({
+      ...capability,
+      targetIdentity: `${capability.id}:<reviewed-account-or-project>`,
+    }).join("\n"),
+    /must match the concrete capability catalog/,
+  );
 });
 
 test("provider capabilities wire preview, apply, and evidence through reviewed admission", () => {

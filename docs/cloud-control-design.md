@@ -658,6 +658,31 @@ when those provider-capability entries exist. The minimum required entries are:
 - `vercel-operator-ui` if the operator UI/API is deployed on Vercel
 - `remote-build-worker-fleet` for build/test worker capacity registration and autoscaling policy
 
+Concrete capability declarations for this topology are generated from the reviewed catalog used by
+`deployment-control-plane setup`. Each declaration defines a non-placeholder target identity shape,
+file-backed or support-mediated credential source, lock scope, redacted preview command, apply and
+smoke hooks, rollback evidence, replay semantics, audit evidence, and protected/shared eligibility.
+The current catalog is:
+
+- `aws-ec2-control-plane-host`: automated through reviewed AWS host-profile IaC or provider CLI
+  hooks; requires EC2 runtime DB/S3 path proof and worker shutdown evidence.
+- `aws-attic-cache-service`: automated adjacent cache rollout; requires `atticd` health,
+  cache-object conformance, token-scope evidence, and rollback to the previous cache endpoint.
+- `aws-s3-artifact-store`: automated artifact bucket, lifecycle, KMS, and VPC endpoint capability;
+  requires artifact PUT/GET/HEAD metadata and digest conformance.
+- `aws-network-foundation`: automated VPC, subnet, security-group, endpoint, ALB/NLB, TLS, and DNS
+  capability; requires fresh ingress and DNS/TLS health evidence.
+- `supabase-managed-postgres`: managed dependency capability; requires SQL feature conformance,
+  TLS connectivity from the selected host, migration lock evidence, and backup/restore reference.
+- `supabase-privatelink-prerequisite`: gated prerequisite; support-mediated steps are recorded as
+  control-plane evidence and do not become hidden mutation authority.
+- `cloudflare-edge`: automated edge prerequisite for DNS, TLS/WAF, rate limiting, and callback
+  routing; Cloudflare is not deployment mutation authority.
+- `vercel-operator-ui`: automated operator UI/API deployment and alias capability; Vercel remains a
+  browser/API surface and not a deployment worker or mutation provider.
+- `remote-build-worker-fleet`: adjacent build-system capacity capability; it must prove separate
+  Buck/Nix worker authority and must not replace deployment worker scheduling.
+
 Provider entries may be implemented directly or by invoking reviewed infrastructure tooling such as
 OpenTofu, Terraform, CloudFormation, or provider CLIs. In all cases, the deployment control plane owns
 admission, locks, credential scoping, audit, smoke evidence, and rollback evidence. Raw IaC state or

@@ -48,6 +48,7 @@ export type ProviderCapabilityDeclaration = {
     reviewedReference: string;
     previewCommand: string;
     applyCommand: string;
+    smokeCommand: string;
     evidenceCommand: string;
   };
 };

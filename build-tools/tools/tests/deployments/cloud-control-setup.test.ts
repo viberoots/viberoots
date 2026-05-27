@@ -87,6 +87,8 @@ test("cloud setup bundle renders runtime, credentials, commands, and capabilitie
   for (const capability of bundle.capabilities) {
     assert.deepEqual(validateProviderCapabilityDeclaration(capability), []);
     for (const field of REQUIRED_CAPABILITY_FIELDS) assert.ok((capability as any)[field]);
+    assert.doesNotMatch(JSON.stringify(capability), /<reviewed|placeholder provider/i);
+    assert.match(capability.targetIdentity, /account|Supabase|Cloudflare|Vercel|fleet/);
   }
 });
 
@@ -209,7 +211,30 @@ test("provider-capability evidence is required before protected readiness", () =
   };
   assert.match(
     validateProviderCapabilityEvidence(capabilities, incompleteEvidence).join("\n"),
-    /aws-s3-artifact-store: missing evidence "apply result digest"/,
+    /aws-s3-artifact-store: missing evidence "s3-apply-digest"/,
+  );
+});
+
+test("placeholder capability declarations and raw evidence cannot mark readiness", () => {
+  const capabilities = renderCloudControlSetupBundle(baseInput()).capabilities;
+  const placeholder = {
+    ...capabilities[0],
+    targetIdentity: "aws-ec2-control-plane-host:<reviewed-account-or-project>",
+  };
+  assert.match(
+    validateProviderCapabilityEvidence(
+      [placeholder, ...capabilities.slice(1)],
+      Object.fromEntries(
+        capabilities.map((capability) => [capability.id, capability.auditEvidence]),
+      ),
+    ).join("\n"),
+    /aws-ec2-control-plane-host: declaration must match the concrete capability catalog/,
+  );
+  assert.match(
+    validateProviderCapabilityEvidence(capabilities, {
+      [capabilities[0].id]: ["dashboard-only", ...capabilities[0].auditEvidence],
+    }).join("\n"),
+    /dashboard-only is not control-plane audit evidence/,
   );
 });
 

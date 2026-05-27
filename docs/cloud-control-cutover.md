@@ -24,6 +24,10 @@ Required cutover evidence:
   cloud-primary path
 - provider-capability audit identity, rollback procedure, and smoke evidence for every selected
   external component
+- the concrete provider-capability declaration used for that component, with an `auditEvidence` list
+  containing every evidence id required by that declaration; placeholder declarations, unrelated
+  capability declarations, dashboard-only state, raw IaC state, and manual notes are rejected as
+  protected/shared evidence
 - standby mode evidence proving mini service/worker controls prevent double execution
 - operation-specific audit evidence for cutover, rollback, restore, or break-glass use
 

@@ -8,6 +8,7 @@ import {
 } from "./cloud-control-setup-types";
 import {
   CREDENTIAL_FILENAMES,
+  CONCRETE_PROVIDER_CAPABILITIES,
   GITHUB_APP_FILENAMES,
   INFISICAL_FILENAMES,
   REQUIRED_CAPABILITY_FIELDS,
@@ -16,6 +17,7 @@ import {
 
 const IMAGE_DIGEST_PATTERN = /^[a-z0-9][a-z0-9._:-]*(\/[a-z0-9][a-z0-9._-]*)+@sha256:[a-f0-9]{64}$/;
 const SECRET_PATTERN = /(secret|token|password|private.key|access.key|database.url)=/i;
+const INVALID_EVIDENCE_SOURCE = /\b(dashboard-only|raw-iac-only|manual-notes?)\b/i;
 
 export function validateCloudControlSetupInput(input: CloudControlSetupInput): string[] {
   const errors: string[] = [];
@@ -84,16 +86,28 @@ export function validateProviderCapabilityDeclaration(
   declaration: ProviderCapabilityDeclaration,
 ): string[] {
   const errors: string[] = [];
+  const concrete =
+    CONCRETE_PROVIDER_CAPABILITIES[declaration.id as keyof typeof CONCRETE_PROVIDER_CAPABILITIES];
+  if (!concrete) {
+    errors.push(`${declaration.id || "<missing>"}: unknown provider-capability declaration`);
+  }
   for (const field of REQUIRED_CAPABILITY_FIELDS) {
     const value = declaration[field];
     if (Array.isArray(value) ? value.length === 0 : !String(value || "").trim()) {
       errors.push(`${declaration.id}: ${field} must not be empty`);
     }
   }
-  if (declaration.credentialSource.toLowerCase().includes("ambient")) {
+  if (concrete && !matchesConcreteCapability(declaration, concrete)) {
+    errors.push(`${declaration.id}: declaration must match the concrete capability catalog`);
+  }
+  if (
+    String(declaration.credentialSource || "")
+      .toLowerCase()
+      .includes("ambient")
+  ) {
     errors.push(`${declaration.id}: credentialSource must not use ambient credentials`);
   }
-  for (const [name, command] of Object.entries(declaration.iac)) {
+  for (const [name, command] of Object.entries(declaration.iac || {})) {
     if (name === "reviewedReference") continue;
     if (!command.includes("deploy --deployment <label>")) {
       errors.push(`${declaration.id}: iac.${name} must use reviewed deploy admission`);
@@ -102,16 +116,34 @@ export function validateProviderCapabilityDeclaration(
   return errors;
 }
 
+function matchesConcreteCapability(
+  declaration: ProviderCapabilityDeclaration,
+  concrete: ProviderCapabilityDeclaration,
+): boolean {
+  const fields = ["id", ...REQUIRED_CAPABILITY_FIELDS] as const;
+  const iacFields = Object.keys(concrete.iac) as Array<keyof ProviderCapabilityDeclaration["iac"]>;
+  return (
+    fields.every(
+      (field) => JSON.stringify(declaration[field]) === JSON.stringify(concrete[field]),
+    ) && iacFields.every((field) => declaration.iac?.[field] === concrete.iac[field])
+  );
+}
+
 export function validateProviderCapabilityEvidence(
   declarations: ProviderCapabilityDeclaration[],
   evidenceByCapability: Record<string, string[]>,
 ): string[] {
   const errors: string[] = [];
   for (const declaration of declarations) {
+    errors.push(...validateProviderCapabilityDeclaration(declaration));
     const evidence = evidenceByCapability[declaration.id] || [];
     if (evidence.length === 0) {
       errors.push(`${declaration.id}: protected/shared readiness requires attached evidence`);
       continue;
+    }
+    const invalidEvidence = evidence.find((item) => INVALID_EVIDENCE_SOURCE.test(item));
+    if (invalidEvidence) {
+      errors.push(`${declaration.id}: ${invalidEvidence} is not control-plane audit evidence`);
     }
     for (const required of declaration.auditEvidence) {
       if (!evidence.includes(required)) {

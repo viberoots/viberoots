@@ -87,6 +87,60 @@ test("cloud cutover validation rejects stale, mismatched, and dashboard-only evi
   assert.match(result.errors.join("\n"), /dashboard or IaC state/);
 });
 
+test("cloud cutover rejects placeholder declarations and manual-note evidence", () => {
+  const invalid = { ...capabilityEvidence(), declaration: { id: "placeholder" } };
+  const result = validateCloudControlCutover(
+    evidence({
+      providerCapabilities: {
+        "aws-ec2-control-plane-host": {
+          ...invalid,
+          source: "manual-notes",
+        },
+      },
+    }),
+    {
+      operation: "cutover",
+      expectedHostProfile: "aws-ec2",
+      expectedRegion: "us-east-1",
+      selectedCapabilities: ["aws-ec2-control-plane-host"],
+      maxAgeMinutes: 60,
+    },
+  );
+  assert.match(result.errors.join("\n"), /unrelated capability|unknown provider-capability/);
+  assert.match(result.errors.join("\n"), /manual notes/);
+});
+
+test("cloud cutover rejects unrelated or incomplete capability evidence", () => {
+  const result = validateCloudControlCutover(
+    evidence({
+      providerCapabilities: {
+        "aws-ec2-control-plane-host": capabilityEvidence("aws-s3-artifact-store"),
+      },
+    }),
+    {
+      operation: "cutover",
+      expectedHostProfile: "aws-ec2",
+      selectedCapabilities: ["aws-ec2-control-plane-host"],
+      maxAgeMinutes: 60,
+    },
+  );
+  assert.match(result.errors.join("\n"), /unrelated capability aws-s3-artifact-store/);
+  const missing = validateCloudControlCutover(
+    evidence({
+      providerCapabilities: {
+        "aws-ec2-control-plane-host": { ...capabilityEvidence(), auditEvidence: [] },
+      },
+    }),
+    {
+      operation: "cutover",
+      expectedHostProfile: "aws-ec2",
+      selectedCapabilities: ["aws-ec2-control-plane-host"],
+      maxAgeMinutes: 60,
+    },
+  );
+  assert.match(missing.errors.join("\n"), /missing provider-capability audit evidence contract/);
+});
+
 test("cloud cutover validation requires cloud-primary staging evidence", () => {
   const result = validateCloudControlCutover(
     evidence({

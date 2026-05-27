@@ -1,3 +1,5 @@
+import { capabilityDeclaration } from "../../deployments/cloud-control-setup-contract";
+
 export function evidence(overrides: Record<string, unknown> = {}) {
   return {
     hostProfile: "aws-ec2",
@@ -36,11 +38,11 @@ export function evidence(overrides: Record<string, unknown> = {}) {
       stagingDeploymentSucceeded: true,
     },
     providerCapabilities: {
-      "aws-ec2-control-plane-host": capabilityEvidence(),
-      "aws-network-foundation": capabilityEvidence(),
-      "aws-s3-artifact-store": capabilityEvidence(),
-      "supabase-managed-postgres": capabilityEvidence(),
-      "supabase-privatelink-prerequisite": capabilityEvidence(),
+      "aws-ec2-control-plane-host": capabilityEvidence("aws-ec2-control-plane-host"),
+      "aws-network-foundation": capabilityEvidence("aws-network-foundation"),
+      "aws-s3-artifact-store": capabilityEvidence("aws-s3-artifact-store"),
+      "supabase-managed-postgres": capabilityEvidence("supabase-managed-postgres"),
+      "supabase-privatelink-prerequisite": capabilityEvidence("supabase-privatelink-prerequisite"),
     },
     standby: { mode: "service-only", doubleExecutionPrevented: true },
     restore: restoreEvidence(),
@@ -56,8 +58,16 @@ export function evidence(overrides: Record<string, unknown> = {}) {
   };
 }
 
-export function capabilityEvidence() {
-  return { auditIdentity: "operator-1", rollbackProcedure: true, smokeEvidence: true };
+export function capabilityEvidence(id = "aws-ec2-control-plane-host") {
+  const declaration = capabilityDeclaration(id);
+  return {
+    capabilityId: id,
+    declaration,
+    auditEvidence: [...declaration.auditEvidence],
+    auditIdentity: "operator-1",
+    rollbackProcedure: true,
+    smokeEvidence: true,
+  };
 }
 
 export function restoreEvidence() {

@@ -1,4 +1,10 @@
-import type { ProviderCapabilityDeclaration } from "./cloud-control-setup-types";
+import {
+  capabilityDeclaration,
+  CLOUD_CAPABILITY_IDS,
+  CONCRETE_PROVIDER_CAPABILITIES,
+} from "./cloud-control-provider-capabilities";
+
+export { capabilityDeclaration, CLOUD_CAPABILITY_IDS, CONCRETE_PROVIDER_CAPABILITIES };
 
 export const CREDENTIAL_FILENAMES = [
   "control-plane-database-url",
@@ -24,18 +30,6 @@ export const INFISICAL_FILENAMES = [
   "{deploymentId}-infisical-client-secret",
 ] as const;
 
-export const CLOUD_CAPABILITY_IDS = [
-  "aws-ec2-control-plane-host",
-  "aws-attic-cache-service",
-  "aws-s3-artifact-store",
-  "aws-network-foundation",
-  "supabase-managed-postgres",
-  "supabase-privatelink-prerequisite",
-  "cloudflare-edge",
-  "vercel-operator-ui",
-  "remote-build-worker-fleet",
-] as const;
-
 export const REQUIRED_CAPABILITY_FIELDS = [
   "targetIdentity",
   "credentialSource",
@@ -48,37 +42,3 @@ export const REQUIRED_CAPABILITY_FIELDS = [
   "auditEvidence",
   "protectedSharedEligibility",
 ] as const;
-
-export function capabilityDeclaration(id: string): ProviderCapabilityDeclaration {
-  return {
-    id,
-    targetIdentity: `${id}:<reviewed-account-or-project>/<reviewed-region>/<reviewed-name>`,
-    credentialSource: "file-backed runtime credential or reviewed prerequisite evidence only",
-    lockScope: `provider-capability:${id}:<target-identity>`,
-    previewDiffBehavior: "reviewed IaC preview/diff must run before protected/shared apply",
-    mutationSequence: [
-      "admission revalidation",
-      "provider lock acquisition",
-      "reviewed IaC or provider CLI preview",
-      "operator approval",
-      "idempotent apply",
-      "smoke check",
-      "audit evidence capture",
-    ],
-    smokeChecks: ["health/readiness check", "provider identity check", "audit evidence check"],
-    rollbackProcedure: [
-      "restore last reviewed IaC state or provider snapshot",
-      "record rollback evidence",
-      "rerun smoke checks",
-    ],
-    replaySemantics: "replay uses durable records and immutable artifacts, not dashboard state",
-    auditEvidence: ["preview output digest", "apply result digest", "smoke result", "operator id"],
-    protectedSharedEligibility: "blocked until every selected prerequisite has evidence",
-    iac: {
-      reviewedReference: `iac/${id}/README.md`,
-      previewCommand: `deploy --deployment <label> --preview --provider-capability ${id}`,
-      applyCommand: `deploy --deployment <label> --provider-capability ${id}`,
-      evidenceCommand: `deploy --deployment <label> --record --provider-capability ${id}`,
-    },
-  };
-}

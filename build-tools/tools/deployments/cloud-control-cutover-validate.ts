@@ -7,6 +7,7 @@ import {
   requiredAwsProviderCapabilities,
   validateAwsCutoverTopology,
 } from "./cloud-control-cutover-aws";
+import { validateCutoverProviderCapabilities } from "./cloud-control-cutover-provider-capabilities";
 
 const BASE_HEALTH = [
   "cloudHealth",
@@ -27,7 +28,10 @@ export function validateCloudControlCutover(
     ...validateIdentity(evidence, options),
     ...validateBaseHealth(evidence),
     ...validateLatestDeployment(evidence, options),
-    ...validateProviderCapabilities(evidence, requiredProviderCapabilities(evidence, options)),
+    ...validateCutoverProviderCapabilities(
+      evidence,
+      requiredProviderCapabilities(evidence, options),
+    ),
     ...validateAwsCutoverTopology(evidence, options),
     ...validateOperation(evidence, options.operation),
     ...validateAudit(evidence, options.operation),
@@ -88,21 +92,6 @@ function validateLatestDeployment(
     errors.push("latest protected/shared staging deployment did not succeed through cloud-primary");
   }
   return errors;
-}
-
-function validateProviderCapabilities(evidence: CutoverEvidence, selected: string[]): string[] {
-  const capabilities = evidence.providerCapabilities || {};
-  return selected.flatMap((id) => {
-    const capability = capabilities[id] || {};
-    const errors: string[] = [];
-    if (!capability.auditIdentity) errors.push(`${id}: missing provider-capability audit identity`);
-    if (!capability.rollbackProcedure) errors.push(`${id}: missing rollback procedure evidence`);
-    if (!capability.smokeEvidence) errors.push(`${id}: missing smoke evidence`);
-    if (capability.source === "dashboard-only" || capability.source === "raw-iac-only") {
-      errors.push(`${id}: raw dashboard or IaC state is not control-plane audit evidence`);
-    }
-    return errors;
-  });
 }
 
 function validateOperation(evidence: CutoverEvidence, operation: string): string[] {

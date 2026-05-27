@@ -147,13 +147,6 @@ test("deploy admission requirements for listed deployments", async (t) => {
 
     await t.test("admit-for-commit binds explicit evidence to the requested commit", async () => {
       await resetToFixture(tmp, $, fixtureRevision);
-      const policyPath = `${tmp}/sandbox/deployments/shared/TARGETS`;
-      const policySource = await fsp.readFile(policyPath, "utf8");
-      await fsp.writeFile(
-        policyPath,
-        policySource.replace('allowed_refs = ["main"]', 'allowed_refs = ["main", "commit:*"]'),
-        "utf8",
-      );
       await $({ cwd: tmp, stdio: "pipe" })`git checkout -B local-work ${fixtureRevision}`;
       await $({ cwd: tmp, stdio: "pipe" })`git branch -f main ${fixtureRevision}`;
       await fsp.writeFile(`${tmp}/local-only.txt`, "local-only\n", "utf8");
@@ -181,8 +174,15 @@ test("deploy admission requirements for listed deployments", async (t) => {
               "--deployment-json is not supported; use --deployment <label>",
           },
         );
+        const deploymentWithExplicitCommitRef = {
+          ...deployment,
+          admissionPolicy: {
+            ...deployment.admissionPolicy,
+            allowedRefs: [...deployment.admissionPolicy.allowedRefs, "commit:*"],
+          },
+        };
         const evidence = await resolveDeploymentAdmissionEvidence({
-          deployment,
+          deployment: deploymentWithExplicitCommitRef,
           workspaceRoot: tmp,
         });
         assert.deepEqual(evidence?.reviewedSource, {
