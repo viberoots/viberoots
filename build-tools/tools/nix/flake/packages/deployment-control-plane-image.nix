@@ -45,7 +45,7 @@ runDeploymentControlPlaneCommand()
         process.exit(0);
       });
     }
-    if ((process.argv[2] || "") === "worker") return new Promise(() => {});
+    if ((process.argv[2] || "") === "worker" && !process.argv.includes("--help")) return new Promise(() => {});
   })
   .catch((error) => {
     console.error(error);
@@ -113,6 +113,8 @@ EOF
       ".env"
       "id_rsa"
       "control-plane-database-url"
+      "artifact-store-secret-access-key"
+      "infisical-client-secret"
     ];
   };
 

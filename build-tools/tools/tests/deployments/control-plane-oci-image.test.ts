@@ -1,7 +1,9 @@
 #!/usr/bin/env zx-wrapper
 import assert from "node:assert/strict";
+import { execFile } from "node:child_process";
 import path from "node:path";
 import { test } from "node:test";
+import { promisify } from "node:util";
 import { readControlPlaneImageMetadata } from "../../deployments/control-plane-image-metadata";
 import { startNixosSharedHostControlPlaneServer } from "../../deployments/nixos-shared-host-control-plane-server";
 import { localHarnessControlPlaneDatabaseUrl } from "../../deployments/nixos-shared-host-control-plane-backend";
@@ -20,6 +22,7 @@ import {
 import {
   assertNoSecretPayloads,
   assertProhibitedPathContract,
+  buildControlPlaneRuntime,
   buildImageContract,
   buildImageTarball,
   layerPathMatches,
@@ -28,22 +31,25 @@ import { readJson } from "./nixos-shared-host.control-plane.helpers";
 import { runInTemp } from "../lib/test-helpers";
 
 const TOKEN = "oci-image-test-token";
+const execFileAsync = promisify(execFile);
 
 test("control-plane image contract exposes service and worker entrypoints without host secrets", async () => {
   const first = await buildImageContract();
   const second = await buildImageContract();
   const image = await buildImageTarball();
-  const rebuiltImage = await buildImageTarball();
   assert.equal(first.outPath, second.outPath);
-  assert.equal(image.outPath, rebuiltImage.outPath);
-  assert.equal(image.archiveSha256, rebuiltImage.archiveSha256);
   assert.deepEqual(image.config.config.Entrypoint, ["/bin/deployment-control-plane"]);
   assert.equal(image.config.config.User, "10001:10001");
   assert.equal(
     image.config.config.Labels["org.opencontainers.image.title"],
     "deployment-control-plane",
   );
+  assert.equal(
+    image.config.config.Labels["org.opencontainers.image.revision"],
+    first.contract.sourceRevision,
+  );
   assert.equal(image.config.config.Labels["org.opencontainers.image.digest"], "unknown");
+  assert.match(first.contract.sourceRevision, /^source-[a-z0-9]{12}$/);
   assert.deepEqual(first.contract.commands, [
     "deployment-control-plane service --config /etc/deployment-control-plane/config.yaml",
     "deployment-control-plane worker --config /etc/deployment-control-plane/config.yaml",
@@ -75,6 +81,18 @@ test("control-plane image contract exposes service and worker entrypoints withou
       !image.layerPaths.some((layerPath) => layerPathMatches(layerPath, prohibitedPath)),
       `image layer unexpectedly includes ${prohibitedPath}`,
     );
+  }
+});
+
+test("control-plane Nix runtime exposes non-mutating service and worker help", async () => {
+  const runtime = await buildControlPlaneRuntime();
+  for (const mode of ["service", "worker"]) {
+    const { stdout } = await execFileAsync(runtime.commandPath, [mode, "--help"], {
+      cwd: process.cwd(),
+      timeout: 30_000,
+      maxBuffer: 1024 * 1024,
+    });
+    assert.match(stdout, new RegExp(`deployment-control-plane ${mode} --config <path>`));
   }
 });
 

@@ -17,8 +17,9 @@ Profile files live in
 
 Real hosts must provide:
 
-- an immutable reviewed image reference through `VBR_CONTROL_PLANE_IMAGE`
-- a matching `VBR_CONTROL_PLANE_IMAGE_DIGEST` for status reporting
+- `VBR_CONTROL_PLANE_IMAGE_REGISTRY`, `VBR_CONTROL_PLANE_IMAGE_REPOSITORY`, and
+  `VBR_CONTROL_PLANE_IMAGE_DIGEST` so the runtime image is assembled as
+  `<registry>/<repository>@sha256:<digest>`
 - an external Postgres database URL credential file
 - an S3-compatible artifact-store bucket and credential files
 - a reviewed-source SSH key credential file
@@ -55,7 +56,7 @@ Deployment-scoped Infisical credentials keep the same defaults as the NixOS prof
 
 Compose, Docker, and Podman are only runtime substrates. They must preserve:
 
-- the same reviewed image
+- the same reviewed image pinned by digest, never a tag-only image such as `:latest`
 - `deployment-control-plane service --config /etc/deployment-control-plane/config.yaml`
 - `deployment-control-plane worker --config /etc/deployment-control-plane/config.yaml`
 - the mounted config, credential directory, records root, artifact scratch root, and runtime root

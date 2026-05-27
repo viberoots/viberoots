@@ -10,6 +10,13 @@ let
     if cfg.image != null then cfg.image
     else if cfg.imageRegistry == null || cfg.imageRepository == null || cfg.imageDigest == null then ""
     else "${cfg.imageRegistry}/${cfg.imageRepository}@${cfg.imageDigest}";
+  digestPattern = "sha256:[0-9a-f]{64}";
+  imageRefPattern = ".+@${digestPattern}";
+  imageRefDigestMatch = builtins.match ".*@(${digestPattern})" imageRef;
+  resolvedImageDigest =
+    if cfg.imageDigest != null then cfg.imageDigest
+    else if imageRefDigestMatch == null then null
+    else builtins.elemAt imageRefDigestMatch 0;
   credentialSource = name:
     if builtins.hasAttr name cfg.credentials then cfg.credentials.${name}.source else cfg.extraCredentialFiles.${name};
   configuredCredentialNames = lib.unique (builtins.attrNames cfg.credentials ++ builtins.attrNames cfg.extraCredentialFiles);
@@ -97,8 +104,8 @@ let
     image = imageRef;
     autoStart = true;
     volumes = baseVolumes ++ [ "${credentialRuntimeDirectory name}:${cfg.credentialDirectory}:ro" ];
-    environment = lib.optionalAttrs (cfg.imageDigest != null) {
-      VBR_CONTROL_PLANE_IMAGE_DIGEST = cfg.imageDigest;
+    environment = lib.optionalAttrs (resolvedImageDigest != null) {
+      VBR_CONTROL_PLANE_IMAGE_DIGEST = resolvedImageDigest;
     } // {
       WORKSPACE_ROOT = "${defaults.runtimeRoot}/workspace";
       TMPDIR = "${defaults.runtimeRoot}/tmp";
@@ -185,6 +192,8 @@ in
       { assertion = cfg.instanceId != null; message = "deploymentControlPlaneContainer.instanceId is required."; }
       { assertion = cfg.publicUrl != null; message = "deploymentControlPlaneContainer.publicUrl is required."; }
       { assertion = cfg.image != null || (cfg.imageRegistry != null && cfg.imageRepository != null && cfg.imageDigest != null); message = "deploymentControlPlaneContainer requires image or imageRegistry/imageRepository/imageDigest."; }
+      { assertion = imageRef == "" || builtins.match imageRefPattern imageRef != null; message = "deploymentControlPlaneContainer image must be pinned by @sha256:<64 lowercase hex>."; }
+      { assertion = cfg.imageDigest == null || builtins.match digestPattern cfg.imageDigest != null; message = "deploymentControlPlaneContainer.imageDigest must be sha256:<64 lowercase hex>."; }
       { assertion = cfg.artifactStore.bucket != null; message = "deploymentControlPlaneContainer.artifactStore.bucket is required."; }
       { assertion = missingCredentialNames == [ ]; message = "deploymentControlPlaneContainer missing credential sources: ${lib.concatStringsSep ", " missingCredentialNames}"; }
       { assertion = nullCredentialNames == [ ]; message = "deploymentControlPlaneContainer credential sources must not be null: ${lib.concatStringsSep ", " nullCredentialNames}"; }

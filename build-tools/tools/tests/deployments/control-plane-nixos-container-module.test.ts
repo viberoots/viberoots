@@ -2,7 +2,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
-import { evalModule } from "./control-plane-nixos-container-module.helpers";
+import { evalModule, REVIEWED_IMAGE_DIGEST } from "./control-plane-nixos-container-module.helpers";
 
 test("control-plane NixOS container module defaults to Podman service plus two workers", async () => {
   await runInTemp("control-plane-nixos-container-defaults", async (tmp, $) => {
@@ -112,6 +112,7 @@ test("control-plane NixOS container module preserves mounts when Docker is selec
     assert.deepEqual(service.ports, ["127.0.0.1:7780:7780"]);
     assert.deepEqual(service.environment, {
       TMPDIR: "/var/lib/deployment-control-plane/runtime/tmp",
+      VBR_CONTROL_PLANE_IMAGE_DIGEST: REVIEWED_IMAGE_DIGEST,
       VBR_DEPLOY_REVIEWED_SOURCE_SSH_KEY_FILE:
         "/run/deployment-control-plane/credentials/reviewed-source-ssh-key",
       VBR_DEPLOY_REVIEWED_SOURCE_SSH_KNOWN_HOSTS_FILE:
@@ -207,7 +208,7 @@ test("control-plane NixOS container module parameterizes image and gated nginx",
       `
       imageRegistry = "registry.ops.example";
       imageRepository = "deploy/control-plane";
-      imageDigest = "sha256:reviewed";
+      imageDigest = "${REVIEWED_IMAGE_DIGEST}";
       publicHostName = "deploy.example.test";
       manageNginx = true;
     `,
@@ -221,8 +222,8 @@ test("control-plane NixOS container module parameterizes image and gated nginx",
     }`,
       { image: false },
     );
-    assert.equal(out.image, "registry.ops.example/deploy/control-plane@sha256:reviewed");
-    assert.equal(out.imageDigestEnv, "sha256:reviewed");
+    assert.equal(out.image, `registry.ops.example/deploy/control-plane@${REVIEWED_IMAGE_DIGEST}`);
+    assert.equal(out.imageDigestEnv, REVIEWED_IMAGE_DIGEST);
     assert.equal(out.nginxEnabled, true);
     assert.equal(out.proxyPass, "http://127.0.0.1:7780");
   });

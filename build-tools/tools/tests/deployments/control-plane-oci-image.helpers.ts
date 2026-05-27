@@ -1,6 +1,5 @@
 #!/usr/bin/env zx-wrapper
 import assert from "node:assert/strict";
-import { createHash } from "node:crypto";
 import { execFile, spawn } from "node:child_process";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
@@ -12,16 +11,25 @@ const execFileAsync = promisify(execFile);
 export type ControlPlaneImageTarball = {
   outPath: string;
   repoTag: string;
-  archiveSha256: string;
   config: any;
   layerPaths: string[];
   rootFilesystemPaths: string[];
+};
+
+export type ControlPlaneRuntime = {
+  outPath: string;
+  commandPath: string;
 };
 
 export async function buildImageContract() {
   const outPath = await nixBuildOutput(".#deployment-control-plane-image-contract");
   const raw = await fsp.readFile(path.join(outPath, "contract.json"), "utf8");
   return { outPath, contract: JSON.parse(raw) as any };
+}
+
+export async function buildControlPlaneRuntime(): Promise<ControlPlaneRuntime> {
+  const outPath = await nixBuildOutput(".#deployment-control-plane-runtime");
+  return { outPath, commandPath: path.join(outPath, "bin", "deployment-control-plane") };
 }
 
 export async function buildImageTarball(): Promise<ControlPlaneImageTarball> {
@@ -48,7 +56,6 @@ export async function buildImageTarball(): Promise<ControlPlaneImageTarball> {
     return {
       outPath,
       repoTag,
-      archiveSha256: await sha256File(outPath),
       config: config as any,
       layerPaths,
       rootFilesystemPaths: [...rootFilesystemPaths].sort(),
@@ -71,7 +78,13 @@ export function assertNoSecretPayloads(value: any) {
 }
 
 export function assertProhibitedPathContract(contract: any) {
-  for (const prohibited of [".env", "id_rsa", "control-plane-database-url"]) {
+  for (const prohibited of [
+    ".env",
+    "id_rsa",
+    "control-plane-database-url",
+    "artifact-store-secret-access-key",
+    "infisical-client-secret",
+  ]) {
     assert.ok(contract.prohibitedPaths.includes(prohibited));
   }
 }
@@ -156,12 +169,6 @@ function forbiddenLayerPayloads(): string[] {
     "container-smoke-token",
     "/Users/kiltyj/Code/viberoots",
   ];
-}
-
-async function sha256File(file: string): Promise<string> {
-  const hash = createHash("sha256");
-  hash.update(await fsp.readFile(file));
-  return hash.digest("hex");
 }
 
 function normalizeLayerPath(layerPath: string): string {

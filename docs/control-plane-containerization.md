@@ -96,6 +96,37 @@ Do not deploy mutable tags such as `latest` as the runtime identity. Pass the sa
 `VBR_CONTROL_PLANE_IMAGE_DIGEST` so `/healthz`, the web UI status API, and MCP status report the
 reviewed image identity without reading mutable registry tags.
 
+Publication records must include the source revision and immutable digest together. Tags are
+convenience references for humans and CI logs only. The reviewed publication helper renders the
+registry-neutral steps:
+
+```text
+skopeo copy docker-archive:<nix-built-image-tarball> docker://<registry>/<repo>:<sourceRevision>
+skopeo inspect --format '{{.Digest}}' docker://<registry>/<repo>:<sourceRevision>
+test "$(skopeo inspect --format '{{.Digest}}' docker://<registry>/<repo>:<sourceRevision>)" = "sha256:<digest>"
+```
+
+The resulting manifest shape is:
+
+```json
+{
+  "image": "registry.example.com/platform/deployment-control-plane@sha256:<digest>",
+  "sourceRevision": "source-<reviewed-revision>",
+  "digest": "sha256:<digest>",
+  "tag": "registry.example.com/platform/deployment-control-plane:source-<reviewed-revision>"
+}
+```
+
+Host profiles and production runtime config must consume the `image` digest reference, not the tag.
+The optional live registry test is skipped by default; enable it only against a reviewed temporary
+repository with:
+
+```text
+VBR_CONTROL_PLANE_IMAGE_LIVE_REGISTRY=1
+VBR_CONTROL_PLANE_IMAGE_REPOSITORY=registry.example.com/platform/deployment-control-plane
+VBR_CONTROL_PLANE_IMAGE_EXPECTED_DIGEST=sha256:<digest>
+```
+
 Required mounted paths:
 
 - `/etc/deployment-control-plane/config.yaml`
@@ -520,7 +551,7 @@ The module should expose options like:
     enable = true;
 
     instanceId = "mini";
-    image = "registry.example.com/viberoots/deployment-control-plane@sha256:REVIEWED";
+    image = "registry.example.com/viberoots/deployment-control-plane@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
     imageRegistry = null;
     imageRepository = null;
     imageDigest = null;
@@ -613,7 +644,7 @@ Host-local import example:
   services.viberoots.deploymentControlPlaneContainer = {
     enable = true;
     instanceId = "mini";
-    image = "registry.example.com/viberoots/deployment-control-plane@sha256:REVIEWED";
+    image = "registry.example.com/viberoots/deployment-control-plane@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
     publicUrl = "https://deploy.apps.kilty.io";
     publicHostName = "deploy.apps.kilty.io";
     manageNginx = true;

@@ -13,6 +13,9 @@ const credentialConfig = `
   };
 `;
 
+export const REVIEWED_IMAGE_DIGEST =
+  "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+
 export async function evalModule(
   tmp: string,
   $: any,
@@ -38,7 +41,7 @@ export async function evalModule(
             ${includeBucket ? `artifactStore.bucket = "deployment-artifacts";` : ""}
             ${
               includeImage
-                ? `image = "registry.example.com/platform/deployment-control-plane@sha256:reviewed";`
+                ? `image = "registry.example.com/platform/deployment-control-plane@${REVIEWED_IMAGE_DIGEST}";`
                 : ""
             }
             ${credentials}

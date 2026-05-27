@@ -2,6 +2,7 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { parseControlPlaneRuntimeConfig } from "../../deployments/control-plane-runtime-config";
+import { REVIEWED_IMAGE_DIGEST } from "./control-plane-nixos-container-module.helpers";
 
 const execFileAsync = promisify(execFile);
 
@@ -37,7 +38,7 @@ export async function loadNixosRenderedConfig(): Promise<
             instanceId = "mini";
             publicUrl = "https://deploy.example.test";
             artifactStore.bucket = "deployment-control-plane-artifacts";
-            image = "registry.example.com/platform/deployment-control-plane@sha256:reviewed";
+            image = "registry.example.com/platform/deployment-control-plane@${REVIEWED_IMAGE_DIGEST}";
             credentials = {
               control-plane-database-url.source = "/run/secrets/db";
               control-plane-token.source = "/run/secrets/control-plane-token";

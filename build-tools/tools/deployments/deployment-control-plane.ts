@@ -1,6 +1,6 @@
 #!/usr/bin/env zx-wrapper
 import { pathToFileURL } from "node:url";
-import { getFlagStr, getPositionalsWithValueFlags } from "../lib/cli";
+import { getFlagBool, getFlagStr, getPositionalsWithValueFlags } from "../lib/cli";
 import { findRepoRoot } from "../lib/repo";
 import { loadControlPlaneRuntimeConfig } from "./control-plane-runtime-config";
 import {
@@ -20,6 +20,10 @@ function command(): "service" | "worker" {
 
 export async function runDeploymentControlPlaneCommand() {
   const mode = command();
+  if (getFlagBool("help")) {
+    console.log(`usage: deployment-control-plane ${mode} --config <path>`);
+    return undefined;
+  }
   const correlationId = createControlPlaneCorrelationId(mode);
   const configPath = getFlagStr("config", "").trim();
   if (!configPath) throw new Error(`${mode} mode requires --config <path>`);
@@ -79,7 +83,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
           process.exit(0);
         });
       }
-      if (command() === "worker") await new Promise(() => {});
+      if (command() === "worker" && !getFlagBool("help")) await new Promise(() => {});
     })
     .catch((error) => {
       console.error(error);

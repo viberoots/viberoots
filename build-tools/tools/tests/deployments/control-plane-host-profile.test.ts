@@ -35,6 +35,8 @@ const REQUIRED_MOUNTS = [
   RUNTIME_ROOT,
 ];
 const SECRET_ENV_PATTERN = /(secret|token|password|credential|database|access.key|ssh)/i;
+const COMPOSE_IMAGE_REF =
+  "${VBR_CONTROL_PLANE_IMAGE_REGISTRY:?set image registry}/${VBR_CONTROL_PLANE_IMAGE_REPOSITORY:?set image repository}@${VBR_CONTROL_PLANE_IMAGE_DIGEST:?set immutable sha256 image digest}";
 
 type ComposeService = {
   image?: string;
@@ -98,10 +100,7 @@ test("non-NixOS Compose profile defines one service and two workers", async () =
     "127.0.0.1:${VBR_CONTROL_PLANE_PORT:-7780}:7780",
   ]);
   for (const service of Object.values(services)) {
-    assert.equal(
-      service.image,
-      "${VBR_CONTROL_PLANE_IMAGE:?set immutable reviewed image reference}",
-    );
+    assert.equal(service.image, COMPOSE_IMAGE_REF);
     assertMounts(service);
     assertNoCredentialEnvironment(service);
   }
@@ -152,6 +151,10 @@ test("non-NixOS profile config matches the shared runtime credential contract", 
 
 test("direct Podman example preserves the same runtime contract", async () => {
   const text = await readProfileFile("podman-run.example.txt");
+  assert.match(text, /VBR_CONTROL_PLANE_IMAGE_REF=/);
+  assert.match(text, /\^sha256:\[0-9a-f\]\{64\}\$/);
+  assert.match(text, /VBR_CONTROL_PLANE_IMAGE_DIGEST must be sha256:<64 lowercase hex>/);
+  assert.doesNotMatch(text, /VBR_CONTROL_PLANE_IMAGE:\?/);
   assert.match(text, /podman pod create/);
   assert.match(text, /--publish 127\.0\.0\.1:7780:7780/);
   assert.equal((text.match(/deployment-control-plane service --config/g) || []).length, 1);

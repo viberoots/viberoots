@@ -2,7 +2,7 @@ name: deployment-control-plane
 
 services:
   control-plane-service:
-    image: ${VBR_CONTROL_PLANE_IMAGE:?set immutable reviewed image reference}
+    image: ${VBR_CONTROL_PLANE_IMAGE_REGISTRY:?set image registry}/${VBR_CONTROL_PLANE_IMAGE_REPOSITORY:?set image repository}@${VBR_CONTROL_PLANE_IMAGE_DIGEST:?set immutable sha256 image digest}
     command:
       - deployment-control-plane
       - service
@@ -36,7 +36,7 @@ services:
       VBR_CONTROL_PLANE_IMAGE_DIGEST: ${VBR_CONTROL_PLANE_IMAGE_DIGEST:-unknown}
 
   control-plane-worker-1:
-    image: ${VBR_CONTROL_PLANE_IMAGE:?set immutable reviewed image reference}
+    image: ${VBR_CONTROL_PLANE_IMAGE_REGISTRY:?set image registry}/${VBR_CONTROL_PLANE_IMAGE_REPOSITORY:?set image repository}@${VBR_CONTROL_PLANE_IMAGE_DIGEST:?set immutable sha256 image digest}
     command:
       - deployment-control-plane
       - worker
@@ -68,7 +68,7 @@ services:
       VBR_CONTROL_PLANE_IMAGE_DIGEST: ${VBR_CONTROL_PLANE_IMAGE_DIGEST:-unknown}
 
   control-plane-worker-2:
-    image: ${VBR_CONTROL_PLANE_IMAGE:?set immutable reviewed image reference}
+    image: ${VBR_CONTROL_PLANE_IMAGE_REGISTRY:?set image registry}/${VBR_CONTROL_PLANE_IMAGE_REPOSITORY:?set image repository}@${VBR_CONTROL_PLANE_IMAGE_DIGEST:?set immutable sha256 image digest}
     command:
       - deployment-control-plane
       - worker
