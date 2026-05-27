@@ -80,6 +80,11 @@ credentials:
   defaults:
     infisicalClientIdFilePattern: "{deploymentId}-infisical-client-id"
     infisicalClientSecretFilePattern: "{deploymentId}-infisical-client-secret"
+  infisicalDeployments:
+    - deploymentId: pleomino-staging
+      siteUrl: https://app.infisical.com
+      projectId: pleomino-staging-infisical-project
+      environment: production
 
 reviewedSource:
   sshKeyFile: /run/deployment-control-plane/credentials/reviewed-source-ssh-key
@@ -192,6 +197,8 @@ Infisical Universal Auth credentials are deployment-scoped by default:
 Reviewed deployment metadata may override these filenames for one deployment, but overrides remain
 plain filenames resolved inside `credentials.directory`. There are no global Infisical tenant,
 project, site URL, environment, client id, or client secret defaults in the runtime config.
+Production validation checks every entry in `credentials.infisicalDeployments`; missing,
+unreadable, empty, or filename-mismatched files fail before the service or worker starts.
 
 Credential file manifest:
 
@@ -203,6 +210,7 @@ Credential file manifest:
 | Artifact-store access key id       | `artifact-store-access-key-id`           |
 | Artifact-store secret access key   | `artifact-store-secret-access-key`       |
 | Reviewed-source SSH key            | `reviewed-source-ssh-key`                |
+| Reviewed-source known hosts        | `reviewed-source-known-hosts`            |
 | Deployment Infisical client id     | `{deploymentId}-infisical-client-id`     |
 | Deployment Infisical client secret | `{deploymentId}-infisical-client-secret` |
 

@@ -42,6 +42,7 @@ export type ControlPlaneRuntimeConfig = {
       infisicalClientIdFilePattern: string;
       infisicalClientSecretFilePattern: string;
     };
+    infisicalDeployments: DeploymentInfisicalCredentialRequest[];
   };
   reviewedSource: {
     sshKeyFile: string;

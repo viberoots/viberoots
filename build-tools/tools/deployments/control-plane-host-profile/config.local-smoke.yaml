@@ -27,6 +27,11 @@ credentials:
   defaults:
     infisicalClientIdFilePattern: "{deploymentId}-infisical-client-id"
     infisicalClientSecretFilePattern: "{deploymentId}-infisical-client-secret"
+  infisicalDeployments:
+    - deploymentId: cloud-control-fixture-staging
+      siteUrl: https://app.infisical.com
+      projectId: cloud-control-fixture-staging-infisical-project
+      environment: production
 
 reviewedSource:
   sshKeyFile: /run/deployment-control-plane/credentials/reviewed-source-ssh-key

@@ -3,7 +3,6 @@ import YAML from "yaml";
 import { normalizeAuthProviderConfig } from "./deployment-auth-provider-config";
 import {
   DEFAULT_CONTROL_PLANE_CONFIG_PATH,
-  type ControlPlaneProcessMode,
   type ControlPlaneRuntimeConfig,
 } from "./control-plane-runtime-config-types";
 import {
@@ -19,6 +18,7 @@ import {
   validateControlPlaneProductionEnv,
   validateControlPlaneRuntimeConfigFiles,
 } from "./control-plane-runtime-config-validation";
+import { deploymentInfisicalCredentialRequests } from "./control-plane-runtime-infisical";
 
 export { redactConfigDiagnostic, validateControlPlaneRuntimeConfigFiles };
 
@@ -62,7 +62,11 @@ export function parseControlPlaneRuntimeConfig(
   const config = withDefaults(value, directory);
   const parsed = {
     ...config,
-    processMode: processModeValue(config.processMode, "processMode"),
+    processMode: enumValue(
+      config.processMode,
+      ["fully-enabled", "service-only", "worker-only", "fully-disabled"],
+      "processMode",
+    ),
     database: {
       urlFile: assertCredentialDirectoryPath(config.database.urlFile, policy),
     },
@@ -173,6 +177,7 @@ function withDefaults(
           "credentials.defaults.infisicalClientSecretFilePattern",
         ),
       },
+      infisicalDeployments: deploymentInfisicalCredentialRequests(credentials.infisicalDeployments),
     },
     reviewedSource: {
       sshKeyFile: stringValue(reviewedSource.sshKeyFile, "reviewedSource.sshKeyFile"),
@@ -235,15 +240,4 @@ function enumValue<T extends string>(value: unknown, choices: T[], fieldName: st
   if (typeof value !== "string" || !choices.includes(value as T))
     throw new Error(`${fieldName} has unsupported value`);
   return value as T;
-}
-
-function processModeValue(
-  value: ControlPlaneProcessMode,
-  fieldName: string,
-): ControlPlaneProcessMode {
-  return enumValue(
-    value,
-    ["fully-enabled", "service-only", "worker-only", "fully-disabled"],
-    fieldName,
-  );
 }

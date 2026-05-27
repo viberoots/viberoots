@@ -42,11 +42,7 @@ test("control-plane NixOS container module defaults to Podman service plus two w
         "/run/deployment-control-plane-container-credentials/deployment-control-plane-service:/run/deployment-control-plane/credentials:ro",
       ),
     );
-    assert.ok(
-      service.volumes.includes(
-        "/etc/deployment-control-plane/github-known-hosts:/etc/deployment-control-plane/github-known-hosts:ro",
-      ),
-    );
+    assert.ok(!service.volumes.some((volume) => volume.includes("github-known-hosts")));
     const rendered = JSON.parse(String(out.configText));
     assert.equal(rendered.instanceId, "mini");
     assert.equal(rendered.service.host, "0.0.0.0");
@@ -56,6 +52,10 @@ test("control-plane NixOS container module defaults to Podman service plus two w
     );
     assert.equal(rendered.storage.artifactStore.bucket, "deployment-artifacts");
     assert.equal(rendered.storage.artifactStore.region, "us-east-1");
+    assert.equal(
+      rendered.credentials.infisicalDeployments[0].deploymentId,
+      "cloud-control-fixture-staging",
+    );
     assert.equal(rendered.webUi.enabled, true);
     assert.ok(
       (out.tmpfiles as string[]).includes(
@@ -97,6 +97,16 @@ test("control-plane NixOS container module preserves mounts when Docker is selec
         "control-plane-database-url:/run/secrets/db",
       ),
     );
+    assert.ok(
+      (out.serviceLoadCredential as string[]).includes(
+        "reviewed-source-known-hosts:/run/secrets/known-hosts",
+      ),
+    );
+    assert.ok(
+      (out.serviceLoadCredential as string[]).includes(
+        "cloud-control-fixture-staging-infisical-client-secret:/run/secrets/infisical-secret",
+      ),
+    );
     assert.match(String(out.servicePreStart), /install -d -m 0500 -o 10001 -g 10001/);
     assert.match(
       String(out.workerPreStart),
@@ -113,10 +123,6 @@ test("control-plane NixOS container module preserves mounts when Docker is selec
     assert.deepEqual(service.environment, {
       TMPDIR: "/var/lib/deployment-control-plane/runtime/tmp",
       VBR_CONTROL_PLANE_IMAGE_DIGEST: REVIEWED_IMAGE_DIGEST,
-      VBR_DEPLOY_REVIEWED_SOURCE_SSH_KEY_FILE:
-        "/run/deployment-control-plane/credentials/reviewed-source-ssh-key",
-      VBR_DEPLOY_REVIEWED_SOURCE_SSH_KNOWN_HOSTS_FILE:
-        "/etc/deployment-control-plane/github-known-hosts",
       WORKSPACE_ROOT: "/var/lib/deployment-control-plane/runtime/workspace",
     });
     assert.ok(service.extraOptions.includes("--health-interval=30s"));
@@ -185,6 +191,9 @@ test("control-plane NixOS container module fails closed for required host-local 
         credentials = {
           control-plane-database-url.source = "/run/secrets/db";
           reviewed-source-ssh-key.source = "/run/secrets/ssh";
+          reviewed-source-known-hosts.source = "/run/secrets/known-hosts";
+          cloud-control-fixture-staging-infisical-client-id.source = "/run/secrets/infisical-id";
+          cloud-control-fixture-staging-infisical-client-secret.source = "/run/secrets/infisical-secret";
           artifact-store-endpoint.source = "/run/secrets/endpoint";
           artifact-store-access-key-id.source = "/run/secrets/access";
           control-plane-token.source = "/run/secrets/control-plane-token";

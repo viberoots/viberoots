@@ -43,6 +43,9 @@ export async function loadNixosRenderedConfig(): Promise<
               control-plane-database-url.source = "/run/secrets/db";
               control-plane-token.source = "/run/secrets/control-plane-token";
               reviewed-source-ssh-key.source = "/run/secrets/ssh";
+              reviewed-source-known-hosts.source = "/run/secrets/known-hosts";
+              cloud-control-fixture-staging-infisical-client-id.source = "/run/secrets/infisical-id";
+              cloud-control-fixture-staging-infisical-client-secret.source = "/run/secrets/infisical-secret";
               artifact-store-endpoint.source = "/run/secrets/endpoint";
               artifact-store-access-key-id.source = "/run/secrets/access";
               artifact-store-secret-access-key.source = "/run/secrets/secret";

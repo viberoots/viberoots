@@ -15,6 +15,10 @@ import {
   validateProviderCapabilityEvidence,
   validateProviderCapabilityDeclaration,
 } from "../../deployments/cloud-control-setup-validate";
+import {
+  validateProtectedSharedProfileReadiness,
+  validateRenderedProfile,
+} from "../../deployments/cloud-control-setup-profile-validate";
 import type { CloudControlSetupInput } from "../../deployments/cloud-control-setup-types";
 import { runInScratchTemp } from "../lib/test-helpers";
 
@@ -32,6 +36,7 @@ function baseInput(overrides: Partial<CloudControlSetupInput> = {}): CloudContro
     artifactRegion: "us-east-1",
     artifactBackend: "aws-s3",
     artifactBackendEvidence: "",
+    deploymentIds: ["pleomino-staging"],
     reviewedSourceMode: "ssh",
     authCallbackHost: "deploy-auth.example.test",
     authCallbackPath: "/oidc/callback",
@@ -63,7 +68,8 @@ test("cloud setup bundle renders runtime, credentials, commands, and capabilitie
   assert.equal(managed.postgres.candidate, "supabase-managed-postgres");
   assert.equal(managed.artifactStore.backend, "aws-s3");
   assert.equal(ingress.serviceIngress.readiness, "/readyz");
-  assert.ok(manifest.requiredFiles.includes("{deploymentId}-infisical-client-secret"));
+  assert.ok(manifest.requiredFiles.includes("pleomino-staging-infisical-client-secret"));
+  assert.equal(config.credentials.infisicalDeployments[0].deploymentId, "pleomino-staging");
   assert.ok(manifest.requiredFiles.includes("reviewed-source-ssh-key"));
   assert.ok(manifest.requiredFiles.includes("reviewed-source-known-hosts"));
   assert.equal(
@@ -72,6 +78,7 @@ test("cloud setup bundle renders runtime, credentials, commands, and capabilitie
   );
   assert.equal(commands.image, DIGEST_REF);
   assert.equal(commands.workers.length, 2);
+  assert.deepEqual(validateRenderedProfile(bundle.files), []);
   assert.deepEqual(
     bundle.capabilities.map((capability) => capability.id),
     [...CLOUD_CAPABILITY_IDS],
@@ -85,19 +92,52 @@ test("cloud setup bundle renders runtime, credentials, commands, and capabilitie
 test("AWS EC2 profile records production boundaries and reviewed alternates", async () => {
   await runInScratchTemp("cloud-control-aws-setup", async (tmp) => {
     await writeCloudControlSetupBundle(baseInput({ outDir: tmp, mode: "aws-ec2" }));
-    const awsProfile = await fsp.readFile(path.join(tmp, "aws-ec2-profile.md"), "utf8");
+    const awsProfile = await fsp.readFile(path.join(tmp, "aws-ec2-profile.yaml"), "utf8");
     const capabilities = JSON.parse(
       await fsp.readFile(path.join(tmp, "provider-capabilities.json"), "utf8"),
     );
-    assert.match(awsProfile, /AWS S3 through a VPC endpoint/);
-    assert.match(
-      awsProfile,
-      /Supabase Storage S3 and other S3-compatible stores are reviewed alternates/,
-    );
+    const aws = YAML.parse(awsProfile);
+    assert.equal(aws.artifactBackend.defaultPath, "AWS S3 through a VPC endpoint");
+    assert.equal(aws.systemdPodmanUnits.length, 3);
+    assert.equal(aws.systemdPodmanUnits[0].name, "deployment-control-plane-service");
     assert.ok(await exists(path.join(tmp, "managed-dependencies.json")));
     assert.ok(await exists(path.join(tmp, "ingress-checklist.json")));
     assert.equal(capabilities.length, CLOUD_CAPABILITY_IDS.length);
   });
+});
+
+test("incomplete generated profiles cannot be marked protected/shared-ready", () => {
+  const incomplete = {
+    "credential-manifest.json": JSON.stringify({ requiredFiles: ["control-plane-token"] }),
+    "saas-oci-profile.yaml": `
+schemaVersion: cloud-control-saas-oci-profile@1
+processes:
+  - name: deployment-control-plane-service
+    image: ${DIGEST_REF}
+    command: ["service"]
+    mounts: []
+protectedSharedReady: true
+`,
+  };
+  assert.match(
+    validateProtectedSharedProfileReadiness(incomplete).join("\n"),
+    /cannot be marked protected\/shared-ready.*missing worker 1.*credentials\.infisicalDeployments/s,
+  );
+  assert.deepEqual(
+    validateProtectedSharedProfileReadiness(renderCloudControlSetupBundle(baseInput()).files),
+    [],
+  );
+});
+
+test("every generated profile mode has runnable service and worker structure", () => {
+  for (const mode of ["compose-podman", "nixos", "saas-oci", "aws-ec2"] as const) {
+    const bundle = renderCloudControlSetupBundle(baseInput({ mode }));
+    assert.deepEqual(validateRenderedProfile(bundle.files), [], mode);
+  }
+  assert.match(
+    validateRenderedProfile({ "compose.yaml": "services:\n  placeholder-only: {}\n" }).join("\n"),
+    /missing service process.*missing worker 1.*missing worker 2/s,
+  );
 });
 
 test("GitHub App reviewed-source mode is rejected until runtime adapter support exists", () => {

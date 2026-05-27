@@ -75,6 +75,7 @@ export function readCloudControlSetupInput(): CloudControlSetupInput {
       "s3-compatible",
     ]),
     artifactBackendEvidence: getFlagStr("artifact-backend-evidence", "").trim(),
+    deploymentIds: deploymentIds(getFlagList("deployment-id")),
     reviewedSourceMode: enumFlag("reviewed-source-mode", "ssh", ["ssh", "github-app"]),
     authCallbackHost: getFlagStr("auth-callback-host", "deploy-auth.example.test").trim(),
     authCallbackPath: getFlagStr("auth-callback-path", "/oidc/callback").trim(),
@@ -87,6 +88,11 @@ export function readCloudControlSetupInput(): CloudControlSetupInput {
     awsSecurityGroupIds: getFlagList("aws-security-group-id"),
     tlsEvidence: getFlagStr("tls-evidence", "").trim(),
   };
+}
+
+function deploymentIds(values: string[]): string[] {
+  const ids = values.map((value) => value.trim()).filter(Boolean);
+  return ids.length > 0 ? ids : ["cloud-control-fixture-staging"];
 }
 
 function enumFlag<T extends string>(name: string, fallback: T, values: readonly T[]): T {

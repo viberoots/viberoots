@@ -78,7 +78,7 @@ function exactInfisicalCredentialFileName(
   return expected;
 }
 
-function applyDeploymentPattern(pattern: string, deploymentId: string): string {
+export function applyDeploymentPattern(pattern: string, deploymentId: string): string {
   if (!/^[a-z0-9._-]+$/i.test(deploymentId)) {
     throw new Error("deploymentId contains characters that cannot be used in credential filenames");
   }

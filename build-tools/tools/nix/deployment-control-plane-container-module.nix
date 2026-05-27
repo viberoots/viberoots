@@ -25,6 +25,7 @@ let
       cfg.databaseUrlCredential
       cfg.controlPlaneTokenCredential
       cfg.reviewedSourceSshKeyCredential
+      cfg.reviewedSourceKnownHostsCredential
       cfg.artifactStore.endpointCredential
       cfg.artifactStore.accessKeyIdCredential
       cfg.artifactStore.secretAccessKeyCredential
@@ -36,10 +37,21 @@ let
     cfg.databaseUrlCredential
     cfg.controlPlaneTokenCredential
     cfg.reviewedSourceSshKeyCredential
+    cfg.reviewedSourceKnownHostsCredential
     cfg.artifactStore.endpointCredential
     cfg.artifactStore.accessKeyIdCredential
     cfg.artifactStore.secretAccessKeyCredential
-  ];
+  ] ++ infisicalCredentialNames;
+  infisicalCredentialNames = lib.flatten (
+    map
+      (deploymentId: [
+        (deploymentCredentialName cfg.infisicalCredentialFilePattern.clientId deploymentId)
+        (deploymentCredentialName cfg.infisicalCredentialFilePattern.clientSecret deploymentId)
+      ])
+      cfg.infisicalDeploymentIds
+  );
+  deploymentCredentialName = pattern: deploymentId:
+    lib.replaceStrings [ "{deploymentId}" ] [ deploymentId ] pattern;
   missingCredentialNames = lib.filter
     (name: !(builtins.hasAttr name cfg.credentials) && !(builtins.hasAttr name cfg.extraCredentialFiles))
     requiredCredentialNames;
@@ -85,10 +97,18 @@ let
         infisicalClientIdFilePattern = cfg.infisicalCredentialFilePattern.clientId;
         infisicalClientSecretFilePattern = cfg.infisicalCredentialFilePattern.clientSecret;
       };
+      infisicalDeployments = map
+        (deploymentId: {
+          inherit deploymentId;
+          siteUrl = cfg.infisicalSiteUrl;
+          projectId = "${deploymentId}-infisical-project";
+          environment = cfg.infisicalEnvironment;
+        })
+        cfg.infisicalDeploymentIds;
     };
     reviewedSource = {
       sshKeyFile = credentialFile cfg.reviewedSourceSshKeyCredential;
-      sshKnownHostsFile = cfg.reviewedSourceKnownHostsFile;
+      sshKnownHostsFile = credentialFile cfg.reviewedSourceKnownHostsCredential;
     };
     webUi = { enabled = cfg.webUi.enable; basePath = cfg.webUi.basePath; };
     mcp = { enabled = cfg.mcp.enable; basePath = cfg.mcp.basePath; };
@@ -96,7 +116,6 @@ let
   };
   baseVolumes = [
     "${configFile}:${configFile}:ro"
-    "${cfg.reviewedSourceKnownHostsFile}:${cfg.reviewedSourceKnownHostsFile}:ro"
     "${cfg.recordsRoot}:${defaults.recordsRoot}:rw"
     "${cfg.artifactStagingRoot}:${defaults.artifactStagingRoot}:rw"
     "${cfg.runtimeRoot}:${defaults.runtimeRoot}:rw"
@@ -110,8 +129,6 @@ let
     } // {
       WORKSPACE_ROOT = "${defaults.runtimeRoot}/workspace";
       TMPDIR = "${defaults.runtimeRoot}/tmp";
-      VBR_DEPLOY_REVIEWED_SOURCE_SSH_KEY_FILE = credentialFile cfg.reviewedSourceSshKeyCredential;
-      VBR_DEPLOY_REVIEWED_SOURCE_SSH_KNOWN_HOSTS_FILE = cfg.reviewedSourceKnownHostsFile;
     };
     cmd = [ mode "--config" configFile ];
   };
@@ -168,10 +185,10 @@ in
     artifactStagingRoot = opt lib.types.str defaults.artifactStagingRoot "Host artifact scratch directory.";
     runtimeRoot = opt lib.types.str defaults.runtimeRoot "Host runtime scratch directory.";
     credentialDirectory = opt lib.types.str defaults.credentialDirectory "Container credential directory.";
-    reviewedSourceKnownHostsFile = opt lib.types.str "/etc/deployment-control-plane/github-known-hosts" "Known hosts file.";
     databaseUrlCredential = opt lib.types.str defaults.databaseUrlCredential "Database credential name.";
     controlPlaneTokenCredential = opt lib.types.str defaults.controlPlaneTokenCredential "Reviewed service bearer token credential name.";
     reviewedSourceSshKeyCredential = opt lib.types.str defaults.reviewedSourceSshKeyCredential "SSH key credential name.";
+    reviewedSourceKnownHostsCredential = opt lib.types.str defaults.reviewedSourceKnownHostsCredential "SSH known-hosts credential name.";
     artifactStore = {
       kind = opt (lib.types.enum [ "s3-compatible" ]) defaults.artifactStoreKind "Artifact store kind.";
       bucket = opt nullStr null "Artifact store bucket.";
@@ -182,6 +199,9 @@ in
     };
     infisicalCredentialFilePattern.clientId = opt lib.types.str defaults.infisicalClientIdPattern "Infisical client id pattern.";
     infisicalCredentialFilePattern.clientSecret = opt lib.types.str defaults.infisicalClientSecretPattern "Infisical client secret pattern.";
+    infisicalDeploymentIds = opt (lib.types.listOf lib.types.str) [ "cloud-control-fixture-staging" ] "Deployment ids that require deployment-scoped Infisical credentials.";
+    infisicalSiteUrl = opt lib.types.str "https://app.infisical.com" "Infisical site URL for generated runtime credential requirements.";
+    infisicalEnvironment = opt lib.types.str "production" "Infisical environment for generated runtime credential requirements.";
     credentials = opt (lib.types.attrsOf (lib.types.submodule {
       options.source = opt nullStr null "Host-local credential source path.";
     })) { } "Credential source files.";

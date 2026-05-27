@@ -1,6 +1,11 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
+import { applyDeploymentPattern } from "./control-plane-credentials";
 import type { ControlPlaneRuntimeConfig } from "./control-plane-runtime-config-types";
+import {
+  assertCredentialDirectoryPath,
+  resolveCredentialFileName,
+} from "./control-plane-runtime-config-paths";
 
 const INFISICAL_CLIENT_ID_PATTERN = "{deploymentId}-infisical-client-id";
 const INFISICAL_CLIENT_SECRET_PATTERN = "{deploymentId}-infisical-client-secret";
@@ -42,6 +47,7 @@ export async function validateControlPlaneRuntimeConfigFiles(
     ["storage.artifactStore.secretAccessKeyFile", config.storage.artifactStore.secretAccessKeyFile],
     ["reviewedSource.sshKeyFile", config.reviewedSource.sshKeyFile],
     ["reviewedSource.sshKnownHostsFile", config.reviewedSource.sshKnownHostsFile],
+    ...infisicalCredentialFiles(config),
   ] as const;
   const missing: string[] = [];
   for (const [fieldName, filePath] of required) {
@@ -126,6 +132,9 @@ async function validateCredentialFileContents(config: ControlPlaneRuntimeConfig)
     config.storage.artifactStore.secretAccessKeyFile,
     "storage.artifactStore.secretAccessKeyFile",
   );
+  for (const [fieldName, filePath] of infisicalCredentialFiles(config)) {
+    await assertNonEmptyCredential(filePath, fieldName);
+  }
 }
 
 async function readCredential(filePath: string, fieldName: string): Promise<string> {
@@ -160,4 +169,46 @@ function validateExactDeploymentPattern(
   if (pattern !== expected) {
     throw new Error(`${fieldName} must be exactly ${expected}`);
   }
+}
+
+function infisicalCredentialFiles(config: ControlPlaneRuntimeConfig): [string, string][] {
+  return config.credentials.infisicalDeployments.flatMap((request) => {
+    const prefix = `credentials.infisicalDeployments.${request.deploymentId}`;
+    const clientIdName = exactInfisicalName(
+      request.clientIdFileName,
+      config.credentials.defaults.infisicalClientIdFilePattern,
+      request.deploymentId,
+      `${prefix}.clientIdFileName`,
+    );
+    const clientSecretName = exactInfisicalName(
+      request.clientSecretFileName,
+      config.credentials.defaults.infisicalClientSecretFilePattern,
+      request.deploymentId,
+      `${prefix}.clientSecretFileName`,
+    );
+    return [
+      [`${prefix}.clientIdFile`, credentialPath(config, clientIdName)],
+      [`${prefix}.clientSecretFile`, credentialPath(config, clientSecretName)],
+    ];
+  });
+}
+
+function credentialPath(config: ControlPlaneRuntimeConfig, fileName: string): string {
+  return assertCredentialDirectoryPath(
+    resolveCredentialFileName(config.credentials.directory, fileName),
+    { credentialDirectory: config.credentials.directory },
+  );
+}
+
+function exactInfisicalName(
+  requested: string | undefined,
+  pattern: string,
+  deploymentId: string,
+  fieldName: string,
+): string {
+  const expected = applyDeploymentPattern(pattern, deploymentId);
+  if (requested !== undefined && requested !== expected) {
+    throw new Error(`${fieldName} must be exactly ${expected}`);
+  }
+  return expected;
 }

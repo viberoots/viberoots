@@ -1,6 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import YAML from "yaml";
 import { renderCloudControlSetupBundle } from "../../deployments/cloud-control-setup-render";
 import { validateCloudControlSetupInput } from "../../deployments/cloud-control-setup-validate";
 import type { CloudControlSetupInput } from "../../deployments/cloud-control-setup-types";
@@ -19,6 +20,7 @@ function input(overrides: Partial<CloudControlSetupInput> = {}): CloudControlSet
     artifactRegion: "us-east-1",
     artifactBackend: "aws-s3",
     artifactBackendEvidence: "",
+    deploymentIds: ["pleomino-staging"],
     reviewedSourceMode: "ssh",
     authCallbackHost: "deploy-auth.example.test",
     authCallbackPath: "/oidc/callback",
@@ -60,12 +62,10 @@ test("AWS EC2 alternate artifact backend records reviewed evidence", () => {
     managed.artifactStore.reviewedAlternateEvidence,
     "reviewed-supabase-storage-s3-endpoint-policy",
   );
-  assert.match(
-    bundle.files["aws-ec2-profile.md"]!,
-    /Selected artifact backend: supabase-storage-s3/,
-  );
-  assert.match(
-    bundle.files["aws-ec2-profile.md"]!,
-    /Reviewed alternate artifact evidence: supabase-storage-s3 with evidence reviewed-supabase-storage-s3-endpoint-policy/,
+  const profile = YAML.parse(bundle.files["aws-ec2-profile.yaml"]!);
+  assert.equal(profile.artifactBackend.selected, "supabase-storage-s3");
+  assert.equal(
+    profile.artifactBackend.reviewedAlternateEvidence,
+    "supabase-storage-s3 with evidence reviewed-supabase-storage-s3-endpoint-policy",
   );
 });

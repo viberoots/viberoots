@@ -44,6 +44,14 @@ export function validateCloudControlSetupInput(input: CloudControlSetupInput): s
     errors.push("cloud control-plane profile requires at least two workers");
   if (input.serviceReplicas !== 1)
     errors.push("cloud control-plane profile expects one service process");
+  if (input.deploymentIds.length === 0) {
+    errors.push("cloud control-plane profile requires at least one deployment id");
+  }
+  for (const deploymentId of input.deploymentIds) {
+    if (!/^[a-z0-9._-]+$/i.test(deploymentId)) {
+      errors.push(`deployment id ${deploymentId} cannot be used in credential filenames`);
+    }
+  }
   if (input.mode === "aws-ec2") errors.push(...validateAwsEvidence(input));
   return errors;
 }

@@ -12,7 +12,7 @@ Profile files live in
 - `config.example.yaml` is the production-shaped mounted config.
 - `config.local-smoke.yaml` is a local fixture config that disables web UI and MCP exposure.
 - `podman-run.example.txt` shows equivalent direct Podman commands when Compose is unavailable.
-- `saas-oci-profile.md` describes the generic SaaS OCI substrate contract.
+- `saas-oci-profile.yaml` describes the generic SaaS OCI substrate contract.
 - `substrate-conformance.ts` checks runtime behavior that the image cannot pin.
 
 ## Required Host Inputs

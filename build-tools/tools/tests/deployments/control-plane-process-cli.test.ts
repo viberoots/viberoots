@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
+import YAML from "yaml";
 import { runDeploymentControlPlaneCommand } from "../../deployments/deployment-control-plane";
 import {
   withControlPlaneArgv,
@@ -97,7 +98,9 @@ test("deployment-control-plane setup writes a cloud host profile bundle", async 
     assert.ok(await exists(path.join(out, "config.yaml")));
     assert.ok(await exists(path.join(out, "credential-manifest.json")));
     assert.ok(await exists(path.join(out, "provider-capabilities.json")));
-    assert.match(await fsp.readFile(path.join(out, "aws-ec2-profile.md"), "utf8"), /AWS S3/);
+    const profile = YAML.parse(await fsp.readFile(path.join(out, "aws-ec2-profile.yaml"), "utf8"));
+    assert.equal(profile.artifactBackend.defaultPath, "AWS S3 through a VPC endpoint");
+    assert.equal(profile.systemdPodmanUnits.length, 3);
   });
 });
 

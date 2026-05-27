@@ -18,6 +18,7 @@ import {
   renderManagedDependencies,
   renderManagedDependencyProfile,
 } from "./cloud-control-setup-artifacts";
+import { modeFiles } from "./cloud-control-setup-profiles";
 import { assertCloudControlSetupInput } from "./cloud-control-setup-validate";
 
 export type CloudControlSetupBundle = {
@@ -76,6 +77,12 @@ function renderRuntimeConfig(input: CloudControlSetupInput): string {
         infisicalClientIdFilePattern: "{deploymentId}-infisical-client-id",
         infisicalClientSecretFilePattern: "{deploymentId}-infisical-client-secret",
       },
+      infisicalDeployments: input.deploymentIds.map((deploymentId) => ({
+        deploymentId,
+        siteUrl: "https://app.infisical.com",
+        projectId: `${deploymentId}-infisical-project`,
+        environment: "production",
+      })),
     },
     reviewedSource: reviewedSource(input),
     webUi: { enabled: true, basePath: "/" },
@@ -99,7 +106,13 @@ function renderCredentialManifest(input: CloudControlSetupInput): string {
     {
       schemaVersion: "cloud-control-credential-manifest@1",
       credentialDirectory: "/run/deployment-control-plane/credentials",
-      requiredFiles: [...CREDENTIAL_FILENAMES, ...INFISICAL_FILENAMES, ...reviewed],
+      requiredFiles: [
+        ...CREDENTIAL_FILENAMES,
+        ...input.deploymentIds.flatMap((deploymentId) =>
+          INFISICAL_FILENAMES.map((name) => name.replace("{deploymentId}", deploymentId)),
+        ),
+        ...reviewed,
+      ],
       placeholdersOnly: true,
       rejectedSources: [
         "ambient environment",
@@ -130,18 +143,6 @@ function renderReadme(input: CloudControlSetupInput): string {
   ].join("\n");
 }
 
-function modeFiles(input: CloudControlSetupInput): Record<string, string> {
-  if (input.mode === "aws-ec2") {
-    return {
-      "aws-ec2-profile.md": awsProfile(input),
-      "systemd-podman.units.txt": systemdPodman(input),
-    };
-  }
-  if (input.mode === "nixos") return { "nixos-module.example.nix": nixosExample(input) };
-  if (input.mode === "saas-oci") return { "saas-oci-profile.md": saasProfile(input) };
-  return { "compose.yaml": composeProfile(input) };
-}
-
 function reviewedSource(input: CloudControlSetupInput) {
   if (input.reviewedSourceMode === "github-app") {
     return {
@@ -158,28 +159,4 @@ function reviewedSource(input: CloudControlSetupInput) {
 
 function cred(name: string): string {
   return `/run/deployment-control-plane/credentials/${name}`;
-}
-
-function composeProfile(input: CloudControlSetupInput): string {
-  return `services:\n  control-plane-service:\n    image: ${input.image}\n    command: [deployment-control-plane, service, --config, /etc/deployment-control-plane/config.yaml]\n`;
-}
-
-function nixosExample(input: CloudControlSetupInput): string {
-  return `{ services.viberoots.deploymentControlPlaneContainer = { enable = true; image = "${input.image}"; workerReplicas = ${input.workerReplicas}; }; }\n`;
-}
-
-function saasProfile(input: CloudControlSetupInput): string {
-  return `# SaaS OCI Profile\n\nUse digest image ${input.image}, file-backed credentials, persistent scratch mounts, HTTPS ingress, and graceful shutdown evidence.\n`;
-}
-
-function awsProfile(input: CloudControlSetupInput): string {
-  const alternate =
-    input.artifactBackend === "aws-s3"
-      ? "none"
-      : `${input.artifactBackend} with evidence ${input.artifactBackendEvidence}`;
-  return `# AWS EC2 Control Plane Profile\n\nDefault artifact path: AWS S3 through a VPC endpoint. Supabase Storage S3 and other S3-compatible stores are reviewed alternates only. Selected artifact backend: ${input.artifactBackend}. Reviewed alternate artifact evidence: ${alternate}. Subnets: ${input.awsSubnetIds.join(", ")}. Security groups: ${input.awsSecurityGroupIds.join(", ")}. Supabase PrivateLink: ${input.supabasePrivatelink ? "selected" : "not selected"}.\n`;
-}
-
-function systemdPodman(input: CloudControlSetupInput): string {
-  return `deployment-control-plane-service: ${input.image}\ndeployment-control-plane-workers: ${input.workerReplicas}\n`;
 }

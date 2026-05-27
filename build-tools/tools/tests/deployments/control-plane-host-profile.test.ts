@@ -18,7 +18,6 @@ import {
 import { buildImageTarball } from "./control-plane-oci-image.helpers";
 import { loadNixosDefaults, loadNixosRenderedConfig } from "./control-plane-host-profile.helpers";
 import { runInTemp } from "../lib/test-helpers";
-
 const PROFILE_DIR = "build-tools/tools/deployments/control-plane-host-profile";
 const CONFIG_PATH = "/etc/deployment-control-plane/config.yaml";
 const KNOWN_HOSTS_PATH = "/etc/deployment-control-plane/github-known-hosts";
@@ -113,7 +112,10 @@ test("non-NixOS profile config matches the shared runtime credential contract", 
   const smoke = parseControlPlaneRuntimeConfig(smokeText);
   const nixosConfig = await loadNixosRenderedConfig();
   const defaults = await loadNixosDefaults();
-  assert.deepEqual(config, nixosConfig);
+  assert.deepEqual(config, {
+    ...nixosConfig,
+    reviewedSource: { ...nixosConfig.reviewedSource, sshKnownHostsFile: KNOWN_HOSTS_PATH },
+  });
   assert.equal(config.service.host, "0.0.0.0");
   assert.equal(config.service.port, defaults.servicePort);
   assert.equal(

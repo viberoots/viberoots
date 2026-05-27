@@ -18,6 +18,7 @@ export type CloudControlSetupInput = {
   artifactRegion: string;
   artifactBackend: ArtifactBackend;
   artifactBackendEvidence: string;
+  deploymentIds: string[];
   reviewedSourceMode: ReviewedSourceMode;
   authCallbackHost: string;
   authCallbackPath: string;

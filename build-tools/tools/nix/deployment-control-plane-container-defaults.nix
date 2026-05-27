@@ -24,6 +24,7 @@
   databaseUrlCredential = "control-plane-database-url";
   controlPlaneTokenCredential = "control-plane-token";
   reviewedSourceSshKeyCredential = "reviewed-source-ssh-key";
+  reviewedSourceKnownHostsCredential = "reviewed-source-known-hosts";
   infisicalClientIdPattern = "{deploymentId}-infisical-client-id";
   infisicalClientSecretPattern = "{deploymentId}-infisical-client-secret";
 }

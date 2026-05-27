@@ -33,6 +33,7 @@ function input(overrides: Partial<CloudControlSetupInput> = {}): CloudControlSet
     artifactRegion: "us-east-1",
     artifactBackend: "aws-s3",
     artifactBackendEvidence: "",
+    deploymentIds: ["pleomino-staging"],
     reviewedSourceMode: "ssh",
     authCallbackHost: "deploy-auth.example.test",
     authCallbackPath: "/oidc/callback",
@@ -51,8 +52,8 @@ function input(overrides: Partial<CloudControlSetupInput> = {}): CloudControlSet
 const modeFile: Record<CloudProfileMode, string> = {
   "compose-podman": "compose.yaml",
   nixos: "nixos-module.example.nix",
-  "saas-oci": "saas-oci-profile.md",
-  "aws-ec2": "aws-ec2-profile.md",
+  "saas-oci": "saas-oci-profile.yaml",
+  "aws-ec2": "aws-ec2-profile.yaml",
 };
 
 for (const mode of Object.keys(modeFile) as CloudProfileMode[]) {
@@ -94,11 +95,11 @@ test("AWS EC2 profile includes Supabase PrivateLink and S3 VPC endpoint placehol
     input({ mode: "aws-ec2", supabasePrivatelink: true }),
   );
   const managed = JSON.parse(bundle.files["managed-dependencies.json"]!);
-  const profile = bundle.files["aws-ec2-profile.md"]!;
+  const profile = YAML.parse(bundle.files["aws-ec2-profile.yaml"]!);
   assert.equal(managed.postgres.privateConnectivity, "supabase-privatelink-prerequisite");
   assert.equal(managed.artifactStore.defaultAwsPath, "aws-s3-vpc-endpoint");
-  assert.match(profile, /Supabase PrivateLink: selected/);
-  assert.match(profile, /AWS S3 through a VPC endpoint/);
+  assert.equal(profile.network.supabasePrivatelink, true);
+  assert.equal(profile.artifactBackend.defaultPath, "AWS S3 through a VPC endpoint");
 });
 
 test("managed dependency profile is concrete and parser-compatible", () => {

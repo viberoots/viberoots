@@ -15,6 +15,7 @@ NixOS hosts can import the repo-owned module and provide a small host-local conf
     publicUrl = "https://deploy.example.test";
     publicHostName = "deploy.example.test";
     manageNginx = true;
+    infisicalDeploymentIds = [ "pleomino-staging" ];
 
     artifactStore.bucket = "deployment-control-plane-artifacts";
 
@@ -22,6 +23,7 @@ NixOS hosts can import the repo-owned module and provide a small host-local conf
       control-plane-database-url.source = "/run/secrets/deploy-control-plane-database-url";
       control-plane-token.source = "/run/secrets/deploy-control-plane-token";
       reviewed-source-ssh-key.source = "/run/secrets/deploy-reviewed-source-ssh-key";
+      reviewed-source-known-hosts.source = "/run/secrets/deploy-reviewed-source-known-hosts";
       artifact-store-endpoint.source = "/run/secrets/deploy-artifact-store-endpoint";
       artifact-store-access-key-id.source =
         "/run/secrets/deploy-artifact-store-access-key-id";
@@ -59,13 +61,16 @@ Required host-local parameters:
 - reviewed immutable image reference or registry/repository/digest parts
 - `artifactStore.bucket`
 - credential source files for the database URL, bearer token, reviewed-source SSH key,
-  artifact-store endpoint, artifact-store access key id, and artifact-store secret access key
+  reviewed-source known hosts, artifact-store endpoint, artifact-store access key id, and
+  artifact-store secret access key
 
 Credential source paths are host paths such as `/run/secrets/...`. They can come from SOPS-nix,
 agenix, manually provisioned files, or another secret system. The module wires those paths through
 systemd `LoadCredential=`, stages them into per-container directories owned by uid/gid `10001`, and
 mounts those directories read-only into the containers. The generated non-secret config file contains
-only credential file paths. Secret values must not be placed in Nix options.
+only credential file paths. The containers do not export reviewed-source SSH credential environment
+variables; reviewed-source files are resolved from the mounted credential directory. Secret values
+must not be placed in Nix options.
 
 Set `containerRuntime = "docker"` only on hosts where Docker preserves the same mounts, credential
 file behavior, health semantics, and loopback service bind. Podman is the NixOS default because it
@@ -95,10 +100,12 @@ moving authoritative state to external Postgres and S3-compatible storage:
     publicUrl = "https://mini.example.test";
     publicHostName = "mini.example.test";
     artifactBucket = "mini-control-plane-artifacts";
+    infisicalDeploymentIds = [ "pleomino-staging" ];
     credentials = {
       control-plane-database-url.source = "/run/secrets/external-postgres-url";
       control-plane-token.source = "/run/secrets/deploy-control-plane-token";
       reviewed-source-ssh-key.source = "/run/secrets/deploy-reviewed-source-ssh-key";
+      reviewed-source-known-hosts.source = "/run/secrets/deploy-reviewed-source-known-hosts";
       artifact-store-endpoint.source = "/run/secrets/artifact-store-endpoint";
       artifact-store-access-key-id.source = "/run/secrets/artifact-store-access-key-id";
       artifact-store-secret-access-key.source = "/run/secrets/artifact-store-secret-access-key";

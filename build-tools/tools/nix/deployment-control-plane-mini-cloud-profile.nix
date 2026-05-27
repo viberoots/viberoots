@@ -14,6 +14,7 @@ in
     publicHostName = opt (lib.types.nullOr lib.types.str) null "Mini ingress hostname.";
     artifactBucket = opt (lib.types.nullOr lib.types.str) null "External S3-compatible artifact bucket.";
     artifactRegion = opt lib.types.str "us-east-1" "S3-compatible signing region.";
+    infisicalDeploymentIds = opt (lib.types.listOf lib.types.str) [ "cloud-control-fixture-staging" ] "Deployment ids that require deployment-scoped Infisical credentials.";
     workerReplicas = opt lib.types.ints.positive 2 "Worker container count.";
     manageNginx = opt lib.types.bool true "Keep mini as ingress through nginx.";
     requireMigrationPreflight = opt lib.types.bool true "Require migration evidence during mini external database cutover.";
@@ -41,6 +42,7 @@ in
       publicHostName = lib.mkForce cfg.publicHostName;
       manageNginx = lib.mkForce cfg.manageNginx;
       workerReplicas = lib.mkForce cfg.workerReplicas;
+      infisicalDeploymentIds = lib.mkForce cfg.infisicalDeploymentIds;
       miniMigrationPreflight.enable = lib.mkForce cfg.requireMigrationPreflight;
       artifactStore = {
         bucket = lib.mkForce cfg.artifactBucket;

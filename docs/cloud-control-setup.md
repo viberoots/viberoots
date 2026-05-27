@@ -9,6 +9,7 @@ deployment-control-plane setup \
   --host-mode aws-ec2 \
   --image registry.example.com/platform/deployment-control-plane@sha256:<64-hex-digest> \
   --public-url https://deploy.example.test \
+  --deployment-id pleomino-staging \
   --auth-callback-host deploy-auth.example.test \
   --artifact-backend aws-s3 \
   --artifact-bucket deployment-control-plane-artifacts \
@@ -32,7 +33,11 @@ The generated bundle contains:
   conformance validator.
 - `managed-dependencies.json` and `ingress-checklist.json`: non-secret evidence checklist data.
 - `provider-capabilities.json`: declarations for selected cloud topology components.
-- mode-specific profile files for Compose/Podman, NixOS, SaaS OCI, or AWS EC2.
+- mode-specific runnable profile files for Compose/Podman, NixOS, SaaS OCI, or AWS EC2. SaaS OCI
+  and AWS EC2 profiles are structured YAML with one service, two workers, digest-pinned image,
+  config and credential mounts, and scratch/state/cache mounts.
+  Compose/Podman profiles also set the runtime user to uid/gid `10001` and list the scratch,
+  artifact, and record paths that must be owned by that identity.
 
 Generated files use placeholders and paths, not secret values. Stage real credentials only as files
 under `/run/deployment-control-plane/credentials`.
@@ -49,6 +54,9 @@ under `/run/deployment-control-plane/credentials`.
    prerequisite, then rerun without `--dry-run`.
 5. Stage `config.yaml`, `managed-dependencies.profile.yaml`, provider-capability evidence, the
    reviewed-source credential files, and deployment-scoped Infisical credential files on the host.
+   Generated Compose/Podman, NixOS, SaaS OCI, and AWS EC2 profiles include one service, two
+   workers, config and credential mounts, digest-pinned image references, and scratch/state/cache
+   paths owned by the runtime uid/gid.
 6. Run `commands.validations.database.command` and `commands.validations.artifactStore.command`.
    Both checks must pass against temporary schema/data or temporary object prefixes.
 7. Start one service process and at least two worker processes from `commands.json`.

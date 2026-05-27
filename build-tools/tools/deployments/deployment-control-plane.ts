@@ -25,6 +25,7 @@ function command(): "service" | "worker" | "setup" | "cutover" {
     "auth-callback-host",
     "auth-callback-path",
     "config",
+    "deployment-id",
     "host-mode",
     "image",
     "instance-id",
