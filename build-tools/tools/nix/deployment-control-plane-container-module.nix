@@ -53,7 +53,7 @@ let
     rm -rf "$dst"
     install -d -m 0500 -o ${defaults.containerUid} -g ${defaults.containerGid} "$dst"
     ${lib.concatMapStringsSep "\n" (credentialName: ''
-      install -m 0400 -o ${defaults.containerUid} -g ${defaults.containerGid} ${lib.escapeShellArg (credentialSource credentialName)} "$dst/${credentialName}"
+      install -m 0400 -o ${defaults.containerUid} -g ${defaults.containerGid} "$CREDENTIALS_DIRECTORY/${credentialName}" "$dst/${credentialName}"
     '') credentialNames}
   '';
   renderedConfig = {
@@ -92,6 +92,7 @@ let
     };
     webUi = { enabled = cfg.webUi.enable; basePath = cfg.webUi.basePath; };
     mcp = { enabled = cfg.mcp.enable; basePath = cfg.mcp.basePath; };
+    miniMigrationPreflight = { enabled = cfg.miniMigrationPreflight.enable; };
   };
   baseVolumes = [
     "${configFile}:${configFile}:ro"
@@ -162,6 +163,7 @@ in
     webUi.basePath = opt lib.types.str defaults.webUiBasePath "Web UI base path.";
     mcp.enable = opt lib.types.bool true "Whether HTTP MCP is enabled.";
     mcp.basePath = opt lib.types.str defaults.mcpBasePath "HTTP MCP base path.";
+    miniMigrationPreflight.enable = opt lib.types.bool false "Require mini database migration cutover evidence before protected/shared submit.";
     recordsRoot = opt lib.types.str defaults.recordsRoot "Host records directory.";
     artifactStagingRoot = opt lib.types.str defaults.artifactStagingRoot "Host artifact scratch directory.";
     runtimeRoot = opt lib.types.str defaults.runtimeRoot "Host runtime scratch directory.";

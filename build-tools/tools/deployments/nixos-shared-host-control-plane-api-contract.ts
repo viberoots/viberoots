@@ -17,6 +17,7 @@ import type {
   NixosSharedHostSmokeConnectOverride,
 } from "./nixos-shared-host-control-plane-contract";
 import type { NixosSharedHostControlPlaneSourceSelection } from "./nixos-shared-host-control-plane-snapshot";
+import type { MiniCloudMigrationEvidence } from "./control-plane-mini-migration-preflight";
 
 export const NIXOS_SHARED_HOST_CONTROL_PLANE_SUBMIT_REQUEST_SCHEMA =
   "nixos-shared-host-control-plane-submit-request@1";
@@ -47,4 +48,5 @@ export type NixosSharedHostControlPlaneSubmitRequest = DeploymentExpectedArtifac
   admissionEvidence?: DeploymentAdmissionEvidence;
   smokeConnectOverride?: NixosSharedHostSmokeConnectOverride;
   artifactBindingProof?: DeploymentArtifactBindingProof;
+  miniMigrationEvidence?: MiniCloudMigrationEvidence;
 };

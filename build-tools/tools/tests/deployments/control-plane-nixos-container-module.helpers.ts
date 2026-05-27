@@ -21,18 +21,27 @@ export async function evalModule(
   $: any,
   moduleConfig: string,
   body: string,
-  base: { image?: boolean; bucket?: boolean; credentials?: string } = {},
+  base: {
+    image?: boolean;
+    bucket?: boolean;
+    credentials?: string;
+    imports?: string[];
+    extraConfig?: string;
+  } = {},
 ): Promise<EvalOut> {
   const includeImage = base.image ?? true;
   const includeBucket = base.bucket ?? true;
   const credentials = base.credentials ?? credentialConfig;
+  const imports = base.imports ?? [
+    "./build-tools/tools/nix/deployment-control-plane-container-module.nix",
+  ];
   const expr = `
     let
       lib = import <nixpkgs/lib>;
       system = import <nixpkgs/nixos> {
         configuration = {
           nixpkgs.hostPlatform = "x86_64-linux";
-          imports = [ ./build-tools/tools/nix/deployment-control-plane-container-module.nix ];
+          imports = [ ${imports.join(" ")} ];
           system.stateVersion = "24.11";
           services.viberoots.deploymentControlPlaneContainer = {
             enable = true;
@@ -47,6 +56,7 @@ export async function evalModule(
             ${credentials}
             ${moduleConfig}
           };
+          ${base.extraConfig || ""}
         };
       };
     in ${body}

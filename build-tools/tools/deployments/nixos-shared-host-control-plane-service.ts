@@ -34,6 +34,7 @@ export async function startControlPlaneServiceFromRuntimeConfig(opts: {
     instanceId: opts.runtimeConfig.instanceId,
     webUi: opts.runtimeConfig.webUi,
     mcp: opts.runtimeConfig.mcp,
+    miniMigrationPreflight: opts.runtimeConfig.miniMigrationPreflight,
     reviewedSourceCredentials: opts.runtimeConfig.reviewedSource,
     ...(token ? { token } : {}),
   });

@@ -1,6 +1,5 @@
 #!/usr/bin/env zx-wrapper
 import { defaultRequestedBy } from "./deployment-admission-evidence";
-import { DeploymentAdmissionError } from "./deployment-control-plane-errors";
 import { createAdmissionFailureSubmission } from "./nixos-shared-host-control-plane-admission-failure";
 import { evaluateNixosSharedHostControlPlaneAdmission } from "./nixos-shared-host-control-plane-admission";
 import { queueBackendSubmissionForLock } from "./nixos-shared-host-control-plane-backend-submit";
@@ -21,12 +20,11 @@ import type {
 import type {
   NixosSharedHostControlPlaneOperationKind,
   NixosSharedHostControlPlanePaths,
-  NixosSharedHostControlPlaneSnapshot,
   NixosSharedHostControlPlaneSubmission,
   NixosSharedHostPublishBehavior,
   NixosSharedHostSmokeConnectOverride,
 } from "./nixos-shared-host-control-plane-contract";
-import type { DeploymentExpectedArtifactIdentities } from "./deployment-artifact-binding";
+import { assertExpectedArtifactIdentities } from "./nixos-shared-host-control-plane-artifact-identity";
 import { ensureNoActiveProgressiveRun } from "./nixos-shared-host-control-plane-progressive-guard";
 import { createNixosSharedHostControlPlaneSubmission } from "./nixos-shared-host-control-plane-submission";
 import {
@@ -50,41 +48,10 @@ import { putVerifiedArtifactObject } from "./control-plane-artifact-store";
 import { writeBackendSnapshotArtifactObjects } from "./control-plane-artifact-snapshot-metadata";
 import type { ControlPlaneArtifactStore } from "./control-plane-artifact-store-types";
 import type { ReviewedSourceCredentialFiles } from "./nixos-shared-host-reviewed-source-git";
-
-function assertExpectedArtifactIdentities(
-  snapshot: NixosSharedHostControlPlaneSnapshot,
-  expected: DeploymentExpectedArtifactIdentities,
-) {
-  const publishInput = snapshot.action.kind === "deploy" ? snapshot.action.publishInput : undefined;
-  if (!publishInput) return;
-  if (publishInput.kind === "exact-artifact" && expected.expectedArtifactIdentity) {
-    if (publishInput.artifact.identity !== expected.expectedArtifactIdentity) {
-      throw new DeploymentAdmissionError(
-        "no_longer_admitted",
-        "admitted artifact identity does not match the challenged expected identity",
-      );
-    }
-  }
-  if (publishInput.kind !== "component-artifacts") return;
-  if (
-    expected.expectedCompositeArtifactIdentity &&
-    publishInput.compositeArtifactIdentity !== expected.expectedCompositeArtifactIdentity
-  ) {
-    throw new DeploymentAdmissionError(
-      "no_longer_admitted",
-      "admitted composite artifact identity does not match the challenged expected identity",
-    );
-  }
-  for (const component of publishInput.components) {
-    const expectedIdentity = expected.expectedComponentArtifactIdentities?.[component.componentId];
-    if (expectedIdentity && component.artifact.identity !== expectedIdentity) {
-      throw new DeploymentAdmissionError(
-        "no_longer_admitted",
-        `admitted artifact identity does not match challenged component ${component.componentId}`,
-      );
-    }
-  }
-}
+import {
+  assertMiniCloudMigrationPreflight,
+  type MiniCloudMigrationEvidence,
+} from "./control-plane-mini-migration-preflight";
 
 export async function prepareBackendNixosSharedHostControlPlaneRun(opts: {
   workspaceRoot: string;
@@ -118,6 +85,10 @@ export async function prepareBackendNixosSharedHostControlPlaneRun(opts: {
   serviceInstance?: DeploymentControlPlaneServiceInstance;
   objectStore?: ControlPlaneArtifactStore;
   reviewedSourceCredentials?: ReviewedSourceCredentialFiles;
+  miniMigrationPreflight?: {
+    enabled: boolean;
+    evidence?: Partial<MiniCloudMigrationEvidence>;
+  };
 }) {
   const submissionId = opts.submissionId || createNixosSharedHostSubmissionId();
   const requestedBy =
@@ -178,6 +149,12 @@ export async function prepareBackendNixosSharedHostControlPlaneRun(opts: {
     await ensureNoActiveProgressiveRun(opts.paths.recordsRoot, snapshot.lockScope, submissionId, {
       backend: opts.backend,
     });
+    if (opts.miniMigrationPreflight) {
+      await assertMiniCloudMigrationPreflight({
+        backend: opts.backend,
+        ...opts.miniMigrationPreflight,
+      });
+    }
     await evaluateNixosSharedHostControlPlaneAdmission({
       workspaceRoot: opts.workspaceRoot,
       recordsRoot: opts.paths.recordsRoot,

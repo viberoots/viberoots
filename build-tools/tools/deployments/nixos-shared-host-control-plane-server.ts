@@ -43,6 +43,7 @@ export async function startNixosSharedHostControlPlaneServer(opts: {
   webUi?: { enabled: boolean; basePath: string };
   mcp?: { enabled: boolean; basePath: string };
   reviewedSourceCredentials?: ReviewedSourceCredentialFiles;
+  miniMigrationPreflight?: { enabled: boolean };
 }) {
   assertReviewedServiceTokenConfigured({
     serviceToken: opts.token,
@@ -129,6 +130,7 @@ export async function startNixosSharedHostControlPlaneServer(opts: {
             localFixture: opts.localFixture,
             env: opts.env,
             objectStore: opts.objectStore,
+            miniMigrationPreflight: opts.miniMigrationPreflight,
             ...(opts.reviewedSourceCredentials
               ? { reviewedSourceCredentials: opts.reviewedSourceCredentials }
               : {}),
@@ -233,18 +235,16 @@ export async function startNixosSharedHostControlPlaneServer(opts: {
       });
     }
   });
-  await new Promise<void>((resolve) =>
-    server.listen(opts.port || 0, opts.host || "127.0.0.1", () => resolve()),
-  );
+  // prettier-ignore
+  await new Promise<void>((resolve) => server.listen(opts.port || 0, opts.host || "127.0.0.1", () => resolve()));
   const address = server.address();
   if (!address || typeof address === "string")
     throw new Error("failed to bind control-plane server");
   return {
     url: `http://${address.address}:${address.port}`,
     close: async () => {
-      await new Promise<void>((resolve, reject) =>
-        server.close((error) => (error ? reject(error) : resolve())),
-      );
+      // prettier-ignore
+      await new Promise<void>((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));
     },
   };
 }

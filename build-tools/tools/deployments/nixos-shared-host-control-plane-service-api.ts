@@ -1,28 +1,18 @@
 #!/usr/bin/env zx-wrapper
 import { authorizeControlPlaneSubmit } from "./deployment-control-plane-authz";
 import { resolveSubmitAuthorizationBoundary } from "./deployment-service-authorization-boundary";
-import {
-  CLOUDFLARE_PAGES_CONTROL_PLANE_SUBMIT_REQUEST_SCHEMA,
-  type CloudflarePagesControlPlaneSubmitRequest,
-} from "./cloudflare-pages-control-plane-api-contract";
+// prettier-ignore
+import { CLOUDFLARE_PAGES_CONTROL_PLANE_SUBMIT_REQUEST_SCHEMA, type CloudflarePagesControlPlaneSubmitRequest } from "./cloudflare-pages-control-plane-api-contract";
 import { prepareBackendCloudflarePagesControlPlaneRun } from "./cloudflare-pages-control-plane-backend-prepare";
 import { resolveCloudflarePagesServiceSubmitRequest } from "./cloudflare-pages-control-plane-service-submit";
 import { assertNoProtectedSharedClientIdentityFields } from "./deployment-service-client-contract";
-import {
-  isDeploymentProviderServiceSubmitRequest,
-  queueDeploymentProviderControlPlaneSubmission,
-  type DeploymentProviderServiceSubmitRequest,
-} from "./deployment-provider-control-plane-submit";
+// prettier-ignore
+import { isDeploymentProviderServiceSubmitRequest, queueDeploymentProviderControlPlaneSubmission, type DeploymentProviderServiceSubmitRequest } from "./deployment-provider-control-plane-submit";
 import { submitResponseFromSubmission } from "./deployment-control-plane-status";
-import {
-  enqueueBackendSubmission,
-  resolveBackendIdempotency,
-  type NixosSharedHostControlPlaneBackendTarget,
-} from "./nixos-shared-host-control-plane-backend";
-import {
-  NIXOS_SHARED_HOST_CONTROL_PLANE_SUBMIT_REQUEST_SCHEMA,
-  type NixosSharedHostControlPlaneSubmitRequest,
-} from "./nixos-shared-host-control-plane-api-contract";
+// prettier-ignore
+import { enqueueBackendSubmission, resolveBackendIdempotency, type NixosSharedHostControlPlaneBackendTarget } from "./nixos-shared-host-control-plane-backend";
+// prettier-ignore
+import { NIXOS_SHARED_HOST_CONTROL_PLANE_SUBMIT_REQUEST_SCHEMA, type NixosSharedHostControlPlaneSubmitRequest } from "./nixos-shared-host-control-plane-api-contract";
 import type { NixosSharedHostControlPlanePaths } from "./nixos-shared-host-control-plane-contract";
 import { prepareBackendNixosSharedHostControlPlaneRun } from "./nixos-shared-host-control-plane-backend-prepare";
 import { reusedBackendSubmitResponse } from "./nixos-shared-host-control-plane-service-idempotency";
@@ -31,6 +21,7 @@ import { handleProtectedChallengedNixosServiceSubmit } from "./nixos-shared-host
 import { resolveNixosSharedHostSubmitContext } from "./nixos-shared-host-control-plane-submit-context";
 import { assertProductionArtifactStore } from "./control-plane-artifact-store";
 import type { ReviewedSourceCredentialFiles } from "./nixos-shared-host-reviewed-source-git";
+import { miniMigrationPreflightForNixosSubmit } from "./control-plane-mini-migration-submit";
 // prettier-ignore
 export { readControlPlaneCurrentStageState, readControlPlaneRecord, readControlPlaneStageHistory, readControlPlaneStatus } from "./nixos-shared-host-control-plane-service-read";
 // prettier-ignore
@@ -50,6 +41,7 @@ export async function handleControlPlaneSubmit(
     env?: NodeJS.ProcessEnv;
     objectStore?: any;
     reviewedSourceCredentials?: ReviewedSourceCredentialFiles;
+    miniMigrationPreflight?: { enabled: boolean };
   },
 ) {
   if (
@@ -108,6 +100,9 @@ export async function handleControlPlaneSubmit(
       governanceResolver,
       ...(serviceInstance ? { serviceInstance } : {}),
       ...(opts.objectStore ? { objectStore: opts.objectStore } : {}),
+      ...(opts.miniMigrationPreflight
+        ? { miniMigrationPreflight: opts.miniMigrationPreflight }
+        : {}),
     });
   }
   const boundary =
@@ -216,6 +211,10 @@ export async function handleControlPlaneSubmit(
             ...(serviceInstance ? { serviceInstance } : {}),
             ...(opts.objectStore ? { objectStore: opts.objectStore } : {}),
             ...(reviewedSourceCredentials ? { reviewedSourceCredentials } : {}),
+            ...miniMigrationPreflightForNixosSubmit(
+              opts.miniMigrationPreflight,
+              resolvedRequest as NixosSharedHostControlPlaneSubmitRequest,
+            ),
           })
         : await prepareBackendCloudflarePagesControlPlaneRun({
             workspaceRoot: opts.workspaceRoot,

@@ -10,6 +10,7 @@ import { assertReviewedServiceBearerToken } from "./nixos-shared-host-control-pl
 import type { DeploymentLaneGovernanceResolver } from "./deployment-lane-governance-resolution";
 import type { DeploymentControlPlaneServiceInstance } from "./deployment-control-plane-contract";
 import type { ControlPlaneArtifactStore } from "./control-plane-artifact-store-types";
+import { miniMigrationPreflightForNixosSubmit } from "./control-plane-mini-migration-submit";
 
 export async function handleProtectedChallengedNixosServiceSubmit(opts: {
   workspaceRoot: string;
@@ -26,6 +27,7 @@ export async function handleProtectedChallengedNixosServiceSubmit(opts: {
   governanceResolver?: DeploymentLaneGovernanceResolver;
   serviceInstance?: DeploymentControlPlaneServiceInstance;
   objectStore?: ControlPlaneArtifactStore;
+  miniMigrationPreflight?: { enabled: boolean };
 }) {
   try {
     assertReviewedServiceBearerToken({
@@ -65,6 +67,7 @@ export async function handleProtectedChallengedNixosServiceSubmit(opts: {
       ...(opts.serviceInstance ? { serviceInstance: opts.serviceInstance } : {}),
       ...(authorization ? { authorization } : {}),
       ...(opts.objectStore ? { objectStore: opts.objectStore } : {}),
+      ...miniMigrationPreflightForNixosSubmit(opts.miniMigrationPreflight, opts.resolvedRequest),
     });
   } catch (error) {
     return await cleanupThenRethrowRejectedNixosSubmit({

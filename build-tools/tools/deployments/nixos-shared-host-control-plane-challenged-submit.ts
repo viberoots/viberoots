@@ -23,6 +23,7 @@ import {
   finalizedStagedArtifactReference,
 } from "./nixos-shared-host-artifact-submit-request";
 import type { ControlPlaneArtifactStore } from "./control-plane-artifact-store-types";
+import type { MiniCloudMigrationEvidence } from "./control-plane-mini-migration-preflight";
 
 type Boundary = {
   requestedBy?: NixosSharedHostControlPlaneSubmission["requestedBy"];
@@ -42,6 +43,10 @@ export async function acceptChallengedNixosSharedHostSubmit(opts: {
   governanceResolver?: DeploymentLaneGovernanceResolver;
   serviceInstance?: DeploymentControlPlaneServiceInstance;
   objectStore?: ControlPlaneArtifactStore;
+  miniMigrationPreflight?: {
+    enabled: boolean;
+    evidence?: Partial<MiniCloudMigrationEvidence>;
+  };
 }) {
   assertProtectedSharedArtifactIdentityFields(opts.resolvedRequest);
   const reusable = await readReusableChallengedArtifactSubmission({
@@ -126,6 +131,7 @@ export async function acceptChallengedNixosSharedHostSubmit(opts: {
     ...(opts.governanceResolver ? { governanceResolver: opts.governanceResolver } : {}),
     ...(opts.serviceInstance ? { serviceInstance: opts.serviceInstance } : {}),
     ...(opts.objectStore ? { objectStore: opts.objectStore } : {}),
+    ...(opts.miniMigrationPreflight ? { miniMigrationPreflight: opts.miniMigrationPreflight } : {}),
     persistMode: "defer",
   });
   const accepted = await acceptChallengedArtifactSubmission({

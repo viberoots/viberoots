@@ -53,6 +53,7 @@ test("runtime config parser applies container defaults", () => {
   );
   assert.deepEqual(config.webUi, { enabled: true, basePath: "/" });
   assert.deepEqual(config.mcp, { enabled: true, basePath: "/mcp" });
+  assert.deepEqual(config.miniMigrationPreflight, { enabled: false });
 });
 
 test("runtime config parser accepts explicit values", () => {
@@ -67,6 +68,8 @@ webUi:
 mcp:
   enabled: false
   basePath: /agent-mcp
+miniMigrationPreflight:
+  enabled: true
 `,
     ),
   );
@@ -74,6 +77,7 @@ mcp:
   assert.equal(config.mode, "dedicated");
   assert.deepEqual(config.webUi, { enabled: false, basePath: "/ui" });
   assert.deepEqual(config.mcp, { enabled: false, basePath: "/agent-mcp" });
+  assert.equal(config.miniMigrationPreflight.enabled, true);
 });
 
 test("runtime config parser rejects invalid enum values, base paths, and malformed YAML", () => {

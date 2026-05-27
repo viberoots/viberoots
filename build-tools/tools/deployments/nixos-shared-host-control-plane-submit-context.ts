@@ -47,6 +47,7 @@ function stableSubmitPayload(request: ServiceSubmitRequest): Record<string, unkn
     submittedAt: _submittedAt,
     authSessionId: _authSessionId,
     artifactBindingProof: _artifactBindingProof,
+    miniMigrationEvidence: _miniMigrationEvidence,
     ...stable
   } = request as Record<string, unknown>;
   return stable;

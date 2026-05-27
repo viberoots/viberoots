@@ -46,6 +46,9 @@ export type ControlPlaneRuntimeConfig = {
     enabled: boolean;
     basePath: string;
   };
+  miniMigrationPreflight: {
+    enabled: boolean;
+  };
 };
 
 export type DeploymentInfisicalCredentialRequest = {

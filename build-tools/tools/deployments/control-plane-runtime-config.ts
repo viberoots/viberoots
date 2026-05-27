@@ -175,6 +175,12 @@ function withDefaults(
     },
     webUi: sectionWithBasePath(value.webUi, "webUi", "/", true),
     mcp: sectionWithBasePath(value.mcp, "mcp", "/mcp", true),
+    miniMigrationPreflight: {
+      enabled: booleanValue(
+        objectValue(value.miniMigrationPreflight ?? {}, "miniMigrationPreflight").enabled ?? false,
+        "miniMigrationPreflight.enabled",
+      ),
+    },
   };
 }
 
