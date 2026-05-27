@@ -167,6 +167,12 @@ plane needs an external Postgres candidate and, optionally, a Supabase Storage a
 candidate. Supabase is not required to be the final artifact store, but the project provisioning
 work must exist before live compatibility checks can be meaningful.
 
+Managed dependency setup is captured in
+[`docs/control-plane-managed-dependencies.md`](control-plane-managed-dependencies.md). Candidate
+profiles keep provider choice explicit, validate Supabase Postgres, Supabase Storage S3, Cloudflare
+R2, or another S3-compatible store before use, and record compatibility evidence without storing
+secret values.
+
 This work is the prerequisite for later cloud tasks:
 
 - Kubernetes or OpenTofu deployment of the control plane itself
