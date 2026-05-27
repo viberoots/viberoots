@@ -163,7 +163,7 @@ export async function queryPostgresJson(runtime: Runtime, container: string, sql
 
 export async function writeWorkspace(root: string) {
   const workspace = path.join(root, "workspace");
-  const deployDir = path.join(workspace, "projects/deployments/pleomino/staging-s3");
+  const deployDir = path.join(workspace, "projects/deployments/cloud-control-fixture/staging-s3");
   const artifactDir = path.join(workspace, "artifact");
   const binDir = path.join(workspace, "bin");
   await fsp.mkdir(deployDir, { recursive: true });

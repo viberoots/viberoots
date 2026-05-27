@@ -58,6 +58,83 @@ under `/run/deployment-control-plane/credentials`.
    `conformance-checklist.json` passes and the evidence is attached to the selected provider
    capabilities.
 
+## Fixture E2E Validation
+
+The default container E2E runs locally with fixture-only dependencies: one service process, two
+worker processes, fixture Postgres, and a fixture S3-compatible object server. It submits a
+cloud-control fixture deployment, corrupts one stored artifact to prove materialization fails
+closed, then runs a successful duplicate submission through admission revalidation, queue claiming,
+lease/worker authority, provider locking, artifact upload and materialization, stage-state updates,
+audit records, UI reads, and MCP reads. The fixture intentionally uses
+`cloud-control-fixture-staging-s3` so the check does not depend on Pleomino or another demo project.
+
+Live smoke stays opt-in. Set `VBR_CONTROL_PLANE_LIVE_SMOKE=1` only for a non-production target and
+provide `VBR_CONTROL_PLANE_LIVE_SERVICE_URL`, `VBR_CONTROL_PLANE_LIVE_TOKEN_FILE`,
+`VBR_CONTROL_PLANE_LIVE_DATABASE_URL_FILE`, artifact-store credential files, artifact bucket and
+region, `VBR_CONTROL_PLANE_LIVE_AUTH_PROVIDER`, and
+`VBR_CONTROL_PLANE_LIVE_DEPLOYMENT_STAGE=staging` or `shared_nonprod`.
+The enabled path also requires `VBR_CONTROL_PLANE_LIVE_STAGING_DEPLOY_SMOKE_COMMAND`,
+`VBR_CONTROL_PLANE_LIVE_PROVIDER_CAPABILITIES_FILE`, and
+`VBR_CONTROL_PLANE_LIVE_PROVIDER_CAPABILITY_EVIDENCE_FILE`; the staging command runs only after
+health, readiness, worker-heartbeat, database, artifact-store, provider-capability evidence, and
+auth-provider checks pass. When `VBR_CONTROL_PLANE_LIVE_AWS_TOPOLOGY=1`, the AWS topology checks
+are also conformance checks and must pass before the staging deploy command runs. Auth validation is
+provider-specific: WorkOS requires a WorkOS JWKS URL, Supabase Auth requires health and JWKS URLs,
+and generic OIDC requires a discovery URL whose `jwks_uri` is fetched. AWS EC2 topology smoke must
+additionally attach JSON evidence files for subnets, security groups, S3 endpoint, and DNS/TLS; use
+HTTPS ingress for health, readiness, and worker-heartbeat checks; and provide structured runtime
+evidence files through `VBR_CONTROL_PLANE_LIVE_AWS_RUNTIME_DB_EVIDENCE_FILE` and
+`VBR_CONTROL_PLANE_LIVE_AWS_RUNTIME_S3_EVIDENCE_FILE`, plus
+`VBR_CONTROL_PLANE_LIVE_AWS_WORKER_SHUTDOWN_EVIDENCE_FILE`. The runtime evidence must identify the
+EC2 instance source, service process, worker process, service image digest, worker image digest,
+runtime config digest, the configured Supabase path from
+`VBR_CONTROL_PLANE_LIVE_AWS_SUPABASE_PATH` (`public` or `privatelink`), the configured S3 endpoint
+path from `VBR_CONTROL_PLANE_LIVE_AWS_S3_ENDPOINT_PATH` (`gateway` or `interface`), and successful
+DB/S3 checks tied to those same service/worker process IDs. Shutdown evidence must show the same
+worker process stopped gracefully and disappeared from worker state after shutdown. Subnet and
+security-group evidence must list the same EC2 instance IDs that produced the service/worker runtime
+evidence. Provider-capability evidence must attach the runtime DB, runtime S3, and worker-shutdown
+evidence files or their SHA-256 digests to the selected AWS runtime capability, normally
+`aws-ec2-control-plane-host`; attaching those refs only to an unrelated capability is not enough.
+Shell snippets such as `true`, operator laptop output, CI output, and opaque support-ticket
+references are not valid runtime evidence. Evidence kept only in provider dashboards, support
+tickets, or IaC output is not enough to claim protected/shared readiness.
+
+### E2E Troubleshooting
+
+- Service health failure: check that the service process is using the digest-pinned image, mounted
+  `config.yaml`, and `control-plane-token` file from the generated credential manifest. Restart only
+  after replacing missing files; do not substitute environment variables for production secrets.
+- Readiness failure: run the database and artifact-store validation commands from `commands.json`.
+  Database failures usually mean the Postgres URL file points at the wrong project, lacks required
+  SQL features, or is blocked by network policy. Artifact failures usually mean the endpoint, bucket,
+  signing region, key prefix, or credential files do not match the selected S3-compatible backend.
+- Worker heartbeat failure: confirm at least two worker processes are running from the same image and
+  config as the service, then check worker logs for claim lease renewal, provider-lock, credential,
+  or graceful-shutdown errors. A stale worker must lose authority after lease expiry; do not extend
+  leases to hide stuck workers.
+- Duplicate-worker or stale-worker assertion failure: inspect queue rows and claim tokens for the
+  submission. Only one worker may hold a non-expired claim token, and any replaced worker must fail
+  subsequent authority checks before writing provider state or final records.
+- Missing-secret negative failure: confirm required credential filenames match
+  `credential-manifest.json`. The service and workers should fail closed and name the missing file
+  without printing database URLs, access keys, tokens, or private key material.
+- Artifact tamper failure: verify workers read artifacts only through the configured object store and
+  compare stored digest/provenance metadata before execution. Do not repair this by falling back to
+  local artifact directories.
+- UI or MCP redaction failure: treat the response as unsafe until the redaction helper is fixed.
+  Read APIs, UI rendering, MCP tools, and audit records must not expose credential values, private
+  keys, database URLs, mutation endpoints, or submit/approval controls.
+- Live-smoke failure: keep the target non-production, preserve the failing evidence bundle, and rerun
+  only the failed class after fixing credentials, topology, DNS/TLS, auth-provider, database, S3, or
+  worker-shutdown evidence. If AWS topology is enabled, confirm the EC2 runtime DB and S3 evidence
+  includes instance metadata, selected-path fields, image/config digests, process IDs, and operation
+  success from the service/worker network path rather than from the operator laptop or CI runner.
+  Confirm shutdown evidence is a post-shutdown worker-state assertion for the same worker process,
+  not a shell command. Confirm provider-capability evidence references those exact runtime evidence
+  artifacts by file or digest, and confirm subnet/security-group evidence names the EC2 instance IDs
+  in the runtime proof. Do not point live smoke at protected/prod deployments.
+
 ## AWS EC2 Topology
 
 The recommended AWS profile runs one long-running service process and at least two long-running
@@ -93,6 +170,9 @@ evidence. The default `aws-s3` backend still requires `--aws-vpc-endpoint`.
 7. Run the database, artifact-store, health, readiness, and worker-heartbeat commands from
    `commands.json`. The profile is not protected/shared-ready until those pass and the AWS network,
    EC2 host, S3 artifact store, and Supabase prerequisite capabilities all have audit evidence.
+   Live smoke for this topology must also attach EC2-runtime evidence that proves the same
+   digest-pinned service/worker image and runtime config use the selected public or PrivateLink
+   Postgres path and selected S3 endpoint path before any staging deploy smoke is accepted.
 
 ## Provider Capabilities
 

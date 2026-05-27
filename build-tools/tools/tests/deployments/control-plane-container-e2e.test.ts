@@ -34,7 +34,46 @@ import {
   waitForFinished,
   writeE2eConfig,
 } from "./control-plane-container-e2e-flow.helpers";
+import {
+  containerE2eDeploymentFixture,
+  E2E_DEPLOYMENT_ID,
+} from "./control-plane-container-e2e-deployment.helpers";
+import { assertContainerRejectsMissingSecret } from "./control-plane-container-e2e-runtime.helpers";
+import {
+  assertDuplicateWorkerClaimRejected,
+  assertStaleWorkerLosesAuthority,
+} from "./control-plane-container-e2e-worker.helpers";
 import { runInTemp } from "../lib/test-helpers";
+
+test("container E2E fixture metadata is independent of demo projects", () => {
+  const deployment = containerE2eDeploymentFixture();
+  assert.equal(deployment.deploymentId, E2E_DEPLOYMENT_ID);
+  assert.doesNotMatch(JSON.stringify(deployment), /pleomino/i);
+  assert.match(deployment.label, /cloud-control-fixture/);
+});
+
+test("container E2E fixture rejects duplicate workers and stale worker authority", async () => {
+  await runInTemp("control-plane-container-worker-claims", async (tmp) => {
+    await assertDuplicateWorkerClaimRejected(tmp);
+    await assertStaleWorkerLosesAuthority(tmp);
+  });
+});
+
+test("container runtime fails closed when a required secret file is missing", async (t) => {
+  const runtime = await findContainerRuntime();
+  if (!runtime) {
+    t.skip("no usable local Podman or Docker daemon is available");
+    return;
+  }
+  const image = await buildImageTarball();
+  await runInTemp("control-plane-container-missing-secret", async (tmp) => {
+    const port = await freePort();
+    const mounts = await writeContainerSmokeRuntimeTree(tmp, port, E2E_TOKEN);
+    await writeE2eConfig(mounts.configPath, port);
+    await loadImage(runtime, image);
+    await assertContainerRejectsMissingSecret({ runtime, image, mounts });
+  });
+});
 
 test("containerized control plane processes one fixture deployment through service and two workers", async (t) => {
   const runtime = await findContainerRuntime();
@@ -103,20 +142,20 @@ test("containerized control plane processes one fixture deployment through servi
       const renderedQueue = await renderUiRoute(port, "/queue", "container-e2e-ui-queue");
       const renderedDetail = await renderUiRoute(
         port,
-        "/deployment?deploymentId=pleomino-staging-s3",
+        `/deployment?deploymentId=${E2E_DEPLOYMENT_ID}`,
         "container-e2e-ui-detail",
       );
       assert.match(renderedStatus, /Status/i);
       assert.match(renderedStatus, /workers|artifactStore|database/i);
       assert.match(renderedQueue, /container-e2e-submission/);
-      assert.match(renderedQueue, /pleomino-staging-s3/);
-      assert.match(renderedDetail, /pleomino-staging-s3/);
+      assert.match(renderedQueue, new RegExp(E2E_DEPLOYMENT_ID));
+      assert.match(renderedDetail, new RegExp(E2E_DEPLOYMENT_ID));
       assert.match(renderedDetail, /succeeded/);
       assert.doesNotMatch(
         `${renderedStatus}\n${renderedQueue}\n${renderedDetail}`,
         /secret|PRIVATE KEY|postgres|run-actions|api\/v1\/submissions|<form|<button/i,
       );
-      const detail = await readJson(port, "/api/v1/read/deployments/pleomino-staging-s3");
+      const detail = await readJson(port, `/api/v1/read/deployments/${E2E_DEPLOYMENT_ID}`);
       assert.equal(detail.latestRun.finalOutcome, "succeeded");
       const tools = await callMcpRaw(port, "tools/list", {}, "container-e2e-mcp-list");
       const toolNames = tools.result.tools.map((tool: any) => tool.name);
@@ -127,12 +166,12 @@ test("containerized control plane processes one fixture deployment through servi
         "deployment_auth_context",
       ]);
       assert.doesNotMatch(JSON.stringify(tools), /submit|approve|run_action|mutation/i);
-      const mcp = await callMcp(port, "deployment_detail", { deploymentId: "pleomino-staging-s3" });
+      const mcp = await callMcp(port, "deployment_detail", { deploymentId: E2E_DEPLOYMENT_ID });
       assert.equal(mcp.result.data.latestRun.finalOutcome, "succeeded");
       const audit = await queryPostgresJson(
         runtime,
         names.postgres,
-        "SELECT json_agg(document_json ORDER BY occurred_at) FROM control_plane_audit_events WHERE deployment_id = 'pleomino-staging-s3' OR request_id IN ('container-e2e-mcp', 'container-e2e-mcp-list', 'ui-container-e2e-ui-status', 'ui-container-e2e-ui-queue')",
+        `SELECT json_agg(document_json ORDER BY occurred_at) FROM control_plane_audit_events WHERE deployment_id = '${E2E_DEPLOYMENT_ID}' OR request_id IN ('container-e2e-mcp', 'container-e2e-mcp-list', 'ui-container-e2e-ui-status', 'ui-container-e2e-ui-queue')`,
       );
       assert.ok(
         audit.some(
@@ -152,7 +191,7 @@ test("containerized control plane processes one fixture deployment through servi
       );
       assert.match(
         JSON.stringify({ status, renderedStatus, renderedQueue, renderedDetail, audit }),
-        /e2e-worker-[01]|container-e2e-submission|pleomino-staging-s3/,
+        new RegExp(`e2e-worker-[01]|container-e2e-submission|${E2E_DEPLOYMENT_ID}`),
       );
       assert.ok(
         audit.some(
@@ -183,7 +222,7 @@ test("containerized control plane processes one fixture deployment through servi
           (event: any) =>
             event.requestId === "ui-container-e2e-ui-detail" &&
             event.operation === "read.deployment_detail" &&
-            event.deploymentId === "pleomino-staging-s3",
+            event.deploymentId === E2E_DEPLOYMENT_ID,
         ),
       );
       assert.ok(audit.some((event: any) => event.requestId === "container-e2e-mcp"));
@@ -192,7 +231,7 @@ test("containerized control plane processes one fixture deployment through servi
       assert.ok(audit.some((event: any) => event.operation === "mcp.tools/list"));
       assert.doesNotMatch(
         JSON.stringify({ queue, detail, mcp, tools }),
-        /secret|PRIVATE KEY|postgres/i,
+        /pleomino|secret|PRIVATE KEY|postgres/i,
       );
       const awsLog = await fsp.readFile(path.join(tmp, "runtime/aws.log"), "utf8");
       assert.equal(awsLog.trim().split(/\n+/).length, 1);

@@ -5,13 +5,13 @@ import path from "node:path";
 import vm from "node:vm";
 import { S3_STATIC_CONTROL_PLANE_SUBMIT_REQUEST_SCHEMA } from "../../deployments/s3-static-control-plane";
 import { reviewedLaneAdmissionEvidenceFixture } from "./deployment-lane-governance.fixture";
-import { s3StaticDeploymentFixture } from "./s3-static.fixture";
 import { runControlPlaneContainer } from "./control-plane-container-smoke.helpers";
 import {
   E2E_TOKEN,
   runFixtureContainer,
   writeFakeS3Server,
 } from "./control-plane-container-e2e.helpers";
+import { containerE2eDeploymentFixture } from "./control-plane-container-e2e-deployment.helpers";
 
 const CONFIG_PATH = "/etc/deployment-control-plane/config.yaml";
 
@@ -117,16 +117,8 @@ export async function writeE2eConfig(configPath: string, port: number) {
 }
 
 export async function submit(port: number, artifactDir: string, submissionId: string) {
-  const deployment = s3StaticDeploymentFixture({
-    smoke: {
-      exception: {
-        owner: "platform",
-        reason: "deterministic container fixture",
-        scope: "omit container e2e smoke",
-        expiresAt: "2027-01-01T00:00:00.000Z",
-      },
-    },
-  });
+  const deployment = containerE2eDeploymentFixture();
+  assert.doesNotMatch(JSON.stringify(deployment), /pleomino/i);
   return await postJson(port, "/api/v1/submissions", {
     schemaVersion: S3_STATIC_CONTROL_PLANE_SUBMIT_REQUEST_SCHEMA,
     submissionId,

@@ -99,6 +99,26 @@ export function validateProviderCapabilityDeclaration(
   return errors;
 }
 
+export function validateProviderCapabilityEvidence(
+  declarations: ProviderCapabilityDeclaration[],
+  evidenceByCapability: Record<string, string[]>,
+): string[] {
+  const errors: string[] = [];
+  for (const declaration of declarations) {
+    const evidence = evidenceByCapability[declaration.id] || [];
+    if (evidence.length === 0) {
+      errors.push(`${declaration.id}: protected/shared readiness requires attached evidence`);
+      continue;
+    }
+    for (const required of declaration.auditEvidence) {
+      if (!evidence.includes(required)) {
+        errors.push(`${declaration.id}: missing evidence "${required}"`);
+      }
+    }
+  }
+  return errors;
+}
+
 function validateAwsEvidence(input: CloudControlSetupInput): string[] {
   const errors: string[] = [];
   if (input.artifactBackend === "aws-s3" && !input.awsVpcEndpoint) {
