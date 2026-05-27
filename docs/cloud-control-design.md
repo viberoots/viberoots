@@ -118,6 +118,38 @@ scratch directories. Artifact payloads and execution snapshots are immutable obj
 artifact store. Deployment records, queue state, locks, heartbeats, stage state, and audit rows live
 in Postgres.
 
+## Orchestration Authority
+
+The Buck2-based deployment system may orchestrate every component in this topology only through
+reviewed provider capabilities. This includes:
+
+- the deployment control-plane service and workers
+- adjacent `atticd` cache service
+- AWS S3 buckets, VPC endpoints, security groups, ALB/NLB, DNS records, and EC2 host profiles
+- Cloudflare DNS, TLS/WAF, rate limiting, and reviewed edge settings
+- Vercel operator UI/API deployments
+- Supabase managed dependency configuration and PrivateLink prerequisites where the API/support model
+  allows automation
+- EC2 Spot fleets for Nix remote builders and Buck2 remote-execution workers
+
+Every protected/shared orchestration path must have a provider-capability entry before use. The entry
+defines target identity, credential source, lock scope, preview/diff behavior, mutation sequence,
+smoke checks, rollback procedure, replay semantics, audit evidence, and whether the action is
+eligible for protected/shared deployment.
+
+The deployment system must not use ad hoc shell scripts, laptop credentials, CI-owned provider
+credentials, or undocumented dashboard state as hidden mutation authority. If a provider action still
+requires manual approval or support involvement, such as parts of Supabase PrivateLink setup, the
+control plane records it as a gated prerequisite with evidence rather than pretending it is fully
+automated.
+
+This orchestration authority does not make the deployment control plane a build/test scheduler.
+Buck2 remains the build/test graph and action scheduler. Buck2 remote execution remains the scheduler
+for distributed Buck build and test actions. Nix remains responsible for Nix store builds, remote
+builder selection, and substitution. The deployment system may provision and scale worker fleets,
+publish configs, validate health, and record audit evidence; it must not replace Buck2 REAPI or Nix
+remote-builder semantics with a repo-specific scheduler.
+
 Minimum production topology:
 
 - one service replica
@@ -348,6 +380,25 @@ If Supabase becomes a deployment target, it needs explicit provider capability e
 entries should define target identity, locks, rollout model, smoke/release-health behavior,
 provisioner support, replay semantics, and protected/shared eligibility.
 
+For the recommended production topology, Supabase provides managed dependencies and identity
+surfaces, while long-running control-plane and build-cache services run elsewhere:
+
+- Supabase Postgres hosts durable control-plane state.
+- Supabase Auth may participate in operator login through the auth-provider abstraction.
+- Supabase Storage S3 remains a valid alternate control-plane artifact-store candidate after live
+  conformance.
+- Supabase Edge Functions do not host the deployment control-plane service, workers, or cache
+  service.
+- Supabase PrivateLink may provide private Postgres connectivity when the host runs in AWS, but it
+  does not make Supabase Storage, Auth, Realtime, or API traffic private.
+
+For the AWS-hosted topology, use AWS S3 as the default control-plane artifact store after the
+`ControlPlaneArtifactStore` conformance suite passes. That keeps control-plane artifacts and Attic
+objects on the same AWS object-store substrate, enables private S3 access through VPC endpoints, and
+avoids operating two artifact-store backends. Supabase Storage S3 remains acceptable when public
+HTTPS object-store traffic is acceptable, its conformance passes, and its dashboard/platform
+integration is worth the extra backend.
+
 ## WorkOS Role
 
 If WorkOS is used, it should initially be an identity provider, not a deployment provider.
@@ -420,6 +471,19 @@ Before selecting Supabase Storage, run a live compatibility test that writes and
 artifact and verifies metadata through the same `ControlPlaneArtifactStore` implementation used by
 workers.
 
+Backend selection should follow the host-networking requirement:
+
+- AWS S3 is the default candidate when the service and workers run in AWS, especially when Attic also
+  uses S3 and object-store traffic should stay on private AWS network paths through VPC endpoints.
+- Supabase Storage S3 is an alternate candidate when public HTTPS object-store traffic is acceptable
+  and Supabase platform integration is preferable to sharing the AWS S3 substrate.
+- Cloudflare R2 is the strongest alternate when egress cost, regional behavior, or Supabase Storage
+  S3 conformance is unacceptable.
+
+The artifact-store abstraction must not expose those choices to workers as different correctness
+models. Provider-specific endpoint shape, signing region, path-style behavior, and metadata handling
+belong in reviewed configuration and conformance evidence.
+
 ## Database Requirements
 
 The control-plane database must support:
@@ -436,6 +500,13 @@ The control-plane database must support:
 Supabase Postgres is a strong fit if connection management, network access, backups, and migration
 operations are explicit. The control-plane service and workers should use a server-side connection
 credential mounted as a file. Browser clients must never receive database credentials.
+
+For AWS-hosted control-plane service and worker processes, the preferred private Postgres shape is
+Supabase Postgres over Supabase PrivateLink when the organization has the required Supabase plan and
+support path. The host must run in an AWS VPC in the same region as the Supabase project. If those
+constraints are unacceptable, use the normal Supabase connection path with SSL, explicit network
+restrictions where available, and file-backed credentials, or choose AWS RDS when the database must be
+fully AWS-native.
 
 ## Secret Backend Requirements
 
@@ -493,6 +564,7 @@ Required inputs:
 Acceptable substrates:
 
 - NixOS VM using the existing container module
+- AWS EC2 using the NixOS VM or non-NixOS profile
 - Kubernetes running Nix-built images
 - Docker or Podman host using the non-NixOS profile
 - Cloudflare Containers, if the provider supports required mounts and secret files
@@ -501,12 +573,32 @@ The substrate must preserve the runtime boundary. If a platform cannot provide f
 immutable image digest pinning, persistent scratch mounts, and outbound provider access, it is not a
 valid control-plane host without a reviewed exception.
 
+Recommended service mapping:
+
+- Operator UI and request-scoped admission/read APIs may run on Vercel or another web runtime if they
+  only call the protected control-plane API and never hold provider, database, artifact-store, or
+  worker credentials in browser-visible state.
+- Long-running deployment control-plane service and worker processes should run on EC2, ECS-on-EC2,
+  Kubernetes, or another always-on container/VM substrate that preserves file-backed credentials,
+  graceful shutdown, persistent scratch, and worker lease semantics.
+- The adjacent remote-build cache service (`atticd`) should run on a small On-Demand EC2 instance or
+  tiny EC2 Auto Scaling group in the AWS VPC when the build/test fleet also uses EC2. It is adjacent
+  build infrastructure, not a deployment provider, and it must not run on Spot.
+- Distributed build/test workers should use EC2 Spot fleets for Linux Nix remote builders and Buck2
+  remote-execution workers. They are not deployment control-plane workers and should use separate
+  worker registration, credentials, leases, and autoscaling policy.
+- Cloudflare should provide DNS, TLS/WAF, rate limiting, and possibly CDN in front of read paths only
+  after cache-control and auth behavior are verified. Cloudflare Workers, Vercel Functions, and
+  Supabase Edge Functions are not valid hot paths for deployment mutations, cache traffic, or
+  build/test execution.
+
 ## Deployment Provider Direction
 
 Existing provider support should be used where it already matches the workload:
 
 - static webapps: Cloudflare Pages, Vercel, or S3 static
 - services and third-party services: Kubernetes
+- AWS-hosted control-plane service/worker runtime: EC2 or ECS-on-EC2 host profiles, once reviewed
 - mini-hosted apps: `nixos-shared-host` while mini remains a target
 - containerized cloud services: Kubernetes first, Cloudflare Containers only after live mutation is
   reviewed
@@ -520,12 +612,40 @@ Future provider entries may include:
 
 Each new provider must add a provider-capability entry before protected/shared use.
 
+The deployment control plane may orchestrate the recommended AWS/Supabase/Cloudflare/Vercel topology
+when those provider-capability entries exist. The minimum required entries are:
+
+- `aws-ec2-control-plane-host` for service/worker host profile rollout, health checks, and rollback
+- `aws-attic-cache-service` for adjacent `atticd` rollout and health checks
+- `aws-s3-artifact-store` for bucket, lifecycle, endpoint, and artifact-store conformance
+- `aws-network-foundation` for security groups, VPC endpoints, ALB/NLB, and related DNS prerequisites
+- `supabase-managed-postgres` for database connectivity and conformance evidence
+- `supabase-privatelink-prerequisite` for PrivateLink setup evidence when it cannot be fully
+  automated
+- `cloudflare-edge` for DNS/TLS/WAF/rate-limiting changes
+- `vercel-operator-ui` if the operator UI/API is deployed on Vercel
+- `remote-build-worker-fleet` for build/test worker capacity registration and autoscaling policy
+
+Provider entries may be implemented directly or by invoking reviewed infrastructure tooling such as
+OpenTofu, Terraform, CloudFormation, or provider CLIs. In all cases, the deployment control plane owns
+admission, locks, credential scoping, audit, smoke evidence, and rollback evidence. Raw IaC state or
+provider dashboards do not replace control-plane audit records.
+
+Prefer infrastructure-as-code for every external component that can be represented safely and
+maintainably. VPCs, subnets, security groups, VPC endpoints, ALB/NLB, DNS records, S3 buckets,
+lifecycle policies, IAM roles, EC2 launch templates, Auto Scaling groups, and cache/control-plane host
+profiles should be declared in reviewed IaC rather than assembled by hand. IaC modules must be
+versioned, reviewed, previewed, and applied only through the deployment control plane or an equally
+audited bootstrap path. Do not force IaC around provider steps that are not safely automatable, such
+as support-mediated PrivateLink setup; record those as gated prerequisites with evidence.
+
 ## Migration Phases
 
 ### Phase 1: Prove external persistence
 
 - Create a managed Postgres target, likely Supabase Postgres.
-- Create an S3-compatible artifact-store target, likely Supabase Storage or R2.
+- Create an S3-compatible artifact-store target. For the AWS-hosted topology, prefer AWS S3 after
+  conformance; keep Supabase Storage S3 and R2 as alternate candidates.
 - Run compatibility tests for queue, locks, artifact metadata, and artifact replay.
 - Keep mini as the only service ingress while external persistence is tested.
 - This phase can begin once the credential contract, artifact-store contract, and service/worker
@@ -545,8 +665,14 @@ Each new provider must add a provider-capability entry before protected/shared u
 ### Phase 3: Introduce cloud host
 
 - Publish the reviewed Nix-built control-plane image by immutable digest.
-- Run one service replica and two worker replicas on the cloud host.
+- Run one service replica and two worker replicas on the cloud host. The recommended first production
+  host is AWS EC2 in the same VPC used for adjacent cache/build infrastructure, using a NixOS VM or
+  reviewed non-NixOS profile.
 - Use the same external Postgres and artifact store.
+- If using Supabase Postgres PrivateLink, place the host in the same AWS region/VPC path required by
+  the Supabase PrivateLink configuration.
+- Use AWS S3 through a VPC endpoint for the control-plane artifact store when the AWS-hosted topology
+  is selected, unless a reviewed exception chooses Supabase Storage S3 or another compatible backend.
 - Start with cloud service private or on a staging hostname.
 - Verify `/healthz`, `/readyz`, worker heartbeats, read APIs, and a non-production deploy.
 - This phase requires the reviewed OCI image and chosen host substrate from the implementation
@@ -609,6 +735,8 @@ Substrate conformance for each candidate host must include:
 - mounted credential files are readable only by the container user
 - mounted scratch roots have expected ownership and permissions
 - outbound Git/SSH, Infisical, artifact-store, database, and provider API access works
+- if AWS is selected, S3 VPC endpoint access and Supabase PrivateLink database connectivity work from
+  the service and worker subnets when those features are part of the profile
 - child process environment scrubbing is preserved
 - graceful shutdown and replacement worker claim behavior is correct
 
@@ -672,6 +800,18 @@ Podman is the NixOS-idiomatic default through `virtualisation.oci-containers`. D
 Compose remains useful for non-NixOS hosts, but any divergence in mounts, networking, health checks,
 or credential behavior must be tested instead of assumed.
 
+### AWS Host Boundary
+
+AWS EC2 is the recommended first production host for long-running deployment control-plane processes
+when the build cache and build/test workers are also AWS-hosted. The benefit is one VPC, one security
+group model, private S3 access through VPC endpoints, direct Supabase PrivateLink compatibility for
+Postgres, and the option to use NixOS profiles without depending on a serverless runtime. The cost is
+that AWS substrate setup becomes explicit infrastructure, not a portable SaaS default.
+
+Do not collapse all AWS workloads into one authority model. The deployment control-plane service and
+workers, adjacent `atticd` cache service, and Buck/Nix build/test workers must keep separate
+credentials, registration records, logs, scaling policy, and failure domains.
+
 ### File-Backed Secrets
 
 File-backed credentials are more operationally strict than env-var secrets. Some hosted runtimes may
@@ -702,8 +842,10 @@ to a delivery-planning document.
 
 ## Open Questions
 
-- Should the first cloud host be a NixOS VM, Kubernetes, or another OCI platform?
-- Should artifact storage be Supabase Storage or Cloudflare R2?
+- Should the first EC2 host profile be NixOS-only, or should the non-NixOS profile also generate an
+  AWS systemd/Podman bundle?
+- Is there any control-plane artifact workload that still benefits enough from Supabase Storage S3 to
+  justify using it instead of AWS S3 in the AWS-hosted topology?
 - Should operator auth move first to Supabase Auth or WorkOS?
 - Should reviewed-source access move from SSH deploy key to GitHub App before cloud cutover?
 - Do we want multi-region standby, or is one cloud host plus mini fallback enough for the first
@@ -716,7 +858,8 @@ The safest path is:
 1. Keep the current Nix-built OCI image model.
 2. Make mini use external Postgres and S3-compatible artifact storage.
 3. Keep Infisical as the deployment secret backend.
-4. Add a cloud host that runs the same image by immutable digest.
+4. Add an AWS EC2 cloud host that runs the same image by immutable digest, with Supabase Postgres
+   over PrivateLink when available and AWS S3 through a VPC endpoint for control-plane artifacts.
 5. Add auth-provider abstraction after persistence is cloud-shaped.
 6. Cut traffic to cloud only after staging deploys pass on both mini-shaped and cloud-shaped
    runtimes.

@@ -794,6 +794,9 @@ role with Supabase Auth, WorkOS, or another reviewed OIDC provider.
 - Keep mutation authority in the control-plane service; auth providers only authenticate and supply
   claims.
 - Make auth callback ingress portable away from mini-specific nginx assumptions.
+- Document that Supabase Auth and WorkOS may authorize adjacent cache-admin workflows, such as
+  issuing narrowly scoped Attic tokens, but they must not become direct credentials for Nix cache
+  traffic, deployment workers, or provider mutations.
 
 ### 3. External prerequisites
 
@@ -815,6 +818,8 @@ role with Supabase Auth, WorkOS, or another reviewed OIDC provider.
 - Update cloud-control docs to explain Supabase Auth and WorkOS as identity providers, not
   deployment providers.
 - Document callback hostname requirements for cloud hosts.
+- Document the separation between operator identity, deployment authority, and adjacent cache-token
+  issuance.
 
 ### 5.5. Expected regression scope
 
@@ -825,6 +830,8 @@ role with Supabase Auth, WorkOS, or another reviewed OIDC provider.
 - Existing local auth still works through an adapter.
 - A generic OIDC/JWKS provider can authenticate operators and map roles in fixture tests.
 - Protected/shared authorization and audit identity remain stable across adapters.
+- Auth documentation makes clear that provider credentials, deployment worker credentials, and
+  cache-service tokens remain separate from browser SSO sessions.
 
 ### 7. Risks
 
@@ -866,12 +873,51 @@ cloud control-plane host profile without embedding secrets.
   - Infisical deployment credential placeholders
   - auth callback and service ingress settings
   - health, readiness, worker-heartbeat, artifact, and database validation commands
+- Add an AWS EC2 host profile mode for the recommended production topology:
+  - one long-running service process and N long-running deployment worker processes
+  - file-backed credentials staged through the existing credential manifest
+  - optional Supabase Postgres PrivateLink endpoint settings
+  - AWS S3 artifact-store settings through a VPC endpoint as the default artifact path for this
+    topology
+  - optional Supabase Storage S3 or other S3-compatible artifact-store settings only as reviewed
+    alternate backends
+  - security-group, subnet, TLS/ALB-or-NLB, and DNS checklist placeholders without embedding
+    provider secrets
+- Add provider-capability declarations or generated placeholders for the topology components the
+  deployment control plane is allowed to orchestrate:
+  - `aws-ec2-control-plane-host`
+  - `aws-attic-cache-service`
+  - `aws-s3-artifact-store`
+  - `aws-network-foundation`
+  - `supabase-managed-postgres`
+  - `supabase-privatelink-prerequisite`
+  - `cloudflare-edge`
+  - `vercel-operator-ui`
+  - `remote-build-worker-fleet`
+- Require each generated provider-capability declaration to state target identity, credential source,
+  lock scope, preview/diff behavior, mutation sequence, smoke checks, rollback procedure, replay
+  semantics, audit evidence, and protected/shared eligibility.
+- Allow provider capabilities to invoke reviewed IaC or provider CLIs only through the control-plane
+  admission, locking, credential, audit, and rollback model.
+- Prefer reviewed infrastructure-as-code for every external component that can be represented safely:
+  VPCs, subnets, security groups, VPC endpoints, ALB/NLB, DNS records, S3 buckets, lifecycle policies,
+  IAM roles, EC2 launch templates, Auto Scaling groups, and cache/control-plane host profiles.
+- Require IaC modules used by provider capabilities to support preview/diff, reviewed inputs,
+  redacted outputs, idempotent apply where the provider supports it, rollback or restore guidance,
+  and evidence capture into the control-plane audit model.
+- Represent provider actions that are not safely automatable, including support-mediated setup steps,
+  as gated prerequisites with recorded evidence rather than hand-waved manual state.
+- Keep Vercel output limited to operator UI/API guidance for request-scoped endpoints that call the
+  protected control-plane API and do not proxy deployment, cache, or build/test traffic.
+- Keep Cloudflare output limited to DNS, TLS/WAF, rate limiting, and reviewed edge settings; do not
+  generate Workers or Edge Functions as deployment mutation hosts.
 - Support reviewed-source credential mode selection in generated profiles:
   - SSH deploy key files as the initial supported mode
   - GitHub App credential files as a reviewed optional mode when the runtime adapter exists
 - Validate that a selected reviewed-source mode supplies only file-backed credentials and never
   relies on laptop or CI credentials for protected/shared deploys.
 - Support NixOS module, Compose/Podman, and generic SaaS OCI output modes.
+- Support an AWS-oriented NixOS VM or non-NixOS systemd/Podman output mode for EC2 hosts.
 - Validate that generated profiles do not include secret values.
 - Add a dry-run mode that reports missing prerequisites and next commands.
 
@@ -879,24 +925,45 @@ cloud control-plane host profile without embedding secrets.
 
 - None for generation tests.
 - Optional live credentials for validation commands after a profile is generated.
+- Optional AWS account/VPC/subnet/security-group identifiers for live validation of generated AWS
+  host profiles.
+- Optional Supabase PrivateLink endpoint information when the AWS profile uses private Postgres.
 
 ### 4. Tests to be added
 
 - Add snapshot or structural tests for each generated profile mode.
+- Add snapshot or structural tests for the AWS EC2 host profile mode, including Supabase PrivateLink
+  and AWS S3 VPC-endpoint placeholders.
 - Add tests proving secret values are never rendered into generated files.
 - Add invalid-input tests for tag-only images, missing credential filenames, unsupported host
   substrates, and env-var-only secret modes.
 - Add reviewed-source credential mode tests for SSH deploy key profiles and GitHub App profile
   placeholders, including rejection of incomplete credential-file manifests.
 - Add dry-run tests for missing managed dependency evidence.
+- Add dry-run tests that reject AWS profiles missing required subnet/security-group/TLS/artifact-store
+  evidence when those features are selected.
+- Add structural tests that reject generated provider-capability declarations missing lock scope,
+  credential source, smoke checks, rollback procedure, or protected/shared eligibility.
+- Add tests proving provider capability commands cannot rely on ambient laptop or CI credentials.
+- Add tests proving generated IaC references are explicit, reviewed, free of secret values, and wired
+  to preview/apply/evidence commands rather than raw manual instructions.
 
 ### 5. Docs to be added or updated
 
 - Add `docs/cloud-control-setup.md`.
 - Update `docs/cloud-control-design.md` to point to the setup command as the operator entrypoint.
 - Add a quickstart that starts from managed dependency URLs and ends at healthy service and workers.
+- Add an AWS EC2 topology quickstart for Supabase Postgres over PrivateLink plus AWS S3 artifact
+  storage through a VPC endpoint, and state that Supabase Storage S3 is an alternate rather than the
+  default for this topology.
+- Document that provider dashboards, raw IaC state, and manual support actions are evidence inputs,
+  not hidden deployment authority.
+- Document the IaC-first expectation and the limited cases where a manual or support-mediated
+  prerequisite is acceptable.
 - Document reviewed-source credential mode tradeoffs and the expected GitHub App credential files if
   that mode is selected.
+- Document why Fargate, Vercel Functions, Supabase Edge Functions, and Cloudflare Workers are not the
+  default substrate for long-running deployment service/worker processes.
 
 ### 5.5. Expected regression scope
 
@@ -908,6 +975,12 @@ cloud control-plane host profile without embedding secrets.
 - Generated files contain placeholders and paths, not secret values.
 - The generated profile makes reviewed-source credential mode explicit and file-backed.
 - The bundle tells the operator exactly which conformance checks must pass before deployment.
+- The AWS profile makes the selected boundaries explicit: Supabase Postgres over public TLS or
+  PrivateLink, AWS S3 as the default artifact store, reviewed alternate S3-compatible artifact stores
+  only by explicit selection, request-scoped UI/API hosting, and long-running service/worker hosting
+  on EC2.
+- The generated topology cannot be marked protected/shared-ready until every selected external
+  component has a provider-capability declaration and validation evidence.
 
 ### 7. Risks
 
@@ -946,12 +1019,18 @@ reads.
   UI redaction, and MCP redaction.
 - Add optional live-smoke mode for managed Postgres, selected object store, selected auth provider,
   and a non-production deployment target.
+- Add optional live-smoke mode for the AWS EC2 topology that validates service and worker processes
+  from EC2 subnets, Supabase Postgres connectivity through the selected public or PrivateLink path,
+  AWS S3 artifact-store access through the selected endpoint path, and DNS/TLS ingress.
+- Validate that live-smoke evidence is attached to the selected provider-capability declarations
+  rather than stored only in provider dashboards or IaC output.
 - Ensure tests do not depend on Pleomino or any demo project.
 
 ### 3. External prerequisites
 
 - None for default fixture E2E.
 - Optional live credentials for managed dependencies and a safe non-production deployment target.
+- Optional AWS EC2 host or disposable test environment for live-gated AWS topology smoke.
 
 ### 4. Tests to be added
 
@@ -960,12 +1039,18 @@ reads.
 - Add artifact tamper and missing-secret negative cases.
 - Add UI and MCP redaction assertions from records produced by the same run.
 - Add live-gated staging deploy smoke only after all conformance checks pass.
+- Add live-gated AWS topology smoke assertions for service readiness, worker heartbeat, database
+  connectivity, artifact-store read/write/head, and graceful worker shutdown.
+- Add fixture tests proving provider-capability evidence is required before the E2E can claim
+  protected/shared readiness.
 
 ### 5. Docs to be added or updated
 
 - Add E2E validation docs and troubleshooting.
 - Update cloud setup docs with the final validation sequence.
 - Document how to run live-gated checks without touching protected/prod targets.
+- Document the AWS topology validation sequence separately from generic fixture E2E so local
+  validation remains account-free by default.
 
 ### 5.5. Expected regression scope
 
@@ -979,6 +1064,11 @@ reads.
 - A full fixture deployment runs through the cloud-shaped service and two workers.
 - The E2E proves no test depends on Pleomino or another demo project.
 - Live smoke is gated, documented, and safe for non-production verification.
+- The AWS topology smoke, when explicitly enabled, proves the same service/worker image and runtime
+  configuration work from EC2 with the selected managed Postgres and artifact-store paths.
+- The E2E output distinguishes deployment control-plane orchestration from Buck2/Nix build-test
+  scheduling; provisioning worker fleets is allowed, but executing Buck test actions outside Buck2 RE
+  is not.
 
 ### 7. Risks
 
@@ -1009,6 +1099,13 @@ Make the transition from mini-primary to cloud-primary safe, reversible, and doc
 - Add a cutover validation command that checks cloud health, readiness, worker heartbeats, database
   connectivity, artifact-store compatibility, auth callback reachability, UI reads, MCP reads, and
   the latest non-production deployment evidence before traffic is moved.
+- Extend cutover validation for the AWS EC2 topology to check selected subnets/security groups,
+  Supabase PrivateLink or public database connectivity evidence, AWS S3 VPC endpoint artifact-store
+  evidence unless an alternate backend is explicitly selected, ALB/NLB/TLS/DNS health, and
+  Cloudflare/Vercel edge settings when selected.
+- Require selected provider-capability evidence for every external component that will be mutated or
+  depended on after cutover, including adjacent `atticd` and remote build/test worker fleet
+  prerequisites when they are part of the deployment topology.
 - Add standby worker controls in config and CLI so mini can run service-only, worker-only,
   fully-enabled, or fully-disabled modes against the same external Postgres and artifact store.
 - Add a guarded cutover command or checklist generator that refuses to proceed when validation
@@ -1026,12 +1123,19 @@ Make the transition from mini-primary to cloud-primary safe, reversible, and doc
 - A cloud host that has passed PR-12 and PR-13 checks.
 - DNS or ingress control for the deployment service and auth callback hostnames.
 - Mini access if mini remains standby.
+- If the AWS topology is selected, access to the generated AWS host profile evidence and network
+  validation results.
 
 ### 4. Tests to be added
 
 - Add fixture tests for standby worker disablement and re-enable behavior.
 - Add restore validation tests from exported config and durable state references.
 - Add cutover validation command tests for missing, stale, and mismatched evidence.
+- Add cutover validation tests for missing or mismatched AWS topology evidence, including wrong
+  region, missing S3 endpoint validation, missing PrivateLink validation when selected, and stale
+  TLS/DNS checks.
+- Add cutover validation tests that reject dashboard-only or raw-IaC-only state without corresponding
+  control-plane provider-capability audit evidence.
 - Add rollback validation tests proving standby worker controls prevent double execution.
 - Add break-glass tests proving emergency controls are audited and cannot mutate providers without
   normal worker authority.
@@ -1040,6 +1144,10 @@ Make the transition from mini-primary to cloud-primary safe, reversible, and doc
 ### 5. Docs to be added or updated
 
 - Add cloud cutover and rollback runbook generated from or aligned with the validation tooling.
+- Add AWS EC2 topology cutover notes covering Supabase PrivateLink, AWS S3, ALB/NLB, optional
+  Cloudflare edge, and why adjacent `atticd` and build/test worker fleets remain separate systems.
+- Document which parts of the topology may be fully automated, which may require gated manual
+  prerequisites, and how those prerequisites are recorded before protected/shared use.
 - Update mini operations docs to describe standby mode.
 - Add restore, disaster-recovery, and break-glass docs for the cloud control plane.
 
@@ -1053,6 +1161,10 @@ Make the transition from mini-primary to cloud-primary safe, reversible, and doc
 
 - Cloud-primary cutover has a reviewed checklist, rollback path, and restore validation.
 - Cutover validation tooling refuses stale, missing, or host-mismatched evidence.
+- AWS topology cutover refuses to proceed when required network, ingress, database, or artifact-store
+  evidence is missing or inconsistent with the generated profile.
+- Cutover refuses to proceed if any selected external component lacks provider-capability evidence,
+  audit identity, rollback procedure, or smoke evidence.
 - Break-glass procedures are implemented as audited controls rather than undocumented manual
   database or host mutations.
 - Mini can remain a standby host without owning authoritative durable state.

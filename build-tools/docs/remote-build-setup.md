@@ -1,274 +1,969 @@
-## Remote Nix Builds — Setup Guide
+# Remote Builds and Distributed Tests
 
-This guide explains how to enable remote Nix building and binary caching for this repository. It covers developer machines and CI, what needs to be configured, and how this integrates with our Buck2 + Nix dynamic-derivation design.
+This document describes the current remote-build state of this repository and the design needed to make remote builds and distributed test execution reliable on spot capacity.
 
-### What you gain
+The short version:
 
-- **Faster builds for everyone**: heavy artifacts are built once on remote builders and pulled from a binary cache.
-- **Determinism across machines**: the same inputs produce identical outputs, regardless of host OS/CPU.
-- **Precise reuse**: cache keys reflect our exact inputs (patch files, GOOS/GOARCH/tags, toolchains), so only relevant artifacts rebuild.
+- Nix remote builders and binary caches are usable today for many `nix build` calls, but the repo has a few intentional paths that disable builders.
+- Buck2 remote execution is not enabled today. The repo has a placeholder `toolchains//:remote_test_execution` target, but no Buck2 RE client config or remote execution profiles.
+- The target architecture is Buck2-native remote execution for build and test actions, backed by Nix-native binary caches and remote builders. Custom code should handle orchestration around Buck/Nix, not reimplement their execution engines.
+- Spot workers should be stateless, preemptible RE workers backed by CAS, immutable logs/artifacts, a Nix binary cache, and narrowly scoped credentials.
 
-### Concepts (quick)
+## Current State
 
-- **Remote builders**: Machines that perform builds over SSH for your local `nix-daemon`. Your machine uploads inputs; the remote machine builds and returns store paths.
-- **Binary cache (substituters)**: A shared blob store (e.g., Cachix/Hydra) holding build outputs, so other machines can download instead of rebuilding.
-- **Our design**: Buck decides impact; Nix performs per‑target builds via dynamic derivations. If Nix is configured with remote builders and substituters, those are used automatically whenever `nix build` runs (locally or in CI).
+### What Works Today
 
----
+The active build system is Buck2 as the orchestrator and Nix as the hermetic toolchain/build layer. The flake exports conventional package attributes for the supported systems (`aarch64-darwin`, `aarch64-linux`, `x86_64-linux`), including:
 
-## Prerequisites & policy
+- `.#graph-generator`
+- `.#graph-generator-selected`
+- `.#graph-generator-cppTargets`
+- `.#graph-generator-selected-wasm`
+- `.#graph-generator-pure`
+- `.#graph-generator-pure-selected`
+- `.#buck-graph` when `BUCK_GRAPH_JSON` is supplied with impure evaluation
+- `.#test-seed`
+- `.#node-test.<importer>`
+- `.#py-wheelhouse-*`
+- language and deployment package outputs
 
-- **Nix version**: 2.18+ recommended.
-- **Enable features** (client and builders):
-  - Required by current build implementation: `nix-command`, `flakes`
-  - Optional policy features (org/CI choice): `dynamic-derivations`, `recursive-nix`, `ca-derivations`
-- **Our repo conventions**:
-  - Startup-check enforces implementation-required features (`nix-command`, `flakes`).
-  - CI may enforce additional policy features independently of startup-check.
-  - Unset `NIX_GO_DEV_OVERRIDE_JSON` before sharing caches (local overrides change derivation hashes and are forbidden in CI).
+Language-specific Buck rules generally call Nix through the selected-target path. The common shape is:
 
-Example snippets for `nix.conf` (see OS‑specific locations below):
+1. Buck exports or consumes the target graph.
+2. A rule or test runner sets `BUCK_TARGET`, `BUCK_GRAPH_JSON`, `WORKSPACE_ROOT`, and related env.
+3. `build-tools/tools/dev/build-selected.ts` invokes `nix build --impure ... .#graph-generator-selected` or a target-specific selected output.
+
+The implementation-required Nix feature floor is only:
 
 ```conf
 experimental-features = nix-command flakes
 ```
 
-Locations:
+`dynamic-derivations`, `recursive-nix`, and `ca-derivations` are not implementation requirements in the current codebase. They can be evaluated as organization policy, but this repo should not require them for normal startup checks. `build-tools/docs/build-system-design.md` still uses dynamic-derivation architecture terminology, but its current Nix feature snippet and the current startup check require only `nix-command` and `flakes`.
 
-- macOS (multi-user): `/etc/nix/nix.conf`
-- Linux (multi-user): `/etc/nix/nix.conf`
-- (Single-user installs: `$HOME/.config/nix/nix.conf`, but multi-user is strongly recommended.)
+### Nix Build Shape
 
----
+The current implementation uses conventional flake outputs, graph-generator package attributes, selected-target env, and pure graph outputs such as `.#graph-generator-pure-selected`.
 
-## Step 1 — Set up a binary cache (substituters)
+`.#buck-graph` is a graph-materialization output, not a standalone pure `nix build .#buck-graph`. It requires an exported graph path through `BUCK_GRAPH_JSON` and impure evaluation.
 
-You can use Hydra/S3 or a managed service like Cachix. The simplest path is Cachix.
+`build-tools/tools/dev/build-selected.ts` currently omits `--no-link` on its selected-target `nix build` calls, and verify seed preparation intentionally uses `--out-link` to pin `.#test-seed`. That reflects current implementation state, but it is drift from `build-tools/docs/build-system-design.md`'s no-out-link policy and must be fixed or explicitly accepted before remote-enabling those actions.
 
-1. Install and configure on developer machines:
+Remote builders are not automatically used for every `nix build` invocation in this repository:
+
+- `.envrc` injects `NIX_CONFIG` with empty `builders =`, empty `build-hook =`, and `max-jobs = auto` unless `NIX_CONFIG` already contains `builders =`.
+- Known local-only Nix paths include `build-tools/tools/dev/node-modules-build.ts`, `build-tools/tools/buck/node-cli-bundle.ts`, update-pnpm-hash/store-refresh helpers, and some tests/scaffolding helpers that pass `--builders ""`.
+- Most selected-target Nix builds can use configured builders if the environment allows them, but repo-local wrappers may intentionally prefer local builds for latency, reproducibility, or store-cache behavior.
+
+The flake does not currently export `packages.<system>.remote-worker-tools` or `apps.<system>.remote-worker-bootstrap`; those are required target interfaces for the remote worker design, not shipped interfaces today.
+
+### CI Today
+
+Jenkins runs a matrix over:
+
+- `aarch64-darwin`
+- `aarch64-linux`
+- `x86_64-linux`
+
+Each axis currently runs `node build-tools/tools/ci/run-stage.ts --stage <name>` through `codegen`, `export-graph`, `sync-providers`, `gen-auto-map`, `prebuild-guard`, `nix-gaps-policy`, `cpp-addon-smoke`, `file-size-lint`, `patches-lint`, `nix-build-graph-generator`, `wheelhouse-preload`, `buck-test`, and a coverage pass that reruns `buck-test` with `COVERAGE=1` before `pnpm coverage:build`.
+
+The `wheelhouse-preload` stage already has one implemented cache-push path:
 
 ```bash
-nix profile install nixpkgs#cachix
-cachix use <your-cache-name>
+NIX_CACHE_TO='s3://...' node build-tools/tools/ci/run-stage.ts --stage wheelhouse-preload
+# or
+node build-tools/tools/ci/run-stage.ts --stage wheelhouse-preload --to 's3://...'
 ```
 
-This adds entries to `nix.conf` similar to:
+It discovers `py-wheelhouse-*` attrs, builds them, and runs `nix copy --to` when a destination is configured. Jenkins currently invokes the stage but does not configure the cache destination in the `Jenkinsfile`.
+
+### Verify Today
+
+`v` is not just `buck2 test //...`.
+
+It performs startup checks, lint/policy preflights, template manifest checks, verify locking, Nix GC and disk preflights, optional coverage setup, optional unified/toolchain prewarm, conditional test-seed preparation, target expansion, test pass scheduling, Buck daemon cleanup/watchdog work, and merged coverage reporting.
+
+Concrete tests are discovered through Buck cquery. Recursive selectors expand with `kind(test, ...)`; explicit targets are queried directly and are expected to already be Buck test targets. Tests are then split by labels:
+
+- `verify:isolated`: isolated pass, single-threaded by default
+- `verify:resource-limited`: resource-limited pass, currently 4 threads
+- everything else: shared pass
+
+Current verify planning partitions tests into isolated, resource-limited, and shared passes. `verify:isolated` and `verify:resource-limited` are serial barriers in the default pass plan; shared/non-serial pass groups can run concurrently only when grouped by the planner. Any distributed design must preserve those policy semantics.
+
+### Buck2 Remote Execution Today
+
+Buck2 remote execution is not configured.
+
+The repo currently has:
+
+- `toolchains//:remote_test_execution`
+- a thin `toolchains/remote_test_execution.bzl` re-export of Prelude's remote test execution toolchain
+- no `[buck2_re_client]` section in `.buckconfig`
+- no non-empty remote test execution profiles
+- no REAPI/CAS/scheduler/worker service in this repo
+
+That means Buck2 RE is a required design target, but not yet an operational path in the current repository.
+
+## Remote Nix Builders
+
+Remote Nix builders are the Nix-layer acceleration path and should remain part of the target architecture.
+
+They are useful when a local or CI process invokes Nix for expensive artifacts and the environment does not disable builders. They do not distribute Buck's own analysis, cquery, scheduling, or test execution; they only distribute Nix builds.
+
+### Client Config
+
+Example `/etc/nix/nix.conf`:
 
 ```conf
-substituters = https://cache.nixos.org https://<your-cache-name>.cachix.org
-trusted-public-keys = <your-cache-name>.cachix.org-1:<PUBKEY> cache.nixos.org-1:6NCH... (etc)
-```
-
-2. Configure CI to push:
-
-- Provide the signing key as a secret in CI (do not commit keys to the repo).
-- After successful builds, push to the cache:
-
-```bash
-cachix push <your-cache-name> $(nix path-info --all)
-```
-
-Tip: For large pipelines, prefer targeted `nix copy` (see “Step 4 — Push results from CI”).
-
----
-
-## Step 2 — Configure remote builders (client side)
-
-Your machine (client) can delegate builds to remote hosts via `builders`. You can specify them in `nix.conf` or an external machines file.
-
-Option A: inline in `nix.conf`:
-
-```conf
-builders = ssh-ng://builder1.example.com x86_64-linux / - 8 1 big-parallel,benchmark,allow-import-from-derivation;
-           ssh-ng://builder2.example.com aarch64-linux / - 8 1 big-parallel
+experimental-features = nix-command flakes
 builders-use-substitutes = true
-max-jobs = 0  # build nothing locally; delegate to builders
-```
-
-Option B: reference a file:
-
-```conf
 builders = @/etc/nix/machines
-builders-use-substitutes = true
 max-jobs = 0
 ```
 
-Then `/etc/nix/machines` could contain lines like:
+Example `/etc/nix/machines`:
 
 ```text
-ssh-ng://builder1.example.com x86_64-linux / - 8 1 big-parallel,benchmark,allow-import-from-derivation
-ssh-ng://builder2.example.com aarch64-linux / - 8 1 big-parallel
+ssh-ng://nix-builder@builder-x86-linux.example.com x86_64-linux /etc/nix/builder_ed25519 16 1 big-parallel
+ssh-ng://nix-builder@builder-arm-linux.example.com aarch64-linux /etc/nix/builder_ed25519 16 1 big-parallel
+ssh-ng://nix-builder@builder-arm-darwin.example.com aarch64-darwin /etc/nix/builder_ed25519 8 1 big-parallel
+# With host-key pinning, field 8 is the base64 public host key; keep "-" in field 7 when there are no mandatory features.
+ssh-ng://nix-builder@builder-x86-linux.example.com x86_64-linux /etc/nix/builder_ed25519 16 1 big-parallel - <base64-public-host-key>
 ```
 
-Notes:
+Use `ssh-ng://` when the installed Nix version supports the experimental SSH store and the remote `nix-daemon` program is available to the SSH user; configure the store `remote-store` setting explicitly if the remote should use a daemon or a direct local store. Otherwise use `ssh://`, which uses `nix-store` on the remote host and requires `nix`/`nix-store` in the remote SSH user's non-interactive path. In both cases, the remote SSH user must be trusted by the remote Nix configuration for distributed builds. The third machines-file field is the SSH key path, or `-` for the default key. The effective Nix daemon identity on the client/CI host must be able to use that key non-interactively, and host keys must be pinned through the daemon identity's `known_hosts` or the machines-file host-key field. The machines-file host-key field is a base64-encoded public host key, not an OpenSSH `known_hosts` line.
 
-- Use `ssh-ng://` (new protocol) for better performance.
-- The third column (`/`) is the remote store path (usually `/`).
-- The two numbers are the job limits per host.
-- The trailing list declares host capabilities.
-- Ensure passwordless SSH from the client to the builder user, and that `nix-daemon` runs on both ends.
-
-macOS specifics:
-
-- You can remote‑build Linux artifacts from macOS by delegating to a Linux builder with the matching `system` string (e.g., `x86_64-linux`).
-- For Go builds, cross‑compilation and platform tags are captured by the derivation; the remote host compiles natively for its architecture.
-
----
-
-## Step 3 — Prepare each builder host
-
-On each builder:
-
-1. Install Nix (multi-user) and enable `nix-daemon`.
-2. Set `experimental-features` to include at least: `nix-command flakes`.
-3. Ensure the builder user has SSH access and is allowed in `nix.conf` (e.g., `trusted-users = root <builder-user>` if needed).
-4. Keep the builder’s Nixpkgs pinned or allow flake‑provided inputs; consistency across builders improves cache hits.
-5. Ensure adequate disk, CPU, and RAM; set `systemd` limits if applicable.
-6. (Optional) Set `nix.sandbox = true` for stronger isolation.
-
-Connectivity test (from client):
+Connectivity smoke test:
 
 ```bash
-nix store ping --store ssh-ng://builder1.example.com
+nix store info --store 'ssh-ng://nix-builder@builder-x86-linux.example.com?ssh-key=/etc/nix/builder_ed25519'
 ```
 
----
-
-## Step 4 — Push results from CI to the binary cache
-
-We already build Nix artifacts in CI (see `Jenkinsfile` “Build graph-generator (Nix)”). To share results:
-
-- Preferred (generic):
+Build smoke test:
 
 ```bash
-# Push only newly built outputs (example target shown)
-nix build .#graph-generator --accept-flake-config
-nix copy --to 'https://<cache-endpoint>' $(nix path-info .#graph-generator)
+export NIX_CONFIG=$'experimental-features = nix-command flakes\nbuilders = @/etc/nix/machines\nmax-jobs = 0\nbuilders-use-substitutes = true\n'
+nix build .#graph-generator --no-link --accept-flake-config --rebuild
 ```
 
-- Python wheelhouse (uv2nix) example:
+In this repo, `/etc/nix/nix.conf` builders are masked by `.envrc` unless `NIX_CONFIG` already contains a `builders = ...` setting before `direnv` loads. CI and dev shells that want remote builders should export `NIX_CONFIG` with `builders = @/etc/nix/machines` before entering the repo, or opt out of `direnv` for the remote-builder smoke test.
 
-```bash
-# Build and push all wheelhouse outputs for importers with uv.lock
-node build-tools/tools/ci/run-stage.ts --stage wheelhouse-preload --to 'https://<cache-endpoint>'
-# Equivalent (manual): discover attributes, then copy their closures
-nix build .#py-wheelhouse-apps-foo .#py-wheelhouse-libs-bar --accept-flake-config
-nix copy --to 'https://<cache-endpoint>' $(nix path-info .#py-wheelhouse-apps-foo .#py-wheelhouse-libs-bar)
+### Builder Host Requirements
+
+Each builder host needs:
+
+- Nix installed, SSH server reachable, and the selected remote store program available in the remote SSH user's non-interactive path (`nix-daemon` for `ssh-ng://`, `nix-store` for `ssh://`)
+- `experimental-features = nix-command flakes`
+- SSH access from the effective Nix daemon identity on the client/CI host, not only from an interactive shell user
+- the remote SSH user listed in the builder URI must be in the builder host's `trusted-users`
+- enough disk for `/nix/store`; plan for aggressive GC rather than tiny disks
+- trusted substituters and public keys matching the organization cache
+- no developer override env (`NIX_GO_DEV_OVERRIDE_JSON`, `NIX_CPP_DEV_OVERRIDE_JSON`, `NIX_PY_DEV_OVERRIDE_JSON`)
+
+For Linux builders on spot instances, use immutable images or bootstrapping that converges quickly:
+
+1. Install Nix.
+2. Configure substituters and trusted keys.
+3. Join SSH trust for the CI/client identity.
+4. Warm high-value paths (`.#toolchains.go`, `.#toolchains.cxx`, `.#toolchains.python`, `.#buck2-prelude`, `.#node-modules.default`, `.#node-modules.<sanitized-importer>`, `.#py-wheelhouse-<sanitized-importer>`) from the binary cache.
+5. Register the instance in the generated `/etc/nix/machines` consumed by CI or a bastion.
+
+### Binary Cache
+
+A binary cache is required for spot economics. Without it, every preempted worker loses too much work.
+
+The design is not tied to Cachix. The architecture requires an organization-controlled Nix substituter with signed metadata, reader trust configuration, publisher-only signing/write authority, retention policy, regional placement, and hit-rate/cost observability.
+
+Supported implementations include:
+
+- self-hosted HTTP or S3-compatible Nix binary caches
+- Attic, Harmonia, or another Nix substituter service
+- managed Cachix
+
+The most straightforward cloud path is managed Cachix when the priority is speed of adoption and low operational burden. Cachix provides the hosted substituter endpoint, server-side signing by default, read/write access tokens, CDN-backed reads, retention controls, and a purpose-built `cachix push` publisher flow.
+
+The most straightforward self-hosted cloud path is Attic backed by a managed Postgres database and S3-compatible object storage. This preserves provider neutrality while still using a Nix-native cache service with managed signing, multi-tenant cache names, deduplication, garbage collection, and `attic push`/`attic use` client flows. Run `atticd` as a small replicated service behind HTTPS, place object storage near the dominant worker regions, and keep the database and signing material under infrastructure control.
+
+If the managed-dependency baseline is Supabase, the straightforward Attic topology is:
+
+1. Use Supabase Postgres as Attic's metadata database. `atticd` is a persistent backend service, so prefer the direct Postgres connection when the host has IPv6 support; use Supabase's session pooler when the host needs IPv4 compatibility. Avoid transaction-pooler mode unless Attic is explicitly verified against it, because transaction poolers can break clients that rely on session state or prepared statements.
+2. Use Supabase Storage's S3-compatible endpoint as Attic's object store after a live conformance test. Configure Attic with the direct storage hostname form, for example `https://<project-ref>.storage.supabase.co/storage/v1/s3`, the Supabase project region, path-style access, a dedicated private bucket, and server-side S3 access keys stored in the secret manager.
+3. Run `atticd` outside hosted Supabase as a long-running service on the selected cloud container/VM platform. Hosted Supabase compute is for Supabase-managed product services, including Postgres and Edge Functions; it is not arbitrary always-on container hosting for services such as `atticd`. Edge Functions are request-scoped runtimes and are not the right place for an always-on Nix substituter that serves large downloads.
+4. Put HTTPS, auth policy, and rate limiting in front of `atticd`. Public read access is acceptable only for non-sensitive outputs; private caches require reader credentials. CI receives a push-scoped Attic token. Developers and workers receive pull-only configuration.
+5. Use Supabase Auth and WorkOS for the human and organization control plane, not as direct substitutes for Attic cache credentials. The operator UI/API should authenticate users with the selected Supabase Auth/WorkOS flow, authorize cache actions through the existing organization/role model, audit the decision, then mint or retrieve narrowly scoped Attic tokens for the requested subject. Attic remains the cache authorization authority for Nix traffic because Attic uses signed JWTs with cache permissions, `attic login`/`attic use` configure Nix credentials, and Nix substituter clients expect cache credentials rather than browser SSO sessions.
+6. Keep Supabase Auth, WorkOS, and PostgREST out of the hot cache data path. They may protect token issuance, cache administration, audit views, and emergency revocation workflows, but `nix build`, `attic push`, and worker substitution should talk to Attic with Attic-compatible tokens. Do not proxy Nix cache downloads through application auth middleware.
+7. Record the production cache as a named managed dependency with endpoint, cache name, public signing key, retention policy, storage bucket, database connection mode, token scopes, owner, and rollback procedure.
+
+Supabase is a better fit than RDS only when the cache service is part of the broader Supabase-centered control-plane architecture. Supabase provides managed Postgres plus adjacent platform services: Auth, Storage with S3-compatible access, PostgREST/Data API, dashboard/API-key management, local development workflows, and a single project boundary for operator-facing features. Those services can simplify cache administration, token issuance workflows, audit views, and shared artifact/control-plane dependencies.
+
+For Attic metadata alone, RDS is the more direct AWS-native database choice. RDS gives mature AWS networking, IAM/KMS/Secrets Manager integration, private subnets, security groups, VPC endpoints, backup/restore controls, Multi-AZ options, and a simpler private path when `atticd` already runs on AWS. Choose RDS when the cache stack is intentionally AWS-native, when strict private networking is mandatory, or when Supabase Auth/Storage/API features are not being used by the surrounding control plane. Choose Supabase when the surrounding system already depends on Supabase Auth/WorkOS, Supabase Storage, and Supabase-managed operational workflows, and the cache can accept the Supabase networking and storage compatibility constraints validated in this document.
+
+Private networking changes the provider choice. Supabase PrivateLink is the clean private-database option, but it is currently an AWS VPC Lattice/PrivateLink integration for direct Postgres and PgBouncer connections only; it does not cover Supabase Storage, Auth, Realtime, or API traffic. It also requires the Attic host to run in an AWS VPC in the same region as the Supabase project and the required Supabase plan/support path. If strict private database connectivity is required, the simplest topology is `atticd` on AWS ECS/Fargate, EC2, or a small NixOS VM in that VPC, Supabase Postgres over PrivateLink, and AWS S3 through a VPC endpoint for object storage. Supabase Storage S3 remains a reviewed alternate when public HTTPS object-store traffic is acceptable and Supabase platform integration is worth using a separate storage backend, because hosted Supabase Storage does not currently participate in the Supabase PrivateLink path.
+
+Vercel is a good fit for dashboards, admission APIs, operator UI, webhooks, and short request/queue orchestration around the cache. It is not the right runtime for `atticd`: Vercel Functions remain invocation-bounded even with Fluid Compute, and Vercel does not provide arbitrary always-on container hosting for a long-lived Nix substituter. Do not proxy Nix cache traffic through Vercel Functions; that would add duration limits, body-size/bundling constraints, cost risk, and another custom cache path.
+
+Cloudflare pairs well with Supabase for the edge-network parts of the design. In the AWS-hosted topology, AWS S3 is the default Attic object store because `atticd`, the control-plane artifact store, and build/test workers can share the same AWS network and IAM/VPC endpoint model. Supabase Storage S3 remains a reviewed alternate when public HTTPS object-store traffic and Supabase platform integration are preferred. Cloudflare R2 is S3-compatible, avoids object-store egress fees, and is the strongest alternate Attic object store if AWS S3 or Supabase Storage S3 conformance, throughput, regional behavior, object-count behavior, or cost is not acceptable. Cloudflare DNS, TLS, WAF, rate limiting, and CDN can also sit in front of `atticd` when cache auth and cache-control behavior are explicitly verified.
+
+Cloudflare Workers are not a host for `atticd`: they are invocation-scoped and have CPU, memory, request-size, subrequest, and startup limits. Cloudflare Containers are closer because they run arbitrary Linux containers on the Workers platform, but the current model is Worker-controlled, can start on demand, can sleep after inactivity, has ephemeral disk across sleep, requires `linux/amd64` images, and is still a platform-specific lifecycle. Treat Cloudflare Containers as a candidate only after a live validation proves stable always-warm operation, rolling deploy behavior, large NAR download behavior, Attic token/auth behavior, observability, cost, and failure recovery. The lower-risk production default remains a conventional always-on container/VM service for `atticd`, paired with Supabase Postgres and AWS S3 in the AWS-hosted topology; Supabase Storage S3 and Cloudflare R2 remain reviewed alternate object stores.
+
+AWS does not provide a managed Attic service or managed Nix substituter. AWS CodeArtifact is a managed package repository for supported package formats such as npm, PyPI, Maven, NuGet, RubyGems, Swift, Cargo, and generic packages, but it is not a Nix binary cache service and should not be treated as an Attic replacement. The AWS-native Attic shape is self-managed `atticd` on ECS/Fargate, EC2, or a small NixOS VM, with optional RDS Postgres, S3 object storage, ALB/CloudFront, IAM/KMS/Secrets Manager, and VPC endpoints where the design chooses AWS-managed dependencies instead of Supabase-managed dependencies.
+
+Recommended service mapping:
+
+- Control plane: Supabase Postgres for durable control-plane state, Supabase Auth plus WorkOS for operator identity and organization authorization, AWS S3 for control-plane artifacts in the AWS-hosted topology after the artifact-store conformance suite passes, and a small always-on web/API runtime for operator UI and admission APIs. Supabase Storage S3 remains a reviewed alternate when public HTTPS object-store traffic and Supabase platform integration are preferred. Vercel is acceptable for the operator UI/API if the endpoints stay request-scoped and do not proxy cache or build/test traffic. If the control-plane backend needs long-running workers, host those workers on EC2/ECS-on-EC2 or another always-on container/VM service.
+- Attic service: run `atticd` on a small On-Demand EC2 instance or tiny EC2 Auto Scaling Group in the AWS VPC. Use Supabase Postgres over PrivateLink for metadata if the broader architecture stays Supabase-centered. Use AWS S3 through a VPC endpoint for Attic object storage when private object-store traffic matters. Put ALB/NLB and TLS in front of `atticd`, with Cloudflare DNS/WAF/rate limiting optionally in front after cache auth and cache-control behavior are verified. Do not run `atticd` on Spot.
+- Build/test workers: use EC2 Spot fleets for Linux Nix remote builders and Buck2 RE workers. Keep Nix remote builders and Buck2 RE workers as distinct roles even when they share an image family. Use Graviton Spot for `aarch64-linux`, x86 Spot for x86-only or parity lanes, scale-to-zero for low-priority queues, small warm pools for interactive CI, and bounded On-Demand fallback for deadline-bound runs. macOS remains a dedicated macOS worker lane or local-execution lane with the same reporting contract.
+- Container scheduling: start with direct EC2 Auto Scaling groups or EC2 Fleet for one-worker-per-host simplicity. Move to ECS-on-EC2 capacity providers when multiple containerized daemons or task shapes need shared placement, rolling deploys, service discovery, and separate On-Demand/Spot capacity providers while retaining EC2 host control. Keep Fargate for simple service containers only when host-level Nix/sandbox control is not required.
+- Edge/network services: use Cloudflare for DNS, TLS/WAF/rate limiting, and possibly CDN in front of read paths after validating Nix/Attic cache semantics. Do not use Cloudflare Workers, Vercel Functions, or Supabase Edge Functions as the hot cache or build/test execution layer.
+
+Direct S3-compatible Nix binary caches are valid and simple for `nix copy --to s3://...`, but they push more signing, retention, indexing, and credential-boundary responsibility into CI and infrastructure. Use direct S3 only when the desired cache contract is intentionally a plain Nix store rather than a managed cache service.
+
+The home Attic endpoint `https://cache.home.kilty.io/` is useful evidence that the workflow already exists, but it is not the production cache target. Cloud workers and CI should use a production cloud endpoint such as `https://cache.<domain>/<cache-name>` with documented cache name, trusted public key, read credentials, publisher token, retention policy, and owner.
+
+Developer machines should trust the cache without replacing the default substituter set:
+
+```conf
+# /etc/nix/nix.conf on daemon-managed machines
+# Use priority when the organization cache should be preferred over cache.nixos.org.
+extra-substituters = https://cache.<domain>/<cache-name>?priority=30
+extra-trusted-public-keys = vbr-cache-1:<pubkey>
+
+# Admin/CI daemon allow-list for opt-in user configs:
+trusted-substituters = https://cache.<domain>/<cache-name>?priority=30
 ```
 
-- Cachix (convenient):
+Use `extra-substituters` plus `extra-trusted-public-keys` in daemon config when the cache should be enabled by default. Use `trusted-substituters` plus the trusted public key as an admin allow-list for opt-in user configs. Untrusted users can opt into allow-listed caches with `extra-substituters`; they cannot make a new substituter trusted solely from `NIX_CONFIG`.
+
+For Cachix-backed caches, the developer setup remains:
 
 ```bash
-cachix push <your-cache-name> $(nix path-info .#graph-generator)
+nix profile install --accept-flake-config nixpkgs#cachix
+cachix use <cache>
 ```
 
-Add the copy/push step after Nix build stages. Keep signing keys as CI secrets.
+For private Cachix caches, configure a read-scoped token before `cachix use`, for example with `cachix authtoken <read-token>` or `CACHIX_AUTH_TOKEN`.
 
----
+CI should push narrowly scoped closures after successful builds, not the whole local store. Publishers get backend-specific write authority only.
 
-## How this integrates with our repo
-
-- **Per-target builds via Nix**: Our flake exports dynamic-derivation planners (e.g., `.#graph-generator`) that Nix builds. When remote builders and substituters are configured globally, they’re picked up automatically for these builds.
-- **Hermetic inputs are captured**: The flake pins inputs and snapshots the working tree via `builtins.path`; remote builders receive exactly the files our derivations declare.
-- **Patches and overrides**: Patch files under `patches/<lang>/**` are treated as inputs and drive invalidation/caching. Local dev overrides (`NIX_GO_DEV_OVERRIDE_JSON`) must be unset in CI and before pushing to caches.
-- **Buck integration**: Buck orchestrates what to build/test; when Nix builds are invoked (directly or via our scripts), remote Nix infra handles distribution and caching under the hood.
-
-No repository changes are strictly required to use remote builders and caches. However, you may optionally:
-
-- Add CI steps to `nix copy`/`cachix push` after successful Nix builds.
-- Document/cache keys and substituters for your organization.
-
-### Developer hydration of wheelhouse (offline local builds)
-
-After CI publishes wheelhouse artifacts, developers can hydrate locally and build offline:
+Generic writable Nix stores such as `s3://...`, `file://...`, and `ssh://...` can be populated with `nix copy` and, where needed, signing material:
 
 ```bash
-# Pull wheelhouse closures locally (example cache URL)
-nix copy --from 'https://<cache-endpoint>' $(nix path-info .#py-wheelhouse-apps-foo)
-
-# Then build Python envs offline (no network)
-nix build .#py-apps-foo --offline --accept-flake-config
+out=$(nix build .#graph-generator --no-link --accept-flake-config --print-out-paths)
+nix copy --extra-secret-key-files /run/secrets/nix-cache-key \
+  --to "s3://bucket?region=us-east-2" "$out"
+# For Cachix:
+cachix push <cache> "$out"
 ```
 
----
+Managed Cachix should use `cachix push`; Attic should use `attic push`. Harmonia and nix-serve serve an existing Nix store, so populate them by building on the cache host or copying closures to the host/store, then signing with host-owned cache keys. For generic writable Nix stores such as S3 or local file binary caches, CI publishers may need signing material through `secret-key-files`, `--extra-secret-key-files`, or the destination store's `secret-key`/`secret-keys` setting. Cache services and store-serving hosts should keep signing material with the cache service or host unless explicitly configured for local self-signing; CI should receive only the backend-specific write capability required for that model, not broad signing keys. For managed Cachix, publishers need Cachix write auth such as `CACHIX_AUTH_TOKEN`; Cachix signs server-side by default. Only self-signed Cachix caches need publisher-side signing material such as `CACHIX_SIGNING_KEY`. Readers should receive only trusted public keys and read credentials, never signing keys.
 
-## Developer quickstart
-
-1. Enable features locally (macOS/Linux):
+Wheelhouse preload currently supports `nix copy`-compatible destinations through `NIX_CACHE_TO` or `--to`, such as S3, file, or SSH store URIs:
 
 ```bash
-sudo mkdir -p /etc/nix
-sudo tee -a /etc/nix/nix.conf >/dev/null <<'CONF'
-experimental-features = nix-command flakes
-builders-use-substitutes = true
-max-jobs = 0
-CONF
+NIX_CONFIG=$'secret-key-files = /run/secrets/nix-cache-key\n' \
+NIX_CACHE_TO="s3://bucket?region=us-east-2" \
+  node build-tools/tools/ci/run-stage.ts --stage wheelhouse-preload
 ```
 
-2. Add builders:
+For S3 binary caches, the signing key can also be supplied as a store setting in the destination URI if the installed Nix version supports it. Managed Cachix publishing remains design-compatible, but it needs a separate `cachix push` CI step or a dedicated publisher hook.
+
+Publish two cache sets deliberately:
+
+- runtime closures for downstream consumers of built outputs
+- builder/worker prewarm closures for remote execution, including the archived flake source and locked inputs, selected toolchain attrs, `.#buck2-prelude`, `.#test-seed`, wheelhouse outputs, and worker tool closures
+
+Attic is appropriate as the hot and warm Nix binary cache for retained build outputs when its retention and garbage-collection policy is configured deliberately. Each production cache must declare a retention period, GC schedule, storage quota policy, and ownership model. Do not rely on default unbounded cache growth or ad hoc manual deletion. Retention policy must be source-revision aware: release, regulatory, incident-response, and reproducibility closures belong in a separate cache namespace or protection class from disposable CI acceleration outputs.
+
+For regulatory or audit retention, treat Attic as the Nix substituter and deduplicated serving layer, not as the sole system of record. Publish an immutable build provenance bundle alongside the cache entry: source revision, flake lock, graph digest, exact store paths, `.narinfo` metadata, signing key identity, builder platform identity, RE/Buck event-log identity, test summary, SBOM/attestation when available, and the archive retention class. Store that bundle and any legally required artifacts in an append-only or object-lock-capable artifact archive with lifecycle policy, access logging, and deletion controls. The archive may point back to Attic paths for fast substitution, but an Attic GC policy must never be the only thing preserving regulated artifacts.
+
+Developers can hydrate published wheelhouse closures for offline or low-network local work. CI should archive the exact flake source and all locked inputs with Nix itself, then publish exact output closures.
+
+For writable Nix store backends:
 
 ```bash
-sudo tee /etc/nix/machines >/dev/null <<'MACH'
-ssh-ng://builder1.example.com x86_64-linux / - 8 1 big-parallel
-ssh-ng://builder2.example.com aarch64-linux / - 8 1 big-parallel
-MACH
-
-sudo sed -i.bak 's|^builders =.*$|builders = @/etc/nix/machines|' /etc/nix/nix.conf || true
-sudo launchctl kickstart -k system/org.nixos.nix-daemon 2>/dev/null || sudo systemctl restart nix-daemon || true
+nix flake archive --to "$WRITABLE_STORE" .
+nix flake archive --json . > flake-archive.json
+nix build .#py-wheelhouse-<sanitized-importer> \
+  --no-link --accept-flake-config --print-out-paths > outputs.txt
+nix copy --to "$WRITABLE_STORE" --stdin < outputs.txt
 ```
 
-3. Use a shared cache (Cachix example):
+For Cachix or Attic, archive/build locally, extract exact store paths, and pass those paths to the backend CLI:
 
 ```bash
-nix profile install nixpkgs#cachix
-cachix use <your-cache-name>
+nix flake archive --json . \
+  | jq -r '.path,(.inputs|to_entries[].value.path)' > flake-input-paths.txt
+nix build .#py-wheelhouse-<sanitized-importer> \
+  --no-link --accept-flake-config --print-out-paths > outputs.txt
+cachix push <cache> $(cat flake-input-paths.txt outputs.txt)
+# or:
+attic push <cache> $(cat flake-input-paths.txt outputs.txt)
 ```
 
-4. Smoke test:
+Any helper used to parse archive JSON, such as `jq`, must come from the repo's Nix-provided tool closure or devshell, not from mutable image packages.
+
+Hydration verification remains against a read substituter:
 
 ```bash
-direnv allow || true
+nix copy --from "https://<cache-endpoint>" --stdin < outputs.txt
+nix build .#py-wheelhouse-<sanitized-importer> --offline --accept-flake-config --no-link
+```
+
+Offline mode is only a verification step after hydrating archived flake inputs and exact output paths. Do not rely on a hand-maintained flake-input path list or on re-resolving a flake attr as the hydration step. If evaluation inputs are not already in the local store, `--offline` can still fail before substitution because it disables substituters.
+
+### Developer Quickstart
+
+For a local smoke test of the current Nix layer:
+
+```bash
 node build-tools/tools/dev/startup-check.ts
-nix build .#graph-generator --accept-flake-config --rebuild
+nix build .#graph-generator --no-link --accept-flake-config --rebuild
 ```
 
-You should see remote activity (SSH sessions to builders) and subsequent runs should fetch from your substituter.
-
----
-
-## CI notes (Jenkins)
-
-- Ensure agents have `/etc/nix/nix.conf` set with the features above and either `builders = ...` or `builders = @/etc/nix/machines`.
-- Add a post‑build step to push to your binary cache (see Step 4). For example, after the “Build graph-generator (Nix)” stage, run:
+For a local smoke test that attempts to force an eligible derivation onto remote builders:
 
 ```bash
-# Example: push only the graph-generator closure
-nix copy --to 'https://<cache-endpoint>' $(nix path-info .#graph-generator)
-# or
-cachix push <your-cache-name> $(nix path-info .#graph-generator)
+export NIX_CONFIG=$'experimental-features = nix-command flakes\nbuilders = @/etc/nix/machines\nmax-jobs = 0\nbuilders-use-substitutes = true\n'
+nix store info --store 'ssh-ng://nix-builder@builder-x86-linux.example.com?ssh-key=/etc/nix/builder_ed25519'
+nix build .#graph-generator --no-link --accept-flake-config --rebuild
 ```
 
-- Keep signing keys in Jenkins credentials; inject them per stage.
+This does not override derivations that prefer local builds, missing system/feature matches, or daemon SSH/trust failures.
 
----
+## Distributed Test Execution Design
+
+Remote Nix builders are not enough to make `v` or the Jenkins Buck test stages distributed. The ideal state is a Buck2-native remote execution system:
+
+- Buck2 performs target analysis, action construction, action execution/cache interaction, and the test-runner protocol.
+- Test execution and result reporting happen through Buck2's test runner using `ExternalRunnerTestInfo` and Buck-provided executor configs.
+- Nix provides hermetic toolchains, selected-target builds, binary cache substitution, and optional SSH remote builders for Nix store builds that happen inside workers.
+- The repo-owned control plane handles only the parts Buck and Nix do not own: spot fleet capacity, worker registration, credential scoping, policy gates, queue-depth driven autoscaling, and run-level observability.
+
+This design avoids a custom test execution engine. A worker may have a clone for bootstrapping, diagnostics, and local smoke checks, but remote Buck actions should receive their inputs through REAPI/CAS and should not depend on an ambient checkout unless the action explicitly declares that checkout materialization as an input.
+
+### Division Of Responsibility
+
+Use built-in Buck2 capabilities for:
+
+- target graph expansion (`cquery`, `kind(test, ...)`, labels)
+- action construction
+- local and remote cache keys
+- REAPI/CAS upload/download
+- action scheduling to remote workers
+- test execution protocol
+- test result status
+- event logs and action timing
+
+Use built-in Nix capabilities for:
+
+- pinned toolchains
+- selected-target package builds
+- binary substitution
+- closure copying
+- SSH remote Nix builders
+- store path verification
+- Nix sandboxing on builder/worker hosts
+
+Add custom repo code only for:
+
+- translating `v` policy into Buck target sets and Buck options
+- provisioning and draining spot workers
+- registering worker capabilities by platform/provider/resource class
+- distributing Buck2 RE client credentials to CI and workers
+- configuring Nix substituters/builders on workers
+- publishing run-level summaries, logs, coverage artifacts, and diagnostics
+- enforcing credential boundaries for deployment-domain tests
+
+### Buck2 REAPI Target Architecture
+
+The Buck2 RE deployment should include:
+
+- a REAPI scheduler endpoint compatible with the pinned Buck2 commit
+- a CAS and action cache sized for the repo's source/actions
+- Linux `x86_64` and `aarch64` worker pools
+- a macOS worker pool or a dedicated macOS local-execution lane with identical reporting semantics
+- worker images with host-level prerequisites, Nix, cache trust config, cloud identity plumbing, and required sandbox support; repo-controlled build/test tools should be supplied by `packages.<system>.remote-worker-tools`. Backend-specific RE worker runtimes and sidecars should be pinned and reproducibly installed, preferably via Nix when the selected backend supports it.
+- a CI-only `.buckconfig` include or generated config containing `[buck2_re_client]`
+- non-empty `toolchains//:remote_test_execution` profiles for the supported worker classes
+- repo-owned test rules wired to expose remote execution selection, translate selected profiles through Prelude's RE helpers, and pass Buck's `default_executor` / `executor_overrides` into `ExternalRunnerTestInfo`
+- a remote-enabled execution platform/executor path for build actions, separate from the test-only remote execution toolchain
+- explicit local fallback policy, configured per lane rather than hidden in developer defaults
+
+The target behavior for a CI test run is:
+
+1. CI runs the normal preflight and target-selection logic.
+2. CI invokes Buck2 with RE enabled and target-platforms set.
+3. Buck2 uploads action inputs to CAS.
+4. The RE scheduler assigns actions to matching workers.
+5. Workers execute build/test actions in the worker sandbox.
+6. Nix builds inside actions use trusted binary caches and, where appropriate, Nix remote builders.
+7. Buck2 downloads outputs and reports test status.
+8. Repo tooling aggregates Buck event logs, coverage, and high-level verify diagnostics.
+
+The target behavior for developer machines is configurable:
+
+- default local execution for normal iteration
+- opt-in RE execution for expensive builds/tests
+- no hidden dependency on RE credentials for basic local development
+- identical target/test semantics between local and RE modes
+
+### Nix-In-Buck Actions
+
+The hard part is not scheduling. The hard part is that many Buck test/build actions invoke Nix internally. The ideal design is to make those actions valid remote actions rather than bypassing Buck.
+
+Requirements:
+
+- Every action that invokes Nix must declare all source, graph, patch, lockfile, and helper-script inputs through Buck.
+- Worker images must provide Nix and host-level runtime prerequisites. Define `packages.<system>.remote-worker-tools` as the authoritative repo-controlled worker tool closure, containing `bash`, coreutils/`timeout`, Node, Git, Buck2/prelude provisioning, repo helper launchers, and the same tool contract expected by local actions. Optionally expose `apps.<system>.remote-worker-bootstrap` for activation. Backend-specific RE worker binaries and sidecars should be pinned and reproducibly installed, preferably via Nix when the selected backend supports it. Any non-Nix repo-controlled tool baked into the image needs an explicit host-level exception.
+- Workers must trust the same Nix binary caches as CI.
+- Developer override env vars must be scrubbed in CI and remote workers.
+- Repo wrappers that pass `--builders ""` must do so only for paths that intentionally require local Nix builds; remote-capable wrappers should inherit the configured Nix builder/substituter policy.
+- Actions must not read undeclared checkout files through `WORKSPACE_ROOT` unless that checkout or filtered source snapshot is declared as an action input.
+- Nix-backed Buck actions must copy required artifacts into declared Buck outputs, or pass exact store paths plus cache identity as declared action data and have the consuming action explicitly realize them with `nix copy --from "$SUBSTITUTER" "$path"` or an equivalent `nix build --no-link --print-out-paths` step before use. Cache publication alone is not a declared action input and does not materialize a store path on the worker.
+- `path:$WORKSPACE_ROOT#...` is remote-safe only when `WORKSPACE_ROOT` is the declared action input tree or a declared filtered flake/source snapshot.
+- Remote workers should not require broad repo credentials during action execution; source material should arrive through CAS or a declared immutable source artifact.
+
+Where a test truly needs an entire checkout, model that explicitly as a materialized source artifact or a declared test fixture, not as an implicit worker-side clone.
+
+### Scheduler Model
+
+Add a generic remote execution operations subsystem alongside the deployment control-plane schema. This subsystem manages capacity and run metadata; it does not replace Buck2's action scheduler.
+
+Authority boundaries must be explicit:
+
+- Buck2/RE owns action queueing, CAS/action-cache state, action leasing, action retry, and action terminal status.
+- The repo control plane owns run envelopes, fleet desired state, worker registration eligibility, external-state locks, object artifacts, operator summaries, and policy decisions derived from Buck event logs.
+- Provider autoscalers own cloud-specific instance creation, termination, and quota handling.
+- Nix owns binary-cache substitution, closure copying, remote Nix builder selection, and store verification.
+
+New tables or documents should model:
+
+- `runs`: immutable run request, source revision, graph identity, platform matrix, target selectors, policy mode, requester
+- `run_children`: per matrix axis/pass execution identity, parent run id, platform, pass name, Buck invocation identity, and aggregation state
+- `run_attempts`: CI/client attempt id, Buck invocation identity, terminal outcome, retry cause, and redacted failure summary
+- `worker_pools`: provider, region, system, resource class, min/max capacity, launch template identity
+- `worker_instances`: provider instance identity, lifecycle class, worker image digest, capability set, registration status, drain state
+- `worker_registration_leases`: worker identity, lease expiry, heartbeat, drain/preemption signal; these are not Buck action leases
+- `scaling_decisions`: observed demand, desired capacity, current capacity, provider response, budget/quota result, cooldown reason
+- `run_outputs`: Buck event log refs, coverage object refs, verify summary, failed targets, Nix paths produced
+- `worker_heartbeats`: provider, region, instance type, spot/on-demand class, system, capacity, current action/run, last heartbeat
+- `audit_events`: actor, action, object, decision, redaction class, correlation id, timestamp
+- `run_locks`: optional lock scopes for deployment-domain tests or tests that mutate shared external state
+
+Every persisted document should carry `schemaVersion`, immutable IDs, idempotency keys where requests can be retried, a closed state vocabulary, terminal outcome fields, redacted error shape, object refs with digest/size/content type, retention policy, and migration strategy. Worker registration states are limited to `registered`, `ready`, `draining`, `preempting`, `expired`, and `removed`. Buck/RE action states are observational copies from Buck event logs or RE metrics, not repo-owned terminal state.
+
+A top-level `run` represents the full CI/developer verification request. Each platform axis and verify pass is represented as a `run_child` under that run. Aggregation succeeds only when every required child succeeds with the same immutable source, graph, Nix, Buck2, RE config, and cache namespace identity.
+
+Reuse the existing deployment control-plane ideas:
+
+- `FOR UPDATE SKIP LOCKED` claim flow
+- claim tokens and lease renewal
+- explicit fencing before writing terminal output
+- immutable object-store artifacts
+- idempotency keys
+- worker heartbeats and readiness/status surfaces
+- containerized worker runtime
+
+Do not reuse deployment-specific lifecycle names, admission policies, Vault/Infisical credentials, or deployment audit records for generic remote execution operations.
+
+### Run Envelope
+
+Each run should carry enough information for CI, workers, and observers to agree on the exact execution context:
+
+```json
+{
+  "schemaVersion": "vbr-remote-execution-run@1",
+  "runId": "run-...",
+  "source": {
+    "repository": "git@github.com:...",
+    "revision": "<full commit>",
+    "treeFingerprint": "<source tree fingerprint>",
+    "buckGraphFingerprint": "<exported graph fingerprint>",
+    "flakeLockFingerprint": "<flake.lock fingerprint>",
+    "buck2Version": "<pinned buck2 version>",
+    "preludeFingerprint": "<prelude store/source fingerprint>",
+    "verifyPlannerVersion": "<verify planner version>",
+    "selectedPassPlanFingerprint": "<verify pass plan fingerprint>",
+    "reConfigFingerprint": "<RE client/profile config fingerprint>",
+    "cacheNamespace": "<nix/cache namespace>"
+  },
+  "platform": {
+    "system": "x86_64-linux",
+    "os": "linux",
+    "arch": "x86_64"
+  },
+  "command": {
+    "kind": "buck2-re-test",
+    "targets": ["//:some_test", "//:other_test"],
+    "coverage": false,
+    "verifyPassName": "shared"
+  },
+  "buck2": {
+    "remoteExecution": true,
+    "remoteProfile": "linux-x86_64-default",
+    "targetPlatforms": ["prelude//platforms:default"],
+    "executionPlatforms": ["toolchains//platforms:linux-x86_64-re"]
+  },
+  "timeouts": {
+    "overallSeconds": 7200,
+    "idleSeconds": 600
+  },
+  "cache": {
+    "substituters": ["https://cache.nixos.org", "https://cache.example.com/vbr"],
+    "requiredPublicKeys": ["..."]
+  },
+  "artifacts": {
+    "logsPrefix": "s3://vbr-remote-test/runs/run-..."
+  }
+}
+```
+
+### Worker Runtime
+
+Workers should be disposable RE workers. A worker should be able to start from a minimal image, activate pinned repo-controlled tool closures and the selected backend's worker runtime/sidecars, register capabilities, execute remote actions assigned by the RE scheduler, upload logs/metrics, and disappear.
+
+Linux worker bootstrap:
+
+1. Start from a NixOS or Linux image that contains OS boot services, networking, storage setup, trust anchors, cloud identity/metadata access, Nix, and required sandbox/kernel support.
+2. Avoid mutable image-installed repo tools. Git, Node, Buck2/prelude provisioning, and repo helper scripts should come from the pinned `packages.<system>.remote-worker-tools` Nix closure. Backend-specific RE worker runtimes and sidecars should be pinned and reproducibly installed, preferably through Nix when the selected backend permits it.
+3. Configure binary caches and Nix remote builders if this worker delegates expensive Nix builds.
+4. Activate the repo-controlled tool closures and backend worker/runtime, then register RE worker capabilities with the scheduler.
+5. Warm `.#test-seed`, `.#buck2-prelude`, high-value toolchain attrs, node-module attrs, and selected wheelhouse outputs from cache.
+6. Execute REAPI actions assigned by the scheduler.
+7. Emit heartbeat, action timing, Nix cache statistics, and preemption/drain state.
+
+Darwin worker bootstrap follows the same registration, cache trust, heartbeat, and reporting contract, but uses a dedicated macOS host lifecycle and cleanup path described in the macOS lane section.
+
+The CI/client command remains normal Buck2, with RE enabled by the selected execution platform and CI config. CI must provide both the configured target platform and `[build] execution_platforms = <registration-target>`, where that target returns `ExecutionPlatformRegistrationInfo` containing one or more `ExecutionPlatformInfo` values whose `executor_config` uses `CommandExecutorConfig(remote_enabled = True, ...)`. `--target-platforms` configures targets; it does not select a remote executor by itself. CI should prefer remote execution explicitly after the selected rule families are marked remote-capable. `EVENT_LOG` must use a Buck2-recognized event-log extension. Prefer `.pb.zst` for compact raw archives; use `.json-lines` or `.json-lines.zst` only when direct text inspection is intentional.
+
+```bash
+buck2 --isolation-dir "ci-${RUN_ID}" test \
+  --config-file "$RE_BUCKCONFIG" \
+  --target-platforms "<target-platform-for-this-axis>" \
+  --prefer-remote \
+  --unstable-allow-compatible-tests-on-re \
+  --event-log "$EVENT_LOG" \
+  --build-report "$RUN_ARTIFACT_DIR/buck-build-report.json" \
+  --write-build-id "$RUN_ARTIFACT_DIR/buck-build-id.txt" \
+  --command-report-path "$RUN_ARTIFACT_DIR/buck-command-report.json" \
+  --num-threads "$THREADS" \
+  --overall-timeout "${OVERALL_TIMEOUT}s" \
+  "${TARGETS[@]}"
+```
+
+The selected execution platform, not merely `--target-platforms`, must carry a `CommandExecutorConfig(remote_enabled = True, ...)`. Use `--remote-only` only in conformance lanes where every selected build action and test has a remote-capable executor.
+
+For full `v` parity, this Buck command is the inner execution step, not the whole verify workflow. The verify wrapper must still provide target expansion, pass planning, generated test env after `--`, nested isolation registration, pass logging, safety rails, seed setup, and coverage aggregation.
+
+The worker must not need broad deployment credentials. It needs RE worker credentials, cache read credentials, narrow log/metric write credentials, and optional Nix remote-builder credentials if that worker delegates Nix builds.
+
+### Credential Contract
+
+Remote execution credentials must follow the same bias as the deployment control plane: explicit, narrow, file-backed or workload-identity-backed, startup-validated, rotated, and redacted.
+
+Separate roles:
+
+- CI Buck2 RE client credential
+- RE worker registration credential
+- CAS/action-cache read/write credential
+- Nix binary cache read credential
+- Nix binary cache write credential for trusted publishers only; signing credentials only when the cache backend requires publisher-side signing
+- object-store write credential scoped to run logs/artifacts
+- metrics/logs write credential
+- Nix remote-builder SSH credential
+- deployment-domain test credential, granted only to locked external-state test lanes
+
+Rules:
+
+- No secrets in ambient env, Buck logs, Nix store paths, action cache keys, or persisted run summaries.
+- Credentials must have TTL, rotation, revocation, and owner metadata.
+- Workers should prefer workload identity, mTLS, OIDC, or SPIFFE/SPIRE-style identity over long-lived static tokens.
+- Child process env must be scrubbed before invoking Buck, Nix, test runners, or deployment helpers.
+- A run summary may reference credential role names and fingerprints, never secret material.
+- Buck2/Nix credential paths must be explicit config paths, not inherited from broad shell state.
+- Cache signing keys are either held by the cache service/host or available only to publisher jobs for locally signed stores; worker and developer identities get read-only cache credentials.
+- Authenticated `s3://` cache reads must use workload identity or instance-role credentials outside the action env. Prefer HTTPS substituter URLs for read-only worker configuration when possible.
+- Credential-use audit events record role, subject, fingerprint, and operation, never token material or file contents.
+- Credentialed tests receive declared credentials only through file-backed mounts, workload identity, or a narrow explicit env allowlist owned by the test rule. Those credential inputs are excluded from CAS/action keys, Buck logs, Nix logs, and run summaries except for redacted role/fingerprint metadata.
+
+### Target Partitioning
+
+Prefer Buck2 action-level scheduling through REAPI. Use repo-level target batching only as an explicit policy layer around Buck, not as a second execution engine.
+
+The target-selection layer should:
+
+1. Run the same target-selection logic used by `v` or CI.
+2. Expand recursive selectors to concrete Buck test labels when policy requires pass partitioning.
+3. Preserve label-driven semantics:
+   - `verify:isolated` currently maps to pass partitioning and `--num-threads 1`; the remote design must add an explicit Buck executor/profile selection if isolated tests should use dedicated remote capacity.
+   - `verify:resource-limited` currently maps to pass partitioning and a 4-thread cap; the remote design must add an explicit Buck executor/profile selection if these tests should use larger resource units or lower remote concurrency.
+   - shared tests use the default remote profile.
+4. Keep deployment-domain tests behind explicit locks and credential boundaries.
+
+Timing data should come from Buck2 event logs and existing verify logs. The repo should not invent a parallel action telemetry format.
+
+### Action Classes And Retry Policy
+
+Every remote-capable rule/test family must declare an action class:
+
+- `pure_retryable`: no external side effects; Buck2/RE may retry freely.
+- `external_readonly`: reads external services; retryable with bounded retry and stable credentials.
+- `external_mutating_locked`: mutates shared external state; requires a repo-control-plane lock, idempotency key, attempt record, and in-doubt reconciliation.
+- `local_only`: cannot run remotely until the contract is fixed.
+
+Preemption handling depends on the class. `pure_retryable` actions rely on Buck2/RE retry. `external_mutating_locked` actions require fenced authority before terminal writes, partial-output capture, and explicit recovery logic before the lock can be released or the action retried.
+
+The authoritative declaration surface is a Buck-visible policy attribute or label exported into graph metadata and checked by the verify planner before remote opt-in. Sidecar manifests may summarize policy, but they must be generated from or validated against Buck-visible metadata so policy cannot drift from target definitions.
+
+Retry contract:
+
+- `pure_retryable`: Buck/RE owns action retry with bounded max attempts and backoff recorded in Buck/RE metrics.
+- `external_readonly`: Buck/RE retry is allowed within a run-level max-attempt budget; failures record provider/service category.
+- `external_mutating_locked`: repo control plane creates a new `run_attempt` for run-level retry, records `in_doubt` when the worker dies before fenced terminal evidence, and requires recovery evidence before releasing `run_locks`.
+- `local_only`: no remote retry; failures remain local/CI failures until the rule family is made remote-capable.
+
+### Spot Capacity Across Providers
+
+Use a provider-neutral worker registration model:
+
+- AWS EC2 Spot for `x86_64-linux` and `aarch64-linux`
+- GCP Spot VMs for overflow Linux capacity
+- Azure Spot VMs only if cache/network behavior is acceptable
+- macOS uses either a dedicated macOS RE worker pool or a local-execution lane with the same run metadata and reporting contract
+
+For cheap on-demand Linux capacity, use EC2 Spot instances as disposable servers, not Fargate tasks, as the default worker substrate. Build/test workers need Nix, sandbox support, large local disks, predictable process execution, worker-side cache warming, preemption handling, and backend-specific RE worker daemons. EC2 Spot exposes those host-level controls directly and can be diversified across instance families and Availability Zones. Fargate is a reasonable always-on service host for simple containers such as `atticd`, but it is not the first choice for Nix remote builders or Buck2 RE workers.
+
+Use two worker roles even when they share the same image family:
+
+- Nix remote builders: NixOS or Linux EC2 Spot instances reachable by CI or worker hosts over SSH, listed through generated `/etc/nix/machines`, trusted by remote `nix-daemon`, configured with the organization binary cache, and sized for store-build throughput.
+- Buck2 RE workers: EC2 Spot instances running the selected RE worker runtime/sidecars, registering platform properties with the RE scheduler, executing Buck build/test actions from CAS inputs, and using the Nix binary cache and optional Nix remote builders from inside actions.
+
+Do not use AWS Batch as the primary scheduler for Buck2 tests. AWS Batch is useful for coarse batch jobs and managed Spot compute environments, but Buck2 RE must remain the action scheduler for distributed build/test execution. Placing Batch between Buck and workers would create a second action scheduler, weaken Buck's retry/cache semantics, and make per-action logs/capabilities harder to reason about. AWS Batch can still be useful for separate maintenance jobs such as image prewarming, cache conformance checks, or one-shot fleet diagnostics.
+
+Use instance diversification and fallback policy deliberately:
+
+- Prefer Graviton Spot pools for `aarch64-linux` when the repo's target graph supports them; use `c7g`, `m7g`, and newer generation equivalents for CPU-heavy work, with memory-optimized families only for tests that need them.
+- Keep `x86_64-linux` pools for targets that require x86, native addons, or parity with deployment artifacts.
+- Use EC2 Auto Scaling groups, EC2 Fleet, or an ECS-on-EC2 capacity provider with a price/capacity-optimized allocation strategy across multiple instance families and AZs.
+- Maintain scale-to-zero for low-priority queues, a small warm pool for interactive CI, and bounded On-Demand fallback only for high-priority or deadline-bound runs.
+- Keep all mutable repo tools out of AMIs; workers activate pinned Nix closures on boot, then register only after cache trust, tool activation, and sandbox checks pass.
+
+The RE scheduler should not know provider-specific APIs. Workers register RE platform properties/capabilities and use-case/resource metadata understood by the selected RE backend. Repo Buck profile names are control-plane aliases only and must map to `remote_execution_properties`, `remote_execution_use_case`, and resource fields before Buck invokes RE. The provider-neutral registration shape is:
+
+```json
+{
+  "workerId": "aws-us-east-2-c7g-spot-...",
+  "provider": "aws",
+  "region": "us-east-2",
+  "lifecycle": "spot",
+  "system": "aarch64-linux",
+  "cpu": 16,
+  "memoryGiB": 32,
+  "resourceClasses": ["default", "resource-limited"],
+  "remoteExecutionProperties": {
+    "platform": "linux-aarch64",
+    "resource_class": "large"
+  },
+  "remoteExecutionUseCases": ["buck2-build", "tpx-default"]
+}
+```
+
+Provider-specific autoscalers should only translate queue depth and platform demand into instance counts.
+
+Autoscaling contract:
+
+- Inputs: RE queue depth by backend platform properties/use case/resource class, observed action runtime, worker readiness, cache pressure, preemption rate, provider capacity errors, budget caps, and CI priority.
+- Outputs: desired worker count per provider/region/resource class, warm-pool size, on-demand fallback request, or scale-to-zero decision.
+- Controls: cooldowns, hysteresis, min/max capacity, price ceiling, quota handling, per-provider failure backoff, and region/cache-locality preference.
+- Audit: every scaling decision writes observed demand, desired/current capacity, provider response, and budget/quota result.
+
+Demand source of truth:
+
+- The RE scheduler API or metrics endpoint is authoritative for queued/running action demand by backend platform properties/use case/resource class.
+- Buck event logs are authoritative for completed action timing and retry outcomes.
+- Repo DB run records provide priority, policy, source identity, and lock context.
+- Autoscalers must reject stale demand snapshots, record the snapshot timestamp, and apply cooldowns before scaling down.
+
+Preemption handling:
+
+- Workers catch cloud metadata preemption notices when available, but they must not assume a uniform drain window. Treat notice as best-effort and provider-specific: AWS EC2 Spot normally provides a two-minute interruption notice except hibernation; GCP Spot VMs default to notice at the start of a best-effort shutdown period up to 30 seconds, with 120-second preemption notice in Preview where available; Azure Spot VMs can use Scheduled Events, with attempted delivery up to 30 seconds before eviction.
+- They stop accepting new RE actions immediately.
+- They mark the worker registration lease as preempting and keep uploading logs until shutdown.
+- The repo control plane drains or removes the worker registration after lease expiry. Buck2/REAPI retries the affected action according to the configured retry policy.
+
+Provider conformance requirements:
+
+- instance identity can be verified
+- preemption notice is observable and tested
+- worker clock sync is within tolerance
+- CAS/cache/object-store network paths are available
+- filesystem and sandbox behavior match the worker profile
+- shutdown grace is measured
+- IAM scope is minimal and tested
+- object-store compatibility includes digest/size/content-type checks
+- cache locality and cross-region transfer costs are visible
+
+### macOS Lane
+
+The `aarch64-darwin` lane must use the same run envelope, event-log ingestion, result aggregation, and policy gates as Linux.
+
+Supported modes:
+
+- dedicated remote macOS RE workers
+- dedicated local macOS executors reporting into the same run/control-plane model
+
+macOS-specific requirements:
+
+- explicit host lifecycle and capacity model; avoid pretending macOS spot capacity behaves like Linux spot. On AWS, macOS capacity means EC2 Mac Dedicated Hosts, On-Demand, or Savings Plans, not Spot.
+- Nix installed and cache-trusted under the same feature floor
+- no keychain, codesigning, or Apple credential material in generic RE workers unless a test explicitly declares that credential class
+- sandbox and filesystem differences documented in the worker profile
+- long-lived host drift detection, image/bootstrap reproducibility, and cleanup of Buck/Nix temp state between runs
+
+### Result Aggregation
+
+Buck2 success is necessary but not sufficient. A top-level verify run succeeds only when required preflights, seed/prewarm setup, every Buck pass, coverage aggregation when enabled, and artifact publication/reporting all succeed for the same source, graph, Nix, Buck2, RE config, and cache namespace identity.
+
+Aggregation should produce:
+
+- final status
+- failed Buck targets
+- links or object refs for logs
+- per-action duration and worker metadata
+- coverage merge input refs when coverage is enabled
+- cache miss/build summary when available
+
+For coverage, do not let remote actions write directly into the repo `coverage/` directory. Upload raw V8 coverage outputs as declared test outputs or run artifacts, then run the existing `coverage:build` normalization/merge step once in a final aggregation job.
+
+### Observability Contract
+
+Remote execution must provide an operator surface, not just logs.
+
+Required surfaces:
+
+- `/healthz` and `/readyz` for the repo control plane
+- worker heartbeat/status API
+- run status API keyed by run id, source revision, and CI attempt
+- Buck event log references for every run
+- Buck-native build reports, build IDs, and command reports for every Buck invocation
+- structured logs with correlation IDs spanning CI, Buck invocation, RE action, worker, CAS/cache, Nix build, and object-store writes
+- audit log for scaling, credential use, lock acquisition, lock release, retries, and terminal outcomes
+
+Required metrics and alerts:
+
+- run queue age by platform/profile
+- desired vs current worker capacity
+- worker registration failures
+- spot preemption rate
+- RE retry rate
+- action cache hit rate
+- CAS size/pressure/error rate
+- Nix binary cache hit rate
+- Nix remote-builder failures
+- slowest actions/tests
+- stuck run/action detection
+- external-state lock age
+- artifact upload failure rate
+- redaction violation count
+
+All operator outputs must use defined redaction classes. Secret values, tokens, signing keys, SSH keys, and deployment credentials must never appear in Buck logs, worker logs, Nix logs, run summaries, or audit events.
+
+Redaction classes:
+
+- `public`: safe for logs, dashboards, and PR comments.
+- `internal`: safe for authenticated operators; not emitted to public artifacts.
+- `sensitive_identifier`: account IDs, hostnames, repository URLs, object refs, credential fingerprints; visible only in authenticated operator views.
+- `secret`: tokens, private keys, signing keys, session cookies, deployment credentials; never logged or persisted outside approved secret stores.
+- `regulated`: user/customer data or external-service payloads; excluded from remote execution logs unless a test-specific policy allows redacted summaries.
+
+## Buck2 REAPI Design
+
+Buck2 REAPI is the built-in mechanism this repo should use for distributed build and test execution.
+
+Activation requires:
+
+- adding `[buck2_re_client]` config in `.buckconfig` or an included local/CI config
+- configuring authentication and TLS for the RE endpoint
+- adding at least one non-empty profile to `toolchains//:remote_test_execution` for test execution
+- updating repo-owned test rules (`zx_test`, Node, Go, C++, and Python Nix tests) to expose remote execution selection and pass the chosen executor fields into `ExternalRunnerTestInfo`
+- auditing Rust Nix build rules separately as build-action RE candidates; this repo does not currently expose a Rust external-runner test wrapper
+- ensuring remote-capable external-runner tests set `use_project_relative_paths = True` and `run_from_project_root = True`; CI may pass Buck2's `--unstable-allow-compatible-tests-on-re` only to allow compatible tests to run on RE, not to make incompatible tests compatible
+- adding a remote-enabled execution platform/executor config for build actions; the test remote execution toolchain alone does not make ordinary build/genrule actions remote
+- opting rule families into remote build execution only after their actions are hermetic
+- ensuring worker images can run actions that invoke Nix
+- proving that action inputs do not rely on undeclared host paths or volatile env
+
+Linux and Darwin should be designed under one profile model. If Darwin capacity is scarce or expensive, the Darwin lane can use local execution while preserving the same run metadata, result aggregation, and policy gates.
+
+Buck2 RE and Nix remote builders are complementary:
+
+- Nix remote builders distribute Nix store builds over SSH.
+- Buck2 RE distributes Buck actions through REAPI/CAS.
+- The repo-owned control plane manages spot capacity, policy, credentials, and observability around the Buck/Nix engines.
+
+Do not conflate their caches. A Nix binary cache stores Nix closures. A Buck/RE CAS stores action inputs and outputs. A remote-test object store stores run logs, coverage, event logs, and structured summaries.
+
+### Buck2 Configuration Shape
+
+The repository should keep developer defaults local and make RE activation explicit through CI or an opt-in include.
+
+Example shape, intentionally incomplete until validated against the pinned Buck2 commit. Use `grpc://` or omit the scheme; TLS is controlled by Buck2 RE client config, not by a `grpcs://` scheme. Use provider-specific RE client keys validated against the pinned Buck2 commit: local insecure BuildBarn-style setups may require `tls = false`; mTLS providers should use `tls_client_cert` and optionally `tls_ca_certs`; token-based providers should use `http_headers`. Source secret values from explicit CI-owned files or workload identity rather than ambient env, and do not treat `tls = true` as a complete authentication configuration:
+
+```ini
+[buck2_re_client]
+engine_address = grpc://re.example.com:443
+cas_address = grpc://cas.example.com:443
+action_cache_address = grpc://ac.example.com:443
+tls = true
+```
+
+The concrete keys must match the pinned Buck2 commit's supported config. Current Buck2 documentation describes `[buck2_re_client]` endpoint, TLS, and HTTP-header settings; do not invent local enablement keys unless the pinned Buck2 commit supports them. The design requirement is that CI can generate or include RE config without forcing every developer to hold RE credentials.
+
+The `toolchains//:remote_test_execution` target should define named profiles by worker class:
+
+- `linux-x86_64-default`
+- `linux-x86_64-large`
+- `linux-aarch64-default`
+- `linux-aarch64-large`
+- `darwin-aarch64-default` when remote Darwin workers are available
+
+Profiles should use only the keys accepted by the pinned Prelude profile schema. Each named profile must include:
+
+- `capabilities` passed into `CommandExecutorConfig.remote_execution_properties`
+- `use_case` for the remote execution request
+
+Optional profile keys are:
+
+- `listing_capabilities` when test listing needs a different worker class
+- `remote_cache_enabled`
+- `dependencies` for remote execution dependencies
+- `local_enabled` and `local_listing_enabled` fallback policy
+- `resource_units` for large/resource-limited profiles
+- `remote_execution_dynamic_image` when the pinned Buck2 commit and RE backend support dynamic image selection
+
+Do not add profile keys such as `fallback_policy`, `worker_image`, or `platform` unless they are represented as supported `capabilities`, `remote_execution_dynamic_image`, or build-execution-platform `CommandExecutorConfig` fields.
+
+Choose fallback behavior explicitly for every profile. Omit or set `local_enabled = False` for strict RE-only CI profiles; set `local_enabled = True` only for hybrid/fallback lanes. Do not assume `--prefer-remote` adds local fallback when the selected test profile's `CommandExecutorConfig` is RE-only.
+
+When setting `default_profile`, set `default_run_as_bundle` deliberately. The pinned Prelude defaults bundling to true when a default profile exists. Use `False` unless bundled-suite behavior has been validated against verify pass partitioning, timeouts, retries, and log/coverage aggregation.
+
+Profiles are not sufficient by themselves for this repo's current external-runner tests. The Node, Go, C++, and Python wrappers must expose a `remote_execution` attribute using Prelude's RE test argument schema, translate selected profiles with Prelude's `get_re_executors_from_props(ctx)` helper, and pass Buck's executor fields through to `ExternalRunnerTestInfo`; otherwise the profiles exist but the repo-owned test rules keep running under their current local executor behavior. `zx_test` already inherits the `remote_execution` attribute from `sh_test`, but its implementation override must still translate that attribute with `get_re_executors_from_props(ctx)` and pass `default_executor` / `executor_overrides` into `ExternalRunnerTestInfo`. Rules must have `run_from_project_root = True` and `use_project_relative_paths = True`; set them explicitly in repo-owned wrappers to make RE compatibility auditable, even though Buck2 defaults them to true.
+
+Remote-enabling these wrappers also requires rewriting test commands and environment setup to carry declared artifacts through `cmd_args`/handles or through an explicit declared source snapshot. Merely passing `default_executor` and `executor_overrides` is insufficient while test commands read arbitrary paths through `WORKSPACE_ROOT`, `FLK_ROOT`, generated Buck config, helper TypeScript files, `.git`, or temp workspaces outside Buck's declared input model.
+
+Build-action RE needs separate configuration from test RE. The current Prelude default platform is local-only, so the design must add a repo execution-platform registration target for remote-capable build actions and point CI `[build].execution_platforms` at that registration target. The registration target must return `ExecutionPlatformRegistrationInfo` containing one or more `ExecutionPlatformInfo` values. Each remote-capable `ExecutionPlatformInfo.executor_config` must set `remote_enabled = True`, explicit `local_enabled`, explicit `use_limited_hybrid`, `remote_execution_use_case = "buck2-build"`, and the same capability vocabulary used by test profiles through `remote_execution_properties`. Test profiles and build execution platforms should share the same worker capability vocabulary, but they are not the same Buck configuration surface.
+
+### Hermeticity Audit
+
+Before marking a rule family remote-capable, audit it for:
+
+- undeclared reads through `WORKSPACE_ROOT`
+- undeclared reads from `.git`, `buck-out`, `.direnv`, `node_modules`, or temp dirs
+- volatile env use
+- writes outside declared outputs
+- Nix invocation that depends on local store paths not available through cache or declared inputs
+- network access during actions
+- reliance on developer override env
+
+The expected fix is not to disable remote execution broadly. The expected fix is to declare inputs, move volatile setup into preflight or Nix-provided worker closures, and make remote workers match the local action contract. Baking mutable tools into images is an exception for host-level dependencies only, not the default path for repo tool dependencies.
+
+## Implementation Plan
+
+### Phase 1: Establish Shared Cache And Worker Images
+
+1. Pick the binary cache backend and signing model.
+2. Configure CI agents with substituters and trusted keys.
+3. Set `NIX_CACHE_TO` for `wheelhouse-preload`.
+4. Add targeted cache push steps for `.#graph-generator`, graph-materialization outputs produced with `BUCK_GRAPH_JSON`, `.#test-seed`, and high-value toolchain attrs.
+5. Archive the exact flake source and locked inputs with `nix flake archive`, populate the selected cache backend using its supported writable-store or push flow, and publish a cache hydration manifest per CI axis containing the exact wheelhouse/toolchain/test-seed output paths, flake archive metadata, cache endpoint, system, source revision, and flake lock fingerprint.
+6. Define `packages.<system>.remote-worker-tools` as the authoritative repo-controlled worker tool closure and, if useful, `apps.<system>.remote-worker-bootstrap` as the activation command.
+7. Document how developers opt into builders despite `.envrc`'s default empty builder config.
+8. Build Linux worker images with host-level prerequisites, Nix, cache trust config, cloud identity plumbing, and sandbox support; realize `packages.<system>.remote-worker-tools`, and pin the selected backend's worker runtime/sidecars with reproducible installation, preferably through Nix when the backend supports it.
+9. Define the macOS lane mode: remote Darwin RE worker pool or local Darwin executor reporting into the same run model.
+10. Add a TypeScript zx smoke test under `build-tools/tools/...` that prints effective `NIX_CONFIG`, verifies builder reachability, builds `.#graph-generator --rebuild`, and has focused tests for config rendering/parsing.
+
+### Phase 2: Configure Buck2 RE
+
+1. Add CI-generated or included `[buck2_re_client]` config.
+2. Configure non-empty `toolchains//:remote_test_execution` profiles.
+3. Wire repo-owned external-runner test rules to Buck's remote execution selection fields.
+4. Add a remote-enabled build execution platform/executor config separate from test RE profiles.
+5. Replace or extend `run-stage.ts --stage buck-test` so Jenkins invokes the verify pass planner, or `v`, with generated RE config per pass. A direct `buck2 test` command is not a valid remote CI entrypoint because it bypasses verify seed setup, pass partitioning, safety rails, nested isolation registration, and coverage aggregation.
+6. Extend the verify pass model with an explicit executor/profile field per pass, then have `spawnVerifyBuck2Tests` apply the generated Buck config/options for isolated, resource-limited, and shared passes. Keep thread caps independent from remote worker resource-class selection.
+7. Add target/rule-family controls for remote-capable, local-only, isolated, and resource-limited execution.
+8. Persist Buck-native artifacts first: raw event logs with `--event-log` to a Buck2-recognized event-log path, preferably `${RUN_ARTIFACT_DIR}/buck-event-log.pb.zst`, `--build-report`, `--write-build-id`, and `--command-report-path`. Add newer Buck2 report flags only after they are verified against the pinned Buck2 commit.
+9. Derive run summaries from Buck-native log commands before adding repo-specific fields: `buck2 log what-ran`, `summary`, `critical-path` or `slowest-path`, `what-uploaded`, and `what-materialized`.
+10. Verify representative build and test actions with `buck2 log what-ran --format json "$EVENT_LOG"`. Treat JSON output as pinned-version JSONL. Classify `record.reproducer.executor === "Re"` as remote execution, `Cache` as action-cache hit, `ReDepFileCache` as dep-file-cache hit when allowed for the lane, and `CacheQuery` as diagnostic-only, not proof of execution. Fail on `Local`, `Worker`, or `WorkerInit` for remote-capable actions unless the target is explicitly local-only. Keep this parser covered by pinned-version tests. Treat direct event-log protobuf parsing as pinned-version code, not a stable schema.
+11. Keep local developer execution working without RE credentials.
+
+### Phase 3: Add Spot Capacity Control Plane
+
+1. Define run, attempt, worker-pool, worker-instance, worker-registration-lease, scaling-decision, heartbeat, audit, lock, and output schemas separate from deployment submissions.
+2. Reuse existing backend patterns for claims, leases, fencing, locks, heartbeats, and object artifacts.
+3. Define the authority boundary between Buck/RE, repo control plane, provider autoscalers, and Nix.
+4. Support AWS and one second provider behind the same worker registration contract.
+5. Autoscale worker pools from queued Buck/RE demand, platform demand, and observed action runtime.
+6. Implement drain/preemption handling that lets Buck2 retry affected actions.
+7. Add provider conformance tests.
+8. Add macOS lane conformance tests for drift checks, cleanup validation, and reporting parity.
+
+### Phase 4: Make Rule Families Remote-Capable
+
+1. Audit Node, Go, C++, Python, Rust, deployment-domain tests, and zx tests for hermetic remote execution.
+2. Fix undeclared inputs and local checkout assumptions.
+3. Before marking any selected-target or verify-seed action remote-capable, remove workspace out-link creation and use declared Buck outputs/store-path realization, or record an explicit accepted exception with remote-worker cleanup and GC-root semantics.
+4. Ensure Nix-backed Buck actions produce declared Buck outputs, or explicitly realize declared store paths from the configured cache before downstream use.
+5. Map `verify:isolated` and `verify:resource-limited` labels to explicit Buck executor/profile selection, preserving their current pass/thread semantics.
+6. Add raw coverage upload and final merge.
+7. Add deployment-domain execution with explicit locks, action classes, idempotency, and credential boundaries.
+
+### Phase 5: Enforce The Remote Contract
+
+1. Add CI checks that fail when remote-capable actions read undeclared inputs or rely on forbidden env.
+2. Add policy docs for local-only exceptions.
+3. Track local/remote parity by target and rule family.
+4. Publish run summaries with remote hit rates, action retries, worker preemptions, Nix cache hits, and slowest actions.
+5. Add health/readiness APIs, alerts, structured logs, audit events, and redaction checks.
+6. Keep local and remote execution semantically identical.
+
+### Production Acceptance Boundary
+
+The production design is complete only when these conditions are true:
+
+- one Buck2-compatible RE backend serves all configured cloud worker pools
+- Linux default and large profiles exist for both `x86_64` and `aarch64`
+- `verify:isolated` and `verify:resource-limited` map to explicit Buck executor/profile selection while preserving their pass and thread semantics
+- AWS and at least one second cloud provider pass provider conformance behind the same worker registration contract
+- the `aarch64-darwin` lane uses the same run envelope, result aggregation, policy gates, and operator reporting as Linux, whether its execution capacity is remote RE or dedicated local/on-demand macOS hosts
+- no repo-owned action scheduler exists
+- no custom action telemetry format exists beyond Buck event logs, RE metrics, Nix logs, and repo run summaries
+- `external_mutating_locked` tests remain local-only unless locks, idempotency, fencing, and recovery evidence are implemented and tested
 
 ## Troubleshooting
 
-- **startup-check fails for Nix features**: Align your `nix.conf` with implementation-required features (`nix-command flakes`).
-- **Remote builder never used**: Ensure `max-jobs = 0` (to avoid local builds) and `builders-use-substitutes = true`. Confirm SSH access and `nix-daemon` on the builder.
-- **Poor cache hits between hosts**: Enable `ca-derivations` on both client and builders; ensure identical flake inputs; avoid local overrides.
-- **macOS notarization warnings**: Not relevant to Nix store binaries, but some CI uploaders may need signing—configure per your org’s policy.
-- **Large downloads**: Consider enabling store optimization and compression on the cache; use fast networks on builders.
-
----
+- Startup check fails for Nix features: ensure `nix-command flakes` are present in `nix config show` or `NIX_CONFIG`.
+- Remote builder is not used: inspect effective `NIX_CONFIG`; `.envrc` may have installed `builders =` empty, or a wrapper may pass `--builders ""`.
+- Cache misses are high: verify the same flake lock, same system, same source revision, no dev override env, and trusted substituters on clients and builders. Content-addressed derivations can be evaluated as cache policy, but they are not required by the current repo.
+- Cache downloads are too large or slow: use cache compression and store optimization, place workers close to the cache, and make cross-region transfer costs visible in autoscaling metrics.
+- Buck2 tests are not remote: expected today. Buck2 RE is not configured yet.
+- macOS upload or notarization warnings appear: not relevant to ordinary Nix store binaries, but CI upload/signing steps outside Nix need their own organization policy and credentials.
+- Spot workers lose progress: expected under preemption unless Buck2/REAPI retries the affected action or the action produced a fenced terminal result.
 
 ## FAQ
 
-- **Do we need repo changes to use remote Nix builds?**
-  - No. Configure Nix on clients/builders/CI; our current flake and dynamic-derivation design already cooperate with remote builds and caches.
+**Do we need repo changes to use remote Nix builders?**
 
-- **Which cache should we rely on?**
-  - Nix binary caches for heavy artifacts. Buck’s cache can remain enabled for small Buck‑native steps, but Nix is authoritative for our build outputs.
+Mostly no, but CI and developer shell configuration need care. Some repo wrappers intentionally disable builders, and `.envrc` defaults to an empty builders config unless one is already present.
 
-- **Will dev overrides poison the cache?**
-  - They change derivation hashes. CI forbids them; unset `NIX_GO_DEV_OVERRIDE_JSON` before pushing builds to the shared cache.
+**Do remote Nix builders make `v` distributed?**
+
+No. They can accelerate Nix builds spawned during tests, but Buck still schedules and runs test actions from the invoking machine.
+
+**Should we use Buck2 REAPI as the target design?**
+
+Yes. Buck2 REAPI is the right execution layer. Custom repo code should make Buck2 RE practical on spot capacity and with Nix-backed actions; it should not replace Buck's remote execution engine.
+
+**Can spot workers be multi-cloud?**
+
+Yes, if the worker-registration and autoscaling layer is provider-neutral, while Buck2/RE remains the only action scheduler, and all workers use the same source identity, Nix cache, object store contract, and platform capability model.
