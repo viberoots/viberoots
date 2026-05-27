@@ -4,6 +4,7 @@ import http from "node:http";
 import { URL } from "node:url";
 import { writeJson } from "./control-plane-http";
 import { writeBackendControlPlaneMcpAuditEvent } from "./deployment-control-plane-audit";
+import { readMcpJsonRequest } from "./deployment-control-plane-mcp-request";
 import {
   readControlPlaneDeploymentDetail,
   readControlPlaneQueueSummary,
@@ -36,10 +37,24 @@ export async function handleControlPlaneMcpRoute(opts: {
   if (pathname === null) return false;
   if (!opts.mcp.enabled || opts.request.method !== "POST" || pathname !== "/") return false;
   if (!hasMcpAuth(opts.request, opts.mcp)) return unauthorized(opts.response);
-  const request = await readMcpRequest(opts.request);
   const requestId = requestIdFor(opts.request);
-  const response = await handleMcpRequest({ request, requestId, mcp: opts.mcp });
-  writeJson(opts.response, 200, { jsonrpc: "2.0", id: request.id ?? null, ...response });
+  const parsed = await readMcpJsonRequest(opts.request);
+  if (!parsed.ok) {
+    await auditMcp(opts.mcp, {
+      requestId,
+      operation: "mcp.parse",
+      result: "failed",
+      failureSummary: parsed.error,
+    });
+    writeJson(opts.response, 200, {
+      jsonrpc: "2.0",
+      id: null,
+      error: { code: -32700, message: "MCP request failed", requestId },
+    });
+    return true;
+  }
+  const response = await handleMcpRequest({ request: parsed.request, requestId, mcp: opts.mcp });
+  writeJson(opts.response, 200, { jsonrpc: "2.0", id: parsed.request.id ?? null, ...response });
   return true;
 }
 
@@ -136,12 +151,6 @@ async function auditMcp(
   await withBackendClient(mcp.backend, async (client) => {
     await writeBackendControlPlaneMcpAuditEvent({ client, ...event });
   });
-}
-
-async function readMcpRequest(request: http.IncomingMessage): Promise<Record<string, any>> {
-  const chunks: Buffer[] = [];
-  for await (const chunk of request) chunks.push(Buffer.from(chunk));
-  return JSON.parse(Buffer.concat(chunks).toString("utf8") || "{}") as Record<string, any>;
 }
 
 function toolDescriptor(name: McpToolName) {

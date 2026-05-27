@@ -30,6 +30,9 @@ The matching resources are:
 - `mcp://deployment-control-plane/deployments/{deploymentId}`
 - `mcp://deployment-control-plane/auth-context`
 
+Unknown methods, unknown tools, unsupported resources, malformed JSON bodies, and oversized request
+bodies return generic MCP errors and do not expose deployment mutation helpers.
+
 Each response includes a `requestId`. If the caller supplies `X-Request-Id`, the service returns
 that value; otherwise it generates one. The same request id is written to
 `control_plane_audit_events` with the MCP operation, result, and target deployment id when one is

@@ -150,6 +150,42 @@ test("MCP disabled mode and fixture-only unauthenticated mode are enforced", asy
   });
 });
 
+test("MCP rejects mutation-like and malformed requests without exposing new tools", async () => {
+  await runInTemp("control-plane-mcp-read-only-negative", async (tmp) => {
+    const backend = mcpBackendFor(tmp);
+    const service = await mcpServiceFor(tmp, backend);
+    try {
+      for (const request of [
+        { method: "tools/call", params: { name: "deploy", arguments: { deploymentId: "demo" } } },
+        { method: "deployments/approve", params: { deploymentId: "demo" } },
+        { method: "resources/read", params: { uri: "mcp://deployment-control-plane/deploy" } },
+      ]) {
+        const response = await callMcpRaw(service.url, request.method, request.params, "mcp-ro");
+        assert.equal(response.status, 200);
+        const body = (await response.json()) as any;
+        assert.equal(body.error.message, "MCP request failed");
+        assert.equal(body.error.requestId, "mcp-ro");
+        assert.equal(JSON.stringify(body).includes("deployments/approve"), false);
+      }
+      const malformed = await fetch(new URL("/mcp", service.url), {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${MCP_TEST_TOKEN}`,
+          "x-request-id": "mcp-malformed",
+        },
+        body: "{not json",
+      });
+      assert.equal(malformed.status, 200);
+      const body = (await malformed.json()) as any;
+      assert.equal(body.error.code, -32700);
+      assert.equal(body.error.message, "MCP request failed");
+      assert.equal(body.error.requestId, "mcp-malformed");
+    } finally {
+      await service.close();
+    }
+  });
+});
+
 function toolArguments(name: string) {
   return name === "deployment_detail" ? { deploymentId: "demo-mcp" } : {};
 }
@@ -180,6 +216,15 @@ async function callMcp(
   const response = await mcpFetch(serviceUrl, method, params, requestId, authorized);
   assert.equal(response.status, 200);
   return (await response.json()) as any;
+}
+
+async function callMcpRaw(
+  serviceUrl: string,
+  method: string,
+  params: Record<string, unknown>,
+  requestId: string,
+) {
+  return await mcpFetch(serviceUrl, method, params, requestId, true);
 }
 
 async function mcpFetch(
