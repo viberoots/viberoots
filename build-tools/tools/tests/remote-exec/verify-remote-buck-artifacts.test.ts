@@ -20,9 +20,19 @@ const remoteEnv = {
   VBR_REMOTE_BUCK_CONFIG: "/tmp/vbr-remote/buckconfig",
   VBR_REMOTE_EXEC_MODE: "hybrid",
   VBR_REMOTE_EXEC_SYSTEM: "x86_64-linux",
+  VBR_REMOTE_TEST_ACTIVATION_DIR: "/tmp/vbr-remote/activation",
 };
 
+function ensureActivation(passName = "shared"): void {
+  fs.mkdirSync(remoteEnv.VBR_REMOTE_TEST_ACTIVATION_DIR, { recursive: true });
+  fs.writeFileSync(
+    path.join(remoteEnv.VBR_REMOTE_TEST_ACTIVATION_DIR, `${passName}.buckconfig`),
+    "[test]\nviberoots_remote_profile = linux-x86_64-default\n",
+  );
+}
+
 test("remote Buck modes use reviewed execution flags only", () => {
+  ensureActivation();
   const modes = [
     ["hybrid", "--prefer-remote"],
     ["remote", "--prefer-remote"],

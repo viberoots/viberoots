@@ -23,13 +23,12 @@ test("verify forwards a minimum 20 minute pnpm and test timeout budget", async (
       throw new Error(`verify buck2 runner must forward ${fragment}`);
     }
   }
-  if (
-    !buck2TestTxt.includes(
-      "const overallTimeoutSecs = Math.max(tsec, testNixTimeoutSecs + 5 * 60);",
-    )
-  ) {
+  if (!buck2TestTxt.includes("Math.max(tsec, testNixTimeoutSecs + 5 * 60)")) {
     throw new Error(
       "verify must ensure the overall buck2 timeout does not undercut per-test timeouts",
     );
+  }
+  if (!buck2TestTxt.includes("opts.exactOverallTimeoutSecs ??")) {
+    throw new Error("verify must allow explicit callers to preserve an exact overall timeout");
   }
 });

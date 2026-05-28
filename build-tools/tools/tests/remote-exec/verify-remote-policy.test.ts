@@ -1,6 +1,8 @@
 #!/usr/bin/env zx-wrapper
 import assert from "node:assert/strict";
 import fs from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
 import { test } from "node:test";
 import { parseVerifyExecutionPolicyForArgs } from "../../dev/verify/args";
 import { buildVerifyTestEnvArgs } from "../../dev/verify/buck2-test-env";
@@ -18,7 +20,21 @@ const remoteEnv = {
   VBR_REMOTE_BUCK_CONFIG: "/tmp/vbr-remote/buckconfig",
   VBR_REMOTE_EXEC_SYSTEM: "x86_64-linux",
   VBR_REMOTE_ARTIFACT_DIR: "/tmp/vbr-remote/artifacts",
+  VBR_REMOTE_TEST_ACTIVATION_DIR: "/tmp/vbr-remote/activation",
 };
+
+async function activationEnv(profile = "linux-x86_64-default") {
+  const activationDir = await fs.mkdtemp(path.join(os.tmpdir(), "vbr-activation-"));
+  await fs.writeFile(
+    path.join(activationDir, "shared.buckconfig"),
+    `[test]\nviberoots_remote_profile = ${profile}\n`,
+  );
+  await fs.writeFile(
+    path.join(activationDir, "resource-limited.buckconfig"),
+    `[test]\nviberoots_remote_profile = linux-x86_64-large\n`,
+  );
+  return { ...remoteEnv, VBR_REMOTE_TEST_ACTIVATION_DIR: activationDir };
+}
 
 test("verify remote policy defaults to local with no remote inputs", () => {
   const policy = parseVerifyExecutionPolicy({ env: {} });
@@ -102,10 +118,11 @@ test("verify remote policy parser covers every remote mode and unsafe paths", ()
   }
 });
 
-test("verify remote policy carries per-pass profile overrides into Buck args", () => {
+test("verify remote policy carries per-pass profile overrides into Buck args", async () => {
+  const env = await activationEnv("linux-x86_64-default");
   const policy = parseVerifyExecutionPolicy({
     env: {
-      ...remoteEnv,
+      ...env,
       VBR_REMOTE_EXEC_MODE: "remote-only-conformance",
       VBR_REMOTE_TEST_PROFILE_RESOURCE_LIMITED: "linux-x86_64-large",
     },
@@ -117,11 +134,36 @@ test("verify remote policy carries per-pass profile overrides into Buck args", (
     "/tmp/vbr-remote/buckconfig",
     "-c",
     "build.execution_platforms=repo_toolchains//:remote_execution_platforms",
+    "--config-file",
+    path.join(env.VBR_REMOTE_TEST_ACTIVATION_DIR, "resource-limited.buckconfig"),
     "--remote-only",
     "--unstable-allow-compatible-tests-on-re",
-    "-c",
-    "test.viberoots_remote_profile=linux-x86_64-large",
   ]);
+  assert.match(
+    await fs.readFile(
+      path.join(env.VBR_REMOTE_TEST_ACTIVATION_DIR, "resource-limited.buckconfig"),
+      "utf8",
+    ),
+    /viberoots_remote_profile = linux-x86_64-large/,
+  );
+});
+
+test("verify remote policy rewrites stale activation config from selected profile", async () => {
+  const env = await activationEnv("linux-x86_64-default");
+  const stalePath = path.join(env.VBR_REMOTE_TEST_ACTIVATION_DIR, "shared.buckconfig");
+  await fs.writeFile(stalePath, "[test]\nviberoots_remote_profile = linux-x86_64-default\n");
+  const policy = parseVerifyExecutionPolicy({
+    env: {
+      ...env,
+      VBR_REMOTE_TEST_PROFILE_SHARED: "linux-x86_64-large",
+    },
+  });
+
+  assert.equal(remoteProfileForPass(policy, "shared"), "linux-x86_64-large");
+  assert.ok(buckTestArgsForExecutionPolicy(policy, "shared").includes(stalePath));
+  const rewritten = await fs.readFile(stalePath, "utf8");
+  assert.match(rewritten, /viberoots_remote_profile = linux-x86_64-large/);
+  assert.doesNotMatch(rewritten, /grpc:\/\/|authorization|api[_-]?key|token|secret|password/i);
 });
 
 test("verify remote policy shares cquery and test configuration policy", () => {
@@ -138,6 +180,18 @@ test("verify remote policy shares cquery and test configuration policy", () => {
     "prelude//platforms:default",
   ]);
   assert.equal(shouldComputeLocalZxTestNodeModules(policy), false);
+});
+
+test("verify remote policy fails before Buck when profile activation is not selected", () => {
+  const { VBR_REMOTE_TEST_ACTIVATION_DIR: _unused, ...env } = remoteEnv;
+
+  assert.throws(
+    () =>
+      parseVerifyExecutionPolicy({
+        env,
+      }),
+    /VBR_REMOTE_TEST_ACTIVATION_DIR is required/,
+  );
 });
 
 test("verify remote policy does not emit local zx node_modules env when unavailable", () => {

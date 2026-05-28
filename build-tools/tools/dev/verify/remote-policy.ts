@@ -1,4 +1,6 @@
+import fs from "node:fs";
 import path from "node:path";
+import { renderRemoteTestActivationConfigText } from "../../remote-exec/remote-test-activation";
 
 export type VerifyRemoteExecMode = "local" | "hybrid" | "remote" | "remote-only-conformance";
 export type VerifyRemoteExecSystem = "x86_64-linux" | "aarch64-linux" | "aarch64-darwin";
@@ -8,6 +10,7 @@ export type VerifyExecutionPolicy = {
   buckConfig: string | null;
   system: VerifyRemoteExecSystem | null;
   artifactDir: string | null;
+  activationDir: string | null;
   profilePrefix: string | null;
   passProfiles: Record<string, string>;
 };
@@ -89,6 +92,7 @@ export function parseVerifyExecutionPolicy(opts?: {
       buckConfig: null,
       system: null,
       artifactDir: null,
+      activationDir: null,
       profilePrefix: null,
       passProfiles: {},
     };
@@ -108,6 +112,10 @@ export function parseVerifyExecutionPolicy(opts?: {
     artifactDir: parseAbsolutePath(
       cleanEnvValue(env, "VBR_REMOTE_ARTIFACT_DIR"),
       "VBR_REMOTE_ARTIFACT_DIR",
+    ),
+    activationDir: parseAbsolutePath(
+      cleanEnvValue(env, "VBR_REMOTE_TEST_ACTIVATION_DIR"),
+      "VBR_REMOTE_TEST_ACTIVATION_DIR",
     ),
     profilePrefix,
     passProfiles: parsePassProfiles(env, profilePrefix),
@@ -139,6 +147,26 @@ export function buckCqueryArgsForExecutionPolicy(policy: VerifyExecutionPolicy):
   ];
 }
 
+function activationConfigPath(policy: VerifyExecutionPolicy, passName: string): string {
+  if (!policy.activationDir) {
+    throw new Error(
+      `remote verify selected test profile ${remoteProfileForPass(policy, passName) || "<none>"} for pass ${passName}, but VBR_REMOTE_TEST_ACTIVATION_DIR is required`,
+    );
+  }
+  const targetProfile = remoteProfileForPass(policy, passName);
+  if (!targetProfile)
+    throw new Error(`remote verify did not select a test profile for ${passName}`);
+  const configPath = path.join(policy.activationDir, `${passName}.buckconfig`);
+  const configText = renderRemoteTestActivationConfigText({
+    artifactDir: policy.activationDir,
+    passName,
+    targetProfile,
+  });
+  fs.mkdirSync(policy.activationDir, { recursive: true });
+  fs.writeFileSync(configPath, configText, { mode: 0o600 });
+  return configPath;
+}
+
 export function buckTestArgsForExecutionPolicy(
   policy: VerifyExecutionPolicy,
   passName: string,
@@ -150,12 +178,12 @@ export function buckTestArgsForExecutionPolicy(
       : policy.mode === "remote" || policy.mode === "hybrid"
         ? ["--prefer-remote"]
         : [];
-  const profile = remoteProfileForPass(policy, passName);
   return [
     ...buckCqueryArgsForExecutionPolicy(policy),
+    "--config-file",
+    activationConfigPath(policy, passName),
     ...modeArgs,
     "--unstable-allow-compatible-tests-on-re",
-    ...(profile ? ["-c", `test.viberoots_remote_profile=${profile}`] : []),
   ];
 }
 

@@ -106,6 +106,7 @@ export function localArgvSnapshot(): string[] {
 }
 
 export function remoteArgvSnapshot(opts: {
+  activationDir: string;
   artifactDir: string;
   buckConfig: string;
   mode: RemoteMode;
@@ -123,10 +124,10 @@ export function remoteArgvSnapshot(opts: {
     opts.buckConfig,
     "-c",
     "build.execution_platforms=repo_toolchains//:remote_execution_platforms",
+    "--config-file",
+    path.join(opts.activationDir, "shared.buckconfig"),
     modeFlag,
     "--unstable-allow-compatible-tests-on-re",
-    "-c",
-    "test.viberoots_remote_profile=linux-x86_64-default",
     "--event-log",
     path.join(opts.artifactDir, "shared", "buck-event-log.pb.zst"),
     "--build-report",

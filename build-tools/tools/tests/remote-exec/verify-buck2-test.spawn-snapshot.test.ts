@@ -22,6 +22,7 @@ type SpawnCall = {
 
 type Snapshot = {
   artifactDir: string;
+  activationDir: string;
   buckConfig: string;
   call: SpawnCall;
 };
@@ -62,7 +63,14 @@ function spawnedEnvSnapshot(call: SpawnCall): Record<string, string | undefined>
 function spawnSnapshot(mode: "local" | RemoteMode): Snapshot {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "vbr-spawn-snapshot-"));
   const artifactDir = path.join(tmp, "artifacts");
+  const activationDir = path.join(tmp, "activation");
   const buckConfig = path.join(tmp, "remote.buckconfig");
+  fs.mkdirSync(activationDir, { recursive: true });
+  fs.writeFileSync(
+    path.join(activationDir, "shared.buckconfig"),
+    "[test]\nviberoots_remote_profile = linux-x86_64-default\n",
+    "utf8",
+  );
   fs.writeFileSync(buckConfig, "remote = true\n", "utf8");
   const calls: SpawnCall[] = [];
   const policy = parseVerifyExecutionPolicy({
@@ -71,6 +79,7 @@ function spawnSnapshot(mode: "local" | RemoteMode): Snapshot {
         ? {}
         : {
             ...remoteEnv,
+            VBR_REMOTE_TEST_ACTIVATION_DIR: activationDir,
             VBR_REMOTE_ARTIFACT_DIR: artifactDir,
             VBR_REMOTE_BUCK_CONFIG: buckConfig,
             VBR_REMOTE_EXEC_MODE: mode,
@@ -109,7 +118,7 @@ function spawnSnapshot(mode: "local" | RemoteMode): Snapshot {
     for (const key of Object.keys(process.env)) if (!(key in prev)) delete process.env[key];
     Object.assign(process.env, prev);
   }
-  return { artifactDir, buckConfig, call: calls[0] };
+  return { activationDir, artifactDir, buckConfig, call: calls[0] };
 }
 
 test("spawnVerifyBuck2Tests local argv/env snapshot is unchanged", () => {
@@ -127,8 +136,11 @@ test("spawnVerifyBuck2Tests local argv/env snapshot is unchanged", () => {
 
 test("spawnVerifyBuck2Tests remote argv/env snapshots cover every mode", () => {
   for (const mode of ["hybrid", "remote", "remote-only-conformance"] as const) {
-    const { artifactDir, buckConfig, call } = spawnSnapshot(mode);
-    assert.deepEqual(call.args, remoteArgvSnapshot({ artifactDir, buckConfig, mode }));
+    const { activationDir, artifactDir, buckConfig, call } = spawnSnapshot(mode);
+    assert.deepEqual(
+      call.args,
+      remoteArgvSnapshot({ activationDir, artifactDir, buckConfig, mode }),
+    );
     assert.deepEqual(spawnedEnvSnapshot(call), {
       BUCK_LOG: "warn,buck2_execute=trace",
       RUST_LOG: "info,buck2_client_ctx=debug",

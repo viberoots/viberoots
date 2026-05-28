@@ -9,6 +9,7 @@ const remoteEnv = {
   VBR_REMOTE_BUCK_CONFIG: "/tmp/vbr-remote/buckconfig",
   VBR_REMOTE_EXEC_MODE: "hybrid",
   VBR_REMOTE_EXEC_SYSTEM: "x86_64-linux",
+  VBR_REMOTE_TEST_ACTIVATION_DIR: "/tmp/vbr-remote/activation",
 };
 
 class VerifyExit extends Error {
@@ -197,4 +198,18 @@ test("runVerify accepted remote mode skips and does not forward local zx node_mo
   assert.equal(calls.includes("setup-local-workspace"), false);
   assert.equal(calls.includes("prepare-seed"), false);
   assert.ok(calls.includes("buck-passes-zx:<null>"));
+});
+
+test("runVerify rejects remote mode without activation before Buck", async () => {
+  const calls: string[] = [];
+  const { VBR_REMOTE_TEST_ACTIVATION_DIR: _unused, ...env } = remoteEnv;
+  await assert.rejects(
+    async () => await withEnv(env, async () => await runVerifyWithDeps(fakeRunVerifyDeps(calls))),
+    /VBR_REMOTE_TEST_ACTIVATION_DIR is required/,
+  );
+
+  assert.equal(calls.includes("setup-local-workspace"), false);
+  assert.equal(calls.includes("initialize-state"), false);
+  assert.equal(calls.includes("resolve-scope"), false);
+  assert.equal(calls.includes("buck-passes-zx:<null>"), false);
 });

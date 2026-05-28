@@ -93,7 +93,10 @@ remote_profile_conversion_action_key = rule(
 )
 
 def remote_profile_conversion_probe_targets() -> None:
-    remote_profile_conversion_action_key(name = "remote_profile_conversion_action_key")
+    remote_profile_conversion_action_key(
+        name = "remote_profile_conversion_action_key",
+        visibility = ["PUBLIC"],
+    )
     for profile in REMOTE_PROFILE_NAMES:
         remote_profile_conversion_probe(
             name = "remote_profile_conversion_" + profile.replace("-", "_"),

@@ -1,5 +1,8 @@
 load("@prelude//test:inject_test_run_info.bzl", "inject_test_run_info")
+load("@prelude//:build_mode.bzl", "BuildModeInfo")
 load("@prelude//:rules.bzl", "clone_rule")
+load("@prelude//decls:re_test_common.bzl", "re_test_common")
+load("@prelude//tests:re_utils.bzl", "get_re_executors_from_props")
 
 def _zx_test_impl(ctx):
     script = ctx.attrs.script
@@ -152,7 +155,14 @@ def _zx_test_impl(ctx):
         "-c",
         run_and_report,
     ]
-    labels = ctx.attrs.labels or []
+    labels = list(ctx.attrs.labels or [])
+    if ctx.attrs.remote_execution == "":
+        if "re_ignore_force_run_as_bundle" not in labels:
+            labels.append("re_ignore_force_run_as_bundle")
+        re_executor, executor_overrides = None, {}
+    else:
+        re_executor, executor_overrides = get_re_executors_from_props(ctx)
+    run_from_project_root = "buck2_run_from_project_root" in labels or re_executor != None
     stamp = ctx.actions.declare_output(ctx.attrs.out)
     stamp_cmd = cmd_args(
         ["bash", "-c", "echo zx_test > \"$1\"", "stamp", stamp.as_output()],
@@ -164,6 +174,10 @@ def _zx_test_impl(ctx):
             command = cmd,
             labels = labels,
             contacts = [],
+            default_executor = re_executor,
+            executor_overrides = executor_overrides,
+            run_from_project_root = run_from_project_root,
+            use_project_relative_paths = run_from_project_root,
         )) + [
         DefaultInfo(
             default_output = stamp,
@@ -177,6 +191,15 @@ zx_test = clone_rule(
         # Ensure a default output so Buck always recognizes an output artifact
         "out": attrs.string(default = "zx_test.stamp"),
         "template_inputs": attrs.list(attrs.source(), default = []),
+        "remote_execution": attrs.one_of(
+            attrs.string(),
+            re_test_common.opts_for_tests_arg(),
+            default = read_config("test", "viberoots_remote_profile", ""),
+        ),
+        "remote_execution_action_key_providers": attrs.dep(
+            providers = [BuildModeInfo],
+            default = "repo_toolchains//:remote_profile_conversion_action_key",
+        ),
     },
     impl_override = _zx_test_impl,
 )
