@@ -147,13 +147,14 @@ export function buckTestArgsForExecutionPolicy(
   const modeArgs =
     policy.mode === "remote-only-conformance"
       ? ["--remote-only"]
-      : policy.mode === "remote"
+      : policy.mode === "remote" || policy.mode === "hybrid"
         ? ["--prefer-remote"]
-        : ["--remote"];
+        : [];
   const profile = remoteProfileForPass(policy, passName);
   return [
     ...buckCqueryArgsForExecutionPolicy(policy),
     ...modeArgs,
+    "--unstable-allow-compatible-tests-on-re",
     ...(profile ? ["-c", `test.viberoots_remote_profile=${profile}`] : []),
   ];
 }

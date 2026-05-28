@@ -6,20 +6,21 @@ import { startVerifyDaemonCheckpoints } from "./buck2-daemon-checkpoints";
 import { appendBuck2FailureDiagnostics } from "./buck2-failure-diagnostics";
 import { parseBuck2ProgressFromLines } from "./buck2-output";
 import { createBuck2SlowestRecorder } from "./buck2-slowest";
+import { spawnBuck2WithTimeout } from "./buck2-spawn";
 import { verifyBuck2Threads } from "./buck2-threads";
 import { buildVerifyTestEnvArgs, previewVerifyNestedBuckIsolation } from "./buck2-test-env";
 import { registerVerifyBuckTestIsolations } from "./verify-buck-isolation-registration";
 import { resolveToolPathSync } from "../../lib/tool-paths";
 import { buckTestArgsForExecutionPolicy, targetPlatformArgsForPolicy } from "./remote-policy";
 import type { VerifyExecutionPolicy } from "./remote-policy";
+import {
+  buckLogEnvForExecutionPolicy,
+  remoteBuckArtifactArgs,
+  remoteBuckPolicySummary,
+  writeRemoteBuckMaterializationMetadata,
+} from "./remote-buck-artifacts";
 
 export { verifyBuck2Threads, type VerifyBuck2ThreadsOptions } from "./buck2-threads";
-
-export type SpawnedVerifyTests = {
-  pgid: number;
-  nestedIso: string;
-  wait: () => Promise<number>;
-};
 
 export function spawnVerifyBuck2Tests(opts: {
   root: string;
@@ -32,7 +33,8 @@ export function spawnVerifyBuck2Tests(opts: {
   passName?: string;
   analysisDir?: string | null;
   executionPolicy: VerifyExecutionPolicy;
-}): SpawnedVerifyTests {
+  spawnImpl?: typeof spawn;
+}): { pgid: number; nestedIso: string; wait: () => Promise<number> } {
   const minPerTestTimeoutSecs = 20 * 60;
   const tsecRaw = Number((process.env.VERIFY_TIMEOUT_SECS || "7200").trim());
   const tsec = Number.isFinite(tsecRaw) && tsecRaw > 0 ? Math.floor(tsecRaw) : 7200;
@@ -71,6 +73,7 @@ export function spawnVerifyBuck2Tests(opts: {
     opts.iso,
     "test",
     ...buckTestArgsForExecutionPolicy(opts.executionPolicy, passName),
+    ...remoteBuckArtifactArgs(opts.executionPolicy, passName),
     ...consoleFlag,
     ...(threads > 0 ? ["--num-threads", String(threads)] : []),
     "--overall-timeout",
@@ -85,20 +88,17 @@ export function spawnVerifyBuck2Tests(opts: {
   const startS = Math.floor(Date.now() / 1000);
   const buckEnv = { ...process.env };
   delete buckEnv.VBR_VERIFY_REGISTER_PROCESS;
+  const buckLogEnv = buckLogEnvForExecutionPolicy(opts.executionPolicy);
+  writeRemoteBuckMaterializationMetadata({ policy: opts.executionPolicy, passName });
 
-  const proc = spawn(timeoutPath, ["-k", "10s", `${overallTimeoutSecs}s`, buck2Path, ...buckArgs], {
-    cwd: opts.root,
-    env: {
-      ...buckEnv,
-      RUST_LOG:
-        (process.env.RUST_LOG || "warn") +
-        ",buck2_client_ctx::file_tailers::tailer=off,buck2_event_log::writer=off",
-      BUCK_LOG:
-        (process.env.BUCK_LOG || "warn") +
-        ",buck2_client_ctx::file_tailers::tailer=off,buck2_event_log::writer=off",
-    },
-    detached: true,
-    stdio: ["ignore", "pipe", "pipe"],
+  const proc = spawnBuck2WithTimeout({
+    timeoutPath,
+    overallTimeoutSecs,
+    buck2Path,
+    buckArgs,
+    root: opts.root,
+    env: { ...buckEnv, ...buckLogEnv },
+    spawnImpl: opts.spawnImpl,
   });
   const pgid = proc.pid || process.pid;
 
@@ -118,9 +118,10 @@ export function spawnVerifyBuck2Tests(opts: {
   };
 
   if (opts.logFile) {
+    const remotePolicySummary = remoteBuckPolicySummary(opts.executionPolicy, passName);
     void fsp.appendFile(
       opts.logFile,
-      `[verify] buck2 test begin iso=${opts.iso} pass=${passName} start_s=${startS} threads=${threads > 0 ? threads : "default"} nested_iso=${nestedIso} target_count=${opts.targets.length}\n`,
+      `${remotePolicySummary ? `${remotePolicySummary}\n` : ""}[verify] buck2 test begin iso=${opts.iso} pass=${passName} start_s=${startS} threads=${threads > 0 ? threads : "default"} nested_iso=${nestedIso} target_count=${opts.targets.length}\n`,
       "utf8",
     );
   }
@@ -142,7 +143,6 @@ export function spawnVerifyBuck2Tests(opts: {
     timer.unref?.();
     pacingTimers.push(timer);
   };
-  // Validate early throughput (helps spot too-low or too-high thread caps).
   schedulePacingCheckpoint(5 * 60 * 1000);
   schedulePacingCheckpoint(10 * 60 * 1000);
 

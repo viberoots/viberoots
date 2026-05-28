@@ -118,6 +118,7 @@ test("verify remote policy carries per-pass profile overrides into Buck args", (
     "-c",
     "build.execution_platforms=repo_toolchains//:remote_execution_platforms",
     "--remote-only",
+    "--unstable-allow-compatible-tests-on-re",
     "-c",
     "test.viberoots_remote_profile=linux-x86_64-large",
   ]);
