@@ -19,9 +19,7 @@ import {
   remoteBuckPolicySummary,
   writeRemoteBuckMaterializationMetadata,
 } from "./remote-buck-artifacts";
-
 export { verifyBuck2Threads, type VerifyBuck2ThreadsOptions } from "./buck2-threads";
-
 export function spawnVerifyBuck2Tests(opts: {
   root: string;
   iso: string;
@@ -33,6 +31,7 @@ export function spawnVerifyBuck2Tests(opts: {
   passName?: string;
   analysisDir?: string | null;
   executionPolicy: VerifyExecutionPolicy;
+  exactOverallTimeoutSecs?: number;
   spawnImpl?: typeof spawn;
 }): { pgid: number; nestedIso: string; wait: () => Promise<number> } {
   const minPerTestTimeoutSecs = 20 * 60;
@@ -45,9 +44,9 @@ export function spawnVerifyBuck2Tests(opts: {
       ? Math.floor(testNixTimeoutRaw)
       : 1800;
   const testNixTimeoutSecs = Math.max(minPerTestTimeoutSecs, requestedTestNixTimeoutSecs);
-  const overallTimeoutSecs = Math.max(tsec, testNixTimeoutSecs + 5 * 60);
+  const overallTimeoutSecs =
+    opts.exactOverallTimeoutSecs ?? Math.max(tsec, testNixTimeoutSecs + 5 * 60);
   const nodeTestTimeoutMs = Math.max(minPerTestTimeoutSecs * 1000, tms, testNixTimeoutSecs * 1000);
-
   const consoleFlag =
     opts.console === "auto"
       ? []

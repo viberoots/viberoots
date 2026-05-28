@@ -26,7 +26,8 @@ Run locally with `CI=true build-tools/tools/ci/run-stage.ts --stage <name>`.
 - **wheelhouse-preload**: Builds Python wheelhouse outputs (`py-wheelhouse-*`) for any importers with `uv.lock`, and if `NIX_CACHE_TO` is set (or `--to` is passed), pushes the closures to a binary cache via `nix copy`.
   - Configure cache destination in CI via environment: `NIX_CACHE_TO=https://<cache-endpoint>`.
   - Safe no-op when no Python importers exist.
-- **buck-test**: Runs project tests by default (`//projects/...`). Build-system tests are included only when build-system files changed, or when forced via `VBR_BUILD_SYSTEM_TESTS=always` (also supports `1/true`). Use `VBR_BUILD_SYSTEM_TESTS=never` (`0/false`) to force project-only test scope.
+- **buck-test**: Resolves the same requested scope as local `v`, then runs the selected Buck tests through verify target-pass planning. Coverage mode still flows through `COVERAGE=1`; CI defaults remain local unless a future lane explicitly provides remote verify policy env.
+- **cpp-addon-smoke**: Explicitly local-only direct Buck smoke stage for the temporary scaffold workspace. It scrubs broad `VBR_REMOTE_*` policy env before invoking Buck because the temp workspace does not yet carry the remote execution policy contract.
 
 ## Why keep a Nix build stage separate from Buck
 

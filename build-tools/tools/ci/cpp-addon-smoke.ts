@@ -11,7 +11,15 @@
  */
 import { runInTemp } from "../tests/lib/test-helpers";
 
+function scrubRemoteBuckEnv(): void {
+  for (const key of Object.keys(process.env)) {
+    if (key.startsWith("VBR_REMOTE_")) delete process.env[key];
+  }
+}
+
 async function main() {
+  scrubRemoteBuckEnv();
+
   // Minimize rsync size to speed up CI temp setup
   process.env.TEST_RSYNC_ROOTS =
     process.env.TEST_RSYNC_ROOTS || "tools toolchains cpp node lang prelude third_party/providers";

@@ -45,6 +45,7 @@ export async function runVerifyBuckPasses(opts: {
   onNestedIso?: (iso: string) => void;
   onNestedIsoDone?: (iso: string) => void;
   executionPolicy: VerifyExecutionPolicy;
+  exactOverallTimeoutSecs?: number;
 }): Promise<number> {
   const plan = resolveVerifyTargetPlan({
     root: opts.root,
@@ -94,6 +95,7 @@ export async function runVerifyBuckPasses(opts: {
       passName: pass.name,
       analysisDir: passAnalysisDir,
       executionPolicy: opts.executionPolicy,
+      exactOverallTimeoutSecs: opts.exactOverallTimeoutSecs,
     });
     opts.onPgid(spawned.pgid);
     opts.onNestedIso?.(spawned.nestedIso);

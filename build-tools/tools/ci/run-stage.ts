@@ -7,8 +7,7 @@ import { ensureGraph, runGlue } from "../buck/glue-run";
 import { getFlagStr } from "../lib/cli";
 import { DEFAULT_GRAPH_PATH } from "../lib/graph-const";
 import { runNodeWithZx } from "../lib/node-run";
-import { resolveRequestedVerifyScope } from "../dev/verify/requested-scope";
-import { summarizeVerifyScopeDecision } from "../dev/verify/selection-output";
+import { runCiBuckTestStage } from "./buck-test-stage";
 
 type Stage =
   | "codegen"
@@ -153,27 +152,7 @@ async function main() {
       }
       break;
     case "buck-test":
-      // External timeout is recommended; allow override via TIMEOUT_SEC
-      const t = Number(process.env.TIMEOUT_SEC || 1200);
-      const { selection } = await resolveRequestedVerifyScope({
-        root: process.cwd(),
-        invocationCwd: process.cwd(),
-        args: {
-          coverage: false,
-          console: "auto",
-          targets: ["//..."],
-          selector: "default",
-          requestedProjects: [],
-          explainSelection: false,
-        },
-      });
-      console.log(`[ci] buck-test selection: ${summarizeVerifyScopeDecision(selection)}`);
-      if (selection.diagnostics) {
-        console.log(JSON.stringify(selection.diagnostics, null, 2));
-      }
-      // Coverage passthrough if COVERAGE=1 in env
-      const extra = process.env.COVERAGE === "1" ? ["--", "--env", "COVERAGE=1"] : [];
-      await $`timeout -k 10s ${t}s buck2 test ${selection.targets} ${extra}`;
+      await runCiBuckTestStage();
       break;
     case "cpp-addon-smoke": {
       const target = path.resolve("build-tools/tools/ci/cpp-addon-smoke.ts");
