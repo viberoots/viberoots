@@ -131,6 +131,20 @@ PREWARM_ATTRS="toolchains.go,toolchains.cxx" node build-tools/tools/dev/prewarm-
 
 ```
 
+## Verify remote execution policy
+
+`v` is local by default. Remote execution is opt-in and validated before local-only setup such as housekeeping, seed preparation, prewarm, and coverage directories.
+
+Set:
+
+- `VBR_REMOTE_EXEC_MODE=local|hybrid|remote|remote-only-conformance`
+- `VBR_REMOTE_BUCK_CONFIG=<absolute generated .buckconfig path>`
+- `VBR_REMOTE_EXEC_SYSTEM=x86_64-linux|aarch64-linux|aarch64-darwin`
+- `VBR_REMOTE_ARTIFACT_DIR=<absolute artifact directory>`
+- `VBR_REMOTE_TEST_PROFILE_<PASS_NAME>=<profile>` for optional pass-specific profiles
+
+System names map to profile prefixes: `x86_64-linux` to `linux-x86_64`, `aarch64-linux` to `linux-aarch64`, and `aarch64-darwin` to `darwin-aarch64`. Remote mode rejects `--coverage` until declared coverage artifacts are implemented.
+
 ## Faster temp workspaces (seed store)
 
 Many zx tests run in a temporary copy of the workspace created via rsync. To speed this up without affecting correctness, the helper already excludes heavy or irrelevant directories. Notably, `test-logs/` is now excluded by default to avoid copying large artifacts from prior runs.

@@ -5,7 +5,7 @@ import { resolveToolPathSync } from "../../lib/tool-paths";
 type VerifyBuck2TestEnvArgsOptions = {
   iso: string;
   passName: string;
-  zxNodeModulesOut: string;
+  zxNodeModulesOut: string | null;
   nodeTestTimeoutMs: number;
   testNixTimeoutSecs: number;
 };
@@ -95,8 +95,7 @@ export function buildVerifyTestEnvArgs(opts: VerifyBuck2TestEnvArgsOptions): str
     `TEST_PARTIAL_CLONE_GO_ONLY=${process.env.TEST_PARTIAL_CLONE_GO_ONLY || ""}`,
     "--env",
     `TEST_EXCLUDE_CPP_REQS=${process.env.TEST_EXCLUDE_CPP_REQS || ""}`,
-    "--env",
-    `ZX_TEST_NODE_MODULES_OUT=${opts.zxNodeModulesOut}`,
+    ...maybeEnvArg("ZX_TEST_NODE_MODULES_OUT", opts.zxNodeModulesOut || undefined),
     "--env",
     `NIX_PATH=${process.env.NIX_PATH || ""}`,
     ...maybeEnvArg("XDG_CONFIG_HOME", process.env.XDG_CONFIG_HOME),

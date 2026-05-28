@@ -2,6 +2,8 @@ import { spawnSync } from "node:child_process";
 import process from "node:process";
 import { normalizeTargetLabel } from "../../lib/labels";
 import { resolveToolPathSync } from "../../lib/tool-paths";
+import { buckCqueryArgsForExecutionPolicy, targetPlatformArgsForPolicy } from "./remote-policy";
+import type { VerifyExecutionPolicy } from "./remote-policy";
 
 export const VERIFY_ISOLATED_LABEL = "verify:isolated";
 export const VERIFY_RESOURCE_LIMITED_LABEL = "verify:resource-limited";
@@ -141,6 +143,7 @@ function queryVerifyTargetLabels(opts: {
   root: string;
   iso: string;
   query: string;
+  executionPolicy: VerifyExecutionPolicy;
 }): Map<string, readonly string[]> {
   const buck2Path = resolveToolPathSync("buck2");
   const result = spawnSync(
@@ -149,8 +152,8 @@ function queryVerifyTargetLabels(opts: {
       "--isolation-dir",
       opts.iso,
       "cquery",
-      "--target-platforms",
-      "prelude//platforms:default",
+      ...buckCqueryArgsForExecutionPolicy(opts.executionPolicy),
+      ...targetPlatformArgsForPolicy(opts.executionPolicy),
       "--json",
       "--output-attribute",
       "labels",
@@ -181,6 +184,7 @@ export function loadVerifyTargetLabels(opts: {
   root: string;
   iso: string;
   targets: string[];
+  executionPolicy: VerifyExecutionPolicy;
 }): VerifyTargetLabels[] {
   if (opts.targets.length === 0) return [];
   const explicitTargets = opts.targets.filter((target) => !isPatternVerifyTarget(target));
@@ -192,6 +196,7 @@ export function loadVerifyTargetLabels(opts: {
       root: opts.root,
       iso: opts.iso,
       query: buildCqueryQuery(explicitTargets),
+      executionPolicy: opts.executionPolicy,
     });
     for (const target of explicitTargets) {
       const normalizedTarget = normalizeTargetLabel(target);
@@ -204,6 +209,7 @@ export function loadVerifyTargetLabels(opts: {
       root: opts.root,
       iso: opts.iso,
       query: `kind(test, ${buildCqueryQuery(patternTargets)})`,
+      executionPolicy: opts.executionPolicy,
     });
     const expandedTargets = [...labelsByTarget.keys()].sort((left, right) =>
       left.localeCompare(right),
@@ -222,6 +228,7 @@ export function resolveVerifyTargetPlan(opts: {
   root: string;
   iso: string;
   targets: string[];
+  executionPolicy: VerifyExecutionPolicy;
 }): VerifyTargetPlan {
   const targetLabels = loadVerifyTargetLabels(opts);
   return {

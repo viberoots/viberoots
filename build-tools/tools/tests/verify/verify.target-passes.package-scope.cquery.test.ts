@@ -9,13 +9,17 @@ import {
   VERIFY_RESOURCE_LIMITED_LABEL,
   VERIFY_RESOURCE_LIMITED_THREADS,
 } from "../../dev/verify/target-passes";
+import { parseVerifyExecutionPolicy } from "../../dev/verify/remote-policy";
 import { inheritedBuckIsolation } from "../lib/test-helpers";
+
+const localExecutionPolicy = parseVerifyExecutionPolicy({ env: {} });
 
 test("verify target pass loading expands package scopes before isolating labeled targets", () => {
   const targets = loadVerifyTargetLabels({
     root: process.cwd(),
     iso: inheritedBuckIsolation("verify-target-passes-package-scope"),
     targets: ["//projects/apps/pleomino/..."],
+    executionPolicy: localExecutionPolicy,
   });
 
   assert.deepEqual(
@@ -61,6 +65,7 @@ test("verify target pass loading keeps wildcard scope broad while isolating labe
     root: process.cwd(),
     iso: inheritedBuckIsolation("verify-target-passes-wildcard-scope"),
     targets: ["//..."],
+    executionPolicy: localExecutionPolicy,
   });
 
   const targetSet = new Set(targets.map((entry) => entry.target));

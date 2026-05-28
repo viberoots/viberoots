@@ -10,6 +10,8 @@ import { verifyBuck2Threads } from "./buck2-threads";
 import { buildVerifyTestEnvArgs, previewVerifyNestedBuckIsolation } from "./buck2-test-env";
 import { registerVerifyBuckTestIsolations } from "./verify-buck-isolation-registration";
 import { resolveToolPathSync } from "../../lib/tool-paths";
+import { buckTestArgsForExecutionPolicy, targetPlatformArgsForPolicy } from "./remote-policy";
+import type { VerifyExecutionPolicy } from "./remote-policy";
 
 export { verifyBuck2Threads, type VerifyBuck2ThreadsOptions } from "./buck2-threads";
 
@@ -25,10 +27,11 @@ export function spawnVerifyBuck2Tests(opts: {
   logFile: string | null;
   console: "auto" | "super" | "simple";
   targets: string[];
-  zxNodeModulesOut: string;
+  zxNodeModulesOut: string | null;
   threadsOverride?: number;
   passName?: string;
   analysisDir?: string | null;
+  executionPolicy: VerifyExecutionPolicy;
 }): SpawnedVerifyTests {
   const minPerTestTimeoutSecs = 20 * 60;
   const tsecRaw = Number((process.env.VERIFY_TIMEOUT_SECS || "7200").trim());
@@ -41,7 +44,6 @@ export function spawnVerifyBuck2Tests(opts: {
       : 1800;
   const testNixTimeoutSecs = Math.max(minPerTestTimeoutSecs, requestedTestNixTimeoutSecs);
   const overallTimeoutSecs = Math.max(tsec, testNixTimeoutSecs + 5 * 60);
-  // Node's per-test timeout should never be tighter than the Nix timeout budget.
   const nodeTestTimeoutMs = Math.max(minPerTestTimeoutSecs * 1000, tms, testNixTimeoutSecs * 1000);
 
   const consoleFlag =
@@ -68,12 +70,12 @@ export function spawnVerifyBuck2Tests(opts: {
     "--isolation-dir",
     opts.iso,
     "test",
+    ...buckTestArgsForExecutionPolicy(opts.executionPolicy, passName),
     ...consoleFlag,
     ...(threads > 0 ? ["--num-threads", String(threads)] : []),
     "--overall-timeout",
     `${overallTimeoutSecs}s`,
-    "--target-platforms",
-    "prelude//platforms:default",
+    ...targetPlatformArgsForPolicy(opts.executionPolicy),
     ...opts.targets,
     "--",
     ...testEnvArgs,
@@ -100,8 +102,6 @@ export function spawnVerifyBuck2Tests(opts: {
   });
   const pgid = proc.pid || process.pid;
 
-  // Keep incremental pass/fail counts without rereading the full verify log (which can be huge).
-  // This makes pacing checkpoints O(1) and avoids slowdowns late in long verify runs.
   let passCount = 0;
   let failCount = 0;
   let stdoutCarry = "";

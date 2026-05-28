@@ -13,6 +13,7 @@ import {
   resolveVerifyTargetPlan,
   summarizeVerifyTargetPlan,
 } from "./target-passes";
+import type { VerifyExecutionPolicy } from "./remote-policy";
 
 async function appendVerifyPassLog(file: string | null, line: string): Promise<void> {
   if (!file) return;
@@ -37,14 +38,20 @@ export async function runVerifyBuckPasses(opts: {
   logFile: string | null;
   console: "auto" | "super" | "simple";
   targets: string[];
-  zxNodeModulesOut: string;
+  zxNodeModulesOut: string | null;
   analysisDir: string;
   onPgid: (pgid: number) => void;
   onPgidDone?: (pgid: number) => void;
   onNestedIso?: (iso: string) => void;
   onNestedIsoDone?: (iso: string) => void;
+  executionPolicy: VerifyExecutionPolicy;
 }): Promise<number> {
-  const plan = resolveVerifyTargetPlan({ root: opts.root, iso: opts.iso, targets: opts.targets });
+  const plan = resolveVerifyTargetPlan({
+    root: opts.root,
+    iso: opts.iso,
+    targets: opts.targets,
+    executionPolicy: opts.executionPolicy,
+  });
   try {
     assertVerifyTargetPlanNotEmpty({ requestedTargets: opts.targets, plan });
   } catch (error) {
@@ -86,6 +93,7 @@ export async function runVerifyBuckPasses(opts: {
       threadsOverride: pass.threadsOverride,
       passName: pass.name,
       analysisDir: passAnalysisDir,
+      executionPolicy: opts.executionPolicy,
     });
     opts.onPgid(spawned.pgid);
     opts.onNestedIso?.(spawned.nestedIso);

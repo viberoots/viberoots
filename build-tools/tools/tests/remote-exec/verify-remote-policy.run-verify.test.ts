@@ -1,0 +1,200 @@
+#!/usr/bin/env zx-wrapper
+import assert from "node:assert/strict";
+import { test } from "node:test";
+import { runVerifyWithDeps } from "../../dev/verify/run-verify";
+import { defaultRunVerifyDeps, type RunVerifyDeps } from "../../dev/verify/run-verify-deps";
+
+const remoteEnv = {
+  VBR_REMOTE_ARTIFACT_DIR: "/tmp/vbr-remote/artifacts",
+  VBR_REMOTE_BUCK_CONFIG: "/tmp/vbr-remote/buckconfig",
+  VBR_REMOTE_EXEC_MODE: "hybrid",
+  VBR_REMOTE_EXEC_SYSTEM: "x86_64-linux",
+};
+
+class VerifyExit extends Error {
+  readonly code: number;
+
+  constructor(code: number) {
+    super(`verify exited ${code}`);
+    this.code = code;
+  }
+}
+
+async function withEnv<T>(env: NodeJS.ProcessEnv, fn: () => Promise<T>): Promise<T> {
+  const prev = { ...process.env };
+  Object.assign(process.env, env);
+  try {
+    return await fn();
+  } finally {
+    for (const key of Object.keys(process.env)) {
+      if (!(key in prev)) delete process.env[key];
+    }
+    Object.assign(process.env, prev);
+  }
+}
+
+function fakeRunVerifyDeps(calls: string[]): Partial<RunVerifyDeps> {
+  const timedPhase = async <T>(name: string, fn: () => Promise<T>): Promise<T> => {
+    calls.push(`phase:${name}`);
+    return await fn();
+  };
+  return {
+    ...defaultRunVerifyDeps,
+    acquireVerifyLock: async () => ({ lockDir: "/tmp/verify-lock", logFile: null }),
+    appendVerifyLogLine: async () => {},
+    chdir: () => {},
+    cleanupLocalOrphanBuckDaemons: async () => calls.push("local-orphan-cleanup"),
+    cleanupVerifyLegacyPnpmState: async () => calls.push("local-pnpm-cleanup"),
+    computeZxTestNodeModulesOut: async () => {
+      calls.push("compute-zx");
+      return "/nix/store/local-zx-node-modules";
+    },
+    createRegisteredStateCleaner: () => async () => calls.push("cleanup-state"),
+    createVerifyPhaseTimer: () => ({ setLogFile: async () => {}, timedPhase }),
+    ensureBuckPreludeConfig: async () => {},
+    ensureRepoLocalTmpRoot: async () => {},
+    ensureVerifyPinnedNixpkgs: async () => calls.push("ensure-pinned"),
+    exit: ((code: number) => {
+      throw new VerifyExit(code);
+    }) as RunVerifyDeps["exit"],
+    initializeVerifyProcessState: async () => {
+      calls.push("initialize-state");
+      return { iso: "v-1-test", stateFile: "/tmp/state" };
+    },
+    installVerifySignalHandlers: () => {},
+    isNonBuildSystemOnlyVerifyTargets: () => false,
+    killBuckIsolation: async () => {},
+    logVerifyRevision: async () => {},
+    maybeWriteVerifyTimingSummary: async () => {},
+    parseVerifyArgs: () => ({
+      coverage: false,
+      console: "simple",
+      explainSelection: false,
+      requestedProjects: [],
+      selector: "default",
+      targets: ["//:remote_exec_verify_remote_policy"],
+    }),
+    prepareVerifySeed: async () => {
+      calls.push("prepare-seed");
+      return {
+        cleanup: async () => {},
+        pinDir: "/tmp/pin",
+        seedKey: "seed",
+        seedPath: "/tmp/seed",
+      };
+    },
+    prewarmVerifyOnce: async () => calls.push("prewarm"),
+    recordNixGcPreflight: async () => {},
+    repoRoot: () => "/tmp/repo",
+    runStartupCheck: async () => calls.push("startup"),
+    setupLocalVerifyWorkspace: async () => {
+      calls.push("setup-local-workspace");
+      return { rawDir: "/tmp/coverage/raw" };
+    },
+    shouldPrepareVerifySeedForRequestedTargets: () => {
+      calls.push("should-seed");
+      return true;
+    },
+    startBuckDaemonReaper: async () => calls.push("daemon-reaper"),
+    startBuckWatchdog: async () => calls.push("watchdog"),
+    ...fakeRunVerifyNoops(calls),
+  };
+}
+
+function fakeRunVerifyNoops(calls: string[]): Partial<RunVerifyDeps> {
+  return {
+    recordNixGcPreflight: async () => {},
+    resolveRequestedVerifyScope: async ({ args }) => {
+      calls.push("resolve-scope");
+      return {
+        args,
+        selection: {
+          diagnostics: null,
+          lintFilters: [],
+          reason: "explicit-targets",
+          requestedDeploymentMode: "auto",
+          requestedMode: "auto",
+          selectorMode: "explicit",
+          targets: args.targets,
+        },
+      };
+    },
+    runExplainSelection: async () => {},
+    runFinalOrphanBuckCleanup: async () => {},
+    runMergedCoverageReport: async () => {},
+    runTemplateManifestCheck: async () => {},
+    runVerifyBuckPasses: async (opts) => {
+      calls.push(`buck-passes-zx:${opts.zxNodeModulesOut ?? "<null>"}`);
+      return 0;
+    },
+    runVerifyLintPreflight: async () => {},
+    summarizeVerifyScopeDecision: () => "explicit-targets",
+    writeVerifyIsoMarker: async () => {},
+  };
+}
+
+test("runVerify rejects remote policy before local setup side effects", async () => {
+  const calls: string[] = [];
+  await assert.rejects(
+    async () =>
+      await withEnv(
+        { ...remoteEnv, VBR_REMOTE_BUCK_CONFIG: "relative/.buckconfig" },
+        async () => await runVerifyWithDeps(fakeRunVerifyDeps(calls)),
+      ),
+    /VBR_REMOTE_BUCK_CONFIG must be an absolute path/,
+  );
+
+  assert.deepEqual(
+    calls.filter(
+      (call) =>
+        call.startsWith("phase:") ||
+        call.includes("local") ||
+        call === "compute-zx" ||
+        call === "initialize-state" ||
+        call === "resolve-scope",
+    ),
+    [],
+  );
+});
+
+test("runVerify rejects remote coverage before coverage setup paths are created", async () => {
+  const calls: string[] = [];
+  await assert.rejects(
+    async () =>
+      await withEnv(remoteEnv, async () => {
+        const deps = fakeRunVerifyDeps(calls);
+        deps.parseVerifyArgs = () => ({
+          coverage: true,
+          console: "simple",
+          explainSelection: false,
+          requestedProjects: [],
+          selector: "default",
+          targets: ["//:remote_exec_verify_remote_policy"],
+        });
+        await runVerifyWithDeps(deps);
+      }),
+    /remote verify does not support --coverage/,
+  );
+
+  assert.equal(calls.includes("setup-local-workspace"), false);
+  assert.equal(calls.includes("initialize-state"), false);
+  assert.equal(calls.includes("resolve-scope"), false);
+  assert.equal(
+    calls.some((call) => call.includes("coverage")),
+    false,
+  );
+});
+
+test("runVerify accepted remote mode skips and does not forward local zx node_modules", async () => {
+  const calls: string[] = [];
+  await assert.rejects(
+    async () =>
+      await withEnv(remoteEnv, async () => await runVerifyWithDeps(fakeRunVerifyDeps(calls))),
+    (error) => error instanceof VerifyExit && error.code === 0,
+  );
+
+  assert.equal(calls.includes("compute-zx"), false);
+  assert.equal(calls.includes("setup-local-workspace"), false);
+  assert.equal(calls.includes("prepare-seed"), false);
+  assert.ok(calls.includes("buck-passes-zx:<null>"));
+});

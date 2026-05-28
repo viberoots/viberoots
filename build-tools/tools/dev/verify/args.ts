@@ -2,6 +2,7 @@ import path from "node:path";
 import * as fsp from "node:fs/promises";
 import { getArgvTokens } from "../../lib/cli";
 import { normalizeDevBuildTargetArgs } from "../dev-build/target-args";
+import { parseVerifyExecutionPolicy, type VerifyExecutionPolicy } from "./remote-policy";
 
 export type VerifyConsole = "auto" | "super" | "simple";
 export type VerifySelectorMode = "default" | "project-closure";
@@ -136,6 +137,16 @@ export function parseVerifyArgs(opts?: {
     requestedProjects,
     explainSelection,
   };
+}
+
+export function parseVerifyExecutionPolicyForArgs(opts: {
+  args: Pick<VerifyArgs, "coverage">;
+  env?: NodeJS.ProcessEnv;
+}): VerifyExecutionPolicy {
+  return parseVerifyExecutionPolicy({
+    env: opts.env,
+    coverage: opts.args.coverage,
+  });
 }
 
 export async function normalizeVerifyTargets(opts: {
