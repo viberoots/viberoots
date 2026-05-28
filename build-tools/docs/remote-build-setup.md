@@ -558,6 +558,16 @@ For full `v` parity, this Buck command is the inner execution step, not the whol
 
 The worker must not need broad deployment credentials. It needs RE worker credentials, cache read credentials, narrow log/metric write credentials, and optional Nix remote-builder credentials if that worker delegates Nix builds.
 
+### Generated Buck RE Config
+
+`build-tools/tools/remote-exec/render-buckconfig.ts` is the dormant renderer for CI/developer Buck RE config files. It writes `.buckconfig.remote.generated` under an explicit artifact directory such as `buck-out/tmp/remote-exec/<run-id>/`; repo root output is rejected. The renderer does not enable remote execution by itself, and local verify/Jenkins defaults do not read the generated file. A later opt-in lane must explicitly set `VBR_REMOTE_BUCK_CONFIG`.
+
+Renderer inputs are explicit: engine/CAS/action-cache endpoints, instance name, auth mode, target system/profile, fallback policy, and event/report artifact directory. Supported fallback policy values are `strict-remote`, `hybrid`, and `local-only`; none is selected implicitly.
+
+Auth input must be file-backed or environment-backed. mTLS values are paths or environment references, never inline PEM. `http_headers` is a Buck header list, and bearer/API-key-looking values must be supplied through environment references. Renderer summaries include only the config fingerprint; endpoint, artifact path, policy, platform, and credential material are not printed as success evidence.
+
+Use `build-tools/tools/remote-exec/remote-buckconfig.example.json` as the fixture shape. It uses only `example.invalid` endpoints and fake environment references.
+
 ### Credential Contract
 
 Remote execution credentials must follow the same bias as the deployment control plane: explicit, narrow, file-backed or workload-identity-backed, startup-validated, rotated, and redacted.

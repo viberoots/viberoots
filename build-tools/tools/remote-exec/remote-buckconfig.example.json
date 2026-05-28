@@ -1,0 +1,15 @@
+{
+  "artifactDir": "buck-out/tmp/remote-exec/example-run",
+  "engineAddress": "grpc://re.example.invalid:8980",
+  "casAddress": "grpc://cas.example.invalid:8980",
+  "actionCacheAddress": "grpc://cache.example.invalid:8980",
+  "instanceName": "viberoots/example",
+  "auth": {
+    "mode": "headers",
+    "httpHeaders": ["authorization: ${VBR_RE_TOKEN}"]
+  },
+  "targetSystem": "x86_64-linux",
+  "targetProfile": "linux-x86_64-default",
+  "fallbackPolicy": "strict-remote",
+  "eventLogReportDir": "buck-out/tmp/remote-exec/example-run/reports"
+}
