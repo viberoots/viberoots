@@ -185,6 +185,20 @@ Acceptance:
 - The guard test fails if a future change turns remote execution on by default.
 - The test allows inert profile/platform targets and generated-config templates.
 
+Local-only invariants:
+
+- Committed Buck config remains local by default: no `[buck2_re_client]` section and no
+  `build.execution_platforms` remote registration.
+- `toolchains//:remote_test_execution` may model dormant profiles, but the committed target must not
+  select `default_profile`.
+- Jenkins and CI defaults do not set `VBR_REMOTE_EXEC_MODE`, `VBR_REMOTE_BUCK_CONFIG`,
+  `VBR_REMOTE_EXEC_SYSTEM`, or `VBR_REMOTE_ARTIFACT_DIR`.
+- Direct `buck2 test //...` and CI smoke-test entrypoints stay on committed local config unless a
+  later policy explicitly passes a generated remote config.
+- Config templates and examples use fake endpoints and environment/file references only; real
+  endpoints, tokens, signing keys, SSH key paths, cache credentials, and inline PEM material are
+  rejected by the checker.
+
 ### 1. Add Dormant Remote Execution Configuration Surfaces
 
 Add a new small Starlark module, for example:
@@ -925,15 +939,15 @@ Acceptance:
 
 ## Rule Family Readiness Matrix
 
-| Family | Current state | Required before `remote:ready` |
-| --- | --- | --- |
-| `zx_test` | Heavy `WORKSPACE_ROOT` mutation; creates temp `.buckconfig`, `prelude`, `node_modules`, shims, logs under `buck-out` | Add executor propagation, then split local bootstrap from remote snapshot mode; declare scripts/templates/node modules; declared logs/coverage |
-| `node_nix_test` | Invokes Nix via filtered flake, reads importer under workspace, prepares pnpm store | Add executor propagation; declare importer source snapshot; make pnpm store/cache materialization explicit; declared coverage/log outputs |
-| `go_nix_test` | Invokes selected Nix build from `WORKSPACE_ROOT`; runs binary from store path | Add executor propagation; declared graph/source snapshot; no workspace log writes; exact store path realization from cache |
-| `python_nix_test` | Same pattern as Go | Same as Go; ensure wheelhouse cache attrs are published |
-| `cpp_nix_test` | Same pattern plus `/tmp/cpp_nix_test_build.log` | Same as Go; move log to declared temp/output |
-| Go/Python/C++/Rust Nix build actions | `ctx.actions.run` shell fragments read workspace and graph paths | Add remote execution platform later only after declared source snapshot and no undeclared workspace reads |
-| Deployment-domain tests | Many interact with external services/secrets | Keep local-only until action classes, locks, idempotency, and credential boundaries are implemented |
+| Family                               | Current state                                                                                                        | Required before `remote:ready`                                                                                                                 |
+| ------------------------------------ | -------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| `zx_test`                            | Heavy `WORKSPACE_ROOT` mutation; creates temp `.buckconfig`, `prelude`, `node_modules`, shims, logs under `buck-out` | Add executor propagation, then split local bootstrap from remote snapshot mode; declare scripts/templates/node modules; declared logs/coverage |
+| `node_nix_test`                      | Invokes Nix via filtered flake, reads importer under workspace, prepares pnpm store                                  | Add executor propagation; declare importer source snapshot; make pnpm store/cache materialization explicit; declared coverage/log outputs      |
+| `go_nix_test`                        | Invokes selected Nix build from `WORKSPACE_ROOT`; runs binary from store path                                        | Add executor propagation; declared graph/source snapshot; no workspace log writes; exact store path realization from cache                     |
+| `python_nix_test`                    | Same pattern as Go                                                                                                   | Same as Go; ensure wheelhouse cache attrs are published                                                                                        |
+| `cpp_nix_test`                       | Same pattern plus `/tmp/cpp_nix_test_build.log`                                                                      | Same as Go; move log to declared temp/output                                                                                                   |
+| Go/Python/C++/Rust Nix build actions | `ctx.actions.run` shell fragments read workspace and graph paths                                                     | Add remote execution platform later only after declared source snapshot and no undeclared workspace reads                                      |
+| Deployment-domain tests              | Many interact with external services/secrets                                                                         | Keep local-only until action classes, locks, idempotency, and credential boundaries are implemented                                            |
 
 All external-runner rows also require command-handle cleanup before `remote:ready`; executor propagation is only the selection plumbing, not proof that Buck can materialize the test command remotely.
 

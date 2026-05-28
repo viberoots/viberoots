@@ -52,7 +52,7 @@ test("shared pnpm-store hash cache is keyed by lock hash and importer-aware buil
   }
 });
 
-test("non-default pnpm-store hash refresh singleflights cold shared-cache misses", async () => {
+test("non-default pnpm-store hash refresh verifies shared-cache hits", async () => {
   const repoRoot = await fsp.mkdtemp(path.join(os.tmpdir(), "pnpm-shared-cache-lock-"));
   const prevRepoRoot = process.env.REPO_ROOT;
   const prevCwd = process.cwd();
@@ -90,13 +90,18 @@ test("non-default pnpm-store hash refresh singleflights cold shared-cache misses
         runFixedBuild: async (phaseLabel) => {
           fixedPhases.push(phaseLabel);
           await new Promise((resolve) => setTimeout(resolve, 50));
-          if (phaseLabel.includes("fixed-build-after-hash")) {
+          const rawHashes = await fsp.readFile(
+            path.join(repoRoot, "build-tools", "tools", "nix", "node-modules.hashes.json"),
+            "utf8",
+          );
+          const currentHash = (JSON.parse(rawHashes) as Record<string, string>)[key] || "";
+          if (phaseLabel.includes("fixed-build-after-hash") || currentHash === hashValue) {
             return { ok: true, output: "" };
           }
           return { ok: false, output: `got: ${hashValue}` };
         },
         runUnfixedBuild: async () => {
-          throw new Error("shared-cache singleflight test should not run unfixed build");
+          throw new Error("shared-cache verification test should not run unfixed build");
         },
       });
 
@@ -104,6 +109,7 @@ test("non-default pnpm-store hash refresh singleflights cold shared-cache misses
     assert.deepEqual(fixedPhases, [
       "importer=projects/libs/demo step=fixed-build attr=pnpm-store.projects-libs-demo",
       "importer=projects/libs/demo step=fixed-build-after-hash attr=pnpm-store.projects-libs-demo",
+      "importer=projects/libs/demo step=fixed-build attr=pnpm-store.projects-libs-demo",
     ]);
     assert.equal(await readSharedHashCache({ repoRoot, builderFingerprint, lockHash }), hashValue);
   } finally {

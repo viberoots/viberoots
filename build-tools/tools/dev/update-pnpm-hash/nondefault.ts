@@ -63,7 +63,7 @@ export async function handleNonDefaultImporter(opts: {
         lockHash: opts.existingLockHash,
       },
       async () => {
-        if (await restoreSharedHash()) return true;
+        await restoreSharedHash();
         return await compute();
       },
     );
@@ -129,9 +129,6 @@ export async function handleNonDefaultImporter(opts: {
     ) {
       return true;
     }
-  }
-  if (await restoreSharedHash()) {
-    return true;
   }
   return await withSharedHashComputation(async () => {
     console.log(
