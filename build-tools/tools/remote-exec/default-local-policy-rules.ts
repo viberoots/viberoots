@@ -26,7 +26,8 @@ export async function checkRemoteTestToolchain(root: string): Promise<PolicyFind
   const text = await readOptional(root, rel);
   const block = matchCallBlock(text, "remote_test_execution_toolchain");
   if (!block) return [];
-  const selected = /^\s*default_profile\s*=\s*(?!None\b|null\b)(.+),?\s*$/m.exec(block);
+  const defaultProfile = /^\s*default_profile\s*=\s*(.+?)\s*,?\s*$/m.exec(block)?.[1]?.trim();
+  const selected = defaultProfile && defaultProfile !== "None" && defaultProfile !== "null";
   return selected
     ? [finding(rel, "toolchains//:remote_test_execution selects a default_profile")]
     : [];

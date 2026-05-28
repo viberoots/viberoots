@@ -3,6 +3,12 @@ load("@repo_toolchains//:python.bzl", "system_python_bootstrap_toolchain", "syst
 load("@repo_toolchains//:cxx.bzl", "system_cxx_toolchain")
 load("@prelude//tests:test_toolchain.bzl", "noop_test_toolchain")
 load("@repo_toolchains//:remote_test_execution.bzl", "remote_test_execution_toolchain")
+load("@repo_toolchains//:remote_execution_platforms.bzl", "remote_execution_platform_targets")
+load(
+    "@repo_toolchains//:remote_execution_profiles.bzl",
+    "remote_execution_profiles",
+    "remote_profile_conversion_probe_targets",
+)
 load("@prelude//toolchains:genrule.bzl", "system_genrule_toolchain")
 
 oncall("build_infra")
@@ -39,14 +45,17 @@ noop_test_toolchain(
 )
 
 remote_test_execution_toolchain(
+    default_profile = None,
+    default_run_as_bundle = False,
     name = "remote_test_execution",
+    profiles = remote_execution_profiles(),
     visibility = ["PUBLIC"],
 )
 
+remote_execution_platform_targets()
+remote_profile_conversion_probe_targets()
 
 system_genrule_toolchain(
     name = "genrule",
     visibility = ["PUBLIC"],
 )
-
-

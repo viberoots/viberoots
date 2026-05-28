@@ -25,6 +25,8 @@ target_platforms = prelude//platforms:default
 
 const localToolchain = `remote_test_execution_toolchain(
     name = "remote_test_execution",
+    default_profile = None,
+    default_run_as_bundle = False,
     visibility = ["PUBLIC"],
 )
 `;

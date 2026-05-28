@@ -99,11 +99,36 @@ The repo currently has:
 
 - `toolchains//:remote_test_execution`
 - a thin `toolchains/remote_test_execution.bzl` re-export of Prelude's remote test execution toolchain
+- named dormant remote test profiles in `toolchains/remote_execution_profiles.bzl`
+- an inactive execution platform registration target at `toolchains//:remote_execution_platforms`
 - no `[buck2_re_client]` section in `.buckconfig`
-- no non-empty remote test execution profiles
 - no REAPI/CAS/scheduler/worker service in this repo
 
 That means Buck2 RE is a required design target, but not yet an operational path in the current repository.
+
+### Dormant Buck Profile Vocabulary
+
+Remote test profiles live in `toolchains/remote_execution_profiles.bzl` and are attached to
+`toolchains//:remote_test_execution`, but the committed toolchain keeps `default_profile = None` and
+`default_run_as_bundle = False`. The reviewed profile names are `linux-x86_64-default`,
+`linux-x86_64-large`, `linux-aarch64-default`, `linux-aarch64-large`, and
+`darwin-aarch64-default`.
+
+Every profile uses only Prelude-supported keys: `capabilities`, `listing_capabilities`,
+`local_listing_enabled`, `local_enabled`, `use_case`, `remote_cache_enabled`, `dependencies`,
+`resource_units`, and `remote_execution_dynamic_image`. `capabilities` and `use_case` are required
+because Prelude converts named profiles through `get_re_executors_from_props(ctx)`.
+
+Build execution platforms live separately in `toolchains/remote_execution_platforms.bzl`. The
+registration target returns `ExecutionPlatformRegistrationInfo` and carries
+`ExecutionPlatformInfo.executor_config` values with explicit local, remote, and limited-hybrid
+settings. Build platforms use `remote_execution_use_case = "buck2-build"` and the same capability
+vocabulary as the test profiles through `remote_execution_properties`.
+
+These surfaces are inert until a generated Buck config explicitly selects
+`build.execution_platforms = toolchains//:remote_execution_platforms` or a test target/toolchain
+explicitly selects a named remote profile. Local verify, Jenkins defaults, and direct local
+`buck2 test //...` invocations must not select them by default.
 
 ## Remote Nix Builders
 
