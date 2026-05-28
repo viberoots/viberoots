@@ -87,6 +87,16 @@ let
     volumes = baseVolumes ++ [ "${credentialRuntimeDirectory name}:${cfg.credentialDirectory}:ro" ];
     environment = lib.optionalAttrs (resolvedImageDigest != null) {
       VBR_CONTROL_PLANE_IMAGE_DIGEST = resolvedImageDigest;
+      VBR_CONTROL_PLANE_IMAGE_REF = imageRef;
+      VBR_CONTROL_PLANE_IMAGE_DIGEST_STATUS = cfg.imageDigestStatus;
+    } // lib.optionalAttrs (cfg.imageBuildIdentity != null) {
+      VBR_CONTROL_PLANE_IMAGE_BUILD_IDENTITY = cfg.imageBuildIdentity;
+    } // lib.optionalAttrs (cfg.imageSourceRevision != null) {
+      VBR_CONTROL_PLANE_SOURCE_REVISION = cfg.imageSourceRevision;
+    } // lib.optionalAttrs (cfg.imageInspectedDigest != null) {
+      VBR_CONTROL_PLANE_IMAGE_INSPECTED_DIGEST = cfg.imageInspectedDigest;
+    } // lib.optionalAttrs (cfg.imageTag != null) {
+      VBR_CONTROL_PLANE_IMAGE_TAG = cfg.imageTag;
     } // {
       WORKSPACE_ROOT = "${defaults.runtimeRoot}/workspace";
       TMPDIR = "${defaults.runtimeRoot}/tmp";
@@ -129,6 +139,11 @@ in
     imageRegistry = opt nullStr null "Image registry when image is assembled from parts.";
     imageRepository = opt nullStr null "Image repository when image is assembled from parts.";
     imageDigest = opt nullStr null "Immutable image digest when image is assembled from parts.";
+    imageSourceRevision = opt nullStr null "Reviewed source revision for verified image publication metadata.";
+    imageBuildIdentity = opt nullStr null "Reviewed Nix image build identity.";
+    imageInspectedDigest = opt nullStr null "Registry-inspected digest for verified image publication metadata.";
+    imageTag = opt nullStr null "Reviewed publication tag for verified image publication metadata.";
+    imageDigestStatus = opt (lib.types.enum [ "build-only" "verified-registry-publication" ]) "build-only" "Runtime image digest contract status.";
     publicUrl = opt nullStr null "Externally routed service URL.";
     publicHostName = opt nullStr null "Optional hostname for managed nginx.";
     serviceHost = opt lib.types.str "0.0.0.0" "Container service bind host.";
@@ -181,6 +196,11 @@ in
       { assertion = cfg.image != null || (cfg.imageRegistry != null && cfg.imageRepository != null && cfg.imageDigest != null); message = "deploymentControlPlaneContainer requires image or imageRegistry/imageRepository/imageDigest."; }
       { assertion = imageRef == "" || builtins.match imageRefPattern imageRef != null; message = "deploymentControlPlaneContainer image must be pinned by @sha256:<64 lowercase hex>."; }
       { assertion = cfg.imageDigest == null || builtins.match digestPattern cfg.imageDigest != null; message = "deploymentControlPlaneContainer.imageDigest must be sha256:<64 lowercase hex>."; }
+      { assertion = cfg.imageInspectedDigest == null || builtins.match digestPattern cfg.imageInspectedDigest != null; message = "deploymentControlPlaneContainer.imageInspectedDigest must be sha256:<64 lowercase hex>."; }
+      { assertion = cfg.imageDigestStatus != "verified-registry-publication" || cfg.imageBuildIdentity != null; message = "deploymentControlPlaneContainer.imageBuildIdentity is required for verified registry publication metadata."; }
+      { assertion = cfg.imageDigestStatus != "verified-registry-publication" || cfg.imageSourceRevision != null; message = "deploymentControlPlaneContainer.imageSourceRevision is required for verified registry publication metadata."; }
+      { assertion = cfg.imageDigestStatus != "verified-registry-publication" || cfg.imageInspectedDigest != null; message = "deploymentControlPlaneContainer.imageInspectedDigest is required for verified registry publication metadata."; }
+      { assertion = cfg.imageDigestStatus != "verified-registry-publication" || cfg.imageTag != null; message = "deploymentControlPlaneContainer.imageTag is required for verified registry publication metadata."; }
       { assertion = cfg.artifactStore.bucket != null; message = "deploymentControlPlaneContainer.artifactStore.bucket is required."; }
       { assertion = missingCredentialNames == [ ]; message = "deploymentControlPlaneContainer missing credential sources: ${lib.concatStringsSep ", " missingCredentialNames}"; }
       { assertion = nullCredentialNames == [ ]; message = "deploymentControlPlaneContainer credential sources must not be null: ${lib.concatStringsSep ", " nullCredentialNames}"; }

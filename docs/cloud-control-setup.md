@@ -8,6 +8,11 @@ deployment-control-plane setup \
   --out ./cloud-control-profile \
   --host-mode aws-ec2 \
   --image registry.example.com/platform/deployment-control-plane@sha256:<64-hex-digest> \
+  --expected-image-build-identity nix-source-<64-hex-build-identity> \
+  --image-source-revision source-<reviewed-revision> \
+  --image-build-identity nix-source-<64-hex-build-identity> \
+  --image-publication-digest sha256:<64-hex-digest> \
+  --image-inspected-digest sha256:<64-hex-digest> \
   --public-url https://deploy.example.test \
   --deployment-id pleomino-staging \
   --auth-callback-host deploy-auth.example.test \
@@ -29,13 +34,16 @@ The generated bundle contains:
 - `credential-manifest.json`: required credential filenames and rejected secret sources.
 - `commands.json`: service, worker, health, readiness, worker-heartbeat, artifact, and database
   validation commands.
+- `image-publication.json`: verified registry inspection evidence tying the generated profile image
+  to the build identity and registry manifest digest.
 - `conformance-checklist.json`: exact checks that must pass before protected/shared readiness.
 - `managed-dependencies.profile.yaml`: concrete input for the managed Postgres and artifact-store
   conformance validator.
 - `managed-dependencies.json` and `ingress-checklist.json`: non-secret evidence checklist data.
 - `provider-capabilities.json`: declarations for selected cloud topology components.
-- mode-specific runnable profile files for Compose/Podman, NixOS, SaaS OCI, or AWS EC2. SaaS OCI
-  and AWS EC2 profiles are structured YAML with one service, two workers, digest-pinned image,
+- mode-specific runnable profile files for Compose/Podman, NixOS, SaaS OCI, or AWS EC2. Profiles
+  pass the full image publication contract as runtime metadata. SaaS OCI and AWS EC2 profiles are
+  structured YAML with one service, two workers, digest-pinned image,
   config and credential mounts, and scratch/state/cache mounts.
   Compose/Podman profiles also set the runtime user to uid/gid `10001` and list the scratch,
   artifact, and record paths that must be owned by that identity.
@@ -49,8 +57,10 @@ under `/run/deployment-control-plane/credentials`.
    `/run/deployment-control-plane/credentials/control-plane-database-url`.
 2. Provision an S3-compatible artifact store and write endpoint, access key id, and secret access
    key to the filenames in `credential-manifest.json`.
-3. Publish the reviewed Nix-built image and use only the immutable
-   `registry/repository@sha256:<digest>` reference.
+3. Publish the reviewed Nix-built image, inspect the registry manifest, and keep the resulting
+   `image-publication.json` fields together. Setup rejects build-only image identity, placeholder
+   digest values, mismatched build identity, and mismatched inspection evidence for production
+   profiles.
 4. Generate the bundle with `deployment-control-plane setup --dry-run`, resolve every reported
    prerequisite, then rerun without `--dry-run`.
 5. Stage `config.yaml`, `managed-dependencies.profile.yaml`, provider-capability evidence, the

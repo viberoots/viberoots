@@ -8,6 +8,7 @@ export type CutoverEvidence = {
   region?: string;
   generatedAt: string;
   health?: Record<string, unknown>;
+  imagePublication?: ControlPlaneImagePublicationEvidence;
   awsTopology?: Record<string, unknown>;
   latestNonProductionDeployment?: Record<string, unknown>;
   providerCapabilities?: Record<string, Record<string, unknown>>;
@@ -20,6 +21,7 @@ export type CutoverEvidence = {
 
 export type CutoverValidationOptions = {
   expectedHostProfile: string;
+  expectedImageBuildIdentity: string;
   expectedRegion?: string;
   operation: CutoverOperation;
   selectedCapabilities: string[];
@@ -31,3 +33,4 @@ export type CutoverValidationResult = {
   errors: string[];
   checklist: string[];
 };
+import type { ControlPlaneImagePublicationEvidence } from "./control-plane-image-publication";

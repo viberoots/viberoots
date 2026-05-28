@@ -13,6 +13,8 @@ import { runInTemp } from "../lib/test-helpers";
 
 const SETUP_IMAGE =
   "registry.example.com/platform/deployment-control-plane@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+const SETUP_DIGEST = `sha256:${"a".repeat(64)}`;
+const SETUP_BUILD_IDENTITY = `nix-source-${"b".repeat(64)}`;
 
 test("deployment-control-plane command validates mode config overrides and credentials", async () => {
   await runInTemp("control-plane-cli-config", async (tmp) => {
@@ -85,6 +87,16 @@ test("deployment-control-plane setup writes a cloud host profile bundle", async 
         "aws-ec2",
         "--image",
         SETUP_IMAGE,
+        "--expected-image-build-identity",
+        SETUP_BUILD_IDENTITY,
+        "--image-source-revision",
+        "source-cli-setup",
+        "--image-build-identity",
+        SETUP_BUILD_IDENTITY,
+        "--image-publication-digest",
+        SETUP_DIGEST,
+        "--image-inspected-digest",
+        SETUP_DIGEST,
         "--aws-vpc-endpoint",
         "--aws-subnet-id",
         "subnet-123",

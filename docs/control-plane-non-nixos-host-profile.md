@@ -22,6 +22,10 @@ Real hosts must provide:
 - `VBR_CONTROL_PLANE_IMAGE_REGISTRY`, `VBR_CONTROL_PLANE_IMAGE_REPOSITORY`, and
   `VBR_CONTROL_PLANE_IMAGE_DIGEST` so the runtime image is assembled as
   `<registry>/<repository>@sha256:<digest>`
+- `VBR_CONTROL_PLANE_IMAGE_BUILD_IDENTITY` so runtime status can tie the pinned registry digest
+  back to the reviewed Nix image contract
+- `VBR_CONTROL_PLANE_SOURCE_REVISION`, `VBR_CONTROL_PLANE_IMAGE_INSPECTED_DIGEST`, and
+  `VBR_CONTROL_PLANE_IMAGE_TAG` from the reviewed registry publication evidence
 - an external Postgres database URL credential file
 - an S3-compatible artifact-store bucket and credential files
 - a reviewed-source SSH key credential file

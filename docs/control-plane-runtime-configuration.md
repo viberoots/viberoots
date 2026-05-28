@@ -41,13 +41,19 @@ Image metadata is non-secret and comes from the reviewed image/runtime environme
 
 - `VBR_CONTROL_PLANE_VERSION`
 - `VBR_CONTROL_PLANE_SOURCE_REVISION`
+- `VBR_CONTROL_PLANE_IMAGE_BUILD_IDENTITY`
+- `VBR_CONTROL_PLANE_IMAGE_REF`
 - `VBR_CONTROL_PLANE_IMAGE_DIGEST`
+- `VBR_CONTROL_PLANE_IMAGE_INSPECTED_DIGEST`
+- `VBR_CONTROL_PLANE_IMAGE_TAG`
+- `VBR_CONTROL_PLANE_IMAGE_DIGEST_STATUS`
 
 The reviewed image contract records a deterministic `nix-source-<hash>` build identity, not a
 verified OCI digest. Registry publication evidence records the immutable registry manifest digest
-after `skopeo inspect`, and host profiles pin that registry digest. Status APIs report the digest
-supplied by the running image or host profile so operators do not need to infer identity from a
-mutable image tag.
+after `skopeo inspect`, and host profiles pin that registry digest. Status APIs report
+`verified-registry-publication` only when the host profile supplies the full publication contract:
+source revision, verified image reference, build identity, pinned digest, registry-inspected digest,
+publication tag, and digest status. A digest value by itself remains `build-only`.
 
 ## YAML Shape
 

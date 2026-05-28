@@ -71,16 +71,29 @@ EOF
 #!${pkgs.runtimeShell}
 export VBR_CONTROL_PLANE_VERSION="${version}"
 export VBR_CONTROL_PLANE_SOURCE_REVISION="\''${VBR_CONTROL_PLANE_SOURCE_REVISION:-${sourceRevision}}"
-export VBR_CONTROL_PLANE_IMAGE_DIGEST="\''${VBR_CONTROL_PLANE_IMAGE_DIGEST:-unpublished}"
+export VBR_CONTROL_PLANE_IMAGE_BUILD_IDENTITY="\''${VBR_CONTROL_PLANE_IMAGE_BUILD_IDENTITY:-${imageBuildIdentity}}"
+export VBR_CONTROL_PLANE_IMAGE_DIGEST_STATUS="\''${VBR_CONTROL_PLANE_IMAGE_DIGEST_STATUS:-build-only}"
+export VBR_CONTROL_PLANE_IMAGE_DIGEST="\''${VBR_CONTROL_PLANE_IMAGE_DIGEST:-build-only}"
 exec ${pkgs.nodejs_22}/bin/node "$out/share/deployment-control-plane/deployment-control-plane-wrapper.cjs" "\$@"
 EOF
       chmod 0755 "$out/bin/deployment-control-plane"
     '';
   };
+  digestContract = {
+    schemaVersion = "control-plane-image-digest-contract@1";
+    build = {
+      inherit sourceRevision imageBuildIdentity;
+    };
+    publication = {
+      status = "build-only";
+      productionUsable = false;
+      registryDigestRequired = true;
+    };
+  };
   contract = {
     imageName = "deployment-control-plane";
     inherit version sourceRevision imageBuildIdentity;
-    publicationDigest = null;
+    inherit digestContract;
     user = "10001:10001";
     entrypoint = [ "/bin/deployment-control-plane" ];
     commands = [
@@ -136,13 +149,17 @@ EOF
         "NODE_EXTRA_CA_CERTS=${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt"
         "VBR_CONTROL_PLANE_VERSION=${version}"
         "VBR_CONTROL_PLANE_SOURCE_REVISION=${sourceRevision}"
-        "VBR_CONTROL_PLANE_IMAGE_DIGEST=unpublished"
+        "VBR_CONTROL_PLANE_IMAGE_BUILD_IDENTITY=${imageBuildIdentity}"
+        "VBR_CONTROL_PLANE_IMAGE_DIGEST_STATUS=build-only"
+        "VBR_CONTROL_PLANE_IMAGE_DIGEST=build-only"
       ];
       Labels = {
         "org.opencontainers.image.title" = "deployment-control-plane";
         "org.opencontainers.image.version" = version;
         "org.opencontainers.image.revision" = sourceRevision;
         "org.viberoots.control-plane.image-build-identity" = imageBuildIdentity;
+        "org.viberoots.control-plane.digest-contract" = "build-only";
+        "org.viberoots.control-plane.registry-digest-required" = "true";
       };
     };
     extraCommands = ''

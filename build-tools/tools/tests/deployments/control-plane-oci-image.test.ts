@@ -49,13 +49,20 @@ test("control-plane image contract exposes service and worker entrypoints withou
     first.contract.sourceRevision,
   );
   assert.match(first.contract.imageBuildIdentity, /^nix-source-[a-f0-9]{64}$/);
-  assert.equal(first.contract.publicationDigest, null);
+  assert.equal(first.contract.digestContract.publication.status, "build-only");
+  assert.equal(first.contract.digestContract.publication.productionUsable, false);
   assert.equal(
     image.config.config.Labels["org.viberoots.control-plane.image-build-identity"],
     first.contract.imageBuildIdentity,
   );
+  assert.equal(
+    image.config.config.Labels["org.viberoots.control-plane.digest-contract"],
+    "build-only",
+  );
   assert.equal(image.config.config.Labels["org.opencontainers.image.digest"], undefined);
   assert.notEqual(first.contract.imageBuildIdentity, "unknown");
+  assert.doesNotMatch(JSON.stringify(first.contract), /unpublished|null|unknown/i);
+  assert.doesNotMatch(JSON.stringify(image.config.config.Labels), /unpublished|null|unknown/i);
   assert.match(first.contract.sourceRevision, /^source-[a-z0-9]{12}$/);
   assert.deepEqual(first.contract.commands, [
     "deployment-control-plane service --config /etc/deployment-control-plane/config.yaml",
@@ -162,13 +169,44 @@ test("control-plane image metadata is non-secret and visible from service status
     const env = {
       VBR_CONTROL_PLANE_VERSION: "7.0.0-test",
       VBR_CONTROL_PLANE_SOURCE_REVISION: "abc1234",
+      VBR_CONTROL_PLANE_IMAGE_BUILD_IDENTITY: `nix-source-${"a".repeat(64)}`,
       VBR_CONTROL_PLANE_IMAGE_DIGEST: "sha256:feedface",
     };
     assert.deepEqual(readControlPlaneImageMetadata(env), {
       version: "7.0.0-test",
       sourceRevision: "abc1234",
+      imageBuildIdentity: `nix-source-${"a".repeat(64)}`,
       imageDigest: "sha256:feedface",
+      imageDigestStatus: "build-only",
+      digestContract: {
+        schemaVersion: "control-plane-image-digest-contract@1",
+        build: {
+          sourceRevision: "abc1234",
+          imageBuildIdentity: `nix-source-${"a".repeat(64)}`,
+        },
+        publication: {
+          status: "build-only",
+          productionUsable: false,
+          registryDigestRequired: true,
+        },
+      },
     });
+    const partial = readControlPlaneImageMetadata({
+      ...env,
+      VBR_CONTROL_PLANE_IMAGE_REF: `registry.example.com/platform/deployment-control-plane@${"sha256:"}${"b".repeat(64)}`,
+      VBR_CONTROL_PLANE_IMAGE_DIGEST: `sha256:${"b".repeat(64)}`,
+      VBR_CONTROL_PLANE_IMAGE_DIGEST_STATUS: "verified-registry-publication",
+    });
+    assert.equal(partial.imageDigestStatus, "build-only");
+    const verified = readControlPlaneImageMetadata({
+      ...env,
+      VBR_CONTROL_PLANE_IMAGE_REF: `registry.example.com/platform/deployment-control-plane@${"sha256:"}${"b".repeat(64)}`,
+      VBR_CONTROL_PLANE_IMAGE_DIGEST: `sha256:${"b".repeat(64)}`,
+      VBR_CONTROL_PLANE_IMAGE_INSPECTED_DIGEST: `sha256:${"b".repeat(64)}`,
+      VBR_CONTROL_PLANE_IMAGE_TAG: "registry.example.com/platform/deployment-control-plane:abc1234",
+      VBR_CONTROL_PLANE_IMAGE_DIGEST_STATUS: "verified-registry-publication",
+    });
+    assert.equal(verified.imageDigestStatus, "verified-registry-publication");
     const recordsRoot = path.join(tmp, "records");
     const service = await startNixosSharedHostControlPlaneServer({
       workspaceRoot: tmp,
@@ -182,6 +220,7 @@ test("control-plane image metadata is non-secret and visible from service status
     try {
       const health = await readJson<any>(await fetch(new URL("/healthz", service.url)));
       assert.equal(health.image.imageDigest, "sha256:feedface");
+      assert.equal(health.image.imageDigestStatus, "build-only");
       assert.equal(health.image.sourceRevision, "abc1234");
       const status = await readJson<any>(
         await fetch(new URL("/api/v1/read/status", service.url), {

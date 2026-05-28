@@ -1,11 +1,10 @@
 #!/usr/bin/env zx-wrapper
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
-import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { after, test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
-import { producerByteLength, waitForValue } from "./lib/wasm-watch";
+import { producerByteLength, waitForValue, writeAndBumpMtime } from "./lib/wasm-watch";
 import {
   evaluateRenderedAppText,
   httpGet,
@@ -40,12 +39,6 @@ function serverEntrySource(tag: string): string {
   ].join("\n");
 }
 
-async function writeAndTouch(filePath: string, contents: string): Promise<void> {
-  await fsp.writeFile(filePath, contents, "utf8");
-  const now = new Date();
-  await fsp.utimes(filePath, now, now);
-}
-
 test(
   "webapp-ssr-vite dev runtime consistency remains deterministic across repeated edit cycles",
   { timeout: TEST_TIMEOUT_MS },
@@ -61,9 +54,9 @@ test(
       const entryClientPath = path.join(appAbs, "src", "entry-client.ts");
       const entryServerPath = path.join(appAbs, "src", "entry-server.ts");
 
-      await writeAndTouch(payloadPath, "phase3-a");
-      await writeAndTouch(entryClientPath, clientEntrySource("a"));
-      await writeAndTouch(entryServerPath, serverEntrySource("a"));
+      await writeAndBumpMtime(payloadPath, "phase3-a");
+      await writeAndBumpMtime(entryClientPath, clientEntrySource("a"));
+      await writeAndBumpMtime(entryServerPath, serverEntrySource("a"));
 
       await _$({ cwd: tmp, stdio: "pipe" })`git add -A projects/apps/demo-vite-ssr`;
       await _$({
@@ -76,6 +69,13 @@ test(
       const serverStdout: string[] = [];
       const serverStderr: string[] = [];
       const mainModuleUrl = `http://127.0.0.1:${port}/src/entry-client.ts`;
+      let clientEvalSerial = 0;
+      const evaluateClientText = async (): Promise<string> => {
+        clientEvalSerial += 1;
+        return await evaluateRenderedAppText(
+          `${mainModuleUrl}?t=${Date.now()}-${clientEvalSerial}`,
+        );
+      };
       const readClientWasmLength = async (): Promise<number | null> => {
         const res = await httpGet(`http://127.0.0.1:${port}/src/wasm-contract/top.wasm`);
         if (res.status !== 200) return null;
@@ -109,7 +109,7 @@ test(
 
         let currentWasmLength = producerByteLength("phase3-a");
         const initialClientText = await waitForValue(
-          async () => await evaluateRenderedAppText(mainModuleUrl),
+          evaluateClientText,
           (value) => value === "client:a",
         );
         assert.equal(initialClientText, "client:a");
@@ -131,16 +131,16 @@ test(
           { tag: "c", payload: "phase3-cccc" },
         ];
         for (const cycle of cycles) {
-          await writeAndTouch(entryClientPath, clientEntrySource(cycle.tag));
+          await writeAndBumpMtime(entryClientPath, clientEntrySource(cycle.tag));
           const clientTextAfterClientEdit = await waitForValue(
-            async () => await evaluateRenderedAppText(mainModuleUrl),
+            evaluateClientText,
             (value) => value === `client:${cycle.tag}`,
           );
           assert.equal(clientTextAfterClientEdit, `client:${cycle.tag}`);
           assert.equal(devServer.exitCode, null);
           assert.equal(devServer.pid, serverPid);
 
-          await writeAndTouch(entryServerPath, serverEntrySource(cycle.tag));
+          await writeAndBumpMtime(entryServerPath, serverEntrySource(cycle.tag));
           const serverBodyAfterServerEdit = await waitForValue(
             async () => await httpGet(`http://127.0.0.1:${port}/`),
             (res) =>
@@ -151,7 +151,7 @@ test(
           assert.equal(devServer.exitCode, null);
           assert.equal(devServer.pid, serverPid);
 
-          await writeAndTouch(payloadPath, cycle.payload);
+          await writeAndBumpMtime(payloadPath, cycle.payload);
           currentWasmLength = producerByteLength(cycle.payload);
           const clientWasmLengthAfterWasmEdit = await waitForValue(
             readClientWasmLength,

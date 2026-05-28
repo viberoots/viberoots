@@ -8,6 +8,8 @@ import type { CloudControlSetupInput } from "../../deployments/cloud-control-set
 
 const DIGEST_REF =
   "registry.example.com/platform/deployment-control-plane@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+const DIGEST = `sha256:${"a".repeat(64)}`;
+const BUILD_IDENTITY = `nix-source-${"b".repeat(64)}`;
 
 test("provider-capability hook evidence is required before protected readiness", async () => {
   const capabilities = renderCloudControlSetupBundle(baseInput()).capabilities;
@@ -87,6 +89,15 @@ function baseInput(): CloudControlSetupInput {
     outDir: "unused",
     mode: "compose-podman",
     image: DIGEST_REF,
+    expectedImageBuildIdentity: BUILD_IDENTITY,
+    imagePublication: {
+      image: DIGEST_REF,
+      sourceRevision: "source-capability",
+      imageBuildIdentity: BUILD_IDENTITY,
+      digest: DIGEST,
+      inspectedDigest: DIGEST,
+      tag: "registry.example.com/platform/deployment-control-plane:source-capability",
+    },
     instanceId: "cloud-staging",
     publicUrl: "https://deploy.example.test",
     artifactBucket: "deployment-control-plane-artifacts",

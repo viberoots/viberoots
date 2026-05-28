@@ -68,7 +68,7 @@ function assertNoCredentialEnvironment(service: ComposeService) {
   assert.equal(service.env_file, undefined);
   for (const key of Object.keys(service.environment || {})) {
     assert.ok(
-      key === "VBR_CONTROL_PLANE_IMAGE_DIGEST" || !SECRET_ENV_PATTERN.test(key),
+      key.startsWith("VBR_CONTROL_PLANE_IMAGE_") || !SECRET_ENV_PATTERN.test(key),
       `unexpected credential-like environment key ${key}`,
     );
   }
@@ -89,6 +89,10 @@ test("non-NixOS Compose profile defines one service and two workers", async () =
   ]);
   for (const service of Object.values(services)) {
     assert.equal(service.image, COMPOSE_IMAGE_REF);
+    assert.equal(
+      service.environment?.VBR_CONTROL_PLANE_IMAGE_DIGEST_STATUS,
+      "verified-registry-publication",
+    );
     assertMounts(service);
     assertNoCredentialEnvironment(service);
   }
@@ -144,8 +148,11 @@ test("direct Podman example preserves the same runtime contract", async () => {
   const text = await readProfileFile("podman-run.example.txt");
   assert.match(text, /VBR_CONTROL_PLANE_IMAGE_REF=/);
   assert.match(text, /\^sha256:\[0-9a-f\]\{64\}\$/);
+  assert.match(text, /\^nix-source-\[0-9a-f\]\{64\}\$/);
   assert.match(text, /VBR_CONTROL_PLANE_IMAGE_DIGEST must be sha256:<64 lowercase hex>/);
+  assert.match(text, /VBR_CONTROL_PLANE_IMAGE_DIGEST_STATUS="verified-registry-publication"/);
   assert.doesNotMatch(text, /VBR_CONTROL_PLANE_IMAGE:\?/);
+  assert.doesNotMatch(text, /IMAGE_DIGEST:-unknown/);
   assert.match(text, /podman pod create/);
   assert.match(text, /--publish 127\.0\.0\.1:7780:7780/);
   assert.equal((text.match(/deployment-control-plane service --config/g) || []).length, 1);

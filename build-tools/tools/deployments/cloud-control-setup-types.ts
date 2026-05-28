@@ -1,3 +1,5 @@
+import type { ControlPlaneImagePublicationEvidence } from "./control-plane-image-publication";
+
 export const CLOUD_PROFILE_MODES = ["compose-podman", "nixos", "saas-oci", "aws-ec2"] as const;
 
 export const REVIEWED_SOURCE_MODES = ["ssh", "github-app"] as const;
@@ -12,6 +14,8 @@ export type CloudControlSetupInput = {
   outDir: string;
   mode: CloudProfileMode;
   image: string;
+  expectedImageBuildIdentity: string;
+  imagePublication?: ControlPlaneImagePublicationEvidence;
   instanceId: string;
   publicUrl: string;
   artifactBucket: string;

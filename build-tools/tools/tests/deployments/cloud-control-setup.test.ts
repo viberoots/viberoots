@@ -23,12 +23,16 @@ import { runInScratchTemp } from "../lib/test-helpers";
 
 const DIGEST_REF =
   "registry.example.com/platform/deployment-control-plane@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+const DIGEST = `sha256:${"a".repeat(64)}`;
+const BUILD_IDENTITY = `nix-source-${"b".repeat(64)}`;
 
 function baseInput(overrides: Partial<CloudControlSetupInput> = {}): CloudControlSetupInput {
   return {
     outDir: "unused",
     mode: "compose-podman",
     image: DIGEST_REF,
+    expectedImageBuildIdentity: BUILD_IDENTITY,
+    imagePublication: publicationEvidence(DIGEST_REF, DIGEST),
     instanceId: "cloud-staging",
     publicUrl: "https://deploy.example.test",
     artifactBucket: "deployment-control-plane-artifacts",
@@ -51,11 +55,24 @@ function baseInput(overrides: Partial<CloudControlSetupInput> = {}): CloudContro
   };
 }
 
+function publicationEvidence(image: string, digest: string) {
+  return {
+    image,
+    sourceRevision: "source-abc123",
+    imageBuildIdentity: BUILD_IDENTITY,
+    digest,
+    inspectedDigest: digest,
+    tag: "registry.example.com/platform/deployment-control-plane:source-abc123",
+  };
+}
+
 test("cloud setup bundle renders runtime, credentials, commands, and capabilities", () => {
   const bundle = renderCloudControlSetupBundle(baseInput());
   const config = YAML.parse(bundle.files["config.yaml"]!);
+  const compose = YAML.parse(bundle.files["compose.yaml"]!);
   const manifest = JSON.parse(bundle.files["credential-manifest.json"]!);
   const commands = JSON.parse(bundle.files["commands.json"]!);
+  const imagePublication = JSON.parse(bundle.files["image-publication.json"]!);
   const managed = JSON.parse(bundle.files["managed-dependencies.json"]!);
   const ingress = JSON.parse(bundle.files["ingress-checklist.json"]!);
   assert.equal(
@@ -77,6 +94,18 @@ test("cloud setup bundle renders runtime, credentials, commands, and capabilitie
     "/run/deployment-control-plane/credentials/reviewed-source-known-hosts",
   );
   assert.equal(commands.image, DIGEST_REF);
+  assert.equal(imagePublication.digestContract.publication.status, "verified-registry-publication");
+  assert.equal(imagePublication.image, DIGEST_REF);
+  assert.equal(
+    compose.services["deployment-control-plane-service"].environment
+      .VBR_CONTROL_PLANE_IMAGE_DIGEST_STATUS,
+    "verified-registry-publication",
+  );
+  assert.equal(
+    compose.services["deployment-control-plane-service"].environment
+      .VBR_CONTROL_PLANE_IMAGE_BUILD_IDENTITY,
+    BUILD_IDENTITY,
+  );
   assert.equal(commands.workers.length, 2);
   assert.deepEqual(validateRenderedProfile(bundle.files), []);
   assert.deepEqual(
@@ -167,6 +196,16 @@ test("cloud setup validation rejects tag-only images, weak topology, and missing
       baseInput({ image: "registry.example.com/control-plane:latest" }),
     ).join("\n"),
     /pinned by @sha256 digest/,
+  );
+  assert.match(
+    validateCloudControlSetupInput(baseInput({ imagePublication: undefined })).join("\n"),
+    /requires verified publication evidence/,
+  );
+  assert.match(
+    validateCloudControlSetupInput(
+      baseInput({ expectedImageBuildIdentity: `nix-source-${"c".repeat(64)}` }),
+    ).join("\n"),
+    /does not match expected build identity/,
   );
   assert.match(
     validateCloudControlSetupInput(baseInput({ workerReplicas: 1 })).join("\n"),

@@ -46,6 +46,7 @@ function injectHeadMarkup(html, headMarkup) {
 
 async function loadRender(vite, url) {
   try {
+    vite.moduleGraph.invalidateAll();
     const mod = await vite.ssrLoadModule(ssrEntryModule);
     if (typeof mod?.renderParts === "function") {
       const result = await mod.renderParts(url);

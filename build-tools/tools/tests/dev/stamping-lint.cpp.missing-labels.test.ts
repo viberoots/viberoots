@@ -44,6 +44,11 @@ await runInTemp("stamping-lint-cpp-missing", async (tmp, $) => {
     path.join(tmp, "build-tools", "cpp", "wasm_defs.bzl"),
     await fs.readFile("build-tools/cpp/wasm_defs.bzl", "utf8"),
   );
+  await $({
+    cwd: tmp,
+    quiet: true,
+    env,
+  })`buck2 kill`.nothrow();
   const res2 = await $({
     cwd: tmp,
     quiet: true,

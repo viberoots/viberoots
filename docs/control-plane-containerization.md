@@ -93,10 +93,14 @@ registry.example.com/platform/deployment-control-plane@sha256:<digest>
 ```
 
 Do not deploy mutable tags such as `latest` as the runtime identity. The Nix image contract records
-a non-`unknown` `nix-source-<hash>` build identity, not a verified OCI digest. Publication evidence
-records the registry manifest digest that hosts pin after registry inspection. Pass the pinned registry digest into
-`VBR_CONTROL_PLANE_IMAGE_DIGEST` so `/healthz`, the web UI status API, and MCP status report the
-reviewed image identity without reading mutable registry tags.
+a non-`unknown` `nix-source-<hash>` build identity, not a verified OCI digest. Its digest contract
+is explicitly `build-only` until registry inspection proves a publication digest. Publication
+evidence records the registry manifest digest that hosts pin after registry inspection. Production
+profiles pass the full publication contract as runtime metadata: source revision, image ref, build
+identity, digest, inspected digest, tag, and
+`VBR_CONTROL_PLANE_IMAGE_DIGEST_STATUS=verified-registry-publication`. That lets `/healthz`, the web
+UI status API, and MCP status report the reviewed image identity without reading mutable registry
+tags.
 
 Publication records must include the source revision and immutable digest together. Tags are
 convenience references for humans and CI logs only. The reviewed publication helper renders the
@@ -117,11 +121,20 @@ The resulting manifest shape is:
   "imageBuildIdentity": "nix-source-<reviewed-build-identity>",
   "digest": "sha256:<digest>",
   "inspectedDigest": "sha256:<digest>",
-  "tag": "registry.example.com/platform/deployment-control-plane:source-<reviewed-revision>"
+  "tag": "registry.example.com/platform/deployment-control-plane:source-<reviewed-revision>",
+  "digestContract": {
+    "schemaVersion": "control-plane-image-digest-contract@1",
+    "publication": {
+      "status": "verified-registry-publication",
+      "productionUsable": true
+    }
+  }
 }
 ```
 
-Host profiles and production runtime config must consume the `image` digest reference, not the tag.
+Host profiles, setup bundles, cutover evidence, and production runtime config must consume the
+`image` digest reference, not the tag. Production setup and cutover reject build-only, placeholder,
+`unknown`, `unpublished`, or registry-unverified image metadata.
 The optional live registry test is skipped by default; enable it only against a reviewed temporary
 repository with:
 
@@ -557,7 +570,7 @@ The module should expose options like:
     image = "registry.example.com/viberoots/deployment-control-plane@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
     imageRegistry = null;
     imageRepository = null;
-    imageDigest = null;
+    imageDigest = "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
     publicUrl = "https://deploy.apps.kilty.io";
 
     port = 7780;

@@ -29,7 +29,13 @@ services:
         source: ${VBR_CONTROL_PLANE_RUNTIME:-./state/runtime}
         target: /var/lib/deployment-control-plane/runtime
     environment:
-      VBR_CONTROL_PLANE_IMAGE_DIGEST: ${VBR_CONTROL_PLANE_IMAGE_DIGEST:-unknown}
+      VBR_CONTROL_PLANE_SOURCE_REVISION: ${VBR_CONTROL_PLANE_SOURCE_REVISION:?set reviewed source revision}
+      VBR_CONTROL_PLANE_IMAGE_REF: ${VBR_CONTROL_PLANE_IMAGE_REGISTRY:?set image registry}/${VBR_CONTROL_PLANE_IMAGE_REPOSITORY:?set image repository}@${VBR_CONTROL_PLANE_IMAGE_DIGEST:?set immutable sha256 image digest}
+      VBR_CONTROL_PLANE_IMAGE_BUILD_IDENTITY: ${VBR_CONTROL_PLANE_IMAGE_BUILD_IDENTITY:?set reviewed nix-source image build identity}
+      VBR_CONTROL_PLANE_IMAGE_DIGEST: ${VBR_CONTROL_PLANE_IMAGE_DIGEST:?set immutable sha256 image digest}
+      VBR_CONTROL_PLANE_IMAGE_INSPECTED_DIGEST: ${VBR_CONTROL_PLANE_IMAGE_INSPECTED_DIGEST:?set registry inspected sha256 image digest}
+      VBR_CONTROL_PLANE_IMAGE_TAG: ${VBR_CONTROL_PLANE_IMAGE_TAG:?set reviewed publication tag}
+      VBR_CONTROL_PLANE_IMAGE_DIGEST_STATUS: verified-registry-publication
 
   control-plane-worker-1:
     image: ${VBR_CONTROL_PLANE_IMAGE_REGISTRY:?set image registry}/${VBR_CONTROL_PLANE_IMAGE_REPOSITORY:?set image repository}@${VBR_CONTROL_PLANE_IMAGE_DIGEST:?set immutable sha256 image digest}
@@ -57,7 +63,13 @@ services:
         source: ${VBR_CONTROL_PLANE_RUNTIME:-./state/runtime}
         target: /var/lib/deployment-control-plane/runtime
     environment:
-      VBR_CONTROL_PLANE_IMAGE_DIGEST: ${VBR_CONTROL_PLANE_IMAGE_DIGEST:-unknown}
+      VBR_CONTROL_PLANE_SOURCE_REVISION: ${VBR_CONTROL_PLANE_SOURCE_REVISION:?set reviewed source revision}
+      VBR_CONTROL_PLANE_IMAGE_REF: ${VBR_CONTROL_PLANE_IMAGE_REGISTRY:?set image registry}/${VBR_CONTROL_PLANE_IMAGE_REPOSITORY:?set image repository}@${VBR_CONTROL_PLANE_IMAGE_DIGEST:?set immutable sha256 image digest}
+      VBR_CONTROL_PLANE_IMAGE_BUILD_IDENTITY: ${VBR_CONTROL_PLANE_IMAGE_BUILD_IDENTITY:?set reviewed nix-source image build identity}
+      VBR_CONTROL_PLANE_IMAGE_DIGEST: ${VBR_CONTROL_PLANE_IMAGE_DIGEST:?set immutable sha256 image digest}
+      VBR_CONTROL_PLANE_IMAGE_INSPECTED_DIGEST: ${VBR_CONTROL_PLANE_IMAGE_INSPECTED_DIGEST:?set registry inspected sha256 image digest}
+      VBR_CONTROL_PLANE_IMAGE_TAG: ${VBR_CONTROL_PLANE_IMAGE_TAG:?set reviewed publication tag}
+      VBR_CONTROL_PLANE_IMAGE_DIGEST_STATUS: verified-registry-publication
 
   control-plane-worker-2:
     image: ${VBR_CONTROL_PLANE_IMAGE_REGISTRY:?set image registry}/${VBR_CONTROL_PLANE_IMAGE_REPOSITORY:?set image repository}@${VBR_CONTROL_PLANE_IMAGE_DIGEST:?set immutable sha256 image digest}
@@ -68,4 +80,10 @@ services:
       - /etc/deployment-control-plane/config.yaml
     volumes: *control-plane-worker-volumes
     environment:
-      VBR_CONTROL_PLANE_IMAGE_DIGEST: ${VBR_CONTROL_PLANE_IMAGE_DIGEST:-unknown}
+      VBR_CONTROL_PLANE_SOURCE_REVISION: ${VBR_CONTROL_PLANE_SOURCE_REVISION:?set reviewed source revision}
+      VBR_CONTROL_PLANE_IMAGE_REF: ${VBR_CONTROL_PLANE_IMAGE_REGISTRY:?set image registry}/${VBR_CONTROL_PLANE_IMAGE_REPOSITORY:?set image repository}@${VBR_CONTROL_PLANE_IMAGE_DIGEST:?set immutable sha256 image digest}
+      VBR_CONTROL_PLANE_IMAGE_BUILD_IDENTITY: ${VBR_CONTROL_PLANE_IMAGE_BUILD_IDENTITY:?set reviewed nix-source image build identity}
+      VBR_CONTROL_PLANE_IMAGE_DIGEST: ${VBR_CONTROL_PLANE_IMAGE_DIGEST:?set immutable sha256 image digest}
+      VBR_CONTROL_PLANE_IMAGE_INSPECTED_DIGEST: ${VBR_CONTROL_PLANE_IMAGE_INSPECTED_DIGEST:?set registry inspected sha256 image digest}
+      VBR_CONTROL_PLANE_IMAGE_TAG: ${VBR_CONTROL_PLANE_IMAGE_TAG:?set reviewed publication tag}
+      VBR_CONTROL_PLANE_IMAGE_DIGEST_STATUS: verified-registry-publication

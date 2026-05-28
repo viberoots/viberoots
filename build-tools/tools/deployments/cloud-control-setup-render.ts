@@ -20,6 +20,7 @@ import {
 } from "./cloud-control-setup-artifacts";
 import { modeFiles } from "./cloud-control-setup-profiles";
 import { assertCloudControlSetupInput } from "./cloud-control-setup-validate";
+import { verifiedControlPlaneImageDigestContract } from "./control-plane-image-publication";
 
 export type CloudControlSetupBundle = {
   files: Record<string, string>;
@@ -35,6 +36,7 @@ export function renderCloudControlSetupBundle(
     "config.yaml": renderRuntimeConfig(input),
     "credential-manifest.json": renderCredentialManifest(input),
     "commands.json": renderCommands(input),
+    "image-publication.json": renderImagePublication(input),
     "conformance-checklist.json": renderConformanceChecklist(input),
     "managed-dependencies.profile.yaml": renderManagedDependencyProfile(input),
     "managed-dependencies.json": renderManagedDependencies(input),
@@ -132,6 +134,7 @@ function renderReadme(input: CloudControlSetupInput): string {
     "",
     `Mode: \`${input.mode}\``,
     `Image: \`${input.image}\``,
+    "Image publication evidence: `image-publication.json`",
     "",
     "This bundle contains placeholders and mounted file paths only. Provider dashboards, raw IaC",
     "state, and support-mediated actions are evidence inputs; they are not hidden deployment",
@@ -141,6 +144,19 @@ function renderReadme(input: CloudControlSetupInput): string {
     "Review `provider-capabilities.json`, `credential-manifest.json`, and `commands.json` before",
     "starting the service and workers.",
   ].join("\n");
+}
+
+function renderImagePublication(input: CloudControlSetupInput): string {
+  const evidence = input.imagePublication!;
+  return `${JSON.stringify(
+    {
+      schemaVersion: "cloud-control-image-publication@1",
+      ...evidence,
+      digestContract: verifiedControlPlaneImageDigestContract(evidence),
+    },
+    null,
+    2,
+  )}\n`;
 }
 
 function reviewedSource(input: CloudControlSetupInput) {

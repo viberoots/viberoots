@@ -10,11 +10,13 @@ type RenderedProcess = {
   command: string[];
   mounts: string[];
   user?: string;
+  environment?: Record<string, string>;
 };
 
 export function validateRenderedProfile(files: Record<string, string>): string[] {
   const errors: string[] = [];
   const processes = renderedProcesses(files);
+  errors.push(...validateImagePublication(files, processes));
   const service = processes.find((process) => process.name === "deployment-control-plane-service");
   const worker1 = processes.find((process) => process.name === "deployment-control-plane-worker-1");
   const worker2 = processes.find((process) => process.name === "deployment-control-plane-worker-2");
@@ -26,6 +28,39 @@ export function validateRenderedProfile(files: Record<string, string>): string[]
   }
   errors.push(...validateOwnership(files));
   return errors;
+}
+
+function validateImagePublication(
+  files: Record<string, string>,
+  processes: RenderedProcess[],
+): string[] {
+  const evidence = parseJson(files["image-publication.json"]);
+  if (!evidence) return ["missing image publication evidence"];
+  const images = new Set(processes.map((process) => process.image).filter(Boolean));
+  if (images.size === 0) return [];
+  if (images.size > 1) return ["profile processes do not share one image reference"];
+  const image = [...images][0]!;
+  if (evidence.image !== image) {
+    return ["image publication evidence does not match generated profile image"];
+  }
+  const expectedEnvironment = {
+    VBR_CONTROL_PLANE_SOURCE_REVISION: evidence.sourceRevision,
+    VBR_CONTROL_PLANE_IMAGE_REF: image,
+    VBR_CONTROL_PLANE_IMAGE_BUILD_IDENTITY: evidence.imageBuildIdentity,
+    VBR_CONTROL_PLANE_IMAGE_DIGEST: evidence.digest,
+    VBR_CONTROL_PLANE_IMAGE_INSPECTED_DIGEST: evidence.inspectedDigest,
+    VBR_CONTROL_PLANE_IMAGE_TAG: evidence.tag,
+    VBR_CONTROL_PLANE_IMAGE_DIGEST_STATUS: "verified-registry-publication",
+  };
+  for (const process of processes) {
+    const env = process.environment || {};
+    for (const [key, value] of Object.entries(expectedEnvironment)) {
+      if (env[key] !== value) {
+        return [`${process.name} runtime ${key} metadata does not match publication evidence`];
+      }
+    }
+  }
+  return [];
 }
 
 export function validateProtectedSharedProfileReadiness(files: Record<string, string>): string[] {
@@ -139,6 +174,7 @@ function composeProcesses(raw: string): RenderedProcess[] {
     command: Array.isArray(service.command) ? service.command.map(String) : [],
     mounts: Array.isArray(service.volumes) ? service.volumes.map(String) : [],
     user: typeof service.user === "string" ? service.user : undefined,
+    environment: service.environment || {},
   }));
 }
 
@@ -149,17 +185,31 @@ function profileProcesses(raw: string, key: string): RenderedProcess[] {
     image: String(process.image || ""),
     command: Array.isArray(process.command) ? process.command.map(String) : [],
     mounts: Array.isArray(process.mounts) ? process.mounts.map(String) : [],
+    environment: process.environment || {},
   }));
 }
 
 function nixosProcesses(raw: string): RenderedProcess[] {
   if (!raw.includes("services.viberoots.deploymentControlPlaneContainer")) return [];
   const image = (raw.match(/image = "([^"]+)"/) || [])[1] || "";
+  const sourceRevision = (raw.match(/imageSourceRevision = "([^"]+)"/) || [])[1] || "";
+  const imageBuildIdentity = (raw.match(/imageBuildIdentity = "([^"]+)"/) || [])[1] || "";
+  const inspectedDigest = (raw.match(/imageInspectedDigest = "([^"]+)"/) || [])[1] || "";
+  const imageTag = (raw.match(/imageTag = "([^"]+)"/) || [])[1] || "";
   return ["service", "worker-1", "worker-2"].map((role) => ({
     name: `deployment-control-plane-${role}`,
     image,
     command: [role.startsWith("worker") ? "worker" : "service", "--config", CONFIG],
     mounts: [CONFIG, CREDS, `${STATE}/records`, `${STATE}/artifacts`, `${STATE}/runtime`],
+    environment: {
+      VBR_CONTROL_PLANE_SOURCE_REVISION: sourceRevision,
+      VBR_CONTROL_PLANE_IMAGE_REF: image,
+      VBR_CONTROL_PLANE_IMAGE_BUILD_IDENTITY: imageBuildIdentity,
+      VBR_CONTROL_PLANE_IMAGE_DIGEST: image.split("@").at(-1) || "",
+      VBR_CONTROL_PLANE_IMAGE_INSPECTED_DIGEST: inspectedDigest,
+      VBR_CONTROL_PLANE_IMAGE_TAG: imageTag,
+      VBR_CONTROL_PLANE_IMAGE_DIGEST_STATUS: "verified-registry-publication",
+    },
   }));
 }
 

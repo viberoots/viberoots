@@ -4,6 +4,10 @@ import {
   CLOUD_PROVIDER_CAPABILITY_HOOK_EVIDENCE_SOURCE,
 } from "../../deployments/cloud-control-provider-capability-hook-contract";
 
+export const IMAGE_DIGEST = `sha256:${"a".repeat(64)}`;
+export const IMAGE_REF = `registry.example.com/platform/deployment-control-plane@${IMAGE_DIGEST}`;
+export const IMAGE_BUILD_IDENTITY = `nix-source-${"b".repeat(64)}`;
+
 export function evidence(overrides: Record<string, unknown> = {}) {
   return {
     hostProfile: "aws-ec2",
@@ -19,6 +23,7 @@ export function evidence(overrides: Record<string, unknown> = {}) {
       uiReads: true,
       mcpReads: true,
     },
+    imagePublication: imagePublicationEvidence(),
     awsTopology: {
       artifactBackend: "aws-s3",
       region: "us-east-1",
@@ -37,6 +42,7 @@ export function evidence(overrides: Record<string, unknown> = {}) {
     latestNonProductionDeployment: {
       runId: "deploy-run-1",
       hostProfile: "aws-ec2",
+      image: IMAGE_REF,
       trafficIngressHostProfile: "aws-ec2",
       cloudPrimaryPath: true,
       stagingDeploymentSucceeded: true,
@@ -58,6 +64,18 @@ export function evidence(overrides: Record<string, unknown> = {}) {
       providerMutationBlocked: true,
     },
     audit: { cutover: true, rollback: true, restore: true, "break-glass": true },
+    ...overrides,
+  };
+}
+
+export function imagePublicationEvidence(overrides: Record<string, unknown> = {}) {
+  return {
+    image: IMAGE_REF,
+    sourceRevision: "source-cutover",
+    imageBuildIdentity: IMAGE_BUILD_IDENTITY,
+    digest: IMAGE_DIGEST,
+    inspectedDigest: IMAGE_DIGEST,
+    tag: "registry.example.com/platform/deployment-control-plane:source-cutover",
     ...overrides,
   };
 }

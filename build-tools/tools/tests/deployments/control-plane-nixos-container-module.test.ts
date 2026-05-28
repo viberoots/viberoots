@@ -123,6 +123,8 @@ test("control-plane NixOS container module preserves mounts when Docker is selec
     assert.deepEqual(service.environment, {
       TMPDIR: "/var/lib/deployment-control-plane/runtime/tmp",
       VBR_CONTROL_PLANE_IMAGE_DIGEST: REVIEWED_IMAGE_DIGEST,
+      VBR_CONTROL_PLANE_IMAGE_DIGEST_STATUS: "build-only",
+      VBR_CONTROL_PLANE_IMAGE_REF: `registry.example.com/platform/deployment-control-plane@${REVIEWED_IMAGE_DIGEST}`,
       WORKSPACE_ROOT: "/var/lib/deployment-control-plane/runtime/workspace",
     });
     assert.ok(service.extraOptions.includes("--health-interval=30s"));
@@ -208,7 +210,6 @@ test("control-plane NixOS container module fails closed for required host-local 
     ]);
   });
 });
-
 test("control-plane NixOS container module parameterizes image and gated nginx", async () => {
   await runInTemp("control-plane-nixos-container-nginx", async (tmp, $) => {
     const out = await evalModule(
@@ -218,13 +219,21 @@ test("control-plane NixOS container module parameterizes image and gated nginx",
       imageRegistry = "registry.ops.example";
       imageRepository = "deploy/control-plane";
       imageDigest = "${REVIEWED_IMAGE_DIGEST}";
+      imageSourceRevision = "source-nginx";
+      imageBuildIdentity = "nix-source-${"b".repeat(64)}";
+      imageInspectedDigest = "${REVIEWED_IMAGE_DIGEST}";
+      imageTag = "registry.ops.example/deploy/control-plane:source-nginx";
+      imageDigestStatus = "verified-registry-publication";
       publicHostName = "deploy.example.test";
       manageNginx = true;
     `,
-      `{
+      `let
+      env = system.config.virtualisation.oci-containers.containers.deployment-control-plane-service.environment;
+    in {
       image = system.config.virtualisation.oci-containers.containers.deployment-control-plane-service.image;
-      imageDigestEnv =
-        system.config.virtualisation.oci-containers.containers.deployment-control-plane-service.environment.VBR_CONTROL_PLANE_IMAGE_DIGEST;
+      imageDigestEnv = env.VBR_CONTROL_PLANE_IMAGE_DIGEST;
+      imageDigestStatusEnv = env.VBR_CONTROL_PLANE_IMAGE_DIGEST_STATUS;
+      imageBuildIdentityEnv = env.VBR_CONTROL_PLANE_IMAGE_BUILD_IDENTITY;
       nginxEnabled = system.config.services.nginx.enable;
       proxyPass =
         system.config.services.nginx.virtualHosts."deploy.example.test".locations."/".proxyPass;
@@ -233,6 +242,8 @@ test("control-plane NixOS container module parameterizes image and gated nginx",
     );
     assert.equal(out.image, `registry.ops.example/deploy/control-plane@${REVIEWED_IMAGE_DIGEST}`);
     assert.equal(out.imageDigestEnv, REVIEWED_IMAGE_DIGEST);
+    assert.equal(out.imageDigestStatusEnv, "verified-registry-publication");
+    assert.equal(out.imageBuildIdentityEnv, `nix-source-${"b".repeat(64)}`);
     assert.equal(out.nginxEnabled, true);
     assert.equal(out.proxyPass, "http://127.0.0.1:7780");
   });

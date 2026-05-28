@@ -165,6 +165,11 @@ export async function runWebappLocalTsDependencyTest(options: {
       );
       await waitForHttpOk(`http://127.0.0.1:${port}/`);
       const mainModuleUrl = `http://127.0.0.1:${port}/src/main.ts`;
+      let mainEvalSerial = 0;
+      const evaluateMainText = async (): Promise<string> => {
+        mainEvalSerial += 1;
+        return await evaluateRenderedAppText(`${mainModuleUrl}?t=${Date.now()}-${mainEvalSerial}`);
+      };
       const firstMainModule = await httpGet(mainModuleUrl);
       assert.equal(firstMainModule.status, 200);
       const firstDepSpec = extractImportedUrl(firstMainModule.body, "/demo-lib");
@@ -178,7 +183,7 @@ export async function runWebappLocalTsDependencyTest(options: {
         true,
         `expected dependency module URL to resolve to source file ${libSourcePath}, got ${firstDepModuleUrl}`,
       );
-      const firstRenderedText = await evaluateRenderedAppText(mainModuleUrl);
+      const firstRenderedText = await evaluateMainText();
       assert.equal(firstRenderedText, "dep:phase1-a");
       const serverPid = devServer.pid;
 
@@ -186,7 +191,7 @@ export async function runWebappLocalTsDependencyTest(options: {
       const appLocalObserved = await waitForValue(
         async () => {
           assertNoProcessRestart(devServer, serverPid);
-          return await evaluateRenderedAppText(mainModuleUrl);
+          return await evaluateMainText();
         },
         (v) => v === "dep:phase1-a|app:phase1-local",
         120000,
@@ -201,7 +206,7 @@ export async function runWebappLocalTsDependencyTest(options: {
       const observed = await waitForValue(
         async () => {
           assertNoProcessRestart(devServer, serverPid);
-          return await evaluateRenderedAppText(mainModuleUrl);
+          return await evaluateMainText();
         },
         (v) => v === "dep:phase1-b|app:phase1-local",
         120000,

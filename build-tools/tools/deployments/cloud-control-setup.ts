@@ -56,6 +56,8 @@ export async function writeCloudControlSetupBundle(input: CloudControlSetupInput
 }
 
 export function readCloudControlSetupInput(): CloudControlSetupInput {
+  const image = getFlagStr("image", "").trim();
+  const expectedImageBuildIdentity = getFlagStr("expected-image-build-identity", "").trim();
   return {
     outDir: getFlagStr("out", "cloud-control-profile").trim(),
     mode: enumFlag("host-mode", "compose-podman", [
@@ -64,7 +66,9 @@ export function readCloudControlSetupInput(): CloudControlSetupInput {
       "saas-oci",
       "aws-ec2",
     ]),
-    image: getFlagStr("image", "").trim(),
+    image,
+    expectedImageBuildIdentity,
+    imagePublication: imagePublicationFromFlags(image),
     instanceId: getFlagStr("instance-id", "cloud-control-plane").trim(),
     publicUrl: getFlagStr("public-url", "https://deploy.example.test").trim(),
     artifactBucket: getFlagStr("artifact-bucket", "deployment-control-plane-artifacts").trim(),
@@ -90,6 +94,18 @@ export function readCloudControlSetupInput(): CloudControlSetupInput {
   };
 }
 
+function imagePublicationFromFlags(image: string): CloudControlSetupInput["imagePublication"] {
+  const sourceRevision = getFlagStr("image-source-revision", "").trim();
+  const imageBuildIdentity = getFlagStr("image-build-identity", "").trim();
+  const digest = getFlagStr("image-publication-digest", "").trim();
+  const inspectedDigest = getFlagStr("image-inspected-digest", "").trim();
+  const tag = getFlagStr("image-tag", "").trim() || sourceRevision;
+  if (![sourceRevision, imageBuildIdentity, digest, inspectedDigest, tag].some(Boolean)) {
+    return undefined;
+  }
+  return { image, sourceRevision, imageBuildIdentity, digest, inspectedDigest, tag };
+}
+
 function deploymentIds(values: string[]): string[] {
   const ids = values.map((value) => value.trim()).filter(Boolean);
   return ids.length > 0 ? ids : ["cloud-control-fixture-staging"];
@@ -109,6 +125,7 @@ function numberFlag(name: string, fallback: number): number {
 function nextCommands(input: CloudControlSetupInput): string[] {
   return [
     `deployment-control-plane setup --out ${input.outDir} --host-mode ${input.mode} --image <registry/repo@sha256:digest>`,
+    "provide --expected-image-build-identity, --image-build-identity, --image-publication-digest, and --image-inspected-digest from registry inspection",
     "stage credential files listed in credential-manifest.json",
     "run health, readiness, worker-heartbeat, artifact, and database validation commands",
   ];

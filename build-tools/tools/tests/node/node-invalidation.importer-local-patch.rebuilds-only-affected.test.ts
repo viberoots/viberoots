@@ -1,13 +1,27 @@
 #!/usr/bin/env zx-wrapper
 import * as fsp from "node:fs/promises";
 import path from "node:path";
+import { setTimeout as sleep } from "node:timers/promises";
 import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
 
+async function appendPatchChangeForBuck(
+  file: string,
+  text: string,
+  tmp: string,
+  $: any,
+): Promise<void> {
+  const before = await fsp.stat(file);
+  await fsp.appendFile(file, text, "utf8");
+  const nextMtimeMs = Math.max(Date.now() + 2000, before.mtimeMs + 2000);
+  const nextMtime = new Date(nextMtimeMs);
+  await fsp.utimes(file, nextMtime, nextMtime);
+  await $`git add -- ${path.relative(tmp, file)}`;
+  await sleep(1500);
+}
+
 test("node: importer-local patch rebuilds only affected importer's target", async () => {
   await runInTemp("node-invalidation-only-affected", async (tmp, $) => {
-    await $`git init`;
-
     // Two importers with their own lockfiles
     const lfA = path.join(tmp, "projects/apps/a/pnpm-lock.yaml");
     const lfB = path.join(tmp, "projects/apps/b/pnpm-lock.yaml");
@@ -43,6 +57,7 @@ test("node: importer-local patch rebuilds only affected importer's target", asyn
       "",
     ].join("\n");
     await fsp.writeFile(path.join(tmp, "projects/apps/b/TARGETS"), targetsB, "utf8");
+    await $`git add -A projects/apps/a projects/apps/b`;
 
     // Initial build
     await $`buck2 build --target-platforms //:no_cgo //projects/apps/a:ta //projects/apps/b:tb`;
@@ -86,7 +101,8 @@ test("node: importer-local patch rebuilds only affected importer's target", asyn
       .catch(() => "");
 
     // Change importer-local patch only for importer A (modify the declared input)
-    await fsp.appendFile(path.join(patchDirA, "base@0.0.0.patch"), "# change\n", "utf8");
+    await appendPatchChangeForBuck(path.join(patchDirA, "base@0.0.0.patch"), "# change\n", tmp, $);
+    await $`buck2 kill`;
 
     // Rebuild both targets. The declared input is an existing file, so Buck should observe the change.
     await $`buck2 build --target-platforms //:no_cgo //projects/apps/a:ta //projects/apps/b:tb`;

@@ -14,6 +14,7 @@ import {
   REQUIRED_CAPABILITY_FIELDS,
   SSH_REVIEWED_SOURCE_FILENAMES,
 } from "./cloud-control-setup-contract";
+import { validateControlPlaneImagePublicationEvidence } from "./control-plane-image-publication";
 import {
   hookEvidenceDeclaration,
   hookEvidenceRefs,
@@ -32,6 +33,16 @@ export function validateCloudControlSetupInput(input: CloudControlSetupInput): s
   if (!IMAGE_DIGEST_PATTERN.test(input.image)) {
     errors.push("control-plane image must be a registry reference pinned by @sha256 digest");
   }
+  if (!input.expectedImageBuildIdentity) {
+    errors.push("control-plane setup requires expected image build identity");
+  }
+  errors.push(
+    ...validateControlPlaneImagePublicationEvidence(
+      input.imagePublication,
+      input.image,
+      input.expectedImageBuildIdentity,
+    ),
+  );
   if (!ARTIFACT_BACKENDS.includes(input.artifactBackend)) {
     errors.push(`unsupported artifact backend ${input.artifactBackend}`);
   }

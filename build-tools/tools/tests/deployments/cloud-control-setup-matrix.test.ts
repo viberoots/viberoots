@@ -2,16 +2,11 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import YAML from "yaml";
-import {
-  capabilityDeclaration,
-  CLOUD_CAPABILITY_IDS,
-} from "../../deployments/cloud-control-setup-contract";
 import { renderCloudControlSetupBundle } from "../../deployments/cloud-control-setup-render";
 import { runCloudControlSetupCommand } from "../../deployments/cloud-control-setup";
 import {
   validateCloudControlSetupInput,
   validateCredentialManifestFiles,
-  validateProviderCapabilityDeclaration,
 } from "../../deployments/cloud-control-setup-validate";
 import type {
   CloudControlSetupInput,
@@ -21,12 +16,16 @@ import { withControlPlaneArgv } from "./control-plane-process-entrypoints.helper
 
 const DIGEST_REF =
   "registry.example.com/platform/deployment-control-plane@sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
+const DIGEST = `sha256:${"b".repeat(64)}`;
+const BUILD_IDENTITY = `nix-source-${"c".repeat(64)}`;
 
 function input(overrides: Partial<CloudControlSetupInput> = {}): CloudControlSetupInput {
   return {
     outDir: "unused",
     mode: "compose-podman",
     image: DIGEST_REF,
+    expectedImageBuildIdentity: BUILD_IDENTITY,
+    imagePublication: publicationEvidence(DIGEST_REF, DIGEST),
     instanceId: "cloud-review",
     publicUrl: "https://deploy.example.test",
     artifactBucket: "deployment-control-plane-artifacts",
@@ -46,6 +45,17 @@ function input(overrides: Partial<CloudControlSetupInput> = {}): CloudControlSet
     awsSecurityGroupIds: ["sg-123"],
     tlsEvidence: "alb-listener-dns-reviewed",
     ...overrides,
+  };
+}
+
+function publicationEvidence(image: string, digest: string) {
+  return {
+    image,
+    sourceRevision: "source-review",
+    imageBuildIdentity: BUILD_IDENTITY,
+    digest,
+    inspectedDigest: digest,
+    tag: "registry.example.com/platform/deployment-control-plane:source-review",
   };
 }
 
@@ -80,6 +90,7 @@ test("commands contain exact health, readiness, heartbeat, artifact, and databas
   assert.deepEqual(
     checklist.requiredChecks.map((check: { name: string }) => check.name),
     [
+      "image-publication",
       "health",
       "readiness",
       "worker-heartbeats",
@@ -198,43 +209,6 @@ test("AWS EC2 default artifact path requires S3 VPC endpoint evidence", () => {
   assert.match(
     validateCloudControlSetupInput(input({ mode: "aws-ec2", awsVpcEndpoint: false })).join("\n"),
     /AWS S3 VPC endpoint artifact-store evidence/,
-  );
-});
-
-test("provider capability validation rejects missing fields, ambient credentials, and raw IaC", () => {
-  const capability = capabilityDeclaration(CLOUD_CAPABILITY_IDS[0]);
-  for (const [field, patch] of [
-    ["lockScope", { lockScope: "" }],
-    ["credentialSource", { credentialSource: "" }],
-    ["rollbackProcedure", { rollbackProcedure: [] }],
-    ["protectedSharedEligibility", { protectedSharedEligibility: "" }],
-    ["smokeChecks", { smokeChecks: [] }],
-  ] as const) {
-    assert.match(
-      validateProviderCapabilityDeclaration({ ...capability, ...patch }).join("\n"),
-      new RegExp(`${field} must not be empty`),
-    );
-  }
-  assert.match(
-    validateProviderCapabilityDeclaration({
-      ...capability,
-      credentialSource: "ambient AWS_PROFILE",
-    }).join("\n"),
-    /must not use ambient credentials/,
-  );
-  assert.match(
-    validateProviderCapabilityDeclaration({
-      ...capability,
-      iac: { ...capability.iac, applyCommand: "aws ec2 run-instances" },
-    }).join("\n"),
-    /iac.applyCommand must use reviewed deploy admission/,
-  );
-  assert.match(
-    validateProviderCapabilityDeclaration({
-      ...capability,
-      targetIdentity: `${capability.id}:<reviewed-account-or-project>`,
-    }).join("\n"),
-    /must match the concrete capability catalog/,
   );
 });
 

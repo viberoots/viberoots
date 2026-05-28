@@ -1,13 +1,27 @@
 #!/usr/bin/env zx-wrapper
 import * as fsp from "node:fs/promises";
 import path from "node:path";
+import { setTimeout as sleep } from "node:timers/promises";
 import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
 
+async function appendPatchChangeForBuck(
+  file: string,
+  text: string,
+  tmp: string,
+  $: any,
+): Promise<void> {
+  const before = await fsp.stat(file);
+  await fsp.appendFile(file, text, "utf8");
+  const nextMtimeMs = Math.max(Date.now() + 2000, before.mtimeMs + 2000);
+  const nextMtime = new Date(nextMtimeMs);
+  await fsp.utimes(file, nextMtime, nextMtime);
+  await $`git add -- ${path.relative(tmp, file)}`;
+  await sleep(1500);
+}
+
 test("node: importer-local patch touch triggers rebuild of target", async () => {
   await runInTemp("node-invalidation-patch-touch", async (tmp, $) => {
-    await $`git init`;
-
     // Minimal PNPM lockfile with one importer
     const lf = path.join(tmp, "projects/apps/demo/pnpm-lock.yaml");
     await fsp.mkdir(path.dirname(lf), { recursive: true });
@@ -38,6 +52,7 @@ test("node: importer-local patch touch triggers rebuild of target", async () => 
       "",
     ].join("\n");
     await fsp.writeFile(path.join(tmp, "projects/apps/demo/TARGETS"), targets, "utf8");
+    await $`git add -A projects/apps/demo`;
 
     // Initial build
     await $`buck2 build --target-platforms //:no_cgo //projects/apps/demo:t`;
@@ -63,7 +78,8 @@ test("node: importer-local patch touch triggers rebuild of target", async () => 
     const outAbs = path.isAbsolute(outPath) ? outPath : path.join(tmp, outPath);
     const c1 = await fsp.readFile(outAbs, "utf8").then((s) => s.trim());
     // Modify the existing importer-local patch and rebuild
-    await fsp.appendFile(basePatch, "# change\n", "utf8");
+    await appendPatchChangeForBuck(basePatch, "# change\n", tmp, $);
+    await $`buck2 kill`;
 
     await $`buck2 build --target-platforms //:no_cgo //projects/apps/demo:t`;
     const so2 =

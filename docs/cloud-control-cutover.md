@@ -10,6 +10,7 @@ dashboard-only evidence:
 deployment-control-plane cutover \
   --evidence ./cloud-cutover-evidence.json \
   --expected-host-profile aws-ec2 \
+  --expected-image-build-identity nix-source-<64-hex-build-identity> \
   --expected-region us-east-1 \
   --selected-capability aws-ec2-control-plane-host,aws-s3-artifact-store \
   --out ./cloud-cutover-report.json
@@ -17,6 +18,9 @@ deployment-control-plane cutover \
 
 Required cutover evidence:
 
+- verified image publication evidence whose `image` matches the digest-pinned host profile, whose
+  build identity is `nix-source-<64-hex>`, and whose recorded digest equals registry inspection
+  evidence
 - cloud service health, readiness, worker heartbeats, database connectivity, artifact-store
   read/write/head compatibility, auth callback reachability, UI reads, and MCP reads
 - latest non-production deployment evidence from the same host profile proving traffic/ingress was

@@ -34,6 +34,21 @@ test("control-plane image publication records immutable digest and source revisi
     digest: DIGEST,
     inspectedDigest: DIGEST,
     tag: plan.tagRef,
+    digestContract: {
+      schemaVersion: "control-plane-image-digest-contract@1",
+      build: {
+        sourceRevision: "source-abc123",
+        imageBuildIdentity: BUILD_IDENTITY,
+      },
+      publication: {
+        status: "verified-registry-publication",
+        productionUsable: true,
+        image: plan.digestRef,
+        digest: DIGEST,
+        inspectedDigest: DIGEST,
+        tag: plan.tagRef,
+      },
+    },
   });
   assert.match(
     plan.commands.join("\n"),
@@ -54,6 +69,7 @@ test("control-plane image publication records build identity and registry digest
   assert.equal(plan.manifest.imageBuildIdentity, BUILD_IDENTITY);
   assert.equal(plan.manifest.digest, DIGEST);
   assert.equal(plan.manifest.inspectedDigest, DIGEST);
+  assert.equal(plan.manifest.digestContract.publication.status, "verified-registry-publication");
 });
 
 test("control-plane image publication rejects synthetic or unverified digest evidence", () => {
@@ -80,6 +96,18 @@ test("control-plane image publication rejects synthetic or unverified digest evi
         imageTarball: "/nix/store/image.tar.gz",
       }),
     /must match registry inspect evidence/,
+  );
+  assert.throws(
+    () =>
+      controlPlaneImagePublicationPlan({
+        repository: "registry.example.com/platform/deployment-control-plane",
+        sourceRevision: "source-abc123",
+        imageBuildIdentity: BUILD_IDENTITY,
+        digest: "unpublished",
+        inspectedDigest: DIGEST,
+        imageTarball: "/nix/store/image.tar.gz",
+      }),
+    /verified digest|sha256:<64 lowercase hex>/,
   );
 });
 

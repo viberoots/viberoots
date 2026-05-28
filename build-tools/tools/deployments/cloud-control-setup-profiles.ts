@@ -43,6 +43,7 @@ function serviceBlock(input: CloudControlSetupInput): string {
     `    image: ${input.image}`,
     '    user: "10001:10001"',
     `    command: ["service", "--config", "${CONFIG}"]`,
+    metadataEnvironment(input),
     "    volumes:",
     `      - ./config.yaml:${CONFIG}:ro`,
     `      - ./credentials:${CREDS}:ro`,
@@ -59,6 +60,7 @@ function workerBlock(input: CloudControlSetupInput, index: number): string {
     `    image: ${input.image}`,
     '    user: "10001:10001"',
     `    command: ["worker", "--config", "${CONFIG}", "--worker-id", "worker-${index}"]`,
+    metadataEnvironment(input),
     "    volumes:",
     `      - ./config.yaml:${CONFIG}:ro`,
     `      - ./credentials:${CREDS}:ro`,
@@ -86,6 +88,11 @@ function nixosExample(input: CloudControlSetupInput): string {
   services.viberoots.deploymentControlPlaneContainer = {
     enable = true;
     image = "${input.image}";
+    imageSourceRevision = "${input.imagePublication!.sourceRevision}";
+    imageBuildIdentity = "${input.expectedImageBuildIdentity}";
+    imageInspectedDigest = "${input.imagePublication!.inspectedDigest}";
+    imageTag = "${input.imagePublication!.tag}";
+    imageDigestStatus = "verified-registry-publication";
     instanceId = "${input.instanceId}";
     publicUrl = "${input.publicUrl}";
     reviewedSourceMode = "${input.reviewedSourceMode}";
@@ -110,6 +117,7 @@ function saasProfile(input: CloudControlSetupInput): string {
     schemaVersion: "cloud-control-saas-oci-profile@1",
     image: input.image,
     processes: processSpecs(input, "saas-oci"),
+    imagePublication: input.imagePublication,
     mounts: mountSpecs("persistent-volume"),
     runtimeUser: { uid: 10001, gid: 10001 },
     protectedSharedReady: false,
@@ -135,6 +143,7 @@ function awsProfile(input: CloudControlSetupInput): string {
       supabasePrivatelink: input.supabasePrivatelink,
     },
     systemdPodmanUnits: processSpecs(input, "aws-ec2"),
+    imagePublication: input.imagePublication,
     mounts: mountSpecs("host-path"),
     runtimeUser: { uid: 10001, gid: 10001 },
     protectedSharedReady: false,
@@ -142,9 +151,12 @@ function awsProfile(input: CloudControlSetupInput): string {
 }
 
 function systemdPodman(input: CloudControlSetupInput): string {
-  return `deployment-control-plane-service ${input.image} ${CONFIG} ${CREDS}
-deployment-control-plane-worker-1 ${input.image} ${CONFIG} ${CREDS} ${STATE}/runtime
-deployment-control-plane-worker-2 ${input.image} ${CONFIG} ${CREDS} ${STATE}/runtime
+  const env = metadataEnv(input)
+    .map(([key, value]) => `${key}=${value}`)
+    .join(" ");
+  return `deployment-control-plane-service ${input.image} ${CONFIG} ${CREDS} ${env}
+deployment-control-plane-worker-1 ${input.image} ${CONFIG} ${CREDS} ${STATE}/runtime ${env}
+deployment-control-plane-worker-2 ${input.image} ${CONFIG} ${CREDS} ${STATE}/runtime ${env}
 `;
 }
 
@@ -153,6 +165,7 @@ type RenderedProcess = {
   image: string;
   command: string[];
   mounts: string[];
+  environment: Record<string, string>;
 };
 
 function processSpecs(input: CloudControlSetupInput, substrate: string): RenderedProcess[] {
@@ -162,6 +175,7 @@ function processSpecs(input: CloudControlSetupInput, substrate: string): Rendere
       image: input.image,
       command: ["service", "--config", CONFIG],
       mounts: mountedPaths(),
+      environment: Object.fromEntries(metadataEnv(input)),
       ...(substrate === "aws-ec2"
         ? { systemdUnit: "deployment-control-plane-service.service" }
         : {}),
@@ -171,6 +185,7 @@ function processSpecs(input: CloudControlSetupInput, substrate: string): Rendere
       image: input.image,
       command: ["worker", "--config", CONFIG, "--worker-id", `worker-${index}`],
       mounts: mountedPaths(),
+      environment: Object.fromEntries(metadataEnv(input)),
       ...(substrate === "aws-ec2"
         ? { systemdUnit: `deployment-control-plane-worker-${index}.service` }
         : {}),
@@ -188,4 +203,23 @@ function mountSpecs(kind: string) {
 
 function mountedPaths(): string[] {
   return [CONFIG, CREDS, `${STATE}/records`, `${STATE}/artifacts`, `${STATE}/runtime`];
+}
+
+function metadataEnvironment(input: CloudControlSetupInput): string {
+  return [
+    "    environment:",
+    ...metadataEnv(input).map(([key, value]) => `      ${key}: ${JSON.stringify(value)}`),
+  ].join("\n");
+}
+
+function metadataEnv(input: CloudControlSetupInput): Array<[string, string]> {
+  return [
+    ["VBR_CONTROL_PLANE_SOURCE_REVISION", input.imagePublication!.sourceRevision],
+    ["VBR_CONTROL_PLANE_IMAGE_REF", input.image],
+    ["VBR_CONTROL_PLANE_IMAGE_BUILD_IDENTITY", input.expectedImageBuildIdentity],
+    ["VBR_CONTROL_PLANE_IMAGE_DIGEST", input.imagePublication!.digest],
+    ["VBR_CONTROL_PLANE_IMAGE_INSPECTED_DIGEST", input.imagePublication!.inspectedDigest],
+    ["VBR_CONTROL_PLANE_IMAGE_TAG", input.imagePublication!.tag],
+    ["VBR_CONTROL_PLANE_IMAGE_DIGEST_STATUS", "verified-registry-publication"],
+  ];
 }

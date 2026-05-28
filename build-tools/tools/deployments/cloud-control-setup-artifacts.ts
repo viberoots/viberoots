@@ -12,6 +12,7 @@ export function renderCommands(input: CloudControlSetupInput): string {
   return `${JSON.stringify(
     {
       image: input.image,
+      imagePublication: input.imagePublication,
       service:
         "deployment-control-plane service --config /etc/deployment-control-plane/config.yaml",
       workers: Array.from(
@@ -56,6 +57,11 @@ export function renderConformanceChecklist(input: CloudControlSetupInput): strin
     {
       schemaVersion: "cloud-control-conformance-checklist@1",
       requiredChecks: [
+        {
+          name: "image-publication",
+          commandRef: "image-publication.json",
+          passCondition: "registry inspection digest matches the host-profile image reference",
+        },
         {
           name: "health",
           commandRef: "commands.validations.health.command",

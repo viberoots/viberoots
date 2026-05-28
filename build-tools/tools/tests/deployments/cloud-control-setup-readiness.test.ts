@@ -7,12 +7,16 @@ import type { CloudControlSetupInput } from "../../deployments/cloud-control-set
 
 const DIGEST_REF =
   "registry.example.com/platform/deployment-control-plane@sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd";
+const DIGEST = `sha256:${"d".repeat(64)}`;
+const BUILD_IDENTITY = `nix-source-${"e".repeat(64)}`;
 
 function input(overrides: Partial<CloudControlSetupInput> = {}): CloudControlSetupInput {
   return {
     outDir: "unused",
     mode: "compose-podman",
     image: DIGEST_REF,
+    expectedImageBuildIdentity: BUILD_IDENTITY,
+    imagePublication: publicationEvidence(),
     instanceId: "cloud-review",
     publicUrl: "https://deploy.example.test",
     artifactBucket: "deployment-control-plane-artifacts",
@@ -32,6 +36,17 @@ function input(overrides: Partial<CloudControlSetupInput> = {}): CloudControlSet
     awsSecurityGroupIds: ["sg-123"],
     tlsEvidence: "alb-listener-dns-reviewed",
     ...overrides,
+  };
+}
+
+function publicationEvidence() {
+  return {
+    image: DIGEST_REF,
+    sourceRevision: "source-readiness",
+    imageBuildIdentity: BUILD_IDENTITY,
+    digest: DIGEST,
+    inspectedDigest: DIGEST,
+    tag: "registry.example.com/platform/deployment-control-plane:source-readiness",
   };
 }
 

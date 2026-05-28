@@ -8,24 +8,52 @@ export type ControlPlaneImagePublicationInput = {
   tag?: string;
 };
 
+export type ControlPlaneImagePublicationEvidence = {
+  image: string;
+  sourceRevision: string;
+  imageBuildIdentity: string;
+  digest: string;
+  inspectedDigest: string;
+  tag: string;
+};
+
 export type ControlPlaneImagePublicationPlan = {
   repository: string;
   sourceRevision: string;
   digest: string;
   tagRef: string;
   digestRef: string;
-  manifest: {
-    image: string;
-    sourceRevision: string;
-    imageBuildIdentity: string;
-    digest: string;
-    inspectedDigest: string;
-    tag: string;
+  manifest: ControlPlaneImagePublicationEvidence & {
+    digestContract: ControlPlaneImageDigestContract;
   };
   commands: string[];
 };
 
 const DIGEST_PATTERN = /^sha256:[a-f0-9]{64}$/;
+const BUILD_ONLY_STATUS = "build-only";
+const VERIFIED_STATUS = "verified-registry-publication";
+
+export type ControlPlaneImageDigestContract = {
+  schemaVersion: "control-plane-image-digest-contract@1";
+  build: {
+    sourceRevision: string;
+    imageBuildIdentity: string;
+  };
+  publication:
+    | {
+        status: typeof BUILD_ONLY_STATUS;
+        productionUsable: false;
+        registryDigestRequired: true;
+      }
+    | {
+        status: typeof VERIFIED_STATUS;
+        productionUsable: true;
+        image: string;
+        digest: string;
+        inspectedDigest: string;
+        tag: string;
+      };
+};
 
 export function controlPlaneImagePublicationPlan(
   input: ControlPlaneImagePublicationInput,
@@ -48,6 +76,14 @@ export function controlPlaneImagePublicationPlan(
   const tag = cleanTag(input.tag || sourceRevision);
   const tagRef = `${repository}:${tag}`;
   const digestRef = `${repository}@${digest}`;
+  const digestContract = verifiedControlPlaneImageDigestContract({
+    image: digestRef,
+    sourceRevision,
+    imageBuildIdentity,
+    digest,
+    inspectedDigest,
+    tag: tagRef,
+  });
   const manifest = {
     image: digestRef,
     sourceRevision,
@@ -55,6 +91,7 @@ export function controlPlaneImagePublicationPlan(
     digest,
     inspectedDigest,
     tag: tagRef,
+    digestContract,
   };
   return {
     repository,
@@ -70,6 +107,74 @@ export function controlPlaneImagePublicationPlan(
       `printf '%s\\n' ${shellQuote(JSON.stringify(manifest))}`,
     ],
   };
+}
+
+export function buildOnlyControlPlaneImageDigestContract(
+  sourceRevision: string,
+  imageBuildIdentity: string,
+): ControlPlaneImageDigestContract {
+  return {
+    schemaVersion: "control-plane-image-digest-contract@1",
+    build: {
+      sourceRevision: required("sourceRevision", sourceRevision),
+      imageBuildIdentity: cleanImageBuildIdentity(imageBuildIdentity),
+    },
+    publication: {
+      status: BUILD_ONLY_STATUS,
+      productionUsable: false,
+      registryDigestRequired: true,
+    },
+  };
+}
+
+export function verifiedControlPlaneImageDigestContract(
+  evidence: ControlPlaneImagePublicationEvidence,
+): ControlPlaneImageDigestContract {
+  const image = assertControlPlaneImageDigestReference(evidence.image);
+  const digest = required("digest", evidence.digest).toLowerCase();
+  const inspectedDigest = required("inspectedDigest", evidence.inspectedDigest).toLowerCase();
+  if (!image.endsWith(`@${digest}`)) {
+    throw new Error("control-plane image publication evidence must match image digest reference");
+  }
+  if (digest !== inspectedDigest) {
+    throw new Error("control-plane image publication evidence must match registry inspect digest");
+  }
+  return {
+    schemaVersion: "control-plane-image-digest-contract@1",
+    build: {
+      sourceRevision: required("sourceRevision", evidence.sourceRevision),
+      imageBuildIdentity: cleanImageBuildIdentity(evidence.imageBuildIdentity),
+    },
+    publication: {
+      status: VERIFIED_STATUS,
+      productionUsable: true,
+      image,
+      digest,
+      inspectedDigest,
+      tag: required("tag", evidence.tag),
+    },
+  };
+}
+
+export function validateControlPlaneImagePublicationEvidence(
+  evidence: ControlPlaneImagePublicationEvidence | undefined,
+  expectedImageRef: string,
+  expectedBuildIdentity?: string,
+): string[] {
+  const errors: string[] = [];
+  if (!evidence) return ["control-plane image requires verified publication evidence"];
+  try {
+    verifiedControlPlaneImageDigestContract(evidence);
+  } catch (error) {
+    errors.push(error instanceof Error ? error.message : String(error));
+  }
+  if (evidence.image !== expectedImageRef) {
+    errors.push("control-plane image publication evidence does not match requested image");
+  }
+  if (expectedBuildIdentity && evidence.imageBuildIdentity !== expectedBuildIdentity) {
+    errors.push("control-plane image publication evidence does not match expected build identity");
+  }
+  return errors;
 }
 
 export function assertControlPlaneImageDigestReference(imageRef: string): string {
@@ -116,6 +221,9 @@ function cleanImageBuildIdentity(value: string): string {
 function required(name: string, value: string): string {
   const trimmed = String(value || "").trim();
   if (!trimmed) throw new Error(`control-plane image publication requires ${name}`);
+  if (/^(unknown|null|unpublished)$/i.test(trimmed)) {
+    throw new Error(`control-plane image publication requires verified ${name}`);
+  }
   return trimmed;
 }
 

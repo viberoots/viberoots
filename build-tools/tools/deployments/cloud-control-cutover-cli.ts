@@ -16,9 +16,14 @@ export async function runCloudControlCutoverCommand() {
   if (!expectedHostProfile) {
     throw new Error("cutover validation requires --expected-host-profile <trusted-host-profile>");
   }
+  const expectedImageBuildIdentity = getFlagStr("expected-image-build-identity", "").trim();
+  if (!expectedImageBuildIdentity) {
+    throw new Error("cutover validation requires --expected-image-build-identity <nix-source>");
+  }
   const result = validateCloudControlCutover(evidence, {
     operation,
     expectedHostProfile,
+    expectedImageBuildIdentity,
     expectedRegion: getFlagStr("expected-region", "").trim() || undefined,
     selectedCapabilities: selectedCapabilities(evidence),
     maxAgeMinutes: Number(getFlagStr("max-age-minutes", "1440").trim() || "1440"),

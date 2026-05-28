@@ -8,6 +8,7 @@ import {
   validateAwsCutoverTopology,
 } from "./cloud-control-cutover-aws";
 import { validateCutoverProviderCapabilities } from "./cloud-control-cutover-provider-capabilities";
+import { validateControlPlaneImagePublicationEvidence } from "./control-plane-image-publication";
 
 const BASE_HEALTH = [
   "cloudHealth",
@@ -27,6 +28,7 @@ export function validateCloudControlCutover(
   const errors = [
     ...validateIdentity(evidence, options),
     ...validateBaseHealth(evidence),
+    ...validateImagePublication(evidence, options),
     ...validateLatestDeployment(evidence, options),
     ...validateCutoverProviderCapabilities(
       evidence,
@@ -37,6 +39,27 @@ export function validateCloudControlCutover(
     ...validateAudit(evidence, options.operation),
   ];
   return { ok: errors.length === 0, errors, checklist: checklist(options) };
+}
+
+function validateImagePublication(
+  evidence: CutoverEvidence,
+  options: CutoverValidationOptions,
+): string[] {
+  const image = String(evidence.latestNonProductionDeployment?.image || "");
+  const errors = [
+    ...(image ? [] : ["missing latest non-production image digest evidence"]),
+    ...(options.expectedImageBuildIdentity
+      ? []
+      : ["cutover validation requires expected image build identity"]),
+  ];
+  return [
+    ...errors,
+    ...validateControlPlaneImagePublicationEvidence(
+      evidence.imagePublication,
+      image,
+      options.expectedImageBuildIdentity,
+    ),
+  ];
 }
 
 function requiredProviderCapabilities(

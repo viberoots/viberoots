@@ -75,7 +75,8 @@ This means:
 
 - image contents are assembled by Nix from reviewed nixpkgs inputs and repo derivations
 - image identity is pinned by immutable digest in production
-- image metadata reports version, source revision, and digest
+- image metadata reports version, source revision, build identity, and verified publication digest
+  status
 - runtime tools are explicit Nix closures
 - no mutable base distro image is used
 - no credentials are baked into image layers
@@ -337,7 +338,8 @@ The image expression at
 - non-root uid/gid `10001:10001`
 - no credentials in image layers
 - service and worker commands from one image
-- contract derivation with required mounts and prohibited paths
+- contract derivation with required mounts, prohibited paths, build identity, and explicit build-only
+  versus verified-registry-publication digest status
 
 The layer inspection test must check the prohibited-path threat model, including indirect captures
 through bundling or Nix store closure inclusion.

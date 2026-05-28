@@ -13,10 +13,18 @@ const COMPOSE_IMAGE_REF =
 
 test("non-NixOS host profile requires digest-assembled image references", async () => {
   const compose = YAML.parse(await readProfileFile("compose.yaml")) as {
-    services: Record<string, { image?: string }>;
+    services: Record<string, { image?: string; environment?: Record<string, string> }>;
   };
   for (const service of Object.values(compose.services)) {
     assert.equal(service.image, COMPOSE_IMAGE_REF);
+    assert.equal(
+      service.environment?.VBR_CONTROL_PLANE_IMAGE_DIGEST_STATUS,
+      "verified-registry-publication",
+    );
+    assert.match(
+      service.environment?.VBR_CONTROL_PLANE_IMAGE_BUILD_IDENTITY || "",
+      /VBR_CONTROL_PLANE_IMAGE_BUILD_IDENTITY/,
+    );
     assert.doesNotMatch(service.image || "", /VBR_CONTROL_PLANE_IMAGE[:?}]/);
     assert.match(service.image || "", /@.*VBR_CONTROL_PLANE_IMAGE_DIGEST/);
   }

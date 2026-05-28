@@ -2,16 +2,20 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { validateCloudControlCutover } from "../../deployments/cloud-control-cutover-validate";
-import { evidence, capabilityEvidence } from "./cloud-control-cutover-fixture";
+import {
+  capabilityEvidence,
+  evidence,
+  IMAGE_BUILD_IDENTITY,
+} from "./cloud-control-cutover-fixture";
 
 const opts = {
   operation: "cutover" as const,
   expectedHostProfile: "aws-ec2",
+  expectedImageBuildIdentity: IMAGE_BUILD_IDENTITY,
   expectedRegion: "us-east-1",
   selectedCapabilities: ["aws-ec2-control-plane-host"],
   maxAgeMinutes: 60,
 };
-
 test("AWS cutover rejects wrong region and mismatched topology evidence", () => {
   const result = validateCloudControlCutover(
     evidence({

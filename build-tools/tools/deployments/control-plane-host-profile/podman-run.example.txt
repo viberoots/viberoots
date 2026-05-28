@@ -1,6 +1,12 @@
 printf '%s\n' "${VBR_CONTROL_PLANE_IMAGE_DIGEST:?set immutable sha256 image digest}" \
   | grep -Eq '^sha256:[0-9a-f]{64}$' \
   || { echo "VBR_CONTROL_PLANE_IMAGE_DIGEST must be sha256:<64 lowercase hex>" >&2; exit 2; }
+printf '%s\n' "${VBR_CONTROL_PLANE_IMAGE_INSPECTED_DIGEST:?set registry inspected sha256 image digest}" \
+  | grep -Eq '^sha256:[0-9a-f]{64}$' \
+  || { echo "VBR_CONTROL_PLANE_IMAGE_INSPECTED_DIGEST must be sha256:<64 lowercase hex>" >&2; exit 2; }
+printf '%s\n' "${VBR_CONTROL_PLANE_IMAGE_BUILD_IDENTITY:?set reviewed nix-source image build identity}" \
+  | grep -Eq '^nix-source-[0-9a-f]{64}$' \
+  || { echo "VBR_CONTROL_PLANE_IMAGE_BUILD_IDENTITY must be nix-source-<64 lowercase hex>" >&2; exit 2; }
 
 VBR_CONTROL_PLANE_IMAGE_REF="${VBR_CONTROL_PLANE_IMAGE_REGISTRY:?set image registry}/${VBR_CONTROL_PLANE_IMAGE_REPOSITORY:?set image repository}@${VBR_CONTROL_PLANE_IMAGE_DIGEST}"
 
@@ -16,7 +22,13 @@ podman run -d --pod deployment-control-plane \
   --mount type=bind,source="${VBR_CONTROL_PLANE_RECORDS:-./state/records}",target=/var/lib/deployment-control-plane/records \
   --mount type=bind,source="${VBR_CONTROL_PLANE_ARTIFACTS:-./state/artifacts}",target=/var/lib/deployment-control-plane/artifacts \
   --mount type=bind,source="${VBR_CONTROL_PLANE_RUNTIME:-./state/runtime}",target=/var/lib/deployment-control-plane/runtime \
-  --env VBR_CONTROL_PLANE_IMAGE_DIGEST="${VBR_CONTROL_PLANE_IMAGE_DIGEST:-unknown}" \
+  --env VBR_CONTROL_PLANE_SOURCE_REVISION="${VBR_CONTROL_PLANE_SOURCE_REVISION:?set reviewed source revision}" \
+  --env VBR_CONTROL_PLANE_IMAGE_REF="${VBR_CONTROL_PLANE_IMAGE_REF}" \
+  --env VBR_CONTROL_PLANE_IMAGE_BUILD_IDENTITY="${VBR_CONTROL_PLANE_IMAGE_BUILD_IDENTITY}" \
+  --env VBR_CONTROL_PLANE_IMAGE_DIGEST="${VBR_CONTROL_PLANE_IMAGE_DIGEST}" \
+  --env VBR_CONTROL_PLANE_IMAGE_INSPECTED_DIGEST="${VBR_CONTROL_PLANE_IMAGE_INSPECTED_DIGEST}" \
+  --env VBR_CONTROL_PLANE_IMAGE_TAG="${VBR_CONTROL_PLANE_IMAGE_TAG:?set reviewed publication tag}" \
+  --env VBR_CONTROL_PLANE_IMAGE_DIGEST_STATUS="verified-registry-publication" \
   "${VBR_CONTROL_PLANE_IMAGE_REF}" \
   deployment-control-plane service --config /etc/deployment-control-plane/config.yaml
 
@@ -28,7 +40,13 @@ podman run -d --pod deployment-control-plane \
   --mount type=bind,source="${VBR_CONTROL_PLANE_RECORDS:-./state/records}",target=/var/lib/deployment-control-plane/records \
   --mount type=bind,source="${VBR_CONTROL_PLANE_ARTIFACTS:-./state/artifacts}",target=/var/lib/deployment-control-plane/artifacts \
   --mount type=bind,source="${VBR_CONTROL_PLANE_RUNTIME:-./state/runtime}",target=/var/lib/deployment-control-plane/runtime \
-  --env VBR_CONTROL_PLANE_IMAGE_DIGEST="${VBR_CONTROL_PLANE_IMAGE_DIGEST:-unknown}" \
+  --env VBR_CONTROL_PLANE_SOURCE_REVISION="${VBR_CONTROL_PLANE_SOURCE_REVISION:?set reviewed source revision}" \
+  --env VBR_CONTROL_PLANE_IMAGE_REF="${VBR_CONTROL_PLANE_IMAGE_REF}" \
+  --env VBR_CONTROL_PLANE_IMAGE_BUILD_IDENTITY="${VBR_CONTROL_PLANE_IMAGE_BUILD_IDENTITY}" \
+  --env VBR_CONTROL_PLANE_IMAGE_DIGEST="${VBR_CONTROL_PLANE_IMAGE_DIGEST}" \
+  --env VBR_CONTROL_PLANE_IMAGE_INSPECTED_DIGEST="${VBR_CONTROL_PLANE_IMAGE_INSPECTED_DIGEST}" \
+  --env VBR_CONTROL_PLANE_IMAGE_TAG="${VBR_CONTROL_PLANE_IMAGE_TAG:?set reviewed publication tag}" \
+  --env VBR_CONTROL_PLANE_IMAGE_DIGEST_STATUS="verified-registry-publication" \
   "${VBR_CONTROL_PLANE_IMAGE_REF}" \
   deployment-control-plane worker --config /etc/deployment-control-plane/config.yaml
 
@@ -40,6 +58,12 @@ podman run -d --pod deployment-control-plane \
   --mount type=bind,source="${VBR_CONTROL_PLANE_RECORDS:-./state/records}",target=/var/lib/deployment-control-plane/records \
   --mount type=bind,source="${VBR_CONTROL_PLANE_ARTIFACTS:-./state/artifacts}",target=/var/lib/deployment-control-plane/artifacts \
   --mount type=bind,source="${VBR_CONTROL_PLANE_RUNTIME:-./state/runtime}",target=/var/lib/deployment-control-plane/runtime \
-  --env VBR_CONTROL_PLANE_IMAGE_DIGEST="${VBR_CONTROL_PLANE_IMAGE_DIGEST:-unknown}" \
+  --env VBR_CONTROL_PLANE_SOURCE_REVISION="${VBR_CONTROL_PLANE_SOURCE_REVISION:?set reviewed source revision}" \
+  --env VBR_CONTROL_PLANE_IMAGE_REF="${VBR_CONTROL_PLANE_IMAGE_REF}" \
+  --env VBR_CONTROL_PLANE_IMAGE_BUILD_IDENTITY="${VBR_CONTROL_PLANE_IMAGE_BUILD_IDENTITY}" \
+  --env VBR_CONTROL_PLANE_IMAGE_DIGEST="${VBR_CONTROL_PLANE_IMAGE_DIGEST}" \
+  --env VBR_CONTROL_PLANE_IMAGE_INSPECTED_DIGEST="${VBR_CONTROL_PLANE_IMAGE_INSPECTED_DIGEST}" \
+  --env VBR_CONTROL_PLANE_IMAGE_TAG="${VBR_CONTROL_PLANE_IMAGE_TAG:?set reviewed publication tag}" \
+  --env VBR_CONTROL_PLANE_IMAGE_DIGEST_STATUS="verified-registry-publication" \
   "${VBR_CONTROL_PLANE_IMAGE_REF}" \
   deployment-control-plane worker --config /etc/deployment-control-plane/config.yaml
