@@ -1,5 +1,6 @@
 load("//build-tools/lang:nix_action_runner.bzl", "nix_action_build_selected_out_path_cmd")
 load("//build-tools/lang:nix_shell.bzl", "nix_cmd_prefix")
+load("//build-tools/lang:remote_action_policy.bzl", "run_nix_action")
 
 def _go_nix_build_carchive_impl(ctx):
     raw = ctx.attrs.self_label
@@ -49,7 +50,7 @@ def _go_nix_build_carchive_impl(ctx):
         ["bash", "-c", run_and_copy, out.as_output()],
         hidden = ctx.attrs.srcs + ctx.attrs.nix_inputs,
     )
-    ctx.actions.run(cmd, category = "go_nix_build_carchive")
+    run_nix_action(ctx, cmd, category = "go_nix_build_carchive")
     return [DefaultInfo(default_output = out)]
 
 go_nix_build_carchive = rule(

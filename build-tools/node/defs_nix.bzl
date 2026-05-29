@@ -1,5 +1,6 @@
 load("@prelude//:rules.bzl", "genrule")
 load("//build-tools/lang:importer_strings.bzl", "importer_display_name", "sanitize_importer_for_nix_attr")
+load("//build-tools/lang:remote_action_policy.bzl", "stamp_local_only_genrule_labels")
 load(
     "//build-tools/lang:nix_shell.bzl",
     "nix_calling_env_export_buck_graph_json",
@@ -74,6 +75,7 @@ def node_webapp(
 
     kw["out"] = out if out != None else "dist"
     kw["cmd"] = cmd
+    kw["labels"] = stamp_local_only_genrule_labels(kw.get("labels", []) or [])
     genrule(**kw)
 def nix_node_cli_bin(
     name,
@@ -150,6 +152,7 @@ def nix_node_cli_bin(
         )
         kw["out"] = out
         kw["cmd"] = cmd
+        kw["labels"] = stamp_local_only_genrule_labels(kw.get("labels", []) or [])
         genrule(**kw)
         return
     if entry == None:
@@ -209,4 +212,5 @@ def nix_node_cli_bin(
     )
     kw["out"] = out
     kw["cmd"] = cmd
+    kw["labels"] = stamp_local_only_genrule_labels(kw.get("labels", []) or [])
     genrule(**kw)

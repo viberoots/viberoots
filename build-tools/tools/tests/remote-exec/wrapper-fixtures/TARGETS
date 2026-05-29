@@ -12,46 +12,46 @@ export_file(
 
 zx_test(
     name = "zx_local",
-    labels = ["fixture:local", "existing:label"],
+    labels = ["fixture:local", "existing:label", "verify:manual"],
     script = "noop.test.ts",
 )
 
 zx_test(
     name = "zx_remote",
-    labels = ["fixture:remote", "existing:label"],
+    labels = ["fixture:remote", "existing:label", "verify:manual"],
     remote_execution = "linux-x86_64-default",
     script = "noop.test.ts",
 )
 
 zx_test(
     name = "zx_local_labeled_bundle_ignore",
-    labels = ["fixture:local", "existing:label", "re_ignore_force_run_as_bundle"],
+    labels = ["fixture:local", "existing:label", "re_ignore_force_run_as_bundle", "verify:manual"],
     script = "noop.test.ts",
 )
 
 node_nix_test(
     name = "node_local",
     importer = ".",
-    labels = ["fixture:local", "existing:label"],
+    labels = ["fixture:local", "existing:label", "verify:manual"],
 )
 
 node_nix_test(
     name = "node_remote",
     importer = ".",
-    labels = ["fixture:remote", "existing:label"],
+    labels = ["fixture:remote", "existing:label", "verify:manual"],
     remote_execution = "linux-x86_64-default",
 )
 
 go_nix_test(
     name = "go_local",
-    labels = ["fixture:local", "existing:label"],
+    labels = ["fixture:local", "existing:label", "lang:go", "patch_scope:package-local", "verify:manual"],
     out = "go_local.stamp",
     self_label = "//build-tools/tools/tests/remote-exec/wrapper-fixtures:go_local",
 )
 
 go_nix_test(
     name = "go_remote",
-    labels = ["fixture:remote", "existing:label"],
+    labels = ["fixture:remote", "existing:label", "lang:go", "patch_scope:package-local", "verify:manual"],
     out = "go_remote.stamp",
     remote_execution = "linux-x86_64-default",
     self_label = "//build-tools/tools/tests/remote-exec/wrapper-fixtures:go_remote",
@@ -59,14 +59,14 @@ go_nix_test(
 
 python_nix_test(
     name = "python_local",
-    labels = ["fixture:local", "existing:label"],
+    labels = ["fixture:local", "existing:label", "verify:manual"],
     out = "python_local.stamp",
     self_label = "//build-tools/tools/tests/remote-exec/wrapper-fixtures:python_local",
 )
 
 python_nix_test(
     name = "python_remote",
-    labels = ["fixture:remote", "existing:label"],
+    labels = ["fixture:remote", "existing:label", "verify:manual"],
     out = "python_remote.stamp",
     remote_execution = "linux-x86_64-default",
     self_label = "//build-tools/tools/tests/remote-exec/wrapper-fixtures:python_remote",
@@ -74,7 +74,7 @@ python_nix_test(
 
 cpp_nix_test(
     name = "cpp_local",
-    labels = ["fixture:local", "existing:label"],
+    labels = ["fixture:local", "existing:label", "verify:manual"],
     out = "cpp_local.stamp",
     planner = ":cpp_planner",
     planner_label = "//build-tools/tools/tests/remote-exec/wrapper-fixtures:cpp_local__planner",
@@ -82,7 +82,7 @@ cpp_nix_test(
 
 cpp_nix_test(
     name = "cpp_remote",
-    labels = ["fixture:remote", "existing:label"],
+    labels = ["fixture:remote", "existing:label", "verify:manual"],
     out = "cpp_remote.stamp",
     planner = ":cpp_planner",
     planner_label = "//build-tools/tools/tests/remote-exec/wrapper-fixtures:cpp_remote__planner",

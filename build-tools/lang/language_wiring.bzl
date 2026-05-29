@@ -10,6 +10,7 @@ load(
     "prepare_importer_non_genrule_nix_calling_wiring",
 )
 load("//build-tools/lang:lang_contracts.bzl", "patch_invalidation_strategy_for_lang")
+load("//build-tools/lang:remote_action_policy.bzl", "stamp_remote_readiness_labels")
 load(
     "//build-tools/lang/internal:nix_calling_importer_genrule_wiring.bzl",
     "prepare_importer_nix_calling_genrule_wiring",
@@ -27,12 +28,10 @@ def _clone_labels(labels):
 def _apply_labels(kwargs, labels):
     kw = dict(kwargs) if kwargs != None else {}
     extra = _clone_labels(labels)
-    if len(extra) == 0:
-        return kw
     current = kw.get("labels", []) or []
     if not isinstance(current, list):
         current = []
-    kw["labels"] = current + extra
+    kw["labels"] = stamp_remote_readiness_labels(current + extra)
     return kw
 
 def _require_strategy(lang):
@@ -118,7 +117,7 @@ def prepare_language_wiring(
             deps = deps2,
             lang = lang,
             kind = kind,
-            labels = labels,
+            labels = stamp_remote_readiness_labels(labels),
             lockfile_label = lockfile_label,
             patch_into = patch_into,
             patch_base = patch_base,
@@ -140,7 +139,7 @@ def prepare_language_wiring(
             deps = deps2,
             lang = lang,
             kind = kind,
-            labels = labels,
+            labels = stamp_remote_readiness_labels(labels),
             lockfile_label = lockfile_label,
             patch_into = patch_into,
             patch_base = patch_base,
@@ -166,7 +165,7 @@ def prepare_language_wiring(
             deps = deps2,
             lang = lang,
             kind = kind,
-            labels = labels,
+            labels = stamp_remote_readiness_labels(labels),
             lockfile_label = lockfile_label,
             MODULE_PROVIDERS = MODULE_PROVIDERS,
             patch_key_prefix = patch_key_prefix,
@@ -185,7 +184,7 @@ def prepare_language_wiring(
             deps = deps2,
             lang = lang,
             kind = kind,
-            labels = labels,
+            labels = stamp_remote_readiness_labels(labels),
             lockfile_label = lockfile_label,
             MODULE_PROVIDERS = MODULE_PROVIDERS,
             patch_key_prefix = patch_key_prefix,
@@ -204,7 +203,7 @@ def prepare_language_wiring(
             deps = deps2,
             lang = lang,
             kind = kind,
-            labels = labels,
+            labels = stamp_remote_readiness_labels(labels),
             lockfile_label = lockfile_label,
             patch_dep_into = patch_dep_into,
             patch_dep_suffix = patch_dep_suffix,

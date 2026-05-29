@@ -48,13 +48,16 @@ async function runNodeScript(
 async function runNodeScriptWithOutput(
   script: string,
   env: NodeJS.ProcessEnv = process.env,
+  opts: { cwd?: string; eval?: boolean } = {},
 ): Promise<{ code: number; stdout: string; stderr: string }> {
   const zxInit = path.join(process.cwd(), "build-tools", "tools", "dev", "zx-init.mjs");
   const child = spawn(
     process.execPath,
-    ["--experimental-strip-types", "--import", zxInit, script],
+    opts.eval
+      ? ["--experimental-strip-types", "--import", zxInit, "--input-type=module", "--eval", script]
+      : ["--experimental-strip-types", "--import", zxInit, script],
     {
-      cwd: process.cwd(),
+      cwd: opts.cwd || process.cwd(),
       env,
       stdio: ["ignore", "pipe", "pipe"],
     },
@@ -72,6 +75,22 @@ async function runNodeScriptWithOutput(
   const [code] = (await once(child, "close")) as [number | null];
   return { code: typeof code === "number" ? code : 1, stdout, stderr };
 }
+
+test("zx-init resolves repo node_modules when the child cwd is outside the repo", async () => {
+  const dir = await fsp.mkdtemp(path.join(os.tmpdir(), "zx-init-repo-node-modules-"));
+  try {
+    const env = { ...process.env, NODE_PATH: "" };
+    const result = await runNodeScriptWithOutput(
+      "import fs from 'fs-extra'; console.log(typeof fs.pathExists);",
+      env,
+      { cwd: dir, eval: true },
+    );
+    assert.equal(result.code, 0, result.stderr);
+    assert.equal(result.stdout.trim(), "function");
+  } finally {
+    await fsp.rm(dir, { recursive: true, force: true });
+  }
+});
 
 test("zx-init registers verify-owned processes only when explicitly opted in", async () => {
   const dir = await fsp.mkdtemp(path.join(os.tmpdir(), "zx-init-verify-registration-"));

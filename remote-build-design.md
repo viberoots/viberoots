@@ -527,13 +527,19 @@ Acceptance:
 
 Add a Buck-visible metadata surface for remote status:
 
-- `remote:local-only`
-- `remote:ready`
-- `remote:needs-source-snapshot`
-- `remote:external-readonly`
-- `remote:external-mutating-locked`
+- `remote:local-only`: the target/action is allowed only on the invoking host. This is the
+  default for repo-owned Nix-backed wrappers and actions.
+- `remote:ready`: the target has declared command inputs, project-relative execution flags, source
+  snapshot evidence, materialization, artifact, builder-policy, smoke, and profile compatibility
+  evidence.
+- `remote:needs-source-snapshot`: the target cannot graduate until workspace reads are replaced by a
+  declared project-relative source snapshot.
+- `remote:external-readonly`: the target reads external state and needs reviewed remote egress and
+  credential boundaries before remote-only conformance.
+- `remote:external-mutating-locked`: the target mutates external state and additionally needs a
+  lock/fencing capability before remote mode can select it.
 
-Use labels initially because the verify planner already reads labels. Later this can become a stricter rule attr if needed.
+Use labels initially because the verify planner already reads labels. Later this can become a stricter rule attr if needed. In remote mode, absence of `remote:ready` is treated as local-only and rejected before Buck test execution.
 
 Default every repo-owned Nix-backed test/build wrapper to local-only by policy. Do not trust absence of a label as ready.
 
@@ -543,7 +549,9 @@ Fix wrapper label propagation at the same time. Some repo-owned wrappers have a 
 - `build-tools/python/private/nix_test.bzl`
 - `build-tools/cpp/private/nix_test.bzl`
 
-Those providers should use `labels = ctx.attrs.labels` so test-runner metadata, verify cquery metadata, policy checks, and event-log summaries agree. Wrapper macros should add `remote:local-only` by default until their family is explicitly converted.
+Those providers should use the same readiness-label helper as cquery-visible macro labels so
+test-runner metadata, verify cquery metadata, policy checks, and event-log summaries agree. Wrapper
+macros should add `remote:local-only` by default until their family is explicitly converted.
 
 For repo-owned Nix-backed build actions, labels alone are not enough. Once an opt-in remote execution platform is selected, ordinary `ctx.actions.run` actions can be scheduled remotely unless the action itself is constrained. Add a shared Starlark helper for Nix-backed actions, for example:
 
@@ -552,6 +560,7 @@ For repo-owned Nix-backed build actions, labels alone are not enough. Once an op
 The helper should make the default explicit:
 
 - local-only action: pass `local_only = True` to `ctx.actions.run` and stamp policy metadata for static checks;
+- local-only genrule wrappers: stamp `remote:local-only` and the Prelude local-scheduling label used by genrule to set `local_only = True`;
 - remote-ready action: require declared source snapshot, materialization manifest, artifact contract, builder policy, and remote profile compatibility before allowing `local_only = False`;
 - hybrid action: require the same remote-ready evidence plus an explicit fallback reason.
 
@@ -570,9 +579,9 @@ Add a policy check:
 
 Checks:
 
-- remote mode cannot select targets labeled `remote:local-only`;
+- remote mode cannot select targets labeled `remote:local-only` or targets missing explicit `remote:ready`;
 - external mutating tests require a lock capability before remote mode;
-- remote-ready targets must also have `run_from_project_root` and `use_project_relative_paths` true;
+- remote-ready targets must also have provider evidence for `run_from_project_root` and `use_project_relative_paths` true;
 - resource labels map to a valid profile.
 - remote-ready tests must not require Buck local resources unless the selected lane is explicitly hybrid/local-fallback and the local resource requirement is reported;
 - remote-ready tests that request provider-level network access must name an explicit reviewed remote egress capability, credential boundary, and lock/idempotency policy where applicable;
@@ -581,6 +590,12 @@ Checks:
 Buck test providers can also carry `local_resources` / `required_local_resources` for resources that only exist on the invoking host. Add provider/cquery coverage for these fields. A target with required local resources must stay `remote:local-only` until that dependency is either removed, represented by a remote worker capability, or handled through an explicit hybrid fallback policy. Do not rely on RE to supply local-resource semantics implicitly.
 
 Buck test providers can also expose `network_access`. The policy checker must inspect provider/cquery output for it. Tests needing network stay `remote:local-only`, `remote:external-readonly`, or `remote:external-mutating-locked` until the design names the remote egress class, credentials, locks/idempotency where relevant, and worker-network capability. Remote mode must not infer network permission from the worker's ambient egress.
+
+Provider fields that block remote-only conformance are: `local_resources`,
+`required_local_resources`, `network_access`, missing `run_from_project_root`, missing
+`use_project_relative_paths`, undeclared command inputs, and plain required `$WORKSPACE_ROOT`
+lookups. A remote-ready wrapper must model each of those as a remote worker capability, egress/lock
+policy, declared input handle, or source snapshot before the policy checker can allow it.
 
 Acceptance:
 

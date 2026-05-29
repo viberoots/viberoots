@@ -2,6 +2,7 @@ load("//build-tools/lang:sanitize.bzl", "sanitize_name")
 load("//build-tools/lang:nix_shell.bzl", "nix_bootstrap_env_core", "nix_timeout_wrapper_var")
 load("//build-tools/lang:nix_attr.bzl", "sanitize_nix_attr_from_target_label")
 load("//build-tools/lang:nix_action_runner.bzl", "nix_action_build_selected_out_path_cmd")
+load("//build-tools/lang:remote_action_policy.bzl", "run_nix_action", "stamp_remote_readiness_labels")
 load("@prelude//:build_mode.bzl", "BuildModeInfo")
 load("@prelude//decls:re_test_common.bzl", "re_test_common")
 load("@prelude//test:inject_test_run_info.bzl", "inject_test_run_info")
@@ -55,12 +56,12 @@ def _cpp_nix_test_impl(ctx):
         ["bash", "-c", "echo cpp_nix_test > \"$1\"", "stamp", stamp.as_output()],
         hidden = ctx.attrs.nix_inputs,
     )
-    ctx.actions.run(stamp_cmd, category = "cpp_nix_test_stamp")
+    run_nix_action(ctx, stamp_cmd, category = "cpp_nix_test_stamp")
     re_executor, executor_overrides = get_re_executors_from_props(ctx)
     return inject_test_run_info(ctx, ExternalRunnerTestInfo(
             type = "custom",
             command = ["bash", "-c", run_and_exec],
-            labels = ctx.attrs.labels,
+            labels = stamp_remote_readiness_labels(ctx.attrs.labels),
             contacts = [],
             default_executor = re_executor,
             executor_overrides = executor_overrides,

@@ -3,7 +3,7 @@
 const urlMod = await import("node:url");
 const pathMod = await import("node:path");
 const here = urlMod.fileURLToPath(import.meta.url);
-const WORKSPACE_ROOT_FIXED = pathMod.dirname(pathMod.dirname(pathMod.dirname(here)));
+const WORKSPACE_ROOT_FIXED = pathMod.resolve(pathMod.dirname(here), "../../..");
 // Ensure zx globals are available as early as possible via bare import using NODE_PATH
 // This covers cases where workspace/node_modules is not present in sandboxes but NODE_PATH points
 // to a host workspace node_modules. Fail silently if not available; other strategies follow.

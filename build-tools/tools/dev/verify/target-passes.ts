@@ -3,9 +3,11 @@ import process from "node:process";
 import { normalizeTargetLabel } from "../../lib/labels";
 import { resolveToolPathSync } from "../../lib/tool-paths";
 import { buckCqueryArgsForExecutionPolicy, targetPlatformArgsForPolicy } from "./remote-policy";
+import { assertVerifyRemoteTargetsAllowed } from "./remote-target-policy";
 import type { VerifyExecutionPolicy } from "./remote-policy";
 
 export const VERIFY_ISOLATED_LABEL = "verify:isolated";
+export const VERIFY_MANUAL_LABEL = "verify:manual";
 export const VERIFY_RESOURCE_LIMITED_LABEL = "verify:resource-limited";
 export const VERIFY_RESOURCE_LIMITED_THREADS = 4;
 
@@ -34,20 +36,23 @@ export type VerifyTargetPlan = {
   targetLabels: VerifyTargetLabels[];
   passes: VerifyTargetPass[];
 };
+export { summarizeVerifyTargetPlan } from "./target-plan-summary";
 
 type CqueryTargetInfo = {
   labels?: string[];
 };
 
 function buildCqueryQuery(targets: readonly string[]): string {
-  return targets.length === 1
-    ? targets[0]!
-    : `(${targets.map((target) => `${target}`).join(" + ")})`;
+  return targets.length === 1 ? targets[0]! : `(${targets.map((t) => `${t}`).join(" + ")})`;
 }
 
 function isPatternVerifyTarget(target: string): boolean {
   const trimmed = String(target || "").trim();
   return trimmed === "//..." || (trimmed.startsWith("//") && trimmed.endsWith("/..."));
+}
+
+function isManualVerifyTarget(labels: readonly string[]): boolean {
+  return labels.includes(VERIFY_MANUAL_LABEL);
 }
 
 type IsolatedPassMode = "batch" | "per-target";
@@ -106,28 +111,6 @@ export function planVerifyTargetPasses(
     passes.push({ name: "shared", targets: sharedTargets });
   }
   return passes;
-}
-
-export function summarizeVerifyTargetPlan(plan: VerifyTargetPlan): VerifyTargetExpansionSummary {
-  const isolatedPassCount = plan.passes.filter((pass) => pass.name.startsWith("isolated")).length;
-  const isolatedTargetCount = plan.passes
-    .filter((pass) => pass.name.startsWith("isolated"))
-    .reduce((total, pass) => total + pass.targets.length, 0);
-  const resourceLimitedPasses = plan.passes.filter((pass) => pass.name === "resource-limited");
-  const resourceLimitedTargetCount = resourceLimitedPasses.reduce(
-    (total, pass) => total + pass.targets.length,
-    0,
-  );
-  const sharedTargetCount = plan.passes.find((pass) => pass.name === "shared")?.targets.length ?? 0;
-  return {
-    expandedTargetCount: plan.targetLabels.length,
-    isolatedPassCount,
-    isolatedTargetCount,
-    resourceLimitedPassCount: resourceLimitedPasses.length,
-    resourceLimitedTargetCount,
-    sharedTargetCount,
-    passCount: plan.passes.length,
-  };
 }
 
 function parseVerifyTargetLabelsJson(stdout: string): Map<string, readonly string[]> {
@@ -215,8 +198,10 @@ export function loadVerifyTargetLabels(opts: {
       left.localeCompare(right),
     );
     for (const target of expandedTargets) {
+      const labels = labelsByTarget.get(target) ?? [];
+      if (isManualVerifyTarget(labels)) continue;
       if (!resolved.has(target)) {
-        resolved.set(target, labelsByTarget.get(target) ?? []);
+        resolved.set(target, labels);
       }
     }
   }
@@ -231,6 +216,9 @@ export function resolveVerifyTargetPlan(opts: {
   executionPolicy: VerifyExecutionPolicy;
 }): VerifyTargetPlan {
   const targetLabels = loadVerifyTargetLabels(opts);
+  if (opts.executionPolicy.mode !== "local") {
+    assertVerifyRemoteTargetsAllowed({ ...opts, targets: targetLabels });
+  }
   return {
     targetLabels,
     passes: planVerifyTargetPasses(targetLabels),

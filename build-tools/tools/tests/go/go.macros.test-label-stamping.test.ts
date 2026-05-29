@@ -24,7 +24,7 @@ function count(arr: string[], s: string): number {
 
 test("go macros: nix_go_test stamps lang:go and kind:test (including auto-wired tests)", async () => {
   await runInTemp("go-macro-test-stamping", async (tmp, $) => {
-    const pkgDir = path.join(tmp, "apps", "demo");
+    const pkgDir = path.join(tmp, "projects", "apps", "demo");
     await fsp.mkdir(path.join(pkgDir, "pkg", "api"), { recursive: true });
 
     await fsp.writeFile(
@@ -77,6 +77,7 @@ test("go macros: nix_go_test stamps lang:go and kind:test (including auto-wired 
     const autoLabels = auto?.labels || [];
     assert.ok(autoLabels.includes("lang:go"), "expected auto-wired go test to include lang:go");
     assert.ok(autoLabels.includes("kind:test"), "expected auto-wired go test to include kind:test");
+    assert.ok(autoLabels.includes("remote:local-only"), "expected go test to default local-only");
 
     const probeExplicit = await $({
       cwd: tmp,
@@ -89,6 +90,7 @@ test("go macros: nix_go_test stamps lang:go and kind:test (including auto-wired 
     );
     const explicitLabels = explicit?.labels || [];
     assert.ok(explicitLabels.includes("custom:probe"), "expected custom label preserved");
+    assert.ok(explicitLabels.includes("remote:local-only"), "expected local-only label preserved");
     assert.equal(count(explicitLabels, "lang:go"), 1, "expected lang:go stamped exactly once");
     assert.equal(count(explicitLabels, "kind:test"), 1, "expected kind:test stamped exactly once");
   });

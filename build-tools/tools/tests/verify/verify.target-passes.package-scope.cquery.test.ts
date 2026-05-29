@@ -6,6 +6,7 @@ import {
   planVerifyTargetPasses,
   summarizeVerifyTargetPlan,
   VERIFY_ISOLATED_LABEL,
+  VERIFY_MANUAL_LABEL,
   VERIFY_RESOURCE_LIMITED_LABEL,
   VERIFY_RESOURCE_LIMITED_THREADS,
 } from "../../dev/verify/target-passes";
@@ -73,6 +74,13 @@ test("verify target pass loading keeps wildcard scope broad while isolating labe
     targetSet.has("//:verify_template_test_scope_policy"),
     "expected wildcard expansion to retain build-system zx tests",
   );
+  assert.equal(
+    [...targetSet].some((target) =>
+      target.startsWith("//build-tools/tools/tests/remote-exec/wrapper-fixtures:"),
+    ),
+    false,
+    "expected wildcard expansion to skip provider-only wrapper fixture tests",
+  );
   assert.ok(
     targetSet.has("//projects/apps/pleomino:latency-guardrail"),
     "expected wildcard expansion to retain isolated project tests",
@@ -133,4 +141,33 @@ test("verify target pass loading keeps wildcard scope broad while isolating labe
   assert.ok(summary.resourceLimitedTargetCount > 0);
   assert.equal(summary.sharedTargetCount, sharedPass?.targets.length ?? 0);
   assert.equal(summary.passCount, 3);
+});
+
+test("verify target pass loading keeps manual targets explicit-only", () => {
+  const wildcardTargets = loadVerifyTargetLabels({
+    root: process.cwd(),
+    iso: inheritedBuckIsolation("verify-target-passes-manual-wildcard"),
+    targets: ["//build-tools/tools/tests/remote-exec/wrapper-fixtures/..."],
+    executionPolicy: localExecutionPolicy,
+  });
+  assert.deepEqual(
+    wildcardTargets.map((entry) => entry.target),
+    [],
+    "expected package-scope expansion to skip manual provider fixtures",
+  );
+
+  const explicitTargets = loadVerifyTargetLabels({
+    root: process.cwd(),
+    iso: inheritedBuckIsolation("verify-target-passes-manual-explicit"),
+    targets: ["//build-tools/tools/tests/remote-exec/wrapper-fixtures:zx_remote"],
+    executionPolicy: localExecutionPolicy,
+  });
+  assert.deepEqual(
+    explicitTargets.map((entry) => entry.target),
+    ["//build-tools/tools/tests/remote-exec/wrapper-fixtures:zx_remote"],
+  );
+  assert.ok(
+    explicitTargets[0]?.labels.includes(VERIFY_MANUAL_LABEL),
+    "expected explicit manual fixture target labels to remain visible",
+  );
 });

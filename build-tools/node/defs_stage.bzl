@@ -1,6 +1,7 @@
 load("@prelude//:rules.bzl", "genrule")
 load("//build-tools/lang:defs_common.bzl", "default_lockfile_label_from_package", "default_lockfile_path_from_package", "ensure_default_lockfile_exists", "extract_lockfile_labels", "prepare_language_wiring")
 load("//build-tools/lang:nix_shell.bzl", "nix_build_out_path_cmd", "nix_calling_env_export_buck_graph_json", "nix_calling_genrule_bootstrap", "nix_calling_node_patch_requirements_preflight")
+load("//build-tools/lang:remote_action_policy.bzl", "stamp_local_only_genrule_labels")
 load("//build-tools/node/private:wasm_source_resolver.bzl", "asset_with_selector", "sh_quote", "validate_wasm_selector_args", "wasm_source_resolver_shell")
 MODULE_PROVIDERS = {}
 load("//build-tools/lang:auto_map.bzl", "MODULE_PROVIDERS")
@@ -56,6 +57,9 @@ def _selected_route_build_cmd(selected_route_target):
         + "fi; "
     )
 
+def _finish_node_nix_genrule(kw, out, cmd):
+    kw.update({"out": out, "cmd": cmd, "labels": stamp_local_only_genrule_labels(kw.get("labels", []) or [])})
+    genrule(**kw)
 def node_asset_stage(
         name,
         app,
@@ -148,9 +152,7 @@ def node_asset_stage(
         lockfile_label = lockfile_label,
     )
     kw = wiring.kwargs
-    kw["out"] = out
-    kw["cmd"] = cmd
-    genrule(**kw)
+    _finish_node_nix_genrule(kw, out, cmd)
 
 def node_wasm_inline_module(
         name,
@@ -245,6 +247,4 @@ def node_wasm_inline_module(
         lockfile_label = lockfile_label,
     )
     kw = wiring.kwargs
-    kw["out"] = out
-    kw["cmd"] = cmd
-    genrule(**kw)
+    _finish_node_nix_genrule(kw, out, cmd)

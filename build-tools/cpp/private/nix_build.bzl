@@ -1,6 +1,7 @@
 load("//build-tools/lang:sanitize.bzl", "sanitize_name")
 load("//build-tools/lang:nix_shell.bzl", "nix_cmd_prefix")
 load("//build-tools/lang:nix_action_runner.bzl", "nix_action_export_graph_cmd", "nix_action_workspace_setup_from_args")
+load("//build-tools/lang:remote_action_policy.bzl", "run_nix_action")
 
 
 def _cpp_nix_build_impl(ctx):
@@ -149,7 +150,7 @@ def _cpp_nix_build_impl(ctx):
         + ([ctx.attrs.workspace_env] if ctx.attrs.workspace_env != None else [])
         + ([ctx.attrs.flake_file] if ctx.attrs.flake_file != None else [])
     ))  # include local patches and explicit Nix inputs
-    ctx.actions.run(cmd, category = "cpp_nix_build")
+    run_nix_action(ctx, cmd, category = "cpp_nix_build")
     return [DefaultInfo(default_output = out)]
 
 

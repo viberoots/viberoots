@@ -3,6 +3,7 @@ load("@prelude//:build_mode.bzl", "BuildModeInfo")
 load("@prelude//:rules.bzl", "clone_rule")
 load("@prelude//decls:re_test_common.bzl", "re_test_common")
 load("@prelude//tests:re_utils.bzl", "get_re_executors_from_props")
+load("//build-tools/lang:remote_action_policy.bzl", "run_nix_action", "stamp_remote_readiness_labels")
 
 def _zx_test_impl(ctx):
     script = ctx.attrs.script
@@ -155,7 +156,7 @@ def _zx_test_impl(ctx):
         "-c",
         run_and_report,
     ]
-    labels = list(ctx.attrs.labels or [])
+    labels = stamp_remote_readiness_labels(ctx.attrs.labels)
     if ctx.attrs.remote_execution == "":
         if "re_ignore_force_run_as_bundle" not in labels:
             labels.append("re_ignore_force_run_as_bundle")
@@ -167,7 +168,7 @@ def _zx_test_impl(ctx):
         ["bash", "-c", "echo zx_test > \"$1\"", "stamp", stamp.as_output()],
         hidden = [ctx.attrs.script] + (ctx.attrs.template_inputs or []),
     )
-    ctx.actions.run(stamp_cmd, category = "zx_test_stamp")
+    run_nix_action(ctx, stamp_cmd, category = "zx_test_stamp")
     return inject_test_run_info(ctx, ExternalRunnerTestInfo(
             type = "custom",
             command = cmd,

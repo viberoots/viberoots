@@ -8,6 +8,7 @@ load(
     "prepare_language_wiring",
 )
 load("//build-tools/node/private:patch_requirements.bzl", "apply_node_patch_requirement_labels")
+load("//build-tools/lang:remote_action_policy.bzl", "stamp_local_only_genrule_labels")
 load(
     "//build-tools/lang:nix_shell.bzl",
     "nix_build_out_path_cmd",
@@ -51,6 +52,7 @@ def nix_node_gen(name, srcs = [], out = None, cmd = None, deps = [], labels = []
     planner_kw = planner_wiring.kwargs
     planner_kw["out"] = effective_out
     planner_kw["cmd"] = cmd
+    planner_kw["labels"] = stamp_local_only_genrule_labels(planner_kw.get("labels", []) or [])
     genrule(**planner_kw)
     if planner_only:
         return
@@ -97,6 +99,7 @@ def nix_node_gen(name, srcs = [], out = None, cmd = None, deps = [], labels = []
     )
     kw["out"] = effective_out
     kw["cmd"] = wrapper_cmd
+    kw["labels"] = stamp_local_only_genrule_labels(kw.get("labels", []) or [])
     genrule(**kw)
 
 def nix_node_test(
@@ -156,4 +159,3 @@ def nix_node_lib(name, patch_options = None, **kwargs):
 
 def nix_node_bin(name, **kwargs):
     nix_node_gen(name = name, kind = "bin", **kwargs)
-

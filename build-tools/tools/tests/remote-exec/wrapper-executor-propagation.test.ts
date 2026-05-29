@@ -38,6 +38,7 @@ function expectLocalProvider(providerText: string): void {
   assert.match(providerText, /default_executor=None/);
   assert.match(providerText, /executor_overrides={}/);
   assert.match(providerText, /"existing:label"/);
+  assert.match(providerText, /"remote:local-only"/);
 }
 
 function expectRemoteProvider(providerText: string): void {
@@ -47,6 +48,7 @@ function expectRemoteProvider(providerText: string): void {
   assert.match(providerText, /data: "buck2-test"/);
   assert.match(providerText, /executor_overrides=\{\s*"listing": CommandExecutorConfig/s);
   assert.match(providerText, /"existing:label"/);
+  assert.match(providerText, /"remote:local-only"/);
 }
 
 test("repo-owned external-runner wrappers default to local executor fields", async () => {

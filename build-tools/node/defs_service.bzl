@@ -13,6 +13,7 @@ load(
     "prepare_node_importer_nix_calling_genrule_kwargs",
     "validate_optional_importer_arg_matches_wiring",
 )
+load("//build-tools/lang:remote_action_policy.bzl", "stamp_local_only_genrule_labels")
 load("//build-tools/node/private:wasm_source_resolver.bzl", "sh_quote")
 
 MODULE_PROVIDERS = {}
@@ -94,4 +95,5 @@ def node_service_artifact(
     )
     kw["out"] = out if out != None else "node-service"
     kw["cmd"] = cmd
+    kw["labels"] = stamp_local_only_genrule_labels(kw.get("labels", []) or [])
     genrule(**kw)
