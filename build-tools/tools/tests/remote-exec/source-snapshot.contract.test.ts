@@ -81,3 +81,24 @@ test("source_snapshot rule builds a declared Buck snapshot artifact", async () =
     assert.match(String(res.stdout || ""), /tiny\.source-snapshot/);
   });
 });
+
+test("source_snapshot rule rejects ambient workspace snapshots", async () => {
+  await runInTemp("source-snapshot-rule-empty-srcs", async (tmp, $) => {
+    const dir = path.join(tmp, "tmp", "source_snapshot_rule_empty_srcs");
+    await fs.mkdir(dir, { recursive: true });
+    await write(
+      path.join(dir, "TARGETS"),
+      [
+        'load("//build-tools/lang:source_snapshot.bzl", "source_snapshot")',
+        'source_snapshot(name = "ambient", srcs = [], graph = "TARGETS")',
+      ].join("\n") + "\n",
+    );
+    const res = await $({
+      cwd: tmp,
+      stdio: "pipe",
+      nothrow: true,
+    })`buck2 --isolation-dir ${inheritedBuckIsolation("source_snapshot_empty_srcs")} build //tmp/source_snapshot_rule_empty_srcs:ambient`;
+    assert.notEqual(res.exitCode, 0);
+    assert.match(String(res.stderr || ""), /source_snapshot requires explicit declared srcs/);
+  });
+});

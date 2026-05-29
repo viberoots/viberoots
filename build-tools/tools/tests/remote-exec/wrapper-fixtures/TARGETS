@@ -2,12 +2,23 @@ load("//build-tools/cpp/private:nix_test.bzl", "cpp_nix_test")
 load("//build-tools/go/private:nix_test.bzl", "go_nix_test")
 load("//build-tools/node/private:nix_test.bzl", "node_nix_test")
 load("//build-tools/python/private:nix_test.bzl", "python_nix_test")
+load("//build-tools/lang:source_snapshot.bzl", "source_snapshot")
 load("//build-tools/tools/buck:zx_test.bzl", "zx_test")
 load("@prelude//:rules.bzl", "export_file")
 
 export_file(
     name = "cpp_planner",
     src = "fixture.txt",
+)
+
+source_snapshot(
+    name = "zx_ready_source_snapshot",
+    srcs = [
+        "fixture.txt",
+        "noop.test.ts",
+        "remote-ready-runner.sh",
+    ],
+    graph = "fixture.txt",
 )
 
 zx_test(
@@ -28,8 +39,7 @@ zx_test(
     labels = ["fixture:ready", "existing:label", "remote:ready", "verify:manual"],
     remote_ready_runner = "remote-ready-runner.sh",
     script = "noop.test.ts",
-    source_snapshot = "fixture.txt",
-    source_snapshot_manifest = "source-snapshot.manifest.json",
+    source_snapshot_bundle = ":zx_ready_source_snapshot",
     template_inputs = ["fixture.txt"],
 )
 

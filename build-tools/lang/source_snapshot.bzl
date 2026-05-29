@@ -58,6 +58,8 @@ _source_snapshot = rule(
 )
 
 def source_snapshot(name, srcs = [], graph = "//build-tools/tools/buck:graph.json"):
+    if len(srcs) == 0:
+        fail("source_snapshot requires explicit declared srcs")
     _source_snapshot(
         name = name,
         srcs = srcs,

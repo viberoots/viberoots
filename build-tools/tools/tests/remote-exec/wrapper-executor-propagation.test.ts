@@ -111,6 +111,8 @@ const expectedReadyHandles = new Map<string, string[]>([
     [
       "noop.test.ts",
       "fixture.txt",
+      "zx_ready_source_snapshot.source-snapshot",
+      "zx_ready_source_snapshot.source-snapshot.manifest.json",
       "remote-ready-runner.sh",
       "zx-init.mjs",
       "command-heartbeat.ts",

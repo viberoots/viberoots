@@ -5,12 +5,12 @@ load("@prelude//decls:re_test_common.bzl", "re_test_common")
 load("@prelude//tests:re_utils.bzl", "get_re_executors_from_props")
 load("//build-tools/lang:nix_shell.bzl", "nix_calling_env_export_source_snapshot")
 load("//build-tools/lang:remote_action_policy.bzl", "external_runner_command", "remote_ready_evidence", "run_nix_action", "stamp_remote_readiness_labels")
+load("//build-tools/lang:source_snapshot.bzl", "SourceSnapshotInfo")
 
 def _zx_test_impl(ctx):
     script = ctx.attrs.script
     timeout_ms = ctx.attrs.test_rule_timeout_ms if ctx.attrs.test_rule_timeout_ms != None else 20 * 60 * 1000
     timeout_sec = timeout_ms // 1000 if timeout_ms > 0 else 1200
-    # Export NODE_V8_COVERAGE so child Node processes also write coverage data, but only when COVERAGE=1.
     run_and_report = (
         (
             nix_calling_env_export_source_snapshot()
@@ -19,15 +19,9 @@ def _zx_test_impl(ctx):
             + "if [ \"$(basename \"$WORKSPACE_ROOT\")\" = \"node_modules\" ] && [ -f \"$WORKSPACE_ROOT/../flake.nix\" ]; then "
             + "  WORKSPACE_ROOT=\"$(cd \"$WORKSPACE_ROOT/..\" && pwd)\"; "
             + "fi; "
-            # Tests run under verify inside the dev shell, but Buck actions do not propagate IN_NIX_SHELL.
-            # Many build-tools/tools/bin wrappers will re-exec via direnv when IN_NIX_SHELL is unset, which breaks
-            # in tests that set HOME to a temp dir (direnv treats the repo .envrc as "blocked").
             + "export IN_NIX_SHELL=\"${IN_NIX_SHELL:-1}\"; "
             + "ORIG_BUCK2=\"$(command -v buck2)\"; "
-            # Default to no relink side-effects; tests may opt in with NO_NODE_MODULES_LINK=0.
             + "export NO_NODE_MODULES_LINK=\"${NO_NODE_MODULES_LINK:-1}\"; "
-            + "# Coverage: keep NODE_V8_COVERAGE scoped to the actual node --test process (not helper node scripts),\n"
-            + "# otherwise we generate massive raw coverage churn and slow the suite down.\n"
             + "V8COV_DIR=\"\"; "
             + "if [ \"$COVERAGE\" = \"1\" ]; then "
             + "  V8COV_DIR=\"${NODE_V8_COVERAGE:-$WORKSPACE_ROOT/buck-out/tmp/node-v8-coverage}\"; "
@@ -41,11 +35,7 @@ def _zx_test_impl(ctx):
             + "  ISO_HASH=\"$($NODE_BIN -e 'const crypto=require(\"node:crypto\"); const path=require(\"node:path\"); const root=path.resolve(process.argv[1] || process.cwd()); process.stdout.write(crypto.createHash(\"sha256\").update(root).digest(\"hex\").slice(0, 10));' \"$WORKSPACE_ROOT\")\"; "
             + "  export BUCK_NESTED_ISO=\"zxtest-shared-$ISO_HASH\"; "
             + "fi; "
-            # Ensure a valid TMPDIR inside the sandbox to avoid stale host TMPDIR paths
             + "export TMPDIR=\"${TMPDIR:-$WORKSPACE_ROOT/buck-out/tmp}\"; mkdir -p \"$TMPDIR\"; "
-            + ""
-            
-            # Ensure Buck prelude/config present in test sandbox
             + "if [ ! -e .buckconfig ] || ! grep -q '^prelude = prelude' .buckconfig 2>/dev/null; then "
             + "  PRELUDE_PATH=\"\"; "
             + "  if [ -n \"${VBR_SHARED_PRELUDE_PATH:-}\" ] && [ -e \"$VBR_SHARED_PRELUDE_PATH\" ]; then PRELUDE_PATH=\"$VBR_SHARED_PRELUDE_PATH\"; fi; "
@@ -80,8 +70,6 @@ def _zx_test_impl(ctx):
             + "EOF\n"
             + "  mkdir -p \"$WORKSPACE_ROOT/toolchains\" && printf '[buildfile]\nname = TARGETS\n' > \"$WORKSPACE_ROOT/toolchains/.buckconfig\"; "
             + "            fi; "
-            # Ensure node_modules available in sandbox by linking from flake output. Even when linking is disabled,
-            # if node_modules is missing, provision a link to avoid ESM resolution failures for dev deps.
             + "if [ \"$NO_NODE_MODULES_LINK\" != \"1\" ] || [ ! -d \"$WORKSPACE_ROOT/node_modules\" ]; then "
             + "  NM_OUT=\"${ZX_TEST_NODE_MODULES_OUT:-}\"; "
             + "  if [ -z \"$NM_OUT\" ]; then "
@@ -92,10 +80,7 @@ def _zx_test_impl(ctx):
             + "    if [ \"$CUR_TGT\" != \"$DESIRED\" ]; then rm -rf \"$CUR\"; ln -s \"$DESIRED\" \"$CUR\"; fi; "
             + "  fi; "
             + "fi; "
-            # Optional: allow tests to opt-in to direnv export when needed
             + "if [ \"$ZX_TEST_DIRENV\" = \"1\" ]; then if command -v direnv >/dev/null 2>&1; then eval \"$(direnv export bash)\"; fi; fi; "
-            # Skip direnv in temp repos by default; specific tests can override
-            # Provide a single global default timeout unless a caller overrides it
             + ("TSECS=%d; " % timeout_sec)
             + "for RAW_TSECS in \"${VERIFY_TIMEOUT_SECS:-}\" \"${TEST_NIX_TIMEOUT_SECS:-}\"; do "
             + "  if [ -n \"$RAW_TSECS\" ] && [ \"$RAW_TSECS\" -gt \"$TSECS\" ] 2>/dev/null; then TSECS=\"$RAW_TSECS\"; fi; "
@@ -108,12 +93,10 @@ def _zx_test_impl(ctx):
             + "if [ -z \"$TEST_NODE_OPTIONS\" ]; then export TEST_NODE_OPTIONS=\"--test-timeout=$(( TSECS * 1000 ))\"; fi; "
             + "echo \"[zx_test] timeout target=$BUCK_TEST_TARGET tsecs=$TSECS node_options=${TEST_NODE_OPTIONS:-}\" >&2; "
             + "if [ -n \"$NODE_V8_COVERAGE\" ]; then mkdir -p \"$NODE_V8_COVERAGE\"; fi; "
-            # Ensure zx-init is loaded in all node:test workers via NODE_OPTIONS
             + "if [ -n \"$NODE_PATH\" ]; then export NODE_PATH=\"$WORKSPACE_ROOT/node_modules:$NODE_PATH\"; else export NODE_PATH=\"$WORKSPACE_ROOT/node_modules\"; fi; "
             + "export NODE_OPTIONS=\"--import \"$WORKSPACE_ROOT/build-tools/tools/dev/zx-init.mjs\" $NODE_OPTIONS\"; "
             + "SAFE=$(printf %%s \"$BUCK_TEST_TARGET\" | sed -E 's|^.*/:||; s/[^A-Za-z0-9._-]+/_/g' | cut -c1-200); "
             + "LOGDIR=\"$TEST_LOG_DIR/$SAFE\"; mkdir -p \"$LOGDIR\"; "
-            # Ensure any nested 'buck2' invocations in test scripts resolve to the original binary
             + "ORIG_BUCK2=\"$(command -v buck2)\"; "
             + ""
             + "SHIMROOT=\"$WORKSPACE_ROOT/buck-out/zx_shims/$SAFE\"; SHIMBIN=\"$SHIMROOT/bin\"; mkdir -p \"$SHIMBIN\"; WRAP=\"$SHIMBIN/buck2\"; "
@@ -166,13 +149,21 @@ def _zx_test_impl(ctx):
         re_executor, executor_overrides = None, {}
     else:
         re_executor, executor_overrides = get_re_executors_from_props(ctx)
+    source_snapshot = ctx.attrs.source_snapshot
+    source_snapshot_manifest = ctx.attrs.source_snapshot_manifest
+    if ctx.attrs.source_snapshot_bundle != None:
+        if source_snapshot != None or source_snapshot_manifest != None:
+            fail("source_snapshot_bundle cannot be combined with source_snapshot or source_snapshot_manifest")
+        snapshot_info = ctx.attrs.source_snapshot_bundle[SourceSnapshotInfo]
+        source_snapshot = snapshot_info.snapshot
+        source_snapshot_manifest = snapshot_info.manifest
     snapshot_inputs = []
-    if ctx.attrs.source_snapshot != None:
-        snapshot_inputs.append(ctx.attrs.source_snapshot)
-    if ctx.attrs.source_snapshot_manifest != None:
-        snapshot_inputs.append(ctx.attrs.source_snapshot_manifest)
+    if source_snapshot != None:
+        snapshot_inputs.append(source_snapshot)
+    if source_snapshot_manifest != None:
+        snapshot_inputs.append(source_snapshot_manifest)
     snapshot_labels = []
-    if ctx.attrs.source_snapshot != None and ctx.attrs.source_snapshot_manifest != None:
+    if source_snapshot != None and source_snapshot_manifest != None:
         snapshot_labels = ["source-snapshot:declared-root", "source-snapshot:manifest", "source-snapshot:graph"]
     labels = labels + snapshot_labels
     remote_command = [ctx.attrs.remote_ready_runner] + snapshot_inputs if ctx.attrs.remote_ready_runner != None else None
@@ -201,7 +192,7 @@ def _zx_test_impl(ctx):
         hidden = [ctx.attrs.script] + (ctx.attrs.template_inputs or []),
     )
     policy_mode = "remote-ready" if "remote:ready" in labels else "local-only"
-    policy_evidence = remote_ready_evidence(ctx.attrs.source_snapshot, ctx.attrs.source_snapshot_manifest) if policy_mode == "remote-ready" else None
+    policy_evidence = remote_ready_evidence(source_snapshot, source_snapshot_manifest) if policy_mode == "remote-ready" else None
     policy_info = run_nix_action(
         ctx,
         stamp_cmd,
@@ -230,6 +221,7 @@ zx_test = clone_rule(
         "script": attrs.source(),
         "out": attrs.string(default = "zx_test.stamp"),
         "remote_ready_runner": attrs.option(attrs.source(), default = None),
+        "source_snapshot_bundle": attrs.option(attrs.dep(providers = [SourceSnapshotInfo]), default = None),
         "source_snapshot": attrs.option(attrs.source(), default = None),
         "source_snapshot_manifest": attrs.option(attrs.source(), default = None),
         "template_inputs": attrs.list(attrs.source(), default = []),
