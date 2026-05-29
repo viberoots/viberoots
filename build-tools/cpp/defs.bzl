@@ -146,6 +146,7 @@ def nix_cpp_headers(name, **kwargs):
 def nix_cpp_test(name, **kwargs):
     # Define a planner-visible cxx_test (not executed) and an external runner test (executed)
     kw = dict(kwargs)
+    remote_execution = kw.pop("remote_execution", None)
     deps = kw.pop("deps", []) or []
     link_deps = kw.pop("link_deps", []) or []
     header_deps = kw.pop("header_deps", []) or []
@@ -167,7 +168,7 @@ def nix_cpp_test(name, **kwargs):
     planner_name = name + "__planner"
     # Planner-visible stub: Nix builds the test; this node exists for planner discovery and invalidation.
     # Provider deps are stripped to avoid visibility / graph-shape problems on the planner-visible boundary.
-    wire_package_local_planner_visible_stub(
+    wiring = wire_package_local_planner_visible_stub(
         name = planner_name,
         out = planner_name + ".stamp",
         kwargs = kw,
@@ -177,14 +178,19 @@ def nix_cpp_test(name, **kwargs):
         srcs = [],
         MODULE_PROVIDERS = MODULE_PROVIDERS,
     )
+    prepared = wiring.kwargs
     # Executed: external runner builds the corresponding flake attr for planner_name and runs it
-    cpp_nix_test(
-        name = name,
-        out = name + ".stamp",
-        planner_label = "//%s:%s" % (native.package_name(), planner_name),
-        planner = ":%s" % planner_name,
-        nix_inputs = cpp_runtime_nix_inputs(),
-    )
+    attrs = {
+        "name": name,
+        "out": name + ".stamp",
+        "planner_label": "//%s:%s" % (native.package_name(), planner_name),
+        "planner": ":%s" % planner_name,
+        "nix_inputs": cpp_runtime_nix_inputs(),
+        "labels": prepared.get("labels", []) or [],
+    }
+    if remote_execution != None:
+        attrs["remote_execution"] = remote_execution
+    cpp_nix_test(**attrs)
 
 
 def cpp_sanitize_probe(name, label):

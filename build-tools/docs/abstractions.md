@@ -50,6 +50,10 @@ For language macros, stamping is the macro’s responsibility. Call sites should
 
 - Go: `nix_go_test(...)` stamps `lang:go` and `kind:test` (auto-wired `*_test` targets do not pass a literal label list).
   - Implementation detail: `build-tools/go/private/auto_tests.bzl` is the canonical implementation of Go auto-wired helper targets (called by `build-tools/go/defs.bzl`).
+- Repo-owned external-runner test wrappers (`zx_test`, `nix_node_test`, `nix_go_test`, `nix_python_test`, and `nix_cpp_test`) accept Buck Prelude's `remote_execution` test attribute and pass selected executor fields into `ExternalRunnerTestInfo`.
+  - Node, Go, Python, and C++ default to `remote_execution = None`; `zx_test` reads `test.viberoots_remote_profile` and treats the empty-string default as local-only.
+  - This is profile-selection plumbing only, not a `remote:ready` claim.
+  - Wrapper providers set `run_from_project_root = True` and `use_project_relative_paths = True` explicitly so local and future remote path behavior are auditable.
 
 ### Canonical implementations
 

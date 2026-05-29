@@ -1,6 +1,17 @@
 load("//build-tools/lang:sanitize.bzl", "sanitize_name")
 load("//build-tools/lang:nix_shell.bzl", "nix_bootstrap_env_core", "nix_bootstrap_env_pnpm_store", "nix_timeout_wrapper_var")
+load("@prelude//:build_mode.bzl", "BuildModeInfo")
+load("@prelude//decls:re_test_common.bzl", "re_test_common")
 load("@prelude//test:inject_test_run_info.bzl", "inject_test_run_info")
+load("@prelude//tests:re_utils.bzl", "get_re_executors_from_props")
+
+def _remote_test_attrs():
+    test_attrs = re_test_common.test_args()
+    test_attrs["remote_execution_action_key_providers"] = attrs.dep(
+        providers = [BuildModeInfo],
+        default = "repo_toolchains//:remote_profile_conversion_action_key",
+    )
+    return test_attrs
 
 def _node_nix_test_impl(ctx):
     imp = ctx.attrs.importer
@@ -66,12 +77,17 @@ def _node_nix_test_impl(ctx):
         hidden = ctx.attrs.srcs,
     )
     ctx.actions.run(cmd, category = "node_nix_test_stamp")
+    re_executor, executor_overrides = get_re_executors_from_props(ctx)
 
     return inject_test_run_info(ctx, ExternalRunnerTestInfo(
             type = "custom",
             command = ["bash", "-c", run_cmd],
             labels = ctx.attrs.labels,
             contacts = [],
+            default_executor = re_executor,
+            executor_overrides = executor_overrides,
+            run_from_project_root = True,
+            use_project_relative_paths = True,
         )) + [
         DefaultInfo(
             default_output = stamp,
@@ -81,10 +97,7 @@ def _node_nix_test_impl(ctx):
         ),
     ]
 
-
-node_nix_test = rule(
-    impl = _node_nix_test_impl,
-    attrs = {
+_NODE_NIX_TEST_ATTRS = {
         # Importer directory like "projects/apps/web" or "."
         "importer": attrs.string(),
         # Optional newline-separated test patterns (forwarded via env)
@@ -103,5 +116,10 @@ node_nix_test = rule(
         # Deterministic tiny output file name
         "out": attrs.string(default = "node_nix_test.stamp"),
         "_inject_test_env": attrs.default_only(attrs.dep(default = "prelude//test/tools:inject_test_env")),
-    },
+    }
+_NODE_NIX_TEST_ATTRS.update(_remote_test_attrs())
+
+node_nix_test = rule(
+    impl = _node_nix_test_impl,
+    attrs = _NODE_NIX_TEST_ATTRS,
 )

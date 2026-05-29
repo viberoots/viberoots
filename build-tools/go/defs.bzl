@@ -18,6 +18,8 @@ def _apply_go_nix_rule_attrs(attrs, prepared):
         attrs["race"] = prepared["race"]
     if "cgo_enabled" in prepared:
         attrs["cgo_enabled"] = prepared["cgo_enabled"]
+    if "remote_execution" in prepared:
+        attrs["remote_execution"] = prepared["remote_execution"]
 
 def nix_go_library(name, **kwargs):
     kw = dict(kwargs)

@@ -106,17 +106,20 @@ def nix_python_test(name, lockfile_label = None, deps = [], **kwargs):
         global_inputs_into = "nix_inputs",
     )
     prepared = wiring.kwargs
-    python_nix_test(
-        name = name,
-        out = name + ".stamp",
-        self_label = "//%s:%s" % (native.package_name(), name),
-        deps = wiring.deps,
-        srcs = prepared.get("srcs", []) or [],
-        nix_inputs = prepared.get("nix_inputs", []) or [],
-        labels = prepared.get("labels", []) or [],
-        test_rule_timeout_ms = 30 * 60 * 1000,
-        visibility = prepared.get("visibility", []),
-    )
+    attrs = {
+        "name": name,
+        "out": name + ".stamp",
+        "self_label": "//%s:%s" % (native.package_name(), name),
+        "deps": wiring.deps,
+        "srcs": prepared.get("srcs", []) or [],
+        "nix_inputs": prepared.get("nix_inputs", []) or [],
+        "labels": prepared.get("labels", []) or [],
+        "test_rule_timeout_ms": 30 * 60 * 1000,
+        "visibility": prepared.get("visibility", []),
+    }
+    if "remote_execution" in prepared:
+        attrs["remote_execution"] = prepared["remote_execution"]
+    python_nix_test(**attrs)
 def nix_python_extension_module(
         name,
         module,

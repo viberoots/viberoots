@@ -162,7 +162,6 @@ def _zx_test_impl(ctx):
         re_executor, executor_overrides = None, {}
     else:
         re_executor, executor_overrides = get_re_executors_from_props(ctx)
-    run_from_project_root = "buck2_run_from_project_root" in labels or re_executor != None
     stamp = ctx.actions.declare_output(ctx.attrs.out)
     stamp_cmd = cmd_args(
         ["bash", "-c", "echo zx_test > \"$1\"", "stamp", stamp.as_output()],
@@ -176,8 +175,8 @@ def _zx_test_impl(ctx):
             contacts = [],
             default_executor = re_executor,
             executor_overrides = executor_overrides,
-            run_from_project_root = run_from_project_root,
-            use_project_relative_paths = run_from_project_root,
+            run_from_project_root = True,
+            use_project_relative_paths = True,
         )) + [
         DefaultInfo(
             default_output = stamp,
