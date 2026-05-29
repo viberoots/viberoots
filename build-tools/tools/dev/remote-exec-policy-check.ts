@@ -20,6 +20,8 @@ export type RemoteExecTargetMetadata = {
   sourceSnapshotManifestDeclared?: boolean;
   declaredGraphPath?: boolean;
   ambientPathDependency?: boolean;
+  declaredArtifactContract?: boolean;
+  undeclaredLocalArtifactPaths?: string[];
   nixBuilderPolicy?: unknown;
   remoteBuilderSmokePolicy?: unknown;
 };
@@ -127,6 +129,17 @@ export function validateRemoteExecTargets(opts: {
     if (target.ambientPathDependency) {
       findings.push(
         finding(target, "ambient PATH dependency declarations block remote-ready execution"),
+      );
+    }
+    if (
+      (target.undeclaredLocalArtifactPaths || []).length > 0 &&
+      !target.declaredArtifactContract
+    ) {
+      findings.push(
+        finding(
+          target,
+          `remote-ready artifact writes require declared outputs: ${(target.undeclaredLocalArtifactPaths || []).join(", ")}`,
+        ),
       );
     }
     if (!isNixBuilderPolicy(target.nixBuilderPolicy)) {

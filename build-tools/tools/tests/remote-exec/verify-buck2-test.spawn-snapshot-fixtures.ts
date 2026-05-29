@@ -141,6 +141,7 @@ export function remoteArgvSnapshot(opts: {
   mode: RemoteMode;
 }): string[] {
   const modeFlag = opts.mode === "remote-only-conformance" ? "--remote-only" : "--prefer-remote";
+  const passDir = path.join(opts.artifactDir, "runs", "verify", "passes", "shared");
   return [
     "-k",
     "10s",
@@ -158,17 +159,17 @@ export function remoteArgvSnapshot(opts: {
     modeFlag,
     "--unstable-allow-compatible-tests-on-re",
     "--event-log",
-    path.join(opts.artifactDir, "shared", "buck-event-log.pb.zst"),
+    path.join(passDir, "buck-event-log.pb.zst"),
     "--build-report",
-    path.join(opts.artifactDir, "shared", "buck-build-report.json"),
+    path.join(passDir, "buck-build-report.json"),
     "--write-build-id",
-    path.join(opts.artifactDir, "shared", "buck-build-id.txt"),
+    path.join(passDir, "buck-build-id.txt"),
     "--command-report-path",
-    path.join(opts.artifactDir, "shared", "buck-command-report.json"),
+    path.join(passDir, "buck-command-report.json"),
     "--test-executor-stdout",
-    path.join(opts.artifactDir, "shared", "test-executor-stdout.log"),
+    path.join(passDir, "test-executor-stdout.log"),
     "--test-executor-stderr",
-    path.join(opts.artifactDir, "shared", "test-executor-stderr.log"),
+    path.join(passDir, "test-executor-stderr.log"),
     "--console",
     "simple",
     "--num-threads",

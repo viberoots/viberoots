@@ -98,7 +98,9 @@ export function parseVerifyExecutionPolicy(opts?: {
     };
   }
   if (opts?.coverage) {
-    throw new Error("remote verify does not support --coverage until declared artifacts land");
+    throw new Error(
+      "remote verify does not support --coverage until declared raw coverage outputs and local aggregation materialization are implemented",
+    );
   }
   const system = parseSystem(cleanEnvValue(env, "VBR_REMOTE_EXEC_SYSTEM"));
   const profilePrefix = PROFILE_PREFIX_BY_SYSTEM[system];

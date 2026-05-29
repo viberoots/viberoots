@@ -56,17 +56,17 @@ test("remote Buck artifacts are deterministic and retention scoped", () => {
 
   assert.deepEqual(remoteBuckArtifactArgs(policy, "shared", {}), [
     "--event-log",
-    "/tmp/vbr-remote/artifacts/shared/buck-event-log.pb.zst",
+    "/tmp/vbr-remote/artifacts/runs/verify/passes/shared/buck-event-log.pb.zst",
     "--build-report",
-    "/tmp/vbr-remote/artifacts/shared/buck-build-report.json",
+    "/tmp/vbr-remote/artifacts/runs/verify/passes/shared/buck-build-report.json",
     "--write-build-id",
-    "/tmp/vbr-remote/artifacts/shared/buck-build-id.txt",
+    "/tmp/vbr-remote/artifacts/runs/verify/passes/shared/buck-build-id.txt",
     "--command-report-path",
-    "/tmp/vbr-remote/artifacts/shared/buck-command-report.json",
+    "/tmp/vbr-remote/artifacts/runs/verify/passes/shared/buck-command-report.json",
     "--test-executor-stdout",
-    "/tmp/vbr-remote/artifacts/shared/test-executor-stdout.log",
+    "/tmp/vbr-remote/artifacts/runs/verify/passes/shared/test-executor-stdout.log",
     "--test-executor-stderr",
-    "/tmp/vbr-remote/artifacts/shared/test-executor-stderr.log",
+    "/tmp/vbr-remote/artifacts/runs/verify/passes/shared/test-executor-stderr.log",
   ]);
 
   assert.deepEqual(
@@ -94,13 +94,25 @@ test("remote Buck materialization writes retention metadata under artifact dir",
   });
 
   const metadata = JSON.parse(
-    fs.readFileSync(path.join(artifactDir, "shared", "failed-materialization-policy.json"), "utf8"),
+    fs.readFileSync(
+      path.join(
+        artifactDir,
+        "runs",
+        "verify",
+        "passes",
+        "shared",
+        "failed-materialization-policy.json",
+      ),
+      "utf8",
+    ),
   );
-  assert.equal(metadata.artifactDir, path.join(artifactDir, "shared"));
+  assert.equal(metadata.artifactDir, path.join(artifactDir, "runs", "verify", "passes", "shared"));
   assert.deepEqual(metadata.buckFlags, [
     "--materialize-failed-inputs",
     "--materialize-failed-outputs",
   ]);
+  assert.equal(metadata.contract.failedInputs.redaction, "sensitive-debug");
+  assert.equal(metadata.contract.policy.retention, "debug-on-failure");
   assert.match(metadata.note, /bare failed-materialization flags/);
 });
 

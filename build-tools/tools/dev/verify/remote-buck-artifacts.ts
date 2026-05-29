@@ -6,13 +6,24 @@ import {
   remoteProfileForPass,
   type VerifyExecutionPolicy,
 } from "./remote-policy";
+import {
+  remoteArtifactDefinition,
+  remoteArtifactPath,
+  remotePassArtifactDir,
+  type RemoteArtifactCategory,
+} from "../../remote-exec/artifact-contract";
 
 function isEnabled(value: string | undefined): boolean {
   return value === "1" || value === "true";
 }
 
-function artifactPath(policy: VerifyExecutionPolicy, passName: string, file: string): string {
-  return path.join(remoteBuckPassArtifactDir(policy, passName), file);
+function artifactPath(
+  policy: VerifyExecutionPolicy,
+  passName: string,
+  category: RemoteArtifactCategory,
+): string {
+  if (!policy.artifactDir) throw new Error("VBR_REMOTE_ARTIFACT_DIR is required for remote verify");
+  return remoteArtifactPath({ root: policy.artifactDir, passName, category });
 }
 
 function materializationPolicy(env: NodeJS.ProcessEnv): {
@@ -27,7 +38,7 @@ function materializationPolicy(env: NodeJS.ProcessEnv): {
 
 export function remoteBuckPassArtifactDir(policy: VerifyExecutionPolicy, passName: string): string {
   if (!policy.artifactDir) throw new Error("VBR_REMOTE_ARTIFACT_DIR is required for remote verify");
-  return path.join(policy.artifactDir, passName);
+  return remotePassArtifactDir(policy.artifactDir, passName);
 }
 
 export function remoteBuckArtifactArgs(
@@ -39,17 +50,17 @@ export function remoteBuckArtifactArgs(
   const materialization = materializationPolicy(env);
   const args = [
     "--event-log",
-    artifactPath(policy, passName, "buck-event-log.pb.zst"),
+    artifactPath(policy, passName, "buck-event-log"),
     "--build-report",
-    artifactPath(policy, passName, "buck-build-report.json"),
+    artifactPath(policy, passName, "buck-build-report"),
     "--write-build-id",
-    artifactPath(policy, passName, "buck-build-id.txt"),
+    artifactPath(policy, passName, "buck-build-id"),
     "--command-report-path",
-    artifactPath(policy, passName, "buck-command-report.json"),
+    artifactPath(policy, passName, "buck-command-report"),
     "--test-executor-stdout",
-    artifactPath(policy, passName, "test-executor-stdout.log"),
+    artifactPath(policy, passName, "test-stdout-summary"),
     "--test-executor-stderr",
-    artifactPath(policy, passName, "test-executor-stderr.log"),
+    artifactPath(policy, passName, "test-stderr-summary"),
   ];
   if (materialization.failedInputs) {
     args.push("--materialize-failed-inputs");
@@ -105,6 +116,11 @@ export function writeRemoteBuckMaterializationMetadata(opts: {
       {
         pass: opts.passName,
         artifactDir: passDir,
+        contract: {
+          failedInputs: remoteArtifactDefinition("failed-input-materialization"),
+          failedOutputs: remoteArtifactDefinition("failed-output-materialization"),
+          policy: remoteArtifactDefinition("failed-materialization-policy"),
+        },
         failedInputs: materialization.failedInputs,
         failedOutputs: materialization.failedOutputs,
         buckFlags: [

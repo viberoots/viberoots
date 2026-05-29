@@ -88,7 +88,7 @@ test("verify remote policy validates remote mode inputs before local setup", () 
   );
   assert.throws(
     () => parseVerifyExecutionPolicy({ env: remoteEnv, coverage: true }),
-    /remote verify does not support --coverage/,
+    /declared raw coverage outputs and local aggregation materialization/,
   );
 });
 

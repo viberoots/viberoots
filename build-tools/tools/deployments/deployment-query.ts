@@ -1,4 +1,5 @@
 #!/usr/bin/env zx-wrapper
+import { ensureGraph } from "../buck/glue-run";
 import { nodesFromCqueryJson } from "../buck/exporter/cquery/nodes";
 import { normalizeTargetLabel } from "../lib/labels";
 import { componentTargetsFor, extractDeployments, type DeploymentTarget } from "./contract";
@@ -10,6 +11,8 @@ import {
   queryComponentLabels,
   queryLabelList,
 } from "./deployment-query-helpers";
+
+const DEPLOYMENT_GRAPH_QUERY_ROOTS = ["projects/deployments", "projects/apps", "projects/libs"];
 
 function relatedLabelsForNodes(
   nodes: ReturnType<typeof nodesFromCqueryJson>,
@@ -64,6 +67,10 @@ export async function queryDeploymentNodesWithAttrs(
   opts?: { env?: NodeJS.ProcessEnv },
 ): Promise<ReturnType<typeof nodesFromCqueryJson>> {
   const normalizedLabels = Array.from(new Set(labels.map((label) => normalizeTargetLabel(label))));
+  await ensureGraph({
+    workspaceRoot,
+    queryRoots: DEPLOYMENT_GRAPH_QUERY_ROOTS,
+  });
   const attrFlags = Array.from(new Set(attrs)).flatMap((attr) => ["--output-attribute", attr]);
   const query = `set(${normalizedLabels.join(" ")})`;
   const buckEnv = deploymentBuckEnv(workspaceRoot, opts?.env);
@@ -152,6 +159,7 @@ async function resolveDeploymentFromNodes(
 }
 
 export async function listDeploymentTargets(workspaceRoot: string): Promise<string[]> {
+  await ensureGraph({ workspaceRoot, queryRoots: DEPLOYMENT_GRAPH_QUERY_ROOTS });
   const query = 'kind("deployment_target", //...)';
   const buckEnv = deploymentBuckEnv(workspaceRoot);
   const { stdout } = await $({

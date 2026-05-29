@@ -11,6 +11,7 @@ import {
   targetPlatformArgsForPolicy,
   type VerifyExecutionPolicy,
 } from "./remote-policy";
+import { localArtifactPathWrites, parseArtifactContractMetadata } from "./remote-target-artifacts";
 import type { VerifyTargetLabels } from "./target-passes";
 
 type CqueryInfo = {
@@ -66,6 +67,7 @@ function parseProviderMetadata(
   const executableText = commandText
     .replace(/hidden=\[[\s\S]*?\]/g, "hidden=[]")
     .replace(/<[^>]+>/g, "<handle>");
+  const localArtifactPaths = localArtifactPathWrites(executableText);
   return {
     target,
     runFromProjectRoot: /run_from_project_root=True/.test(providerText),
@@ -80,6 +82,7 @@ function parseProviderMetadata(
     commandInputsDeclared:
       hasExternalRunner &&
       /command=\[\s*cmd_args\([^)]*hidden=\[[^\]]*[A-Za-z0-9_.\/:-]/s.test(providerText),
+    ...(localArtifactPaths.length > 0 ? { undeclaredLocalArtifactPaths: localArtifactPaths } : {}),
     requiresWorkspaceRootLookup:
       /\$WORKSPACE_ROOT|WORKSPACE_ROOT|\$FLK_ROOT|FLK_ROOT|path:\$FLK_ROOT|build-tools\//.test(
         executableText,
@@ -217,6 +220,7 @@ export function collectRemoteExecTargetMetadata(opts: {
       ...parseProviderMetadata(entry.target, provider.stdout),
       ...parseBuilderPolicyMetadata(labels, provider.stdout),
       ...parseSourceSnapshotMetadata(labels, provider.stdout),
+      ...parseArtifactContractMetadata(labels, provider.stdout),
     };
   });
 }

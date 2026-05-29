@@ -175,7 +175,7 @@ test("runVerify rejects remote coverage before coverage setup paths are created"
         });
         await runVerifyWithDeps(deps);
       }),
-    /remote verify does not support --coverage/,
+    /declared raw coverage outputs and local aggregation materialization/,
   );
 
   assert.equal(calls.includes("setup-local-workspace"), false);

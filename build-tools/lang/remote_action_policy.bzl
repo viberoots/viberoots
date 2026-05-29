@@ -135,6 +135,10 @@ def _policy_labels(evidence, default_builder_policy):
     if type(builder_policy) != "string":
         builder_policy = default_builder_policy
     labels = ["nix-builder:%s" % builder_policy]
+    if values.get("artifact_contract"):
+        labels.append("artifact-contract:declared")
+    if values.get("materialization_manifest"):
+        labels.append("materialization-manifest:declared")
     smoke_policy = values.get("remote_builder_smoke")
     if type(smoke_policy) == "dict":
         smoke_policy = smoke_policy.get("builder_policy")

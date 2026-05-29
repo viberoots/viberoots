@@ -143,7 +143,7 @@ Set:
 - `VBR_REMOTE_ARTIFACT_DIR=<absolute artifact directory>`
 - `VBR_REMOTE_TEST_PROFILE_<PASS_NAME>=<profile>` for optional pass-specific profiles
 
-System names map to profile prefixes: `x86_64-linux` to `linux-x86_64`, `aarch64-linux` to `linux-aarch64`, and `aarch64-darwin` to `darwin-aarch64`. Remote mode rejects `--coverage` until declared coverage artifacts are implemented.
+System names map to profile prefixes: `x86_64-linux` to `linux-x86_64`, `aarch64-linux` to `linux-aarch64`, and `aarch64-darwin` to `darwin-aarch64`. Remote mode rejects `--coverage` until raw coverage outputs are declared per test and verify can materialize them locally for `pnpm coverage:build`. Local `v --coverage` still writes raw V8 coverage under `buck-out/tmp/node-v8-coverage` and merged reports under `coverage/`.
 
 Local verify keeps the full local Buck process and test environment so existing tests continue to see seed-store paths, nested Buck daemon controls, local Nix daemon settings, local coverage output, and developer diagnostics. Remote verify uses separate Buck process and test child environment allowlists. It forwards only timeouts, `COVERAGE=0`, the nested Buck isolation name, generated remote-safe Nix/Pnpm inputs, pinned tool paths, and known certificate paths. It does not forward repo-root `buck-out`, `.direnv`, root `node_modules`, local seed pin directories, `NODE_V8_COVERAGE`, Nix daemon sockets, `TEST_RSYNC_ROOTS`, or developer override env vars.
 

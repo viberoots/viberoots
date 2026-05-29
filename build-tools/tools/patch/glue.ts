@@ -35,8 +35,16 @@ function graphContainsTarget(txt: string, wantTargetRaw: string): boolean {
   );
 }
 
-export async function ensureGraph(opts: { exportGraph?: () => Promise<void> } = {}): Promise<void> {
+export async function ensureGraph(
+  opts: {
+    exportGraph?: () => Promise<void>;
+    workspaceRoot?: string;
+    target?: string;
+    queryRoots?: string[];
+  } = {},
+): Promise<void> {
   const workspaceRoot = (
+    opts.workspaceRoot ||
     process.env.WORKSPACE_ROOT ||
     process.env.BUCK_TEST_SRC ||
     process.cwd()
@@ -57,7 +65,7 @@ export async function ensureGraph(opts: { exportGraph?: () => Promise<void> } = 
   try {
     console.error(`[ensureGraph] workspaceRoot=${workspaceRoot}`);
   } catch {}
-  const wantTargetRaw = (process.env.BUCK_TARGET || "").trim();
+  const wantTargetRaw = (opts.target || process.env.BUCK_TARGET || "").trim();
   const shouldRegenerate = async (): Promise<boolean> => {
     try {
       const txt = await fsp.readFile(graphPath, "utf8");
@@ -96,6 +104,15 @@ export async function ensureGraph(opts: { exportGraph?: () => Promise<void> } = 
     } catch {}
   }
 
+  await fsp.mkdir(path.dirname(graphPath), { recursive: true });
+  try {
+    await fsp.access(graphPath);
+  } catch {
+    // Buck queries may need //build-tools/tools/buck:graph.json to exist as a
+    // declared source before the exporter can regenerate its real contents.
+    await fsp.writeFile(graphPath, "[]\n", "utf8");
+  }
+
   const tryInjected = async (): Promise<boolean> => {
     if (!opts.exportGraph) return false;
     try {
@@ -124,7 +141,11 @@ export async function ensureGraph(opts: { exportGraph?: () => Promise<void> } = 
     } catch {}
     const importerRoots = getImporterRootsContract().workspaceRoots;
     const defaultRoots = Array.from(new Set([...importerRoots, "go", "cpp", "third_party"]));
-    const rawRoots = (process.env.BUCK_QUERY_ROOTS || defaultRoots.join(","))
+    const rawRoots = (
+      opts.queryRoots?.join(",") ||
+      process.env.BUCK_QUERY_ROOTS ||
+      defaultRoots.join(",")
+    )
       .split(/[,\s]+/)
       .filter(Boolean);
     const fs = await import("node:fs");
@@ -161,6 +182,8 @@ export async function ensureGraph(opts: { exportGraph?: () => Promise<void> } = 
     WORKSPACE_ROOT: workspaceRoot,
     BUCK_TEST_SRC: workspaceRoot,
     REPO_ROOT: repoRoot,
+    ...(opts.queryRoots?.length ? { BUCK_QUERY_ROOTS: opts.queryRoots.join(",") } : {}),
+    ...(wantTargetRaw ? { BUCK_TARGET: wantTargetRaw } : {}),
   } as Record<string, string>;
 
   if (haveBuck) {
