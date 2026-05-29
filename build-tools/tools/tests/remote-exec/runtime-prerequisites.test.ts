@@ -5,6 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
 import { evaluateDefaultLocalPolicy } from "../../remote-exec/default-local-policy";
+import { validRuntimeInventory } from "./runtime-prerequisites.fixture";
 
 const inventoryFile = "build-tools/tools/nix/flake/packages/remote-worker-tools.nix";
 
@@ -18,23 +19,9 @@ async function fixture(files: Record<string, string>): Promise<string> {
   return root;
 }
 
-const validInventory = `
-{
-  allowedPrimitives = [
-    "kernel-sandbox-support"
-    "disk-capacity"
-    "network-reachability"
-    "mounted-credentials-or-workload-identity"
-    "trust-anchors"
-    "clock"
-    "minimal-nix-bootstrap"
-  ];
-}
-`;
-
 test("remote-ready helpers cannot use provider executables from ambient PATH", async () => {
   const root = await fixture({
-    [inventoryFile]: validInventory,
+    [inventoryFile]: validRuntimeInventory,
     "build-tools/tools/remote-exec/publisher.ts":
       "// remote-ready helper uses remote-ci-tools\nawait $`aws s3 cp a b`;\n",
   });

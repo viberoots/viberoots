@@ -3,6 +3,7 @@ load("//build-tools/lang/internal:importer_wiring_primitives.bzl", "attach_impor
 load("//build-tools/lang:provider_edges.bzl", "merge_provider_edges")
 load("//build-tools/lang:label_stamping.bzl", "stamp_labels", "stamp_patch_scope_for_lang")
 load("//build-tools/lang:lockfile_labels.bzl", "importer_from_labels")
+load("//build-tools/lang:remote_action_policy.bzl", "stamp_remote_readiness_labels")
 load(
     "//build-tools/lang:patch_inputs.bzl",
     "synthetic_dep_for_importer_patches_from_labels",
@@ -54,7 +55,7 @@ def prepare_importer_non_genrule_wiring(
     base_deps = list(deps) if isinstance(deps, list) else []
 
     kw["name"] = name
-    kw["labels"] = (kw.get("labels", []) or []) + (labels or [])
+    kw["labels"] = stamp_remote_readiness_labels((kw.get("labels", []) or []) + (labels or []))
     require_single_importer_lockfile_label(kw, lockfile_label)
     stamp_patch_scope_for_lang(kw, lang)
     stamp_labels(kw, lang, kind)
@@ -128,7 +129,7 @@ def prepare_importer_genrule_kwargs(
     base_srcs = dict(srcs) if isinstance(srcs, dict) else list(srcs)
 
     kw["name"] = name
-    kw["labels"] = (kw.get("labels", []) or []) + (labels or [])
+    kw["labels"] = stamp_remote_readiness_labels((kw.get("labels", []) or []) + (labels or []))
     require_single_importer_lockfile_label(kw, lockfile_label)
     stamp_patch_scope_for_lang(kw, lang)
     stamp_labels(kw, lang, kind)
@@ -193,7 +194,7 @@ def prepare_importer_srcsless_rule_wiring(
     base_deps = list(deps) if isinstance(deps, list) else []
 
     kw["name"] = name
-    kw["labels"] = (kw.get("labels", []) or []) + (labels or [])
+    kw["labels"] = stamp_remote_readiness_labels((kw.get("labels", []) or []) + (labels or []))
     require_single_importer_lockfile_label(kw, lockfile_label)
     stamp_patch_scope_for_lang(kw, lang)
     stamp_labels(kw, lang, kind)

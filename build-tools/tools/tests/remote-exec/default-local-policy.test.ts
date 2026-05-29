@@ -5,6 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
 import { evaluateDefaultLocalPolicy } from "../../remote-exec/default-local-policy";
+import { validRuntimeInventory } from "./runtime-prerequisites.fixture";
 
 async function fixture(files: Record<string, string>): Promise<string> {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), "default-local-policy-"));
@@ -41,6 +42,7 @@ test("default-local policy allows inert remote profile and platform surfaces", a
     "toolchains/remote_execution_profiles.bzl": "REMOTE_PROFILES = {'linux-x86_64-default': {}}\n",
     "toolchains/remote_execution_platforms.bzl": "def remote_execution_platforms(): return []\n",
     "build-tools/tools/remote-exec/example-template.json": '{"endpoint":"re.example.invalid"}\n',
+    "build-tools/tools/nix/flake/packages/remote-worker-tools.nix": validRuntimeInventory,
   });
 
   const report = await evaluateDefaultLocalPolicy(root);

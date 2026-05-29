@@ -2,6 +2,7 @@ load("//build-tools/lang:macro_kwargs.bzl", "extract_package_local_patch_dirs_an
 load("//build-tools/lang:patch_inputs.bzl", "include_package_local_patches")
 load("//build-tools/lang:label_stamping.bzl", "stamp_labels", "stamp_patch_scope_for_lang")
 load("//build-tools/lang:provider_edges.bzl", "merge_provider_edges", "target_key_for_current_package")
+load("//build-tools/lang:remote_action_policy.bzl", "stamp_remote_readiness_labels")
 load("@prelude//:rules.bzl", "genrule")
 
 def prepare_package_local_wiring(
@@ -33,6 +34,7 @@ def prepare_package_local_wiring(
 
     info = extract_package_local_patch_dirs_and_nixpkg_deps(kwargs, lang, append_labels = True)
     kw = info.kwargs
+    kw["labels"] = stamp_remote_readiness_labels(kw.get("labels", []) or [])
     stamp_patch_scope_for_lang(kw, lang)
     if stamp and kind != None:
         stamp_labels(kw, lang, kind)

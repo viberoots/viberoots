@@ -14,6 +14,8 @@ let
     zx-wrapper
   ];
   declaredRemoteExecutablePackages = {
+    attic = pkgs.attic-client;
+    cachix = pkgs.cachix;
   };
   declaredRemoteExecutablePaths = builtins.attrValues declaredRemoteExecutablePackages;
   ciPaths = workerPaths ++ [ pkgs.nix ] ++ declaredRemoteExecutablePaths;
