@@ -1043,6 +1043,34 @@ The expected fix is not to disable remote execution broadly. The expected fix is
 10. Verify representative build and test actions with `buck2 log what-ran --format json "$EVENT_LOG"`. Treat JSON output as pinned-version JSONL. Classify `record.reproducer.executor === "Re"` as remote execution, `Cache` as action-cache hit, `ReDepFileCache` as dep-file-cache hit when allowed for the lane, and `CacheQuery` as diagnostic-only, not proof of execution. Fail on `Local`, `Worker`, or `WorkerInit` for remote-capable actions unless the target is explicitly local-only. Keep this parser covered by pinned-version tests. Treat direct event-log protobuf parsing as pinned-version code, not a stable schema.
 11. Keep local developer execution working without RE credentials.
 
+### Local Conformance Checklist
+
+`//build-tools/tools/tests/remote-exec/wrapper-fixtures:zx_ready_handles` is the only initial `remote:ready` target. It is a tiny local/dry-run conformance target used to prove the evidence contract before production remote execution is enabled. The remaining wrapper families stay `remote:local-only` until their source snapshot, command input, Nix materialization, artifact, tool closure, and policy evidence is complete.
+
+Local/dry-run conformance uses fixture or generated Buck config only:
+
+1. Render a redacted config into `buck-out/tmp`:
+   `build-tools/tools/remote-exec/render-buckconfig.ts --config build-tools/tools/remote-exec/remote-buckconfig.example.json`.
+2. Run the Nix remote-builder smoke tool in dry-run mode for the selected builder policy.
+3. Run the cache manifest publisher in dry-run mode and keep the manifest digest in the run summary.
+4. Confirm committed defaults remain local-only with `build-tools/tools/remote-exec/default-local-policy.ts`.
+5. Parse captured Buck evidence with `build-tools/tools/remote-exec/buck-event-log-remote-check.ts` and summarize it with `build-tools/tools/remote-exec/buck-run-summary.ts`.
+
+Unsupported Buck log commands are explicit version-gated fields in the summary, not silent success. `what-ran`, `summary`, `critical-path` or `slowest-path`, `what-uploaded`, and `what-materialized` are interpreted as pinned-version Buck2 output schemas.
+
+Future live enablement remains out of scope for this local conformance target:
+
+1. Provision RE, CAS, and action-cache endpoints.
+2. Provision worker pools, Nix cache credentials, generated CI secrets/config, and cache warm paths.
+3. Add one-target remote-only conformance before broader rule-family expansion.
+4. Promote a CI lane only after operational go/no-go checks pass. Do not add a default Jenkins remote lane.
+5. Prove the selected worker has no ambient checkout dependency.
+6. Prove required Nix paths substitute or materialize from configured cache/manifests.
+7. Prove artifacts are uploaded with redacted summaries and Buck/Nix/worker logs contain no secrets.
+8. Require macOS lane reporting parity for Buck event log, artifact, coverage, and summary evidence, even if the lane uses dedicated local/on-demand executors instead of remote RE.
+
+Any self-managed operations control plane is deferred unless the selected RE provider does not supply fleet and run management. If added later, it manages capacity and run metadata only; Buck2 remains the action scheduler and Nix remains the tool/cache layer.
+
 ### Phase 3: Add Spot Capacity Control Plane
 
 1. Define run, attempt, worker-pool, worker-instance, worker-registration-lease, scaling-decision, heartbeat, audit, lock, and output schemas separate from deployment submissions.

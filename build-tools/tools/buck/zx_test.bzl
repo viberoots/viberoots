@@ -4,7 +4,7 @@ load("@prelude//:rules.bzl", "clone_rule")
 load("@prelude//decls:re_test_common.bzl", "re_test_common")
 load("@prelude//tests:re_utils.bzl", "get_re_executors_from_props")
 load("//build-tools/lang:nix_shell.bzl", "nix_calling_env_export_source_snapshot")
-load("//build-tools/lang:remote_action_policy.bzl", "external_runner_command", "run_nix_action", "stamp_remote_readiness_labels")
+load("//build-tools/lang:remote_action_policy.bzl", "external_runner_command", "remote_ready_evidence", "run_nix_action", "stamp_remote_readiness_labels")
 
 def _zx_test_impl(ctx):
     script = ctx.attrs.script
@@ -200,7 +200,15 @@ def _zx_test_impl(ctx):
         ["bash", "-c", "echo zx_test > \"$1\"", "stamp", stamp.as_output()],
         hidden = [ctx.attrs.script] + (ctx.attrs.template_inputs or []),
     )
-    policy_info = run_nix_action(ctx, stamp_cmd, category = "zx_test_stamp")
+    policy_mode = "remote-ready" if "remote:ready" in labels else "local-only"
+    policy_evidence = remote_ready_evidence(ctx.attrs.source_snapshot, ctx.attrs.source_snapshot_manifest) if policy_mode == "remote-ready" else None
+    policy_info = run_nix_action(
+        ctx,
+        stamp_cmd,
+        category = "zx_test_stamp",
+        mode = policy_mode,
+        evidence = policy_evidence,
+    )
     return inject_test_run_info(ctx, ExternalRunnerTestInfo(
             type = "custom",
             command = command,
@@ -220,7 +228,6 @@ zx_test = clone_rule(
     "sh_test",
     extra_attrs = {
         "script": attrs.source(),
-        # Ensure a default output so Buck always recognizes an output artifact
         "out": attrs.string(default = "zx_test.stamp"),
         "remote_ready_runner": attrs.option(attrs.source(), default = None),
         "source_snapshot": attrs.option(attrs.source(), default = None),

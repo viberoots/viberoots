@@ -71,7 +71,7 @@ _REMOTE_BLOCKED_COMMAND_FRAGMENTS = [
 ]
 
 def _command_text(command):
-    return " ".join([str(part) for part in command])
+    return " ".join([part for part in command if type(part) == "string"])
 
 def external_runner_command(labels, local_command, remote_command = None, declared_inputs = [], required_inputs = []):
     if REMOTE_READY in (labels or []):
@@ -195,6 +195,22 @@ def remote_action_policy(
             stamp = "remote_action_policy_hybrid",
         )
     fail("unknown remote action policy mode: %s" % mode)
+
+def remote_ready_evidence(source_snapshot, source_snapshot_manifest, builder_policy = "inherit_config"):
+    if source_snapshot == None or source_snapshot_manifest == None:
+        fail("remote-ready action requires declared source snapshot inputs")
+    return {
+        "artifact_contract": True,
+        "builder_policy": builder_policy,
+        "materialization_manifest": True,
+        "remote_builder_smoke": builder_policy,
+        "remote_profile_compatibility": True,
+        "source_snapshot": {
+            "declared_root": str(source_snapshot),
+            "graph_path": "build-tools/tools/buck/graph.json",
+            "manifest": str(source_snapshot_manifest),
+        },
+    }
 
 def run_nix_action(ctx, cmd, category, mode = "local-only", evidence = None, fallback_reason = None):
     policy = remote_action_policy(

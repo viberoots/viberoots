@@ -124,7 +124,34 @@ export async function ensureBuckConfigForTempRepo(tmp: string, $: any): Promise<
     'system_python_toolchain(name = "python", visibility = ["PUBLIC"]) ',
     'system_cxx_toolchain(name = "cxx", visibility = ["PUBLIC"]) ',
     'noop_test_toolchain(name = "test", visibility = ["PUBLIC"]) ',
-    'remote_test_execution_toolchain(name = "remote_test_execution", visibility = ["PUBLIC"]) ',
+    "remote_test_execution_toolchain(",
+    '    name = "remote_test_execution",',
+    "    default_profile = None,",
+    "    default_run_as_bundle = False,",
+    "    profiles = {",
+    '        "linux-x86_64-default": {',
+    '            "capabilities": {',
+    '                "arch": "x86_64",',
+    '                "os": "linux",',
+    '                "resource_class": "default",',
+    '                "viberoots_remote_profile": "linux-x86_64-default",',
+    "            },",
+    '            "dependencies": [],',
+    '            "listing_capabilities": {',
+    '                "arch": "x86_64",',
+    '                "os": "linux",',
+    '                "resource_class": "default",',
+    '                "viberoots_remote_profile": "linux-x86_64-default",',
+    "            },",
+    '            "local_enabled": False,',
+    '            "local_listing_enabled": False,',
+    '            "remote_cache_enabled": True,',
+    '            "resource_units": 1,',
+    '            "use_case": "buck2-test",',
+    "        },",
+    "    },",
+    '    visibility = ["PUBLIC"],',
+    ") ",
     'remote_profile_conversion_action_key(name = "remote_profile_conversion_action_key", visibility = ["PUBLIC"]) ',
     'system_genrule_toolchain(name = "genrule", visibility = ["PUBLIC"]) ',
     "EOF",
@@ -179,11 +206,18 @@ export async function ensureBuckConfigForTempRepo(tmp: string, $: any): Promise<
 
 export async function ensureWorkspaceRootEnvFile(tmp: string): Promise<void> {
   try {
-    await fsp.mkdir(path.join(tmp, "build-tools", "tools", "buck"), { recursive: true });
+    const buckToolsDir = path.join(tmp, "build-tools", "tools", "buck");
+    await fsp.mkdir(buckToolsDir, { recursive: true });
     await fsp.writeFile(
-      path.join(tmp, "build-tools", "tools", "buck", "workspace-root.env"),
+      path.join(buckToolsDir, "workspace-root.env"),
       `WORKSPACE_ROOT=${tmp}\n`,
       "utf8",
     );
+    const graphPath = path.join(buckToolsDir, "graph.json");
+    try {
+      await fsp.access(graphPath);
+    } catch {
+      await fsp.writeFile(graphPath, "[]\n", "utf8");
+    }
   } catch {}
 }

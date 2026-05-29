@@ -10,7 +10,7 @@ def _source_snapshot_impl(ctx):
     args = [
         "node",
         "--experimental-strip-types",
-        ctx.attrs._tool,
+        "build-tools/tools/dev/source-snapshot.ts",
         "--out",
         snapshot.as_output(),
         "--manifest",
@@ -25,7 +25,14 @@ def _source_snapshot_impl(ctx):
     for src in ctx.attrs.srcs:
         args.extend(["--file", src.short_path, src])
     ctx.actions.run(
-        cmd_args(args, hidden = ctx.attrs.srcs + [ctx.attrs.graph, ctx.attrs._tool]),
+        cmd_args(
+            args,
+            hidden = ctx.attrs.srcs + [
+                ctx.attrs.graph,
+                ctx.attrs._dev_runtime[DefaultInfo].default_outputs,
+                ctx.attrs._lib_runtime[DefaultInfo].default_outputs,
+            ],
+        ),
         category = "source_snapshot",
     )
     return [
@@ -38,7 +45,8 @@ _source_snapshot = rule(
     attrs = {
         "srcs": attrs.list(attrs.source(), default = []),
         "graph": attrs.source(default = "//build-tools/tools/buck:graph.json"),
-        "_tool": attrs.source(default = "//build-tools/tools/dev:source-snapshot.ts"),
+        "_dev_runtime": attrs.dep(default = "//build-tools/tools/dev:runtime_ts"),
+        "_lib_runtime": attrs.dep(default = "//build-tools/tools/lib:runtime_ts"),
     },
 )
 

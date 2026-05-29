@@ -3,6 +3,8 @@ import fs from "node:fs";
 import fsp from "node:fs/promises";
 import path from "node:path";
 
+import { getArgvTokens } from "../lib/argv.ts";
+
 const EXCLUDES = [
   ".git",
   ".direnv",
@@ -92,7 +94,7 @@ async function manifestFiles(root: string): Promise<string[]> {
 }
 
 async function main(): Promise<void> {
-  const tokens = process.argv.slice(2);
+  const tokens = getArgvTokens();
   const out = path.resolve(argValue(tokens, "out"));
   const manifest = path.resolve(argValue(tokens, "manifest"));
   const graph = argValue(tokens, "graph");
