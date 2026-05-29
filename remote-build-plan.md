@@ -1495,3 +1495,162 @@ The repo would have readiness infrastructure but no end-to-end proof that the co
 ### 10. Downsides for implementing this PR
 
 It is the highest-integration readiness PR and may uncover gaps requiring plan updates.
+
+## PR-19: Declared source snapshot generator and conformance assertion hardening
+
+### 1. Intent
+
+Close the remaining local/dry-run conformance gaps discovered after PR-18: prove the tiny
+`remote:ready` runner actually executes, and remove the implicit source snapshot generator path so
+Buck invokes that generator through declared tool inputs rather than a flake app, ambient PATH, or a
+workspace-relative command string.
+
+### 2. Scope of changes
+
+- Update `build-tools/tools/tests/remote-exec/remote-conformance-target.test.ts` so the dry-run
+  conformance test requires the runner's explicit `remote-ready-runner: ok` output instead of
+  passing on generic Buck target/pass text.
+- Update `build-tools/lang/source_snapshot.bzl` so the source snapshot action no longer shells
+  through `nix run path:.#zx-wrapper`.
+- Represent the source snapshot generator and its runtime/tool invocation as declared Buck inputs,
+  without depending on ambient `node` from PATH or a workspace-relative script string as the
+  executable authority.
+- Keep source snapshot outputs unchanged: declared snapshot directory, manifest JSON, graph path
+  evidence, and `SourceSnapshotInfo`.
+- Preserve local/dry-run behavior and do not enable production remote execution.
+- Keep the implementation inside existing Starlark/tool helper surfaces; do not add a scheduler,
+  production RE lane, or ad hoc shell script with substantive logic.
+
+### 3. External prerequisites
+
+- None. Tests use local Buck analysis/execution and fixture targets only.
+
+### 4. Tests to be added
+
+- Update the tiny remote-ready conformance test to assert `remote-ready-runner: ok`.
+- Add or update source snapshot action-command tests proving the action no longer renders
+  `nix run path:.#zx-wrapper`.
+- Add tests proving the generator tool/script is represented by declared Buck inputs and the command
+  does not pass merely because `node` is available from ambient PATH.
+- Rerun focused validation for source snapshot contracts, wrapper conformance, remote target policy,
+  and the tiny remote-ready fixture.
+
+### 5. Docs to be added or updated
+
+- Update remote build setup docs if they describe source snapshot generator invocation details.
+- Update `remote-build-integration-debt-ledger.md` with PR-19 focused validation evidence and the
+  remaining full-suite checkpoint status.
+
+### 5.5. Expected regression scope
+
+- `build-system-only`
+- Expected files are `build-tools/lang/source_snapshot.bzl`,
+  `build-tools/tools/tests/remote-exec/**`, remote build docs, and the integration debt ledger.
+
+### 6. Acceptance criteria
+
+- The PR-18 conformance test fails unless the dry-run runner emits `remote-ready-runner: ok`.
+- No source snapshot action renders `nix run path:.#zx-wrapper`.
+- The source snapshot generator is represented by declared Buck inputs and does not rely on ambient
+  PATH for its executable/tool authority.
+- Existing source snapshot manifests and the tiny remote-ready conformance target still pass.
+
+### 7. Risks
+
+- Tool-path wiring could accidentally depend on developer PATH or unstated workspace layout.
+- Over-tightening the conformance assertion could make unrelated Buck output formatting changes look
+  like functional failures.
+
+### 8. Mitigations
+
+- Validate the generated command/provider surface directly and keep the tool path declared through
+  existing Buck inputs.
+- Assert only the runner-owned success line for execution proof, not incidental Buck progress text.
+
+### 9. Consequences of not implementing this PR
+
+The repo would have a nominal remote-ready conformance target, but one test could still pass without
+proving the runner executed, and source snapshots would retain an implicit generator invocation path
+that conflicts with the build-system generator guardrail.
+
+### 10. Downsides for implementing this PR
+
+It adds one more explicit tool input and tightens a test around intentionally narrow dry-run
+conformance behavior.
+
+## PR-20: Remote worker bootstrap zx helper
+
+### 1. Intent
+
+Keep the worker bootstrap/check flow aligned with the build-system script policy by moving its
+substantive logic out of the flake's inline shell and into a repo-owned TypeScript zx helper while
+preserving the local-only, scheduler-disabled behavior introduced for remote worker tool
+conformance.
+
+### 2. Scope of changes
+
+- Add a `#!/usr/bin/env zx-wrapper` TypeScript helper for the remote worker bootstrap/check flow.
+- Keep `apps.<system>.remote-worker-bootstrap` as a thin Nix launcher that provides the declared
+  `remote-worker-tools` closure path and delegates to the helper.
+- Preserve the current checks that print the worker tools store path, restrict `PATH` to the closure,
+  verify required worker binaries, and report that scheduler registration is disabled.
+- Do not add scheduler registration, production remote execution, mutable worker image setup, or
+  provider-specific bootstrap behavior.
+- Avoid adding substantive shell logic to the flake app or to a standalone `.sh` script.
+
+### 3. External prerequisites
+
+- None. Tests use local Nix app/package evaluation and fixture-only bootstrap checks.
+
+### 4. Tests to be added
+
+- Update remote worker bootstrap tests so `nix run .#remote-worker-bootstrap -- --check-only`
+  continues to prove `PATH` is restricted to the declared `remote-worker-tools` closure.
+- Add a static/script-policy test proving the remote worker bootstrap app is a thin launcher and the
+  substantive logic lives in a `zx-wrapper` TypeScript helper.
+- Keep the existing assertions that bootstrap does not attempt scheduler registration.
+
+### 5. Docs to be added or updated
+
+- Update `build-tools/docs/remote-build-setup.md` if it describes bootstrap implementation details.
+- Update `remote-build-integration-debt-ledger.md` with PR-20 focused validation evidence and the
+  remaining full-suite checkpoint status.
+
+### 5.5. Expected regression scope
+
+- `build-system-only`
+- Expected files are `build-tools/tools/nix/flake/outputs-apps.nix`,
+  `build-tools/tools/remote-exec/**`, `build-tools/tools/tests/nix/**`, remote build docs, and the
+  integration debt ledger.
+
+### 6. Acceptance criteria
+
+- `apps.<system>.remote-worker-bootstrap` delegates to a `zx-wrapper` TypeScript helper rather than
+  carrying substantive inline shell logic.
+- The bootstrap check still reports the declared `remote-worker-tools` store path and closure-only
+  `PATH`.
+- Required worker binaries are still verified from the declared closure.
+- Scheduler registration remains explicitly disabled.
+
+### 7. Risks
+
+- Nix app argument wiring could accidentally hide the declared closure path from tests.
+- Moving the checks into TypeScript could weaken the existing closure-only `PATH` proof if the helper
+  inherits developer environment state.
+
+### 8. Mitigations
+
+- Pass the worker tools path explicitly from the Nix app wrapper and validate it is a Nix store path
+  before constructing `PATH`.
+- Keep tests focused on the rendered app behavior and the helper's environment construction, not just
+  on output text.
+
+### 9. Consequences of not implementing this PR
+
+The remote worker bootstrap flow would remain functionally local-only, but its substantive inline
+shell implementation would conflict with the build-system design's automation-script policy.
+
+### 10. Downsides for implementing this PR
+
+It introduces one small helper file for a deliberately dormant bootstrap path, increasing surface area
+without changing production remote execution behavior.
