@@ -33,7 +33,7 @@ test("source snapshot includes declared source and excludes mutable local direct
 
   await $({
     stdio: "pipe",
-  })`node --experimental-strip-types build-tools/tools/dev/source-snapshot.ts --workspace-root ${root} --out ${out} --manifest ${manifest} --graph ${path.join(root, "build-tools/tools/buck/graph.json")}`;
+  })`zx-wrapper build-tools/tools/dev/source-snapshot.ts --workspace-root ${root} --out ${out} --manifest ${manifest} --graph ${path.join(root, "build-tools/tools/buck/graph.json")}`;
 
   for (const rel of [
     "flake.nix",

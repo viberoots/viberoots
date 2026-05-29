@@ -1,3 +1,5 @@
+load("//build-tools/lang:remote_action_policy.bzl", "run_nix_action")
+
 SourceSnapshotInfo = provider(fields = [
     "snapshot",
     "manifest",
@@ -8,8 +10,11 @@ def _source_snapshot_impl(ctx):
     snapshot = ctx.actions.declare_output(ctx.attrs.name + ".source-snapshot", dir = True)
     manifest = ctx.actions.declare_output(ctx.attrs.name + ".source-snapshot.manifest.json")
     args = [
-        "node",
-        "--experimental-strip-types",
+        "nix",
+        "run",
+        "--accept-flake-config",
+        "path:.#zx-wrapper",
+        "--",
         "build-tools/tools/dev/source-snapshot.ts",
         "--out",
         snapshot.as_output(),
@@ -24,7 +29,8 @@ def _source_snapshot_impl(ctx):
     ]
     for src in ctx.attrs.srcs:
         args.extend(["--file", src.short_path, src])
-    ctx.actions.run(
+    run_nix_action(
+        ctx,
         cmd_args(
             args,
             hidden = ctx.attrs.srcs + [
@@ -33,7 +39,8 @@ def _source_snapshot_impl(ctx):
                 ctx.attrs._lib_runtime[DefaultInfo].default_outputs,
             ],
         ),
-        category = "source_snapshot",
+        "source_snapshot",
+        mode = "local-only",
     )
     return [
         DefaultInfo(default_output = snapshot, other_outputs = [manifest]),
