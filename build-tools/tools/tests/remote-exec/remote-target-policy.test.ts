@@ -41,7 +41,7 @@ test("remote target policy collects cquery and provider metadata before Buck tes
       return {
         status: 0,
         stdout:
-          'ExternalRunnerTestInfo(command=cmd_args(["runner"]), run_from_project_root=True, use_project_relative_paths=True, local_resources={}, required_local_resources=[])',
+          'ExternalRunnerTestInfo(command=[cmd_args("runner", hidden=[<source helper.ts>])], run_from_project_root=True, use_project_relative_paths=True, local_resources={}, required_local_resources=[])',
         stderr: "",
       };
     },
@@ -59,6 +59,7 @@ test("remote target policy collects cquery and provider metadata before Buck tes
     networkAccess: false,
     commandInputsDeclared: true,
     requiresWorkspaceRootLookup: false,
+    ambientPathDependency: false,
   });
 });
 
@@ -85,5 +86,33 @@ test("production remote target assertion rejects unlabeled cquery metadata", () 
               },
       }),
     /requires explicit remote:ready/,
+  );
+});
+
+test("production remote target assertion rejects ambient PATH command dependencies", () => {
+  assert.throws(
+    () =>
+      assertVerifyRemoteTargetsAllowed({
+        root: "/repo",
+        iso: "iso",
+        executionPolicy: remotePolicy,
+        targets: [{ target: "//pkg:t", labels: ["remote:ready"] }],
+        runBuck: (args) =>
+          args.includes("cquery")
+            ? {
+                status: 0,
+                stdout: JSON.stringify({
+                  "//pkg:t": { labels: ["remote:ready"], "buck.type": "go_nix_test" },
+                }),
+                stderr: "",
+              }
+            : {
+                status: 0,
+                stdout:
+                  'ExternalRunnerTestInfo(command=[cmd_args("bash", hidden=[<source helper.ts>]), "-c", "$(command -v node) helper.ts"], env=None, run_from_project_root=True, use_project_relative_paths=True)',
+                stderr: "",
+              },
+      }),
+    /ambient PATH/,
   );
 });

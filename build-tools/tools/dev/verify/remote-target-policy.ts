@@ -59,6 +59,12 @@ function parseProviderMetadata(
   providerText: string,
 ): Partial<RemoteExecTargetMetadata> {
   const hasExternalRunner = providerText.includes("ExternalRunnerTestInfo");
+  const commandText =
+    providerText.match(/ExternalRunnerTestInfo\([\s\S]*?command=\[(?<body>[\s\S]*?)\],\s+env=/)
+      ?.groups?.body || "";
+  const executableText = commandText
+    .replace(/hidden=\[[\s\S]*?\]/g, "hidden=[]")
+    .replace(/<[^>]+>/g, "<handle>");
   return {
     target,
     runFromProjectRoot: /run_from_project_root=True/.test(providerText),
@@ -71,8 +77,16 @@ function parseProviderMetadata(
       : [],
     networkAccess: /network_access=True/.test(providerText),
     commandInputsDeclared:
-      hasExternalRunner && /command=.*(cmd_args|Artifact|RunInfo)/s.test(providerText),
-    requiresWorkspaceRootLookup: /\$WORKSPACE_ROOT|WORKSPACE_ROOT/.test(providerText),
+      hasExternalRunner &&
+      /command=\[\s*cmd_args\([^)]*hidden=\[[^\]]*[A-Za-z0-9_.\/:-]/s.test(providerText),
+    requiresWorkspaceRootLookup:
+      /\$WORKSPACE_ROOT|WORKSPACE_ROOT|\$FLK_ROOT|FLK_ROOT|path:\$FLK_ROOT|build-tools\//.test(
+        executableText,
+      ),
+    ambientPathDependency:
+      /\bcommand -v\b|\$\(command -v\b|\/usr\/bin\/env|\bbash\b|\bnode\b|\bnix\b|\btimeout\b|\bgit\b|\bfind\b/.test(
+        executableText,
+      ),
   };
 }
 

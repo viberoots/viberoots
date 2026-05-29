@@ -12,6 +12,10 @@ function target(wrapper: string, mode: "local" | "remote"): string {
   return `${fixtureRoot}:${wrapper}_${mode}`;
 }
 
+function readyTarget(wrapper: string): string {
+  return `${fixtureRoot}:${wrapper}_ready_handles`;
+}
+
 async function auditProviders(label: string, buckArgs: string[] = []): Promise<string> {
   const result = await $({
     stdio: "pipe",
@@ -51,6 +55,29 @@ function expectRemoteProvider(providerText: string): void {
   assert.match(providerText, /"remote:local-only"/);
 }
 
+function externalRunnerCommand(providerText: string): string {
+  const match = providerText.match(
+    /ExternalRunnerTestInfo\([\s\S]*?command=\[(?<body>[\s\S]*?)\],\n\s+env=/,
+  );
+  assert.ok(match?.groups?.body, "expected ExternalRunnerTestInfo command body");
+  return match.groups.body;
+}
+
+function expectDeclaredHandles(providerText: string, names: string[]): void {
+  const command = externalRunnerCommand(providerText);
+  const hidden = command.match(/hidden=\[(?<body>[\s\S]*?)\]/)?.groups?.body || "";
+  assert.match(command, /cmd_args\(/);
+  assert.match(command, /remote-ready-runner\.sh/);
+  for (const name of names) assert.match(hidden, new RegExp(name.replace(".", "\\.")));
+  const executableText = command.replace(/hidden=\[[\s\S]*?\]/g, "hidden=[]");
+  assert.doesNotMatch(executableText, /WORKSPACE_ROOT|FLK_ROOT|BUCK_TEST_SRC|"[^"]*build-tools\//);
+  assert.doesNotMatch(executableText, /"-c"/);
+  assert.doesNotMatch(
+    executableText,
+    /command -v|\bbash\b|\bnode\b|\bnix\b|\btimeout\b|\bgit\b|\bfind\b/,
+  );
+}
+
 test("repo-owned external-runner wrappers default to local executor fields", async () => {
   for (const wrapper of wrappers) {
     const label = target(wrapper, "local");
@@ -69,6 +96,75 @@ test("repo-owned external-runner wrappers propagate explicit remote executor fie
     const attrs = await cqueryAttrs(label);
     assert.match(attrs, /"remote_execution": "linux-x86_64-default"/);
     assert.match(attrs, /"existing:label"/);
+  }
+});
+
+test("remote-ready wrapper command providers carry declared input handles", async () => {
+  const expectedHandles = new Map<string, string[]>([
+    [
+      "zx",
+      [
+        "noop.test.ts",
+        "fixture.txt",
+        "remote-ready-runner.sh",
+        "zx-init.mjs",
+        "command-heartbeat.ts",
+        "node-modules-build.ts",
+      ],
+    ],
+    [
+      "node",
+      [
+        "fixture.txt",
+        "remote-ready-runner.sh",
+        "zx-init.mjs",
+        "command-heartbeat.ts",
+        "prepare-exact-pnpm-store.ts",
+        "nix-build-filtered-flake.ts",
+        "graph.json",
+        "workspace-root.env",
+      ],
+    ],
+    [
+      "go",
+      [
+        "fixture.txt",
+        "remote-ready-runner.sh",
+        "zx-init.mjs",
+        "build-selected.ts",
+        "graph.json",
+        "workspace-root.env",
+      ],
+    ],
+    [
+      "python",
+      [
+        "fixture.txt",
+        "remote-ready-runner.sh",
+        "zx-init.mjs",
+        "build-selected.ts",
+        "graph.json",
+        "workspace-root.env",
+      ],
+    ],
+    [
+      "cpp",
+      [
+        "fixture.txt",
+        "remote-ready-runner.sh",
+        "zx-init.mjs",
+        "build-selected.ts",
+        "graph.json",
+        "workspace-root.env",
+      ],
+    ],
+  ]);
+  for (const [wrapper, handles] of expectedHandles) {
+    const providerText = await auditProviders(readyTarget(wrapper));
+    expectProjectRelative(providerText);
+    expectDeclaredHandles(providerText, handles);
+    assert.match(providerText, /"remote:ready"/);
+    assert.doesNotMatch(providerText, /"remote:local-only"/);
   }
 });
 

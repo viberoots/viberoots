@@ -1,4 +1,40 @@
-load("@prelude//:rules.bzl", "filegroup")
+load("@prelude//:rules.bzl", "export_file", "filegroup")
+
+export_file(
+    name = "build-selected.ts",
+    src = "build-selected.ts",
+    visibility = ["PUBLIC"],
+)
+
+export_file(
+    name = "command-heartbeat.ts",
+    src = "command-heartbeat.ts",
+    visibility = ["PUBLIC"],
+)
+
+export_file(
+    name = "nix-build-filtered-flake.ts",
+    src = "nix-build-filtered-flake.ts",
+    visibility = ["PUBLIC"],
+)
+
+export_file(
+    name = "node-modules-build.ts",
+    src = "node-modules-build.ts",
+    visibility = ["PUBLIC"],
+)
+
+export_file(
+    name = "prepare-exact-pnpm-store.ts",
+    src = "prepare-exact-pnpm-store.ts",
+    visibility = ["PUBLIC"],
+)
+
+export_file(
+    name = "zx-init.mjs",
+    src = "zx-init.mjs",
+    visibility = ["PUBLIC"],
+)
 
 filegroup(
     name = "runtime_ts",

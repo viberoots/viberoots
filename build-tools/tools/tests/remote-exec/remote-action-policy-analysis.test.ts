@@ -6,7 +6,7 @@ import { test } from "node:test";
 import { inheritedBuckIsolation, runInTemp } from "../lib/test-helpers";
 
 const probeDefs = `
-load("//build-tools/lang:remote_action_policy.bzl", "remote_action_policy")
+load("//build-tools/lang:remote_action_policy.bzl", "external_runner_command", "remote_action_policy")
 
 def policy_probe(name, mode = "local-only", evidence = None, fallback_reason = None):
     remote_action_policy(
@@ -15,6 +15,27 @@ def policy_probe(name, mode = "local-only", evidence = None, fallback_reason = N
         fallback_reason = fallback_reason,
     )
     native.filegroup(name = name, srcs = [])
+
+def command_probe(ctx):
+    labels = ["remote:ready"] if ctx.attrs.remote_ready else []
+    external_runner_command(
+        labels,
+        ["bash", "-c", "echo ok"],
+        remote_command = [ctx.attrs.remote_runner],
+        declared_inputs = ctx.attrs.declared_inputs,
+        required_inputs = ctx.attrs.required_inputs,
+    )
+    return [DefaultInfo()]
+
+command_probe_rule = rule(
+    impl = command_probe,
+    attrs = {
+        "declared_inputs": attrs.list(attrs.source(), default = []),
+        "remote_ready": attrs.bool(default = False),
+        "remote_runner": attrs.source(),
+        "required_inputs": attrs.list(attrs.source(), default = []),
+    },
+)
 `;
 
 const validTargets = `
@@ -81,5 +102,61 @@ test("remote action policy rejects remote-ready and hybrid actions without evide
     })`buck2 --isolation-dir ${iso} cquery //tmp/policy_hybrid:t`;
     assert.notEqual(hybrid.exitCode, 0);
     assert.match(String(hybrid.stderr || ""), /fallback_reason/);
+  });
+});
+
+test("remote-ready external-runner command policy requires declared handles", async () => {
+  await runInTemp("remote-command-policy-analysis", async (tmp, $) => {
+    const defs = path.join(tmp, "tmp", "policy_defs");
+    const commandDir = path.join(tmp, "tmp", "command_policy");
+    await fs.mkdir(defs, { recursive: true });
+    await fs.mkdir(commandDir, { recursive: true });
+    await fs.writeFile(path.join(defs, "defs.bzl"), probeDefs, "utf8");
+    await fs.writeFile(path.join(defs, "TARGETS"), "", "utf8");
+    await fs.writeFile(path.join(commandDir, "helper.txt"), "helper\n", "utf8");
+    await fs.writeFile(path.join(commandDir, "runner.txt"), "runner\n", "utf8");
+    await fs.writeFile(
+      path.join(commandDir, "TARGETS"),
+      [
+        'load("//tmp/policy_defs:defs.bzl", "command_probe_rule")',
+        'command_probe_rule(name = "local_no_inputs", remote_runner = "runner.txt")',
+        'command_probe_rule(name = "ready_no_inputs", remote_ready = True, remote_runner = "runner.txt")',
+        'command_probe_rule(name = "ready_missing_required", remote_ready = True, remote_runner = "runner.txt", declared_inputs = ["helper.txt"], required_inputs = ["missing.txt"])',
+        'command_probe_rule(name = "ready_ok", remote_ready = True, remote_runner = "runner.txt", declared_inputs = ["helper.txt"], required_inputs = ["helper.txt"])',
+      ].join("\n") + "\n",
+      "utf8",
+    );
+    await fs.writeFile(path.join(commandDir, "missing.txt"), "missing\n", "utf8");
+
+    const iso = inheritedBuckIsolation("remote_command_policy_analysis");
+    const ok = await $({
+      cwd: tmp,
+      stdio: "pipe",
+      nothrow: true,
+    })`buck2 --isolation-dir ${iso} audit providers //tmp/command_policy:ready_ok`;
+    assert.equal(ok.exitCode, 0, String(ok.stderr || ""));
+
+    const local = await $({
+      cwd: tmp,
+      stdio: "pipe",
+      nothrow: true,
+    })`buck2 --isolation-dir ${iso} audit providers //tmp/command_policy:local_no_inputs`;
+    assert.equal(local.exitCode, 0, String(local.stderr || ""));
+
+    const noInputs = await $({
+      cwd: tmp,
+      stdio: "pipe",
+      nothrow: true,
+    })`buck2 --isolation-dir ${iso} audit providers //tmp/command_policy:ready_no_inputs`;
+    assert.notEqual(noInputs.exitCode, 0);
+    assert.match(String(noInputs.stderr || ""), /requires declared inputs/);
+
+    const missing = await $({
+      cwd: tmp,
+      stdio: "pipe",
+      nothrow: true,
+    })`buck2 --isolation-dir ${iso} audit providers //tmp/command_policy:ready_missing_required`;
+    assert.notEqual(missing.exitCode, 0);
+    assert.match(String(missing.stderr || ""), /missing required declared inputs/);
   });
 });

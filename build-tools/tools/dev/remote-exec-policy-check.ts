@@ -15,6 +15,7 @@ export type RemoteExecTargetMetadata = {
   networkAccess?: boolean;
   commandInputsDeclared?: boolean;
   requiresWorkspaceRootLookup?: boolean;
+  ambientPathDependency?: boolean;
 };
 
 export type RemoteExecPolicyFinding = {
@@ -102,6 +103,11 @@ export function validateRemoteExecTargets(opts: {
     }
     if (target.requiresWorkspaceRootLookup) {
       findings.push(finding(target, "plain WORKSPACE_ROOT lookups block remote-ready execution"));
+    }
+    if (target.ambientPathDependency) {
+      findings.push(
+        finding(target, "ambient PATH dependency declarations block remote-ready execution"),
+      );
     }
   }
   return findings;

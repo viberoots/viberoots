@@ -2,7 +2,7 @@ load("//build-tools/lang:sanitize.bzl", "sanitize_name")
 load("//build-tools/lang:nix_shell.bzl", "nix_bootstrap_env_core", "nix_timeout_wrapper_var")
 load("//build-tools/lang:nix_attr.bzl", "sanitize_nix_attr_from_target_label")
 load("//build-tools/lang:nix_action_runner.bzl", "nix_action_build_selected_out_path_cmd")
-load("//build-tools/lang:remote_action_policy.bzl", "run_nix_action", "stamp_remote_readiness_labels")
+load("//build-tools/lang:remote_action_policy.bzl", "external_runner_command", "run_nix_action", "stamp_remote_readiness_labels")
 load("@prelude//:build_mode.bzl", "BuildModeInfo")
 load("@prelude//decls:re_test_common.bzl", "re_test_common")
 load("@prelude//test:inject_test_run_info.bzl", "inject_test_run_info")
@@ -58,10 +58,31 @@ def _cpp_nix_test_impl(ctx):
     )
     run_nix_action(ctx, stamp_cmd, category = "cpp_nix_test_stamp")
     re_executor, executor_overrides = get_re_executors_from_props(ctx)
+    labels = stamp_remote_readiness_labels(ctx.attrs.labels)
+    remote_command = [ctx.attrs.remote_ready_runner] if ctx.attrs.remote_ready_runner != None else None
+    declared_inputs = ctx.attrs.nix_inputs + ([] if ctx.attrs.remote_ready_runner == None else [ctx.attrs.remote_ready_runner]) + [
+        ctx.attrs._build_selected,
+        ctx.attrs._graph_json,
+        ctx.attrs._workspace_root_env,
+        ctx.attrs._zx_init,
+    ]
+    command = external_runner_command(
+        labels,
+        ["bash", "-c", run_and_exec],
+        remote_command = remote_command,
+        declared_inputs = declared_inputs,
+        required_inputs = [
+            ctx.attrs.remote_ready_runner,
+            ctx.attrs._build_selected,
+            ctx.attrs._graph_json,
+            ctx.attrs._workspace_root_env,
+            ctx.attrs._zx_init,
+        ],
+    )
     return inject_test_run_info(ctx, ExternalRunnerTestInfo(
             type = "custom",
-            command = ["bash", "-c", run_and_exec],
-            labels = stamp_remote_readiness_labels(ctx.attrs.labels),
+            command = command,
+            labels = labels,
             contacts = [],
             default_executor = re_executor,
             executor_overrides = executor_overrides,
@@ -77,8 +98,13 @@ _CPP_NIX_TEST_ATTRS = {
         "out": attrs.string(),
         "nix_inputs": attrs.list(attrs.source(), default = []),
         "labels": attrs.list(attrs.string(), default = []),
+        "remote_ready_runner": attrs.option(attrs.source(), default = None),
         "test_rule_timeout_ms": attrs.option(attrs.int(), default = None),
         "_inject_test_env": attrs.default_only(attrs.dep(default = "prelude//test/tools:inject_test_env")),
+        "_build_selected": attrs.source(default = "//build-tools/tools/dev:build-selected.ts"),
+        "_graph_json": attrs.source(default = "//build-tools/tools/buck:graph.json"),
+        "_workspace_root_env": attrs.source(default = "//build-tools/tools/buck:workspace-root.env"),
+        "_zx_init": attrs.source(default = "//build-tools/tools/dev:zx-init.mjs"),
         # Create a graph edge so exporter cquery includes the planner cxx_test node
         "planner": attrs.dep(),
     }

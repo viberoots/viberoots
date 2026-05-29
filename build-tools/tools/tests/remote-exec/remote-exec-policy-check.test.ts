@@ -60,6 +60,7 @@ test("remote-ready external-runner metadata must be complete", () => {
         networkAccess: true,
         commandInputsDeclared: false,
         requiresWorkspaceRootLookup: true,
+        ambientPathDependency: true,
       },
     ],
   });
@@ -70,6 +71,7 @@ test("remote-ready external-runner metadata must be complete", () => {
   assert.match(text, /network access/);
   assert.match(text, /command inputs/);
   assert.match(text, /WORKSPACE_ROOT/);
+  assert.match(text, /ambient PATH/);
 });
 
 test("remote-ready labels are limited to reviewed wrapper families", () => {

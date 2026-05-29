@@ -24,6 +24,14 @@ zx_test(
 )
 
 zx_test(
+    name = "zx_ready_handles",
+    labels = ["fixture:ready", "existing:label", "remote:ready", "verify:manual"],
+    remote_ready_runner = "remote-ready-runner.sh",
+    script = "noop.test.ts",
+    template_inputs = ["fixture.txt"],
+)
+
+zx_test(
     name = "zx_local_labeled_bundle_ignore",
     labels = ["fixture:local", "existing:label", "re_ignore_force_run_as_bundle", "verify:manual"],
     script = "noop.test.ts",
@@ -42,6 +50,14 @@ node_nix_test(
     remote_execution = "linux-x86_64-default",
 )
 
+node_nix_test(
+    name = "node_ready_handles",
+    importer = ".",
+    labels = ["fixture:ready", "existing:label", "remote:ready", "verify:manual"],
+    remote_ready_runner = "remote-ready-runner.sh",
+    srcs = ["fixture.txt"],
+)
+
 go_nix_test(
     name = "go_local",
     labels = ["fixture:local", "existing:label", "lang:go", "patch_scope:package-local", "verify:manual"],
@@ -55,6 +71,15 @@ go_nix_test(
     out = "go_remote.stamp",
     remote_execution = "linux-x86_64-default",
     self_label = "//build-tools/tools/tests/remote-exec/wrapper-fixtures:go_remote",
+)
+
+go_nix_test(
+    name = "go_ready_handles",
+    labels = ["fixture:ready", "existing:label", "remote:ready", "lang:go", "patch_scope:package-local", "verify:manual"],
+    nix_inputs = ["fixture.txt"],
+    out = "go_ready_handles.stamp",
+    remote_ready_runner = "remote-ready-runner.sh",
+    self_label = "//build-tools/tools/tests/remote-exec/wrapper-fixtures:go_ready_handles",
 )
 
 python_nix_test(
@@ -72,6 +97,15 @@ python_nix_test(
     self_label = "//build-tools/tools/tests/remote-exec/wrapper-fixtures:python_remote",
 )
 
+python_nix_test(
+    name = "python_ready_handles",
+    labels = ["fixture:ready", "existing:label", "remote:ready", "verify:manual"],
+    nix_inputs = ["fixture.txt"],
+    out = "python_ready_handles.stamp",
+    remote_ready_runner = "remote-ready-runner.sh",
+    self_label = "//build-tools/tools/tests/remote-exec/wrapper-fixtures:python_ready_handles",
+)
+
 cpp_nix_test(
     name = "cpp_local",
     labels = ["fixture:local", "existing:label", "verify:manual"],
@@ -87,4 +121,14 @@ cpp_nix_test(
     planner = ":cpp_planner",
     planner_label = "//build-tools/tools/tests/remote-exec/wrapper-fixtures:cpp_remote__planner",
     remote_execution = "linux-x86_64-default",
+)
+
+cpp_nix_test(
+    name = "cpp_ready_handles",
+    labels = ["fixture:ready", "existing:label", "remote:ready", "verify:manual"],
+    nix_inputs = ["fixture.txt"],
+    out = "cpp_ready_handles.stamp",
+    planner = ":cpp_planner",
+    planner_label = "//build-tools/tools/tests/remote-exec/wrapper-fixtures:cpp_ready_handles__planner",
+    remote_ready_runner = "remote-ready-runner.sh",
 )

@@ -1,6 +1,12 @@
 load("@prelude//:rules.bzl", "export_file", "filegroup")
 
 export_file(
+    name = "graph.json",
+    src = "graph.json",
+    visibility = ["PUBLIC"],
+)
+
+export_file(
     name = "workspace-root.env",
     src = "workspace-root.env",
     visibility = ["PUBLIC"],

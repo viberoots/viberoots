@@ -42,6 +42,42 @@ def stamp_local_only_genrule_labels(labels):
         out.append(_GENRULE_LOCAL_SCHEDULING_LABEL)
     return out
 
+_REMOTE_BLOCKED_COMMAND_FRAGMENTS = [
+    "WORKSPACE_ROOT",
+    "FLK_ROOT",
+    "BUCK_TEST_SRC",
+    "command -v",
+    "path:$FLK_ROOT",
+    "build-tools/",
+    "/usr/bin/env",
+]
+
+def _command_text(command):
+    return " ".join([str(part) for part in command])
+
+def external_runner_command(labels, local_command, remote_command = None, declared_inputs = [], required_inputs = []):
+    if REMOTE_READY in (labels or []):
+        if remote_command == None:
+            fail("remote-ready external-runner command requires a separate declared remote command")
+        if len(declared_inputs) == 0:
+            fail("remote-ready external-runner command requires declared inputs")
+        declared_input_ids = [str(item) for item in declared_inputs]
+        missing = []
+        for required in required_inputs:
+            if str(required) not in declared_input_ids:
+                missing.append(str(required))
+        if missing:
+            fail("remote-ready external-runner command missing required declared inputs: %s" % ", ".join(missing))
+        text = _command_text(remote_command[1:])
+        blocked = []
+        for fragment in _REMOTE_BLOCKED_COMMAND_FRAGMENTS:
+            if fragment in text:
+                blocked.append(fragment)
+        if blocked:
+            fail("remote-ready external-runner command contains local workspace/bootstrap fragments: %s" % ", ".join(blocked))
+        return [cmd_args(remote_command[0], hidden = declared_inputs)] + remote_command[1:]
+    return local_command
+
 def _missing_evidence(evidence):
     values = evidence or {}
     return [key for key in _REMOTE_READY_EVIDENCE if not values.get(key)]

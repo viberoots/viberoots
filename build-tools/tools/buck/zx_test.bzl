@@ -3,7 +3,7 @@ load("@prelude//:build_mode.bzl", "BuildModeInfo")
 load("@prelude//:rules.bzl", "clone_rule")
 load("@prelude//decls:re_test_common.bzl", "re_test_common")
 load("@prelude//tests:re_utils.bzl", "get_re_executors_from_props")
-load("//build-tools/lang:remote_action_policy.bzl", "run_nix_action", "stamp_remote_readiness_labels")
+load("//build-tools/lang:remote_action_policy.bzl", "external_runner_command", "run_nix_action", "stamp_remote_readiness_labels")
 
 def _zx_test_impl(ctx):
     script = ctx.attrs.script
@@ -151,7 +151,7 @@ def _zx_test_impl(ctx):
         )
         % (ctx.label, ctx.label.package, script.short_path, script.short_path)
     )
-    cmd = [
+    local_command = [
         "bash",
         "-c",
         run_and_report,
@@ -163,6 +163,26 @@ def _zx_test_impl(ctx):
         re_executor, executor_overrides = None, {}
     else:
         re_executor, executor_overrides = get_re_executors_from_props(ctx)
+    remote_command = [ctx.attrs.remote_ready_runner] if ctx.attrs.remote_ready_runner != None else None
+    declared_inputs = ([] if ctx.attrs.remote_ready_runner == None else [ctx.attrs.remote_ready_runner]) + [
+        ctx.attrs.script,
+        ctx.attrs._command_heartbeat,
+        ctx.attrs._node_modules_build,
+        ctx.attrs._zx_init,
+    ] + (ctx.attrs.template_inputs or [])
+    command = external_runner_command(
+        labels,
+        local_command,
+        remote_command = remote_command,
+        declared_inputs = declared_inputs,
+        required_inputs = [
+            ctx.attrs.remote_ready_runner,
+            ctx.attrs.script,
+            ctx.attrs._command_heartbeat,
+            ctx.attrs._node_modules_build,
+            ctx.attrs._zx_init,
+        ],
+    )
     stamp = ctx.actions.declare_output(ctx.attrs.out)
     stamp_cmd = cmd_args(
         ["bash", "-c", "echo zx_test > \"$1\"", "stamp", stamp.as_output()],
@@ -171,7 +191,7 @@ def _zx_test_impl(ctx):
     run_nix_action(ctx, stamp_cmd, category = "zx_test_stamp")
     return inject_test_run_info(ctx, ExternalRunnerTestInfo(
             type = "custom",
-            command = cmd,
+            command = command,
             labels = labels,
             contacts = [],
             default_executor = re_executor,
@@ -190,6 +210,7 @@ zx_test = clone_rule(
         "script": attrs.source(),
         # Ensure a default output so Buck always recognizes an output artifact
         "out": attrs.string(default = "zx_test.stamp"),
+        "remote_ready_runner": attrs.option(attrs.source(), default = None),
         "template_inputs": attrs.list(attrs.source(), default = []),
         "remote_execution": attrs.one_of(
             attrs.string(),
@@ -200,6 +221,9 @@ zx_test = clone_rule(
             providers = [BuildModeInfo],
             default = "repo_toolchains//:remote_profile_conversion_action_key",
         ),
+        "_command_heartbeat": attrs.source(default = "//build-tools/tools/dev:command-heartbeat.ts"),
+        "_node_modules_build": attrs.source(default = "//build-tools/tools/dev:node-modules-build.ts"),
+        "_zx_init": attrs.source(default = "//build-tools/tools/dev:zx-init.mjs"),
     },
     impl_override = _zx_test_impl,
 )

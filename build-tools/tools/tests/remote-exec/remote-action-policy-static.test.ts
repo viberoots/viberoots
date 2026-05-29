@@ -30,6 +30,14 @@ const sharedNixHelpers = [
   "build-tools/lang/nix_action_runner.bzl",
 ];
 
+const externalRunnerWrappers = [
+  "build-tools/go/private/nix_test.bzl",
+  "build-tools/python/private/nix_test.bzl",
+  "build-tools/cpp/private/nix_test.bzl",
+  "build-tools/node/private/nix_test.bzl",
+  "build-tools/tools/buck/zx_test.bzl",
+];
+
 function read(path: string): string {
   return fs.readFileSync(path, "utf8");
 }
@@ -60,6 +68,22 @@ test("shared action policy stamps local-only, hybrid, and remote-ready metadata"
   assert.match(text, /remote_builder_smoke/);
   assert.match(text, /remote_profile_compatibility/);
   assert.match(text, /fallback_reason/);
+});
+
+test("remote-ready external-runner commands carry declared input handles", () => {
+  const policyText = read("build-tools/lang/remote_action_policy.bzl");
+  assert.match(policyText, /def external_runner_command/);
+  assert.match(policyText, /REMOTE_READY/);
+  assert.match(policyText, /requires declared inputs/);
+  assert.match(policyText, /missing required declared inputs/);
+  assert.match(policyText, /requires a separate declared remote command/);
+  assert.match(policyText, /contains local workspace\/bootstrap fragments/);
+  assert.match(policyText, /cmd_args\(remote_command\[0\], hidden = declared_inputs\)/);
+  for (const file of externalRunnerWrappers) {
+    const text = read(file);
+    assert.match(text, /external_runner_command\(/, file);
+    assert.match(text, /declared_inputs = /, file);
+  }
 });
 
 test("Node Nix build and stage genrules apply local-only scheduling labels", () => {

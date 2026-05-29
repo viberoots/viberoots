@@ -1,6 +1,6 @@
 load("//build-tools/lang:sanitize.bzl", "sanitize_name")
 load("//build-tools/lang:nix_shell.bzl", "nix_bootstrap_env_core", "nix_bootstrap_env_pnpm_store", "nix_timeout_wrapper_var")
-load("//build-tools/lang:remote_action_policy.bzl", "run_nix_action", "stamp_remote_readiness_labels")
+load("//build-tools/lang:remote_action_policy.bzl", "external_runner_command", "run_nix_action", "stamp_remote_readiness_labels")
 load("@prelude//:build_mode.bzl", "BuildModeInfo")
 load("@prelude//decls:re_test_common.bzl", "re_test_common")
 load("@prelude//test:inject_test_run_info.bzl", "inject_test_run_info")
@@ -79,11 +79,36 @@ def _node_nix_test_impl(ctx):
     )
     run_nix_action(ctx, cmd, category = "node_nix_test_stamp")
     re_executor, executor_overrides = get_re_executors_from_props(ctx)
+    labels = stamp_remote_readiness_labels(ctx.attrs.labels)
+    remote_command = [ctx.attrs.remote_ready_runner] if ctx.attrs.remote_ready_runner != None else None
+    declared_inputs = ctx.attrs.srcs + ([] if ctx.attrs.remote_ready_runner == None else [ctx.attrs.remote_ready_runner]) + [
+        ctx.attrs._command_heartbeat,
+        ctx.attrs._graph_json,
+        ctx.attrs._nix_build_filtered_flake,
+        ctx.attrs._prepare_exact_pnpm_store,
+        ctx.attrs._workspace_root_env,
+        ctx.attrs._zx_init,
+    ]
+    command = external_runner_command(
+        labels,
+        ["bash", "-c", run_cmd],
+        remote_command = remote_command,
+        declared_inputs = declared_inputs,
+        required_inputs = [
+            ctx.attrs.remote_ready_runner,
+            ctx.attrs._command_heartbeat,
+            ctx.attrs._graph_json,
+            ctx.attrs._nix_build_filtered_flake,
+            ctx.attrs._prepare_exact_pnpm_store,
+            ctx.attrs._workspace_root_env,
+            ctx.attrs._zx_init,
+        ],
+    )
 
     return inject_test_run_info(ctx, ExternalRunnerTestInfo(
             type = "custom",
-            command = ["bash", "-c", run_cmd],
-            labels = stamp_remote_readiness_labels(ctx.attrs.labels),
+            command = command,
+            labels = labels,
             contacts = [],
             default_executor = re_executor,
             executor_overrides = executor_overrides,
@@ -116,7 +141,14 @@ _NODE_NIX_TEST_ATTRS = {
         "labels": attrs.list(attrs.string(), default = []),
         # Deterministic tiny output file name
         "out": attrs.string(default = "node_nix_test.stamp"),
+        "remote_ready_runner": attrs.option(attrs.source(), default = None),
         "_inject_test_env": attrs.default_only(attrs.dep(default = "prelude//test/tools:inject_test_env")),
+        "_command_heartbeat": attrs.source(default = "//build-tools/tools/dev:command-heartbeat.ts"),
+        "_graph_json": attrs.source(default = "//build-tools/tools/buck:graph.json"),
+        "_nix_build_filtered_flake": attrs.source(default = "//build-tools/tools/dev:nix-build-filtered-flake.ts"),
+        "_prepare_exact_pnpm_store": attrs.source(default = "//build-tools/tools/dev:prepare-exact-pnpm-store.ts"),
+        "_workspace_root_env": attrs.source(default = "//build-tools/tools/buck:workspace-root.env"),
+        "_zx_init": attrs.source(default = "//build-tools/tools/dev:zx-init.mjs"),
     }
 _NODE_NIX_TEST_ATTRS.update(_remote_test_attrs())
 
