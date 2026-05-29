@@ -1,0 +1,32 @@
+export const REMOTE_SAFE_NIX_IMPURE_ENV_VARS = new Set([
+  "BUCK_GRAPH_JSON",
+  "BUCK_TARGET",
+  "NIX_PNPM_FETCH_TIMEOUT",
+  "NIX_PNPM_INSTALL_TIMEOUT",
+  "NIX_NODE_TEST_PATTERNS",
+]);
+
+export const LOCAL_ONLY_NIX_IMPURE_ENV_VARS = new Set([
+  "BUCK_TEST_SRC",
+  "COVERAGE",
+  "NIX_CPP_DEV_OVERRIDE_JSON",
+  "NIX_GO_DEV_OVERRIDE_JSON",
+  "NIX_PNPM_ALLOW_GENERATE",
+  "NIX_PNPM_EXACT_STORE",
+  "NIX_PY_DEV_OVERRIDE_JSON",
+  "NIX_PY_TEST_RESOLVE_JSON",
+  "PLANNER_NO_DEV_OVERRIDE_LOG",
+  "PLANNER_TRACE",
+  "ROOT_GOMOD2NIX_TOML",
+  "TEST_EXCLUDE_CPP_REQS",
+  "TEST_PARTIAL_CLONE_GO_ONLY",
+  "TEST_RSYNC_ROOTS",
+  "WORKSPACE_ROOT",
+]);
+
+export function assertClassifiedNixImpureEnv(name: string): void {
+  if (REMOTE_SAFE_NIX_IMPURE_ENV_VARS.has(name) || LOCAL_ONLY_NIX_IMPURE_ENV_VARS.has(name)) {
+    return;
+  }
+  throw new Error(`${name} must be classified as remote-safe or local-only`);
+}

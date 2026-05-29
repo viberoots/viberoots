@@ -82,6 +82,35 @@ function commonTestEnvArgs(): string[] {
   ];
 }
 
+function remoteTestEnvArgs(): string[] {
+  return [
+    "--env",
+    "COVERAGE=0",
+    "--env",
+    "TEST_NODE_OPTIONS=--test-timeout=7200000",
+    "--env",
+    "TEST_NIX_TIMEOUT_SECS=1800",
+    "--env",
+    "NIX_PNPM_FETCH_TIMEOUT=1800",
+    "--env",
+    "NIX_PNPM_INSTALL_TIMEOUT=1800",
+    "--env",
+    "BUCK_NESTED_ISO=verify-nested-17a5591c2ed6",
+    "--env",
+    "NIX_SSL_CERT_FILE=<cert>",
+    "--env",
+    "SSL_CERT_FILE=<cert>",
+    "--env",
+    "NODE_EXTRA_CA_CERTS=<cert>",
+    "--env",
+    "NIX_BIN=<nix>",
+    "--env",
+    "PATCH_BIN=<patch>",
+    "--env",
+    "GIT_BIN=<git>",
+  ];
+}
+
 export function localArgvSnapshot(): string[] {
   return [
     "-k",
@@ -150,6 +179,6 @@ export function remoteArgvSnapshot(opts: {
     "prelude//platforms:default",
     "//:target",
     "--",
-    ...commonTestEnvArgs(),
+    ...remoteTestEnvArgs(),
   ];
 }

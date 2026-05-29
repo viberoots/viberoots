@@ -9,6 +9,7 @@ import { createBuck2SlowestRecorder } from "./buck2-slowest";
 import { spawnBuck2WithTimeout } from "./buck2-spawn";
 import { verifyBuck2Threads } from "./buck2-threads";
 import { buildVerifyTestEnvArgs, previewVerifyNestedBuckIsolation } from "./buck2-test-env";
+import { buildBuckProcessEnvForPolicy } from "./buck2-test-remote-env";
 import { registerVerifyBuckTestIsolations } from "./verify-buck-isolation-registration";
 import { resolveToolPathSync } from "../../lib/tool-paths";
 import { buckTestArgsForExecutionPolicy, targetPlatformArgsForPolicy } from "./remote-policy";
@@ -64,6 +65,7 @@ export function spawnVerifyBuck2Tests(opts: {
     zxNodeModulesOut: opts.zxNodeModulesOut,
     nodeTestTimeoutMs,
     testNixTimeoutSecs,
+    executionPolicy: opts.executionPolicy,
   });
   const timeoutPath = resolveToolPathSync("timeout");
   const buck2Path = resolveToolPathSync("buck2");
@@ -85,8 +87,7 @@ export function spawnVerifyBuck2Tests(opts: {
   const buckCommandForDiagnostics = [buck2Path, ...buckArgs];
 
   const startS = Math.floor(Date.now() / 1000);
-  const buckEnv = { ...process.env };
-  delete buckEnv.VBR_VERIFY_REGISTER_PROCESS;
+  const buckEnv = buildBuckProcessEnvForPolicy(opts.executionPolicy);
   const buckLogEnv = buckLogEnvForExecutionPolicy(opts.executionPolicy);
   writeRemoteBuckMaterializationMetadata({ policy: opts.executionPolicy, passName });
 

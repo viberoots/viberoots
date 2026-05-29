@@ -60,7 +60,16 @@ function spawnedEnvSnapshot(call: SpawnCall): Record<string, string | undefined>
   };
 }
 
-function spawnSnapshot(mode: "local" | RemoteMode): Snapshot {
+function remoteOnlyEnvSnapshot(call: SpawnCall): Record<string, string | undefined> {
+  return {
+    NIX_DAEMON_SOCKET_PATH: call.options.env?.NIX_DAEMON_SOCKET_PATH,
+    NIX_SSL_CERT_FILE: call.options.env?.NIX_SSL_CERT_FILE,
+    TEST_RSYNC_ROOTS: call.options.env?.TEST_RSYNC_ROOTS,
+    WORKSPACE_ROOT: call.options.env?.WORKSPACE_ROOT,
+  };
+}
+
+function spawnSnapshot(mode: "local" | RemoteMode, extraEnv: NodeJS.ProcessEnv = {}): Snapshot {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "vbr-spawn-snapshot-"));
   const artifactDir = path.join(tmp, "artifacts");
   const activationDir = path.join(tmp, "activation");
@@ -89,7 +98,10 @@ function spawnSnapshot(mode: "local" | RemoteMode): Snapshot {
   const prev = { ...process.env };
   Object.assign(process.env, {
     BUCK_LOG: "warn,buck2_event_log::writer=off,buck2_execute=trace",
+    NODE_V8_COVERAGE: path.join(tmp, "coverage", "raw"),
     NIX_PATH: "",
+    NIX_DAEMON_SOCKET_PATH: "/var/run/nix-daemon.socket",
+    NIX_SSL_CERT_FILE: "/nix/store/cacert/etc/ssl/certs/ca-bundle.crt",
     RUST_LOG: "info,buck2_event_log::writer=off,buck2_client_ctx=debug",
     VBR_BUCK_REAPER_STATE_FILE: "",
     VBR_SHARED_PRELUDE_PATH: "",
@@ -100,6 +112,7 @@ function spawnSnapshot(mode: "local" | RemoteMode): Snapshot {
     VBR_VERIFY_LOG_FILE: "",
     VBR_VERIFY_PROCESS_STATE_FILE: "",
     VERIFY_TIMEOUT_SECS: "7200",
+    ...extraEnv,
   });
   try {
     spawnVerifyBuck2Tests({
@@ -146,5 +159,18 @@ test("spawnVerifyBuck2Tests remote argv/env snapshots cover every mode", () => {
       RUST_LOG: "info,buck2_client_ctx=debug",
       VBR_VERIFY_REGISTER_PROCESS: undefined,
     });
+    assert.deepEqual(remoteOnlyEnvSnapshot(call), {
+      NIX_DAEMON_SOCKET_PATH: undefined,
+      NIX_SSL_CERT_FILE: "/nix/store/cacert/etc/ssl/certs/ca-bundle.crt",
+      TEST_RSYNC_ROOTS: undefined,
+      WORKSPACE_ROOT: undefined,
+    });
   }
+});
+
+test("spawnVerifyBuck2Tests rejects undeclared remote inputs before remote Buck spawn", () => {
+  assert.throws(
+    () => spawnSnapshot("remote", { BUCK_GRAPH_JSON: "/tmp/graph.json" }),
+    /BUCK_GRAPH_JSON must be passed through a declared remote input/,
+  );
 });

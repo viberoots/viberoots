@@ -1,6 +1,8 @@
 import crypto from "node:crypto";
 import process from "node:process";
 import { resolveToolPathSync } from "../../lib/tool-paths";
+import { buildRemoteVerifyTestEnvArgs } from "./buck2-test-remote-env";
+import type { VerifyExecutionPolicy } from "./remote-policy";
 
 type VerifyBuck2TestEnvArgsOptions = {
   iso: string;
@@ -8,6 +10,7 @@ type VerifyBuck2TestEnvArgsOptions = {
   zxNodeModulesOut: string | null;
   nodeTestTimeoutMs: number;
   testNixTimeoutSecs: number;
+  executionPolicy?: VerifyExecutionPolicy;
 };
 
 function verifyNestedBuckIsolation(iso: string, passName: string): string {
@@ -38,6 +41,13 @@ function buckdStartupInitTimeout(): string {
 }
 
 export function buildVerifyTestEnvArgs(opts: VerifyBuck2TestEnvArgsOptions): string[] {
+  if (opts.executionPolicy && opts.executionPolicy.mode !== "local") {
+    return buildRemoteVerifyTestEnvArgs({
+      nestedIso: verifyNestedBuckIsolation(opts.iso, opts.passName),
+      nodeTestTimeoutMs: opts.nodeTestTimeoutMs,
+      testNixTimeoutSecs: opts.testNixTimeoutSecs,
+    });
+  }
   const nestedIso = verifyNestedBuckIsolation(opts.iso, opts.passName);
   const extraEnvArgs: string[] = [];
   const sslCertFile = process.env.SSL_CERT_FILE || process.env.NIX_SSL_CERT_FILE;

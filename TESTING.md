@@ -145,6 +145,10 @@ Set:
 
 System names map to profile prefixes: `x86_64-linux` to `linux-x86_64`, `aarch64-linux` to `linux-aarch64`, and `aarch64-darwin` to `darwin-aarch64`. Remote mode rejects `--coverage` until declared coverage artifacts are implemented.
 
+Local verify keeps the full local Buck process and test environment so existing tests continue to see seed-store paths, nested Buck daemon controls, local Nix daemon settings, local coverage output, and developer diagnostics. Remote verify uses separate Buck process and test child environment allowlists. It forwards only timeouts, `COVERAGE=0`, the nested Buck isolation name, generated remote-safe Nix/Pnpm inputs, pinned tool paths, and known certificate paths. It does not forward repo-root `buck-out`, `.direnv`, root `node_modules`, local seed pin directories, `NODE_V8_COVERAGE`, Nix daemon sockets, `TEST_RSYNC_ROOTS`, or developer override env vars.
+
+When adding a Nix `allowed-impure-env-vars` value in `flake.nix` or `build-tools/tools/nix/flake/nix-config.nix`, classify it in `build-tools/tools/dev/verify/buck2-test-env-policy.ts` as remote-safe or local-only. Remote-safe values must be represented by declared source snapshots, graph artifacts, materialization manifests, Nix-store paths, or per-target policy fields. Local-only values must not be forwarded to remote test actions.
+
 ## Faster temp workspaces (seed store)
 
 Many zx tests run in a temporary copy of the workspace created via rsync. To speed this up without affecting correctness, the helper already excludes heavy or irrelevant directories. Notably, `test-logs/` is now excluded by default to avoid copying large artifacts from prior runs.
