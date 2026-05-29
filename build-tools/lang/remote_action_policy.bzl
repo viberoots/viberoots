@@ -16,28 +16,17 @@ _REMOTE_READY_EVIDENCE = [
     "source_snapshot",
     "materialization_manifest",
     "artifact_contract",
+    "tool_closure",
     "builder_policy",
     "remote_builder_smoke",
     "remote_profile_compatibility",
 ]
 
-_REMOTE_BUILDER_POLICIES_REQUIRING_SMOKE = [
-    "inherit_config",
-    "force_builders_file",
-]
+_REMOTE_BUILDER_POLICIES_REQUIRING_SMOKE = ["inherit_config", "force_builders_file"]
 
-_NIX_BUILDER_POLICIES = [
-    "local_only",
-    "inherit_config",
-    "force_builders_file",
-]
+_NIX_BUILDER_POLICIES = ["local_only", "inherit_config", "force_builders_file"]
 
-NixRemoteActionPolicyInfo = provider(fields = [
-    "builder_policy",
-    "labels",
-    "metadata",
-    "remote_builder_smoke_policy",
-])
+NixRemoteActionPolicyInfo = provider(fields = ["builder_policy", "labels", "metadata", "remote_builder_smoke_policy"])
 
 _GENRULE_LOCAL_SCHEDULING_LABEL = "uses_local_filesystem_abspaths"
 
@@ -129,6 +118,17 @@ def _validate_source_snapshot_evidence(evidence):
     if not snapshot.get("graph_path"):
         fail("remote-ready action requires source_snapshot.graph_path")
 
+def _validate_declared_evidence(value, name):
+    if type(value) != "dict" or not value.get("path"):
+        fail("remote-ready action requires %s.path" % name)
+
+def _validate_remote_ready_evidence(evidence):
+    _validate_source_snapshot_evidence(evidence)
+    _validate_declared_evidence(evidence.get("artifact_contract"), "artifact_contract")
+    _validate_declared_evidence(evidence.get("materialization_manifest"), "materialization_manifest")
+    _validate_declared_evidence(evidence.get("tool_closure"), "tool_closure")
+    _validate_builder_evidence(evidence)
+
 def _policy_labels(evidence, default_builder_policy):
     values = evidence or {}
     builder_policy = values.get("builder_policy")
@@ -137,6 +137,8 @@ def _policy_labels(evidence, default_builder_policy):
     labels = ["nix-builder:%s" % builder_policy]
     if values.get("artifact_contract"):
         labels.append("artifact-contract:declared")
+    if values.get("tool_closure"):
+        labels.append("tool-closure:declared")
     if values.get("materialization_manifest"):
         labels.append("materialization-manifest:declared")
         manifest = values.get("materialization_manifest")
@@ -168,8 +170,7 @@ def remote_action_policy(
         missing = _missing_evidence(evidence)
         if missing:
             fail("remote-ready action missing evidence: %s" % ", ".join(missing))
-        _validate_source_snapshot_evidence(evidence)
-        _validate_builder_evidence(evidence)
+        _validate_remote_ready_evidence(evidence)
         return struct(
             local_only = False,
             builder_policy = evidence.get("builder_policy"),
@@ -182,8 +183,7 @@ def remote_action_policy(
         missing = _missing_evidence(evidence)
         if missing:
             fail("hybrid action missing evidence: %s" % ", ".join(missing))
-        _validate_source_snapshot_evidence(evidence)
-        _validate_builder_evidence(evidence)
+        _validate_remote_ready_evidence(evidence)
         if not fallback_reason:
             fail("hybrid action requires fallback_reason")
         return struct(
@@ -196,20 +196,34 @@ def remote_action_policy(
         )
     fail("unknown remote action policy mode: %s" % mode)
 
-def remote_ready_evidence(source_snapshot, source_snapshot_manifest, builder_policy = "inherit_config"):
+def remote_ready_evidence(
+        source_snapshot,
+        source_snapshot_manifest,
+        materialization_manifest,
+        artifact_contract,
+        tool_closure,
+        remote_builder_smoke,
+        builder_policy = "inherit_config"):
     if source_snapshot == None or source_snapshot_manifest == None:
         fail("remote-ready action requires declared source snapshot inputs")
+    for required in [materialization_manifest, artifact_contract, tool_closure, remote_builder_smoke]:
+        if required == None:
+            fail("remote-ready action requires declared materialization, artifact, tool, and smoke evidence")
     return {
-        "artifact_contract": True,
+        "artifact_contract": {"path": str(artifact_contract)},
         "builder_policy": builder_policy,
-        "materialization_manifest": True,
-        "remote_builder_smoke": builder_policy,
+        "materialization_manifest": {"path": str(materialization_manifest)},
+        "remote_builder_smoke": {
+            "builder_policy": builder_policy,
+            "path": str(remote_builder_smoke),
+        },
         "remote_profile_compatibility": True,
         "source_snapshot": {
             "declared_root": str(source_snapshot),
             "graph_path": "build-tools/tools/buck/graph.json",
             "manifest": str(source_snapshot_manifest),
         },
+        "tool_closure": {"path": str(tool_closure)},
     }
 
 def run_nix_action(ctx, cmd, category, mode = "local-only", evidence = None, fallback_reason = None):

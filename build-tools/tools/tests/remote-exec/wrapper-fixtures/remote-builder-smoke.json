@@ -1,0 +1,5 @@
+{
+  "ok": true,
+  "builder_policy": "inherit_config",
+  "mode": "dry-run"
+}

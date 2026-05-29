@@ -1,0 +1,8 @@
+{
+  "tools": [
+    {
+      "name": "remote-ready-runner",
+      "path": "remote-ready-runner.sh"
+    }
+  ]
+}

@@ -29,12 +29,8 @@ function defaultRunner(root: string): BuckRunner {
       cwd: root,
       env: {
         ...process.env,
-        RUST_LOG:
-          (process.env.RUST_LOG || "warn") +
-          ",buck2_client_ctx::file_tailers::tailer=off,buck2_event_log::writer=off",
-        BUCK_LOG:
-          (process.env.BUCK_LOG || "warn") +
-          ",buck2_client_ctx::file_tailers::tailer=off,buck2_event_log::writer=off",
+        RUST_LOG: `${process.env.RUST_LOG || "warn"},buck2_client_ctx::file_tailers::tailer=off,buck2_event_log::writer=off`,
+        BUCK_LOG: `${process.env.BUCK_LOG || "warn"},buck2_client_ctx::file_tailers::tailer=off,buck2_event_log::writer=off`,
       },
       encoding: "utf8",
     });
@@ -44,10 +40,6 @@ function defaultRunner(root: string): BuckRunner {
       stderr: String(result.stderr || ""),
     };
   };
-}
-
-function cqueryExpr(targets: readonly string[]): string {
-  return targets.length === 1 ? targets[0]! : `(${targets.join(" + ")})`;
 }
 
 function parseCqueryMetadata(stdout: string): Map<string, CqueryInfo> {
@@ -130,6 +122,13 @@ function parseLabeledPolicy(
   return undefined;
 }
 
+function parseProviderLabel(text: string, prefix: string): NixBuilderPolicy | string | undefined {
+  const start = text.indexOf(prefix);
+  if (start < 0) return undefined;
+  const value = text.slice(start + prefix.length).match(/^[A-Za-z0-9_-]+/)?.[0];
+  return value ? parseEvidenceValue(value) : undefined;
+}
+
 function parseBuilderPolicyMetadata(
   labels: readonly string[],
   providerText: string,
@@ -137,9 +136,11 @@ function parseBuilderPolicyMetadata(
   return {
     nixBuilderPolicy:
       parseLabeledPolicy(labels, "nix-builder:") ||
+      parseProviderLabel(providerText, "nix-builder:") ||
       parseMetadataValue(providerText, ["nix_builder_policy", "builder_policy"]),
     remoteBuilderSmokePolicy:
       parseLabeledPolicy(labels, "remote-builder-smoke:") ||
+      parseProviderLabel(providerText, "remote-builder-smoke:") ||
       parseMetadataValue(providerText, ["remote_builder_smoke", "remote_builder_smoke_policy"]),
   };
 }
@@ -181,6 +182,7 @@ export function collectRemoteExecTargetMetadata(opts: {
   if (opts.targets.length === 0) return [];
   const runBuck = opts.runBuck || defaultRunner(opts.root);
   const targetNames = opts.targets.map((entry) => entry.target);
+  const targetExpr = targetNames.length === 1 ? targetNames[0]! : `(${targetNames.join(" + ")})`;
   const cquery = runBuck([
     "--isolation-dir",
     opts.iso,
@@ -192,7 +194,7 @@ export function collectRemoteExecTargetMetadata(opts: {
     "labels",
     "--output-attribute",
     "buck.type",
-    cqueryExpr(targetNames),
+    targetExpr,
   ]);
   if (cquery.status !== 0) {
     throw new Error(`remote policy cquery failed (${cquery.status}): ${cquery.stderr.trim()}`);

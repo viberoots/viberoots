@@ -41,7 +41,7 @@ test("remote action policy rejects boolean builder evidence", async () => {
   await assertPolicyFails({
     name: "remote-boolean-builder-evidence",
     targetBody:
-      'policy_probe(name = "t", evidence = {"source_snapshot": {"declared_root": "snapshot", "manifest": "snapshot.manifest.json", "graph_path": "snapshot/build-tools/tools/buck/graph.json"}, "materialization_manifest": True, "artifact_contract": True, "builder_policy": True, "remote_builder_smoke": True, "remote_profile_compatibility": True})',
+      'policy_probe(name = "t", evidence = {"source_snapshot": {"declared_root": "snapshot", "manifest": "snapshot.manifest.json", "graph_path": "snapshot/build-tools/tools/buck/graph.json"}, "materialization_manifest": {"path": "materialization-manifest.json"}, "artifact_contract": {"path": "artifact-contract.json"}, "builder_policy": True, "remote_builder_smoke": {"builder_policy": "inherit_config", "path": "remote-builder-smoke.json"}, "tool_closure": {"path": "tool-closure.json"}, "remote_profile_compatibility": True})',
     message: /typed builder_policy evidence/,
   });
 });
@@ -50,7 +50,7 @@ test("remote action policy rejects boolean remote-builder smoke evidence", async
   await assertPolicyFails({
     name: "remote-boolean-smoke-evidence",
     targetBody:
-      'policy_probe(name = "t", evidence = {"source_snapshot": {"declared_root": "snapshot", "manifest": "snapshot.manifest.json", "graph_path": "snapshot/build-tools/tools/buck/graph.json"}, "materialization_manifest": True, "artifact_contract": True, "builder_policy": "inherit_config", "remote_builder_smoke": True, "remote_profile_compatibility": True})',
+      'policy_probe(name = "t", evidence = {"source_snapshot": {"declared_root": "snapshot", "manifest": "snapshot.manifest.json", "graph_path": "snapshot/build-tools/tools/buck/graph.json"}, "materialization_manifest": {"path": "materialization-manifest.json"}, "artifact_contract": {"path": "artifact-contract.json"}, "builder_policy": "inherit_config", "remote_builder_smoke": True, "tool_closure": {"path": "tool-closure.json"}, "remote_profile_compatibility": True})',
     message: /typed remote_builder_smoke evidence/,
   });
 });

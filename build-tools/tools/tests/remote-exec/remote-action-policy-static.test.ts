@@ -66,6 +66,7 @@ test("shared action policy stamps local-only, hybrid, and remote-ready metadata"
   assert.match(text, /graph_path/);
   assert.match(text, /materialization_manifest/);
   assert.match(text, /artifact_contract/);
+  assert.match(text, /tool_closure/);
   assert.match(text, /builder_policy/);
   assert.match(text, /remote_builder_smoke/);
   assert.match(text, /remote_profile_compatibility/);

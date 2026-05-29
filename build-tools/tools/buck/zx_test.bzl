@@ -6,7 +6,6 @@ load("@prelude//tests:re_utils.bzl", "get_re_executors_from_props")
 load("//build-tools/lang:nix_shell.bzl", "nix_calling_env_export_source_snapshot")
 load("//build-tools/lang:remote_action_policy.bzl", "external_runner_command", "remote_ready_evidence", "run_nix_action", "stamp_remote_readiness_labels")
 load("//build-tools/lang:source_snapshot.bzl", "SourceSnapshotInfo")
-
 def _zx_test_impl(ctx):
     script = ctx.attrs.script
     timeout_ms = ctx.attrs.test_rule_timeout_ms if ctx.attrs.test_rule_timeout_ms != None else 20 * 60 * 1000
@@ -15,7 +14,6 @@ def _zx_test_impl(ctx):
         (
             nix_calling_env_export_source_snapshot()
             + "export WORKSPACE_ROOT=\"${WORKSPACE_ROOT:-${BUCK_TEST_SRC:-$(pwd)}}\"; "
-            + "# Guard against accidental WORKSPACE_ROOT drift into a node_modules symlink path.\n"
             + "if [ \"$(basename \"$WORKSPACE_ROOT\")\" = \"node_modules\" ] && [ -f \"$WORKSPACE_ROOT/../flake.nix\" ]; then "
             + "  WORKSPACE_ROOT=\"$(cd \"$WORKSPACE_ROOT/..\" && pwd)\"; "
             + "fi; "
@@ -105,22 +103,17 @@ def _zx_test_impl(ctx):
             + "set -euo pipefail\n"
             + "orig=\"__BUCK2_BIN__\"\n"
             + "if [[ -z \"${orig}\" ]]; then echo \"buck2 shim error: embedded buck2 path missing\" >&2; exit 127; fi\n"
-            + "# Pass through to buck2; platform selection comes from .buckconfig in temp repos (//:no_cgo)\n"
-            + "# Scrub per-test verify ownership env before starting reusable nested buckd processes.\n"
             + "exec env -u BUCK_TEST_TARGET -u VBR_VERIFY_LOG_FILE -u VBR_VERIFY_PROCESS_STATE_FILE -u VBR_BUCK_REAPER_STATE_FILE \"$orig\" \"$@\"\n"
             + "EOSH\n"
             + "sed -i.bak -e \"s|__BUCK2_BIN__|$ORIG_BUCK2|g\" \"$WRAP\"; rm -f \"$WRAP.bak\"; "
             + "chmod +x \"$WRAP\"; export PATH=\"$SHIMBIN:$PATH\"; "
-            + "# Reuse shared buckd across tests to avoid fork storms; no per-test kill\n"
             + "rm -f \"$LOGDIR/test.stdout.log\" \"$LOGDIR/test.stderr.log\" 2>/dev/null || true; "
             + "cd \"$WORKSPACE_ROOT\"; "
-            # Prefer package from Starlark context; fall back to parsing label, stripping any config suffix
             + "PKG=\"%s\"; "
             + "if [ -z \"$PKG\" ]; then PKG=$(printf %%s \"$BUCK_TEST_TARGET\" | sed -E 's/ \\([^)]*\\)$//; s#^.*//([^:]+):.*$#\\1#'); fi; "
             + "CAND1=\"$WORKSPACE_ROOT/%s\"; CAND2=\"$WORKSPACE_ROOT/$PKG/%s\"; "
             + "SCRIPT_PATH=\"$CAND1\"; if [ ! -f \"$SCRIPT_PATH\" ]; then SCRIPT_PATH=\"$CAND2\"; fi; "
             + "HEARTBEAT_RUNNER=\"$WORKSPACE_ROOT/build-tools/tools/dev/command-heartbeat.ts\"; "
-            # TEMP: disable watchdog to avoid pre-test sleep impacting timeout
             + "WD=; "
             + "{ "
             + "  if [ \"$COVERAGE\" = \"1\" ] && [ -n \"$V8COV_DIR\" ]; then "
@@ -130,8 +123,6 @@ def _zx_test_impl(ctx):
             + "  fi; "
             + "} > >(tee -a \"$LOGDIR/test.stdout.log\") 2> >(grep -Ev 'buck2_client_ctx::file_tailers::tailer: Failed to read from .*buckd\\.(stderr|stdout).*: task [0-9]+ was cancelled' | tee -a \"$LOGDIR/test.stderr.log\" >&2); STATUS=$?; "
             + "if [ -n \"$WD\" ]; then kill \"$WD\" >/dev/null 2>&1 || true; fi; "
-            + "# Coverage reporting is done once per verify run (merged), not per zx_test.\n"
-            + "# Intentionally keep the outer buck2 isolation alive to reduce cross-test cold starts\n"
             + "exit \"$STATUS\""
         )
         % (ctx.label, ctx.label.package, script.short_path, script.short_path)
@@ -166,13 +157,19 @@ def _zx_test_impl(ctx):
     if source_snapshot != None and source_snapshot_manifest != None:
         snapshot_labels = ["source-snapshot:declared-root", "source-snapshot:manifest", "source-snapshot:graph"]
     labels = labels + snapshot_labels
-    remote_command = [ctx.attrs.remote_ready_runner] + snapshot_inputs if ctx.attrs.remote_ready_runner != None else None
+    evidence_inputs = [
+        ctx.attrs.materialization_manifest,
+        ctx.attrs.artifact_contract,
+        ctx.attrs.tool_closure,
+        ctx.attrs.remote_builder_smoke,
+    ] if ctx.attrs.remote_ready_runner != None else []
+    remote_command = [ctx.attrs.remote_ready_runner] + snapshot_inputs + evidence_inputs if ctx.attrs.remote_ready_runner != None else None
     declared_inputs = ([] if ctx.attrs.remote_ready_runner == None else [ctx.attrs.remote_ready_runner]) + [
         ctx.attrs.script,
         ctx.attrs._command_heartbeat,
         ctx.attrs._node_modules_build,
         ctx.attrs._zx_init,
-    ] + snapshot_inputs + (ctx.attrs.template_inputs or [])
+    ] + snapshot_inputs + evidence_inputs + (ctx.attrs.template_inputs or [])
     command = external_runner_command(
         labels,
         local_command + snapshot_inputs,
@@ -184,7 +181,7 @@ def _zx_test_impl(ctx):
             ctx.attrs._command_heartbeat,
             ctx.attrs._node_modules_build,
             ctx.attrs._zx_init,
-        ] + snapshot_inputs,
+        ] + snapshot_inputs + evidence_inputs,
     )
     stamp = ctx.actions.declare_output(ctx.attrs.out)
     stamp_cmd = cmd_args(
@@ -192,7 +189,14 @@ def _zx_test_impl(ctx):
         hidden = [ctx.attrs.script] + (ctx.attrs.template_inputs or []),
     )
     policy_mode = "remote-ready" if "remote:ready" in labels else "local-only"
-    policy_evidence = remote_ready_evidence(source_snapshot, source_snapshot_manifest) if policy_mode == "remote-ready" else None
+    policy_evidence = remote_ready_evidence(
+        source_snapshot,
+        source_snapshot_manifest,
+        ctx.attrs.materialization_manifest,
+        ctx.attrs.artifact_contract,
+        ctx.attrs.tool_closure,
+        ctx.attrs.remote_builder_smoke,
+    ) if policy_mode == "remote-ready" else None
     policy_info = run_nix_action(
         ctx,
         stamp_cmd,
@@ -224,6 +228,10 @@ zx_test = clone_rule(
         "source_snapshot_bundle": attrs.option(attrs.dep(providers = [SourceSnapshotInfo]), default = None),
         "source_snapshot": attrs.option(attrs.source(), default = None),
         "source_snapshot_manifest": attrs.option(attrs.source(), default = None),
+        "materialization_manifest": attrs.option(attrs.source(), default = None),
+        "artifact_contract": attrs.option(attrs.source(), default = None),
+        "tool_closure": attrs.option(attrs.source(), default = None),
+        "remote_builder_smoke": attrs.option(attrs.source(), default = None),
         "template_inputs": attrs.list(attrs.source(), default = []),
         "remote_execution": attrs.one_of(
             attrs.string(),

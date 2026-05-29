@@ -1,0 +1,13 @@
+{
+  "schemaVersion": "viberoots.nix-store-materialization.v1",
+  "storePaths": [
+    {
+      "attr": ".#test-seed",
+      "path": "/nix/store/00000000000000000000000000000000-test-seed",
+      "expectedOutputIdentity": "sha256-test-seed"
+    }
+  ],
+  "tools": {
+    "nix": "/nix/store/00000000000000000000000000000000-nix"
+  }
+}

@@ -43,12 +43,26 @@ test("first local conformance target has target-derived readiness evidence", asy
     "fixture.txt",
     "zx_ready_source_snapshot.source-snapshot",
     "zx_ready_source_snapshot.source-snapshot.manifest.json",
+    "materialization-manifest.json",
+    "artifact-contract.json",
+    "tool-closure.json",
+    "remote-builder-smoke.json",
     "zx-init.mjs",
     "command-heartbeat.ts",
     "node-modules-build.ts",
   ]) {
     assert.match(providerText, new RegExp(required.replaceAll(".", "\\.")));
   }
+});
+
+test("first local conformance target executes the dry-run runner", async () => {
+  const res =
+    await $`buck2 --isolation-dir ${inheritedBuckIsolation("remote_conformance_runner_exec")} test --target-platforms prelude//platforms:default ${tinyTarget}`.nothrow();
+  assert.equal(res.exitCode, 0, String(res.stderr || ""));
+  assert.match(
+    String(res.stdout || "") + String(res.stderr || ""),
+    /remote_exec_wrapper-fixtures_zx_ready_handles|Pass/,
+  );
 });
 
 test("only the tiny target is remote-ready in the Buck graph", async () => {

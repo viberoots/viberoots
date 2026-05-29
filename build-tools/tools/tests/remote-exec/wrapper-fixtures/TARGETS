@@ -40,6 +40,10 @@ zx_test(
     remote_ready_runner = "remote-ready-runner.sh",
     script = "noop.test.ts",
     source_snapshot_bundle = ":zx_ready_source_snapshot",
+    materialization_manifest = "materialization-manifest.json",
+    artifact_contract = "artifact-contract.json",
+    tool_closure = "tool-closure.json",
+    remote_builder_smoke = "remote-builder-smoke.json",
     template_inputs = ["fixture.txt"],
 )
 
