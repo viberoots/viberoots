@@ -460,6 +460,34 @@ Requirements:
 - Actions must not read undeclared checkout files through `WORKSPACE_ROOT` unless that checkout or filtered source snapshot is declared as an action input.
 - Nix-backed Buck actions must copy required artifacts into declared Buck outputs, or pass exact store paths plus cache identity as declared action data and have the consuming action explicitly realize them with `nix copy --from "$SUBSTITUTER" "$path"` or an equivalent `nix build --no-link --print-out-paths` step before use. Cache publication alone is not a declared action input and does not materialize a store path on the worker.
 - `path:$WORKSPACE_ROOT#...` is remote-safe only when `WORKSPACE_ROOT` is the declared action input tree or a declared filtered flake/source snapshot.
+
+### Source snapshot manifest
+
+Remote-ready Nix wrappers that still need `WORKSPACE_ROOT` must use a declared source snapshot
+instead of an ambient worker checkout. The snapshot helper lives in
+`build-tools/lang/source_snapshot.bzl` and is materialized by
+`build-tools/tools/dev/source-snapshot.ts`.
+
+The manifest schema is `viberoots.source-snapshot.v1` and records:
+
+- `declaredSnapshotRoot`: the Buck-declared snapshot directory consumed by the action
+- `ambientWorkspaceRoot`: the local checkout used only to construct the snapshot
+- `declaredGraphPath`: the declared Buck graph artifact used for the snapshot
+- `graphPathInSnapshot`: currently `build-tools/tools/buck/graph.json`
+- `excludes`: filtered mutable/local directories
+- `files`: files present in the snapshot
+
+Allowed contents are filtered repository source, `flake.nix`, `flake.lock`, the declared graph
+artifact, required `TARGETS` and `.bzl` files, and generated provider files. The snapshot must not
+contain `.git`, `.direnv`, root `node_modules`, mutable `buck-out`, `.pnpm-store`, `.pnpm-home`, or
+local temp directories.
+
+To convert a Nix-invoking wrapper, keep the local command path using the current `WORKSPACE_ROOT`
+bootstrap, add `source_snapshot` and `source_snapshot_manifest` as declared inputs for remote-ready
+mode, and set remote metadata fields for the declared snapshot root, manifest, and graph path. A
+remote-ready target that reads `builtins.getEnv "WORKSPACE_ROOT"` without those declared paths must
+remain `remote:local-only`.
+
 - Remote workers should not require broad repo credentials during action execution; source material should arrive through CAS or a declared immutable source artifact.
 
 Where a test truly needs an entire checkout, model that explicitly as a materialized source artifact or a declared test fixture, not as an implicit worker-side clone.

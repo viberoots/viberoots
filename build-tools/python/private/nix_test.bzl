@@ -1,5 +1,5 @@
 load("//build-tools/lang:sanitize.bzl", "sanitize_name")
-load("//build-tools/lang:nix_shell.bzl", "nix_bootstrap_env_core", "nix_timeout_wrapper_var")
+load("//build-tools/lang:nix_shell.bzl", "nix_bootstrap_env_core", "nix_calling_env_export_source_snapshot", "nix_timeout_wrapper_var")
 load("//build-tools/lang:nix_action_runner.bzl", "nix_action_build_selected_out_path_cmd")
 load("//build-tools/lang:remote_action_policy.bzl", "external_runner_command", "run_nix_action", "stamp_remote_readiness_labels")
 load("@prelude//:build_mode.bzl", "BuildModeInfo")
@@ -26,7 +26,8 @@ def _python_nix_test_impl(ctx):
         + "mkdir -p \"$(dirname \"$BUILD_SELECTED_LOG\")\"; "
     )
     run_and_exec = (
-        nix_bootstrap_env_core()
+        nix_calling_env_export_source_snapshot()
+        + nix_bootstrap_env_core()
         + safe_log_path_prefix
         + ("echo '[python_nix_test] planner_label=%s' >&2; " % raw)
         + nix_action_build_selected_out_path_cmd(
@@ -58,9 +59,17 @@ def _python_nix_test_impl(ctx):
     )
     policy_info = run_nix_action(ctx, stamp_cmd, category = "python_nix_test_stamp")
     re_executor, executor_overrides = get_re_executors_from_props(ctx)
-    labels = stamp_remote_readiness_labels(ctx.attrs.labels)
-    remote_command = [ctx.attrs.remote_ready_runner] if ctx.attrs.remote_ready_runner != None else None
-    declared_inputs = ctx.attrs.srcs + ctx.attrs.nix_inputs + ([] if ctx.attrs.remote_ready_runner == None else [ctx.attrs.remote_ready_runner]) + [
+    snapshot_inputs = []
+    if ctx.attrs.source_snapshot != None:
+        snapshot_inputs.append(ctx.attrs.source_snapshot)
+    if ctx.attrs.source_snapshot_manifest != None:
+        snapshot_inputs.append(ctx.attrs.source_snapshot_manifest)
+    snapshot_labels = []
+    if ctx.attrs.source_snapshot != None and ctx.attrs.source_snapshot_manifest != None:
+        snapshot_labels = ["source-snapshot:declared-root", "source-snapshot:manifest", "source-snapshot:graph"]
+    labels = stamp_remote_readiness_labels(ctx.attrs.labels + snapshot_labels)
+    remote_command = [ctx.attrs.remote_ready_runner] + snapshot_inputs if ctx.attrs.remote_ready_runner != None else None
+    declared_inputs = ctx.attrs.srcs + ctx.attrs.nix_inputs + snapshot_inputs + ([] if ctx.attrs.remote_ready_runner == None else [ctx.attrs.remote_ready_runner]) + [
         ctx.attrs._build_selected,
         ctx.attrs._graph_json,
         ctx.attrs._workspace_root_env,
@@ -68,7 +77,7 @@ def _python_nix_test_impl(ctx):
     ]
     command = external_runner_command(
         labels,
-        ["bash", "-c", run_and_exec],
+        ["bash", "-c", run_and_exec, "python_nix_test"] + snapshot_inputs,
         remote_command = remote_command,
         declared_inputs = declared_inputs,
         required_inputs = [
@@ -77,7 +86,7 @@ def _python_nix_test_impl(ctx):
             ctx.attrs._graph_json,
             ctx.attrs._workspace_root_env,
             ctx.attrs._zx_init,
-        ],
+        ] + snapshot_inputs,
     )
     return inject_test_run_info(ctx, ExternalRunnerTestInfo(
             type = "custom",
@@ -99,6 +108,8 @@ _PYTHON_NIX_TEST_ATTRS = {
         "srcs": attrs.list(attrs.source(), default = []),
         "nix_inputs": attrs.list(attrs.source(), default = []),
         "labels": attrs.list(attrs.string(), default = []),
+        "source_snapshot": attrs.option(attrs.source(), default = None),
+        "source_snapshot_manifest": attrs.option(attrs.source(), default = None),
         "remote_ready_runner": attrs.option(attrs.source(), default = None),
         "test_rule_timeout_ms": attrs.option(attrs.int(), default = None),
         "_inject_test_env": attrs.default_only(attrs.dep(default = "prelude//test/tools:inject_test_env")),

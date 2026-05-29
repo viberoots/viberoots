@@ -16,6 +16,9 @@ export type RemoteExecTargetMetadata = {
   networkAccess?: boolean;
   commandInputsDeclared?: boolean;
   requiresWorkspaceRootLookup?: boolean;
+  sourceSnapshotRootDeclared?: boolean;
+  sourceSnapshotManifestDeclared?: boolean;
+  declaredGraphPath?: boolean;
   ambientPathDependency?: boolean;
   nixBuilderPolicy?: unknown;
   remoteBuilderSmokePolicy?: unknown;
@@ -108,8 +111,18 @@ export function validateRemoteExecTargets(opts: {
     if (!target.commandInputsDeclared) {
       findings.push(finding(target, "remote-ready external-runner tests require command inputs"));
     }
-    if (target.requiresWorkspaceRootLookup) {
-      findings.push(finding(target, "plain WORKSPACE_ROOT lookups block remote-ready execution"));
+    if (
+      target.requiresWorkspaceRootLookup &&
+      (!target.sourceSnapshotRootDeclared ||
+        !target.sourceSnapshotManifestDeclared ||
+        !target.declaredGraphPath)
+    ) {
+      findings.push(
+        finding(
+          target,
+          "remote-ready WORKSPACE_ROOT lookups require declared source snapshot and graph paths",
+        ),
+      );
     }
     if (target.ambientPathDependency) {
       findings.push(

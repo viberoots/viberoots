@@ -62,6 +62,8 @@ test("shared action policy stamps local-only, hybrid, and remote-ready metadata"
   assert.match(text, /remote-action-policy:hybrid/);
   assert.match(text, /remote-action-policy:remote-ready/);
   assert.match(text, /source_snapshot/);
+  assert.match(text, /declared_root/);
+  assert.match(text, /graph_path/);
   assert.match(text, /materialization_manifest/);
   assert.match(text, /artifact_contract/);
   assert.match(text, /builder_policy/);
@@ -83,6 +85,13 @@ test("remote-ready external-runner commands carry declared input handles", () =>
     const text = read(file);
     assert.match(text, /external_runner_command\(/, file);
     assert.match(text, /declared_inputs = /, file);
+    assert.match(text, /source_snapshot/, file);
+    assert.match(text, /source-snapshot:declared-root/, file);
+    assert.match(
+      text,
+      /remote_command = \[ctx\.attrs\.remote_ready_runner\] \+ snapshot_inputs/,
+      file,
+    );
   }
 });
 

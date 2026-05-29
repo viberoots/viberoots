@@ -215,6 +215,22 @@ def nix_build_out_path_cmd(flake_attr, timeout_var = "TIMEOUT", impure = False, 
 def nix_calling_env_export_buck_graph_json(graph_json_path = "$WORKSPACE_ROOT/build-tools/tools/buck/graph.json"):
     return ("export BUCK_GRAPH_JSON=\"%s\"; " % graph_json_path)
 
+def nix_calling_env_export_source_snapshot(snapshot_root = "${1:-}", manifest_path = "${2:-}"):
+    return (
+        ("SOURCE_SNAPSHOT_ARG=\"%s\"; " % snapshot_root)
+        + "if [ -n \"$SOURCE_SNAPSHOT_ARG\" ]; then "
+        + "export DECLARED_SOURCE_SNAPSHOT_ROOT=\"$SOURCE_SNAPSHOT_ARG\"; "
+        + ("export DECLARED_SOURCE_SNAPSHOT_MANIFEST=\"%s\"; " % manifest_path)
+        + "export DECLARED_SOURCE_SNAPSHOT_GRAPH_JSON=\"$SOURCE_SNAPSHOT_ARG/build-tools/tools/buck/graph.json\"; "
+        + "export SOURCE_SNAPSHOT_ROOT=\"$DECLARED_SOURCE_SNAPSHOT_ROOT\"; "
+        + "export SOURCE_SNAPSHOT_MANIFEST=\"$DECLARED_SOURCE_SNAPSHOT_MANIFEST\"; "
+        + "export BUCK_GRAPH_JSON=\"$DECLARED_SOURCE_SNAPSHOT_GRAPH_JSON\"; "
+        + "export WORKSPACE_ROOT=\"$DECLARED_SOURCE_SNAPSHOT_ROOT\"; "
+        + "export REPO_ROOT=\"$DECLARED_SOURCE_SNAPSHOT_ROOT\"; "
+        + "export FLK_ROOT=\"$DECLARED_SOURCE_SNAPSHOT_ROOT\"; "
+        + "fi; "
+    )
+
 
 def nix_calling_env_export_nix_pnpm_fetch_timeout(default_sec = 600):
     v = default_sec if type(default_sec) == "int" and default_sec > 0 else 600

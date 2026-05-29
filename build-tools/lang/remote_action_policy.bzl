@@ -118,6 +118,17 @@ def _validate_builder_evidence(evidence):
         if smoke_policy != policy:
             fail("remote-ready action with %s builder policy requires matching remote_builder_smoke evidence" % policy)
 
+def _validate_source_snapshot_evidence(evidence):
+    snapshot = (evidence or {}).get("source_snapshot")
+    if type(snapshot) != "dict":
+        fail("remote-ready action requires typed source_snapshot evidence")
+    if not snapshot.get("declared_root"):
+        fail("remote-ready action requires source_snapshot.declared_root")
+    if not snapshot.get("manifest"):
+        fail("remote-ready action requires source_snapshot.manifest")
+    if not snapshot.get("graph_path"):
+        fail("remote-ready action requires source_snapshot.graph_path")
+
 def _policy_labels(evidence, default_builder_policy):
     values = evidence or {}
     builder_policy = values.get("builder_policy")
@@ -148,6 +159,7 @@ def remote_action_policy(
         missing = _missing_evidence(evidence)
         if missing:
             fail("remote-ready action missing evidence: %s" % ", ".join(missing))
+        _validate_source_snapshot_evidence(evidence)
         _validate_builder_evidence(evidence)
         return struct(
             local_only = False,
@@ -161,6 +173,7 @@ def remote_action_policy(
         missing = _missing_evidence(evidence)
         if missing:
             fail("hybrid action missing evidence: %s" % ", ".join(missing))
+        _validate_source_snapshot_evidence(evidence)
         _validate_builder_evidence(evidence)
         if not fallback_reason:
             fail("hybrid action requires fallback_reason")

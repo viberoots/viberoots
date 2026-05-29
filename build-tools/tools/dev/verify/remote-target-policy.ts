@@ -139,6 +139,33 @@ function parseBuilderPolicyMetadata(
   };
 }
 
+function hasEvidenceLabel(labels: readonly string[], providerText: string, label: string): boolean {
+  return labels.includes(label) || providerText.includes(label);
+}
+
+function parseSourceSnapshotMetadata(
+  labels: readonly string[],
+  providerText: string,
+): Partial<RemoteExecTargetMetadata> {
+  const hasSnapshotEvidence =
+    labels.some((label) => label.startsWith("source-snapshot:")) ||
+    providerText.includes("source-snapshot:");
+  if (!hasSnapshotEvidence) return {};
+  return {
+    sourceSnapshotRootDeclared: hasEvidenceLabel(
+      labels,
+      providerText,
+      "source-snapshot:declared-root",
+    ),
+    sourceSnapshotManifestDeclared: hasEvidenceLabel(
+      labels,
+      providerText,
+      "source-snapshot:manifest",
+    ),
+    declaredGraphPath: hasEvidenceLabel(labels, providerText, "source-snapshot:graph"),
+  };
+}
+
 export function collectRemoteExecTargetMetadata(opts: {
   root: string;
   iso: string;
@@ -189,6 +216,7 @@ export function collectRemoteExecTargetMetadata(opts: {
       labels,
       ...parseProviderMetadata(entry.target, provider.stdout),
       ...parseBuilderPolicyMetadata(labels, provider.stdout),
+      ...parseSourceSnapshotMetadata(labels, provider.stdout),
     };
   });
 }

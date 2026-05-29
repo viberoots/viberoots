@@ -1,5 +1,5 @@
 load("//build-tools/lang:sanitize.bzl", "sanitize_name")
-load("//build-tools/lang:nix_shell.bzl", "nix_bootstrap_env_core", "nix_bootstrap_env_pnpm_store", "nix_timeout_wrapper_var")
+load("//build-tools/lang:nix_shell.bzl", "nix_bootstrap_env_core", "nix_bootstrap_env_pnpm_store", "nix_calling_env_export_source_snapshot", "nix_timeout_wrapper_var")
 load("//build-tools/lang:remote_action_policy.bzl", "external_runner_command", "run_nix_action", "stamp_remote_readiness_labels")
 load("@prelude//:build_mode.bzl", "BuildModeInfo")
 load("@prelude//decls:re_test_common.bzl", "re_test_common")
@@ -43,6 +43,7 @@ def _node_nix_test_impl(ctx):
     run_cmd = (
         # Skip unified pnpm prewarm at bootstrap; we'll do it only if tests exist
         "export VBR_SKIP_REQUIRE_UNIFIED_PNPM_STORE=1; "
+        + nix_calling_env_export_source_snapshot()
         + nix_bootstrap_env_core()
         + ("".join(env_pairs))
         + ("export TEST_NIX_TIMEOUT_SECS=\"%d\"; " % (tout if tout > 0 else 1800))
@@ -79,9 +80,17 @@ def _node_nix_test_impl(ctx):
     )
     policy_info = run_nix_action(ctx, cmd, category = "node_nix_test_stamp")
     re_executor, executor_overrides = get_re_executors_from_props(ctx)
-    labels = stamp_remote_readiness_labels(ctx.attrs.labels)
-    remote_command = [ctx.attrs.remote_ready_runner] if ctx.attrs.remote_ready_runner != None else None
-    declared_inputs = ctx.attrs.srcs + ([] if ctx.attrs.remote_ready_runner == None else [ctx.attrs.remote_ready_runner]) + [
+    snapshot_inputs = []
+    if ctx.attrs.source_snapshot != None:
+        snapshot_inputs.append(ctx.attrs.source_snapshot)
+    if ctx.attrs.source_snapshot_manifest != None:
+        snapshot_inputs.append(ctx.attrs.source_snapshot_manifest)
+    snapshot_labels = []
+    if ctx.attrs.source_snapshot != None and ctx.attrs.source_snapshot_manifest != None:
+        snapshot_labels = ["source-snapshot:declared-root", "source-snapshot:manifest", "source-snapshot:graph"]
+    labels = stamp_remote_readiness_labels(ctx.attrs.labels + snapshot_labels)
+    remote_command = [ctx.attrs.remote_ready_runner] + snapshot_inputs if ctx.attrs.remote_ready_runner != None else None
+    declared_inputs = ctx.attrs.srcs + snapshot_inputs + ([] if ctx.attrs.remote_ready_runner == None else [ctx.attrs.remote_ready_runner]) + [
         ctx.attrs._command_heartbeat,
         ctx.attrs._graph_json,
         ctx.attrs._nix_build_filtered_flake,
@@ -91,7 +100,7 @@ def _node_nix_test_impl(ctx):
     ]
     command = external_runner_command(
         labels,
-        ["bash", "-c", run_cmd],
+        ["bash", "-c", run_cmd, "node_nix_test"] + snapshot_inputs,
         remote_command = remote_command,
         declared_inputs = declared_inputs,
         required_inputs = [
@@ -102,7 +111,7 @@ def _node_nix_test_impl(ctx):
             ctx.attrs._prepare_exact_pnpm_store,
             ctx.attrs._workspace_root_env,
             ctx.attrs._zx_init,
-        ],
+        ] + snapshot_inputs,
     )
 
     return inject_test_run_info(ctx, ExternalRunnerTestInfo(
@@ -139,6 +148,8 @@ _NODE_NIX_TEST_ATTRS = {
         "deps": attrs.list(attrs.dep(), default = []),
         # Pass-through target labels for graph/exporter tooling
         "labels": attrs.list(attrs.string(), default = []),
+        "source_snapshot": attrs.option(attrs.source(), default = None),
+        "source_snapshot_manifest": attrs.option(attrs.source(), default = None),
         # Deterministic tiny output file name
         "out": attrs.string(default = "node_nix_test.stamp"),
         "remote_ready_runner": attrs.option(attrs.source(), default = None),

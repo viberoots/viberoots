@@ -3,6 +3,7 @@ load("@prelude//:build_mode.bzl", "BuildModeInfo")
 load("@prelude//:rules.bzl", "clone_rule")
 load("@prelude//decls:re_test_common.bzl", "re_test_common")
 load("@prelude//tests:re_utils.bzl", "get_re_executors_from_props")
+load("//build-tools/lang:nix_shell.bzl", "nix_calling_env_export_source_snapshot")
 load("//build-tools/lang:remote_action_policy.bzl", "external_runner_command", "run_nix_action", "stamp_remote_readiness_labels")
 
 def _zx_test_impl(ctx):
@@ -12,7 +13,8 @@ def _zx_test_impl(ctx):
     # Export NODE_V8_COVERAGE so child Node processes also write coverage data, but only when COVERAGE=1.
     run_and_report = (
         (
-            "export WORKSPACE_ROOT=\"${WORKSPACE_ROOT:-${BUCK_TEST_SRC:-$(pwd)}}\"; "
+            nix_calling_env_export_source_snapshot()
+            + "export WORKSPACE_ROOT=\"${WORKSPACE_ROOT:-${BUCK_TEST_SRC:-$(pwd)}}\"; "
             + "# Guard against accidental WORKSPACE_ROOT drift into a node_modules symlink path.\n"
             + "if [ \"$(basename \"$WORKSPACE_ROOT\")\" = \"node_modules\" ] && [ -f \"$WORKSPACE_ROOT/../flake.nix\" ]; then "
             + "  WORKSPACE_ROOT=\"$(cd \"$WORKSPACE_ROOT/..\" && pwd)\"; "
@@ -155,6 +157,7 @@ def _zx_test_impl(ctx):
         "bash",
         "-c",
         run_and_report,
+        "zx_test",
     ]
     labels = stamp_remote_readiness_labels(ctx.attrs.labels)
     if ctx.attrs.remote_execution == "":
@@ -163,16 +166,25 @@ def _zx_test_impl(ctx):
         re_executor, executor_overrides = None, {}
     else:
         re_executor, executor_overrides = get_re_executors_from_props(ctx)
-    remote_command = [ctx.attrs.remote_ready_runner] if ctx.attrs.remote_ready_runner != None else None
+    snapshot_inputs = []
+    if ctx.attrs.source_snapshot != None:
+        snapshot_inputs.append(ctx.attrs.source_snapshot)
+    if ctx.attrs.source_snapshot_manifest != None:
+        snapshot_inputs.append(ctx.attrs.source_snapshot_manifest)
+    snapshot_labels = []
+    if ctx.attrs.source_snapshot != None and ctx.attrs.source_snapshot_manifest != None:
+        snapshot_labels = ["source-snapshot:declared-root", "source-snapshot:manifest", "source-snapshot:graph"]
+    labels = labels + snapshot_labels
+    remote_command = [ctx.attrs.remote_ready_runner] + snapshot_inputs if ctx.attrs.remote_ready_runner != None else None
     declared_inputs = ([] if ctx.attrs.remote_ready_runner == None else [ctx.attrs.remote_ready_runner]) + [
         ctx.attrs.script,
         ctx.attrs._command_heartbeat,
         ctx.attrs._node_modules_build,
         ctx.attrs._zx_init,
-    ] + (ctx.attrs.template_inputs or [])
+    ] + snapshot_inputs + (ctx.attrs.template_inputs or [])
     command = external_runner_command(
         labels,
-        local_command,
+        local_command + snapshot_inputs,
         remote_command = remote_command,
         declared_inputs = declared_inputs,
         required_inputs = [
@@ -181,7 +193,7 @@ def _zx_test_impl(ctx):
             ctx.attrs._command_heartbeat,
             ctx.attrs._node_modules_build,
             ctx.attrs._zx_init,
-        ],
+        ] + snapshot_inputs,
     )
     stamp = ctx.actions.declare_output(ctx.attrs.out)
     stamp_cmd = cmd_args(
@@ -211,6 +223,8 @@ zx_test = clone_rule(
         # Ensure a default output so Buck always recognizes an output artifact
         "out": attrs.string(default = "zx_test.stamp"),
         "remote_ready_runner": attrs.option(attrs.source(), default = None),
+        "source_snapshot": attrs.option(attrs.source(), default = None),
+        "source_snapshot_manifest": attrs.option(attrs.source(), default = None),
         "template_inputs": attrs.list(attrs.source(), default = []),
         "remote_execution": attrs.one_of(
             attrs.string(),
