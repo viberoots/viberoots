@@ -12,6 +12,7 @@ import {
   type VerifyExecutionPolicy,
 } from "./remote-policy";
 import { localArtifactPathWrites, parseArtifactContractMetadata } from "./remote-target-artifacts";
+import { parseMaterializationContractMetadata } from "./remote-target-materialization";
 import type { VerifyTargetLabels } from "./target-passes";
 
 type CqueryInfo = {
@@ -91,6 +92,7 @@ function parseProviderMetadata(
       /\bcommand -v\b|\$\(command -v\b|\/usr\/bin\/env|\bbash\b|\bnode\b|\bnix\b|\btimeout\b|\bgit\b|\bfind\b/.test(
         executableText,
       ),
+    ...parseMaterializationContractMetadata([], providerText, executableText),
   };
 }
 
@@ -221,6 +223,7 @@ export function collectRemoteExecTargetMetadata(opts: {
       ...parseBuilderPolicyMetadata(labels, provider.stdout),
       ...parseSourceSnapshotMetadata(labels, provider.stdout),
       ...parseArtifactContractMetadata(labels, provider.stdout),
+      ...parseMaterializationContractMetadata(labels, provider.stdout, ""),
     };
   });
 }

@@ -139,6 +139,11 @@ def _policy_labels(evidence, default_builder_policy):
         labels.append("artifact-contract:declared")
     if values.get("materialization_manifest"):
         labels.append("materialization-manifest:declared")
+        manifest = values.get("materialization_manifest")
+        if type(manifest) == "dict":
+            for entry in manifest.get("storePaths", []):
+                if type(entry) == "dict" and entry.get("path"):
+                    labels.append("materialization-manifest:path=%s" % entry.get("path"))
     smoke_policy = values.get("remote_builder_smoke")
     if type(smoke_policy) == "dict":
         smoke_policy = smoke_policy.get("builder_policy")

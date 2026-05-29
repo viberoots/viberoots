@@ -2,6 +2,7 @@
 import fs from "node:fs";
 import { getArgvTokens } from "../lib/cli";
 import type { NixBuilderPolicy } from "../lib/nix-builder-policy";
+import { materializationMessages } from "./remote-exec-policy-materialization";
 
 export type RemoteExecMode = "local" | "hybrid" | "remote" | "remote-only-conformance";
 
@@ -22,6 +23,9 @@ export type RemoteExecTargetMetadata = {
   ambientPathDependency?: boolean;
   declaredArtifactContract?: boolean;
   undeclaredLocalArtifactPaths?: string[];
+  materializationManifestDeclared?: boolean;
+  materializationManifestPaths?: string[];
+  referencedNixStorePaths?: string[];
   nixBuilderPolicy?: unknown;
   remoteBuilderSmokePolicy?: unknown;
 };
@@ -142,6 +146,9 @@ export function validateRemoteExecTargets(opts: {
         ),
       );
     }
+    for (const message of materializationMessages(target)) {
+      findings.push(finding(target, message));
+    }
     if (!isNixBuilderPolicy(target.nixBuilderPolicy)) {
       findings.push(finding(target, "remote:ready requires typed Nix builder policy evidence"));
       continue;
@@ -197,12 +204,7 @@ export function assertRemoteTargetsAllowed(opts: {
   }
 }
 
-function parseCli(): {
-  mode: RemoteExecMode;
-  metadataJson: string;
-  profiles: string[];
-  locks: string[];
-} {
+function parseCli() {
   const tokens = getArgvTokens();
   const value = (name: string) => {
     const prefixed = tokens.find((t) => t.startsWith(`${name}=`));
@@ -210,9 +212,8 @@ function parseCli(): {
     const i = tokens.indexOf(name);
     return i >= 0 ? String(tokens[i + 1] || "") : "";
   };
-  const mode = (value("--mode") || "remote") as RemoteExecMode;
   return {
-    mode,
+    mode: (value("--mode") || "remote") as RemoteExecMode,
     metadataJson: value("--metadata-json"),
     profiles: value("--profiles").split(",").filter(Boolean),
     locks: value("--locks").split(",").filter(Boolean),
