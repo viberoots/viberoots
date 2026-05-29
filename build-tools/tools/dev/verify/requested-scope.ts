@@ -22,6 +22,7 @@ import {
   type VerifyTemplateScopeDecision,
   type VerifySelectionDiagnostics as VerifyTemplateSelectionDiagnostics,
 } from "./template-test-scope";
+import { allTestsRequested, parseDeploymentTestScopeMode } from "./scope-env";
 
 export type VerifyDeploymentScopeMode = "auto" | "always" | "never";
 
@@ -41,6 +42,7 @@ export type VerifyScopeDecision = Omit<
   requestedDeploymentMode: VerifyDeploymentScopeMode;
   selectorMode:
     | VerifyTemplateScopeDecision["selectorMode"]
+    | "all-tests"
     | "deployment-only"
     | "deployment-and-project-impact";
   diagnostics: VerifyTemplateSelectionDiagnostics | DeploymentVerifySelectionDiagnostics | null;
@@ -54,15 +56,6 @@ type ResolveRequestedVerifyScopeDeps = {
   resolveProjectImpactSelection: typeof resolveProjectImpactSelection;
   deploymentSafetyFloorTargets: readonly string[];
 };
-
-function parseDeploymentTestScopeMode(raw: string | undefined): VerifyDeploymentScopeMode {
-  const v = String(raw || "auto")
-    .trim()
-    .toLowerCase();
-  if (v === "always") return "always";
-  if (v === "never") return "never";
-  return "auto";
-}
 
 function isDefaultVerifyTargetSet(targets: string[]): boolean {
   return targets.length === 1 && targets[0] === "//...";
@@ -204,6 +197,25 @@ export async function resolveRequestedVerifyScope(opts: {
             targets: opts.args.targets,
           }),
   };
+  const requestedDeploymentMode = parseDeploymentTestScopeMode(env.VBR_DEPLOYMENT_TEST_SCOPE);
+  if (
+    args.selector === "default" &&
+    isDefaultVerifyTargetSet(args.targets) &&
+    allTestsRequested(env)
+  ) {
+    return {
+      args,
+      selection: {
+        requestedMode: "auto",
+        requestedDeploymentMode,
+        selectorMode: "all-tests",
+        targets: ["//..."],
+        diagnostics: null,
+        lintFilters: null,
+        reason: "all-tests-env",
+      },
+    };
+  }
   const resolveTemplateScope = opts.deps?.resolveTemplateScope || resolveVerifyTemplateTestScope;
   const baseDecision = await resolveTemplateScope({
     root: opts.root,
@@ -214,7 +226,6 @@ export async function resolveRequestedVerifyScope(opts: {
         : null,
     env,
   });
-  const requestedDeploymentMode = parseDeploymentTestScopeMode(env.VBR_DEPLOYMENT_TEST_SCOPE);
   if (args.selector !== "default" || !isDefaultVerifyTargetSet(args.targets)) {
     return {
       args,

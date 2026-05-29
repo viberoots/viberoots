@@ -58,6 +58,9 @@ This report includes:
 
 ### Verify helper
 
+- Force the default helper to run every Buck test, even when scope selection would narrow it:
+  - `ALL_TESTS=1 build-tools/tools/bin/verify`
+  - `ALL_TESTS=true build-tools/tools/bin/verify`
 - Full suite without coverage:
   - `build-tools/tools/bin/verify`
 - Full suite with coverage (single merged report):
