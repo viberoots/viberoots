@@ -9,6 +9,10 @@ import {
   checkDirectBuckEntrypoints,
   checkRemoteTestToolchain,
 } from "./default-local-policy-rules";
+import {
+  checkAllowedPrimitiveInventory,
+  checkRemoteReadyAmbientExecutables,
+} from "./runtime-prerequisites";
 
 export async function evaluateDefaultLocalPolicy(root = process.cwd()): Promise<PolicyReport> {
   const files = await candidatePolicyFiles(root);
@@ -18,6 +22,8 @@ export async function evaluateDefaultLocalPolicy(root = process.cwd()): Promise<
     ...(await checkConfigSecrets(root, files)),
     ...(await checkCiRemoteEnvDefaults(root, files)),
     ...(await checkDirectBuckEntrypoints(root, files)),
+    ...(await checkAllowedPrimitiveInventory(root)),
+    ...(await checkRemoteReadyAmbientExecutables(root)),
   ];
   return {
     ok: findings.length === 0,

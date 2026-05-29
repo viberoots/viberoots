@@ -26,6 +26,8 @@ The active build system is Buck2 as the orchestrator and Nix as the hermetic too
 - `.#node-test.<importer>`
 - `.#py-wheelhouse-*`
 - language and deployment package outputs
+- `.#remote-worker-tools`
+- `.#remote-ci-tools`
 
 Language-specific Buck rules generally call Nix through the selected-target path. The common shape is:
 
@@ -68,7 +70,30 @@ policy, such as `inherit_config` smoke for an `inherit_config` action. Because `
 builders for local development, remote-builder smoke and CI lanes must export their intended
 `NIX_CONFIG` before entering the repo.
 
-The flake does not currently export `packages.<system>.remote-worker-tools` or `apps.<system>.remote-worker-bootstrap`; those are required target interfaces for the remote worker design, not shipped interfaces today.
+The flake exports `packages.<system>.remote-worker-tools` and
+`packages.<system>.remote-ci-tools` for declared remote worker and CI helper closures.
+It also exports `apps.<system>.remote-worker-bootstrap` as a local check helper. The bootstrap app
+prints the worker closure path, restricts `PATH` to that closure, checks required binaries, and
+does not register with a scheduler.
+
+### Worker and CI Tool Closures
+
+`remote-worker-tools` contains only conservative worker-side runtime tools required by current
+remote-ready Buck/Nix actions: Bash, coreutils including `timeout`, findutils, GNU grep/sed/awk,
+Git, Node 22, PNPM, Buck2, and `zx-wrapper`.
+
+`remote-ci-tools` composes the worker closure with the Nix CLI for CI-side cache publishing and
+remote-builder smoke flows. Backend-specific RE daemons, sidecars, cache publisher clients,
+artifact upload clients, metrics shippers, and worker registration tools must be added as separate
+Nix packages before any repo helper may invoke them.
+
+Allowed non-Nix machine prerequisites are limited to kernel/sandbox support, disk capacity,
+network reachability, mounted credentials or workload identity material, trust anchors, clock
+sync, and minimal Nix bootstrap. SSH, provider CLIs, artifact upload tools, metrics/logging CLIs,
+cache publishers, and worker registration binaries are executable dependencies, not primitives.
+Worker images must not bake repo tools, language runtimes, Buck binaries, helper CLIs, RE runtime
+binaries, registration tools, artifact/cache/metrics clients, or credentials outside these declared
+closures.
 
 ### CI Today
 
@@ -421,7 +446,7 @@ The Buck2 RE deployment should include:
 - a CAS and action cache sized for the repo's source/actions
 - Linux `x86_64` and `aarch64` worker pools
 - a macOS worker pool or a dedicated macOS local-execution lane with identical reporting semantics
-- worker images with host-level prerequisites, Nix, cache trust config, cloud identity plumbing, and required sandbox support; repo-controlled build/test tools should be supplied by `packages.<system>.remote-worker-tools`. Backend-specific RE worker runtimes and sidecars should be pinned and reproducibly installed, preferably via Nix when the selected backend supports it.
+- worker images with host-level prerequisites, Nix, cache trust config, cloud identity plumbing, and required sandbox support; repo-controlled build/test tools must be supplied by `packages.<system>.remote-worker-tools`. Backend-specific RE worker runtimes and sidecars must be declared Nix packages and composed into the worker closure before repo helpers invoke them.
 - a CI-only `.buckconfig` include or generated config containing `[buck2_re_client]`
 - non-empty `toolchains//:remote_test_execution` profiles for the supported worker classes
 - repo-owned test rules wired to expose remote execution selection, translate selected profiles through Prelude's RE helpers, and pass Buck's `default_executor` / `executor_overrides` into `ExternalRunnerTestInfo`; this is selection plumbing only and does not make a wrapper family remote-ready
@@ -453,7 +478,7 @@ The hard part is not scheduling. The hard part is that many Buck test/build acti
 Requirements:
 
 - Every action that invokes Nix must declare all source, graph, patch, lockfile, and helper-script inputs through Buck.
-- Worker images must provide Nix and host-level runtime prerequisites. Define `packages.<system>.remote-worker-tools` as the authoritative repo-controlled worker tool closure, containing `bash`, coreutils/`timeout`, Node, Git, Buck2/prelude provisioning, repo helper launchers, and the same tool contract expected by local actions. Optionally expose `apps.<system>.remote-worker-bootstrap` for activation. Backend-specific RE worker binaries and sidecars should be pinned and reproducibly installed, preferably via Nix when the selected backend supports it. Any non-Nix repo-controlled tool baked into the image needs an explicit host-level exception.
+- Worker images must provide only Nix and host-level runtime prerequisites. Define `packages.<system>.remote-worker-tools` as the authoritative repo-controlled worker tool closure, containing `bash`, coreutils/`timeout`, Node, Git, Buck2/prelude provisioning, repo helper launchers, and the same tool contract expected by local actions. Optionally expose `apps.<system>.remote-worker-bootstrap` for activation. Backend-specific RE worker binaries and sidecars must be declared Nix packages and composed into the worker closure before repo helpers invoke them. Do not bake repo-controlled tools, language runtimes, Buck binaries, helper CLIs, RE runtime binaries, registration tools, artifact/cache/metrics clients, or credentials into worker images outside declared Nix outputs.
 - Workers must trust the same Nix binary caches as CI.
 - Developer override env vars must be scrubbed in CI and remote workers.
 - Repo wrappers that pass `--builders ""` must do so only for paths that intentionally require local Nix builds; remote-capable wrappers should inherit the configured Nix builder/substituter policy.
@@ -592,7 +617,7 @@ Workers should be disposable RE workers. A worker should be able to start from a
 Linux worker bootstrap:
 
 1. Start from a NixOS or Linux image that contains OS boot services, networking, storage setup, trust anchors, cloud identity/metadata access, Nix, and required sandbox/kernel support.
-2. Avoid mutable image-installed repo tools. Git, Node, Buck2/prelude provisioning, and repo helper scripts should come from the pinned `packages.<system>.remote-worker-tools` Nix closure. Backend-specific RE worker runtimes and sidecars should be pinned and reproducibly installed, preferably through Nix when the selected backend permits it.
+2. Avoid mutable image-installed repo tools. Git, Node, Buck2/prelude provisioning, and repo helper scripts must come from the pinned `packages.<system>.remote-worker-tools` Nix closure. Backend-specific RE worker runtimes and sidecars must be declared Nix packages and composed into the worker closure before repo helpers invoke them.
 3. Configure binary caches and Nix remote builders if this worker delegates expensive Nix builds.
 4. Activate the repo-controlled tool closures and backend worker/runtime, then register RE worker capabilities with the scheduler.
 5. Warm `.#test-seed`, `.#buck2-prelude`, high-value toolchain attrs, node-module attrs, and selected wheelhouse outputs from cache.
@@ -969,7 +994,7 @@ The expected fix is not to disable remote execution broadly. The expected fix is
 5. Archive the exact flake source and locked inputs with `nix flake archive`, populate the selected cache backend using its supported writable-store or push flow, and publish a cache hydration manifest per CI axis containing the exact wheelhouse/toolchain/test-seed output paths, flake archive metadata, cache endpoint, system, source revision, and flake lock fingerprint.
 6. Define `packages.<system>.remote-worker-tools` as the authoritative repo-controlled worker tool closure and, if useful, `apps.<system>.remote-worker-bootstrap` as the activation command.
 7. Document how developers opt into builders despite `.envrc`'s default empty builder config.
-8. Build Linux worker images with host-level prerequisites, Nix, cache trust config, cloud identity plumbing, and sandbox support; realize `packages.<system>.remote-worker-tools`, and pin the selected backend's worker runtime/sidecars with reproducible installation, preferably through Nix when the backend supports it.
+8. Build Linux worker images with host-level prerequisites, Nix, cache trust config, cloud identity plumbing, and sandbox support; realize `packages.<system>.remote-worker-tools`, and compose the selected backend's worker runtime/sidecars into declared Nix package outputs before repo helpers invoke them.
 9. Define the macOS lane mode: remote Darwin RE worker pool or local Darwin executor reporting into the same run model.
 10. Add a TypeScript zx smoke test under `build-tools/tools/...` that prints effective `NIX_CONFIG`, verifies builder reachability, builds `.#graph-generator --rebuild`, and has focused tests for config rendering/parsing.
 

@@ -57,11 +57,12 @@ let
     inherit pkgs repoSnapshot;
     nodeMods = resolvedNodeMods;
   };
+  remoteTools = import ./remote-worker-tools.nix { inherit pkgs zx-wrapper; };
 in
 {
   buck2-prelude = prelude.buck2-prelude;
   zx-wrapper = zx-wrapper;
-} // nodeModsPkgs // {
+} // remoteTools // nodeModsPkgs // {
   graph-generator = graph.graphGen.all;
   graph-generator-cppTargets = graph.graphGen.cppTargetsFlat;
   graph-generator-selected = graph.graphGen.selected;

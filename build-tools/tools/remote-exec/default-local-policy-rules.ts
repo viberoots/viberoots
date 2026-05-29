@@ -119,6 +119,7 @@ function matchCallBlock(text: string, callee: string): string {
 
 function isConfigSurface(rel: string): boolean {
   const base = path.basename(rel).toLowerCase();
+  if (rel.endsWith("runtime-prerequisites.ts")) return false;
   return (
     rel === ".buckconfig" ||
     rel.startsWith("build-tools/tools/remote-exec/") ||
