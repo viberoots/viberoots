@@ -45,8 +45,8 @@ def _python_nix_build_impl(ctx):
         ["bash", "-c", run_and_copy, out.as_output()],
         hidden = ctx.attrs.srcs + ctx.attrs.nix_inputs,
     )
-    run_nix_action(ctx, cmd, category = "python_nix_build")
-    return [DefaultInfo(default_output = out)]
+    policy_info = run_nix_action(ctx, cmd, category = "python_nix_build")
+    return [DefaultInfo(default_output = out)] + policy_info
 
 def _python_nix_pyext_build_impl(ctx):
     raw = ctx.attrs.self_label
@@ -84,8 +84,8 @@ def _python_nix_pyext_build_impl(ctx):
         ["bash", "-c", run_and_stamp, out.as_output()],
         hidden = ctx.attrs.srcs + ctx.attrs.nix_inputs,
     )
-    run_nix_action(ctx, cmd, category = "python_nix_pyext_build")
-    return [DefaultInfo(default_output = out)]
+    policy_info = run_nix_action(ctx, cmd, category = "python_nix_pyext_build")
+    return [DefaultInfo(default_output = out)] + policy_info
 
 def _python_nix_wasm_build_impl(ctx):
     raw = ctx.attrs.self_label
@@ -135,8 +135,8 @@ def _python_nix_wasm_build_impl(ctx):
         ["bash", "-c", run_and_copy, out.as_output()],
         hidden = ctx.attrs.srcs + ctx.attrs.nix_inputs,
     )
-    run_nix_action(ctx, cmd, category = "python_nix_wasm_build")
-    return [DefaultInfo(default_output = out)]
+    policy_info = run_nix_action(ctx, cmd, category = "python_nix_wasm_build")
+    return [DefaultInfo(default_output = out)] + policy_info
 
 python_nix_build = rule(
     impl = _python_nix_build_impl,

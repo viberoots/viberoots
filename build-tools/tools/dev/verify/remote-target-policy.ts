@@ -5,6 +5,7 @@ import {
   assertRemoteTargetsAllowed,
   type RemoteExecTargetMetadata,
 } from "../remote-exec-policy-check";
+import type { NixBuilderPolicy } from "../../lib/nix-builder-policy";
 import {
   buckCqueryArgsForExecutionPolicy,
   targetPlatformArgsForPolicy,
@@ -90,6 +91,54 @@ function parseProviderMetadata(
   };
 }
 
+function parsePolicyValue(raw: string): NixBuilderPolicy | undefined {
+  if (raw === "local_only" || raw === "inherit_config" || raw === "force_builders_file") {
+    return raw;
+  }
+  return undefined;
+}
+
+function parseEvidenceValue(raw: string): NixBuilderPolicy | string {
+  return parsePolicyValue(raw) || raw;
+}
+
+function parseMetadataValue(
+  text: string,
+  keys: readonly string[],
+): NixBuilderPolicy | string | undefined {
+  for (const key of keys) {
+    const match = text.match(
+      new RegExp(`${key}["']?\\s*[:=]\\s*(?:"([^"]+)"|'([^']+)'|([^,\\s)\\]}]+))`),
+    );
+    if (match) return parseEvidenceValue(String(match[1] || match[2] || match[3] || ""));
+  }
+  return undefined;
+}
+
+function parseLabeledPolicy(
+  labels: readonly string[],
+  prefix: string,
+): NixBuilderPolicy | string | undefined {
+  for (const label of labels) {
+    if (label.startsWith(prefix)) return parseEvidenceValue(label.slice(prefix.length));
+  }
+  return undefined;
+}
+
+function parseBuilderPolicyMetadata(
+  labels: readonly string[],
+  providerText: string,
+): Partial<RemoteExecTargetMetadata> {
+  return {
+    nixBuilderPolicy:
+      parseLabeledPolicy(labels, "nix-builder:") ||
+      parseMetadataValue(providerText, ["nix_builder_policy", "builder_policy"]),
+    remoteBuilderSmokePolicy:
+      parseLabeledPolicy(labels, "remote-builder-smoke:") ||
+      parseMetadataValue(providerText, ["remote_builder_smoke", "remote_builder_smoke_policy"]),
+  };
+}
+
 export function collectRemoteExecTargetMetadata(opts: {
   root: string;
   iso: string;
@@ -133,11 +182,13 @@ export function collectRemoteExecTargetMetadata(opts: {
       );
     }
     const attrs = cqueryByTarget.get(entry.target) || {};
+    const labels = attrs.labels || [...entry.labels];
     return {
       target: entry.target,
       ruleFamily: attrs["buck.type"],
-      labels: attrs.labels || [...entry.labels],
+      labels,
       ...parseProviderMetadata(entry.target, provider.stdout),
+      ...parseBuilderPolicyMetadata(labels, provider.stdout),
     };
   });
 }

@@ -1,6 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import fs from "node:fs";
 import { getArgvTokens } from "../lib/cli";
+import type { NixBuilderPolicy } from "../lib/nix-builder-policy";
 
 export type RemoteExecMode = "local" | "hybrid" | "remote" | "remote-only-conformance";
 
@@ -16,6 +17,8 @@ export type RemoteExecTargetMetadata = {
   commandInputsDeclared?: boolean;
   requiresWorkspaceRootLookup?: boolean;
   ambientPathDependency?: boolean;
+  nixBuilderPolicy?: unknown;
+  remoteBuilderSmokePolicy?: unknown;
 };
 
 export type RemoteExecPolicyFinding = {
@@ -49,6 +52,10 @@ function isRemoteMode(mode: RemoteExecMode): boolean {
 
 function finding(target: RemoteExecTargetMetadata, message: string): RemoteExecPolicyFinding {
   return { target: target.target || "<unknown>", message };
+}
+
+function isNixBuilderPolicy(value: unknown): value is NixBuilderPolicy {
+  return value === "local_only" || value === "inherit_config" || value === "force_builders_file";
 }
 
 export function validateRemoteExecTargets(opts: {
@@ -107,6 +114,40 @@ export function validateRemoteExecTargets(opts: {
     if (target.ambientPathDependency) {
       findings.push(
         finding(target, "ambient PATH dependency declarations block remote-ready execution"),
+      );
+    }
+    if (!isNixBuilderPolicy(target.nixBuilderPolicy)) {
+      findings.push(finding(target, "remote:ready requires typed Nix builder policy evidence"));
+      continue;
+    }
+    if (target.nixBuilderPolicy === "local_only") {
+      findings.push(finding(target, "remote:ready cannot disable Nix builders"));
+    }
+    if (
+      (target.nixBuilderPolicy === "inherit_config" ||
+        target.nixBuilderPolicy === "force_builders_file") &&
+      target.remoteBuilderSmokePolicy === undefined
+    ) {
+      findings.push(
+        finding(target, `${target.nixBuilderPolicy} requires matching remote-builder smoke`),
+      );
+    }
+    if (
+      (target.nixBuilderPolicy === "inherit_config" ||
+        target.nixBuilderPolicy === "force_builders_file") &&
+      target.remoteBuilderSmokePolicy !== undefined &&
+      !isNixBuilderPolicy(target.remoteBuilderSmokePolicy)
+    ) {
+      findings.push(finding(target, "remote:ready requires typed remote-builder smoke evidence"));
+    }
+    if (
+      (target.nixBuilderPolicy === "inherit_config" ||
+        target.nixBuilderPolicy === "force_builders_file") &&
+      isNixBuilderPolicy(target.remoteBuilderSmokePolicy) &&
+      target.remoteBuilderSmokePolicy !== target.nixBuilderPolicy
+    ) {
+      findings.push(
+        finding(target, `${target.nixBuilderPolicy} requires matching remote-builder smoke`),
       );
     }
   }

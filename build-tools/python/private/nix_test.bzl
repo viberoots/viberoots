@@ -56,7 +56,7 @@ def _python_nix_test_impl(ctx):
         ["bash", "-c", "echo python_nix_test > \"$1\"", "stamp", stamp.as_output()],
         hidden = ctx.attrs.nix_inputs,
     )
-    run_nix_action(ctx, stamp_cmd, category = "python_nix_test_stamp")
+    policy_info = run_nix_action(ctx, stamp_cmd, category = "python_nix_test_stamp")
     re_executor, executor_overrides = get_re_executors_from_props(ctx)
     labels = stamp_remote_readiness_labels(ctx.attrs.labels)
     remote_command = [ctx.attrs.remote_ready_runner] if ctx.attrs.remote_ready_runner != None else None
@@ -90,7 +90,7 @@ def _python_nix_test_impl(ctx):
             use_project_relative_paths = True,
         )) + [
         DefaultInfo(default_output = stamp),
-    ]
+    ] + policy_info
 
 _PYTHON_NIX_TEST_ATTRS = {
         "self_label": attrs.string(),

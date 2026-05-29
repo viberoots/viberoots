@@ -11,7 +11,8 @@ import { findRepoRoot, pathExists } from "../lib/repo";
 import { getArgvTokens } from "../lib/cli";
 import { withScopedEnv } from "../lib/scoped-env";
 import { untrackedRequiresImpureForTargets } from "./dev-build/untracked";
-import { stripAnsi, targetPackageFromLabel } from "./build-selected-helpers";
+import { targetPackageFromLabel } from "./build-selected-helpers";
+import { parseSelectedBuildOutPath, selectedNixBuildArgs } from "./build-selected-nix-command";
 import { makeFilteredFlakeRef } from "./filtered-flake";
 import { resolveSelectedTargetLabel } from "./target-label-resolver";
 function parseSourceMode(argv: string[]): {
@@ -201,18 +202,11 @@ async function main() {
   });
   const nixTrace = exporterDebug === "1" ? "--show-trace" : "";
   const runOnce = async () => {
-    if (nixTrace) {
-      return await $({
-        env: sanitizedEnv,
-        reject: false,
-        nothrow: true,
-      })`nix build --impure --no-write-lock-file --option eval-cache false --accept-flake-config --print-out-paths ${nixTrace} ${flakeSource.flakeRef}`;
-    }
     return await $({
       env: sanitizedEnv,
       reject: false,
       nothrow: true,
-    })`nix build --impure --no-write-lock-file --option eval-cache false --accept-flake-config --print-out-paths ${flakeSource.flakeRef}`;
+    })`${selectedNixBuildArgs({ flakeRef: flakeSource.flakeRef, showTrace: Boolean(nixTrace) })}`;
   };
   let attempt: any;
   try {
@@ -228,19 +222,19 @@ async function main() {
     );
     process.exit(exitCode || 1);
   }
-  const lines = stripAnsi(String(stdout || ""))
-    .split(/\n+/)
-    .map((l) => l.trim())
-    .filter(Boolean);
-  const outPath = lines[lines.length - 1] || "";
-  if (!outPath) {
-    console.error("no out path emitted by nix build");
+  let outPath = "";
+  try {
+    outPath = parseSelectedBuildOutPath(String(stdout || ""));
+  } catch (error) {
+    console.error(error instanceof Error ? error.message : "invalid selected build out path");
     process.exit(2);
   }
   process.stdout.write(outPath + "\n");
 }
 
-main().catch((e) => {
-  console.error(e);
-  process.exit(1);
-});
+if (import.meta.url === `file://${process.argv[1]}`) {
+  main().catch((e) => {
+    console.error(e);
+    process.exit(1);
+  });
+}

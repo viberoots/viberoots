@@ -50,8 +50,8 @@ def _go_nix_build_impl(ctx):
         ["bash", "-c", run_and_copy, out.as_output()],
         hidden = ctx.attrs.srcs + ctx.attrs.nix_inputs,
     )
-    run_nix_action(ctx, cmd, category = "go_nix_build")
-    return [DefaultInfo(default_output = out)]
+    policy_info = run_nix_action(ctx, cmd, category = "go_nix_build")
+    return [DefaultInfo(default_output = out)] + policy_info
 
 go_nix_build = rule(
     impl = _go_nix_build_impl,

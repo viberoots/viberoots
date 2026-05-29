@@ -68,8 +68,8 @@ def _go_nix_build_wasm_impl(ctx):
         "USE_SELECTED_WASM=%s; %s" % ("1" if ctx.attrs.use_selected_wasm else "0", run_and_copy),
         out.as_output(),
     ], hidden = ctx.attrs.srcs + ctx.attrs.nix_inputs)
-    run_nix_action(ctx, cmd, category = "go_nix_build_wasm")
-    return [DefaultInfo(default_output = out)]
+    policy_info = run_nix_action(ctx, cmd, category = "go_nix_build_wasm")
+    return [DefaultInfo(default_output = out)] + policy_info
 
 go_nix_build_wasm = rule(
     impl = _go_nix_build_wasm_impl,
@@ -87,4 +87,3 @@ go_nix_build_wasm = rule(
         "labels": attrs.list(attrs.string(), default = []),
     },
 )
-

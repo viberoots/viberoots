@@ -47,13 +47,26 @@ The current implementation uses conventional flake outputs, graph-generator pack
 
 `.#buck-graph` is a graph-materialization output, not a standalone pure `nix build .#buck-graph`. It requires an exported graph path through `BUCK_GRAPH_JSON` and impure evaluation.
 
-`build-tools/tools/dev/build-selected.ts` currently omits `--no-link` on its selected-target `nix build` calls, and verify seed preparation intentionally uses `--out-link` to pin `.#test-seed`. That reflects current implementation state, but it is drift from `build-tools/docs/build-system-design.md`'s no-out-link policy and must be fixed or explicitly accepted before remote-enabling those actions.
+`build-tools/tools/dev/build-selected.ts` uses `--no-link --print-out-paths` for selected-target `nix build` calls and consumes the printed store path directly. Local verify seed preparation still uses `--out-link` under `buck-out/tmp/verify-seed` to pin `.#test-seed`; remote-ready seed mode uses `--no-link --print-out-paths` and must publish explicit artifact/cache manifest evidence before it can be selected.
 
 Remote builders are not automatically used for every `nix build` invocation in this repository:
 
 - `.envrc` injects `NIX_CONFIG` with empty `builders =`, empty `build-hook =`, and `max-jobs = auto` unless `NIX_CONFIG` already contains `builders =`.
 - Known local-only Nix paths include `build-tools/tools/dev/node-modules-build.ts`, `build-tools/tools/buck/node-cli-bundle.ts`, update-pnpm-hash/store-refresh helpers, and some tests/scaffolding helpers that pass `--builders ""`.
 - Most selected-target Nix builds can use configured builders if the environment allows them, but repo-local wrappers may intentionally prefer local builds for latency, reproducibility, or store-cache behavior.
+
+Nix-invoking repo tools classify builder behavior explicitly:
+
+- `local_only`: pass `--builders ""` for bootstrap, temp-workspace, and local checkout flows that
+  must not escape to configured builders.
+- `inherit_config`: do not pass `--builders`; CI or the Nix daemon decides the effective builders.
+- `force_builders_file`: pass only a generated builders file selected by CI/smoke tooling.
+
+Remote-ready selected builds must not use `local_only`. Paths labeled `remote:ready` that inherit
+builders or force a generated builders file need remote-builder smoke evidence for the same selected
+policy, such as `inherit_config` smoke for an `inherit_config` action. Because `.envrc` may mask
+builders for local development, remote-builder smoke and CI lanes must export their intended
+`NIX_CONFIG` before entering the repo.
 
 The flake does not currently export `packages.<system>.remote-worker-tools` or `apps.<system>.remote-worker-bootstrap`; those are required target interfaces for the remote worker design, not shipped interfaces today.
 

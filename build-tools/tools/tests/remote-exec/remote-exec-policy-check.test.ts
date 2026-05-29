@@ -38,6 +38,8 @@ test("remote policy keeps deployment and external-mutating targets constrained",
           runFromProjectRoot: true,
           useProjectRelativePaths: true,
           commandInputsDeclared: true,
+          nixBuilderPolicy: "inherit_config",
+          remoteBuilderSmokePolicy: "inherit_config",
         },
       ],
     }),
@@ -108,9 +110,110 @@ test("resource labels pass when a compatible profile is selected", () => {
           runFromProjectRoot: true,
           useProjectRelativePaths: true,
           commandInputsDeclared: true,
+          nixBuilderPolicy: "inherit_config",
+          remoteBuilderSmokePolicy: "inherit_config",
         },
       ],
     }),
     [],
+  );
+});
+
+test("remote-ready Nix builder policy requires compatible builder evidence", () => {
+  const base = {
+    target: "//pkg:t",
+    ruleFamily: "go_nix_test",
+    labels: ["remote:ready"],
+    runFromProjectRoot: true,
+    useProjectRelativePaths: true,
+    commandInputsDeclared: true,
+  };
+  assert.match(
+    validateRemoteExecTargets({
+      mode: "remote",
+      targets: [{ ...base, nixBuilderPolicy: "local_only" }],
+    })
+      .map((f) => f.message)
+      .join("\n"),
+    /cannot disable Nix builders/,
+  );
+  assert.match(
+    validateRemoteExecTargets({
+      mode: "remote",
+      targets: [{ ...base }],
+    })
+      .map((f) => f.message)
+      .join("\n"),
+    /typed Nix builder policy evidence/,
+  );
+  assert.match(
+    validateRemoteExecTargets({
+      mode: "remote",
+      targets: [{ ...base, nixBuilderPolicy: true }],
+    })
+      .map((f) => f.message)
+      .join("\n"),
+    /typed Nix builder policy evidence/,
+  );
+  assert.match(
+    validateRemoteExecTargets({
+      mode: "remote",
+      targets: [{ ...base, nixBuilderPolicy: "bogus" }],
+    })
+      .map((f) => f.message)
+      .join("\n"),
+    /typed Nix builder policy evidence/,
+  );
+  assert.match(
+    validateRemoteExecTargets({
+      mode: "remote",
+      targets: [{ ...base, nixBuilderPolicy: "inherit_config" }],
+    })
+      .map((f) => f.message)
+      .join("\n"),
+    /requires matching remote-builder smoke/,
+  );
+  assert.match(
+    validateRemoteExecTargets({
+      mode: "remote",
+      targets: [
+        {
+          ...base,
+          nixBuilderPolicy: "inherit_config",
+          remoteBuilderSmokePolicy: "force_builders_file",
+        },
+      ],
+    })
+      .map((f) => f.message)
+      .join("\n"),
+    /requires matching remote-builder smoke/,
+  );
+  assert.deepEqual(
+    validateRemoteExecTargets({
+      mode: "remote",
+      targets: [
+        {
+          ...base,
+          nixBuilderPolicy: "inherit_config",
+          remoteBuilderSmokePolicy: "inherit_config",
+        },
+      ],
+    }),
+    [],
+  );
+  assert.match(
+    validateRemoteExecTargets({
+      mode: "remote",
+      targets: [
+        {
+          ...base,
+          nixBuilderPolicy: "inherit_config",
+          remoteBuilderSmokePolicy: "yes",
+        },
+      ],
+    })
+      .map((f) => f.message)
+      .join("\n"),
+    /typed remote-builder smoke evidence/,
   );
 });

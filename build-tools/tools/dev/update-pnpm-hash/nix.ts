@@ -1,6 +1,7 @@
 import process from "node:process";
 import { gcWaitConfig, nixGcLockMessage, waitForNoActiveNixGc } from "../../lib/nix-gc-lock";
 import { type ManagedCommandActivity, runManagedCommand } from "../../lib/managed-command";
+import { localOnlyNixBuilderArgs } from "../../lib/nix-builder-policy";
 
 export function extractHash(text: string): string | null {
   const mismatchGot = text.match(/got:\s*(sha256-[A-Za-z0-9+/=\-_]{43,})/);
@@ -47,8 +48,7 @@ function nixBuildArgs(opts: {
     "--impure",
     "--no-link",
     "--accept-flake-config",
-    "--builders",
-    "",
+    ...localOnlyNixBuilderArgs(),
     "--print-build-logs",
     "--option",
     "min-free",

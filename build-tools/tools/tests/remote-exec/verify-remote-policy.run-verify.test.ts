@@ -75,11 +75,12 @@ function fakeRunVerifyDeps(calls: string[]): Partial<RunVerifyDeps> {
       selector: "default",
       targets: ["//:remote_exec_verify_remote_policy"],
     }),
-    prepareVerifySeed: async () => {
-      calls.push("prepare-seed");
+    prepareVerifySeed: async (opts) => {
+      calls.push(`prepare-seed:${opts.mode || "local"}`);
       return {
         cleanup: async () => {},
         pinDir: "/tmp/pin",
+        remoteManifestPath: "/tmp/seed-manifest.json",
         seedKey: "seed",
         seedPath: "/tmp/seed",
       };
@@ -186,7 +187,7 @@ test("runVerify rejects remote coverage before coverage setup paths are created"
   );
 });
 
-test("runVerify accepted remote mode skips and does not forward local zx node_modules", async () => {
+test("runVerify accepted remote mode prepares remote-ready seed and skips local zx node_modules", async () => {
   const calls: string[] = [];
   await assert.rejects(
     async () =>
@@ -196,7 +197,8 @@ test("runVerify accepted remote mode skips and does not forward local zx node_mo
 
   assert.equal(calls.includes("compute-zx"), false);
   assert.equal(calls.includes("setup-local-workspace"), false);
-  assert.equal(calls.includes("prepare-seed"), false);
+  assert.ok(calls.includes("should-seed"));
+  assert.ok(calls.includes("prepare-seed:remote-ready"));
   assert.ok(calls.includes("buck-passes-zx:<null>"));
 });
 

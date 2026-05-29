@@ -77,7 +77,7 @@ def _node_nix_test_impl(ctx):
         ["bash", "-c", "echo node_nix_test > \"$1\"", "stamp", stamp.as_output()],
         hidden = ctx.attrs.srcs,
     )
-    run_nix_action(ctx, cmd, category = "node_nix_test_stamp")
+    policy_info = run_nix_action(ctx, cmd, category = "node_nix_test_stamp")
     re_executor, executor_overrides = get_re_executors_from_props(ctx)
     labels = stamp_remote_readiness_labels(ctx.attrs.labels)
     remote_command = [ctx.attrs.remote_ready_runner] if ctx.attrs.remote_ready_runner != None else None
@@ -121,7 +121,7 @@ def _node_nix_test_impl(ctx):
             # Note: deps edges are carried by attrs.deps
             other_outputs = [],
         ),
-    ]
+    ] + policy_info
 
 _NODE_NIX_TEST_ATTRS = {
         # Importer directory like "projects/apps/web" or "."

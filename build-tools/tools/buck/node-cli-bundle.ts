@@ -12,6 +12,7 @@ import { spawn } from "node:child_process";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { getFlagStr, hasFlag } from "../lib/cli";
+import { localOnlyNixBuilderArgs } from "../lib/nix-builder-policy";
 import { sanitizeName } from "../lib/sanitize";
 
 // No search/fallbacks: the caller must set FLK_ROOT or WORKSPACE_ROOT to a flake root.
@@ -147,8 +148,7 @@ async function main() {
     "--accept-flake-config",
     "--no-write-lock-file",
     "--print-out-paths",
-    "--builders",
-    "",
+    ...localOnlyNixBuilderArgs(),
     "-L",
   ];
   // Only pass --impure when the caller explicitly requested the allow-generate path

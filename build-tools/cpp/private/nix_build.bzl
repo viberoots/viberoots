@@ -150,8 +150,8 @@ def _cpp_nix_build_impl(ctx):
         + ([ctx.attrs.workspace_env] if ctx.attrs.workspace_env != None else [])
         + ([ctx.attrs.flake_file] if ctx.attrs.flake_file != None else [])
     ))  # include local patches and explicit Nix inputs
-    run_nix_action(ctx, cmd, category = "cpp_nix_build")
-    return [DefaultInfo(default_output = out)]
+    policy_info = run_nix_action(ctx, cmd, category = "cpp_nix_build")
+    return [DefaultInfo(default_output = out)] + policy_info
 
 
 cpp_nix_build = rule(

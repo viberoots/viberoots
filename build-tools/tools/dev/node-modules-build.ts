@@ -2,6 +2,7 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
+import { nixBuilderPolicyShellArgs } from "../lib/nix-builder-policy";
 import { resolveToolPathSync } from "../lib/tool-paths";
 import { findNearestImporterLock, nodeModulesAttr } from "./install/common";
 import {
@@ -221,7 +222,7 @@ async function tryBuild(): Promise<string> {
     'TS="${NIX_PNPM_FETCH_TIMEOUT:-900}";',
     'JOBS_FLAG=""; if [ -n "$MJ" ] && [ "$MJ" != "0" ]; then JOBS_FLAG="--max-jobs $MJ"; fi;',
     'CORES_FLAG=""; if [ -n "$CR" ] && [ "$CR" != "0" ]; then CORES_FLAG="--option cores $CR"; fi;',
-    '"$TIMEOUT_PATH" -k 10s "${TS}s" nix build "${FLAKE_REF}#${FULL_ATTR}" --no-link --accept-flake-config --builders "" --print-out-paths $JOBS_FLAG $CORES_FLAG',
+    `"$TIMEOUT_PATH" -k 10s "\${TS}s" nix build "\${FLAKE_REF}#\${FULL_ATTR}" --no-link --accept-flake-config ${nixBuilderPolicyShellArgs("local_only")} --print-out-paths $JOBS_FLAG $CORES_FLAG`,
   ].join(" ");
   const built =
     await $`bash --noprofile --norc -c ${cmd} -- ${timeoutPath} ${flakeRef} ${fullAttr}`.nothrow();

@@ -188,7 +188,7 @@ def _zx_test_impl(ctx):
         ["bash", "-c", "echo zx_test > \"$1\"", "stamp", stamp.as_output()],
         hidden = [ctx.attrs.script] + (ctx.attrs.template_inputs or []),
     )
-    run_nix_action(ctx, stamp_cmd, category = "zx_test_stamp")
+    policy_info = run_nix_action(ctx, stamp_cmd, category = "zx_test_stamp")
     return inject_test_run_info(ctx, ExternalRunnerTestInfo(
             type = "custom",
             command = command,
@@ -202,7 +202,7 @@ def _zx_test_impl(ctx):
         DefaultInfo(
             default_output = stamp,
         ),
-    ]
+    ] + policy_info
 
 zx_test = clone_rule(
     "sh_test",

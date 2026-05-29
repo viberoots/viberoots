@@ -5,6 +5,8 @@ import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
 import { shouldPrepareVerifySeedForRequestedTargets } from "../../dev/verify/seed";
+import { verifySeedBuildArgs } from "../../dev/verify/seed-build";
+import { writeVerifySeedRemoteManifest } from "../../dev/verify/seed-manifest";
 import { seedStageRootDirForTest, stageSeedStore } from "../../dev/verify/seed-staging";
 import { mktemp } from "../lib/test-helpers";
 
@@ -31,6 +33,33 @@ test("verify seed policy honors override mode", () => {
     shouldPrepareVerifySeedForRequestedTargets(["//..."], { VBR_VERIFY_SEED_MODE: "never" }),
     false,
   );
+});
+
+test("verify seed build args split local pinning from remote-ready no-link mode", () => {
+  assert.deepEqual(
+    verifySeedBuildArgs({
+      root: "/repo",
+      mode: "local",
+      gcRootPath: "/repo/buck-out/tmp/verify-seed/nix-root",
+    }).slice(-3),
+    ["--out-link", "/repo/buck-out/tmp/verify-seed/nix-root", "--print-out-paths"],
+  );
+  const remoteArgs = verifySeedBuildArgs({ root: "/repo", mode: "remote-ready" });
+  assert.ok(remoteArgs.includes("--no-link"));
+  assert.ok(remoteArgs.includes("--print-out-paths"));
+  assert.ok(!remoteArgs.includes("--out-link"));
+});
+
+test("verify seed remote-ready manifest records explicit cache artifact path", async () => {
+  const root = await mktemp("verify-seed-manifest-root-");
+  const manifest = await writeVerifySeedRemoteManifest({
+    root,
+    seedPath: "/nix/store/example-test-seed",
+  });
+  const parsed = JSON.parse(await fsp.readFile(manifest, "utf8"));
+  assert.equal(parsed.kind, "verify-seed-remote-ready");
+  assert.equal(parsed.seedPath, "/nix/store/example-test-seed");
+  assert.equal(parsed.cacheManifest.storePath, "/nix/store/example-test-seed");
 });
 
 test("verify seed staging stays outside volatile verify TMPDIR", () => {

@@ -21,6 +21,24 @@ _REMOTE_READY_EVIDENCE = [
     "remote_profile_compatibility",
 ]
 
+_REMOTE_BUILDER_POLICIES_REQUIRING_SMOKE = [
+    "inherit_config",
+    "force_builders_file",
+]
+
+_NIX_BUILDER_POLICIES = [
+    "local_only",
+    "inherit_config",
+    "force_builders_file",
+]
+
+NixRemoteActionPolicyInfo = provider(fields = [
+    "builder_policy",
+    "labels",
+    "metadata",
+    "remote_builder_smoke_policy",
+])
+
 _GENRULE_LOCAL_SCHEDULING_LABEL = "uses_local_filesystem_abspaths"
 
 def remote_readiness_labels():
@@ -69,6 +87,8 @@ def external_runner_command(labels, local_command, remote_command = None, declar
         if missing:
             fail("remote-ready external-runner command missing required declared inputs: %s" % ", ".join(missing))
         text = _command_text(remote_command[1:])
+        if '--builders ""' in text or "--builders ''" in text:
+            fail("remote-ready external-runner command cannot disable Nix builders")
         blocked = []
         for fragment in _REMOTE_BLOCKED_COMMAND_FRAGMENTS:
             if fragment in text:
@@ -82,6 +102,35 @@ def _missing_evidence(evidence):
     values = evidence or {}
     return [key for key in _REMOTE_READY_EVIDENCE if not values.get(key)]
 
+def _validate_builder_evidence(evidence):
+    values = evidence or {}
+    policy = values.get("builder_policy")
+    if type(policy) != "string" or policy not in _NIX_BUILDER_POLICIES:
+        fail("remote-ready action requires typed builder_policy evidence")
+    if policy == "local_only":
+        fail("remote-ready action cannot use local_only Nix builder policy")
+    if policy in _REMOTE_BUILDER_POLICIES_REQUIRING_SMOKE:
+        smoke_policy = values.get("remote_builder_smoke")
+        if type(smoke_policy) == "dict":
+            smoke_policy = smoke_policy.get("builder_policy")
+        if type(smoke_policy) != "string":
+            fail("remote-ready action requires typed remote_builder_smoke evidence")
+        if smoke_policy != policy:
+            fail("remote-ready action with %s builder policy requires matching remote_builder_smoke evidence" % policy)
+
+def _policy_labels(evidence, default_builder_policy):
+    values = evidence or {}
+    builder_policy = values.get("builder_policy")
+    if type(builder_policy) != "string":
+        builder_policy = default_builder_policy
+    labels = ["nix-builder:%s" % builder_policy]
+    smoke_policy = values.get("remote_builder_smoke")
+    if type(smoke_policy) == "dict":
+        smoke_policy = smoke_policy.get("builder_policy")
+    if type(smoke_policy) == "string":
+        labels.append("remote-builder-smoke:%s" % smoke_policy)
+    return labels
+
 def remote_action_policy(
         mode = "local-only",
         evidence = None,
@@ -89,27 +138,38 @@ def remote_action_policy(
     if mode == "local-only":
         return struct(
             local_only = True,
+            builder_policy = "local_only",
+            labels = _policy_labels(evidence, "local_only"),
             metadata = "remote-action-policy:local-only",
+            remote_builder_smoke_policy = None,
             stamp = "remote_action_policy_local_only",
         )
     if mode == "remote-ready":
         missing = _missing_evidence(evidence)
         if missing:
             fail("remote-ready action missing evidence: %s" % ", ".join(missing))
+        _validate_builder_evidence(evidence)
         return struct(
             local_only = False,
+            builder_policy = evidence.get("builder_policy"),
+            labels = _policy_labels(evidence, "inherit_config"),
             metadata = "remote-action-policy:remote-ready",
+            remote_builder_smoke_policy = evidence.get("remote_builder_smoke"),
             stamp = "remote_action_policy_remote_ready",
         )
     if mode == "hybrid":
         missing = _missing_evidence(evidence)
         if missing:
             fail("hybrid action missing evidence: %s" % ", ".join(missing))
+        _validate_builder_evidence(evidence)
         if not fallback_reason:
             fail("hybrid action requires fallback_reason")
         return struct(
             local_only = False,
+            builder_policy = evidence.get("builder_policy"),
+            labels = _policy_labels(evidence, "inherit_config"),
             metadata = "remote-action-policy:hybrid",
+            remote_builder_smoke_policy = evidence.get("remote_builder_smoke"),
             stamp = "remote_action_policy_hybrid",
         )
     fail("unknown remote action policy mode: %s" % mode)
@@ -125,3 +185,9 @@ def run_nix_action(ctx, cmd, category, mode = "local-only", evidence = None, fal
         category = "%s_%s" % (category, policy.stamp),
         local_only = policy.local_only,
     )
+    return [NixRemoteActionPolicyInfo(
+        builder_policy = policy.builder_policy,
+        labels = policy.labels,
+        metadata = policy.metadata,
+        remote_builder_smoke_policy = policy.remote_builder_smoke_policy,
+    )]

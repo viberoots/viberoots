@@ -49,8 +49,8 @@ policy_probe(
         "source_snapshot": True,
         "materialization_manifest": True,
         "artifact_contract": True,
-        "builder_policy": True,
-        "remote_builder_smoke": True,
+        "builder_policy": "inherit_config",
+        "remote_builder_smoke": "inherit_config",
         "remote_profile_compatibility": True,
     },
 )
@@ -73,7 +73,7 @@ test("remote action policy rejects remote-ready and hybrid actions without evide
     );
     await fs.writeFile(
       path.join(hybridDir, "TARGETS"),
-      'load("//tmp/policy_defs:defs.bzl", "policy_probe")\npolicy_probe(name = "t", mode = "hybrid", evidence = {"source_snapshot": True, "materialization_manifest": True, "artifact_contract": True, "builder_policy": True, "remote_builder_smoke": True, "remote_profile_compatibility": True})\n',
+      'load("//tmp/policy_defs:defs.bzl", "policy_probe")\npolicy_probe(name = "t", mode = "hybrid", evidence = {"source_snapshot": True, "materialization_manifest": True, "artifact_contract": True, "builder_policy": "inherit_config", "remote_builder_smoke": "inherit_config", "remote_profile_compatibility": True})\n',
       "utf8",
     );
     await fs.writeFile(path.join(valid, "TARGETS"), validTargets, "utf8");
@@ -102,6 +102,54 @@ test("remote action policy rejects remote-ready and hybrid actions without evide
     })`buck2 --isolation-dir ${iso} cquery //tmp/policy_hybrid:t`;
     assert.notEqual(hybrid.exitCode, 0);
     assert.match(String(hybrid.stderr || ""), /fallback_reason/);
+  });
+});
+
+test("remote action policy rejects local-only Nix builder evidence", async () => {
+  await runInTemp("remote-action-policy-builder-policy", async (tmp, $) => {
+    const defs = path.join(tmp, "tmp", "policy_defs");
+    const dir = path.join(tmp, "tmp", "policy_builder");
+    await fs.mkdir(defs, { recursive: true });
+    await fs.mkdir(dir, { recursive: true });
+    await fs.writeFile(path.join(defs, "defs.bzl"), probeDefs, "utf8");
+    await fs.writeFile(path.join(defs, "TARGETS"), "", "utf8");
+    await fs.writeFile(
+      path.join(dir, "TARGETS"),
+      'load("//tmp/policy_defs:defs.bzl", "policy_probe")\npolicy_probe(name = "t", mode = "remote-ready", evidence = {"source_snapshot": True, "materialization_manifest": True, "artifact_contract": True, "builder_policy": "local_only", "remote_builder_smoke": True, "remote_profile_compatibility": True})\n',
+      "utf8",
+    );
+
+    const res = await $({
+      cwd: tmp,
+      stdio: "pipe",
+      nothrow: true,
+    })`buck2 --isolation-dir ${inheritedBuckIsolation("remote_builder_policy_analysis")} cquery //tmp/policy_builder:t`;
+    assert.notEqual(res.exitCode, 0);
+    assert.match(String(res.stderr || ""), /local_only Nix builder policy/);
+  });
+});
+
+test("remote action policy requires builder smoke to match selected policy", async () => {
+  await runInTemp("remote-action-policy-builder-smoke-match", async (tmp, $) => {
+    const defs = path.join(tmp, "tmp", "policy_defs");
+    const dir = path.join(tmp, "tmp", "policy_builder_smoke");
+    await fs.mkdir(defs, { recursive: true });
+    await fs.mkdir(dir, { recursive: true });
+    await fs.writeFile(path.join(defs, "defs.bzl"), probeDefs, "utf8");
+    await fs.writeFile(path.join(defs, "TARGETS"), "", "utf8");
+    await fs.writeFile(
+      path.join(dir, "TARGETS"),
+      'load("//tmp/policy_defs:defs.bzl", "policy_probe")\npolicy_probe(name = "t", mode = "remote-ready", evidence = {"source_snapshot": True, "materialization_manifest": True, "artifact_contract": True, "builder_policy": "inherit_config", "remote_builder_smoke": "force_builders_file", "remote_profile_compatibility": True})\n',
+      "utf8",
+    );
+
+    const res = await $({
+      cwd: tmp,
+      stdio: "pipe",
+      nothrow: true,
+    })`buck2 --isolation-dir ${inheritedBuckIsolation("remote_builder_smoke_match")} cquery //tmp/policy_builder_smoke:t`;
+    assert.notEqual(res.exitCode, 0);
+    assert.match(String(res.stderr || ""), /matching remote_builder_smoke evidence/);
   });
 });
 

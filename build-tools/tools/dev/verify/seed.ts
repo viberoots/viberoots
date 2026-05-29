@@ -5,14 +5,17 @@ import process from "node:process";
 import "zx/globals";
 import { writeIfChanged } from "../../lib/fs-helpers";
 import { runManagedCommand } from "../../lib/managed-command";
+import { verifySeedBuildArgs, type VerifySeedBuildMode } from "./seed-build";
 import { shouldStageSeed, stageSeedStore } from "./seed-staging";
+import { writeVerifySeedRemoteManifest } from "./seed-manifest";
 import { isNonBuildSystemOnlyVerifyTargets } from "./target-scope";
 import { pidAlive } from "./seed-utils";
 
-type SeedInfo = {
+export type SeedInfo = {
   seedKey: string;
   seedPath: string;
   pinDir: string;
+  remoteManifestPath?: string;
   cleanup: () => Promise<void>;
 };
 
@@ -128,29 +131,22 @@ function seedBuildTimeoutSec(): number {
   return Math.floor(parsed);
 }
 
-async function buildSeedStorePath(root: string): Promise<string> {
+async function buildSeedStorePath(
+  root: string,
+  mode: VerifySeedBuildMode = "local",
+): Promise<string> {
   const timeoutSec = seedBuildTimeoutSec();
-  const flakeRef = `${root}#test-seed`;
   // Pin the built derivation as a Nix GC root so nix-collect-garbage does not evict
   // the current seed between verify runs. Each build overwrites the symlink, so only
   // the most-recent seed derivation is pinned; older ones remain GC-eligible.
   const gcRootPath = path.join(seedRootDir(root), "nix-root");
   await fsp.mkdir(seedRootDir(root), { recursive: true }).catch(() => {});
-  process.stderr.write(`[verify] seed build: nix build ${flakeRef} (timeout=${timeoutSec}s)\n`);
+  process.stderr.write(
+    `[verify] seed build: nix build ${root}#test-seed (timeout=${timeoutSec}s)\n`,
+  );
   const cmd = await runManagedCommand({
     command: "nix",
-    args: [
-      "build",
-      "--option",
-      "eval-cache",
-      "false",
-      "--impure",
-      flakeRef,
-      "--accept-flake-config",
-      "--out-link",
-      gcRootPath,
-      "--print-out-paths",
-    ],
+    args: verifySeedBuildArgs({ root, mode, gcRootPath }),
     cwd: root,
     env: { ...process.env, IN_NIX_SHELL: process.env.IN_NIX_SHELL || "1" },
     timeoutMs: timeoutSec * 1000,
@@ -203,10 +199,29 @@ async function createPin(
   return pinDir;
 }
 
-export async function prepareVerifySeed(opts: { root: string; iso: string }): Promise<SeedInfo> {
+export async function prepareVerifySeed(opts: {
+  root: string;
+  iso: string;
+  mode?: VerifySeedBuildMode;
+}): Promise<SeedInfo> {
   await sweepStalePins(opts.root);
+  const mode = opts.mode || "local";
   const seedKey = await computeSeedKey(opts.root);
-  const seedPath = await buildSeedStorePath(opts.root);
+  const seedPath = await buildSeedStorePath(opts.root, mode);
+  if (mode === "remote-ready") {
+    const remoteManifestPath = await writeVerifySeedRemoteManifest({
+      root: opts.root,
+      seedPath,
+    });
+    await writeCurrentSeed(opts.root, seedPath, seedKey);
+    return {
+      seedKey,
+      seedPath,
+      pinDir: "",
+      remoteManifestPath,
+      cleanup: async () => {},
+    };
+  }
   const seedPathForRun = (await shouldStageSeed(seedPath))
     ? await stageSeedStore(seedPath, seedKey, seedTtlMs)
     : seedPath;

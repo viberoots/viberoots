@@ -1,6 +1,11 @@
 #!/usr/bin/env zx-wrapper
 import * as fsp from "node:fs/promises";
+import assert from "node:assert/strict";
 import { test } from "node:test";
+import {
+  parseSelectedBuildOutPath,
+  selectedNixBuildArgs,
+} from "../../dev/build-selected-nix-command";
 
 test("build-selected runs node patch requirement preflight", async () => {
   const file = "build-tools/tools/dev/build-selected.ts";
@@ -24,6 +29,51 @@ test("build-selected runs node patch requirement preflight", async () => {
   ) {
     throw new Error(`${file} should treat repo-local buck-out/tmp/tmpdir workspaces as temp`);
   }
+});
+
+test("build-selected constructs selected nix build argv with no-link for normal and trace modes", () => {
+  assert.deepEqual(selectedNixBuildArgs({ flakeRef: "path:/repo#graph-generator-selected" }), [
+    "nix",
+    "build",
+    "--impure",
+    "--no-write-lock-file",
+    "--option",
+    "eval-cache",
+    "false",
+    "--accept-flake-config",
+    "--no-link",
+    "--print-out-paths",
+    "path:/repo#graph-generator-selected",
+  ]);
+  assert.deepEqual(
+    selectedNixBuildArgs({ flakeRef: "path:/repo#graph-generator-selected", showTrace: true }),
+    [
+      "nix",
+      "build",
+      "--impure",
+      "--no-write-lock-file",
+      "--option",
+      "eval-cache",
+      "false",
+      "--accept-flake-config",
+      "--no-link",
+      "--print-out-paths",
+      "--show-trace",
+      "path:/repo#graph-generator-selected",
+    ],
+  );
+});
+
+test("build-selected consumes exactly one printed store path", () => {
+  assert.equal(parseSelectedBuildOutPath("/nix/store/one-out\n"), "/nix/store/one-out");
+  assert.throws(
+    () => parseSelectedBuildOutPath("/nix/store/one-out\n/nix/store/two-out\n"),
+    /expected exactly one selected build out path, got 2/,
+  );
+  assert.throws(
+    () => parseSelectedBuildOutPath(""),
+    /expected exactly one selected build out path/,
+  );
 });
 
 test("node entrypoint macros use shared node patch preflight helper", async () => {

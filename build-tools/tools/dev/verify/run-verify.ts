@@ -136,7 +136,19 @@ export async function runVerifyWithDeps(overrides: Partial<RunVerifyDeps> = {}):
     );
   }
   let seedCleanup: (() => Promise<void>) | null = null;
-  if (!remoteVerify && deps.shouldPrepareVerifySeedForRequestedTargets(selection.targets)) {
+  if (remoteVerify && deps.shouldPrepareVerifySeedForRequestedTargets(selection.targets)) {
+    const seed = await timedPhase(
+      "prepare-verify-seed-remote-ready",
+      async () => await deps.prepareVerifySeed({ root, iso, mode: "remote-ready" }),
+    );
+    process.env.VBR_TEST_SEED_STORE_PATH = seed.seedPath;
+    process.env.VBR_TEST_SEED_KEY = seed.seedKey;
+    if (seed.remoteManifestPath) {
+      process.env.VBR_TEST_SEED_REMOTE_MANIFEST = seed.remoteManifestPath;
+    } else {
+      delete process.env.VBR_TEST_SEED_REMOTE_MANIFEST;
+    }
+  } else if (!remoteVerify && deps.shouldPrepareVerifySeedForRequestedTargets(selection.targets)) {
     const seed = await timedPhase(
       "prepare-verify-seed",
       async () => await deps.prepareVerifySeed({ root, iso }),
@@ -150,6 +162,7 @@ export async function runVerifyWithDeps(overrides: Partial<RunVerifyDeps> = {}):
     delete process.env.VBR_TEST_SEED_STORE_PATH;
     delete process.env.VBR_TEST_SEED_KEY;
     delete process.env.VBR_TEST_SEED_PIN_DIR;
+    delete process.env.VBR_TEST_SEED_REMOTE_MANIFEST;
   }
   if (!remoteVerify) {
     await timedPhase(
