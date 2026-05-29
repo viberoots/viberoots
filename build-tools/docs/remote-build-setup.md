@@ -115,6 +115,27 @@ node build-tools/tools/ci/run-stage.ts --stage wheelhouse-preload --to 's3://...
 
 It discovers `py-wheelhouse-*` attrs, builds them, and runs `nix copy --to` when a destination is configured. Jenkins currently invokes the stage but does not configure the cache destination in the `Jenkinsfile`.
 
+`build-tools/tools/ci/publish-nix-cache-manifest.ts` is the generic dormant cache manifest path for
+remote-readiness lanes. In dry-run mode it builds the initial prewarm attrs with
+`--no-link --print-out-paths`, archives flake inputs with `nix flake archive --json`, and writes a
+manifest containing system, source revision, flake lock hash, attrs, exact output paths, selected
+graph/target outputs when provided, cache endpoint identity, and tool versions:
+
+```bash
+node build-tools/tools/ci/publish-nix-cache-manifest.ts \
+  --dry-run \
+  --out buck-out/tmp/nix-cache-manifest.json
+```
+
+The initial attr set is `.#graph-generator`, `.#buck2-prelude`, `.#test-seed`,
+`.#remote-worker-tools`, `.#toolchains.go`, `.#toolchains.cxx`, `.#toolchains.python`, discovered
+`.#py-wheelhouse-*`, and discovered `.#node-modules.*`. Backend credentials stay outside the
+manifest; only redacted endpoint identity is recorded. CI can pass
+`--remote-ci-tools /nix/store/...-remote-ci-tools` or set `VBR_REMOTE_CI_TOOLS` to run child commands
+with `PATH` restricted to the declared CI closure. Writable-store publishing renders `nix copy --to`; future backend
+closures can use `--backend attic` or `--backend cachix` only after those CLIs are declared in the
+remote CI tools closure.
+
 ### Verify Today
 
 `v` is not just `buck2 test //...`.
@@ -388,11 +409,19 @@ For a local smoke test that attempts to force an eligible derivation onto remote
 
 ```bash
 export NIX_CONFIG=$'experimental-features = nix-command flakes\nbuilders = @/etc/nix/machines\nmax-jobs = 0\nbuilders-use-substitutes = true\n'
-nix store info --store 'ssh-ng://nix-builder@builder-x86-linux.example.com?ssh-key=/etc/nix/builder_ed25519'
-nix build .#graph-generator --no-link --accept-flake-config --rebuild
+node build-tools/tools/remote-exec/nix-remote-builder-smoke.ts \
+  --builder-uri 'ssh-ng://nix-builder@builder-x86-linux.example.com?ssh-key=/etc/nix/builder_ed25519' \
+  --probe-build \
+  --report buck-out/tmp/nix-remote-builder-smoke.json
 ```
 
 This does not override derivations that prefer local builds, missing system/feature matches, or daemon SSH/trust failures.
+The smoke report is machine-readable and distinguishes inherited builders, forced generated builder
+files, and intentionally disabled builders. It also reports the effective Nix config for builders,
+substituters, trusted public keys, and `max-jobs`, and flags the common `.envrc` case where empty
+`builders =` masks daemon-level remote builders. The tool does not mutate global Nix config or set
+builders by default; `nix store info --store ...` and the `.#graph-generator --no-link --rebuild`
+probe run only when explicitly requested.
 
 ## Distributed Test Execution Design
 
