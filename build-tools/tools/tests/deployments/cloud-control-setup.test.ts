@@ -94,6 +94,7 @@ test("cloud setup bundle renders runtime, credentials, commands, and capabilitie
     "/run/deployment-control-plane/credentials/reviewed-source-known-hosts",
   );
   assert.equal(commands.image, DIGEST_REF);
+  assert.equal(commands.profileRoot.repoRootRelative, "unused");
   assert.equal(imagePublication.digestContract.publication.status, "verified-registry-publication");
   assert.equal(imagePublication.image, DIGEST_REF);
   assert.equal(
@@ -106,7 +107,10 @@ test("cloud setup bundle renders runtime, credentials, commands, and capabilitie
       .VBR_CONTROL_PLANE_IMAGE_BUILD_IDENTITY,
     BUILD_IDENTITY,
   );
-  assert.equal(commands.workers.length, 2);
+  assert.equal(
+    commands.phases.find((phase: { id: string }) => phase.id === "process-start").commands.length,
+    3,
+  );
   assert.deepEqual(validateRenderedProfile(bundle.files), []);
   assert.deepEqual(
     bundle.capabilities.map((capability) => capability.id),

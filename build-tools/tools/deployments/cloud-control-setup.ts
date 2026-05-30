@@ -124,11 +124,83 @@ function numberFlag(name: string, fallback: number): number {
 
 function nextCommands(input: CloudControlSetupInput): string[] {
   return [
-    `deployment-control-plane setup --out ${input.outDir} --host-mode ${input.mode} --image <registry/repo@sha256:digest>`,
-    "provide --expected-image-build-identity, --image-build-identity, --image-publication-digest, and --image-inspected-digest from registry inspection",
+    setupCommand(input, true),
+    setupCommand(input, false),
     "stage credential files listed in credential-manifest.json",
-    "run health, readiness, worker-heartbeat, artifact, and database validation commands",
+    localCheckCommand("setup-doctor", input.outDir, "setup-doctor.json"),
+    localCheckCommand("credential-preflight", input.outDir, "credential-preflight.json"),
+    "run the ordered phases in commands.json",
   ];
+}
+
+function setupCommand(input: CloudControlSetupInput, dryRun: boolean): string {
+  const publication = input.imagePublication;
+  const args = [
+    "deployment-control-plane",
+    "setup",
+    dryRun ? "--dry-run" : undefined,
+    "--out",
+    input.outDir,
+    "--host-mode",
+    input.mode,
+    "--image",
+    input.image || "<registry/repo@sha256:digest>",
+    "--expected-image-build-identity",
+    input.expectedImageBuildIdentity || "nix-source-<build-identity>",
+    "--image-source-revision",
+    publication?.sourceRevision || "source-<reviewed-revision>",
+    "--image-build-identity",
+    publication?.imageBuildIdentity ||
+      input.expectedImageBuildIdentity ||
+      "nix-source-<build-identity>",
+    "--image-publication-digest",
+    publication?.digest || "sha256:<digest>",
+    "--image-inspected-digest",
+    publication?.inspectedDigest || "sha256:<digest>",
+    "--public-url",
+    input.publicUrl,
+    "--auth-callback-host",
+    input.authCallbackHost,
+    "--auth-callback-path",
+    input.authCallbackPath,
+    "--deployment-id",
+    input.deploymentIds.join(","),
+    "--artifact-backend",
+    input.artifactBackend,
+    "--artifact-bucket",
+    input.artifactBucket,
+    "--artifact-region",
+    input.artifactRegion,
+    "--reviewed-source-mode",
+    input.reviewedSourceMode,
+    "--service-replicas",
+    String(input.serviceReplicas),
+    "--worker-replicas",
+    String(input.workerReplicas),
+    input.artifactBackendEvidence ? "--artifact-backend-evidence" : undefined,
+    input.artifactBackendEvidence || undefined,
+    input.awsVpcEndpoint ? "--aws-vpc-endpoint" : undefined,
+    input.awsSubnetIds.length > 0 ? "--aws-subnet-id" : undefined,
+    input.awsSubnetIds.length > 0 ? input.awsSubnetIds.join(",") : undefined,
+    input.awsSecurityGroupIds.length > 0 ? "--aws-security-group-id" : undefined,
+    input.awsSecurityGroupIds.length > 0 ? input.awsSecurityGroupIds.join(",") : undefined,
+    input.tlsEvidence ? "--tls-evidence" : undefined,
+    input.tlsEvidence || undefined,
+    input.supabasePrivatelink ? "--supabase-privatelink" : undefined,
+  ].filter((arg): arg is string => typeof arg === "string" && arg.length > 0);
+  return args.map(shellArg).join(" ");
+}
+
+function localCheckCommand(command: string, outDir: string, outputFile: string): string {
+  const outPath = `${outDir.replace(/\/+$/, "")}/${outputFile}`;
+  return ["deployment-control-plane", command, "--bundle-dir", outDir, "--out", outPath]
+    .map(shellArg)
+    .join(" ");
+}
+
+function shellArg(value: string): string {
+  if (/^[A-Za-z0-9_./:@=,+-]+$/.test(value)) return value;
+  return `'${value.replace(/'/g, `'\\''`)}'`;
 }
 
 async function assertNoSecretValues(relativePath: string, content: string): Promise<void> {

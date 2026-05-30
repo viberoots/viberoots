@@ -12,12 +12,12 @@ import type {
   ProviderCapabilityDeclaration,
 } from "./cloud-control-setup-types";
 import {
-  renderCommands,
   renderConformanceChecklist,
   renderIngressChecklist,
   renderManagedDependencies,
   renderManagedDependencyProfile,
 } from "./cloud-control-setup-artifacts";
+import { renderCommands } from "./cloud-control-runbook";
 import { modeFiles } from "./cloud-control-setup-profiles";
 import { assertCloudControlSetupInput } from "./cloud-control-setup-validate";
 import { verifiedControlPlaneImageDigestContract } from "./control-plane-image-publication";
@@ -108,6 +108,8 @@ function renderCredentialManifest(input: CloudControlSetupInput): string {
     {
       schemaVersion: "cloud-control-credential-manifest@1",
       credentialDirectory: "/run/deployment-control-plane/credentials",
+      reviewedSourceMode: input.reviewedSourceMode,
+      deploymentIds: input.deploymentIds,
       requiredFiles: [
         ...CREDENTIAL_FILENAMES,
         ...input.deploymentIds.flatMap((deploymentId) =>
@@ -141,8 +143,10 @@ function renderReadme(input: CloudControlSetupInput): string {
     "authority. Protected/shared readiness is blocked until every selected provider capability has",
     "validation evidence.",
     "",
-    "Review `provider-capabilities.json`, `credential-manifest.json`, and `commands.json` before",
-    "starting the service and workers.",
+    "Run `deployment-control-plane setup-doctor --bundle-dir <bundle> --out <bundle>/setup-doctor.json`",
+    "and `deployment-control-plane credential-preflight --bundle-dir <bundle> --out <bundle>/credential-preflight.json`",
+    "before starting the service and workers. `commands.json` is the ordered runbook for the",
+    "remaining checks.",
   ].join("\n");
 }
 

@@ -32,8 +32,8 @@ The generated bundle contains:
 
 - `config.yaml`: production-shaped runtime config with mounted file paths.
 - `credential-manifest.json`: required credential filenames and rejected secret sources.
-- `commands.json`: service, worker, health, readiness, worker-heartbeat, artifact, and database
-  validation commands.
+- `commands.json`: ordered setup runbook phases with profile-root-relative service, worker, health,
+  readiness, worker-heartbeat, artifact, database, doctor, and credential-preflight commands.
 - `image-publication.json`: verified registry inspection evidence tying the generated profile image
   to the build identity and registry manifest digest.
 - `conformance-checklist.json`: exact checks that must pass before protected/shared readiness.
@@ -68,14 +68,20 @@ under `/run/deployment-control-plane/credentials`.
    Generated Compose/Podman, NixOS, SaaS OCI, and AWS EC2 profiles include one service, two
    workers, config and credential mounts, digest-pinned image references, and scratch/state/cache
    paths owned by the runtime uid/gid.
-6. Run `commands.validations.database.command` and `commands.validations.artifactStore.command`.
-   Both checks must pass against temporary schema/data or temporary object prefixes.
-7. Start one service process and at least two worker processes from `commands.json`.
-8. Run `commands.validations.health.command`, `commands.validations.readiness.command`, and
-   `commands.validations.workerHeartbeats.command`.
-9. Treat the host as protected/shared-ready only after every entry in
-   `conformance-checklist.json` passes and the evidence is attached to the selected provider
-   capabilities.
+6. Run
+   `deployment-control-plane setup-doctor --bundle-dir ./cloud-control-profile --out ./cloud-control-profile/setup-doctor.json`
+   from the repo root, or run the generated setup-doctor command from the bundle directory.
+7. Run
+   `deployment-control-plane credential-preflight --bundle-dir ./cloud-control-profile --out ./cloud-control-profile/credential-preflight.json`
+   before starting service and worker processes.
+8. Run the `managed-dependencies` phase in `commands.json`. Both database and artifact-store checks
+   must pass against temporary schema/data or temporary object prefixes.
+9. Start one service process and at least two worker processes from the `process-start` phase.
+10. Run the `http-validation` phase for health, readiness, and authenticated worker-heartbeat
+    checks.
+11. Treat the host as protected/shared-ready only after every entry in
+    `conformance-checklist.json` passes and the evidence is attached to the selected provider
+    capabilities.
 
 ## Reviewed Source Modes
 
@@ -214,8 +220,9 @@ evidence. The default `aws-s3` backend still requires `--aws-vpc-endpoint`.
    reviewed-source credential files, and Infisical deployment credential files through the generated
    credential manifest.
 6. Start the systemd/Podman service and worker units on EC2.
-7. Run the database, artifact-store, health, readiness, and worker-heartbeat commands from
-   `commands.json`. The profile is not protected/shared-ready until those pass and the AWS network,
+7. Run setup-doctor, credential-preflight, database, artifact-store, health, readiness, and
+   worker-heartbeat phases from `commands.json`. The profile is not protected/shared-ready until
+   those pass and the AWS network,
    EC2 host, S3 artifact store, and Supabase prerequisite capabilities all have audit evidence.
    Live smoke for this topology must also attach EC2-runtime evidence that proves the same
    digest-pinned service/worker image and runtime config use the selected public or PrivateLink

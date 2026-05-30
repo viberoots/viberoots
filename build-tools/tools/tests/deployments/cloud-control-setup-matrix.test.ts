@@ -4,6 +4,7 @@ import { test } from "node:test";
 import YAML from "yaml";
 import { renderCloudControlSetupBundle } from "../../deployments/cloud-control-setup-render";
 import { runCloudControlSetupCommand } from "../../deployments/cloud-control-setup";
+import { validateRunbookStructure } from "../../deployments/cloud-control-runbook";
 import {
   validateCloudControlSetupInput,
   validateCredentialManifestFiles,
@@ -79,11 +80,29 @@ for (const mode of Object.keys(modeFile) as CloudProfileMode[]) {
 
 test("commands contain exact health, readiness, heartbeat, artifact, and database checks", () => {
   const commands = JSON.parse(renderCloudControlSetupBundle(input()).files["commands.json"]!);
-  assert.match(commands.validations.health.command, /\/healthz$/);
-  assert.match(commands.validations.readiness.command, /\/readyz$/);
-  assert.match(commands.validations.workerHeartbeats.command, /\/api\/v1\/worker-heartbeats$/);
-  assert.match(commands.validations.database.command, /control-plane-managed-dependencies\.ts/);
-  assert.match(commands.validations.artifactStore.mustPass, /PUT, GET, HEAD/);
+  assert.deepEqual(validateRunbookStructure(commands), []);
+  assert.match(
+    runbookCommand(commands, "health").command,
+    /https:\/\/deploy\.example\.test\/healthz' \| tee "\$PROFILE_ROOT\/http-health\.json"$/,
+  );
+  assert.match(
+    runbookCommand(commands, "readiness").command,
+    /https:\/\/deploy\.example\.test\/readyz' \| tee "\$PROFILE_ROOT\/http-readiness\.json"$/,
+  );
+  assert.match(
+    runbookCommand(commands, "worker-heartbeats").command,
+    /CREDENTIAL_ROOT[\s\S]*Authorization: Bearer %s[\s\S]*\/api\/v1\/worker-heartbeats'/,
+  );
+  assert.doesNotMatch(JSON.stringify(commands), /<control-plane-service-url>|token-value/);
+  assert.match(
+    runbookCommand(commands, "database").command,
+    /deployment-control-plane managed-dependencies/,
+  );
+  assert.match(runbookCommand(commands, "artifact-store").mustPass, /PUT, GET, HEAD/);
+  assert.match(
+    runbookCommand(commands, "database").command,
+    /"\$PROFILE_ROOT\/managed-dependencies\.profile\.yaml"/,
+  );
   const checklist = JSON.parse(
     renderCloudControlSetupBundle(input()).files["conformance-checklist.json"]!,
   );
@@ -101,6 +120,13 @@ test("commands contain exact health, readiness, heartbeat, artifact, and databas
   );
 });
 
+function runbookCommand(commands: any, id: string) {
+  const found = commands.phases
+    .flatMap((phase: any) => phase.commands)
+    .find((c: any) => c.id === id);
+  if (!found) throw new Error(`missing runbook command ${id}`);
+  return found;
+}
 test("AWS EC2 profile includes Supabase PrivateLink and S3 VPC endpoint placeholders", () => {
   const bundle = renderCloudControlSetupBundle(
     input({ mode: "aws-ec2", supabasePrivatelink: true }),

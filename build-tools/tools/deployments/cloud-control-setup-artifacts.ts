@@ -3,55 +3,6 @@ import type { CloudControlSetupInput } from "./cloud-control-setup-types";
 
 const CREDENTIAL_DIR = "/run/deployment-control-plane/credentials";
 
-export function renderCommands(input: CloudControlSetupInput): string {
-  const serviceBase = "<control-plane-service-url>";
-  const managedCheck =
-    "zx-wrapper build-tools/tools/deployments/control-plane-managed-dependencies.ts " +
-    "--profile ./managed-dependencies.profile.yaml " +
-    `--credential-directory ${CREDENTIAL_DIR}`;
-  return `${JSON.stringify(
-    {
-      image: input.image,
-      imagePublication: input.imagePublication,
-      service:
-        "deployment-control-plane service --config /etc/deployment-control-plane/config.yaml",
-      workers: Array.from(
-        { length: input.workerReplicas },
-        (_, index) =>
-          `deployment-control-plane worker --config /etc/deployment-control-plane/config.yaml --worker-id worker-${index + 1}`,
-      ),
-      validations: {
-        health: {
-          command: `curl -fsS ${serviceBase}/healthz`,
-          mustPass: "process liveness returns the expected instance id and image metadata",
-        },
-        readiness: {
-          command: `curl -fsS ${serviceBase}/readyz`,
-          mustPass: "database, artifact-store metadata, and worker heartbeat readiness are ok",
-        },
-        workerHeartbeats: {
-          command: `curl -fsS ${serviceBase}/api/v1/worker-heartbeats`,
-          mustPass: `at least ${input.workerReplicas} running workers report fresh heartbeats`,
-        },
-        database: {
-          command: managedCheck,
-          mustPass: "managed Postgres feature conformance passes",
-        },
-        artifactStore: {
-          command: managedCheck,
-          mustPass: "artifact store PUT, GET, HEAD, metadata, content-type, and digest checks pass",
-        },
-        dryRun: {
-          command: `deployment-control-plane setup --dry-run --host-mode ${input.mode} --image ${input.image}`,
-          mustPass: "no missing prerequisite evidence is reported for the selected topology",
-        },
-      },
-    },
-    null,
-    2,
-  )}\n`;
-}
-
 export function renderConformanceChecklist(input: CloudControlSetupInput): string {
   return `${JSON.stringify(
     {
@@ -64,27 +15,27 @@ export function renderConformanceChecklist(input: CloudControlSetupInput): strin
         },
         {
           name: "health",
-          commandRef: "commands.validations.health.command",
+          commandRef: "commands.json#/phases/4/commands/0/command",
           passCondition: "HTTP 200 from /healthz with reviewed image digest metadata",
         },
         {
           name: "readiness",
-          commandRef: "commands.validations.readiness.command",
+          commandRef: "commands.json#/phases/4/commands/1/command",
           passCondition: "HTTP 200 from /readyz after database and artifact-store checks",
         },
         {
           name: "worker-heartbeats",
-          commandRef: "commands.validations.workerHeartbeats.command",
+          commandRef: "commands.json#/phases/4/commands/2/command",
           passCondition: `${input.workerReplicas} workers visible with fresh heartbeat rows`,
         },
         {
           name: "database",
-          commandRef: "commands.validations.database.command",
+          commandRef: "commands.json#/phases/2/commands/0/command",
           passCondition: "managed Postgres SQL feature conformance succeeds",
         },
         {
           name: "artifact-store",
-          commandRef: "commands.validations.artifactStore.command",
+          commandRef: "commands.json#/phases/2/commands/1/command",
           passCondition: "temporary object PUT/GET/HEAD and digest verification succeeds",
         },
         {

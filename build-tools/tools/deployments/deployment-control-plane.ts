@@ -15,8 +15,18 @@ import { startControlPlaneServiceFromRuntimeConfig } from "./nixos-shared-host-c
 import { startControlPlaneWorkerFromRuntimeConfig } from "./nixos-shared-host-control-plane-worker";
 import { runCloudControlSetupCommand } from "./cloud-control-setup";
 import { runCloudControlCutoverCommand } from "./cloud-control-cutover-cli";
+import { runCloudControlSetupDoctorCommand } from "./cloud-control-setup-doctor";
+import { runCredentialPreflightCommand } from "./control-plane-credential-preflight";
+import { runControlPlaneManagedDependenciesCli } from "./control-plane-managed-dependencies";
 
-function command(): "service" | "worker" | "setup" | "cutover" {
+function command():
+  | "service"
+  | "worker"
+  | "setup"
+  | "cutover"
+  | "setup-doctor"
+  | "credential-preflight"
+  | "managed-dependencies" {
   const [mode] = getPositionalsWithValueFlags([
     "artifact-backend",
     "artifact-backend-evidence",
@@ -25,12 +35,15 @@ function command(): "service" | "worker" | "setup" | "cutover" {
     "auth-callback-host",
     "auth-callback-path",
     "config",
+    "bundle-dir",
+    "credential-directory",
     "deployment-id",
     "host-mode",
     "image",
     "instance-id",
     "out",
     "poll-ms",
+    "profile",
     "process-mode",
     "public-url",
     "evidence",
@@ -46,9 +59,17 @@ function command(): "service" | "worker" | "setup" | "cutover" {
     "worker-id",
     "worker-replicas",
   ]);
-  if (mode !== "service" && mode !== "worker" && mode !== "setup" && mode !== "cutover") {
+  if (
+    mode !== "service" &&
+    mode !== "worker" &&
+    mode !== "setup" &&
+    mode !== "cutover" &&
+    mode !== "setup-doctor" &&
+    mode !== "credential-preflight" &&
+    mode !== "managed-dependencies"
+  ) {
     throw new Error(
-      "usage: deployment-control-plane <service|worker|setup|cutover> --config <path>",
+      "usage: deployment-control-plane <service|worker|setup|setup-doctor|credential-preflight|managed-dependencies|cutover>",
     );
   }
   return mode;
@@ -66,6 +87,18 @@ export async function runDeploymentControlPlaneCommand() {
   }
   if (mode === "cutover") {
     await runCloudControlCutoverCommand();
+    return undefined;
+  }
+  if (mode === "setup-doctor") {
+    await runCloudControlSetupDoctorCommand();
+    return undefined;
+  }
+  if (mode === "credential-preflight") {
+    await runCredentialPreflightCommand();
+    return undefined;
+  }
+  if (mode === "managed-dependencies") {
+    await runControlPlaneManagedDependenciesCli();
     return undefined;
   }
   const correlationId = createControlPlaneCorrelationId(mode);

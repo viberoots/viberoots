@@ -22,6 +22,21 @@ Both modes validate the mounted config, required credential files, database URL 
 artifact-store credential files before accepting work. The service binds to `service.host` and
 `service.port`; workers consume the durable database queue and use the configured artifact store.
 
+Before starting either long-running process from a generated setup bundle, run the credential
+preflight against that bundle:
+
+```bash
+deployment-control-plane credential-preflight \
+  --bundle-dir ./cloud-control-profile \
+  --out ./cloud-control-profile/credential-preflight.json
+```
+
+If your current working directory is the generated bundle, use
+`deployment-control-plane credential-preflight --bundle-dir . --out ./credential-preflight.json`.
+The preflight reads `credential-manifest.json` and `config.yaml`, verifies the exact file-backed
+credential contract, checks safe URL-shaped credential files, rejects ambient/env-var-only
+credential sources, and keeps diagnostics redacted.
+
 Service probes:
 
 - `GET /healthz` returns process liveness, the non-secret instance id, and image metadata.

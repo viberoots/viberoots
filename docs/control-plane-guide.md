@@ -292,7 +292,7 @@ If you intend to disable public Supabase database connectivity after PrivateLink
 only after the service and workers have passed readiness from the private endpoint and every other
 database client has been moved to the private hostname.
 
-## Step 7: Stage Credential Files
+## Step 7: Stage Credential Files And Run Local Checks
 
 Stage real secret values as files under:
 
@@ -323,7 +323,46 @@ If GitHub App mode is selected, replace the SSH files with:
 Secret values must not be placed in Nix options, image layers, command-line arguments, ordinary
 environment files, deployment metadata, or logs.
 
-## Step 8: Start Service And Workers
+After staging files, run the local setup checks. From the repo root, use:
+
+```bash
+deployment-control-plane setup-doctor \
+  --bundle-dir ./cloud-control-profile \
+  --out ./cloud-control-profile/setup-doctor.json
+deployment-control-plane credential-preflight \
+  --bundle-dir ./cloud-control-profile \
+  --out ./cloud-control-profile/credential-preflight.json
+```
+
+From inside the generated bundle directory, use:
+
+```bash
+deployment-control-plane setup-doctor --bundle-dir . --out ./setup-doctor.json
+deployment-control-plane credential-preflight --bundle-dir . --out ./credential-preflight.json
+```
+
+The generated `commands.json` contains the same ordered runbook with profile-root-relative paths.
+
+## Step 8: Run Managed Dependency Validation
+
+Use the generated profile and the same credential directory the service uses:
+
+```bash
+deployment-control-plane managed-dependencies \
+  --profile ./cloud-control-profile/managed-dependencies.profile.yaml \
+  --credential-directory /run/deployment-control-plane/credentials
+```
+
+This validates:
+
+- required Postgres features
+- object-store `PUT`, `GET`, `HEAD`, metadata, content type, and digest checks
+- non-secret evidence output
+
+If the Supabase path is PrivateLink, run the validation from the AWS host or an instance in the same
+VPC path. A laptop or CI runner proof does not prove the cloud runtime path.
+
+## Step 9: Start Service And Workers
 
 Use the generated AWS profile or equivalent host configuration to start:
 
@@ -344,34 +383,18 @@ Service probes:
   heartbeat visibility.
 - `GET /api/v1/worker-heartbeats` reports authenticated worker heartbeat summaries.
 
-## Step 9: Run Managed Dependency Validation
-
-Use the generated profile and the same credential directory the service uses:
-
-```bash
-zx-wrapper build-tools/tools/deployments/control-plane-managed-dependencies.ts \
-  --profile ./cloud-control-profile/managed-dependencies.profile.yaml \
-  --credential-directory /run/deployment-control-plane/credentials
-```
-
-This validates:
-
-- required Postgres features
-- object-store `PUT`, `GET`, `HEAD`, metadata, content type, and digest checks
-- non-secret evidence output
-
-If the Supabase path is PrivateLink, run the validation from the AWS host or an instance in the same
-VPC path. A laptop or CI runner proof does not prove the cloud runtime path.
-
 ## Step 10: Run Runtime And AWS Evidence Checks
 
-From `commands.json`, run:
+From the ordered phases in `commands.json`, run:
 
 - database validation
 - artifact-store validation
 - health check
 - readiness check
 - worker-heartbeat check
+
+The generated HTTP checks use the configured public URL and read bearer tokens from the staged
+`control-plane-token` file without embedding token values in the runbook.
 
 For AWS EC2 readiness, also attach evidence for:
 
