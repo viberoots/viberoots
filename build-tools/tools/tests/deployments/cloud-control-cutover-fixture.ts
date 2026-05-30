@@ -4,7 +4,10 @@ import {
   CLOUD_PROVIDER_CAPABILITY_HOOK_EVIDENCE_SCHEMA,
   CLOUD_PROVIDER_CAPABILITY_HOOK_EVIDENCE_SOURCE,
 } from "../../deployments/cloud-control-provider-capability-hook-contract";
+import { managedDependencyEvidence } from "./cloud-control-cutover-managed-dependencies.fixture";
 import { ecrRegistryProfileForImage } from "./control-plane-registry-profile.fixture";
+
+export { managedDependencyEvidence } from "./cloud-control-cutover-managed-dependencies.fixture";
 
 export const IMAGE_DIGEST = `sha256:${"a".repeat(64)}`;
 export const IMAGE_REF = `registry.example.com/platform/deployment-control-plane@${IMAGE_DIGEST}`;
@@ -104,29 +107,6 @@ export function restoreEvidence() {
     credentialManifest: true,
     authConfiguration: true,
     durableStateReferences: ["submission:1", "artifact:1"],
-  };
-}
-
-export function managedDependencyEvidence(overrides: Record<string, unknown> = {}) {
-  return {
-    schemaVersion: "control-plane-managed-dependency-evidence@1",
-    profileName: "cloud-control-plane",
-    checkedAt: freshCheckedAt(),
-    postgres: {
-      provider: "supabase-postgres",
-      serverVersionNum: 150000,
-      checkedFeatures: ["jsonb", "listen-notify"],
-    },
-    artifactStore: {
-      provider: "s3-compatible",
-      bucket: "deployment-control-plane-artifacts",
-      region: "us-east-1",
-      endpointHost: "s3.us-east-1.amazonaws.com",
-      checkedOperations: ["PUT", "GET", "HEAD", "metadata", "content-type", "digest"],
-      digest: "sha256:artifact-store-proof",
-      objectKey: "control-plane/proof",
-    },
-    ...overrides,
   };
 }
 

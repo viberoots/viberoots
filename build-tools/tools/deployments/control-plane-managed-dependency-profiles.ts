@@ -7,17 +7,22 @@ import { redactConfigDiagnostic } from "./control-plane-runtime-config-validatio
 import type {
   ControlPlaneManagedDependencyProfile,
   ManagedArtifactStoreProvider,
+  ManagedDatabaseConnectivityMode,
   ManagedPostgresProvider,
+  ManagedRuntimeSourceHostKind,
 } from "./control-plane-managed-dependency-types";
 
 type RawObject = Record<string, unknown>;
 
 const POSTGRES_PROVIDERS: ManagedPostgresProvider[] = ["supabase-postgres", "postgres-compatible"];
 const ARTIFACT_PROVIDERS: ManagedArtifactStoreProvider[] = [
+  "aws-s3",
   "supabase-storage-s3",
   "cloudflare-r2",
   "s3-compatible",
 ];
+const DATABASE_MODES: ManagedDatabaseConnectivityMode[] = ["public", "privatelink"];
+const SOURCE_HOST_KINDS: ManagedRuntimeSourceHostKind[] = ["aws-ec2", "diagnostic", "unknown"];
 
 export async function loadManagedDependencyProfile(opts: {
   profilePath: string;
@@ -40,6 +45,7 @@ export function parseManagedDependencyProfile(
   }
   const postgres = objectValue(value.postgres, "postgres");
   const artifactStore = objectValue(value.artifactStore, "artifactStore");
+  const runtimePath = objectValue(value.runtimePath, "runtimePath");
   const policy = { credentialDirectory: path.resolve(opts.credentialDirectory) };
   return {
     profileName: stringValue(value.profileName, "profileName"),
@@ -47,6 +53,57 @@ export function parseManagedDependencyProfile(
       value.compatibilityEvidenceFile,
       opts.baseDir || process.cwd(),
     ),
+    runtimePath: {
+      expectedHostProfile: stringValue(
+        runtimePath.expectedHostProfile,
+        "runtimePath.expectedHostProfile",
+      ),
+      expectedAwsRegion: stringValue(
+        runtimePath.expectedAwsRegion,
+        "runtimePath.expectedAwsRegion",
+      ),
+      databaseConnectivityMode: enumValue(
+        runtimePath.databaseConnectivityMode,
+        DATABASE_MODES,
+        "runtimePath.databaseConnectivityMode",
+      ),
+      expectedSupabaseProjectRef: optionalString(
+        runtimePath.expectedSupabaseProjectRef,
+        "runtimePath.expectedSupabaseProjectRef",
+      ),
+      expectedSupabaseRegion: optionalString(
+        runtimePath.expectedSupabaseRegion,
+        "runtimePath.expectedSupabaseRegion",
+      ),
+      expectedPrivateLinkEndpointId: optionalString(
+        runtimePath.expectedPrivateLinkEndpointId,
+        "runtimePath.expectedPrivateLinkEndpointId",
+      ),
+      expectedPrivateLinkResourceId: optionalString(
+        runtimePath.expectedPrivateLinkResourceId,
+        "runtimePath.expectedPrivateLinkResourceId",
+      ),
+      expectedS3VpcEndpointId: optionalString(
+        runtimePath.expectedS3VpcEndpointId,
+        "runtimePath.expectedS3VpcEndpointId",
+      ),
+      expectedS3EndpointPolicyDigest: optionalString(
+        runtimePath.expectedS3EndpointPolicyDigest,
+        "runtimePath.expectedS3EndpointPolicyDigest",
+      ),
+      expectedAlternateBackendEvidenceRef: optionalString(
+        runtimePath.expectedAlternateBackendEvidenceRef,
+        "runtimePath.expectedAlternateBackendEvidenceRef",
+      ),
+      expectedAlternateBackendEvidenceDigest: optionalString(
+        runtimePath.expectedAlternateBackendEvidenceDigest,
+        "runtimePath.expectedAlternateBackendEvidenceDigest",
+      ),
+      nonCutoverDiagnostic: optionalBoolean(
+        runtimePath.nonCutoverDiagnostic,
+        "runtimePath.nonCutoverDiagnostic",
+      ),
+    },
     postgres: {
       provider: enumValue(postgres.provider, POSTGRES_PROVIDERS, "postgres.provider"),
       urlFile: credentialFile(postgres.urlFile, "postgres.urlFile", policy),
@@ -116,9 +173,19 @@ function optionalString(value: unknown, fieldName: string): string | undefined {
   return stringValue(value, fieldName);
 }
 
+export function parseManagedRuntimeSourceHostKind(value: string): ManagedRuntimeSourceHostKind {
+  return enumValue(value, SOURCE_HOST_KINDS, "sourceHostKind");
+}
+
 function enumValue<T extends string>(value: unknown, choices: T[], fieldName: string): T {
   if (typeof value !== "string" || !choices.includes(value as T)) {
     throw new Error(`${fieldName} has unsupported value`);
   }
   return value as T;
+}
+
+function optionalBoolean(value: unknown, fieldName: string): boolean | undefined {
+  if (value === undefined) return undefined;
+  if (typeof value !== "boolean") throw new Error(`${fieldName} must be a boolean`);
+  return value;
 }

@@ -2,6 +2,7 @@ import YAML from "yaml";
 import type { CloudControlSetupInput } from "./cloud-control-setup-types";
 import {
   setupArtifactBackendEvidenceRef,
+  setupAwsTopology,
   setupAwsSecurityGroupIds,
   setupAwsSubnetIds,
   setupAwsTlsEvidenceRef,
@@ -62,6 +63,7 @@ export function renderManagedDependencyProfile(input: CloudControlSetupInput): s
   return YAML.stringify({
     profileName: input.instanceId,
     compatibilityEvidenceFile: "./managed-dependency-evidence.json",
+    runtimePath: runtimePath(input),
     postgres: {
       provider: "supabase-postgres",
       urlFile: cred("control-plane-database-url"),
@@ -152,5 +154,23 @@ function cred(name: string): string {
 }
 
 function artifactProvider(input: CloudControlSetupInput): string {
+  if (input.artifactBackend === "aws-s3") return "aws-s3";
   return input.artifactBackend === "supabase-storage-s3" ? "supabase-storage-s3" : "s3-compatible";
+}
+
+function runtimePath(input: CloudControlSetupInput) {
+  const topology = setupAwsTopology(input);
+  const database = topology?.database;
+  const privatelink = database?.mode === "privatelink" ? database.privatelink : undefined;
+  return {
+    expectedHostProfile: input.mode,
+    expectedAwsRegion: topology?.region || input.artifactRegion,
+    databaseConnectivityMode: database?.mode || "public",
+    expectedPrivateLinkEndpointId: privatelink?.endpointId,
+    expectedPrivateLinkResourceId: privatelink?.resourceConfigurationArn,
+    expectedS3VpcEndpointId: topology?.s3VpcEndpoint?.endpointId,
+    expectedS3EndpointPolicyDigest: topology?.s3VpcEndpoint?.endpointPolicyDigest,
+    expectedAlternateBackendEvidenceRef: topology?.artifactBackendEvidence?.reviewedReference,
+    expectedAlternateBackendEvidenceDigest: topology?.artifactBackendEvidence?.digest,
+  };
 }

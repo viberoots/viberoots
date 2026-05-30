@@ -6,37 +6,63 @@ import pg from "pg";
 import { putVerifiedArtifactObject } from "./control-plane-artifact-store";
 import { createS3CompatibleArtifactStore } from "./control-plane-artifact-store-http";
 import { readManagedDependencyCredential } from "./control-plane-managed-dependency-profiles";
+import {
+  runtimePathEvidence,
+  validateArtifactRuntimeEvidence,
+  validatePostgresRuntimeEvidence,
+  validateRuntimePathEvidence,
+} from "./control-plane-managed-dependency-runtime";
+import {
+  assertPostgresMatchesRuntimePath,
+  postgresConnectionFacts,
+} from "./control-plane-managed-dependency-postgres-runtime";
 import type {
   ControlPlaneManagedDependencyProfile,
+  ManagedDependencyValidationExpectations,
   ManagedDependencyEvidence,
+  ManagedRuntimePathFacts,
 } from "./control-plane-managed-dependency-types";
-import { evidenceObject, freshEvidenceAt } from "./cloud-control-evidence-helpers";
+import {
+  evidenceObject,
+  evidenceSecretErrors,
+  freshEvidenceAt,
+} from "./cloud-control-evidence-helpers";
 import { redactConfigDiagnostic } from "./control-plane-runtime-config-validation";
 import { validateManagedPostgresFeatures } from "./nixos-shared-host-control-plane-backend-features";
 
 export async function validateManagedDependencyProfile(
   profile: ControlPlaneManagedDependencyProfile,
+  runtimeFacts: ManagedRuntimePathFacts = {},
 ): Promise<ManagedDependencyEvidence> {
   const [postgres, artifactStore] = await Promise.all([
-    withRedactedErrors("managed Postgres", () => validateManagedPostgresProfile(profile)),
+    withRedactedErrors("managed Postgres", () =>
+      validateManagedPostgresProfile(profile, runtimeFacts),
+    ),
     withRedactedErrors("managed artifact store", () =>
-      validateManagedArtifactStoreProfile(profile),
+      validateManagedArtifactStoreProfile(profile, runtimeFacts),
     ),
   ]);
   const evidence: ManagedDependencyEvidence = {
     schemaVersion: "control-plane-managed-dependency-evidence@1",
     profileName: profile.profileName,
     checkedAt: new Date().toISOString(),
+    runtimePath: runtimePathEvidence(profile, runtimeFacts),
     postgres,
     artifactStore,
   };
+  const errors = validateManagedDependencyEvidence(evidence, 1, expectationsFromProfile(profile));
+  if (errors.length > 0) throw new Error(errors.join("; "));
   if (profile.compatibilityEvidenceFile) {
     await writeEvidence(profile.compatibilityEvidenceFile, evidence);
   }
   return evidence;
 }
 
-export function validateManagedDependencyEvidence(value: unknown, maxAgeMinutes: number): string[] {
+export function validateManagedDependencyEvidence(
+  value: unknown,
+  maxAgeMinutes: number,
+  opts: ManagedDependencyValidationExpectations = {},
+): string[] {
   const evidence = evidenceObject(value);
   const errors: string[] = [];
   if (evidence.schemaVersion !== "control-plane-managed-dependency-evidence@1") {
@@ -48,11 +74,15 @@ export function validateManagedDependencyEvidence(value: unknown, maxAgeMinutes:
   if (typeof evidence.profileName !== "string" || !evidence.profileName.trim()) {
     errors.push("managed dependency evidence missing profileName");
   }
+  errors.push(...evidenceSecretErrors(evidence, "managedDependencies"));
   const postgres = evidenceObject(evidence.postgres);
   const artifactStore = evidenceObject(evidence.artifactStore);
+  const runtimePath = evidenceObject(evidence.runtimePath);
+  errors.push(...validateRuntimePathEvidence(runtimePath, opts));
   if (!Array.isArray(postgres.checkedFeatures) || postgres.checkedFeatures.length === 0) {
     errors.push("managed dependency evidence missing Postgres feature checks");
   }
+  errors.push(...validatePostgresRuntimeEvidence(postgres, runtimePath, opts));
   if (
     !Array.isArray(artifactStore.checkedOperations) ||
     !["PUT", "GET", "HEAD"].every((operation) =>
@@ -64,6 +94,7 @@ export function validateManagedDependencyEvidence(value: unknown, maxAgeMinutes:
   if (typeof artifactStore.digest !== "string" || !artifactStore.digest.startsWith("sha256:")) {
     errors.push("managed dependency evidence missing artifact-store digest");
   }
+  errors.push(...validateArtifactRuntimeEvidence(artifactStore, runtimePath, opts));
   return errors;
 }
 
@@ -78,8 +109,11 @@ async function withRedactedErrors<T>(label: string, fn: () => Promise<T>): Promi
 
 export async function validateManagedPostgresProfile(
   profile: ControlPlaneManagedDependencyProfile,
+  runtimeFacts: ManagedRuntimePathFacts = {},
 ) {
   const databaseUrl = await readManagedDependencyCredential(profile.postgres.urlFile);
+  const facts = postgresConnectionFacts(databaseUrl);
+  assertPostgresMatchesRuntimePath(profile, facts);
   const pool = new pg.Pool({
     connectionString: databaseUrl,
     max: 1,
@@ -93,6 +127,16 @@ export async function validateManagedPostgresProfile(
       provider: profile.postgres.provider,
       serverVersionNum: result.serverVersionNum,
       checkedFeatures: result.checkedFeatures,
+      resolvedHost: facts.resolvedHost,
+      tlsEnabled: facts.tlsEnabled,
+      peerHostIdentity: facts.resolvedHost,
+      databaseConnectivityMode: profile.runtimePath.databaseConnectivityMode,
+      sourceHostIdentity: runtimeFacts.sourceHostIdentity,
+      sourceHostKind: runtimeFacts.sourceHostKind,
+      supabaseProjectRef: facts.supabaseProjectRef || runtimeFacts.supabaseProjectRef,
+      supabaseRegion: runtimeFacts.supabaseRegion,
+      privatelinkEndpointId: runtimeFacts.privatelinkEndpointId,
+      privatelinkResourceId: runtimeFacts.privatelinkResourceId,
     };
   } finally {
     client.release();
@@ -102,6 +146,7 @@ export async function validateManagedPostgresProfile(
 
 export async function validateManagedArtifactStoreProfile(
   profile: ControlPlaneManagedDependencyProfile,
+  runtimeFacts: ManagedRuntimePathFacts = {},
 ) {
   const artifactStore = profile.artifactStore;
   const [endpoint, accessKeyId, secretAccessKey] = await Promise.all([
@@ -132,9 +177,35 @@ export async function validateManagedArtifactStoreProfile(
     bucket: artifactStore.bucket,
     region: artifactStore.region,
     endpointHost: new URL(endpoint).host,
+    keyPrefix: artifactStore.keyPrefix,
+    sourceHostIdentity: runtimeFacts.sourceHostIdentity,
+    sourceHostKind: runtimeFacts.sourceHostKind,
+    s3VpcEndpointId: runtimeFacts.s3VpcEndpointId,
+    s3EndpointPolicyDigest: runtimeFacts.s3EndpointPolicyDigest,
+    alternateBackendEvidenceRef: runtimeFacts.alternateBackendEvidenceRef,
+    alternateBackendEvidenceDigest: runtimeFacts.alternateBackendEvidenceDigest,
     checkedOperations: ["PUT", "GET", "HEAD", "metadata", "content-type", "digest"],
     digest: object.digest,
     objectKey: object.key,
+  };
+}
+
+function expectationsFromProfile(
+  profile: ControlPlaneManagedDependencyProfile,
+): ManagedDependencyValidationExpectations {
+  const runtime = profile.runtimePath;
+  return {
+    expectedHostProfile: runtime.expectedHostProfile,
+    expectedRegion: runtime.expectedAwsRegion,
+    expectedDatabaseConnectivityMode: runtime.databaseConnectivityMode,
+    expectedSupabaseProjectRef: runtime.expectedSupabaseProjectRef,
+    expectedSupabaseRegion: runtime.expectedSupabaseRegion,
+    expectedPrivateLinkEndpointId: runtime.expectedPrivateLinkEndpointId,
+    expectedPrivateLinkResourceId: runtime.expectedPrivateLinkResourceId,
+    expectedS3VpcEndpointId: runtime.expectedS3VpcEndpointId,
+    expectedS3EndpointPolicyDigest: runtime.expectedS3EndpointPolicyDigest,
+    expectedAlternateBackendEvidenceRef: runtime.expectedAlternateBackendEvidenceRef,
+    expectedAlternateBackendEvidenceDigest: runtime.expectedAlternateBackendEvidenceDigest,
   };
 }
 

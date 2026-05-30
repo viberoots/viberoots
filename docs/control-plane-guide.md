@@ -366,17 +366,26 @@ Use the generated profile and the same credential directory the service uses:
 ```bash
 deployment-control-plane managed-dependencies \
   --profile ./cloud-control-profile/managed-dependencies.profile.yaml \
-  --credential-directory /run/deployment-control-plane/credentials
+  --credential-directory /run/deployment-control-plane/credentials \
+  --host-profile aws-ec2 \
+  --aws-region us-east-1 \
+  --source-host-identity i-0abc1234 \
+  --source-host-kind aws-ec2
 ```
 
 This validates:
 
 - required Postgres features
 - object-store `PUT`, `GET`, `HEAD`, metadata, content type, and digest checks
-- non-secret evidence output
+- non-secret observed runtime-path evidence: host profile, AWS region, source host identity and
+  kind, selected database connectivity mode, resolved database host, TLS status, Supabase project
+  and region labels when supplied, S3 VPC endpoint proof for AWS S3, and structured
+  alternate-backend evidence for non-AWS S3-compatible stores
 
 If the Supabase path is PrivateLink, run the validation from the AWS host or an instance in the same
-VPC path. A laptop or CI runner proof does not prove the cloud runtime path.
+VPC path. PrivateLink cutover evidence must tie the proof to the AWS EC2 runtime path and a private
+database endpoint. A laptop or CI runner proof is accepted only when the profile marks it as
+non-cutover diagnostic evidence.
 
 ## Step 9: Start Service And Workers
 

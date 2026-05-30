@@ -10,6 +10,7 @@ import {
 import { validateCutoverProviderCapabilities } from "./cloud-control-cutover-provider-capabilities";
 import { validateControlPlaneImagePublicationEvidence } from "./control-plane-image-publication";
 import { validateManagedDependencyEvidence } from "./control-plane-managed-dependency-validation";
+import type { ManagedDependencyValidationExpectations } from "./control-plane-managed-dependency-types";
 
 const BASE_HEALTH = [
   "cloudHealth",
@@ -29,7 +30,11 @@ export function validateCloudControlCutover(
   const errors = [
     ...validateIdentity(evidence, options),
     ...validateBaseHealth(evidence),
-    ...validateManagedDependencyEvidence(evidence.managedDependencies, options.maxAgeMinutes),
+    ...validateManagedDependencyEvidence(
+      evidence.managedDependencies,
+      options.maxAgeMinutes,
+      managedDependencyExpectations(evidence, options),
+    ),
     ...validateImagePublication(evidence, options),
     ...validateLatestDeployment(evidence, options),
     ...validateCutoverProviderCapabilities(
@@ -42,6 +47,28 @@ export function validateCloudControlCutover(
     ...validateAudit(evidence, options.operation),
   ];
   return { ok: errors.length === 0, errors, checklist: checklist(options) };
+}
+
+function managedDependencyExpectations(
+  evidence: CutoverEvidence,
+  options: CutoverValidationOptions,
+): ManagedDependencyValidationExpectations {
+  const topology = (evidence.awsTopology || {}) as any;
+  const privatelink =
+    topology.database?.mode === "privatelink" ? topology.database.privatelink || {} : {};
+  const s3Endpoint = topology.s3VpcEndpoint || {};
+  const alternate = topology.artifactBackendEvidence || {};
+  return {
+    expectedHostProfile: options.expectedHostProfile,
+    expectedRegion: options.expectedRegion,
+    expectedDatabaseConnectivityMode: topology.database?.mode,
+    expectedPrivateLinkEndpointId: privatelink.endpointId,
+    expectedPrivateLinkResourceId: privatelink.resourceConfigurationArn,
+    expectedS3VpcEndpointId: s3Endpoint.endpointId,
+    expectedS3EndpointPolicyDigest: s3Endpoint.endpointPolicyDigest,
+    expectedAlternateBackendEvidenceRef: alternate.reviewedReference,
+    expectedAlternateBackendEvidenceDigest: alternate.digest,
+  };
 }
 
 function validateImagePublication(

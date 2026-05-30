@@ -151,7 +151,7 @@ test("managed dependency profile is concrete and parser-compatible", () => {
     profile.artifactStore.endpointFile,
     "/run/deployment-control-plane/credentials/artifact-store-endpoint",
   );
-  assert.equal(profile.artifactStore.provider, "s3-compatible");
+  assert.equal(profile.artifactStore.provider, "aws-s3");
 });
 
 test("input validation rejects unsupported substrates and env-var-only secret modes", () => {

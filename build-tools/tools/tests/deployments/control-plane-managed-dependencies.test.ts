@@ -31,7 +31,10 @@ async function withScratch(name: string, fn: (tmp: string) => Promise<void>) {
 
 async function writeCredentials(root: string, endpoint: string) {
   await fsp.mkdir(root, { recursive: true });
-  await fsp.writeFile(path.join(root, "database-url"), "postgres://user:secret@db/app");
+  await fsp.writeFile(
+    path.join(root, "database-url"),
+    "postgres://user:secret@db/app?sslmode=require",
+  );
   await fsp.writeFile(path.join(root, "artifact-endpoint"), endpoint);
   await fsp.writeFile(path.join(root, "artifact-access-key"), "file-access-key");
   await fsp.writeFile(path.join(root, "artifact-secret-key"), "file-secret-key");
@@ -41,6 +44,10 @@ function profileYaml(credentials: string, evidenceFile = "evidence/managed.json"
   return `
 profileName: supabase-and-r2-review
 compatibilityEvidenceFile: ${evidenceFile}
+runtimePath:
+  expectedHostProfile: aws-ec2
+  expectedAwsRegion: us-east-1
+  databaseConnectivityMode: public
 postgres:
   provider: supabase-postgres
   urlFile: ${credentials}/database-url
@@ -190,6 +197,11 @@ test("live-gated Supabase Postgres conformance validates Supabase provider expli
     postgres: {
       provider: "supabase-postgres",
       urlFile: env.VBR_SUPABASE_POSTGRES_LIVE_DATABASE_URL_FILE,
+    },
+    runtimePath: {
+      expectedHostProfile: "aws-ec2",
+      expectedAwsRegion: "us-east-1",
+      databaseConnectivityMode: "public",
     },
     artifactStore: livePlaceholderArtifactStore(),
   });

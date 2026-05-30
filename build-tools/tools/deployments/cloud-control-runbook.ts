@@ -5,6 +5,7 @@ import {
   imagePublicationCommand,
   imagePublicationInputs,
 } from "./cloud-control-runbook-image-publication";
+import { managedRuntimeFlags, sourceHostPrelude } from "./cloud-control-runbook-managed-runtime";
 export { validateRunbookBundle, validateRunbookStructure } from "./cloud-control-runbook-doctor";
 
 const CREDENTIAL_DIR = "/run/deployment-control-plane/credentials";
@@ -154,7 +155,7 @@ function localInputs(): string[] {
 }
 
 function managedCommands(input: CloudControlSetupInput): RunbookCommand[] {
-  const body = `${rootPrelude(input.outDir)}; deployment-control-plane managed-dependencies --profile "$PROFILE_ROOT/managed-dependencies.profile.yaml" --credential-directory ${CREDENTIAL_DIR}`;
+  const body = `${rootPrelude(input.outDir)}; ${sourceHostPrelude()}; deployment-control-plane managed-dependencies --profile "$PROFILE_ROOT/managed-dependencies.profile.yaml" --credential-directory ${CREDENTIAL_DIR} --source-host-identity "$SOURCE_HOST_IDENTITY" --source-host-kind "$SOURCE_HOST_KIND" ${managedRuntimeFlags(input)}`;
   const inputs = [
     ...localInputs(),
     "$PROFILE_ROOT/managed-dependencies.profile.yaml",

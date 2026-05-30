@@ -30,6 +30,11 @@ export function liveArtifactProfile(
   if (!env[`${opts.envPrefix}_ENDPOINT_FILE`]) return undefined;
   return {
     profileName: `live-${provider}`,
+    runtimePath: {
+      expectedHostProfile: "aws-ec2",
+      expectedAwsRegion: env[`${opts.envPrefix}_REGION`],
+      databaseConnectivityMode: "public",
+    },
     postgres: { provider: "postgres-compatible", urlFile: "/dev/null" },
     artifactStore: {
       provider,
