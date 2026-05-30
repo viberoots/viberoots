@@ -208,8 +208,27 @@ nix build .#deployment-control-plane-image
 nix build .#deployment-control-plane-image-contract
 ```
 
-Publish it to your registry and inspect the immutable digest. The setup command rejects production
-profiles without registry inspection evidence. Keep these fields together:
+Prepare `registry-profile.json` before publication. For AWS EC2, the default path is ECR with
+repository immutability, lifecycle policy, image scanning or a reviewed exception, EC2
+instance-profile pull permission, separated publish permission, and exact runtime pull proof for the
+selected digest. For a non-ECR registry, set the profile mode to `imported` and provide equivalent
+reviewed evidence for the same policy and pull-proof fields.
+
+Publish it to your registry and inspect the immutable digest through the reviewed command. The setup
+command rejects production AWS profiles without generated registry inspection evidence:
+
+```bash
+deployment-control-plane image-publication \
+  --registry-profile ./registry-profile.json \
+  --image registry.example.com/platform/deployment-control-plane@sha256:<digest> \
+  --source-revision source-<reviewed-revision> \
+  --image-build-identity nix-source-<build-identity> \
+  --published-digest sha256:<digest> \
+  --tag source-<reviewed-revision> \
+  --out ./image-publication.json
+```
+
+Keep these fields together:
 
 - image reference pinned by `@sha256:<digest>`
 - reviewed source revision
@@ -229,12 +248,7 @@ deployment-control-plane setup \
   --dry-run \
   --out ./cloud-control-profile \
   --host-mode aws-ec2 \
-  --image registry.example.com/platform/deployment-control-plane@sha256:<digest> \
-  --expected-image-build-identity nix-source-<build-identity> \
-  --image-source-revision source-<reviewed-revision> \
-  --image-build-identity nix-source-<build-identity> \
-  --image-publication-digest sha256:<digest> \
-  --image-inspected-digest sha256:<digest> \
+  --image-publication-evidence ./image-publication.json \
   --public-url https://deploy.example.com \
   --auth-callback-host deploy-auth.example.com \
   --deployment-id pleomino-staging \
@@ -246,6 +260,7 @@ deployment-control-plane setup \
 ```
 
 Then rerun without `--dry-run` after every prerequisite is resolved. The
+`image-publication.json` file must come from `deployment-control-plane image-publication`, and the
 `aws-topology-evidence.json` file must use schema `aws-topology-evidence@1`; literal `true`,
 dashboard notes, raw IaC state, subnet/security-group string lists, and other truthy placeholders do
 not satisfy AWS setup validation.
@@ -259,6 +274,7 @@ The bundle contains:
 - `credential-manifest.json`
 - `commands.json`
 - `image-publication.json`
+- `registry-profile.json` when registry evidence was generated with a reviewed profile
 - `aws-topology-evidence.json` for AWS EC2 profiles
 - `managed-dependencies.profile.yaml`
 - `provider-capabilities.json`

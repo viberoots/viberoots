@@ -9,6 +9,7 @@ import { test } from "node:test";
 import { renderCloudControlSetupBundle } from "../../deployments/cloud-control-setup-render";
 import type { CloudControlSetupInput } from "../../deployments/cloud-control-setup-types";
 import { privateLinkAwsTopology } from "./cloud-control-cutover-fixture";
+import { ecrRegistryProfileForImage } from "./control-plane-registry-profile.fixture";
 import { runInScratchTemp } from "../lib/test-helpers";
 
 const sh = promisify(exec);
@@ -86,6 +87,8 @@ function input(outDir: string, publicUrl: string): CloudControlSetupInput {
       digest: DIGEST,
       inspectedDigest: DIGEST,
       tag: "registry.example.com/platform/deployment-control-plane:source-review",
+      evidenceSource: "generated-command",
+      registryProfile: ecrRegistryProfileForImage(IMAGE, DIGEST),
     },
     instanceId: "cloud-review",
     publicUrl,

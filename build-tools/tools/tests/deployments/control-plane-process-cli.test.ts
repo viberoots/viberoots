@@ -11,6 +11,7 @@ import {
 } from "./control-plane-process-entrypoints.helpers";
 import { runInTemp } from "../lib/test-helpers";
 import { privateLinkAwsTopology } from "./cloud-control-cutover-fixture";
+import { ecrRegistryProfileForImage } from "./control-plane-registry-profile.fixture";
 
 const SETUP_IMAGE =
   "registry.example.com/platform/deployment-control-plane@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
@@ -80,7 +81,9 @@ test("deployment-control-plane setup writes a cloud host profile bundle", async 
   await runInTemp("control-plane-cli-setup", async (tmp) => {
     const out = path.join(tmp, "profile");
     const topologyFile = path.join(tmp, "aws-topology-evidence.json");
+    const publicationFile = path.join(tmp, "image-publication.json");
     await fsp.writeFile(topologyFile, JSON.stringify(privateLinkAwsTopology()), "utf8");
+    await fsp.writeFile(publicationFile, JSON.stringify(publicationEvidence()), "utf8");
     await withControlPlaneArgv(
       [
         "setup",
@@ -88,18 +91,8 @@ test("deployment-control-plane setup writes a cloud host profile bundle", async 
         out,
         "--host-mode",
         "aws-ec2",
-        "--image",
-        SETUP_IMAGE,
-        "--expected-image-build-identity",
-        SETUP_BUILD_IDENTITY,
-        "--image-source-revision",
-        "source-cli-setup",
-        "--image-build-identity",
-        SETUP_BUILD_IDENTITY,
-        "--image-publication-digest",
-        SETUP_DIGEST,
-        "--image-inspected-digest",
-        SETUP_DIGEST,
+        "--image-publication-evidence",
+        publicationFile,
         "--aws-topology-evidence",
         topologyFile,
       ],
@@ -176,4 +169,18 @@ async function exists(file: string): Promise<boolean> {
     .access(file)
     .then(() => true)
     .catch(() => false);
+}
+
+function publicationEvidence() {
+  return {
+    schemaVersion: "cloud-control-image-publication@1",
+    image: SETUP_IMAGE,
+    sourceRevision: "source-cli-setup",
+    imageBuildIdentity: SETUP_BUILD_IDENTITY,
+    digest: SETUP_DIGEST,
+    inspectedDigest: SETUP_DIGEST,
+    tag: "registry.example.com/platform/deployment-control-plane:source-cli-setup",
+    evidenceSource: "generated-command",
+    registryProfile: ecrRegistryProfileForImage(SETUP_IMAGE, SETUP_DIGEST),
+  };
 }

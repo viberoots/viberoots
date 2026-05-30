@@ -61,6 +61,10 @@ function validateImagePublication(
       evidence.imagePublication,
       image,
       options.expectedImageBuildIdentity,
+      {
+        requireRegistryProfile: options.expectedHostProfile === "aws-ec2",
+        expectedRuntimeHostProfile: options.expectedHostProfile,
+      },
     ),
   ];
 }

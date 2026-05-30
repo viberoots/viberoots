@@ -8,6 +8,10 @@ import {
   validateCloudControlSetupInput,
   validateProviderCapabilityDeclaration,
 } from "./cloud-control-setup-validate";
+import {
+  assertProductionImagePublicationEvidence,
+  readSetupImagePublicationFlags,
+} from "./cloud-control-setup-image-publication";
 import type {
   ArtifactBackend,
   CloudControlSetupInput,
@@ -17,6 +21,9 @@ import type {
 
 export async function runCloudControlSetupCommand(): Promise<void> {
   const input = readCloudControlSetupInput();
+  if (input.mode === "aws-ec2" && !input.dryRun) {
+    assertProductionImagePublicationEvidence(input);
+  }
   if (input.dryRun) {
     const errors = validateCloudControlSetupInput(input);
     console.log(
@@ -57,8 +64,7 @@ export async function writeCloudControlSetupBundle(input: CloudControlSetupInput
 }
 
 export function readCloudControlSetupInput(): CloudControlSetupInput {
-  const image = getFlagStr("image", "").trim();
-  const expectedImageBuildIdentity = getFlagStr("expected-image-build-identity", "").trim();
+  const imagePublication = readSetupImagePublicationFlags();
   return {
     outDir: getFlagStr("out", "cloud-control-profile").trim(),
     mode: enumFlag("host-mode", "compose-podman", [
@@ -67,9 +73,10 @@ export function readCloudControlSetupInput(): CloudControlSetupInput {
       "saas-oci",
       "aws-ec2",
     ]),
-    image,
-    expectedImageBuildIdentity,
-    imagePublication: imagePublicationFromFlags(image),
+    image: imagePublication.image,
+    expectedImageBuildIdentity: imagePublication.expectedImageBuildIdentity,
+    imagePublication: imagePublication.imagePublication,
+    imagePublicationEvidencePath: imagePublication.imagePublicationEvidencePath,
     instanceId: getFlagStr("instance-id", "cloud-control-plane").trim(),
     publicUrl: getFlagStr("public-url", "https://deploy.example.test").trim(),
     artifactBucket: getFlagStr("artifact-bucket", "deployment-control-plane-artifacts").trim(),
@@ -95,18 +102,6 @@ function awsTopologyFromFlags(): CloudControlSetupInput["awsTopology"] {
   const filePath = getFlagStr("aws-topology-evidence", "").trim();
   if (!filePath) return undefined;
   return JSON.parse(fs.readFileSync(filePath, "utf8"));
-}
-
-function imagePublicationFromFlags(image: string): CloudControlSetupInput["imagePublication"] {
-  const sourceRevision = getFlagStr("image-source-revision", "").trim();
-  const imageBuildIdentity = getFlagStr("image-build-identity", "").trim();
-  const digest = getFlagStr("image-publication-digest", "").trim();
-  const inspectedDigest = getFlagStr("image-inspected-digest", "").trim();
-  const tag = getFlagStr("image-tag", "").trim() || sourceRevision;
-  if (![sourceRevision, imageBuildIdentity, digest, inspectedDigest, tag].some(Boolean)) {
-    return undefined;
-  }
-  return { image, sourceRevision, imageBuildIdentity, digest, inspectedDigest, tag };
 }
 
 function deploymentIds(values: string[]): string[] {
@@ -150,16 +145,8 @@ function setupCommand(input: CloudControlSetupInput, dryRun: boolean): string {
     input.image || "<registry/repo@sha256:digest>",
     "--expected-image-build-identity",
     input.expectedImageBuildIdentity || "nix-source-<build-identity>",
-    "--image-source-revision",
-    publication?.sourceRevision || "source-<reviewed-revision>",
-    "--image-build-identity",
-    publication?.imageBuildIdentity ||
-      input.expectedImageBuildIdentity ||
-      "nix-source-<build-identity>",
-    "--image-publication-digest",
-    publication?.digest || "sha256:<digest>",
-    "--image-inspected-digest",
-    publication?.inspectedDigest || "sha256:<digest>",
+    "--image-publication-evidence",
+    publication ? "$PROFILE_ROOT/image-publication.json" : "<image-publication.json>",
     "--public-url",
     input.publicUrl,
     "--auth-callback-host",

@@ -17,6 +17,7 @@ export type CloudControlSetupInput = {
   image: string;
   expectedImageBuildIdentity: string;
   imagePublication?: ControlPlaneImagePublicationEvidence;
+  imagePublicationEvidencePath?: string;
   instanceId: string;
   publicUrl: string;
   artifactBucket: string;

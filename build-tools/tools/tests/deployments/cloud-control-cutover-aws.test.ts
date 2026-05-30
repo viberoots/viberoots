@@ -184,15 +184,9 @@ test("AWS cutover derives required provider capabilities from selected topology"
     { ...opts, selectedCapabilities: [] },
   );
   const errors = result.errors.join("\n");
-  assert.match(errors, /aws-ec2-control-plane-host: missing provider-capability/);
-  assert.match(errors, /aws-network-foundation: missing provider-capability/);
-  assert.match(errors, /aws-s3-artifact-store: missing provider-capability/);
-  assert.match(errors, /supabase-managed-postgres: missing provider-capability/);
-  assert.match(errors, /supabase-privatelink-prerequisite: missing provider-capability/);
-  assert.match(errors, /cloudflare-edge: missing provider-capability/);
-  assert.match(errors, /vercel-operator-ui: missing provider-capability/);
-  assert.match(errors, /aws-attic-cache-service: missing provider-capability/);
-  assert.match(errors, /remote-build-worker-fleet: missing provider-capability/);
+  for (const id of derivedCapabilityIds()) {
+    assert.match(errors, new RegExp(`${id}: missing provider-capability`));
+  }
 });
 
 test("AWS cutover accepts complete derived provider capabilities", () => {
@@ -203,19 +197,9 @@ test("AWS cutover accepts complete derived provider capabilities", () => {
         selectedEdges: { cloudflare: completeCloudflareEdge(), vercel: completeVercelEdge() },
         adjacentSystems: { atticd: true, remoteBuildWorkerFleet: true },
       },
-      providerCapabilities: {
-        "aws-ec2-control-plane-host": capabilityEvidence("aws-ec2-control-plane-host"),
-        "aws-network-foundation": capabilityEvidence("aws-network-foundation"),
-        "aws-s3-artifact-store": capabilityEvidence("aws-s3-artifact-store"),
-        "supabase-managed-postgres": capabilityEvidence("supabase-managed-postgres"),
-        "supabase-privatelink-prerequisite": capabilityEvidence(
-          "supabase-privatelink-prerequisite",
-        ),
-        "cloudflare-edge": capabilityEvidence("cloudflare-edge"),
-        "vercel-operator-ui": capabilityEvidence("vercel-operator-ui"),
-        "aws-attic-cache-service": capabilityEvidence("aws-attic-cache-service"),
-        "remote-build-worker-fleet": capabilityEvidence("remote-build-worker-fleet"),
-      },
+      providerCapabilities: Object.fromEntries(
+        derivedCapabilityIds().map((id) => [id, capabilityEvidence(id)]),
+      ),
     }),
     { ...opts, selectedCapabilities: [] },
   );
@@ -231,6 +215,21 @@ function completeCloudflareEdge() {
 
 function completeVercelEdge() {
   return edgeSet(["project", "domain", "edgeSettings", "callbackRoute"], "vercel");
+}
+
+function derivedCapabilityIds() {
+  return [
+    "aws-ec2-control-plane-host",
+    "aws-network-foundation",
+    "aws-ecr-control-plane-registry",
+    "aws-s3-artifact-store",
+    "supabase-managed-postgres",
+    "supabase-privatelink-prerequisite",
+    "cloudflare-edge",
+    "vercel-operator-ui",
+    "aws-attic-cache-service",
+    "remote-build-worker-fleet",
+  ];
 }
 
 function edgeSet(fields: string[], prefix: string) {

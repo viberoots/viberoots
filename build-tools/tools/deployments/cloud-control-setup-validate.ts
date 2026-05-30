@@ -46,6 +46,11 @@ export function validateCloudControlSetupInput(input: CloudControlSetupInput): s
       input.imagePublication,
       input.image,
       input.expectedImageBuildIdentity,
+      {
+        requireGeneratedEvidence: input.mode === "aws-ec2" && !input.dryRun,
+        requireRegistryProfile: input.mode === "aws-ec2" && !input.dryRun,
+        expectedRuntimeHostProfile: input.mode === "aws-ec2" ? "aws-ec2" : undefined,
+      },
     ),
   );
   if (!ARTIFACT_BACKENDS.includes(input.artifactBackend)) {

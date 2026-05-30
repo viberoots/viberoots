@@ -18,6 +18,7 @@ import { runCloudControlCutoverCommand } from "./cloud-control-cutover-cli";
 import { runCloudControlSetupDoctorCommand } from "./cloud-control-setup-doctor";
 import { runCredentialPreflightCommand } from "./control-plane-credential-preflight";
 import { runControlPlaneManagedDependenciesCli } from "./control-plane-managed-dependencies";
+import { runControlPlaneImagePublicationCommand } from "./control-plane-image-publication-cli";
 
 function command():
   | "service"
@@ -26,6 +27,7 @@ function command():
   | "cutover"
   | "setup-doctor"
   | "credential-preflight"
+  | "image-publication"
   | "managed-dependencies" {
   const [mode] = getPositionalsWithValueFlags([
     "artifact-backend",
@@ -52,9 +54,17 @@ function command():
     "expected-region",
     "max-age-minutes",
     "operation",
+    "image-build-identity",
+    "image-publication-evidence",
+    "image-tarball",
+    "published-digest",
+    "registry-profile",
     "selected-capability",
     "reviewed-source-mode",
     "service-replicas",
+    "skopeo",
+    "source-revision",
+    "tag",
     "token",
     "worker-id",
     "worker-replicas",
@@ -66,10 +76,11 @@ function command():
     mode !== "cutover" &&
     mode !== "setup-doctor" &&
     mode !== "credential-preflight" &&
+    mode !== "image-publication" &&
     mode !== "managed-dependencies"
   ) {
     throw new Error(
-      "usage: deployment-control-plane <service|worker|setup|setup-doctor|credential-preflight|managed-dependencies|cutover>",
+      "usage: deployment-control-plane <service|worker|setup|image-publication|setup-doctor|credential-preflight|managed-dependencies|cutover>",
     );
   }
   return mode;
@@ -95,6 +106,10 @@ export async function runDeploymentControlPlaneCommand() {
   }
   if (mode === "credential-preflight") {
     await runCredentialPreflightCommand();
+    return undefined;
+  }
+  if (mode === "image-publication") {
+    await runControlPlaneImagePublicationCommand();
     return undefined;
   }
   if (mode === "managed-dependencies") {

@@ -14,6 +14,7 @@ import type {
   CloudProfileMode,
 } from "../../deployments/cloud-control-setup-types";
 import { privateLinkAwsTopology } from "./cloud-control-cutover-fixture";
+import { ecrRegistryProfileForImage } from "./control-plane-registry-profile.fixture";
 import { withControlPlaneArgv } from "./control-plane-process-entrypoints.helpers";
 
 const DIGEST_REF =
@@ -54,6 +55,8 @@ function publicationEvidence(image: string, digest: string) {
     digest,
     inspectedDigest: digest,
     tag: "registry.example.com/platform/deployment-control-plane:source-review",
+    evidenceSource: "generated-command" as const,
+    registryProfile: ecrRegistryProfileForImage(image, digest),
   };
 }
 

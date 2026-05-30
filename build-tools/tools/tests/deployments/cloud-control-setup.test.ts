@@ -20,6 +20,7 @@ import {
 } from "../../deployments/cloud-control-setup-profile-validate";
 import type { CloudControlSetupInput } from "../../deployments/cloud-control-setup-types";
 import { privateLinkAwsTopology } from "./cloud-control-cutover-fixture";
+import { ecrRegistryProfileForImage } from "./control-plane-registry-profile.fixture";
 import { runInScratchTemp } from "../lib/test-helpers";
 
 const DIGEST_REF =
@@ -60,6 +61,8 @@ function publicationEvidence(image: string, digest: string) {
     digest,
     inspectedDigest: digest,
     tag: "registry.example.com/platform/deployment-control-plane:source-abc123",
+    evidenceSource: "generated-command" as const,
+    registryProfile: ecrRegistryProfileForImage(image, digest),
   };
 }
 

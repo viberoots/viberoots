@@ -37,6 +37,9 @@ export function renderCloudControlSetupBundle(
     "credential-manifest.json": renderCredentialManifest(input),
     "commands.json": renderCommands(input),
     "image-publication.json": renderImagePublication(input),
+    ...(input.imagePublication?.registryProfile
+      ? { "registry-profile.json": renderRegistryProfile(input) }
+      : {}),
     "conformance-checklist.json": renderConformanceChecklist(input),
     "managed-dependencies.profile.yaml": renderManagedDependencyProfile(input),
     "managed-dependencies.json": renderManagedDependencies(input),
@@ -164,6 +167,10 @@ function renderImagePublication(input: CloudControlSetupInput): string {
     null,
     2,
   )}\n`;
+}
+
+function renderRegistryProfile(input: CloudControlSetupInput): string {
+  return `${JSON.stringify(input.imagePublication!.registryProfile, null, 2)}\n`;
 }
 
 function reviewedSource(input: CloudControlSetupInput) {

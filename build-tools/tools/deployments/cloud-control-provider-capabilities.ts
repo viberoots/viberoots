@@ -6,6 +6,7 @@ export const CLOUD_CAPABILITY_IDS = [
   "aws-ec2-control-plane-host",
   "aws-attic-cache-service",
   "aws-s3-artifact-store",
+  "aws-ecr-control-plane-registry",
   "aws-network-foundation",
   "supabase-managed-postgres",
   "supabase-privatelink-prerequisite",
@@ -46,6 +47,15 @@ export const CONCRETE_PROVIDER_CAPABILITIES: Record<
     ["bucket HEAD", "artifact PUT/GET/HEAD", "metadata and digest conformance"],
     ["previous bucket policy", "previous lifecycle policy", "retained immutable objects"],
     ["s3-preview-digest", "s3-apply-digest", "artifact-conformance", "endpoint-proof"],
+  ),
+  "aws-ecr-control-plane-registry": cap(
+    "aws-ecr-control-plane-registry",
+    "AWS account, region, ECR repository, immutability policy, lifecycle policy, and scan posture",
+    "Infisical-backed AWS registry publishing role plus EC2 instance-profile pull permission",
+    "aws:ecr-control-plane-registry:{account}:{region}:{repository}",
+    ["repository describe", "tag immutability proof", "runtime pull by digest"],
+    ["previous lifecycle policy", "previous repository policy", "retained immutable image digests"],
+    ["ecr-preview-digest", "ecr-apply-digest", "registry-inspection", "runtime-pull-proof"],
   ),
   "aws-network-foundation": cap(
     "aws-network-foundation",

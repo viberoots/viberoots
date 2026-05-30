@@ -150,6 +150,7 @@ function awsProfile(input: CloudControlSetupInput): string {
     },
     systemdPodmanUnits: processSpecs(input, "aws-ec2"),
     imagePublication: input.imagePublication,
+    registryProfile: input.imagePublication?.registryProfile,
     mounts: mountSpecs("host-path"),
     runtimeUser: { uid: 10001, gid: 10001 },
     protectedSharedReady: false,

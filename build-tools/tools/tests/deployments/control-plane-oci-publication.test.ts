@@ -9,6 +9,7 @@ import { promisify } from "node:util";
 import {
   assertControlPlaneImageDigestReference,
   controlPlaneImagePublicationPlan,
+  validateControlPlaneImagePublicationEvidence,
 } from "../../deployments/control-plane-image-publication";
 import { buildImageContract, buildImageTarball } from "./control-plane-oci-image.helpers";
 
@@ -34,6 +35,7 @@ test("control-plane image publication records immutable digest and source revisi
     digest: DIGEST,
     inspectedDigest: DIGEST,
     tag: plan.tagRef,
+    evidenceSource: "generated-command",
     digestContract: {
       schemaVersion: "control-plane-image-digest-contract@1",
       build: {
@@ -124,6 +126,21 @@ test("control-plane image publication rejects mutable production identity", () =
   assert.throws(
     () => assertControlPlaneImageDigestReference("registry.example.com/platform/control-plane:tag"),
     /pinned by @sha256 digest/,
+  );
+  assert.match(
+    validateControlPlaneImagePublicationEvidence(
+      {
+        image: `registry.example.com/platform/control-plane@${DIGEST}`,
+        sourceRevision: "source-abc123",
+        imageBuildIdentity: BUILD_IDENTITY,
+        digest: DIGEST,
+        inspectedDigest: DIGEST,
+        tag: "registry.example.com/platform/control-plane:latest",
+      },
+      `registry.example.com/platform/control-plane@${DIGEST}`,
+      BUILD_IDENTITY,
+    ).join("\n"),
+    /must not be latest/,
   );
 });
 

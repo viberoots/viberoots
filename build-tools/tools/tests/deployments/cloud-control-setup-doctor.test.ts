@@ -10,6 +10,7 @@ import type { CloudControlSetupInput } from "../../deployments/cloud-control-set
 import { runInScratchTemp } from "../lib/test-helpers";
 import { managedDependencyEvidence, privateLinkAwsTopology } from "./cloud-control-cutover-fixture";
 import { withControlPlaneArgv } from "./control-plane-process-entrypoints.helpers";
+import { ecrRegistryProfileForImage } from "./control-plane-registry-profile.fixture";
 
 const DIGEST_REF =
   "registry.example.com/platform/deployment-control-plane@sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc";
@@ -130,8 +131,7 @@ test("dry-run next commands include full setup flags and runbook outputs", async
     assert.match(result.nextCommands[0], /^deployment-control-plane setup --dry-run /);
     assert.match(result.nextCommands[1], /^deployment-control-plane setup --out /);
     for (const flag of [
-      "--image-source-revision",
-      "--image-publication-digest",
+      "--image-publication-evidence",
       "--public-url",
       "--auth-callback-host",
       "--deployment-id",
@@ -190,6 +190,8 @@ function input(overrides: Partial<CloudControlSetupInput> = {}): CloudControlSet
       digest: DIGEST,
       inspectedDigest: DIGEST,
       tag: "registry.example.com/platform/deployment-control-plane:source-review",
+      evidenceSource: "generated-command",
+      registryProfile: ecrRegistryProfileForImage(DIGEST_REF, DIGEST),
     },
     instanceId: "cloud-review",
     publicUrl: "https://deploy.example.test",

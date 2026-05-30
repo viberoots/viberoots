@@ -4,6 +4,7 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
 import { resolveCloudflarePagesPromotionSelection } from "../../deployments/cloudflare-pages-promotion";
+import { stableBuckIsolation } from "../../lib/buck-command-env";
 import { runInTemp } from "../lib/test-helpers";
 import {
   cloudflarePagesDeploymentFixture,
@@ -29,6 +30,30 @@ import {
 } from "./nixos-shared-host.control-plane.helpers";
 import { startNixosSharedHostPublicServer } from "./nixos-shared-host.public-server";
 import { seedSyntheticTargetStageState } from "./nixos-shared-host.promotion.stage-state.helpers";
+
+let buckQueryNonce = 0;
+
+function freshPromotionEnv(tmp: string, overrides: NodeJS.ProcessEnv = {}): NodeJS.ProcessEnv {
+  const isolation = stableBuckIsolation(
+    path.join(tmp, `.cloudflare-promotion-query-${++buckQueryNonce}`),
+    "zxtest-cloudflare-promotion",
+  );
+  const env = {
+    ...process.env,
+    ...overrides,
+    BUCK_ISOLATION_DIR: isolation,
+    BUCK_NESTED_ISO: isolation,
+  };
+  delete env.BUCK_ISOLATION_DIR_EXPORTER;
+  return env;
+}
+
+function restoreProcessEnv(snapshot: NodeJS.ProcessEnv): void {
+  for (const key of Object.keys(process.env)) {
+    if (!(key in snapshot)) delete process.env[key];
+  }
+  Object.assign(process.env, snapshot);
+}
 
 test("cloudflare-pages allows reviewed cross-provider same-artifact promotion only on declared edges", async () => {
   await runInTemp("cloudflare-pages-promotion-e2e", async (tmp, $) => {
@@ -67,6 +92,9 @@ test("cloudflare-pages allows reviewed cross-provider same-artifact promotion on
       deploymentLabel: dev.label,
       deployment: dev,
     });
+    const originalEnv = { ...process.env };
+    const env = freshPromotionEnv(tmp);
+    Object.assign(process.env, env);
     const harness = await startControlPlaneHarness({
       workspaceRoot: tmp,
       hostRoot,
@@ -87,6 +115,7 @@ test("cloudflare-pages allows reviewed cross-provider same-artifact promotion on
     try {
       const devRun = await $({
         cwd: tmp,
+        env,
       })`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment ${dev.label} --admission-evidence-json ${devEvidenceJson} --artifact-dir ${artifactDir} --control-plane-url ${harness.controlPlane.url} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(devServer.port)} --smoke-connect-protocol https:`;
       const devSummary = JSON.parse(String(devRun.stdout));
       await seedSyntheticTargetStageState({ recordsRoot, deployment: staging });
@@ -111,6 +140,7 @@ test("cloudflare-pages allows reviewed cross-provider same-artifact promotion on
       );
     } finally {
       await harness.close();
+      restoreProcessEnv(originalEnv);
       await devServer.close();
       await stagingServer.close();
       await prodServer.close();
@@ -146,6 +176,9 @@ test("cloudflare-pages promotion fails closed when staging smoke blocks the prom
       deploymentLabel: dev.label,
       deployment: dev,
     });
+    const originalEnv = { ...process.env };
+    const env = freshPromotionEnv(tmp, fakeCloudflareEnv(fake));
+    Object.assign(process.env, env);
     const harness = await startControlPlaneHarness({
       workspaceRoot: tmp,
       hostRoot,
@@ -160,11 +193,10 @@ test("cloudflare-pages promotion fails closed when staging smoke blocks the prom
       publishRoot: wrongPublishRoot,
       tlsRoot: tmp,
     });
-    const originalEnv = { ...process.env };
-    Object.assign(process.env, fakeCloudflareEnv(fake));
     try {
       const devRun = await $({
         cwd: tmp,
+        env,
       })`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment ${dev.label} --admission-evidence-json ${devEvidenceJson} --artifact-dir ${artifactDir} --control-plane-url ${harness.controlPlane.url} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(devServer.port)} --smoke-connect-protocol https:`;
       const devSummary = JSON.parse(String(devRun.stdout));
       await seedSyntheticTargetStageState({ recordsRoot, deployment: staging });
@@ -187,10 +219,7 @@ test("cloudflare-pages promotion fails closed when staging smoke blocks the prom
       assert.equal(failedPromotion, undefined);
     } finally {
       await harness.close();
-      process.env.PATH = originalEnv.PATH || "";
-      delete process.env.VBR_CLOUDFLARE_FAKE_PUBLISH_ROOT;
-      delete process.env.VBR_CLOUDFLARE_FAKE_WRANGLER_LOG;
-      delete process.env.VBR_CLOUDFLARE_PAGES_WRANGLER_BIN;
+      restoreProcessEnv(originalEnv);
       await devServer.close();
       await stagingServer.close();
     }

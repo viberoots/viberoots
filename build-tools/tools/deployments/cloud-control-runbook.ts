@@ -1,5 +1,10 @@
 import type { CloudControlSetupInput } from "./cloud-control-setup-types";
-import { phaseMeta, processWorkerOutputPaths } from "./cloud-control-runbook-evidence";
+import { phaseMeta } from "./cloud-control-runbook-evidence";
+import { httpCommands } from "./cloud-control-runbook-http";
+import {
+  imagePublicationCommand,
+  imagePublicationInputs,
+} from "./cloud-control-runbook-image-publication";
 export { validateRunbookBundle, validateRunbookStructure } from "./cloud-control-runbook-doctor";
 
 const CREDENTIAL_DIR = "/run/deployment-control-plane/credentials";
@@ -52,6 +57,13 @@ function phases(input: CloudControlSetupInput): RunbookPhase[] {
       [],
       [
         command(
+          "image-publication",
+          imagePublicationCommand(input, rootPrelude(input.outDir)),
+          imagePublicationInputs(input),
+          ["$PROFILE_ROOT/image-publication.json"],
+          "registry inspection digest matches immutable image reference",
+        ),
+        command(
           "setup-doctor",
           doctor(input),
           localInputs(),
@@ -98,7 +110,7 @@ function phases(input: CloudControlSetupInput): RunbookPhase[] {
       "http-validation",
       "Validate service HTTP checks",
       ["process-start"],
-      httpCommands(input),
+      httpCommands(input, rootPrelude(input.outDir)),
     ),
   ];
 }
@@ -186,62 +198,14 @@ function processCommands(input: CloudControlSetupInput): RunbookCommand[] {
   return [service, ...workers];
 }
 
-function httpCommands(input: CloudControlSetupInput): RunbookCommand[] {
-  return [
-    command(
-      "health",
-      httpCommand(
-        input,
-        `${curl(url(input.publicUrl, "/healthz"))} | tee "$PROFILE_ROOT/http-health.json"`,
-      ),
-      ["$PROFILE_ROOT/process-service.json"],
-      ["$PROFILE_ROOT/http-health.json"],
-      "process liveness returns expected metadata",
-    ),
-    command(
-      "readiness",
-      httpCommand(
-        input,
-        `${curl(url(input.publicUrl, "/readyz"))} | tee "$PROFILE_ROOT/http-readiness.json"`,
-      ),
-      ["$PROFILE_ROOT/process-service.json", "$PROFILE_ROOT/managed-dependency-evidence.json"],
-      ["$PROFILE_ROOT/http-readiness.json"],
-      "database, artifact-store, and worker heartbeat readiness are ok",
-    ),
-    command(
-      "worker-heartbeats",
-      httpCommand(
-        input,
-        `${authCurl(url(input.publicUrl, "/api/v1/worker-heartbeats"))} | tee "$PROFILE_ROOT/http-worker-heartbeats.json"`,
-      ),
-      ["$PROFILE_ROOT/process-service.json", ...processWorkerOutputPaths(input)],
-      ["$PROFILE_ROOT/http-worker-heartbeats.json"],
-      `at least ${input.workerReplicas} running workers report fresh heartbeats`,
-    ),
-  ];
-}
-
 const doctor = (input: CloudControlSetupInput) =>
   `${rootPrelude(input.outDir)}; deployment-control-plane setup-doctor --bundle-dir "$PROFILE_ROOT" --out "$PROFILE_ROOT/setup-doctor.json"`;
 
 const preflight = (input: CloudControlSetupInput) =>
   `${rootPrelude(input.outDir)}; deployment-control-plane credential-preflight --bundle-dir "$PROFILE_ROOT" --out "$PROFILE_ROOT/credential-preflight.json"`;
 
-const httpCommand = (input: CloudControlSetupInput, body: string) =>
-  `${rootPrelude(input.outDir)}; ${body}`;
-
-const curl = (targetUrl: string) => `curl -fsS ${shellQuote(targetUrl)}`;
-
 function rootPrelude(outDir: string): string {
   return `PROFILE_ROOT="\${PROFILE_ROOT:-$(pwd)}"; if [ ! -f "$PROFILE_ROOT/commands.json" ]; then PROFILE_ROOT=${shellQuote(outDir)}; fi; if [ ! -f "$PROFILE_ROOT/commands.json" ]; then echo "commands.json not found; run from repo root or bundle directory" >&2; exit 2; fi`;
-}
-
-function authCurl(targetUrl: string): string {
-  return `CREDENTIAL_ROOT="\${CREDENTIAL_DIR:-${CREDENTIAL_DIR}}"; TOKEN_FILE="$CREDENTIAL_ROOT/control-plane-token"; AUTH_CONFIG="$(mktemp)"; trap 'rm -f "$AUTH_CONFIG"' EXIT; printf 'header = "Authorization: Bearer %s"\\n' "$(tr -d '\\r\\n' < "$TOKEN_FILE")" > "$AUTH_CONFIG"; chmod 600 "$AUTH_CONFIG"; curl -fsS --config "$AUTH_CONFIG" ${shellQuote(targetUrl)}`;
-}
-
-function url(publicUrl: string, pathname: string): string {
-  return new URL(pathname, publicUrl.endsWith("/") ? publicUrl : `${publicUrl}/`).toString();
 }
 
 function shellQuote(value: string): string {

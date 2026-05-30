@@ -4,6 +4,7 @@ import {
   CLOUD_PROVIDER_CAPABILITY_HOOK_EVIDENCE_SCHEMA,
   CLOUD_PROVIDER_CAPABILITY_HOOK_EVIDENCE_SOURCE,
 } from "../../deployments/cloud-control-provider-capability-hook-contract";
+import { ecrRegistryProfileForImage } from "./control-plane-registry-profile.fixture";
 
 export const IMAGE_DIGEST = `sha256:${"a".repeat(64)}`;
 export const IMAGE_REF = `registry.example.com/platform/deployment-control-plane@${IMAGE_DIGEST}`;
@@ -38,6 +39,7 @@ export function evidence(overrides: Record<string, unknown> = {}) {
     providerCapabilities: {
       "aws-ec2-control-plane-host": capabilityEvidence("aws-ec2-control-plane-host"),
       "aws-network-foundation": capabilityEvidence("aws-network-foundation"),
+      "aws-ecr-control-plane-registry": capabilityEvidence("aws-ecr-control-plane-registry"),
       "aws-s3-artifact-store": capabilityEvidence("aws-s3-artifact-store"),
       "supabase-managed-postgres": capabilityEvidence("supabase-managed-postgres"),
       "supabase-privatelink-prerequisite": capabilityEvidence("supabase-privatelink-prerequisite"),
@@ -64,6 +66,7 @@ export function imagePublicationEvidence(overrides: Record<string, unknown> = {}
     digest: IMAGE_DIGEST,
     inspectedDigest: IMAGE_DIGEST,
     tag: "registry.example.com/platform/deployment-control-plane:source-cutover",
+    registryProfile: ecrRegistryProfileForImage(IMAGE_REF, IMAGE_DIGEST),
     ...overrides,
   };
 }

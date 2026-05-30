@@ -84,9 +84,9 @@ nix build .#deployment-control-plane-image-contract
 cat result/contract.json
 ```
 
-Production publication is an operator action outside the repo. Registry and repository names are
-inputs to the publishing path and host configuration; GitHub Container Registry is only an example,
-not a baked-in default. Production hosts should consume an immutable digest reference such as:
+Production publication is a reviewed operator workflow. Registry and repository names are inputs to
+the publishing path and host configuration; GitHub Container Registry is only an example, not a
+baked-in default. Production hosts should consume an immutable digest reference such as:
 
 ```text
 registry.example.com/platform/deployment-control-plane@sha256:<digest>
@@ -112,6 +112,28 @@ skopeo inspect --format '{{.Digest}}' docker://<registry>/<repo>:<sourceRevision
 test "$(skopeo inspect --format '{{.Digest}}' docker://<registry>/<repo>:<sourceRevision>)" = "sha256:<digest>"
 ```
 
+For AWS EC2 profiles, the default registry path is an AWS ECR repository described by
+`control-plane-registry-profile@1`. That profile must carry account, region, repository URI/ARN,
+immutable-tag policy evidence, lifecycle-policy evidence, image scanning or a reviewed exception,
+separate publish and runtime-pull principals, and an EC2 instance-profile runtime pull proof for the
+exact `@sha256:` image reference. Imported external registries use the same profile schema with
+`mode: "imported"` and reviewed identity evidence instead of ECR identity fields; they still need
+equivalent mutation-prevention, lifecycle, scanning/exception, publish/runtime separation, and exact
+runtime pull proof.
+
+Generate production publication evidence with:
+
+```bash
+deployment-control-plane image-publication \
+  --registry-profile ./registry-profile.json \
+  --image registry.example.com/platform/deployment-control-plane@sha256:<digest> \
+  --source-revision source-<reviewed-revision> \
+  --image-build-identity nix-source-<build-identity> \
+  --published-digest sha256:<digest> \
+  --tag source-<reviewed-revision> \
+  --out ./image-publication.json
+```
+
 The resulting manifest shape is:
 
 ```json
@@ -122,6 +144,19 @@ The resulting manifest shape is:
   "digest": "sha256:<digest>",
   "inspectedDigest": "sha256:<digest>",
   "tag": "registry.example.com/platform/deployment-control-plane:source-<reviewed-revision>",
+  "registryProfile": {
+    "schemaVersion": "control-plane-registry-profile@1",
+    "mode": "aws-ecr",
+    "repository": "registry.example.com/platform/deployment-control-plane",
+    "runtimePull": {
+      "credentialSource": "ec2-instance-profile",
+      "proof": {
+        "hostProfile": "aws-ec2",
+        "image": "registry.example.com/platform/deployment-control-plane@sha256:<digest>",
+        "digest": "sha256:<digest>"
+      }
+    }
+  },
   "digestContract": {
     "schemaVersion": "control-plane-image-digest-contract@1",
     "publication": {

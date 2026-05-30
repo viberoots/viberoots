@@ -6,6 +6,7 @@ import { test } from "node:test";
 import { localHarnessControlPlaneDatabaseUrl } from "../../deployments/nixos-shared-host-control-plane-backend";
 import { submitCloudflarePagesControlPlaneDeploy } from "../../deployments/cloudflare-pages-control-plane";
 import { resolveCloudflarePagesPromotionSelection } from "../../deployments/cloudflare-pages-promotion";
+import { stableBuckIsolation } from "../../lib/buck-command-env";
 import { runInTemp } from "../lib/test-helpers";
 import {
   cloudflarePagesDeploymentFixture,
@@ -22,6 +23,30 @@ import {
 } from "./nixos-shared-host.fixture";
 import { startControlPlaneHarness } from "./nixos-shared-host.control-plane.helpers";
 import { startNixosSharedHostPublicServer } from "./nixos-shared-host.public-server";
+
+let buckQueryNonce = 0;
+
+function freshPromotionEnv(tmp: string, overrides: NodeJS.ProcessEnv = {}): NodeJS.ProcessEnv {
+  const isolation = stableBuckIsolation(
+    path.join(tmp, `.cloudflare-promotion-guardrail-query-${++buckQueryNonce}`),
+    "zxtest-cloudflare-promotion-guardrail",
+  );
+  const env = {
+    ...process.env,
+    ...overrides,
+    BUCK_ISOLATION_DIR: isolation,
+    BUCK_NESTED_ISO: isolation,
+  };
+  delete env.BUCK_ISOLATION_DIR_EXPORTER;
+  return env;
+}
+
+function restoreProcessEnv(snapshot: NodeJS.ProcessEnv): void {
+  for (const key of Object.keys(process.env)) {
+    if (!(key in snapshot)) delete process.env[key];
+  }
+  Object.assign(process.env, snapshot);
+}
 
 async function writeArtifact(root: string, html: string): Promise<void> {
   await fsp.mkdir(root, { recursive: true });
@@ -86,6 +111,9 @@ async function createSuccessfulDevRun(
     deploymentLabel: deployment.label,
     deployment,
   });
+  const originalEnv = { ...process.env };
+  const env = freshPromotionEnv(tmp);
+  Object.assign(process.env, env);
   const harness = await startControlPlaneHarness({
     workspaceRoot: tmp,
     hostRoot,
@@ -96,11 +124,13 @@ async function createSuccessfulDevRun(
   try {
     const run = await $({
       cwd: tmp,
+      env,
     })`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment ${deployment.label} --admission-evidence-json ${admissionEvidenceJson} --artifact-dir ${artifactDir} --control-plane-url ${harness.controlPlane.url} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(server.port)} --smoke-connect-protocol https:`;
     const summary = JSON.parse(String(run.stdout));
     return summary.deployRunId;
   } finally {
     await harness.close();
+    restoreProcessEnv(originalEnv);
     await server.close();
   }
 }

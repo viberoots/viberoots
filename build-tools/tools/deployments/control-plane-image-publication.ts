@@ -1,3 +1,6 @@
+import type { ControlPlaneRegistryProfile } from "./control-plane-registry-profile";
+export { validateControlPlaneImagePublicationEvidence } from "./control-plane-image-publication-validate";
+
 export type ControlPlaneImagePublicationInput = {
   repository: string;
   sourceRevision: string;
@@ -5,6 +8,7 @@ export type ControlPlaneImagePublicationInput = {
   digest: string;
   inspectedDigest: string;
   imageTarball: string;
+  registryProfile?: ControlPlaneRegistryProfile;
   tag?: string;
 };
 
@@ -15,6 +19,8 @@ export type ControlPlaneImagePublicationEvidence = {
   digest: string;
   inspectedDigest: string;
   tag: string;
+  registryProfile?: ControlPlaneRegistryProfile;
+  evidenceSource?: "generated-command" | "direct-flags";
 };
 
 export type ControlPlaneImagePublicationPlan = {
@@ -91,6 +97,8 @@ export function controlPlaneImagePublicationPlan(
     digest,
     inspectedDigest,
     tag: tagRef,
+    ...(input.registryProfile ? { registryProfile: input.registryProfile } : {}),
+    evidenceSource: "generated-command" as const,
     digestContract,
   };
   return {
@@ -139,6 +147,7 @@ export function verifiedControlPlaneImageDigestContract(
   if (digest !== inspectedDigest) {
     throw new Error("control-plane image publication evidence must match registry inspect digest");
   }
+  cleanTag(required("tag", evidence.tag).split(":").at(-1) || "");
   return {
     schemaVersion: "control-plane-image-digest-contract@1",
     build: {
@@ -151,30 +160,9 @@ export function verifiedControlPlaneImageDigestContract(
       image,
       digest,
       inspectedDigest,
-      tag: required("tag", evidence.tag),
+      tag: evidence.tag,
     },
   };
-}
-
-export function validateControlPlaneImagePublicationEvidence(
-  evidence: ControlPlaneImagePublicationEvidence | undefined,
-  expectedImageRef: string,
-  expectedBuildIdentity?: string,
-): string[] {
-  const errors: string[] = [];
-  if (!evidence) return ["control-plane image requires verified publication evidence"];
-  try {
-    verifiedControlPlaneImageDigestContract(evidence);
-  } catch (error) {
-    errors.push(error instanceof Error ? error.message : String(error));
-  }
-  if (evidence.image !== expectedImageRef) {
-    errors.push("control-plane image publication evidence does not match requested image");
-  }
-  if (expectedBuildIdentity && evidence.imageBuildIdentity !== expectedBuildIdentity) {
-    errors.push("control-plane image publication evidence does not match expected build identity");
-  }
-  return errors;
 }
 
 export function assertControlPlaneImageDigestReference(imageRef: string): string {

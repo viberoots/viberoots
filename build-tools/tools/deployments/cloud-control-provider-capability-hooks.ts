@@ -64,6 +64,7 @@ type HookAdapterPhaseOptions = {
 const HOOK_ADAPTERS: Record<string, HookAdapter> = {
   "aws-ec2-control-plane-host": reviewedAdapter("aws-ec2-host-profile"),
   "aws-attic-cache-service": reviewedAdapter("aws-attic-cache-service"),
+  "aws-ecr-control-plane-registry": reviewedAdapter("aws-ecr-control-plane-registry"),
   "aws-s3-artifact-store": reviewedAdapter("aws-s3-artifact-store"),
   "aws-network-foundation": reviewedAdapter("aws-network-foundation"),
   "supabase-managed-postgres": reviewedAdapter("supabase-managed-postgres"),

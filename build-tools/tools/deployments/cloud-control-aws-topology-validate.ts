@@ -73,13 +73,13 @@ export function awsTopologyRequiredCapabilityIds(topology: unknown): string[] {
   return unique([
     "aws-ec2-control-plane-host",
     "aws-network-foundation",
+    "aws-ecr-control-plane-registry",
     backend === "aws-s3" ? "aws-s3-artifact-store" : "",
     databaseMode ? "supabase-managed-postgres" : "",
     databaseMode === "privatelink" ? "supabase-privatelink-prerequisite" : "",
     ...awsTopologySelectedCapabilityIds(topology),
   ]);
 }
-
 function unique(values: string[]): string[] {
   return [...new Set(values.filter(Boolean))];
 }

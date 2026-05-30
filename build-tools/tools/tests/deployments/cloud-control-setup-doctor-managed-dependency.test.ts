@@ -8,6 +8,7 @@ import { renderCloudControlSetupBundle } from "../../deployments/cloud-control-s
 import type { CloudControlSetupInput } from "../../deployments/cloud-control-setup-types";
 import { runInScratchTemp } from "../lib/test-helpers";
 import { managedDependencyEvidence, privateLinkAwsTopology } from "./cloud-control-cutover-fixture";
+import { ecrRegistryProfileForImage } from "./control-plane-registry-profile.fixture";
 
 const DIGEST = `sha256:${"d".repeat(64)}`;
 const IMAGE = `registry.example.com/platform/deployment-control-plane@${DIGEST}`;
@@ -56,6 +57,8 @@ function input(outDir: string): CloudControlSetupInput {
       digest: DIGEST,
       inspectedDigest: DIGEST,
       tag: "registry.example.com/platform/deployment-control-plane:source-review",
+      evidenceSource: "generated-command",
+      registryProfile: ecrRegistryProfileForImage(IMAGE, DIGEST),
     },
     instanceId: "cloud-review",
     publicUrl: "https://deploy.example.test",

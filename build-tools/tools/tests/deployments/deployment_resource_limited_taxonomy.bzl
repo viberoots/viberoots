@@ -83,6 +83,8 @@ RESOURCE_LIMITED_DEPLOYMENT_TESTS = {
     "build-tools/tools/tests/deployments/control-plane-nixos-container-module.test.ts": True,
     "build-tools/tools/tests/deployments/control-plane-oci-image.test.ts": True,
     "build-tools/tools/tests/deployments/control-plane-oci-publication.test.ts": True,
+    "build-tools/tools/tests/deployments/control-plane-image-publication-cli.test.ts": True,
+    "build-tools/tools/tests/deployments/control-plane-image-publication-setup.test.ts": True,
     "build-tools/tools/tests/deployments/control-plane-process-cli.test.ts": True,
     "build-tools/tools/tests/deployments/control-plane-process-entrypoints.test.ts": True,
     "build-tools/tools/tests/deployments/control-plane-process-lifecycle.test.ts": True,
