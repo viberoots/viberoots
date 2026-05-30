@@ -1,4 +1,5 @@
 load("//build-tools/lang:remote_action_policy.bzl", "run_nix_action")
+load("@repo_toolchains//:toolchain_paths.bzl", "NIX_ZX_WRAPPER_BIN")
 
 SourceSnapshotInfo = provider(fields = [
     "snapshot",
@@ -10,7 +11,7 @@ def _source_snapshot_impl(ctx):
     snapshot = ctx.actions.declare_output(ctx.attrs.name + ".source-snapshot", dir = True)
     manifest = ctx.actions.declare_output(ctx.attrs.name + ".source-snapshot.manifest.json")
     args = [
-        ctx.attrs._generator,
+        ctx.attrs._runner[RunInfo],
         "--out",
         snapshot.as_output(),
         "--manifest",
@@ -29,11 +30,9 @@ def _source_snapshot_impl(ctx):
         cmd_args(
             args,
             hidden = [
-                ctx.attrs._generator,
+                ctx.attrs._runner[DefaultInfo].default_outputs,
             ] + ctx.attrs.srcs + [
                 ctx.attrs.graph,
-                ctx.attrs._dev_runtime[DefaultInfo].default_outputs,
-                ctx.attrs._lib_runtime[DefaultInfo].default_outputs,
             ],
         ),
         "source_snapshot",
@@ -49,9 +48,69 @@ _source_snapshot = rule(
     attrs = {
         "srcs": attrs.list(attrs.source(), default = []),
         "graph": attrs.source(default = "//build-tools/tools/buck:graph.json"),
-        "_generator": attrs.source(default = "//build-tools/tools/dev:source-snapshot.ts"),
-        "_dev_runtime": attrs.dep(default = "//build-tools/tools/dev:runtime_ts"),
-        "_lib_runtime": attrs.dep(default = "//build-tools/tools/lib:runtime_ts"),
+        "_runner": attrs.dep(
+            default = "//build-tools/tools/dev:source-snapshot-runner",
+            providers = [RunInfo],
+        ),
+    },
+)
+
+def _require_nix_bin(bin_path, label):
+    if not bin_path or not bin_path.startswith("/nix/store/"):
+        fail("{} must be a /nix/store path (got: {}). Run build-tools/tools/dev/gen-toolchain-paths.ts or i.".format(label, bin_path))
+
+def _source_snapshot_runner_impl(ctx):
+    zx_wrapper_tool = ctx.attrs.zx_wrapper_tool[DefaultInfo].default_outputs
+    return [
+        DefaultInfo(
+            default_output = ctx.attrs.generator,
+            other_outputs = [ctx.attrs.zx_init] + zx_wrapper_tool,
+        ),
+        RunInfo(args = cmd_args(
+            ctx.attrs.zx_wrapper_tool[RunInfo],
+            "--import",
+            cmd_args(ctx.attrs.zx_init, format = "./{}"),
+            cmd_args(ctx.attrs.generator, format = "./{}"),
+            hidden = [
+                ctx.attrs.generator,
+                ctx.attrs.zx_init,
+                ctx.attrs.dev_runtime[DefaultInfo].default_outputs,
+                ctx.attrs.lib_runtime[DefaultInfo].default_outputs,
+                zx_wrapper_tool,
+            ],
+        )),
+    ]
+
+source_snapshot_runner = rule(
+    impl = _source_snapshot_runner_impl,
+    attrs = {
+        "dev_runtime": attrs.dep(default = "//build-tools/tools/dev:runtime_ts"),
+        "generator": attrs.source(default = "//build-tools/tools/dev:source-snapshot.ts"),
+        "lib_runtime": attrs.dep(default = "//build-tools/tools/lib:runtime_ts"),
+        "zx_init": attrs.source(default = "//build-tools/tools/dev:zx-init.mjs"),
+        "zx_wrapper_tool": attrs.dep(
+            default = "//build-tools/tools/dev:source-snapshot-zx-wrapper",
+            providers = [RunInfo],
+        ),
+    },
+)
+
+def _source_snapshot_zx_wrapper_tool_impl(ctx):
+    _require_nix_bin(ctx.attrs.zx_wrapper, "NIX_ZX_WRAPPER_BIN")
+    out = ctx.actions.write(
+        ctx.attrs.name,
+        "#!/bin/sh\nexec %s \"$@\"\n" % ctx.attrs.zx_wrapper,
+        is_executable = True,
+    )
+    return [
+        DefaultInfo(default_output = out),
+        RunInfo(args = cmd_args(out)),
+    ]
+
+source_snapshot_zx_wrapper_tool = rule(
+    impl = _source_snapshot_zx_wrapper_tool_impl,
+    attrs = {
+        "zx_wrapper": attrs.string(default = NIX_ZX_WRAPPER_BIN),
     },
 )
 

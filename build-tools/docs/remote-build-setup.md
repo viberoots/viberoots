@@ -521,8 +521,9 @@ Requirements:
 Remote-ready Nix wrappers that still need `WORKSPACE_ROOT` must use a declared source snapshot
 instead of an ambient worker checkout. The snapshot helper lives in
 `build-tools/lang/source_snapshot.bzl` and is materialized by
-`build-tools/tools/dev/source-snapshot.ts`. Buck invokes the generator through the declared
-generator artifact; source snapshot actions must not call `nix run path:.#zx-wrapper` or a
+`build-tools/tools/dev/source-snapshot.ts`. Buck invokes the generator through a declared
+`source-snapshot-zx-wrapper` tool output plus the declared generator artifact; source snapshot
+actions must not call `nix run path:.#zx-wrapper`, an ambient `zx-wrapper`, or a
 workspace-relative helper string as their executable authority.
 
 The manifest schema is `viberoots.source-snapshot.v1` and records:

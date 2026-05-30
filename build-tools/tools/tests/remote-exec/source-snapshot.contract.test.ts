@@ -17,6 +17,12 @@ async function sourceSnapshotActionCommand(target: string): Promise<string> {
   return String(res.stdout || "");
 }
 
+async function sourceSnapshotActions(target: string): Promise<string> {
+  const res =
+    await $`buck2 --isolation-dir ${inheritedBuckIsolation("source_snapshot_actions")} aquery --target-platforms prelude//platforms:default 'deps(${target})' --output-format starlark`;
+  return String(res.stdout || "");
+}
+
 test("source snapshot includes declared source and excludes mutable local directories", async () => {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), "source-snapshot-"));
   const out = path.join(root, "out");
@@ -88,17 +94,19 @@ test("source_snapshot rule builds a declared Buck snapshot artifact", async () =
   });
 });
 
-test("source_snapshot action uses declared generator handle without flake app invocation", async () => {
+test("source_snapshot action uses declared zx-wrapper runner without flake or hashbang invocation", async () => {
   const command = await sourceSnapshotActionCommand(
     "//build-tools/tools/tests/remote-exec/wrapper-fixtures:zx_ready_source_snapshot",
   );
 
   assert.match(
     command,
-    /cmd = \[[^\]]*build-tools\/tools\/dev\/__source-snapshot\.ts__\/source-snapshot\.ts,/,
+    /cmd = \[[^,\]]*build-tools\/tools\/dev\/__source-snapshot-zx-wrapper__\/source-snapshot-zx-wrapper, --import, \.\/[^,\]]*build-tools\/tools\/dev\/__zx-init\.mjs__\/zx-init\.mjs, \.\/[^,\]]*build-tools\/tools\/dev\/__source-snapshot\.ts__\/source-snapshot\.ts,/,
   );
   assert.doesNotMatch(command, /nix, run|path:\.#zx-wrapper/);
-  assert.doesNotMatch(command, /\bnode\b|command -v node/);
+  assert.doesNotMatch(command, /cmd = \[[^,\]]*source-snapshot\.ts,/);
+  assert.doesNotMatch(command, /\/nix\/store\/[^,\]]+-zx-wrapper\/bin\/zx-wrapper/);
+  assert.doesNotMatch(command, /\bnode\b|command -v node|\[zx-wrapper,/);
   assert.match(
     command,
     /--graph, build-tools\/tools\/tests\/remote-exec\/wrapper-fixtures\/fixture\.txt/,
@@ -106,6 +114,19 @@ test("source_snapshot action uses declared generator handle without flake app in
   assert.match(
     command,
     /--file, fixture\.txt, build-tools\/tools\/tests\/remote-exec\/wrapper-fixtures\/fixture\.txt/,
+  );
+});
+
+test("source_snapshot runtime is a declared Buck tool output", async () => {
+  const actions = await sourceSnapshotActions(
+    "//build-tools/tools/tests/remote-exec/wrapper-fixtures:zx_ready_source_snapshot",
+  );
+
+  assert.match(actions, /identifier = source-snapshot-zx-wrapper,\s+kind = write,/);
+  assert.match(actions, /\/nix\/store\/[^,\n]+-zx-wrapper\/bin\/zx-wrapper/);
+  assert.match(
+    actions,
+    /cmd = \[[^,\]]*build-tools\/tools\/dev\/__source-snapshot-zx-wrapper__\/source-snapshot-zx-wrapper,/,
   );
 });
 

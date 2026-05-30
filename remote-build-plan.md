@@ -1654,3 +1654,83 @@ shell implementation would conflict with the build-system design's automation-sc
 
 It introduces one small helper file for a deliberately dormant bootstrap path, increasing surface area
 without changing production remote execution behavior.
+
+## PR-21: Source snapshot generator runtime closure
+
+### 1. Intent
+
+Close the remaining PR-19 assessment gap by making the source snapshot action's executable authority
+fully declared. The action must not depend on the generator script's `#!/usr/bin/env zx-wrapper`
+hashbang finding `zx-wrapper` on ambient `PATH`.
+
+### 2. Scope of changes
+
+- Update `build-tools/lang/source_snapshot.bzl` so the source snapshot action invokes the generator
+  through a declared runtime/tool handle rather than executing `source-snapshot.ts` directly via its
+  hashbang.
+- Represent the generator script, zx wrapper/runtime, and supporting TypeScript runtime files as
+  declared Buck inputs or tool outputs visible to the action command.
+- Preserve the source snapshot output contract: declared snapshot directory, manifest JSON, graph
+  path evidence, and `SourceSnapshotInfo`.
+- Preserve local-only behavior for source snapshot generation and do not enable production remote
+  execution.
+- Do not reintroduce `nix run path:.#zx-wrapper`, ambient `node`, ambient `zx-wrapper`, or a
+  workspace-relative command string as executable authority.
+
+### 3. External prerequisites
+
+- None. Tests use local Buck analysis/execution and fixture targets only.
+
+### 4. Tests to be added
+
+- Add or update source snapshot action-command tests proving the command does not execute
+  `source-snapshot.ts` directly through its hashbang.
+- Add tests proving the rendered command uses a declared runtime/tool handle for `zx-wrapper` or the
+  equivalent declared Node/zx runtime and rejects ambient `PATH` executable authority.
+- Rerun focused validation for source snapshot contracts, wrapper conformance, remote target policy,
+  and the tiny remote-ready fixture.
+
+### 5. Docs to be added or updated
+
+- Update remote build setup docs if they describe source snapshot generator invocation details.
+- Update `remote-build-integration-debt-ledger.md` with PR-21 focused validation evidence and the
+  remaining full-suite checkpoint status.
+
+### 5.5. Expected regression scope
+
+- `build-system-only`
+- Expected files are `build-tools/lang/source_snapshot.bzl`,
+  `build-tools/tools/tests/remote-exec/**`, remote build docs, and the integration debt ledger.
+
+### 6. Acceptance criteria
+
+- The source snapshot action does not rely on `#!/usr/bin/env zx-wrapper` or ambient `PATH` to find
+  the generator runtime.
+- The generator script and its runtime/tool invocation are represented by declared Buck inputs or
+  tool outputs.
+- No source snapshot action renders `nix run path:.#zx-wrapper`, ambient `node`, ambient
+  `zx-wrapper`, or a workspace-relative script string as executable authority.
+- Existing source snapshot manifests and the tiny remote-ready conformance target still pass.
+
+### 7. Risks
+
+- Buck command construction could accidentally hide the runtime from action keys while appearing to
+  work locally.
+- Over-constraining command text assertions could make harmless Buck rendering changes look like
+  functional failures.
+
+### 8. Mitigations
+
+- Assert the provider/command surface for declared tool inputs directly and keep behavioral tests
+  focused on the source snapshot output contract.
+- Match command text only for the forbidden ambient invocation forms and declared runtime evidence.
+
+### 9. Consequences of not implementing this PR
+
+Source snapshot generation would no longer use `nix run`, but it would still rely on ambient
+`zx-wrapper` lookup through the generator hashbang, leaving the executable authority gap identified
+by the end-of-range plan assessment.
+
+### 10. Downsides for implementing this PR
+
+It adds another explicit runtime/tool handle around a local-only generator action.

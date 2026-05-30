@@ -7,6 +7,7 @@ import { repoRoot } from "../lib/repo";
 type ToolchainPaths = {
   go: { bin: string; root: string };
   python: { bin: string };
+  zxWrapper: { bin: string };
 };
 
 const JSON_REL = path.join("build-tools", "tools", "dev", "toolchain-paths.json");
@@ -81,6 +82,7 @@ function renderBzl(paths: ToolchainPaths): string {
     `NIX_GO_BIN = ${q(paths.go.bin)}`,
     `NIX_GO_ROOT = ${q(paths.go.root)}`,
     `NIX_PYTHON_BIN = ${q(paths.python.bin)}`,
+    `NIX_ZX_WRAPPER_BIN = ${q(paths.zxWrapper.bin)}`,
     "",
   ].join("\n");
 }
@@ -100,11 +102,15 @@ async function readExistingToolchainPaths(repo: string): Promise<ToolchainPaths 
     const goBin = String(parsed?.go?.bin || "").trim();
     const goRoot = String(parsed?.go?.root || "").trim();
     const pyBin = String(parsed?.python?.bin || "").trim();
-    if (!goBin || !pyBin) return null;
-    if (!isNixStorePath(goBin) || !isNixStorePath(pyBin)) return null;
+    const zxWrapperBin = String(parsed?.zxWrapper?.bin || "").trim();
+    if (!goBin || !pyBin || !zxWrapperBin) return null;
+    if (!isNixStorePath(goBin) || !isNixStorePath(pyBin) || !isNixStorePath(zxWrapperBin)) {
+      return null;
+    }
     try {
       await fsp.access(goBin);
       await fsp.access(pyBin);
+      await fsp.access(zxWrapperBin);
     } catch {
       return null;
     }
@@ -115,7 +121,11 @@ async function readExistingToolchainPaths(repo: string): Promise<ToolchainPaths 
     } catch {
       return null;
     }
-    const out: ToolchainPaths = { go: { bin: goBin, root }, python: { bin: pyBin } };
+    const out: ToolchainPaths = {
+      go: { bin: goBin, root },
+      python: { bin: pyBin },
+      zxWrapper: { bin: zxWrapperBin },
+    };
     const bzlPath = path.join(repo, BZL_REL);
     await writeIfChanged(jsonPath, JSON.stringify(out, null, 2) + "\n");
     await writeIfChanged(bzlPath, renderBzl(out));
@@ -131,17 +141,23 @@ export async function ensureToolchainPathsFiles(root?: string): Promise<Toolchai
   if (existing) return existing;
   const goOut = await resolveToolchainOut(repo, "toolchains.go");
   const pyOut = await resolveToolchainOut(repo, "toolchains.python");
+  const zxWrapperOut = await resolveToolchainOut(repo, "zx-wrapper");
   const goBin = path.join(goOut, "bin", "go");
   const pyBin = path.join(pyOut, "bin", "python3");
-  if (!isNixStorePath(goOut) || !isNixStorePath(pyOut)) {
+  const zxWrapperBin = path.join(zxWrapperOut, "bin", "zx-wrapper");
+  if (!isNixStorePath(goOut) || !isNixStorePath(pyOut) || !isNixStorePath(zxWrapperOut)) {
     throw new Error(
       `expected Nix store toolchains; got go=${goOut || "<missing>"} python=${
         pyOut || "<missing>"
-      }`,
+      } zx-wrapper=${zxWrapperOut || "<missing>"}`,
     );
   }
   const goRoot = (await resolveGoRoot(goBin)) || path.join(goOut, "share", "go");
-  const pathsObj: ToolchainPaths = { go: { bin: goBin, root: goRoot }, python: { bin: pyBin } };
+  const pathsObj: ToolchainPaths = {
+    go: { bin: goBin, root: goRoot },
+    python: { bin: pyBin },
+    zxWrapper: { bin: zxWrapperBin },
+  };
   const jsonPath = path.join(repo, JSON_REL);
   const bzlPath = path.join(repo, BZL_REL);
   await writeIfChanged(jsonPath, JSON.stringify(pathsObj, null, 2) + "\n");

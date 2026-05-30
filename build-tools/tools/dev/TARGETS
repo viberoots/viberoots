@@ -1,4 +1,9 @@
 load("@prelude//:rules.bzl", "export_file", "filegroup")
+load(
+    "//build-tools/lang:source_snapshot.bzl",
+    "source_snapshot_runner",
+    "source_snapshot_zx_wrapper_tool",
+)
 
 export_file(
     name = "build-selected.ts",
@@ -49,5 +54,15 @@ filegroup(
         "**/*.mjs",
         "**/*.ts",
     ]),
+    visibility = ["PUBLIC"],
+)
+
+source_snapshot_runner(
+    name = "source-snapshot-runner",
+    visibility = ["PUBLIC"],
+)
+
+source_snapshot_zx_wrapper_tool(
+    name = "source-snapshot-zx-wrapper",
     visibility = ["PUBLIC"],
 )
