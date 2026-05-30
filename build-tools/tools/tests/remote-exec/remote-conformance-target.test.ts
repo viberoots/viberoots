@@ -59,10 +59,7 @@ test("first local conformance target executes the dry-run runner", async () => {
   const res =
     await $`buck2 --isolation-dir ${inheritedBuckIsolation("remote_conformance_runner_exec")} test --target-platforms prelude//platforms:default ${tinyTarget}`.nothrow();
   assert.equal(res.exitCode, 0, String(res.stderr || ""));
-  assert.match(
-    String(res.stdout || "") + String(res.stderr || ""),
-    /remote_exec_wrapper-fixtures_zx_ready_handles|Pass/,
-  );
+  assert.match(String(res.stdout || "") + String(res.stderr || ""), /remote-ready-runner: ok/);
 });
 
 test("only the tiny target is remote-ready in the Buck graph", async () => {

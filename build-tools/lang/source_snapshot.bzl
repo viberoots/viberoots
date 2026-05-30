@@ -10,12 +10,7 @@ def _source_snapshot_impl(ctx):
     snapshot = ctx.actions.declare_output(ctx.attrs.name + ".source-snapshot", dir = True)
     manifest = ctx.actions.declare_output(ctx.attrs.name + ".source-snapshot.manifest.json")
     args = [
-        "nix",
-        "run",
-        "--accept-flake-config",
-        "path:.#zx-wrapper",
-        "--",
-        "build-tools/tools/dev/source-snapshot.ts",
+        ctx.attrs._generator,
         "--out",
         snapshot.as_output(),
         "--manifest",
@@ -33,7 +28,9 @@ def _source_snapshot_impl(ctx):
         ctx,
         cmd_args(
             args,
-            hidden = ctx.attrs.srcs + [
+            hidden = [
+                ctx.attrs._generator,
+            ] + ctx.attrs.srcs + [
                 ctx.attrs.graph,
                 ctx.attrs._dev_runtime[DefaultInfo].default_outputs,
                 ctx.attrs._lib_runtime[DefaultInfo].default_outputs,
@@ -52,6 +49,7 @@ _source_snapshot = rule(
     attrs = {
         "srcs": attrs.list(attrs.source(), default = []),
         "graph": attrs.source(default = "//build-tools/tools/buck:graph.json"),
+        "_generator": attrs.source(default = "//build-tools/tools/dev:source-snapshot.ts"),
         "_dev_runtime": attrs.dep(default = "//build-tools/tools/dev:runtime_ts"),
         "_lib_runtime": attrs.dep(default = "//build-tools/tools/lib:runtime_ts"),
     },

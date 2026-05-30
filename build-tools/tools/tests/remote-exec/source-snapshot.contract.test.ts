@@ -11,6 +11,12 @@ async function write(file: string, content: string): Promise<void> {
   await fs.writeFile(file, content, "utf8");
 }
 
+async function sourceSnapshotActionCommand(target: string): Promise<string> {
+  const res =
+    await $`buck2 --isolation-dir ${inheritedBuckIsolation("source_snapshot_aquery")} aquery --target-platforms prelude//platforms:default 'kind(run, deps(${target}))' --output-attribute cmd --output-format starlark`;
+  return String(res.stdout || "");
+}
+
 test("source snapshot includes declared source and excludes mutable local directories", async () => {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), "source-snapshot-"));
   const out = path.join(root, "out");
@@ -80,6 +86,27 @@ test("source_snapshot rule builds a declared Buck snapshot artifact", async () =
     assert.equal(res.exitCode, 0, String(res.stderr || ""));
     assert.match(String(res.stdout || ""), /tiny\.source-snapshot/);
   });
+});
+
+test("source_snapshot action uses declared generator handle without flake app invocation", async () => {
+  const command = await sourceSnapshotActionCommand(
+    "//build-tools/tools/tests/remote-exec/wrapper-fixtures:zx_ready_source_snapshot",
+  );
+
+  assert.match(
+    command,
+    /cmd = \[[^\]]*build-tools\/tools\/dev\/__source-snapshot\.ts__\/source-snapshot\.ts,/,
+  );
+  assert.doesNotMatch(command, /nix, run|path:\.#zx-wrapper/);
+  assert.doesNotMatch(command, /\bnode\b|command -v node/);
+  assert.match(
+    command,
+    /--graph, build-tools\/tools\/tests\/remote-exec\/wrapper-fixtures\/fixture\.txt/,
+  );
+  assert.match(
+    command,
+    /--file, fixture\.txt, build-tools\/tools\/tests\/remote-exec\/wrapper-fixtures\/fixture\.txt/,
+  );
 });
 
 test("source_snapshot rule rejects ambient workspace snapshots", async () => {

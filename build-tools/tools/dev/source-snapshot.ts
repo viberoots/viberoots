@@ -3,8 +3,6 @@ import fs from "node:fs";
 import fsp from "node:fs/promises";
 import path from "node:path";
 
-import { getArgvTokens } from "../lib/argv.ts";
-
 const EXCLUDES = [
   ".git",
   ".direnv",
@@ -27,6 +25,14 @@ const EXCLUDES = [
 const GRAPH_PATH_IN_SNAPSHOT = ["build-tools", "tools", "buck", "graph.json"].join("/");
 
 type FileArg = { rel: string; src: string };
+
+function argvTokens(): string[] {
+  const raw = Array.isArray(process.argv) ? process.argv : [];
+  const scriptIdx = raw.findIndex((token, index) => index > 0 && /\.(ts|js|mjs|cjs)$/.test(token));
+  return (scriptIdx >= 0 ? raw.slice(scriptIdx + 1) : raw.slice(2)).filter(
+    (token) => typeof token === "string",
+  );
+}
 
 function argValue(tokens: string[], name: string): string {
   const eq = tokens.find((token) => token.startsWith(`--${name}=`));
@@ -94,7 +100,7 @@ async function manifestFiles(root: string): Promise<string[]> {
 }
 
 async function main(): Promise<void> {
-  const tokens = getArgvTokens();
+  const tokens = argvTokens();
   const out = path.resolve(argValue(tokens, "out"));
   const manifest = path.resolve(argValue(tokens, "manifest"));
   const graph = argValue(tokens, "graph");
