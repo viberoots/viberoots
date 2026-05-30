@@ -3,21 +3,15 @@ let
   remoteTools = import ./packages/remote-worker-tools.nix { inherit pkgs zx-wrapper; };
   bootstrap = pkgs.writeShellScriptBin "remote-worker-bootstrap" ''
     set -euo pipefail
-    tools="${remoteTools.remote-worker-tools}"
-    export PATH="$tools/bin"
-    echo "remote-worker-tools=$tools"
-    echo "PATH=$PATH"
-    for bin in bash ls find grep sed awk git node pnpm buck2 zx-wrapper timeout; do
-      if ! command -v "$bin" >/dev/null 2>&1; then
-        echo "missing required worker tool: $bin" >&2
-        exit 1
-      fi
-    done
-    if [ "''${1:-}" = "--check-only" ]; then
-      echo "remote-worker-bootstrap: local checks passed; scheduler registration is disabled"
-      exit 0
+    helper="$PWD/build-tools/tools/remote-exec/remote-worker-bootstrap.ts"
+    if [ ! -f "$helper" ]; then
+      echo "remote-worker-bootstrap: run from repo root (missing $helper)" >&2
+      exit 1
     fi
-    echo "remote-worker-bootstrap: no scheduler registration is implemented"
+    exec ${remoteTools.remote-worker-tools}/bin/zx-wrapper \
+      "$helper" \
+      --remote-worker-tools "${remoteTools.remote-worker-tools}" \
+      "$@"
   '';
 in
 {

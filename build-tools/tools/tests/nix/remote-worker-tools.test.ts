@@ -7,7 +7,8 @@ import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
 
 process.env.TEST_RSYNC_ROOTS =
-  process.env.TEST_RSYNC_ROOTS || "flake.nix flake.lock build-tools/tools/nix";
+  process.env.TEST_RSYNC_ROOTS ||
+  "flake.nix flake.lock build-tools/tools/nix build-tools/tools/lib build-tools/tools/remote-exec";
 
 async function build(root: string, $: any, attr: string): Promise<string> {
   const res = await $({
@@ -75,8 +76,45 @@ test("remote worker bootstrap uses closure PATH and avoids scheduler registratio
 
     const output = `${res.stdout}\n${res.stderr}`;
     assert.match(output, /remote-worker-tools=\/nix\/store\//);
+    assert.match(output, /PATH=\/nix\/store\/[^:\n]+\/bin/);
+    assert.doesNotMatch(output, /PATH=.*\/usr\/local/);
     assert.match(output, /local checks passed/);
     assert.match(output, /scheduler registration is disabled/);
+  });
+});
+
+test("remote worker bootstrap app is a thin zx-wrapper launcher", async () => {
+  const app = await fs.readFile("build-tools/tools/nix/flake/outputs-apps.nix", "utf8");
+  const helper = await fs.readFile(
+    "build-tools/tools/remote-exec/remote-worker-bootstrap.ts",
+    "utf8",
+  );
+
+  assert.match(helper, /^#!\/usr\/bin\/env zx-wrapper/);
+  assert.match(app, /exec \$\{remoteTools\.remote-worker-tools\}\/bin\/zx-wrapper/);
+  assert.match(app, /--remote-worker-tools "\$\{remoteTools\.remote-worker-tools\}"/);
+  assert.doesNotMatch(app, /for bin in/);
+  assert.doesNotMatch(app, /command -v/);
+  assert.match(helper, /requiredWorkerBins/);
+  assert.match(helper, /scheduler registration is disabled/);
+});
+
+test("remote worker bootstrap rejects non-store tools before PATH construction", async () => {
+  await runInTemp("remote-worker-bootstrap-non-store", async (tmp) => {
+    const res = await execFileResult(
+      "zx-wrapper",
+      [
+        "build-tools/tools/remote-exec/remote-worker-bootstrap.ts",
+        "--remote-worker-tools",
+        path.join(tmp, "not-store"),
+        "--check-only",
+      ],
+      { cwd: tmp, env: { ...process.env, PATH: process.env.PATH || "" } },
+    );
+
+    assert.equal(res.code, 1, `${res.stdout}\n${res.stderr}`);
+    assert.match(res.stderr, /must be a Nix store path/);
+    assert.doesNotMatch(res.stdout, /^PATH=/m);
   });
 });
 

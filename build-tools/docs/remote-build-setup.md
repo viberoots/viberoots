@@ -73,8 +73,9 @@ builders for local development, remote-builder smoke and CI lanes must export th
 The flake exports `packages.<system>.remote-worker-tools` and
 `packages.<system>.remote-ci-tools` for declared remote worker and CI helper closures.
 It also exports `apps.<system>.remote-worker-bootstrap` as a local check helper. The bootstrap app
-prints the worker closure path, restricts `PATH` to that closure, checks required binaries, and
-does not register with a scheduler.
+delegates to the repo-owned `build-tools/tools/remote-exec/remote-worker-bootstrap.ts`
+`zx-wrapper` helper, prints the worker closure path, restricts `PATH` to that closure, checks
+required binaries, and does not register with a scheduler.
 
 ### Worker and CI Tool Closures
 
