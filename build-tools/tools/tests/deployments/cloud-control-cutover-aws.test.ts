@@ -6,7 +6,15 @@ import {
   capabilityEvidence,
   evidence,
   IMAGE_BUILD_IDENTITY,
+  privateLinkAwsTopology,
+  publicAwsTopology,
 } from "./cloud-control-cutover-fixture";
+
+type MutableAwsTopology = Record<string, unknown> & {
+  privateSubnets: Array<Record<string, unknown>>;
+  securityGroups: Record<string, Record<string, unknown>>;
+  ingress: Record<string, unknown>;
+};
 
 const opts = {
   operation: "cutover" as const,
@@ -22,8 +30,11 @@ test("AWS cutover rejects wrong region and mismatched topology evidence", () => 
       awsTopology: {
         ...baseAws(),
         region: "us-west-2",
-        subnetVpcId: "vpc-other",
-        securityGroupVpcId: "vpc-other",
+        privateSubnets: [{ ...mutableBaseAws().privateSubnets[0], vpcId: "vpc-other" }],
+        securityGroups: {
+          ...mutableBaseAws().securityGroups,
+          service: { ...mutableBaseAws().securityGroups.service, vpcId: "vpc-other" },
+        },
       },
     }),
     opts,
@@ -38,8 +49,8 @@ test("AWS cutover rejects missing S3 endpoint and PrivateLink validation", () =>
     evidence({
       awsTopology: {
         ...baseAws(),
-        s3VpcEndpoint: { validated: false },
-        supabasePrivatelink: { validated: false },
+        s3VpcEndpoint: {},
+        database: { mode: "privatelink", privatelink: {} },
       },
     }),
     opts,
@@ -67,7 +78,7 @@ test("AWS cutover rejects invalid or unevidenced alternate artifact backends", (
       awsTopology: {
         ...baseAws(),
         artifactBackend: "s3-compatible",
-        artifactBackendEvidence: "dashboard says ok",
+        artifactBackendEvidence: { checkedAt: new Date().toISOString(), reviewedReference: "" },
       },
     }),
     opts,
@@ -80,8 +91,7 @@ test("AWS cutover requires explicit public database connectivity proof", () => {
     evidence({
       awsTopology: {
         ...baseAws(),
-        databaseConnectivity: "public",
-        publicDatabaseConnectivity: "psql worked once",
+        database: { mode: "public", publicTls: "psql worked once" },
       },
     }),
     opts,
@@ -89,15 +99,7 @@ test("AWS cutover requires explicit public database connectivity proof", () => {
   assert.match(missing.errors.join("\n"), /missing public database connectivity/);
   const valid = validateCloudControlCutover(
     evidence({
-      awsTopology: {
-        ...baseAws(),
-        databaseConnectivity: "public",
-        publicDatabaseConnectivity: {
-          validated: true,
-          tls: true,
-          sourceHost: "aws-ec2-control-plane-host",
-        },
-      },
+      awsTopology: publicAwsTopology(),
     }),
     opts,
   );
@@ -106,14 +108,14 @@ test("AWS cutover requires explicit public database connectivity proof", () => {
 
 test("AWS cutover rejects missing and invalid database connectivity modes", () => {
   const missing = { ...baseAws() } as Record<string, unknown>;
-  delete missing.databaseConnectivity;
+  delete missing.database;
   assert.match(
     validateCloudControlCutover(evidence({ awsTopology: missing }), opts).errors.join("\n"),
     /connectivity mode <missing>/,
   );
   assert.match(
     validateCloudControlCutover(
-      evidence({ awsTopology: { ...baseAws(), databaseConnectivity: "yes" } }),
+      evidence({ awsTopology: { ...baseAws(), database: { mode: "yes" } } }),
       opts,
     ).errors.join("\n"),
     /connectivity mode yes/,
@@ -126,16 +128,12 @@ test("AWS cutover rejects stale TLS DNS and ingress health", () => {
     evidence({
       awsTopology: {
         ...baseAws(),
-        albNlbHealth: { checkedAt: old },
-        tlsHealth: { checkedAt: old },
-        dnsHealth: { checkedAt: old },
+        ingress: { ...mutableBaseAws().ingress, checkedAt: old },
       },
     }),
     opts,
   );
-  assert.match(result.errors.join("\n"), /albNlbHealth/);
-  assert.match(result.errors.join("\n"), /tlsHealth/);
-  assert.match(result.errors.join("\n"), /dnsHealth/);
+  assert.match(result.errors.join("\n"), /AWS ingress/);
 });
 
 test("selected Cloudflare and Vercel edge paths require matching evidence", () => {
@@ -143,16 +141,17 @@ test("selected Cloudflare and Vercel edge paths require matching evidence", () =
     evidence({
       awsTopology: {
         ...baseAws(),
-        cloudflareEdgeSelected: true,
-        cloudflareEdge: { dnsProxy: true },
-        vercelEdgeSelected: true,
-        vercelEdge: { project: "operator-ui" },
+        selectedEdges: {
+          cloudflare: { dnsProxy: true },
+          vercel: { project: "operator-ui" },
+        },
       },
     }),
     opts,
   );
-  assert.match(result.errors.join("\n"), /missing Cloudflare edge tlsMode evidence/);
-  assert.match(result.errors.join("\n"), /missing Vercel edge domain evidence/);
+  assert.match(result.errors.join("\n"), /structured reviewed evidence/);
+  assert.match(result.errors.join("\n"), /Cloudflare edge evidence is missing or stale/);
+  assert.match(result.errors.join("\n"), /Vercel edge domain evidence must be structured/);
 });
 
 test("adjacent atticd and remote build worker topology requires capability evidence", () => {
@@ -160,8 +159,7 @@ test("adjacent atticd and remote build worker topology requires capability evide
     evidence({
       awsTopology: {
         ...baseAws(),
-        atticdSelected: true,
-        remoteBuildWorkerFleetSelected: true,
+        adjacentSystems: { atticd: true, remoteBuildWorkerFleet: true },
       },
       providerCapabilities: {
         "aws-ec2-control-plane-host": capabilityEvidence("aws-ec2-control-plane-host"),
@@ -169,8 +167,8 @@ test("adjacent atticd and remote build worker topology requires capability evide
     }),
     opts,
   );
-  assert.match(result.errors.join("\n"), /aws-attic-cache-service: missing adjacent-system/);
-  assert.match(result.errors.join("\n"), /remote-build-worker-fleet: missing adjacent-system/);
+  assert.match(result.errors.join("\n"), /aws-attic-cache-service: missing provider-capability/);
+  assert.match(result.errors.join("\n"), /remote-build-worker-fleet: missing provider-capability/);
 });
 
 test("AWS cutover derives required provider capabilities from selected topology", () => {
@@ -178,12 +176,8 @@ test("AWS cutover derives required provider capabilities from selected topology"
     evidence({
       awsTopology: {
         ...baseAws(),
-        cloudflareEdgeSelected: true,
-        cloudflareEdge: completeCloudflareEdge(),
-        vercelEdgeSelected: true,
-        vercelEdge: completeVercelEdge(),
-        atticdSelected: true,
-        remoteBuildWorkerFleetSelected: true,
+        selectedEdges: { cloudflare: completeCloudflareEdge(), vercel: completeVercelEdge() },
+        adjacentSystems: { atticd: true, remoteBuildWorkerFleet: true },
       },
       providerCapabilities: {},
     }),
@@ -206,12 +200,8 @@ test("AWS cutover accepts complete derived provider capabilities", () => {
     evidence({
       awsTopology: {
         ...baseAws(),
-        cloudflareEdgeSelected: true,
-        cloudflareEdge: completeCloudflareEdge(),
-        vercelEdgeSelected: true,
-        vercelEdge: completeVercelEdge(),
-        atticdSelected: true,
-        remoteBuildWorkerFleetSelected: true,
+        selectedEdges: { cloudflare: completeCloudflareEdge(), vercel: completeVercelEdge() },
+        adjacentSystems: { atticd: true, remoteBuildWorkerFleet: true },
       },
       providerCapabilities: {
         "aws-ec2-control-plane-host": capabilityEvidence("aws-ec2-control-plane-host"),
@@ -232,19 +222,28 @@ test("AWS cutover accepts complete derived provider capabilities", () => {
   assert.equal(result.ok, true, result.errors.join("\n"));
 });
 
-function baseAws() {
-  return evidence().awsTopology;
-}
+const baseAws = privateLinkAwsTopology;
+const mutableBaseAws = () => baseAws() as MutableAwsTopology;
 
 function completeCloudflareEdge() {
-  return { dnsProxy: true, tlsMode: "full-strict", wafRules: true, callbackRoute: true };
+  return edgeSet(["dnsProxy", "tlsMode", "wafRules", "callbackRoute"], "cf");
 }
 
 function completeVercelEdge() {
+  return edgeSet(["project", "domain", "edgeSettings", "callbackRoute"], "vercel");
+}
+
+function edgeSet(fields: string[], prefix: string) {
   return {
-    project: "operator-ui",
-    domain: "deploy.example.test",
-    edgeSettings: true,
-    callbackRoute: true,
+    checkedAt: new Date().toISOString(),
+    ...Object.fromEntries(fields.map((field) => [field, edgeEvidence(`${prefix}-${field}`)])),
+  };
+}
+
+function edgeEvidence(id: string) {
+  return {
+    checkedAt: new Date().toISOString(),
+    reviewedReference: `edge://${id}`,
+    digest: "sha256:edge",
   };
 }

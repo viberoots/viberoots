@@ -4,6 +4,7 @@ import { test } from "node:test";
 import { renderCloudControlSetupBundle } from "../../deployments/cloud-control-setup-render";
 import { validateProtectedSharedProfileReadiness } from "../../deployments/cloud-control-setup-profile-validate";
 import type { CloudControlSetupInput } from "../../deployments/cloud-control-setup-types";
+import { privateLinkAwsTopology } from "./cloud-control-cutover-fixture";
 
 const DIGEST_REF =
   "registry.example.com/platform/deployment-control-plane@sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd";
@@ -30,11 +31,7 @@ function input(overrides: Partial<CloudControlSetupInput> = {}): CloudControlSet
     serviceReplicas: 1,
     workerReplicas: 2,
     dryRun: false,
-    supabasePrivatelink: false,
-    awsVpcEndpoint: true,
-    awsSubnetIds: ["subnet-123"],
-    awsSecurityGroupIds: ["sg-123"],
-    tlsEvidence: "alb-listener-dns-reviewed",
+    awsTopology: privateLinkAwsTopology(),
     ...overrides,
   };
 }

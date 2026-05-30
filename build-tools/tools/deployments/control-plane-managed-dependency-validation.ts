@@ -10,6 +10,7 @@ import type {
   ControlPlaneManagedDependencyProfile,
   ManagedDependencyEvidence,
 } from "./control-plane-managed-dependency-types";
+import { evidenceObject, freshEvidenceAt } from "./cloud-control-evidence-helpers";
 import { redactConfigDiagnostic } from "./control-plane-runtime-config-validation";
 import { validateManagedPostgresFeatures } from "./nixos-shared-host-control-plane-backend-features";
 
@@ -33,6 +34,37 @@ export async function validateManagedDependencyProfile(
     await writeEvidence(profile.compatibilityEvidenceFile, evidence);
   }
   return evidence;
+}
+
+export function validateManagedDependencyEvidence(value: unknown, maxAgeMinutes: number): string[] {
+  const evidence = evidenceObject(value);
+  const errors: string[] = [];
+  if (evidence.schemaVersion !== "control-plane-managed-dependency-evidence@1") {
+    errors.push("managed dependency evidence has unsupported schemaVersion");
+  }
+  if (!freshEvidenceAt(evidence, { maxAgeMinutes })) {
+    errors.push("managed dependency evidence is missing or stale");
+  }
+  if (typeof evidence.profileName !== "string" || !evidence.profileName.trim()) {
+    errors.push("managed dependency evidence missing profileName");
+  }
+  const postgres = evidenceObject(evidence.postgres);
+  const artifactStore = evidenceObject(evidence.artifactStore);
+  if (!Array.isArray(postgres.checkedFeatures) || postgres.checkedFeatures.length === 0) {
+    errors.push("managed dependency evidence missing Postgres feature checks");
+  }
+  if (
+    !Array.isArray(artifactStore.checkedOperations) ||
+    !["PUT", "GET", "HEAD"].every((operation) =>
+      artifactStore.checkedOperations.includes(operation),
+    )
+  ) {
+    errors.push("managed dependency evidence missing artifact-store operation checks");
+  }
+  if (typeof artifactStore.digest !== "string" || !artifactStore.digest.startsWith("sha256:")) {
+    errors.push("managed dependency evidence missing artifact-store digest");
+  }
+  return errors;
 }
 
 async function withRedactedErrors<T>(label: string, fn: () => Promise<T>): Promise<T> {

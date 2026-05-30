@@ -13,6 +13,7 @@ import type {
   CloudControlSetupInput,
   CloudProfileMode,
 } from "../../deployments/cloud-control-setup-types";
+import { privateLinkAwsTopology } from "./cloud-control-cutover-fixture";
 import { withControlPlaneArgv } from "./control-plane-process-entrypoints.helpers";
 
 const DIGEST_REF =
@@ -40,11 +41,7 @@ function input(overrides: Partial<CloudControlSetupInput> = {}): CloudControlSet
     serviceReplicas: 1,
     workerReplicas: 2,
     dryRun: false,
-    supabasePrivatelink: false,
-    awsVpcEndpoint: true,
-    awsSubnetIds: ["subnet-123"],
-    awsSecurityGroupIds: ["sg-123"],
-    tlsEvidence: "alb-listener-dns-reviewed",
+    awsTopology: privateLinkAwsTopology(),
     ...overrides,
   };
 }
@@ -129,7 +126,7 @@ function runbookCommand(commands: any, id: string) {
 }
 test("AWS EC2 profile includes Supabase PrivateLink and S3 VPC endpoint placeholders", () => {
   const bundle = renderCloudControlSetupBundle(
-    input({ mode: "aws-ec2", supabasePrivatelink: true }),
+    input({ mode: "aws-ec2", awsTopology: privateLinkAwsTopology() }),
   );
   const managed = JSON.parse(bundle.files["managed-dependencies.json"]!);
   const profile = YAML.parse(bundle.files["aws-ec2-profile.yaml"]!);
@@ -223,7 +220,7 @@ test("dry-run reports missing AWS managed dependency evidence", async () => {
     assert.equal(result.ok, false);
     assert.match(
       result.missingPrerequisites.join("\n"),
-      /AWS S3 VPC endpoint.*subnet evidence.*security-group evidence.*TLS/s,
+      /AWS topology evidence is missing or empty/,
     );
   } finally {
     console.log = previousLog;
@@ -233,8 +230,8 @@ test("dry-run reports missing AWS managed dependency evidence", async () => {
 
 test("AWS EC2 default artifact path requires S3 VPC endpoint evidence", () => {
   assert.match(
-    validateCloudControlSetupInput(input({ mode: "aws-ec2", awsVpcEndpoint: false })).join("\n"),
-    /AWS S3 VPC endpoint artifact-store evidence/,
+    validateCloudControlSetupInput(input({ mode: "aws-ec2", awsTopology: undefined })).join("\n"),
+    /AWS topology evidence is missing or empty/,
   );
 });
 

@@ -11,16 +11,21 @@ const INVALID_SOURCE = /\b(dashboard-only|raw-iac-only|manual-notes?)\b/i;
 export function validateCutoverProviderCapabilities(
   evidence: CutoverEvidence,
   selected: string[],
+  maxAgeMinutes = 60,
 ): string[] {
   const capabilities = evidence.providerCapabilities || {};
   return selected.flatMap((id) => {
     const capability = capabilities[id];
     if (!capability) return [`${id}: missing provider-capability`];
-    return validateCapability(id, capability);
+    return validateCapability(id, capability, maxAgeMinutes);
   });
 }
 
-function validateCapability(id: string, capability: Record<string, unknown>): string[] {
+function validateCapability(
+  id: string,
+  capability: Record<string, unknown>,
+  maxAgeMinutes = 60,
+): string[] {
   const errors: string[] = [];
   const source = String(capability.source || "");
   const declaration = providerDeclaration(capability.declaration);
@@ -32,6 +37,7 @@ function validateCapability(id: string, capability: Record<string, unknown>): st
   errors.push(
     ...validateProviderCapabilityHookEvidenceShape(id, capability, {
       allowedPhases: ["smoke"],
+      maxAgeMinutes,
     }),
   );
   if (!declaration) {

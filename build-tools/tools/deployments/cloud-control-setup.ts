@@ -1,4 +1,5 @@
 import * as fsp from "node:fs/promises";
+import fs from "node:fs";
 import path from "node:path";
 import { getFlagBool, getFlagList, getFlagStr } from "../lib/cli";
 import { renderCloudControlSetupBundle } from "./cloud-control-setup-render";
@@ -86,12 +87,14 @@ export function readCloudControlSetupInput(): CloudControlSetupInput {
     serviceReplicas: numberFlag("service-replicas", 1),
     workerReplicas: numberFlag("worker-replicas", 2),
     dryRun: getFlagBool("dry-run"),
-    supabasePrivatelink: getFlagBool("supabase-privatelink"),
-    awsVpcEndpoint: getFlagBool("aws-vpc-endpoint"),
-    awsSubnetIds: getFlagList("aws-subnet-id"),
-    awsSecurityGroupIds: getFlagList("aws-security-group-id"),
-    tlsEvidence: getFlagStr("tls-evidence", "").trim(),
+    awsTopology: awsTopologyFromFlags(),
   };
+}
+
+function awsTopologyFromFlags(): CloudControlSetupInput["awsTopology"] {
+  const filePath = getFlagStr("aws-topology-evidence", "").trim();
+  if (!filePath) return undefined;
+  return JSON.parse(fs.readFileSync(filePath, "utf8"));
 }
 
 function imagePublicationFromFlags(image: string): CloudControlSetupInput["imagePublication"] {
@@ -179,14 +182,8 @@ function setupCommand(input: CloudControlSetupInput, dryRun: boolean): string {
     String(input.workerReplicas),
     input.artifactBackendEvidence ? "--artifact-backend-evidence" : undefined,
     input.artifactBackendEvidence || undefined,
-    input.awsVpcEndpoint ? "--aws-vpc-endpoint" : undefined,
-    input.awsSubnetIds.length > 0 ? "--aws-subnet-id" : undefined,
-    input.awsSubnetIds.length > 0 ? input.awsSubnetIds.join(",") : undefined,
-    input.awsSecurityGroupIds.length > 0 ? "--aws-security-group-id" : undefined,
-    input.awsSecurityGroupIds.length > 0 ? input.awsSecurityGroupIds.join(",") : undefined,
-    input.tlsEvidence ? "--tls-evidence" : undefined,
-    input.tlsEvidence || undefined,
-    input.supabasePrivatelink ? "--supabase-privatelink" : undefined,
+    input.mode === "aws-ec2" ? "--aws-topology-evidence" : undefined,
+    input.mode === "aws-ec2" ? "$PROFILE_ROOT/aws-topology-evidence.json" : undefined,
   ].filter((arg): arg is string => typeof arg === "string" && arg.length > 0);
   return args.map(shellArg).join(" ");
 }
@@ -199,7 +196,7 @@ function localCheckCommand(command: string, outDir: string, outputFile: string):
 }
 
 function shellArg(value: string): string {
-  if (/^[A-Za-z0-9_./:@=,+-]+$/.test(value)) return value;
+  if (/^[A-Za-z0-9_./:@=,+$-]+$/.test(value)) return value;
   return `'${value.replace(/'/g, `'\\''`)}'`;
 }
 

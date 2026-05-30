@@ -9,6 +9,7 @@ export type CutoverEvidence = {
   generatedAt: string;
   health?: Record<string, unknown>;
   imagePublication?: ControlPlaneImagePublicationEvidence;
+  managedDependencies?: ManagedDependencyEvidence;
   awsTopology?: Record<string, unknown>;
   latestNonProductionDeployment?: Record<string, unknown>;
   providerCapabilities?: Record<string, Record<string, unknown>>;
@@ -34,3 +35,4 @@ export type CutoverValidationResult = {
   checklist: string[];
 };
 import type { ControlPlaneImagePublicationEvidence } from "./control-plane-image-publication";
+import type { ManagedDependencyEvidence } from "./control-plane-managed-dependency-types";

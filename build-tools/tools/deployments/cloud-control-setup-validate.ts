@@ -15,6 +15,11 @@ import {
   SSH_REVIEWED_SOURCE_FILENAMES,
 } from "./cloud-control-setup-contract";
 import { validateControlPlaneImagePublicationEvidence } from "./control-plane-image-publication";
+import { evidenceSecretErrors, evidenceSourceErrors } from "./cloud-control-evidence-helpers";
+import {
+  awsTopologyArtifactBackend,
+  validateAwsTopologyEvidence,
+} from "./cloud-control-aws-topology-validate";
 import {
   hookEvidenceDeclaration,
   hookEvidenceRefs,
@@ -188,19 +193,16 @@ export function validateProviderCapabilityEvidence(
 }
 
 function validateAwsEvidence(input: CloudControlSetupInput): string[] {
-  const errors: string[] = [];
-  if (input.artifactBackend === "aws-s3" && !input.awsVpcEndpoint) {
-    errors.push("AWS EC2 profile requires AWS S3 VPC endpoint artifact-store evidence");
+  const errors = [
+    ...evidenceSourceErrors(input.awsTopology, "cloudControlSetup.awsTopology"),
+    ...evidenceSecretErrors(input.awsTopology, "cloudControlSetup.awsTopology"),
+    ...validateAwsTopologyEvidence(input.awsTopology, { maxAgeMinutes: 60 }),
+  ];
+  if (
+    input.awsTopology &&
+    awsTopologyArtifactBackend(input.awsTopology) !== input.artifactBackend
+  ) {
+    errors.push("AWS topology artifact backend does not match selected setup artifact backend");
   }
-  if (input.artifactBackend !== "aws-s3") {
-    if (!input.artifactBackendEvidence) {
-      errors.push("AWS EC2 alternate artifact stores require reviewed alternate backend evidence");
-    }
-  }
-  if (input.awsSubnetIds.length === 0) errors.push("AWS EC2 profile requires subnet evidence");
-  if (input.awsSecurityGroupIds.length === 0) {
-    errors.push("AWS EC2 profile requires security-group evidence");
-  }
-  if (!input.tlsEvidence) errors.push("AWS EC2 profile requires TLS/ALB-or-NLB/DNS evidence");
   return errors;
 }

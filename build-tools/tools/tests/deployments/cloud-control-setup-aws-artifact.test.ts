@@ -5,6 +5,7 @@ import YAML from "yaml";
 import { renderCloudControlSetupBundle } from "../../deployments/cloud-control-setup-render";
 import { validateCloudControlSetupInput } from "../../deployments/cloud-control-setup-validate";
 import type { CloudControlSetupInput } from "../../deployments/cloud-control-setup-types";
+import { privateLinkAwsTopology } from "./cloud-control-cutover-fixture";
 
 const DIGEST_REF =
   "registry.example.com/platform/deployment-control-plane@sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc";
@@ -38,23 +39,36 @@ function input(overrides: Partial<CloudControlSetupInput> = {}): CloudControlSet
     serviceReplicas: 1,
     workerReplicas: 2,
     dryRun: false,
-    supabasePrivatelink: false,
-    awsVpcEndpoint: true,
-    awsSubnetIds: ["subnet-123"],
-    awsSecurityGroupIds: ["sg-123"],
-    tlsEvidence: "alb-listener-dns-reviewed",
+    awsTopology: privateLinkAwsTopology(),
     ...overrides,
   };
 }
 
 test("AWS EC2 alternate artifact backends require reviewed evidence", () => {
   assert.match(
-    validateCloudControlSetupInput(input({ artifactBackend: "supabase-storage-s3" })).join("\n"),
-    /alternate artifact stores require reviewed alternate backend evidence/,
+    validateCloudControlSetupInput(
+      input({
+        artifactBackend: "supabase-storage-s3",
+        awsTopology: privateLinkAwsTopology({
+          artifactBackend: "supabase-storage-s3",
+          s3VpcEndpoint: undefined,
+        }),
+      }),
+    ).join("\n"),
+    /missing reviewed alternate artifact backend evidence/,
   );
   assert.throws(
-    () => renderCloudControlSetupBundle(input({ artifactBackend: "s3-compatible" })),
-    /alternate artifact stores require reviewed alternate backend evidence/,
+    () =>
+      renderCloudControlSetupBundle(
+        input({
+          artifactBackend: "s3-compatible",
+          awsTopology: privateLinkAwsTopology({
+            artifactBackend: "s3-compatible",
+            s3VpcEndpoint: undefined,
+          }),
+        }),
+      ),
+    /missing reviewed alternate artifact backend evidence/,
   );
 });
 
@@ -62,7 +76,15 @@ test("AWS EC2 alternate artifact backend records reviewed evidence", () => {
   const bundle = renderCloudControlSetupBundle(
     input({
       artifactBackend: "supabase-storage-s3",
-      awsVpcEndpoint: false,
+      awsTopology: privateLinkAwsTopology({
+        artifactBackend: "supabase-storage-s3",
+        s3VpcEndpoint: undefined,
+        artifactBackendEvidence: {
+          checkedAt: new Date().toISOString(),
+          reviewedReference: "reviewed-supabase-storage-s3-endpoint-policy",
+          digest: "sha256:alternate-artifact-backend",
+        },
+      }),
       artifactBackendEvidence: "reviewed-supabase-storage-s3-endpoint-policy",
     }),
   );
@@ -71,12 +93,12 @@ test("AWS EC2 alternate artifact backend records reviewed evidence", () => {
   assert.equal(managed.artifactStore.defaultAwsPath, undefined);
   assert.equal(
     managed.artifactStore.reviewedAlternateEvidence,
-    "reviewed-supabase-storage-s3-endpoint-policy",
+    "reviewed-supabase-storage-s3-endpoint-policy sha256:alternate-artifact-backend",
   );
   const profile = YAML.parse(bundle.files["aws-ec2-profile.yaml"]!);
   assert.equal(profile.artifactBackend.selected, "supabase-storage-s3");
   assert.equal(
     profile.artifactBackend.reviewedAlternateEvidence,
-    "supabase-storage-s3 with evidence reviewed-supabase-storage-s3-endpoint-policy",
+    "supabase-storage-s3 with evidence reviewed-supabase-storage-s3-endpoint-policy sha256:alternate-artifact-backend",
   );
 });

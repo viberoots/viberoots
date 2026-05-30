@@ -8,6 +8,7 @@ import { promisify } from "node:util";
 import { test } from "node:test";
 import { renderCloudControlSetupBundle } from "../../deployments/cloud-control-setup-render";
 import type { CloudControlSetupInput } from "../../deployments/cloud-control-setup-types";
+import { privateLinkAwsTopology } from "./cloud-control-cutover-fixture";
 import { runInScratchTemp } from "../lib/test-helpers";
 
 const sh = promisify(exec);
@@ -99,11 +100,7 @@ function input(outDir: string, publicUrl: string): CloudControlSetupInput {
     serviceReplicas: 1,
     workerReplicas: 2,
     dryRun: false,
-    supabasePrivatelink: true,
-    awsVpcEndpoint: true,
-    awsSubnetIds: ["subnet-123"],
-    awsSecurityGroupIds: ["sg-123"],
-    tlsEvidence: "alb-listener-dns-reviewed",
+    awsTopology: privateLinkAwsTopology(),
   };
 }
 

@@ -20,13 +20,16 @@ deployment-control-plane setup \
   --artifact-bucket deployment-control-plane-artifacts \
   --artifact-region us-east-1 \
   --reviewed-source-mode ssh \
-  --aws-vpc-endpoint \
-  --aws-subnet-id subnet-123,subnet-456 \
-  --aws-security-group-id sg-123 \
-  --tls-evidence alb-listener-dns-reviewed
+  --aws-topology-evidence ./aws-topology-evidence.json
 ```
 
 Run `--dry-run` first to report missing prerequisites and next commands without writing files.
+For AWS EC2, `aws-topology-evidence.json` is the typed prerequisite evidence file. It records the
+selected VPC, private subnets, route tables, egress posture, security groups, S3 gateway/interface
+endpoint, compute service/worker process proof, ALB/NLB ingress proof, and public TLS or Supabase
+PrivateLink database proof. Setup rejects removed boolean/string-list flags and placeholder
+evidence such as literal `true`, dashboard-only notes, raw IaC state, or support-ticket text unless
+it is represented as a structured prerequisite tied to a selected provider capability.
 
 The generated bundle contains:
 
@@ -41,6 +44,8 @@ The generated bundle contains:
   conformance validator.
 - `managed-dependencies.json` and `ingress-checklist.json`: non-secret evidence checklist data.
 - `provider-capabilities.json`: declarations for selected cloud topology components.
+- `aws-topology-evidence.json`: AWS EC2 prerequisite evidence copied from the reviewed typed input
+  when `--host-mode aws-ec2` is selected.
 - mode-specific runnable profile files for Compose/Podman, NixOS, SaaS OCI, or AWS EC2. Profiles
   pass the full image publication contract as runtime metadata. SaaS OCI and AWS EC2 profiles are
   structured YAML with one service, two workers, digest-pinned image,
@@ -195,27 +200,35 @@ worker processes on EC2. Supabase Postgres may be reached through public TLS or 
 when the prerequisite evidence exists. AWS S3 through a VPC endpoint is the default artifact store
 for this topology; Supabase Storage S3 and other S3-compatible stores are reviewed alternates only.
 
-AWS profiles must record subnet, security-group, TLS/ALB-or-NLB, DNS, and artifact-store evidence
-before they can be marked protected/shared-ready.
+AWS profiles must record typed prerequisite evidence for subnets, route tables, security groups,
+S3 endpoint variant, compute, TLS/ALB-or-NLB, DNS, and database connectivity before the generated
+runbook can progress. That prerequisite evidence is not itself protected/shared readiness; the
+profile becomes protected/shared-ready only after setup-doctor, credential preflight, managed
+dependency validation, process, health/readiness, worker heartbeat, provider-capability hook
+evidence, and cutover validation all pass.
 
 For reviewed alternate artifact stores on AWS EC2, select `--artifact-backend
 supabase-storage-s3` or `--artifact-backend s3-compatible` and include
 `--artifact-backend-evidence <reviewed-evidence-id>`. Alternate profiles are rejected without that
-evidence. The default `aws-s3` backend still requires `--aws-vpc-endpoint`.
+evidence. The default `aws-s3` backend still requires S3 gateway or interface endpoint evidence in
+`--aws-topology-evidence`.
 
 ## AWS EC2 Quickstart
 
 1. Create or select the AWS VPC, private subnets, security groups, S3 gateway or interface endpoint,
    ALB/NLB listener, TLS certificate, and DNS records through reviewed IaC.
 2. Provision Supabase Postgres. If private database traffic is selected, complete Supabase
-   PrivateLink setup and record the endpoint evidence before generating the final profile.
+   PrivateLink setup and record the endpoint DNS/IP evidence before generating the final profile.
 3. Create the AWS S3 artifact bucket, lifecycle policy, endpoint policy, and IAM role used by the
    EC2 control-plane host. The generated AWS profile treats AWS S3 through the VPC endpoint as the
    default artifact path.
-4. Generate the profile with `--host-mode aws-ec2 --artifact-backend aws-s3 --aws-vpc-endpoint`
-   and include `--supabase-privatelink` when PrivateLink evidence exists. For a reviewed alternate
-   artifact store, use `--artifact-backend supabase-storage-s3 --artifact-backend-evidence
-<reviewed-evidence-id>` instead of relying on the default AWS S3 artifact path.
+4. Generate the profile with
+   `--host-mode aws-ec2 --artifact-backend aws-s3 --aws-topology-evidence ./aws-topology-evidence.json`.
+   Select public TLS or Supabase PrivateLink inside the typed topology evidence file. For a reviewed
+   alternate artifact store, use `--artifact-backend supabase-storage-s3
+--artifact-backend-evidence <reviewed-evidence-id>` and include the matching reviewed alternate
+   backend evidence in `aws-topology-evidence.json` instead of relying on the default AWS S3
+   endpoint path.
 5. Mount the Supabase Postgres URL, AWS S3 endpoint and credential files, service token,
    reviewed-source credential files, and Infisical deployment credential files through the generated
    credential manifest.

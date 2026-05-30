@@ -7,6 +7,7 @@ import { renderCloudControlSetupBundle } from "../../deployments/cloud-control-s
 import { runCredentialPreflight } from "../../deployments/control-plane-credential-preflight";
 import type { CloudControlSetupInput } from "../../deployments/cloud-control-setup-types";
 import { runInScratchTemp } from "../lib/test-helpers";
+import { privateLinkAwsTopology } from "./cloud-control-cutover-fixture";
 
 const DIGEST_REF =
   "registry.example.com/platform/deployment-control-plane@sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee";
@@ -105,10 +106,6 @@ function input(): CloudControlSetupInput {
     serviceReplicas: 1,
     workerReplicas: 2,
     dryRun: false,
-    supabasePrivatelink: true,
-    awsVpcEndpoint: true,
-    awsSubnetIds: ["subnet-123"],
-    awsSecurityGroupIds: ["sg-123"],
-    tlsEvidence: "alb-listener-dns-reviewed",
+    awsTopology: privateLinkAwsTopology(),
   };
 }

@@ -10,6 +10,7 @@ import {
   writeRuntimeConfig,
 } from "./control-plane-process-entrypoints.helpers";
 import { runInTemp } from "../lib/test-helpers";
+import { privateLinkAwsTopology } from "./cloud-control-cutover-fixture";
 
 const SETUP_IMAGE =
   "registry.example.com/platform/deployment-control-plane@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
@@ -78,6 +79,8 @@ test("deployment-control-plane command validates mode config overrides and crede
 test("deployment-control-plane setup writes a cloud host profile bundle", async () => {
   await runInTemp("control-plane-cli-setup", async (tmp) => {
     const out = path.join(tmp, "profile");
+    const topologyFile = path.join(tmp, "aws-topology-evidence.json");
+    await fsp.writeFile(topologyFile, JSON.stringify(privateLinkAwsTopology()), "utf8");
     await withControlPlaneArgv(
       [
         "setup",
@@ -97,13 +100,8 @@ test("deployment-control-plane setup writes a cloud host profile bundle", async 
         SETUP_DIGEST,
         "--image-inspected-digest",
         SETUP_DIGEST,
-        "--aws-vpc-endpoint",
-        "--aws-subnet-id",
-        "subnet-123",
-        "--aws-security-group-id",
-        "sg-123",
-        "--tls-evidence",
-        "alb-listener-dns-reviewed",
+        "--aws-topology-evidence",
+        topologyFile,
       ],
       runDeploymentControlPlaneCommand,
     );

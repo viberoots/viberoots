@@ -42,6 +42,9 @@ export function renderCloudControlSetupBundle(
     "managed-dependencies.json": renderManagedDependencies(input),
     "ingress-checklist.json": renderIngressChecklist(input),
     "provider-capabilities.json": `${JSON.stringify(capabilities, null, 2)}\n`,
+    ...(input.awsTopology
+      ? { "aws-topology-evidence.json": `${JSON.stringify(input.awsTopology, null, 2)}\n` }
+      : {}),
     "README.md": renderReadme(input),
     ...modeFiles(input),
   };

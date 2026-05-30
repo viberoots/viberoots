@@ -21,6 +21,7 @@ export type CloudProviderCapabilityHookPhase =
 export type CloudProviderCapabilityHookEvidence = {
   schemaVersion: typeof CLOUD_PROVIDER_CAPABILITY_HOOK_EVIDENCE_SCHEMA;
   source: typeof CLOUD_PROVIDER_CAPABILITY_HOOK_EVIDENCE_SOURCE;
+  checkedAt: string;
   capabilityId: string;
   phase: CloudProviderCapabilityHookPhase;
   declaration: ProviderCapabilityDeclaration;
@@ -104,6 +105,7 @@ export async function runCloudProviderCapabilityHook(opts: {
   return {
     schemaVersion: CLOUD_PROVIDER_CAPABILITY_HOOK_EVIDENCE_SCHEMA,
     source: CLOUD_PROVIDER_CAPABILITY_HOOK_EVIDENCE_SOURCE,
+    checkedAt: new Date().toISOString(),
     capabilityId: opts.capabilityId,
     phase: opts.phase,
     declaration,

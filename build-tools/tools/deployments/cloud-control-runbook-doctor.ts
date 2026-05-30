@@ -1,6 +1,7 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { RUNBOOK_SCHEMA, type RunbookPhase } from "./cloud-control-runbook";
+import { validateManagedDependencyEvidence } from "./control-plane-managed-dependency-validation";
 
 export async function validateRunbookBundle(bundleDir: string) {
   const profileRoot = path.resolve(bundleDir);
@@ -67,13 +68,23 @@ async function phaseStatus(profileRoot: string, phase: RunbookPhase, prior: any[
   const existingOutputs = (
     await Promise.all(outputs.map((file) => present(profileRoot, file)))
   ).filter(Boolean);
+  const evidenceErrors = (
+    await Promise.all(outputs.map((file) => validateOutputEvidence(profileRoot, file)))
+  ).flat();
   const status =
-    existingOutputs.length === outputs.length
+    existingOutputs.length === outputs.length && evidenceErrors.length === 0
       ? "complete"
       : blockedPrerequisites.length || missingInputs.length
         ? "blocked"
         : "ready";
-  return { id: phase.id, status, blockedPrerequisites, missingInputs, existingOutputs };
+  return {
+    id: phase.id,
+    status,
+    blockedPrerequisites,
+    missingInputs,
+    existingOutputs,
+    evidenceErrors,
+  };
 }
 
 async function missing(profileRoot: string, file: string): Promise<string> {
@@ -93,4 +104,12 @@ async function exists(file: string): Promise<boolean> {
     .access(file)
     .then(() => true)
     .catch(() => false);
+}
+
+async function validateOutputEvidence(profileRoot: string, file: string): Promise<string[]> {
+  if (file !== "$PROFILE_ROOT/managed-dependency-evidence.json") return [];
+  const localPath = path.join(profileRoot, "managed-dependency-evidence.json");
+  if (!(await exists(localPath))) return [];
+  const evidence = JSON.parse(await fsp.readFile(localPath, "utf8"));
+  return validateManagedDependencyEvidence(evidence, 60);
 }

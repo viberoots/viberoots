@@ -1,4 +1,5 @@
 import type { ControlPlaneImagePublicationEvidence } from "./control-plane-image-publication";
+import type { AwsTopologyEvidence } from "./cloud-control-aws-topology-types";
 
 export const CLOUD_PROFILE_MODES = ["compose-podman", "nixos", "saas-oci", "aws-ec2"] as const;
 
@@ -29,11 +30,7 @@ export type CloudControlSetupInput = {
   serviceReplicas: number;
   workerReplicas: number;
   dryRun: boolean;
-  supabasePrivatelink: boolean;
-  awsVpcEndpoint: boolean;
-  awsSubnetIds: string[];
-  awsSecurityGroupIds: string[];
-  tlsEvidence: string;
+  awsTopology?: AwsTopologyEvidence;
 };
 
 export type ProviderCapabilityDeclaration = {

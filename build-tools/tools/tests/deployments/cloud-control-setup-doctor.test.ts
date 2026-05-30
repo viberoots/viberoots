@@ -8,6 +8,7 @@ import { renderCloudControlSetupBundle } from "../../deployments/cloud-control-s
 import { validateRunbookBundle } from "../../deployments/cloud-control-runbook";
 import type { CloudControlSetupInput } from "../../deployments/cloud-control-setup-types";
 import { runInScratchTemp } from "../lib/test-helpers";
+import { managedDependencyEvidence, privateLinkAwsTopology } from "./cloud-control-cutover-fixture";
 import { withControlPlaneArgv } from "./control-plane-process-entrypoints.helpers";
 
 const DIGEST_REF =
@@ -49,7 +50,11 @@ test("setup doctor classifies local runbook phases without cloud credentials", a
     assert.equal(phase(afterDoctor, "credential-preflight").status, "ready");
 
     await fsp.writeFile(path.join(tmp, "credential-preflight.json"), '{"ok":true}\n', "utf8");
-    await fsp.writeFile(path.join(tmp, "managed-dependency-evidence.json"), "{}\n", "utf8");
+    await fsp.writeFile(
+      path.join(tmp, "managed-dependency-evidence.json"),
+      JSON.stringify(managedDependencyEvidence()),
+      "utf8",
+    );
     const after = await validateRunbookBundle(tmp);
     assert.equal(phase(after, "managed-dependencies").status, "complete");
     assert.equal(phase(after, "process-start").status, "ready");
@@ -77,6 +82,9 @@ test("dry-run next commands include full setup flags and runbook outputs", async
   console.log = (message?: unknown) => output.push(String(message));
   process.exitCode = undefined;
   try {
+    const topologyFile = path.join("buck-out/tmp", "cloud-control-setup-doctor-topology.json");
+    await fsp.mkdir(path.dirname(topologyFile), { recursive: true });
+    await fsp.writeFile(topologyFile, JSON.stringify(privateLinkAwsTopology()), "utf8");
     await withControlPlaneArgv(
       [
         "setup",
@@ -111,14 +119,8 @@ test("dry-run next commands include full setup flags and runbook outputs", async
         "us-east-1",
         "--reviewed-source-mode",
         "ssh",
-        "--aws-vpc-endpoint",
-        "--aws-subnet-id",
-        "subnet-123",
-        "--aws-security-group-id",
-        "sg-123",
-        "--tls-evidence",
-        "alb-listener-dns-reviewed",
-        "--supabase-privatelink",
+        "--aws-topology-evidence",
+        topologyFile,
       ],
       runCloudControlSetupCommand,
     );
@@ -135,10 +137,7 @@ test("dry-run next commands include full setup flags and runbook outputs", async
       "--deployment-id",
       "--artifact-backend",
       "--reviewed-source-mode",
-      "--aws-subnet-id",
-      "--aws-security-group-id",
-      "--tls-evidence",
-      "--supabase-privatelink",
+      "--aws-topology-evidence",
     ]) {
       assert.ok(commands.includes(flag), `missing ${flag}`);
     }
@@ -205,11 +204,7 @@ function input(overrides: Partial<CloudControlSetupInput> = {}): CloudControlSet
     serviceReplicas: 1,
     workerReplicas: 2,
     dryRun: false,
-    supabasePrivatelink: true,
-    awsVpcEndpoint: true,
-    awsSubnetIds: ["subnet-123"],
-    awsSecurityGroupIds: ["sg-123"],
-    tlsEvidence: "alb-listener-dns-reviewed",
+    awsTopology: privateLinkAwsTopology(),
     ...overrides,
   };
 }

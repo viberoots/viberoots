@@ -19,6 +19,7 @@ import {
   validateRenderedProfile,
 } from "../../deployments/cloud-control-setup-profile-validate";
 import type { CloudControlSetupInput } from "../../deployments/cloud-control-setup-types";
+import { privateLinkAwsTopology } from "./cloud-control-cutover-fixture";
 import { runInScratchTemp } from "../lib/test-helpers";
 
 const DIGEST_REF =
@@ -46,11 +47,7 @@ function baseInput(overrides: Partial<CloudControlSetupInput> = {}): CloudContro
     serviceReplicas: 1,
     workerReplicas: 2,
     dryRun: false,
-    supabasePrivatelink: false,
-    awsVpcEndpoint: true,
-    awsSubnetIds: ["subnet-123"],
-    awsSecurityGroupIds: ["sg-123"],
-    tlsEvidence: "alb-listener-and-dns-reviewed",
+    awsTopology: privateLinkAwsTopology(),
     ...overrides,
   };
 }
@@ -217,9 +214,12 @@ test("cloud setup validation rejects tag-only images, weak topology, and missing
   );
   assert.match(
     validateCloudControlSetupInput(
-      baseInput({ mode: "aws-ec2", awsSubnetIds: [], awsSecurityGroupIds: [], tlsEvidence: "" }),
+      baseInput({
+        mode: "aws-ec2",
+        awsTopology: { ...privateLinkAwsTopology(), privateSubnets: [] },
+      }),
     ).join("\n"),
-    /subnet evidence.*security-group evidence.*TLS/s,
+    /private subnet evidence/,
   );
 });
 

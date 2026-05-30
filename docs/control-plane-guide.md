@@ -242,17 +242,16 @@ deployment-control-plane setup \
   --artifact-bucket deployment-control-plane-artifacts \
   --artifact-region us-east-1 \
   --reviewed-source-mode ssh \
-  --aws-vpc-endpoint \
-  --aws-subnet-id subnet-aaa,subnet-bbb \
-  --aws-security-group-id sg-control-plane \
-  --tls-evidence alb-listener-dns-reviewed \
-  --supabase-privatelink
+  --aws-topology-evidence ./aws-topology-evidence.json
 ```
 
-Then rerun without `--dry-run` after every prerequisite is resolved.
+Then rerun without `--dry-run` after every prerequisite is resolved. The
+`aws-topology-evidence.json` file must use schema `aws-topology-evidence@1`; literal `true`,
+dashboard notes, raw IaC state, subnet/security-group string lists, and other truthy placeholders do
+not satisfy AWS setup validation.
 
-If you are using public TLS instead of Supabase PrivateLink, omit `--supabase-privatelink` and make
-the database runtime evidence identify the path as `public`.
+If you are using public TLS instead of Supabase PrivateLink, make the AWS topology evidence database
+mode `public`. PrivateLink mode must be `privatelink`.
 
 The bundle contains:
 
@@ -260,6 +259,7 @@ The bundle contains:
 - `credential-manifest.json`
 - `commands.json`
 - `image-publication.json`
+- `aws-topology-evidence.json` for AWS EC2 profiles
 - `managed-dependencies.profile.yaml`
 - `provider-capabilities.json`
 - conformance and ingress checklists
@@ -398,12 +398,18 @@ The generated HTTP checks use the configured public URL and read bearer tokens f
 
 For AWS EC2 readiness, also attach evidence for:
 
-- selected subnets
-- selected security groups
-- TLS, DNS, and load-balancer health
-- S3 VPC endpoint path
-- Supabase path: `public` or `privatelink`
-- service and worker process ids
+- `aws-topology-evidence@1` identity: AWS account id, region, checked-at timestamp, selected VPC,
+  VPC DNS support, private subnets, route tables, and NAT or controlled-egress posture
+- service, worker, load-balancer, S3 endpoint, and PrivateLink security groups tied to the selected
+  VPC
+- S3 gateway or interface endpoint id, route-table associations, endpoint policy digest, and
+  selected bucket/prefix
+- EC2 instance or Auto Scaling group identity, launch template, AMI, instance profile, and service
+  and worker process evidence
+- ALB/NLB listener, target group health, certificate, TLS policy, DNS record, and callback host
+- Supabase path: `public` with TLS-validated `psql` proof, or `privatelink` with resource
+  configuration, RAM share, endpoint/service-network association, endpoint DNS/IPs, and `psql`
+  proof
 - image digest and runtime config digest
 - graceful worker shutdown evidence
 
@@ -426,6 +432,11 @@ deployment-control-plane cutover \
 
 The report must pass before the AWS host becomes protected/shared-ready. Keep mini or the previous
 host in a reviewed standby mode until rollback evidence is fresh.
+
+Cutover rejects literal `true`, empty objects, dashboard-only notes, raw IaC state, stale
+timestamps, unsupported database modes, and evidence containing obvious secret material. Support or
+dashboard-mediated steps must be represented as structured prerequisite evidence tied to the
+selected provider-capability id; they do not satisfy protected/shared readiness by themselves.
 
 ## Troubleshooting
 

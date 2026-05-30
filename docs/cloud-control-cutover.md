@@ -65,6 +65,227 @@ AWS cutover evidence is conditional on the selected artifact, database, and edge
   remote build/test fleets execute build-system work under Buck/Nix policy, while the deployment
   control plane only orchestrates reviewed deployment state.
 
+Minimal AWS topology evidence uses schema `aws-topology-evidence@1`. Public database mode must
+include VPC, subnet, route-table, security-group, S3 endpoint, compute, ingress, and public TLS
+database proof. Use a fresh `checkedAt` value within the validation max-age window:
+
+```json
+{
+  "schemaVersion": "aws-topology-evidence@1",
+  "checkedAt": "2026-05-30T09:30:00.000Z",
+  "accountId": "123456789012",
+  "region": "us-east-1",
+  "artifactBackend": "aws-s3",
+  "vpc": {
+    "checkedAt": "2026-05-30T09:30:00.000Z",
+    "id": "vpc-123abc",
+    "dnsSupport": true,
+    "dnsHostnames": true
+  },
+  "egress": {
+    "checkedAt": "2026-05-30T09:30:00.000Z",
+    "mode": "nat-gateway",
+    "routeTableIds": ["rtb-123abc"],
+    "natGatewayIds": ["nat-123abc"]
+  },
+  "privateSubnets": [
+    {
+      "checkedAt": "2026-05-30T09:30:00.000Z",
+      "id": "subnet-123abc",
+      "vpcId": "vpc-123abc",
+      "availabilityZone": "us-east-1a",
+      "routeTableId": "rtb-123abc"
+    }
+  ],
+  "securityGroups": {
+    "service": {
+      "checkedAt": "2026-05-30T09:30:00.000Z",
+      "id": "sg-service",
+      "vpcId": "vpc-123abc",
+      "purpose": "control-plane-service"
+    },
+    "worker": {
+      "checkedAt": "2026-05-30T09:30:00.000Z",
+      "id": "sg-worker",
+      "vpcId": "vpc-123abc",
+      "purpose": "control-plane-worker"
+    },
+    "loadBalancer": {
+      "checkedAt": "2026-05-30T09:30:00.000Z",
+      "id": "sg-loadbalancer",
+      "vpcId": "vpc-123abc",
+      "purpose": "load-balancer"
+    },
+    "s3Endpoint": {
+      "checkedAt": "2026-05-30T09:30:00.000Z",
+      "id": "sg-s3endpoint",
+      "vpcId": "vpc-123abc",
+      "purpose": "s3-endpoint"
+    }
+  },
+  "s3VpcEndpoint": {
+    "checkedAt": "2026-05-30T09:30:00.000Z",
+    "type": "gateway",
+    "endpointId": "vpce-123abc",
+    "routeTableIds": ["rtb-123abc"],
+    "endpointPolicyDigest": "sha256:s3endpointpolicy",
+    "bucket": "deployment-control-plane-artifacts",
+    "prefix": "control-plane/"
+  },
+  "compute": {
+    "checkedAt": "2026-05-30T09:30:00.000Z",
+    "mode": "ec2-instance",
+    "instanceId": "i-0123456789abcdef0",
+    "launchTemplateId": "lt-123abc",
+    "launchTemplateVersion": "7",
+    "amiId": "ami-123abc",
+    "instanceProfileArn": "arn:aws:iam::123456789012:instance-profile/control-plane",
+    "processEvidence": {
+      "checkedAt": "2026-05-30T09:30:00.000Z",
+      "service": "pid:100",
+      "workers": ["pid:101"]
+    }
+  },
+  "ingress": {
+    "checkedAt": "2026-05-30T09:30:00.000Z",
+    "type": "alb",
+    "listenerArn": "arn:aws:elasticloadbalancing:us-east-1:123456789012:listener/app/cp/1/2",
+    "targetGroupArn": "arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/cp/1",
+    "targetHealth": "healthy",
+    "certificateArn": "arn:aws:acm:us-east-1:123456789012:certificate/cert-123abc",
+    "tlsPolicy": "ELBSecurityPolicy-TLS13-1-2-2021-06",
+    "dnsRecord": "deploy.example.test",
+    "callbackHost": "deploy-auth.example.test"
+  },
+  "database": {
+    "mode": "public",
+    "publicTls": {
+      "checkedAt": "2026-05-30T09:30:00.000Z",
+      "sourceHost": "i-0123456789abcdef0",
+      "targetHost": "db.project.supabase.co",
+      "tlsValidated": true,
+      "psqlProofDigest": "sha256:publicpsqlproof"
+    }
+  }
+}
+```
+
+PrivateLink mode uses the same AWS topology shape and adds the PrivateLink security group plus
+Supabase PrivateLink resource configuration, RAM share, endpoint DNS/IP evidence, and `psql` proof
+digest:
+
+```json
+{
+  "schemaVersion": "aws-topology-evidence@1",
+  "checkedAt": "2026-05-30T09:30:00.000Z",
+  "accountId": "123456789012",
+  "region": "us-east-1",
+  "artifactBackend": "aws-s3",
+  "vpc": {
+    "checkedAt": "2026-05-30T09:30:00.000Z",
+    "id": "vpc-123abc",
+    "dnsSupport": true,
+    "dnsHostnames": true
+  },
+  "egress": {
+    "checkedAt": "2026-05-30T09:30:00.000Z",
+    "mode": "nat-gateway",
+    "routeTableIds": ["rtb-123abc"],
+    "natGatewayIds": ["nat-123abc"]
+  },
+  "privateSubnets": [
+    {
+      "checkedAt": "2026-05-30T09:30:00.000Z",
+      "id": "subnet-123abc",
+      "vpcId": "vpc-123abc",
+      "availabilityZone": "us-east-1a",
+      "routeTableId": "rtb-123abc"
+    }
+  ],
+  "securityGroups": {
+    "service": {
+      "checkedAt": "2026-05-30T09:30:00.000Z",
+      "id": "sg-service",
+      "vpcId": "vpc-123abc",
+      "purpose": "control-plane-service"
+    },
+    "worker": {
+      "checkedAt": "2026-05-30T09:30:00.000Z",
+      "id": "sg-worker",
+      "vpcId": "vpc-123abc",
+      "purpose": "control-plane-worker"
+    },
+    "loadBalancer": {
+      "checkedAt": "2026-05-30T09:30:00.000Z",
+      "id": "sg-loadbalancer",
+      "vpcId": "vpc-123abc",
+      "purpose": "load-balancer"
+    },
+    "s3Endpoint": {
+      "checkedAt": "2026-05-30T09:30:00.000Z",
+      "id": "sg-s3endpoint",
+      "vpcId": "vpc-123abc",
+      "purpose": "s3-endpoint"
+    },
+    "privatelink": {
+      "checkedAt": "2026-05-30T09:30:00.000Z",
+      "id": "sg-privatelink",
+      "vpcId": "vpc-123abc",
+      "purpose": "supabase-privatelink-endpoint"
+    }
+  },
+  "s3VpcEndpoint": {
+    "checkedAt": "2026-05-30T09:30:00.000Z",
+    "type": "gateway",
+    "endpointId": "vpce-123abc",
+    "routeTableIds": ["rtb-123abc"],
+    "endpointPolicyDigest": "sha256:s3endpointpolicy",
+    "bucket": "deployment-control-plane-artifacts",
+    "prefix": "control-plane/"
+  },
+  "compute": {
+    "checkedAt": "2026-05-30T09:30:00.000Z",
+    "mode": "ec2-instance",
+    "instanceId": "i-0123456789abcdef0",
+    "launchTemplateId": "lt-123abc",
+    "launchTemplateVersion": "7",
+    "amiId": "ami-123abc",
+    "instanceProfileArn": "arn:aws:iam::123456789012:instance-profile/control-plane",
+    "processEvidence": {
+      "checkedAt": "2026-05-30T09:30:00.000Z",
+      "service": "pid:100",
+      "workers": ["pid:101"]
+    }
+  },
+  "ingress": {
+    "checkedAt": "2026-05-30T09:30:00.000Z",
+    "type": "alb",
+    "listenerArn": "arn:aws:elasticloadbalancing:us-east-1:123456789012:listener/app/cp/1/2",
+    "targetGroupArn": "arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/cp/1",
+    "targetHealth": "healthy",
+    "certificateArn": "arn:aws:acm:us-east-1:123456789012:certificate/cert-123abc",
+    "tlsPolicy": "ELBSecurityPolicy-TLS13-1-2-2021-06",
+    "dnsRecord": "deploy.example.test",
+    "callbackHost": "deploy-auth.example.test"
+  },
+  "database": {
+    "mode": "privatelink",
+    "privatelink": {
+      "checkedAt": "2026-05-30T09:30:00.000Z",
+      "resourceConfigurationArn": "arn:aws:vpc-lattice:us-east-1:123456789012:resourceconfiguration/rcfg-123abc",
+      "ramShareArn": "arn:aws:ram:us-east-1:123456789012:resource-share/share-123abc",
+      "endpointId": "vpce-privatelink123",
+      "endpointDnsNames": ["vpce-privatelink123.vpce.amazonaws.com"],
+      "endpointIps": ["10.0.1.12"],
+      "psqlProofDigest": "sha256:privatelinkpsqlproof"
+    }
+  }
+}
+```
+
+Dashboard-only notes, raw IaC state, and support-ticket references are accepted only as structured
+prerequisites tied to a selected provider-capability id, not as protected/shared readiness evidence.
+
 Restore evidence must be tied to exported runtime config and durable state references. A restore
 report should identify database records, artifact objects, image digest, exported config digest,
 credential manifest, auth configuration, and durable submission/artifact references used for the

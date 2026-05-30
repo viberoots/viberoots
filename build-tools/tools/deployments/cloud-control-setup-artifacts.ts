@@ -1,5 +1,12 @@
 import YAML from "yaml";
 import type { CloudControlSetupInput } from "./cloud-control-setup-types";
+import {
+  setupArtifactBackendEvidenceRef,
+  setupAwsSecurityGroupIds,
+  setupAwsSubnetIds,
+  setupAwsTlsEvidenceRef,
+  setupUsesSupabasePrivateLink,
+} from "./cloud-control-setup-aws-topology";
 
 const CREDENTIAL_DIR = "/run/deployment-control-plane/credentials";
 
@@ -80,7 +87,7 @@ export function renderManagedDependencies(input: CloudControlSetupInput): string
         candidate: "supabase-managed-postgres",
         urlCredentialFile: "/run/deployment-control-plane/credentials/control-plane-database-url",
         privateConnectivity:
-          input.mode === "aws-ec2" && input.supabasePrivatelink
+          input.mode === "aws-ec2" && setupUsesSupabasePrivateLink(input)
             ? "supabase-privatelink-prerequisite"
             : "public-tls",
         requiredEvidence: ["feature conformance", "restore check", "backup policy"],
@@ -96,7 +103,7 @@ export function renderManagedDependencies(input: CloudControlSetupInput): string
             : undefined,
         reviewedAlternateEvidence:
           input.mode === "aws-ec2" && input.artifactBackend !== "aws-s3"
-            ? input.artifactBackendEvidence
+            ? setupArtifactBackendEvidenceRef(input)
             : undefined,
         requiredEvidence: ["PUT/GET/HEAD conformance", "digest verification", "temporary prefix"],
       },
@@ -123,10 +130,10 @@ export function renderIngressChecklist(input: CloudControlSetupInput): string {
         requiredBoundary: "identity-provider callback to control-plane service",
       },
       awsEc2: {
-        subnetEvidence: input.awsSubnetIds,
-        securityGroupEvidence: input.awsSecurityGroupIds,
-        tlsAlbOrNlbEvidence: input.tlsEvidence || "<required>",
-        dnsEvidence: input.tlsEvidence ? "covered-by-tls-evidence" : "<required>",
+        subnetEvidence: setupAwsSubnetIds(input),
+        securityGroupEvidence: setupAwsSecurityGroupIds(input),
+        tlsAlbOrNlbEvidence: setupAwsTlsEvidenceRef(input) || "<required>",
+        dnsEvidence: setupAwsTlsEvidenceRef(input) ? "covered-by-tls-evidence" : "<required>",
       },
       unsupportedMutationHosts: [
         "vercel-functions",

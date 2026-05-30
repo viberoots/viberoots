@@ -9,6 +9,7 @@ import {
 } from "./cloud-control-cutover-aws";
 import { validateCutoverProviderCapabilities } from "./cloud-control-cutover-provider-capabilities";
 import { validateControlPlaneImagePublicationEvidence } from "./control-plane-image-publication";
+import { validateManagedDependencyEvidence } from "./control-plane-managed-dependency-validation";
 
 const BASE_HEALTH = [
   "cloudHealth",
@@ -28,11 +29,13 @@ export function validateCloudControlCutover(
   const errors = [
     ...validateIdentity(evidence, options),
     ...validateBaseHealth(evidence),
+    ...validateManagedDependencyEvidence(evidence.managedDependencies, options.maxAgeMinutes),
     ...validateImagePublication(evidence, options),
     ...validateLatestDeployment(evidence, options),
     ...validateCutoverProviderCapabilities(
       evidence,
       requiredProviderCapabilities(evidence, options),
+      options.maxAgeMinutes,
     ),
     ...validateAwsCutoverTopology(evidence, options),
     ...validateOperation(evidence, options.operation),

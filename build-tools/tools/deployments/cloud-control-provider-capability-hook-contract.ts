@@ -1,4 +1,5 @@
 import type { ProviderCapabilityDeclaration } from "./cloud-control-setup-types";
+import { freshEvidenceAt } from "./cloud-control-evidence-helpers";
 
 export const CLOUD_PROVIDER_CAPABILITY_HOOK_EVIDENCE_SCHEMA =
   "cloud-provider-capability-hook-evidence@1";
@@ -8,6 +9,7 @@ export const CLOUD_PROVIDER_CAPABILITY_HOOK_EVIDENCE_SOURCE =
 export type CloudProviderCapabilityHookEvidenceLike = {
   schemaVersion?: unknown;
   source?: unknown;
+  checkedAt?: unknown;
   capabilityId?: unknown;
   phase?: unknown;
   declaration?: unknown;
@@ -16,6 +18,7 @@ export type CloudProviderCapabilityHookEvidenceLike = {
 
 export type ProviderCapabilityHookEvidenceValidationOptions = {
   allowedPhases?: readonly string[];
+  maxAgeMinutes?: number;
 };
 
 export function providerCapabilityHookEvidenceRecord(
@@ -49,6 +52,9 @@ export function validateProviderCapabilityHookEvidenceShape(
   }
   if (opts.allowedPhases && !opts.allowedPhases.includes(String(value.phase || ""))) {
     errors.push(`${id}: provider-capability evidence has wrong hook phase`);
+  }
+  if (!freshEvidenceAt(value, { maxAgeMinutes: opts.maxAgeMinutes ?? 60 })) {
+    errors.push(`${id}: provider-capability evidence is missing or stale`);
   }
   errors.push(...validateRedactedOutputEvidence(id, value));
   errors.push(...validateNoUnsafeEvidenceContent(id, value));

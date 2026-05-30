@@ -1,4 +1,10 @@
 import type { CloudControlSetupInput } from "./cloud-control-setup-types";
+import {
+  setupArtifactBackendEvidenceRef,
+  setupAwsSecurityGroupIds,
+  setupAwsSubnetIds,
+  setupUsesSupabasePrivateLink,
+} from "./cloud-control-setup-aws-topology";
 import YAML from "yaml";
 
 const CONFIG = "/etc/deployment-control-plane/config.yaml";
@@ -129,7 +135,7 @@ function awsProfile(input: CloudControlSetupInput): string {
   const alternate =
     input.artifactBackend === "aws-s3"
       ? "none"
-      : `${input.artifactBackend} with evidence ${input.artifactBackendEvidence}`;
+      : `${input.artifactBackend} with evidence ${setupArtifactBackendEvidenceRef(input)}`;
   return YAML.stringify({
     schemaVersion: "cloud-control-aws-ec2-profile@1",
     artifactBackend: {
@@ -138,9 +144,9 @@ function awsProfile(input: CloudControlSetupInput): string {
       reviewedAlternateEvidence: alternate,
     },
     network: {
-      subnetIds: input.awsSubnetIds,
-      securityGroupIds: input.awsSecurityGroupIds,
-      supabasePrivatelink: input.supabasePrivatelink,
+      subnetIds: setupAwsSubnetIds(input),
+      securityGroupIds: setupAwsSecurityGroupIds(input),
+      supabasePrivatelink: setupUsesSupabasePrivateLink(input),
     },
     systemdPodmanUnits: processSpecs(input, "aws-ec2"),
     imagePublication: input.imagePublication,
