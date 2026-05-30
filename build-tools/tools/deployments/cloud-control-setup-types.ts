@@ -5,7 +5,12 @@ export const CLOUD_PROFILE_MODES = ["compose-podman", "nixos", "saas-oci", "aws-
 
 export const REVIEWED_SOURCE_MODES = ["ssh", "github-app"] as const;
 
-export const ARTIFACT_BACKENDS = ["aws-s3", "supabase-storage-s3", "s3-compatible"] as const;
+export const ARTIFACT_BACKENDS = [
+  "aws-s3",
+  "supabase-storage-s3",
+  "cloudflare-r2",
+  "s3-compatible",
+] as const;
 
 export type CloudProfileMode = (typeof CLOUD_PROFILE_MODES)[number];
 export type ReviewedSourceMode = (typeof REVIEWED_SOURCE_MODES)[number];

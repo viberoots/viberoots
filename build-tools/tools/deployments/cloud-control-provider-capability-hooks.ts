@@ -6,6 +6,8 @@ import {
   CLOUD_PROVIDER_CAPABILITY_HOOK_EVIDENCE_SCHEMA,
   CLOUD_PROVIDER_CAPABILITY_HOOK_EVIDENCE_SOURCE,
 } from "./cloud-control-provider-capability-hook-contract";
+import { awsFoundationHookAdapter } from "./cloud-control-aws-foundation-hooks";
+import type { AwsFoundationProfile } from "./cloud-control-aws-foundation-types";
 
 export const CLOUD_PROVIDER_CAPABILITY_HOOK_PHASES = [
   "preview",
@@ -40,9 +42,10 @@ export type CloudProviderCapabilityHookEvidence = {
     summary: string;
     fingerprint: string;
   };
+  providerPayload?: Record<string, unknown>;
 };
 
-type HookAdapter = {
+export type HookAdapter = {
   name: string;
   automated: boolean;
   manualPrerequisite?: boolean;
@@ -53,20 +56,25 @@ type HookAdapter = {
   rollback: HookAdapterPhase;
 };
 
-type HookAdapterResult = { summary: string; rawOutput: string };
-type HookAdapterPhase = (opts: HookAdapterPhaseOptions) => Promise<HookAdapterResult>;
-type HookAdapterPhaseOptions = {
+export type HookAdapterResult = {
+  summary: string;
+  rawOutput: string;
+  payload?: Record<string, unknown>;
+};
+export type HookAdapterPhase = (opts: HookAdapterPhaseOptions) => Promise<HookAdapterResult>;
+export type HookAdapterPhaseOptions = {
   phase: CloudProviderCapabilityHookPhase;
   deploymentLabel: string;
   declaration: ProviderCapabilityDeclaration;
+  awsFoundationInspection?: AwsFoundationProfile;
 };
 
 const HOOK_ADAPTERS: Record<string, HookAdapter> = {
   "aws-ec2-control-plane-host": reviewedAdapter("aws-ec2-host-profile"),
   "aws-attic-cache-service": reviewedAdapter("aws-attic-cache-service"),
   "aws-ecr-control-plane-registry": reviewedAdapter("aws-ecr-control-plane-registry"),
-  "aws-s3-artifact-store": reviewedAdapter("aws-s3-artifact-store"),
-  "aws-network-foundation": reviewedAdapter("aws-network-foundation"),
+  "aws-s3-artifact-store": awsFoundationHookAdapter("aws-s3-artifact-store"),
+  "aws-network-foundation": awsFoundationHookAdapter("aws-network-foundation"),
   "supabase-managed-postgres": reviewedAdapter("supabase-managed-postgres"),
   "supabase-privatelink-prerequisite": reviewedAdapter(
     "supabase-privatelink-evidence-gate",
@@ -84,6 +92,7 @@ export async function runCloudProviderCapabilityHook(opts: {
   deploymentLabel: string;
   targetIdentity?: string;
   declaration?: ProviderCapabilityDeclaration;
+  awsFoundationInspection?: AwsFoundationProfile;
 }): Promise<CloudProviderCapabilityHookEvidence> {
   assertSupportedPhase(opts.phase);
   const declaration = opts.declaration || concreteDeclaration(opts.capabilityId);
@@ -100,6 +109,9 @@ export async function runCloudProviderCapabilityHook(opts: {
     phase: opts.phase,
     deploymentLabel: opts.deploymentLabel,
     declaration,
+    ...(opts.awsFoundationInspection
+      ? { awsFoundationInspection: opts.awsFoundationInspection }
+      : {}),
   });
   const output = redactOperatorText(result.rawOutput);
   if (!output) throw new Error(`${opts.capabilityId}: hook produced no audit output`);
@@ -124,6 +136,7 @@ export async function runCloudProviderCapabilityHook(opts: {
       manualPrerequisite: adapter.manualPrerequisite === true,
     },
     output,
+    ...(result.payload ? { providerPayload: result.payload } : {}),
   };
 }
 

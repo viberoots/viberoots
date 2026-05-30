@@ -8,6 +8,7 @@ import {
 } from "../../deployments/cloud-control-provider-capability-hooks";
 import { validateCutoverProviderCapabilities } from "../../deployments/cloud-control-cutover-provider-capabilities";
 import { validateProviderCapabilityEvidence } from "../../deployments/cloud-control-setup-validate";
+import { publicAwsTopology } from "./cloud-control-cutover-fixture";
 
 test("provider-capability hook dispatch binds every phase to the concrete declaration", async () => {
   for (const phase of CLOUD_PROVIDER_CAPABILITY_HOOK_PHASES) {
@@ -216,6 +217,9 @@ function hookEvidence(capabilityId: string, phase: any) {
     capabilityId,
     phase,
     deploymentLabel: "//deployments:staging",
+    ...(capabilityId.startsWith("aws-s3-") || capabilityId === "aws-network-foundation"
+      ? { awsFoundationInspection: publicAwsTopology().foundation }
+      : {}),
   });
 }
 
@@ -227,11 +231,8 @@ function badDeclarations(capability: ReturnType<typeof capabilityDeclaration>) {
   ];
 }
 
-function cutoverErrors(
-  providerCapabilities: Record<string, unknown>,
-  selectedCapabilities: string[],
-) {
-  return validateCutoverProviderCapabilities({ providerCapabilities } as any, selectedCapabilities);
+function cutoverErrors(caps: Record<string, unknown>, selected: string[]) {
+  return validateCutoverProviderCapabilities({ providerCapabilities: caps } as any, selected);
 }
 
 function liveCapabilityIds(): string[] {

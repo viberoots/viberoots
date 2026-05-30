@@ -1,5 +1,6 @@
 import { capabilityDeclaration } from "../../deployments/cloud-control-setup-contract";
 import { AWS_TOPOLOGY_EVIDENCE_SCHEMA } from "../../deployments/cloud-control-aws-topology-types";
+import { foundationFromTopology } from "./cloud-control-aws-foundation-fixture";
 import {
   CLOUD_PROVIDER_CAPABILITY_HOOK_EVIDENCE_SCHEMA,
   CLOUD_PROVIDER_CAPABILITY_HOOK_EVIDENCE_SOURCE,
@@ -8,6 +9,7 @@ import { managedDependencyEvidence } from "./cloud-control-cutover-managed-depen
 import { ecrRegistryProfileForImage } from "./control-plane-registry-profile.fixture";
 
 export { managedDependencyEvidence } from "./cloud-control-cutover-managed-dependencies.fixture";
+export { foundationFromTopology } from "./cloud-control-aws-foundation-fixture";
 
 export const IMAGE_DIGEST = `sha256:${"a".repeat(64)}`;
 export const IMAGE_REF = `registry.example.com/platform/deployment-control-plane@${IMAGE_DIGEST}`;
@@ -111,7 +113,7 @@ export function restoreEvidence() {
 }
 
 export function publicAwsTopology(overrides: Record<string, unknown> = {}) {
-  return {
+  const topology = {
     ...baseAwsTopology(),
     database: {
       mode: "public",
@@ -125,10 +127,14 @@ export function publicAwsTopology(overrides: Record<string, unknown> = {}) {
     },
     ...overrides,
   };
+  return {
+    ...topology,
+    foundation: topology.foundation ?? foundationFromTopology(topology),
+  };
 }
 
 export function privateLinkAwsTopology(overrides: Record<string, unknown> = {}) {
-  return {
+  const topology = {
     ...baseAwsTopology(),
     securityGroups: {
       ...baseSecurityGroups(),
@@ -149,6 +155,10 @@ export function privateLinkAwsTopology(overrides: Record<string, unknown> = {}) 
     },
     ...overrides,
   };
+  return {
+    ...topology,
+    foundation: topology.foundation ?? foundationFromTopology(topology),
+  };
 }
 
 function baseAwsTopology() {
@@ -162,7 +172,7 @@ function baseAwsTopology() {
     egress: {
       checkedAt: freshCheckedAt(),
       mode: "nat-gateway",
-      routeTableIds: ["rtb-123"],
+      routeTableIds: ["rtb-123", "rtb-456"],
       natGatewayIds: ["nat-123"],
     },
     privateSubnets: [
@@ -172,6 +182,15 @@ function baseAwsTopology() {
         vpcId: "vpc-123",
         availabilityZone: "us-east-1a",
         routeTableId: "rtb-123",
+        mapPublicIpOnLaunch: false,
+      },
+      {
+        checkedAt: freshCheckedAt(),
+        id: "subnet-456",
+        vpcId: "vpc-123",
+        availabilityZone: "us-east-1b",
+        routeTableId: "rtb-456",
+        mapPublicIpOnLaunch: false,
       },
     ],
     securityGroups: baseSecurityGroups(),
@@ -179,7 +198,7 @@ function baseAwsTopology() {
       checkedAt: freshCheckedAt(),
       type: "gateway",
       endpointId: "vpce-123",
-      routeTableIds: ["rtb-123"],
+      routeTableIds: ["rtb-123", "rtb-456"],
       endpointPolicyDigest: "sha256:s3-endpoint-policy",
       bucket: "deployment-control-plane-artifacts",
       prefix: "control-plane/",
@@ -214,6 +233,7 @@ function baseSecurityGroups() {
     worker: sg("sg-worker", "control-plane-worker"),
     loadBalancer: sg("sg-alb", "load-balancer"),
     s3Endpoint: sg("sg-s3", "s3-endpoint"),
+    privatelink: sg("sg-privatelink", "supabase-privatelink-endpoint"),
   };
 }
 

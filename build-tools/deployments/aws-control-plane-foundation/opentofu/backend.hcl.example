@@ -1,0 +1,5 @@
+bucket         = "deployment-control-plane-tofu-state"
+key            = "aws-foundation/deployment-control-plane.tfstate"
+region         = "us-east-1"
+dynamodb_table = "deployment-control-plane-tofu-locks"
+encrypt        = true

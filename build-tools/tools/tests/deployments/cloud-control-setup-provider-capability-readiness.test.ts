@@ -71,6 +71,7 @@ test("placeholder declarations and raw evidence cannot mark readiness", () => {
 });
 
 async function hookEvidenceFor(capabilities: Array<{ id: string }>) {
+  const foundation = privateLinkAwsTopology().foundation;
   return Object.fromEntries(
     await Promise.all(
       capabilities.map(async (capability) => [
@@ -79,6 +80,10 @@ async function hookEvidenceFor(capabilities: Array<{ id: string }>) {
           capabilityId: capability.id,
           phase: "evidence",
           deploymentLabel: "//deployments:staging",
+          ...(capability.id === "aws-network-foundation" ||
+          capability.id === "aws-s3-artifact-store"
+            ? { awsFoundationInspection: foundation }
+            : {}),
         }),
       ]),
     ),

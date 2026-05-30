@@ -84,6 +84,7 @@ export function readCloudControlSetupInput(): CloudControlSetupInput {
     artifactBackend: enumFlag("artifact-backend", "aws-s3", [
       "aws-s3",
       "supabase-storage-s3",
+      "cloudflare-r2",
       "s3-compatible",
     ]),
     artifactBackendEvidence: getFlagStr("artifact-backend-evidence", "").trim(),

@@ -1,7 +1,13 @@
 export const AWS_TOPOLOGY_EVIDENCE_SCHEMA = "aws-topology-evidence@1" as const;
 
 export type AwsDatabaseConnectivityMode = "public" | "privatelink";
-export type AwsArtifactBackend = "aws-s3" | "supabase-storage-s3" | "s3-compatible";
+import type { AwsFoundationProfile } from "./cloud-control-aws-foundation-types";
+
+export type AwsArtifactBackend =
+  | "aws-s3"
+  | "supabase-storage-s3"
+  | "cloudflare-r2"
+  | "s3-compatible";
 
 export type AwsTopologyEvidence = {
   schemaVersion: typeof AWS_TOPOLOGY_EVIDENCE_SCHEMA;
@@ -14,6 +20,7 @@ export type AwsTopologyEvidence = {
   privateSubnets: AwsSubnetEvidence[];
   securityGroups: AwsSecurityGroupsEvidence;
   s3VpcEndpoint?: AwsS3VpcEndpointEvidence;
+  foundation?: AwsFoundationProfile;
   artifactBackendEvidence?: AwsReviewedEvidence;
   compute: AwsComputeEvidence;
   ingress: AwsIngressEvidence;
@@ -49,6 +56,7 @@ export type AwsSubnetEvidence = {
   vpcId: string;
   availabilityZone: string;
   routeTableId: string;
+  mapPublicIpOnLaunch?: boolean;
 };
 
 export type AwsSecurityGroupEvidence = {

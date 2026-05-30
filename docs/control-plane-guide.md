@@ -168,7 +168,13 @@ checks require structured evidence tied to the selected AWS host path.
 
 ## Step 3: Provision AWS Infrastructure
 
-Use IaC for these AWS resources where your current cloud-foundation workflow supports it:
+Prefer the repo-owned AWS foundation profile for network and artifact-store provisioning. The
+generated `aws-network-foundation` and `aws-s3-artifact-store` provider-capability hooks cover
+preview, apply, evidence, smoke, and rollback phases and emit redacted IaC payload evidence. Use
+import mode only when an organization-owned VPC remains outside this repo; imported evidence must
+still satisfy the same schema, freshness, drift, cost, quota, tag, and redaction checks.
+
+The repo-owned profile covers these AWS resources:
 
 - VPC with private subnets in at least two Availability Zones
 - route tables and egress policy appropriate for your provider APIs
@@ -181,6 +187,52 @@ Use IaC for these AWS resources where your current cloud-foundation workflow sup
 - ALB or NLB listener and target group
 - ACM certificate and DNS records
 - EC2 instance or launch template for the NixOS/OCI host
+
+AWS S3 is the generated default artifact-store path. Supabase Storage S3, Cloudflare R2, and other
+S3-compatible stores are explicit alternate profiles; they require reviewed endpoint-shape, signing
+region, path-style, metadata, retention, and network-path evidence before setup or cutover.
+
+Before a live-gated apply or protected/shared cutover, keep evidence for encrypted locked IaC state,
+clean drift detection, service quota headroom, approved cost estimate, mandatory ownership and
+rollback tags, KMS deletion-window posture when KMS is selected, and least-privilege IAM policy
+digests. Rollback must retain artifacts and should not delete active endpoints or retained object
+prefixes without an explicit reviewed approval.
+
+Operator procedure for `aws-network-foundation`:
+
+1. Preview: run OpenTofu plan from
+   `build-tools/deployments/aws-control-plane-foundation/opentofu` with the reviewed variable file
+   for the account, region, VPC mode, subnet CIDRs or imported VPC id, tags, state bucket, and
+   allowed HTTPS egress CIDRs. Save the plan digest and ensure no public subnet is selected as a
+   private subnet.
+2. Apply: apply only the reviewed plan in the expected account and region using file-backed AWS
+   credentials. Save the apply output and the `foundation_evidence` output.
+3. Evidence: inspect AWS state for the selected VPC, private subnets, route tables, S3 endpoint,
+   security groups, IAM roles, quotas, cost approval, encrypted locked state, and drift status.
+   Feed that evidence to hooks with `VBR_AWS_FOUNDATION_INSPECTION_FILE`; live inspection requires
+   `VBR_AWS_FOUNDATION_LIVE=1` and a file-backed `AWS_SHARED_CREDENTIALS_FILE`.
+4. Smoke: run the provider-capability smoke hook and confirm service and worker hosts resolve AWS
+   provider APIs through the reviewed route tables without broad worker egress.
+5. Rollback: preserve the state bucket and drift evidence, detach new runtime references, and
+   remove only newly-created network resources after retained artifacts and active endpoints have
+   a reviewed replacement path.
+
+Operator procedure for `aws-s3-artifact-store`:
+
+1. Preview: review the S3 bucket, KMS key, public-access block, versioning, lifecycle policy,
+   immutable prefix, endpoint policy, and IAM policy digests from the same OpenTofu plan. For
+   Supabase Storage S3, Cloudflare R2, or another S3-compatible backend, attach reviewed import
+   evidence instead of synthetic endpoint claims.
+2. Apply: apply the reviewed artifact-store plan or record the reviewed alternate import. Keep the
+   bucket or alternate endpoint name out of logs unless it is already classified for operator
+   display.
+3. Evidence: run PUT/GET/HEAD conformance on a temporary prefix, capture retention and versioning
+   posture, endpoint policy digest, replication/import evidence when selected, and exact runtime
+   credential source.
+4. Smoke: run the `aws-s3-artifact-store` smoke hook and the managed-dependency artifact checks
+   from the generated setup bundle.
+5. Rollback: stop new writes, keep immutable and retained prefixes, restore the previous runtime
+   artifact backend from the last reviewed bundle, and record drift after the switch.
 
 Recommended network rules:
 
@@ -451,7 +503,7 @@ deployment-control-plane cutover \
   --expected-host-profile aws-ec2 \
   --expected-image-build-identity nix-source-<build-identity> \
   --expected-region us-east-1 \
-  --selected-capability aws-ec2-control-plane-host,aws-s3-artifact-store \
+  --selected-capability aws-ec2-control-plane-host,aws-network-foundation,aws-s3-artifact-store \
   --out ./cloud-cutover-report.json
 ```
 

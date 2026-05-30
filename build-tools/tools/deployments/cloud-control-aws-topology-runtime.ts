@@ -5,24 +5,24 @@ import {
   freshEvidenceAt,
   type EvidenceFreshnessOptions,
 } from "./cloud-control-evidence-helpers";
-import type { AwsArtifactBackend } from "./cloud-control-aws-topology-types";
+import {
+  AWS_ARTIFACT_BACKENDS,
+  awsTopologyArtifactBackend,
+} from "./cloud-control-aws-artifact-backend";
+
+export { awsTopologyArtifactBackend };
 
 export type AwsTopologyValidationOptions = EvidenceFreshnessOptions & {
   expectedRegion?: string;
   selectedCapabilityIds?: readonly string[];
 };
 
-export function awsTopologyArtifactBackend(topology: unknown): AwsArtifactBackend {
-  const backend = evidenceText(topology, "artifactBackend");
-  return backend === "supabase-storage-s3" || backend === "s3-compatible" ? backend : "aws-s3";
-}
-
 export function validateArtifactStore(
   topology: unknown,
   options: AwsTopologyValidationOptions,
 ): string[] {
   const rawBackend = evidenceText(topology, "artifactBackend");
-  if (rawBackend && !["aws-s3", "supabase-storage-s3", "s3-compatible"].includes(rawBackend)) {
+  if (rawBackend && !(AWS_ARTIFACT_BACKENDS as readonly string[]).includes(rawBackend)) {
     return [`unsupported AWS artifact backend ${rawBackend}`];
   }
   const backend = awsTopologyArtifactBackend(topology);

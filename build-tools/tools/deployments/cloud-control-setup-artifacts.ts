@@ -154,8 +154,7 @@ function cred(name: string): string {
 }
 
 function artifactProvider(input: CloudControlSetupInput): string {
-  if (input.artifactBackend === "aws-s3") return "aws-s3";
-  return input.artifactBackend === "supabase-storage-s3" ? "supabase-storage-s3" : "s3-compatible";
+  return input.artifactBackend;
 }
 
 function runtimePath(input: CloudControlSetupInput) {

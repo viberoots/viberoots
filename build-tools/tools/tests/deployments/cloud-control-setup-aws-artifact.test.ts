@@ -105,3 +105,27 @@ test("AWS EC2 alternate artifact backend records reviewed evidence", () => {
     "supabase-storage-s3 with evidence reviewed-supabase-storage-s3-endpoint-policy sha256:alternate-artifact-backend",
   );
 });
+
+test("AWS EC2 Cloudflare R2 artifact backend remains provider-specific", () => {
+  const bundle = renderCloudControlSetupBundle(
+    input({
+      artifactBackend: "cloudflare-r2",
+      awsTopology: privateLinkAwsTopology({
+        artifactBackend: "cloudflare-r2",
+        s3VpcEndpoint: undefined,
+        artifactBackendEvidence: {
+          checkedAt: new Date().toISOString(),
+          reviewedReference: "reviewed-cloudflare-r2-endpoint-policy",
+          digest: "sha256:cloudflare-r2-artifact-backend",
+        },
+      }),
+      artifactBackendEvidence: "reviewed-cloudflare-r2-endpoint-policy",
+    }),
+  );
+  const profile = YAML.parse(bundle.files["managed-dependencies.profile.yaml"]!);
+  assert.equal(profile.artifactStore.provider, "cloudflare-r2");
+  assert.equal(
+    profile.runtimePath.expectedAlternateBackendEvidenceDigest,
+    "sha256:cloudflare-r2-artifact-backend",
+  );
+});
