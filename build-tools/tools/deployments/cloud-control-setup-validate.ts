@@ -201,7 +201,11 @@ function validateAwsEvidence(input: CloudControlSetupInput): string[] {
   const errors = [
     ...evidenceSourceErrors(input.awsTopology, "cloudControlSetup.awsTopology"),
     ...evidenceSecretErrors(input.awsTopology, "cloudControlSetup.awsTopology"),
-    ...validateAwsTopologyEvidence(input.awsTopology, { maxAgeMinutes: 60 }),
+    ...validateAwsTopologyEvidence(input.awsTopology, {
+      maxAgeMinutes: 60,
+      expectedImage: input.image,
+      expectedImageDigest: input.imagePublication?.digest,
+    }),
   ];
   if (
     input.awsTopology &&

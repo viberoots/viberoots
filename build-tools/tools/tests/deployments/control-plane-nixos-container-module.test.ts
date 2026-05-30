@@ -129,7 +129,7 @@ test("control-plane NixOS container module preserves mounts when Docker is selec
     });
     assert.ok(service.extraOptions.includes("--health-interval=30s"));
     const worker = out.worker as { cmd: string[]; volumes: string[] };
-    assert.deepEqual(worker.cmd.slice(0, 1), ["worker"]);
+    assert.match(worker.cmd.join(" "), /worker --config .* --worker-id worker-1/);
     assert.ok(
       worker.volumes.includes(
         "/run/deployment-control-plane-container-credentials/deployment-control-plane-worker-1:/run/deployment-control-plane/credentials:ro",

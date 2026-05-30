@@ -25,6 +25,10 @@ import {
   awsTopologyRequiredCapabilityIds,
   awsTopologySelectedCapabilityIds,
 } from "./cloud-control-aws-topology-capabilities";
+import {
+  validateAwsHostProfileRuntime,
+  type AwsHostProfileValidationOptions,
+} from "./cloud-control-aws-host-profile-runtime";
 
 export { awsTopologyArtifactBackend, type AwsTopologyValidationOptions };
 export {
@@ -35,7 +39,7 @@ export {
 
 export function validateAwsTopologyEvidence(
   topology: unknown,
-  options: AwsTopologyValidationOptions,
+  options: AwsHostProfileValidationOptions,
 ): string[] {
   if (topology === true) return ["AWS topology evidence must be typed, not literal true"];
   if (!isEvidenceObject(topology)) return ["AWS topology evidence is missing or empty"];
@@ -52,6 +56,7 @@ export function validateAwsTopologyEvidence(
     ...validateCore(topology, topologyOptions),
     ...validateNetwork(topology, topologyOptions),
     ...validateFoundation(topology, topologyOptions),
+    ...validateAwsHostProfileRuntime(topology, topologyOptions),
     ...validateArtifactStore(topology, topologyOptions),
     ...validateComputeAndIngress(topology, topologyOptions),
     ...validateDatabase(topology, topologyOptions),

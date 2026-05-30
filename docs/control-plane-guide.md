@@ -188,6 +188,16 @@ The repo-owned profile covers these AWS resources:
 - ACM certificate and DNS records
 - EC2 instance or launch template for the NixOS/OCI host
 
+For the EC2 host itself, prefer the generated AWS EC2 host profile from
+`deployment-control-plane setup --host-mode aws-ec2`. The profile consumes the reviewed AWS
+foundation evidence for selected private subnets, security groups, instance profile, S3 endpoint,
+and registry access. The generated launch-template or Auto Scaling profile must place instances only
+in the selected private subnets from that evidence.
+
+The generated NixOS EC2 example imports the existing control-plane container module with AWS-specific
+inputs. The generated systemd/Podman artifacts are a compatibility mode for non-NixOS OCI hosts and
+share the same service/worker process and mount contract.
+
 AWS S3 is the generated default artifact-store path. Supabase Storage S3, Cloudflare R2, and other
 S3-compatible stores are explicit alternate profiles; they require reviewed endpoint-shape, signing
 region, path-style, metadata, retention, and network-path evidence before setup or cutover.
@@ -438,6 +448,13 @@ If the Supabase path is PrivateLink, run the validation from the AWS host or an 
 VPC path. PrivateLink cutover evidence must tie the proof to the AWS EC2 runtime path and a private
 database endpoint. A laptop or CI runner proof is accepted only when the profile marks it as
 non-cutover diagnostic evidence.
+
+Before this step is considered ready for cutover evidence, confirm the generated host realization
+artifacts are active on the selected EC2 host: NixOS EC2 wrapper or generated systemd units,
+selected private subnet placement, reviewed instance profile, encrypted EBS/state path, registry
+pull proof for the exact image digest, worker lease/fencing evidence, and operational visibility
+for service down, readiness failure, missing worker heartbeat, queue backlog, and repeated worker
+crash.
 
 ## Step 9: Start Service And Workers
 

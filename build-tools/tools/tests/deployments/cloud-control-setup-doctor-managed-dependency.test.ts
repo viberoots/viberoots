@@ -7,7 +7,11 @@ import { validateRunbookBundle } from "../../deployments/cloud-control-runbook";
 import { renderCloudControlSetupBundle } from "../../deployments/cloud-control-setup-render";
 import type { CloudControlSetupInput } from "../../deployments/cloud-control-setup-types";
 import { runInScratchTemp } from "../lib/test-helpers";
-import { managedDependencyEvidence, privateLinkAwsTopology } from "./cloud-control-cutover-fixture";
+import {
+  managedDependencyEvidence,
+  privateLinkAwsTopology,
+  topologyForPublishedImage,
+} from "./cloud-control-cutover-fixture";
 import { ecrRegistryProfileForImage } from "./control-plane-registry-profile.fixture";
 
 const DIGEST = `sha256:${"d".repeat(64)}`;
@@ -73,6 +77,10 @@ function input(outDir: string): CloudControlSetupInput {
     serviceReplicas: 1,
     workerReplicas: 2,
     dryRun: false,
-    awsTopology: privateLinkAwsTopology(),
+    awsTopology: topologyForImage(),
   };
+}
+
+function topologyForImage() {
+  return topologyForPublishedImage(privateLinkAwsTopology(), IMAGE, DIGEST);
 }

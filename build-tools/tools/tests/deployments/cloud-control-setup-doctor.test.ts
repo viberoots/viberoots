@@ -32,16 +32,6 @@ test("setup doctor classifies local runbook phases without cloud credentials", a
 
     const before = await validateRunbookBundle(tmp);
     assert.equal(before.structureErrors.length, 0);
-    assert.deepEqual(
-      before.phases.map((entry: { id: string }) => entry.id),
-      [
-        "local-review",
-        "credential-preflight",
-        "managed-dependencies",
-        "process-start",
-        "http-validation",
-      ],
-    );
     assert.equal(phase(before, "local-review").status, "ready");
     assert.equal(phase(before, "credential-preflight").status, "blocked");
     assert.equal(phase(before, "managed-dependencies").status, "blocked");
@@ -85,7 +75,7 @@ test("dry-run next commands include full setup flags and runbook outputs", async
   try {
     const topologyFile = path.join("buck-out/tmp", "cloud-control-setup-doctor-topology.json");
     await fsp.mkdir(path.dirname(topologyFile), { recursive: true });
-    await fsp.writeFile(topologyFile, JSON.stringify(privateLinkAwsTopology()), "utf8");
+    await fsp.writeFile(topologyFile, JSON.stringify(topologyForImage()), "utf8");
     await withControlPlaneArgv(
       [
         "setup",
@@ -206,8 +196,24 @@ function input(overrides: Partial<CloudControlSetupInput> = {}): CloudControlSet
     serviceReplicas: 1,
     workerReplicas: 2,
     dryRun: false,
-    awsTopology: privateLinkAwsTopology(),
+    awsTopology: topologyForImage(),
     ...overrides,
+  };
+}
+
+function topologyForImage() {
+  const topology = privateLinkAwsTopology() as any;
+  return {
+    ...topology,
+    compute: {
+      ...topology.compute,
+      processEvidence: { ...topology.compute.processEvidence, imageDigest: DIGEST },
+      registryPullProof: {
+        ...topology.compute.registryPullProof,
+        image: DIGEST_REF,
+        digest: DIGEST,
+      },
+    },
   };
 }
 

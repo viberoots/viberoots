@@ -98,7 +98,7 @@ test("production AWS setup consumes generated image publication evidence path", 
     const out = path.join(tmp, "profile");
     const evidence = path.join(tmp, "image-publication.json");
     const topology = path.join(tmp, "aws-topology-evidence.json");
-    await fsp.writeFile(topology, JSON.stringify(privateLinkAwsTopology()), "utf8");
+    await fsp.writeFile(topology, JSON.stringify(topologyForImage()), "utf8");
     await fsp.writeFile(evidence, JSON.stringify(generatedEvidence(), null, 2), "utf8");
     await withControlPlaneArgv(
       [
@@ -166,6 +166,18 @@ function generatedEvidence() {
     evidenceSource: "generated-command",
     registryProfile: ecrRegistryProfile(),
     reviewedBuildCommands: reviewedBuildCommands(),
+  };
+}
+
+function topologyForImage() {
+  const topology = privateLinkAwsTopology() as any;
+  return {
+    ...topology,
+    compute: {
+      ...topology.compute,
+      processEvidence: { ...topology.compute.processEvidence, imageDigest: DIGEST },
+      registryPullProof: { ...topology.compute.registryPullProof, image: IMAGE, digest: DIGEST },
+    },
   };
 }
 

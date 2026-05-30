@@ -13,7 +13,7 @@ import type {
   CloudControlSetupInput,
   CloudProfileMode,
 } from "../../deployments/cloud-control-setup-types";
-import { privateLinkAwsTopology } from "./cloud-control-cutover-fixture";
+import { privateLinkAwsTopology, topologyForPublishedImage } from "./cloud-control-cutover-fixture";
 import { ecrRegistryProfileForImage } from "./control-plane-registry-profile.fixture";
 import { withControlPlaneArgv } from "./control-plane-process-entrypoints.helpers";
 
@@ -21,6 +21,7 @@ const DIGEST_REF =
   "registry.example.com/platform/deployment-control-plane@sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
 const DIGEST = `sha256:${"b".repeat(64)}`;
 const BUILD_IDENTITY = `nix-source-${"c".repeat(64)}`;
+const awsTopology = () => topologyForPublishedImage(privateLinkAwsTopology(), DIGEST_REF, DIGEST);
 
 function input(overrides: Partial<CloudControlSetupInput> = {}): CloudControlSetupInput {
   return {
@@ -28,7 +29,16 @@ function input(overrides: Partial<CloudControlSetupInput> = {}): CloudControlSet
     mode: "compose-podman",
     image: DIGEST_REF,
     expectedImageBuildIdentity: BUILD_IDENTITY,
-    imagePublication: publicationEvidence(DIGEST_REF, DIGEST),
+    imagePublication: {
+      image: DIGEST_REF,
+      sourceRevision: "source-review",
+      imageBuildIdentity: BUILD_IDENTITY,
+      digest: DIGEST,
+      inspectedDigest: DIGEST,
+      tag: "registry.example.com/platform/deployment-control-plane:source-review",
+      evidenceSource: "generated-command" as const,
+      registryProfile: ecrRegistryProfileForImage(DIGEST_REF, DIGEST),
+    },
     instanceId: "cloud-review",
     publicUrl: "https://deploy.example.test",
     artifactBucket: "deployment-control-plane-artifacts",
@@ -42,21 +52,8 @@ function input(overrides: Partial<CloudControlSetupInput> = {}): CloudControlSet
     serviceReplicas: 1,
     workerReplicas: 2,
     dryRun: false,
-    awsTopology: privateLinkAwsTopology(),
+    awsTopology: awsTopology(),
     ...overrides,
-  };
-}
-
-function publicationEvidence(image: string, digest: string) {
-  return {
-    image,
-    sourceRevision: "source-review",
-    imageBuildIdentity: BUILD_IDENTITY,
-    digest,
-    inspectedDigest: digest,
-    tag: "registry.example.com/platform/deployment-control-plane:source-review",
-    evidenceSource: "generated-command" as const,
-    registryProfile: ecrRegistryProfileForImage(image, digest),
   };
 }
 
@@ -129,7 +126,7 @@ function runbookCommand(commands: any, id: string) {
 }
 test("AWS EC2 profile includes Supabase PrivateLink and S3 VPC endpoint placeholders", () => {
   const bundle = renderCloudControlSetupBundle(
-    input({ mode: "aws-ec2", awsTopology: privateLinkAwsTopology() }),
+    input({ mode: "aws-ec2", awsTopology: awsTopology() }),
   );
   const managed = JSON.parse(bundle.files["managed-dependencies.json"]!);
   const profile = YAML.parse(bundle.files["aws-ec2-profile.yaml"]!);

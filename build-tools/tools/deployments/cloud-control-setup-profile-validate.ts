@@ -1,4 +1,5 @@
 import YAML from "yaml";
+import { validateAwsEc2SystemdArtifacts } from "./cloud-control-aws-ec2-profile-artifact-validate";
 
 const CONFIG = "/etc/deployment-control-plane/config.yaml";
 const CREDS = "/run/deployment-control-plane/credentials";
@@ -26,6 +27,7 @@ export function validateRenderedProfile(files: Record<string, string>): string[]
   for (const process of [service, worker1, worker2].filter(Boolean) as RenderedProcess[]) {
     validateProcess(process, errors);
   }
+  if (files["aws-ec2-profile.yaml"]) errors.push(...validateAwsEc2SystemdArtifacts(files));
   errors.push(...validateOwnership(files));
   return errors;
 }
@@ -162,7 +164,7 @@ function renderedProcesses(files: Record<string, string>): RenderedProcess[] {
   if (files["saas-oci-profile.yaml"])
     return profileProcesses(files["saas-oci-profile.yaml"], "processes");
   if (files["aws-ec2-profile.yaml"])
-    return profileProcesses(files["aws-ec2-profile.yaml"], "systemdPodmanUnits");
+    return profileProcesses(files["aws-ec2-profile.yaml"], "processes");
   return nixosProcesses(files["nixos-module.example.nix"] || "");
 }
 

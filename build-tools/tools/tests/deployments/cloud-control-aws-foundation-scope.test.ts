@@ -16,6 +16,7 @@ import {
   foundationFromTopology,
   privateLinkAwsTopology,
   publicAwsTopology,
+  topologyForPublishedImage,
 } from "./cloud-control-cutover-fixture";
 import { ecrRegistryProfileForImage } from "./control-plane-registry-profile.fixture";
 
@@ -60,7 +61,7 @@ test("repo-owned AWS foundation OpenTofu module covers network IAM S3 state and 
     'resource "aws_dynamodb_table"',
     'output "foundation_evidence"',
   ]) {
-    assert.match(source, new RegExp(escapeRegExp(expected)));
+    assert.ok(source.includes(expected), expected);
   }
 });
 
@@ -166,7 +167,7 @@ test("foundation validation rejects trust KMS replication and broad worker egres
 });
 
 test("alternate artifact backends keep selected provider and reviewed import evidence", () => {
-  const topology = privateLinkAwsTopology({
+  const topology = topologyForImage({
     artifactBackend: "cloudflare-r2",
     artifactBackendEvidence: {
       checkedAt: new Date().toISOString(),
@@ -236,11 +237,11 @@ function input(overrides: Partial<CloudControlSetupInput>): CloudControlSetupInp
     serviceReplicas: 1,
     workerReplicas: 2,
     dryRun: false,
-    awsTopology: privateLinkAwsTopology(),
+    awsTopology: topologyForImage(),
     ...overrides,
   };
 }
 
-function escapeRegExp(value: string): string {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+function topologyForImage(overrides: Record<string, unknown> = {}) {
+  return topologyForPublishedImage(privateLinkAwsTopology(overrides), image, digest);
 }

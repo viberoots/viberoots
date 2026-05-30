@@ -13,6 +13,8 @@ export function validateAwsCutoverTopology(
     expectedRegion: options.expectedRegion,
     maxAgeMinutes: options.maxAgeMinutes,
     selectedCapabilityIds: options.selectedCapabilities,
+    expectedImage: String(evidence.latestNonProductionDeployment?.image || ""),
+    expectedImageDigest: String(evidence.imagePublication?.digest || ""),
   });
 }
 

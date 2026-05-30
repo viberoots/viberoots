@@ -133,8 +133,10 @@ test("AWS EC2 profile records production boundaries and reviewed alternates", as
     );
     const aws = YAML.parse(awsProfile);
     assert.equal(aws.artifactBackend.defaultPath, "AWS S3 through a VPC endpoint");
-    assert.equal(aws.systemdPodmanUnits.length, 3);
-    assert.equal(aws.systemdPodmanUnits[0].name, "deployment-control-plane-service");
+    assert.equal(aws.processes.length, 3);
+    assert.equal(aws.processes[0].name, "deployment-control-plane-service");
+    assert.ok(await exists(path.join(tmp, "systemd/deployment-control-plane-service.service")));
+    assert.ok(await exists(path.join(tmp, "aws-ec2-podman-run.sh")));
     assert.ok(await exists(path.join(tmp, "managed-dependencies.json")));
     assert.ok(await exists(path.join(tmp, "ingress-checklist.json")));
     assert.equal(capabilities.length, CLOUD_CAPABILITY_IDS.length);

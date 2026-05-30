@@ -1,23 +1,20 @@
 import type { CloudControlSetupInput } from "./cloud-control-setup-types";
-import {
-  setupArtifactBackendEvidenceRef,
-  setupAwsSecurityGroupIds,
-  setupAwsSubnetIds,
-  setupUsesSupabasePrivateLink,
-} from "./cloud-control-setup-aws-topology";
 import YAML from "yaml";
-
-const CONFIG = "/etc/deployment-control-plane/config.yaml";
-const CREDS = "/run/deployment-control-plane/credentials";
-const STATE = "/var/lib/deployment-control-plane";
+import { renderAwsEc2ProfileFiles } from "./cloud-control-aws-ec2-host-profile";
+import {
+  CONTROL_PLANE_CONFIG,
+  CONTROL_PLANE_CREDS,
+  CONTROL_PLANE_GID,
+  CONTROL_PLANE_STATE,
+  CONTROL_PLANE_UID,
+  controlPlaneMetadataEnv,
+  controlPlaneMountSpecs,
+  controlPlaneProcessSpecs,
+  workerIndexes,
+} from "./cloud-control-process-contract";
 
 export function modeFiles(input: CloudControlSetupInput): Record<string, string> {
-  if (input.mode === "aws-ec2") {
-    return {
-      "aws-ec2-profile.yaml": awsProfile(input),
-      "systemd-podman.units.txt": systemdPodman(input),
-    };
-  }
+  if (input.mode === "aws-ec2") return renderAwsEc2ProfileFiles(input);
   if (input.mode === "nixos") return { "nixos-module.example.nix": nixosExample(input) };
   if (input.mode === "saas-oci") return { "saas-oci-profile.yaml": saasProfile(input) };
   return { "compose.yaml": composeProfile(input) };
@@ -26,16 +23,15 @@ export function modeFiles(input: CloudControlSetupInput): Record<string, string>
 function composeProfile(input: CloudControlSetupInput): string {
   return [
     "x-control-plane-runtime:",
-    "  uid: 10001",
-    "  gid: 10001",
+    `  uid: ${CONTROL_PLANE_UID}`,
+    `  gid: ${CONTROL_PLANE_GID}`,
     "  ownedPaths:",
-    `    - ${STATE}/records`,
-    `    - ${STATE}/artifacts`,
-    `    - ${STATE}/runtime`,
+    `    - ${CONTROL_PLANE_STATE}/records`,
+    `    - ${CONTROL_PLANE_STATE}/artifacts`,
+    `    - ${CONTROL_PLANE_STATE}/runtime`,
     "services:",
     serviceBlock(input),
-    workerBlock(input, 1),
-    workerBlock(input, 2),
+    ...workerIndexes(input).map((index) => workerBlock(input, index)),
     "volumes:",
     "  control-plane-records: {}",
     "  control-plane-artifacts: {}",
@@ -47,15 +43,15 @@ function serviceBlock(input: CloudControlSetupInput): string {
   return [
     "  deployment-control-plane-service:",
     `    image: ${input.image}`,
-    '    user: "10001:10001"',
-    `    command: ["service", "--config", "${CONFIG}"]`,
+    `    user: "${CONTROL_PLANE_UID}:${CONTROL_PLANE_GID}"`,
+    `    command: ["service", "--config", "${CONTROL_PLANE_CONFIG}"]`,
     metadataEnvironment(input),
     "    volumes:",
-    `      - ./config.yaml:${CONFIG}:ro`,
-    `      - ./credentials:${CREDS}:ro`,
-    `      - control-plane-records:${STATE}/records`,
-    `      - control-plane-artifacts:${STATE}/artifacts`,
-    `      - control-plane-runtime:${STATE}/runtime`,
+    `      - ./config.yaml:${CONTROL_PLANE_CONFIG}:ro`,
+    `      - ./credentials:${CONTROL_PLANE_CREDS}:ro`,
+    `      - control-plane-records:${CONTROL_PLANE_STATE}/records`,
+    `      - control-plane-artifacts:${CONTROL_PLANE_STATE}/artifacts`,
+    `      - control-plane-runtime:${CONTROL_PLANE_STATE}/runtime`,
     `    ports: ["127.0.0.1:7780:7780"]`,
   ].join("\n");
 }
@@ -64,15 +60,15 @@ function workerBlock(input: CloudControlSetupInput, index: number): string {
   return [
     `  deployment-control-plane-worker-${index}:`,
     `    image: ${input.image}`,
-    '    user: "10001:10001"',
-    `    command: ["worker", "--config", "${CONFIG}", "--worker-id", "worker-${index}"]`,
+    `    user: "${CONTROL_PLANE_UID}:${CONTROL_PLANE_GID}"`,
+    `    command: ["worker", "--config", "${CONTROL_PLANE_CONFIG}", "--worker-id", "worker-${index}"]`,
     metadataEnvironment(input),
     "    volumes:",
-    `      - ./config.yaml:${CONFIG}:ro`,
-    `      - ./credentials:${CREDS}:ro`,
-    `      - control-plane-records:${STATE}/records`,
-    `      - control-plane-artifacts:${STATE}/artifacts`,
-    `      - control-plane-runtime:${STATE}/runtime`,
+    `      - ./config.yaml:${CONTROL_PLANE_CONFIG}:ro`,
+    `      - ./credentials:${CONTROL_PLANE_CREDS}:ro`,
+    `      - control-plane-records:${CONTROL_PLANE_STATE}/records`,
+    `      - control-plane-artifacts:${CONTROL_PLANE_STATE}/artifacts`,
+    `      - control-plane-runtime:${CONTROL_PLANE_STATE}/runtime`,
   ].join("\n");
 }
 
@@ -122,111 +118,20 @@ function saasProfile(input: CloudControlSetupInput): string {
   return YAML.stringify({
     schemaVersion: "cloud-control-saas-oci-profile@1",
     image: input.image,
-    processes: processSpecs(input, "saas-oci"),
+    processes: controlPlaneProcessSpecs(input),
     imagePublication: input.imagePublication,
-    mounts: mountSpecs("persistent-volume"),
-    runtimeUser: { uid: 10001, gid: 10001 },
+    mounts: controlPlaneMountSpecs("persistent-volume"),
+    runtimeUser: { uid: CONTROL_PLANE_UID, gid: CONTROL_PLANE_GID },
     protectedSharedReady: false,
     readinessEvidence: ["health", "readiness", "worker-heartbeats", "provider-capabilities"],
   });
 }
 
-function awsProfile(input: CloudControlSetupInput): string {
-  const alternate =
-    input.artifactBackend === "aws-s3"
-      ? "none"
-      : `${input.artifactBackend} with evidence ${setupArtifactBackendEvidenceRef(input)}`;
-  return YAML.stringify({
-    schemaVersion: "cloud-control-aws-ec2-profile@1",
-    artifactBackend: {
-      selected: input.artifactBackend,
-      defaultPath: "AWS S3 through a VPC endpoint",
-      reviewedAlternateEvidence: alternate,
-    },
-    network: {
-      subnetIds: setupAwsSubnetIds(input),
-      securityGroupIds: setupAwsSecurityGroupIds(input),
-      supabasePrivatelink: setupUsesSupabasePrivateLink(input),
-    },
-    systemdPodmanUnits: processSpecs(input, "aws-ec2"),
-    imagePublication: input.imagePublication,
-    registryProfile: input.imagePublication?.registryProfile,
-    mounts: mountSpecs("host-path"),
-    runtimeUser: { uid: 10001, gid: 10001 },
-    protectedSharedReady: false,
-  });
-}
-
-function systemdPodman(input: CloudControlSetupInput): string {
-  const env = metadataEnv(input)
-    .map(([key, value]) => `${key}=${value}`)
-    .join(" ");
-  return `deployment-control-plane-service ${input.image} ${CONFIG} ${CREDS} ${env}
-deployment-control-plane-worker-1 ${input.image} ${CONFIG} ${CREDS} ${STATE}/runtime ${env}
-deployment-control-plane-worker-2 ${input.image} ${CONFIG} ${CREDS} ${STATE}/runtime ${env}
-`;
-}
-
-type RenderedProcess = {
-  name: string;
-  image: string;
-  command: string[];
-  mounts: string[];
-  environment: Record<string, string>;
-};
-
-function processSpecs(input: CloudControlSetupInput, substrate: string): RenderedProcess[] {
-  return [
-    {
-      name: "deployment-control-plane-service",
-      image: input.image,
-      command: ["service", "--config", CONFIG],
-      mounts: mountedPaths(),
-      environment: Object.fromEntries(metadataEnv(input)),
-      ...(substrate === "aws-ec2"
-        ? { systemdUnit: "deployment-control-plane-service.service" }
-        : {}),
-    },
-    ...[1, 2].map((index) => ({
-      name: `deployment-control-plane-worker-${index}`,
-      image: input.image,
-      command: ["worker", "--config", CONFIG, "--worker-id", `worker-${index}`],
-      mounts: mountedPaths(),
-      environment: Object.fromEntries(metadataEnv(input)),
-      ...(substrate === "aws-ec2"
-        ? { systemdUnit: `deployment-control-plane-worker-${index}.service` }
-        : {}),
-    })),
-  ];
-}
-
-function mountSpecs(kind: string) {
-  return mountedPaths().map((target) => ({
-    kind,
-    target,
-    readOnly: target === CONFIG || target === CREDS,
-  }));
-}
-
-function mountedPaths(): string[] {
-  return [CONFIG, CREDS, `${STATE}/records`, `${STATE}/artifacts`, `${STATE}/runtime`];
-}
-
 function metadataEnvironment(input: CloudControlSetupInput): string {
   return [
     "    environment:",
-    ...metadataEnv(input).map(([key, value]) => `      ${key}: ${JSON.stringify(value)}`),
+    ...controlPlaneMetadataEnv(input).map(
+      ([key, value]) => `      ${key}: ${JSON.stringify(value)}`,
+    ),
   ].join("\n");
-}
-
-function metadataEnv(input: CloudControlSetupInput): Array<[string, string]> {
-  return [
-    ["VBR_CONTROL_PLANE_SOURCE_REVISION", input.imagePublication!.sourceRevision],
-    ["VBR_CONTROL_PLANE_IMAGE_REF", input.image],
-    ["VBR_CONTROL_PLANE_IMAGE_BUILD_IDENTITY", input.expectedImageBuildIdentity],
-    ["VBR_CONTROL_PLANE_IMAGE_DIGEST", input.imagePublication!.digest],
-    ["VBR_CONTROL_PLANE_IMAGE_INSPECTED_DIGEST", input.imagePublication!.inspectedDigest],
-    ["VBR_CONTROL_PLANE_IMAGE_TAG", input.imagePublication!.tag],
-    ["VBR_CONTROL_PLANE_IMAGE_DIGEST_STATUS", "verified-registry-publication"],
-  ];
 }

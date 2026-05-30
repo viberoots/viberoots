@@ -1,5 +1,4 @@
 import { capabilityDeclaration } from "../../deployments/cloud-control-setup-contract";
-import { AWS_TOPOLOGY_EVIDENCE_SCHEMA } from "../../deployments/cloud-control-aws-topology-types";
 import { foundationFromTopology } from "./cloud-control-aws-foundation-fixture";
 import {
   CLOUD_PROVIDER_CAPABILITY_HOOK_EVIDENCE_SCHEMA,
@@ -7,13 +6,25 @@ import {
 } from "../../deployments/cloud-control-provider-capability-hook-contract";
 import { managedDependencyEvidence } from "./cloud-control-cutover-managed-dependencies.fixture";
 import { ecrRegistryProfileForImage } from "./control-plane-registry-profile.fixture";
+import {
+  freshCheckedAt,
+  IMAGE_BUILD_IDENTITY,
+  IMAGE_DIGEST,
+  IMAGE_REF,
+  privateLinkAwsTopology,
+  topologyForPublishedImage,
+} from "./cloud-control-aws-topology.fixture";
 
 export { managedDependencyEvidence } from "./cloud-control-cutover-managed-dependencies.fixture";
 export { foundationFromTopology } from "./cloud-control-aws-foundation-fixture";
-
-export const IMAGE_DIGEST = `sha256:${"a".repeat(64)}`;
-export const IMAGE_REF = `registry.example.com/platform/deployment-control-plane@${IMAGE_DIGEST}`;
-export const IMAGE_BUILD_IDENTITY = `nix-source-${"b".repeat(64)}`;
+export {
+  IMAGE_BUILD_IDENTITY,
+  IMAGE_DIGEST,
+  IMAGE_REF,
+  privateLinkAwsTopology,
+  publicAwsTopology,
+  topologyForPublishedImage,
+} from "./cloud-control-aws-topology.fixture";
 
 export function evidence(overrides: Record<string, unknown> = {}) {
   return {
@@ -110,137 +121,4 @@ export function restoreEvidence() {
     authConfiguration: true,
     durableStateReferences: ["submission:1", "artifact:1"],
   };
-}
-
-export function publicAwsTopology(overrides: Record<string, unknown> = {}) {
-  const topology = {
-    ...baseAwsTopology(),
-    database: {
-      mode: "public",
-      publicTls: {
-        checkedAt: freshCheckedAt(),
-        sourceHost: "i-0abc1234",
-        targetHost: "db.project.supabase.co",
-        tlsValidated: true,
-        psqlProofDigest: "sha256:public-psql-proof",
-      },
-    },
-    ...overrides,
-  };
-  return {
-    ...topology,
-    foundation: topology.foundation ?? foundationFromTopology(topology),
-  };
-}
-
-export function privateLinkAwsTopology(overrides: Record<string, unknown> = {}) {
-  const topology = {
-    ...baseAwsTopology(),
-    securityGroups: {
-      ...baseSecurityGroups(),
-      privatelink: sg("sg-privatelink", "supabase-privatelink-endpoint"),
-    },
-    database: {
-      mode: "privatelink",
-      privatelink: {
-        checkedAt: freshCheckedAt(),
-        resourceConfigurationArn:
-          "arn:aws:vpc-lattice:us-east-1:123456789012:resourceconfiguration/rcfg-123",
-        ramShareArn: "arn:aws:ram:us-east-1:123456789012:resource-share/share-123",
-        endpointId: "vpce-privatelink123",
-        endpointDnsNames: ["vpce-privatelink123.vpce.amazonaws.com"],
-        endpointIps: ["10.0.1.12"],
-        psqlProofDigest: "sha256:privatelink-psql-proof",
-      },
-    },
-    ...overrides,
-  };
-  return {
-    ...topology,
-    foundation: topology.foundation ?? foundationFromTopology(topology),
-  };
-}
-
-function baseAwsTopology() {
-  return {
-    schemaVersion: AWS_TOPOLOGY_EVIDENCE_SCHEMA,
-    checkedAt: freshCheckedAt(),
-    accountId: "123456789012",
-    region: "us-east-1",
-    artifactBackend: "aws-s3",
-    vpc: { checkedAt: freshCheckedAt(), id: "vpc-123", dnsSupport: true, dnsHostnames: true },
-    egress: {
-      checkedAt: freshCheckedAt(),
-      mode: "nat-gateway",
-      routeTableIds: ["rtb-123", "rtb-456"],
-      natGatewayIds: ["nat-123"],
-    },
-    privateSubnets: [
-      {
-        checkedAt: freshCheckedAt(),
-        id: "subnet-123",
-        vpcId: "vpc-123",
-        availabilityZone: "us-east-1a",
-        routeTableId: "rtb-123",
-        mapPublicIpOnLaunch: false,
-      },
-      {
-        checkedAt: freshCheckedAt(),
-        id: "subnet-456",
-        vpcId: "vpc-123",
-        availabilityZone: "us-east-1b",
-        routeTableId: "rtb-456",
-        mapPublicIpOnLaunch: false,
-      },
-    ],
-    securityGroups: baseSecurityGroups(),
-    s3VpcEndpoint: {
-      checkedAt: freshCheckedAt(),
-      type: "gateway",
-      endpointId: "vpce-123",
-      routeTableIds: ["rtb-123", "rtb-456"],
-      endpointPolicyDigest: "sha256:s3-endpoint-policy",
-      bucket: "deployment-control-plane-artifacts",
-      prefix: "control-plane/",
-    },
-    compute: {
-      checkedAt: freshCheckedAt(),
-      mode: "ec2-instance",
-      instanceId: "i-0abc1234",
-      launchTemplateId: "lt-123",
-      launchTemplateVersion: "7",
-      amiId: "ami-123",
-      instanceProfileArn: "arn:aws:iam::123456789012:instance-profile/control-plane",
-      processEvidence: { checkedAt: freshCheckedAt(), service: "pid:100", workers: ["pid:101"] },
-    },
-    ingress: {
-      checkedAt: freshCheckedAt(),
-      type: "alb",
-      listenerArn: "arn:aws:elasticloadbalancing:us-east-1:123456789012:listener/app/cp/1/2",
-      targetGroupArn: "arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/cp/1",
-      targetHealth: "healthy",
-      certificateArn: "arn:aws:acm:us-east-1:123456789012:certificate/cert-123",
-      tlsPolicy: "ELBSecurityPolicy-TLS13-1-2-2021-06",
-      dnsRecord: "deploy.example.test",
-      callbackHost: "deploy-auth.example.test",
-    },
-  };
-}
-
-function baseSecurityGroups() {
-  return {
-    service: sg("sg-service", "control-plane-service"),
-    worker: sg("sg-worker", "control-plane-worker"),
-    loadBalancer: sg("sg-alb", "load-balancer"),
-    s3Endpoint: sg("sg-s3", "s3-endpoint"),
-    privatelink: sg("sg-privatelink", "supabase-privatelink-endpoint"),
-  };
-}
-
-function sg(id: string, purpose: string) {
-  return { checkedAt: freshCheckedAt(), id, vpcId: "vpc-123", purpose };
-}
-
-function freshCheckedAt() {
-  return new Date().toISOString();
 }

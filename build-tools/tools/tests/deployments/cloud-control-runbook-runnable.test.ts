@@ -103,7 +103,19 @@ function input(outDir: string, publicUrl: string): CloudControlSetupInput {
     serviceReplicas: 1,
     workerReplicas: 2,
     dryRun: false,
-    awsTopology: privateLinkAwsTopology(),
+    awsTopology: topologyForImage(),
+  };
+}
+
+function topologyForImage() {
+  const topology = privateLinkAwsTopology() as any;
+  return {
+    ...topology,
+    compute: {
+      ...topology.compute,
+      processEvidence: { ...topology.compute.processEvidence, imageDigest: DIGEST },
+      registryPullProof: { ...topology.compute.registryPullProof, image: IMAGE, digest: DIGEST },
+    },
   };
 }
 

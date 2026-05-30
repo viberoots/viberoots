@@ -5,7 +5,7 @@ import YAML from "yaml";
 import { renderCloudControlSetupBundle } from "../../deployments/cloud-control-setup-render";
 import { validateCloudControlSetupInput } from "../../deployments/cloud-control-setup-validate";
 import type { CloudControlSetupInput } from "../../deployments/cloud-control-setup-types";
-import { privateLinkAwsTopology } from "./cloud-control-cutover-fixture";
+import { privateLinkAwsTopology, topologyForPublishedImage } from "./cloud-control-cutover-fixture";
 import { ecrRegistryProfileForImage } from "./control-plane-registry-profile.fixture";
 
 const DIGEST_REF =
@@ -42,7 +42,7 @@ function input(overrides: Partial<CloudControlSetupInput> = {}): CloudControlSet
     serviceReplicas: 1,
     workerReplicas: 2,
     dryRun: false,
-    awsTopology: privateLinkAwsTopology(),
+    awsTopology: topologyForImage(),
     ...overrides,
   };
 }
@@ -52,7 +52,7 @@ test("AWS EC2 alternate artifact backends require reviewed evidence", () => {
     validateCloudControlSetupInput(
       input({
         artifactBackend: "supabase-storage-s3",
-        awsTopology: privateLinkAwsTopology({
+        awsTopology: topologyForImage({
           artifactBackend: "supabase-storage-s3",
           s3VpcEndpoint: undefined,
         }),
@@ -65,7 +65,7 @@ test("AWS EC2 alternate artifact backends require reviewed evidence", () => {
       renderCloudControlSetupBundle(
         input({
           artifactBackend: "s3-compatible",
-          awsTopology: privateLinkAwsTopology({
+          awsTopology: topologyForImage({
             artifactBackend: "s3-compatible",
             s3VpcEndpoint: undefined,
           }),
@@ -79,7 +79,7 @@ test("AWS EC2 alternate artifact backend records reviewed evidence", () => {
   const bundle = renderCloudControlSetupBundle(
     input({
       artifactBackend: "supabase-storage-s3",
-      awsTopology: privateLinkAwsTopology({
+      awsTopology: topologyForImage({
         artifactBackend: "supabase-storage-s3",
         s3VpcEndpoint: undefined,
         artifactBackendEvidence: {
@@ -110,7 +110,7 @@ test("AWS EC2 Cloudflare R2 artifact backend remains provider-specific", () => {
   const bundle = renderCloudControlSetupBundle(
     input({
       artifactBackend: "cloudflare-r2",
-      awsTopology: privateLinkAwsTopology({
+      awsTopology: topologyForImage({
         artifactBackend: "cloudflare-r2",
         s3VpcEndpoint: undefined,
         artifactBackendEvidence: {
@@ -129,3 +129,7 @@ test("AWS EC2 Cloudflare R2 artifact backend remains provider-specific", () => {
     "sha256:cloudflare-r2-artifact-backend",
   );
 });
+
+function topologyForImage(overrides: Record<string, unknown> = {}) {
+  return topologyForPublishedImage(privateLinkAwsTopology(overrides), DIGEST_REF, DIGEST);
+}

@@ -7,7 +7,7 @@ import { renderCloudControlSetupBundle } from "../../deployments/cloud-control-s
 import { runCredentialPreflight } from "../../deployments/control-plane-credential-preflight";
 import type { CloudControlSetupInput } from "../../deployments/cloud-control-setup-types";
 import { runInScratchTemp } from "../lib/test-helpers";
-import { privateLinkAwsTopology } from "./cloud-control-cutover-fixture";
+import { privateLinkAwsTopology, topologyForPublishedImage } from "./cloud-control-cutover-fixture";
 import { ecrRegistryProfileForImage } from "./control-plane-registry-profile.fixture";
 
 const DIGEST_REF =
@@ -64,7 +64,9 @@ test("credential preflight rejects missing, empty, URL, env, and stale deploymen
 async function writeFixture(dir: string, setupInput: CloudControlSetupInput): Promise<void> {
   const bundle = renderCloudControlSetupBundle({ ...setupInput, outDir: dir });
   for (const [name, content] of Object.entries(bundle.files)) {
-    await fsp.writeFile(path.join(dir, name), content, "utf8");
+    const filePath = path.join(dir, name);
+    await fsp.mkdir(path.dirname(filePath), { recursive: true });
+    await fsp.writeFile(filePath, content, "utf8");
   }
   const credentials = path.join(dir, "credentials");
   await fsp.mkdir(credentials, { recursive: true });
@@ -109,6 +111,10 @@ function input(): CloudControlSetupInput {
     serviceReplicas: 1,
     workerReplicas: 2,
     dryRun: false,
-    awsTopology: privateLinkAwsTopology(),
+    awsTopology: topologyForImage(),
   };
+}
+
+function topologyForImage() {
+  return topologyForPublishedImage(privateLinkAwsTopology(), DIGEST_REF, DIGEST);
 }

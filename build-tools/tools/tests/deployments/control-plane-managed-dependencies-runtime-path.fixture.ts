@@ -1,7 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import type { CloudControlSetupInput } from "../../deployments/cloud-control-setup-types";
 import type { ManagedDependencyEvidence } from "../../deployments/control-plane-managed-dependency-types";
-import { privateLinkAwsTopology } from "./cloud-control-cutover-fixture";
+import { privateLinkAwsTopology, topologyForPublishedImage } from "./cloud-control-cutover-fixture";
 import { ecrRegistryProfileForImage } from "./control-plane-registry-profile.fixture";
 
 const DIGEST_REF =
@@ -124,6 +124,10 @@ export function setupInput(): CloudControlSetupInput {
     serviceReplicas: 1,
     workerReplicas: 2,
     dryRun: false,
-    awsTopology: privateLinkAwsTopology(),
+    awsTopology: topologyForImage(),
   };
+}
+
+function topologyForImage() {
+  return topologyForPublishedImage(privateLinkAwsTopology(), DIGEST_REF, DIGEST);
 }

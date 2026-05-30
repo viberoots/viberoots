@@ -81,7 +81,7 @@ let
     "${cfg.artifactStagingRoot}:${defaults.artifactStagingRoot}:rw"
     "${cfg.runtimeRoot}:${defaults.runtimeRoot}:rw"
   ];
-  containerFor = name: mode: {
+  containerFor = name: mode: workerId: {
     image = imageRef;
     autoStart = true;
     volumes = baseVolumes ++ [ "${credentialRuntimeDirectory name}:${cfg.credentialDirectory}:ro" ];
@@ -101,13 +101,13 @@ let
       WORKSPACE_ROOT = "${defaults.runtimeRoot}/workspace";
       TMPDIR = "${defaults.runtimeRoot}/tmp";
     };
-    cmd = [ mode "--config" configFile ];
+    cmd = [ mode "--config" configFile ] ++ lib.optionals (workerId != null) [ "--worker-id" workerId ];
   };
   healthCmd =
     "node -e 'fetch(\"http://127.0.0.1:${toString cfg.port}/healthz\")"
     + ".then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))'";
   networkExtraOptions = lib.optionals (cfg.networkMode == "host") [ "--network=host" ];
-  serviceContainer = containerFor defaults.serviceContainerName "service" // {
+  serviceContainer = containerFor defaults.serviceContainerName "service" null // {
     ports = lib.optionals (cfg.networkMode == "bridge") [ "${cfg.bindAddress}:${toString cfg.port}:${toString cfg.port}" ];
     extraOptions = networkExtraOptions ++ [
       "--health-cmd=${healthCmd}"
@@ -119,7 +119,14 @@ let
   workerIndexes = lib.range 1 cfg.workerReplicas;
   workerNames = map (index: "${defaults.workerContainerNamePrefix}-${toString index}") workerIndexes;
   workerContainers = lib.listToAttrs (
-    map (name: lib.nameValuePair name (containerFor name "worker" // { extraOptions = networkExtraOptions; })) workerNames
+    map
+      (index:
+        let
+          name = "${defaults.workerContainerNamePrefix}-${toString index}";
+          workerId = "worker-${toString index}";
+        in
+        lib.nameValuePair name (containerFor name "worker" workerId // { extraOptions = networkExtraOptions; }))
+      workerIndexes
   );
   allContainerNames = [ defaults.serviceContainerName ] ++ workerNames;
   systemdCredentialServices = lib.listToAttrs (

@@ -180,6 +180,7 @@ function managedCommands(input: CloudControlSetupInput): RunbookCommand[] {
 }
 
 function processCommands(input: CloudControlSetupInput): RunbookCommand[] {
+  if (input.mode === "aws-ec2") return awsEc2ProcessCommands(input);
   const service = command(
     "service",
     "deployment-control-plane service --config /etc/deployment-control-plane/config.yaml",
@@ -194,6 +195,36 @@ function processCommands(input: CloudControlSetupInput): RunbookCommand[] {
       ["$PROFILE_ROOT/credential-preflight.json"],
       [`$PROFILE_ROOT/process-worker-${index + 1}.json`],
       "worker process starts",
+    ),
+  );
+  return [service, ...workers];
+}
+
+function awsEc2ProcessCommands(input: CloudControlSetupInput): RunbookCommand[] {
+  const inputs = [
+    "$PROFILE_ROOT/config.yaml",
+    "$PROFILE_ROOT/credential-preflight.json",
+    "$PROFILE_ROOT/aws-ec2-podman-run.sh",
+    "$PROFILE_ROOT/systemd/deployment-control-plane-service.service",
+    ...Array.from(
+      { length: input.workerReplicas },
+      (_, index) => `$PROFILE_ROOT/systemd/deployment-control-plane-worker-${index + 1}.service`,
+    ),
+  ];
+  const service = command(
+    "service",
+    `${rootPrelude(input.outDir)}; bash "$PROFILE_ROOT/aws-ec2-podman-run.sh"; printf '{"ok":true,"activation":"aws-ec2-podman-run.sh"}\\n' > "$PROFILE_ROOT/process-service.json"`,
+    inputs,
+    ["$PROFILE_ROOT/process-service.json"],
+    "generated AWS EC2 systemd service and workers are activated",
+  );
+  const workers = Array.from({ length: input.workerReplicas }, (_, index) =>
+    command(
+      `worker-${index + 1}`,
+      `${rootPrelude(input.outDir)}; systemctl enable --now deployment-control-plane-worker-${index + 1}.service; printf '{"ok":true,"unit":"deployment-control-plane-worker-${index + 1}.service"}\\n' > "$PROFILE_ROOT/process-worker-${index + 1}.json"`,
+      inputs,
+      [`$PROFILE_ROOT/process-worker-${index + 1}.json`],
+      "generated AWS EC2 worker unit is enabled",
     ),
   );
   return [service, ...workers];

@@ -103,7 +103,7 @@ test("deployment-control-plane setup writes a cloud host profile bundle", async 
     assert.ok(await exists(path.join(out, "provider-capabilities.json")));
     const profile = YAML.parse(await fsp.readFile(path.join(out, "aws-ec2-profile.yaml"), "utf8"));
     assert.equal(profile.artifactBackend.defaultPath, "AWS S3 through a VPC endpoint");
-    assert.equal(profile.systemdPodmanUnits.length, 3);
+    assert.equal(profile.processes.length, 3);
   });
 });
 
