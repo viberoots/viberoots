@@ -12,6 +12,8 @@ import {
   controlPlaneProcessSpecs,
   workerIndexes,
 } from "./cloud-control-process-contract";
+import { runtimeAuthConfig } from "./cloud-control-runtime-input";
+import { setupArtifactCredentialMode } from "./cloud-control-setup-aws-topology";
 
 export function modeFiles(input: CloudControlSetupInput): Record<string, string> {
   if (input.mode === "aws-ec2") return renderAwsEc2ProfileFiles(input);
@@ -86,6 +88,12 @@ function nixosExample(input: CloudControlSetupInput): string {
       reviewed-source-github-app-private-key.source = "/run/secrets/reviewed-source-github-app-private-key";`
       : `      reviewed-source-ssh-key.source = "/run/secrets/reviewed-source-ssh-key";
       reviewed-source-known-hosts.source = "/run/secrets/reviewed-source-known-hosts";`;
+  const artifactCredentialSources =
+    setupArtifactCredentialMode(input) === "files"
+      ? `      artifact-store-access-key-id.source = "/run/secrets/artifact-store-access-key-id";
+      artifact-store-secret-access-key.source = "/run/secrets/artifact-store-secret-access-key";`
+      : "";
+  const auth = runtimeAuthConfig((input.runtimeInput ?? missingRuntimeInput()).authProvider);
   return `{
   services.viberoots.deploymentControlPlaneContainer = {
     enable = true;
@@ -98,20 +106,43 @@ function nixosExample(input: CloudControlSetupInput): string {
     instanceId = "${input.instanceId}";
     publicUrl = "${input.publicUrl}";
     reviewedSourceMode = "${input.reviewedSourceMode}";
+    authProvider = {
+      kind = "${auth.kind}";
+      issuer = "${auth.issuer}";
+      audience = [ ${auth.audience.map((item) => `"${item}"`).join(" ")} ];
+      jwksUrl = "${auth.jwksUrl || ""}";
+      callback.externalHost = "${auth.callback.externalHost}";
+      callback.externalPath = "${auth.callback.externalPath}";
+      claims.userIdClaim = "${auth.claims.userIdClaim}";
+      claims.emailClaim = "${auth.claims.emailClaim}";
+      claims.roleClaim = "${auth.claims.roleClaim}";
+      claims.servicePrincipalClaim = "${auth.claims.servicePrincipalClaim}";
+      roleGroups.deployer = [ ${auth.roleGroups.deployer.map((item) => `"${item}"`).join(" ")} ];
+      roleGroups.admissionReporter = [ ${auth.roleGroups.admissionReporter.map((item) => `"${item}"`).join(" ")} ];
+      roleGroups.admin = [ ${auth.roleGroups.admin.map((item) => `"${item}"`).join(" ")} ];
+      servicePrincipals = { ${Object.entries(auth.servicePrincipals)
+        .map(([key, value]) => `${JSON.stringify(key)} = ${JSON.stringify(value)};`)
+        .join(" ")} };
+    };
     workerReplicas = 2;
     infisicalDeploymentIds = [ ${input.deploymentIds.map((id) => `"${id}"`).join(" ")} ];
     artifactStore.bucket = "${input.artifactBucket}";
+    artifactStore.provider = "${input.artifactBackend}";
+    artifactStore.credentialMode = "${setupArtifactCredentialMode(input)}";
     credentials = {
       control-plane-database-url.source = "/run/secrets/control-plane-database-url";
       control-plane-token.source = "/run/secrets/control-plane-token";
 ${reviewedSourceCredentialSources}
       artifact-store-endpoint.source = "/run/secrets/artifact-store-endpoint";
-      artifact-store-access-key-id.source = "/run/secrets/artifact-store-access-key-id";
-      artifact-store-secret-access-key.source = "/run/secrets/artifact-store-secret-access-key";
+${artifactCredentialSources}
 ${infisicalCredentialSources}
     };
   };
 }`;
+}
+
+function missingRuntimeInput(): never {
+  throw new Error("cloud control-plane setup requires runtime input");
 }
 
 function saasProfile(input: CloudControlSetupInput): string {

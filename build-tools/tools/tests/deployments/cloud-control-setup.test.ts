@@ -1,4 +1,3 @@
-#!/usr/bin/env zx-wrapper
 import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
@@ -20,6 +19,7 @@ import {
 } from "../../deployments/cloud-control-setup-profile-validate";
 import type { CloudControlSetupInput } from "../../deployments/cloud-control-setup-types";
 import { privateLinkAwsTopology } from "./cloud-control-cutover-fixture";
+import { reviewedRuntimeInput } from "./cloud-control-runtime-input.fixture";
 import { privateLinkSupabaseProfile } from "./control-plane-supabase-postgres.fixture";
 import { ecrRegistryProfileForImage } from "./control-plane-registry-profile.fixture";
 import { runInScratchTemp } from "../lib/test-helpers";
@@ -51,6 +51,7 @@ function baseInput(overrides: Partial<CloudControlSetupInput> = {}): CloudContro
     dryRun: false,
     awsTopology: privateLinkAwsTopology(),
     supabasePostgres: privateLinkSupabaseProfile(),
+    runtimeInput: reviewedRuntimeInput(),
     ...overrides,
   };
 }
@@ -135,10 +136,14 @@ test("AWS EC2 profile records production boundaries and reviewed alternates", as
     assert.equal(aws.artifactBackend.defaultPath, "AWS S3 through a VPC endpoint");
     assert.equal(aws.processes.length, 3);
     assert.equal(aws.processes[0].name, "deployment-control-plane-service");
-    assert.ok(await exists(path.join(tmp, "systemd/deployment-control-plane-service.service")));
-    assert.ok(await exists(path.join(tmp, "aws-ec2-podman-run.sh")));
-    assert.ok(await exists(path.join(tmp, "managed-dependencies.json")));
-    assert.ok(await exists(path.join(tmp, "ingress-checklist.json")));
+    for (const name of [
+      "systemd/deployment-control-plane-service.service",
+      "aws-ec2-podman-run.sh",
+      "managed-dependencies.json",
+      "ingress-checklist.json",
+    ]) {
+      await fsp.access(path.join(tmp, name));
+    }
     assert.equal(capabilities.length, CLOUD_CAPABILITY_IDS.length);
   });
 });
@@ -241,10 +246,3 @@ test("generated profile files do not embed secret values", async () => {
     }
   });
 });
-
-async function exists(file: string): Promise<boolean> {
-  return fsp.access(file).then(
-    () => true,
-    () => false,
-  );
-}

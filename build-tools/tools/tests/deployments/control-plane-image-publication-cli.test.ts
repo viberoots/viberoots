@@ -1,4 +1,3 @@
-#!/usr/bin/env zx-wrapper
 import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
@@ -9,6 +8,7 @@ import { runInTemp } from "../lib/test-helpers";
 import { ingressCommandEvidence } from "./cloud-control-aws-ingress.fixture";
 import { foundationFromTopology, privateLinkAwsTopology } from "./cloud-control-cutover-fixture";
 import {
+  runtimeInputArgs,
   supabaseProfileArgs,
   withControlPlaneArgv,
 } from "./control-plane-process-entrypoints.helpers";
@@ -17,6 +17,10 @@ import { ecrRegistryProfile } from "./control-plane-registry-profile.fixture";
 const DIGEST = `sha256:${"d".repeat(64)}`;
 const IMAGE = `123456789012.dkr.ecr.us-east-1.amazonaws.com/deployment-control-plane@${DIGEST}`;
 const BUILD_IDENTITY = `nix-source-${"e".repeat(64)}`;
+const REVIEWED_BUILD_COMMANDS = [
+  "nix build .#deployment-control-plane-image",
+  "nix build .#deployment-control-plane-image-contract",
+];
 
 test("image-publication command writes generated registry inspection evidence", async () => {
   await runInTemp("control-plane-image-publication-cli", async (tmp) => {
@@ -52,7 +56,7 @@ test("image-publication command writes generated registry inspection evidence", 
     assert.equal(evidence.digest, DIGEST);
     assert.equal(evidence.inspectedDigest, DIGEST);
     assert.equal(evidence.evidenceSource, "generated-command");
-    assert.deepEqual(evidence.reviewedBuildCommands, reviewedBuildCommands());
+    assert.deepEqual(evidence.reviewedBuildCommands, REVIEWED_BUILD_COMMANDS);
     assert.equal(
       evidence.registryProfileSummary.runtimePull.credentialSource,
       "ec2-instance-profile",
@@ -119,6 +123,7 @@ test("production AWS setup consumes generated image publication evidence path", 
         "--ingress-command-evidence",
         ingressCommandEvidenceFiles.join(","),
         ...(await supabaseProfileArgs(tmp)),
+        ...(await runtimeInputArgs(tmp)),
       ],
       runDeploymentControlPlaneCommand,
     );
@@ -128,7 +133,7 @@ test("production AWS setup consumes generated image publication evidence path", 
     const publication = JSON.parse(
       await fsp.readFile(path.join(out, "image-publication.json"), "utf8"),
     );
-    assert.deepEqual(publication.reviewedBuildCommands, reviewedBuildCommands());
+    assert.deepEqual(publication.reviewedBuildCommands, REVIEWED_BUILD_COMMANDS);
     const commands = JSON.parse(await fsp.readFile(path.join(out, "commands.json"), "utf8"));
     assert.match(JSON.stringify(commands), /deployment-control-plane image-publication/);
   });
@@ -172,7 +177,7 @@ function generatedEvidence() {
     tag: "123456789012.dkr.ecr.us-east-1.amazonaws.com/deployment-control-plane:source-reviewed",
     evidenceSource: "generated-command",
     registryProfile: ecrRegistryProfile(),
-    reviewedBuildCommands: reviewedBuildCommands(),
+    reviewedBuildCommands: REVIEWED_BUILD_COMMANDS,
   };
 }
 
@@ -240,11 +245,4 @@ async function fakeEmptySkopeo(tmp: string): Promise<string> {
   await fsp.writeFile(file, "#!/usr/bin/env bash\nexit 0\n", "utf8");
   await fsp.chmod(file, 0o755);
   return file;
-}
-
-function reviewedBuildCommands(): string[] {
-  return [
-    "nix build .#deployment-control-plane-image",
-    "nix build .#deployment-control-plane-image-contract",
-  ];
 }

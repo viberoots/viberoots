@@ -12,6 +12,7 @@ import {
   privateLinkAwsTopology,
   topologyForPublishedImage,
 } from "./cloud-control-cutover-fixture";
+import { reviewedRuntimeInput } from "./cloud-control-runtime-input.fixture";
 import { ecrRegistryProfileForImage } from "./control-plane-registry-profile.fixture";
 import { privateLinkSupabaseProfile } from "./control-plane-supabase-postgres.fixture";
 
@@ -80,6 +81,7 @@ function input(outDir: string): CloudControlSetupInput {
     dryRun: false,
     awsTopology: topologyForImage(),
     supabasePostgres: privateLinkSupabaseProfile(),
+    runtimeInput: reviewedRuntimeInput(),
   };
 }
 

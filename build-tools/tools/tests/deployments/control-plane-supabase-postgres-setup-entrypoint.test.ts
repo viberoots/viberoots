@@ -10,6 +10,8 @@ import { validateCloudControlSetupInput } from "../../deployments/cloud-control-
 import type { CloudControlSetupInput } from "../../deployments/cloud-control-setup-types";
 import { reviewedSupabaseManagedPostgresProfile } from "../../deployments/control-plane-supabase-postgres-profile";
 import { privateLinkAwsTopology } from "./cloud-control-cutover-fixture";
+import { reviewedRuntimeInput } from "./cloud-control-runtime-input.fixture";
+import { runtimeInputArgs } from "./control-plane-process-entrypoints.helpers";
 import { ecrRegistryProfileForImage } from "./control-plane-registry-profile.fixture";
 
 const IMAGE =
@@ -91,6 +93,7 @@ test("setup CLI input consumes Supabase profile file for entrypoint validation",
       "aws-ec2",
       "--supabase-postgres-profile",
       profilePath,
+      ...(await runtimeInputArgs(tmp)),
     ];
     const input = readCloudControlSetupInput();
     assert.equal(input.supabasePostgres?.provisioning.projectRef, "project-review");
@@ -140,6 +143,7 @@ function baseInput(overrides: Partial<CloudControlSetupInput> = {}): CloudContro
       organizationId: "org-control-plane-prod",
       projectRef: "project-review",
     }),
+    runtimeInput: reviewedRuntimeInput(),
     ...overrides,
   };
 }

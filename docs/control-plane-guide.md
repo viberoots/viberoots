@@ -357,6 +357,7 @@ deployment-control-plane setup \
   --artifact-iam-role-arn arn:aws:iam::<account-id>:role/<control-plane-artifact-role> \
   --artifact-least-privilege-policy-digest sha256:<policy-digest> \
   --reviewed-source-mode ssh \
+  --runtime-input ./runtime-input.yaml \
   --aws-topology-evidence ./aws-topology-evidence.json \
   --ingress-command-evidence ./ingress-dns-evidence.json,./ingress-tls-evidence.json,./ingress-health-evidence.json,./ingress-callback-evidence.json
 ```
@@ -375,6 +376,9 @@ The bundle contains:
 
 - `config.yaml`
 - `credential-manifest.json`
+- `auth-provider-profile.json`
+- `credential-map.json`
+- `residual-action-checklist.json`
 - `commands.json`
 - `image-publication.json`
 - `registry-profile.json` when registry evidence was generated with a reviewed profile
@@ -384,13 +388,16 @@ The bundle contains:
 - conformance and ingress checklists
 - an AWS EC2 profile artifact
 
-Generated files contain placeholders and file paths only. They must not contain database URLs,
-access keys, token values, private keys, or Infisical client secrets.
+Generated files contain reviewed non-secret runtime metadata, structured evidence references,
+credential source mappings, and file paths only. They must not contain database URLs, access keys,
+token values, private keys, or Infisical client secrets.
 
 ## Step 6: Review Non-Secret Runtime Config
 
-Before starting the service, review `config.yaml` and replace placeholder non-secret values with
-reviewed live values:
+Before starting the service, provide and review the typed runtime input file passed with
+`--runtime-input`. Production `config.yaml` is generated from that runtime input and provider/IaC
+evidence; do not hand-edit production placeholders into the generated config. The runtime input must
+provide reviewed live values for:
 
 - `authProvider.issuer`
 - `authProvider.audience`
@@ -402,10 +409,16 @@ reviewed live values:
 - each `credentials.infisicalDeployments[].projectId`
 - each `credentials.infisicalDeployments[].environment`
 
-The setup generator intentionally uses safe placeholders such as `https://auth.example.test` and
-derived Infisical project ids. Those placeholders are not production-ready. Keep these values
-non-secret and reviewed. Secret material still belongs only in the credential files from the
-manifest.
+Production setup rejects default auth and Infisical placeholders such as `https://auth.example.test`
+unless an explicit local/fixture mode is selected. Keep these values non-secret and reviewed.
+Secret material still belongs only in the credential files from the manifest.
+
+The generated `auth-provider-profile.json` records structured auth-provider import/provision
+evidence for local OIDC compatibility mode, Supabase Auth, WorkOS, or another reviewed external OIDC
+provider. Supabase Auth and WorkOS remain auth-provider profiles over OIDC/JWKS metadata; provider
+dashboards or screenshots are not hidden deployment authority. The profile must tie issuer,
+audience, JWKS URL, callback registration, role/group mappings, service principals, environment, and
+evidence digest to the selected runtime input.
 
 Ingress validation consumes the current runtime auth-provider callback shape. It checks that
 `authProvider.callback.externalHost` and `externalPath` match the AWS listener/routing rule that
@@ -452,6 +465,19 @@ digest for the reviewed artifact operations.
 
 Secret values must not be placed in Nix options, image layers, command-line arguments, ordinary
 environment files, deployment metadata, or logs.
+
+Use `credential-map.json` as the staging source of truth. Every file in
+`credential-manifest.json` must map to an explicit reviewed secret-backend reference or host
+credential source. The map records Infisical project/environment/path import or creation evidence,
+deployment-scoped Universal Auth machine identity evidence, least-privilege role/scope evidence,
+reviewed-source SSH or GitHub App import evidence, control-plane token generation/import evidence,
+database URL import evidence tied to the selected Supabase profile and public/private hostname, and
+rotation/stale-credential posture for every manifest entry. Secret names and access policies may be
+generated as write plans; secret values must stay only in the reviewed backend.
+
+The current AWS EC2 compatibility units use host-specific bind-mounted credential-directory wiring
+for `/run/deployment-control-plane/credentials`. Do not assume systemd `LoadCredential=` unless the
+generated host profile explicitly emits and tests that mode.
 
 After staging files, run the local setup checks. From the repo root, use:
 
@@ -630,8 +656,8 @@ selected provider-capability id; they do not satisfy protected/shared readiness 
       or captured as a documented current-code gap.
 - [ ] Control-plane image is Nix-built and deployed by immutable registry digest.
 - [ ] `deployment-control-plane setup --host-mode aws-ec2` bundle is generated without secrets.
-- [ ] `config.yaml` placeholder auth-provider and Infisical metadata are replaced with reviewed
-      live non-secret values.
+- [ ] `config.yaml` auth-provider and Infisical metadata are generated from reviewed runtime input
+      and provider evidence.
 - [ ] Credential files match `credential-manifest.json`.
 - [ ] One service and at least two workers are running.
 - [ ] Managed dependency validation passes from the AWS runtime path.

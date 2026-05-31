@@ -6,6 +6,7 @@ import { test } from "node:test";
 import { renderCloudControlSetupBundle } from "../../deployments/cloud-control-setup-render";
 import { runCredentialPreflight } from "../../deployments/control-plane-credential-preflight";
 import type { CloudControlSetupInput } from "../../deployments/cloud-control-setup-types";
+import { defaultReviewedRuntimeInput } from "../../deployments/cloud-control-runtime-input";
 import { runInScratchTemp } from "../lib/test-helpers";
 import { privateLinkAwsTopology, topologyForPublishedImage } from "./cloud-control-cutover-fixture";
 import { ecrRegistryProfileForImage } from "./control-plane-registry-profile.fixture";
@@ -53,13 +54,37 @@ test("credential preflight rejects missing, empty, URL, env, and stale deploymen
   await runInScratchTemp("credential-preflight-fail", async (tmp) => {
     await writeFixture(tmp, input());
     const manifestPath = path.join(tmp, "credential-manifest.json");
+    const credentialMapPath = path.join(tmp, "credential-map.json");
     const manifest = JSON.parse(await fsp.readFile(manifestPath, "utf8"));
+    const credentialMap = JSON.parse(await fsp.readFile(credentialMapPath, "utf8"));
     manifest.reviewedSourceMode = "github-app";
     manifest.deploymentIds = ["old-staging"];
     manifest.requiredFiles = manifest.requiredFiles
       .filter((file: string) => file !== "artifact-store-secret-access-key")
       .concat("env:DATABASE_URL", "old-staging-infisical-client-secret");
     await fsp.writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`, "utf8");
+    credentialMap.databaseUrl.supabaseProjectRef = "wrong-project";
+    credentialMap.databaseUrl.hostnameEvidenceRef = "evidence://supabase/test/hostname";
+    credentialMap.reviewedSource.mode = "ssh";
+    credentialMap.reviewedSource.evidenceRef = "self-attested";
+    credentialMap.infisical.requiredSecretNamePlanRef = "evidence://placeholder";
+    credentialMap.infisical.leastPrivilegeScopeEvidenceRef = "dashboard-only";
+    credentialMap.entries.find((entry: any) => entry.file === "artifact-store-endpoint").source = {
+      kind: "secret-backend-ref",
+    };
+    const token = credentialMap.entries.find((entry: any) => entry.file === "control-plane-token");
+    token.rotation = {
+      strategy: "later",
+      staleAfterDays: -1,
+      staleDetectionEvidenceRef: "placeholder",
+    };
+    token.source.evidenceRef = "evidence://secret-backend/test/control-plane-token";
+    token.source.writePlanRef = "placeholder";
+    token.source.policyEvidenceRef = "";
+    credentialMap.entries = credentialMap.entries.filter(
+      (entry: any) => entry.file !== "reviewed-source-known-hosts",
+    );
+    await fsp.writeFile(credentialMapPath, `${JSON.stringify(credentialMap, null, 2)}\n`, "utf8");
     await fsp.writeFile(path.join(tmp, "credentials", "control-plane-database-url"), "not-url\n");
     await fsp.writeFile(path.join(tmp, "credentials", "control-plane-token"), "\n");
     await fsp.chmod(path.join(tmp, "credentials", "artifact-store-access-key-id"), 0o000);
@@ -74,6 +99,20 @@ test("credential preflight rejects missing, empty, URL, env, and stale deploymen
     assert.match(result.errors.join("\n"), /reviewed-source mode does not match/);
     assert.match(result.errors.join("\n"), /stale: old-staging/);
     assert.match(result.errors.join("\n"), /env:DATABASE_URL is env-var-only/);
+    assert.match(result.errors.join("\n"), /credential map missing reviewed-source-known-hosts/);
+    assert.match(result.errors.join("\n"), /database URL evidence does not match Supabase profile/);
+    assert.match(result.errors.join("\n"), /database URL hostname evidence is required/);
+    assert.match(result.errors.join("\n"), /reviewed-source evidence is required/);
+    assert.match(result.errors.join("\n"), /Infisical requiredSecretNamePlanRef evidence/);
+    assert.match(result.errors.join("\n"), /Infisical leastPrivilegeScopeEvidenceRef evidence/);
+    assert.match(result.errors.join("\n"), /artifact-store-endpoint.*secret backend ref/);
+    assert.match(result.errors.join("\n"), /artifact-store-endpoint.*source evidence/);
+    assert.match(result.errors.join("\n"), /artifact-store-endpoint.*least-privilege scope/);
+    assert.match(result.errors.join("\n"), /control-plane-token.*rotation strategy/);
+    assert.match(result.errors.join("\n"), /control-plane-token.*rotation plan/);
+    assert.match(result.errors.join("\n"), /control-plane-token.*stale credential detection/);
+    assert.match(result.errors.join("\n"), /control-plane-token.*write plan is incomplete/);
+    assert.match(result.errors.join("\n"), /control-plane-token.*source evidence/);
     assert.match(result.errors.join("\n"), /artifact-store-secret-access-key/);
     assert.match(result.errors.join("\n"), /artifact-store-access-key-id.*unreadable/);
     assert.match(result.errors.join("\n"), /control-plane-token.*empty/);
@@ -134,8 +173,24 @@ function input(overrides: Partial<CloudControlSetupInput> = {}): CloudControlSet
     dryRun: false,
     awsTopology: topologyForImage(),
     supabasePostgres: privateLinkSupabaseProfile(),
+    runtimeInput: runtimeInput(overrides.artifactCredentialMode || "files"),
     ...overrides,
   };
+}
+
+function runtimeInput(artifactCredentialMode: string) {
+  return defaultReviewedRuntimeInput({
+    publicUrl: "https://deploy.example.test",
+    authCallbackHost: "deploy-auth.example.test",
+    authCallbackPath: "/oidc/callback",
+    deploymentIds: ["pleomino-staging"],
+    supabaseProjectRef: "project-review",
+    supabaseConnectionMode: "privatelink",
+    awsAccountId: "123456789012",
+    awsRegion: "us-east-1",
+    awsVpcId: "vpc-123",
+    artifactCredentialMode,
+  });
 }
 
 function topologyForImage() {

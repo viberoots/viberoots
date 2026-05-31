@@ -167,6 +167,15 @@ in
     mcp.enable = opt lib.types.bool true "Whether HTTP MCP is enabled.";
     mcp.basePath = opt lib.types.str defaults.mcpBasePath "HTTP MCP base path.";
     miniMigrationPreflight.enable = opt lib.types.bool false "Require mini database migration cutover evidence before protected/shared submit.";
+    authProvider = {
+      kind = opt (lib.types.enum [ "local-oidc" "generic-oidc-jwks" ]) "local-oidc" "Auth provider runtime kind."; issuer = opt lib.types.str "local-deployment-identity-provider" "Reviewed auth issuer.";
+      audience = opt (lib.types.listOf lib.types.str) [ "deployments-vault" ] "Reviewed auth audiences."; jwksUrl = opt nullStr null "Reviewed JWKS URL.";
+      cliLoginMode = opt (lib.types.enum [ "pkce-public-callback" "device-code" "external-url" ]) "pkce-public-callback" "CLI login mode."; servicePrincipals = opt (lib.types.attrsOf lib.types.str) { } "Service principal claim mappings.";
+      callback.externalHost = opt lib.types.str "deploy-auth.apps.kilty.io" "Registered callback host."; callback.externalPath = opt lib.types.str "/oidc/callback" "Registered callback path.";
+      claims.userIdClaim = opt lib.types.str "sub" "User id claim."; claims.emailClaim = opt lib.types.str "email" "Email claim.";
+      claims.roleClaim = opt lib.types.str "groups" "Role/group claim."; claims.servicePrincipalClaim = opt lib.types.str "azp" "Service principal claim.";
+      roleGroups.deployer = opt (lib.types.listOf lib.types.str) [ ] "Deployer groups."; roleGroups.admissionReporter = opt (lib.types.listOf lib.types.str) [ ] "Admission reporter groups."; roleGroups.admin = opt (lib.types.listOf lib.types.str) [ ] "Admin groups.";
+    };
     recordsRoot = opt lib.types.str defaults.recordsRoot "Host records directory.";
     artifactStagingRoot = opt lib.types.str defaults.artifactStagingRoot "Host artifact scratch directory.";
     runtimeRoot = opt lib.types.str defaults.runtimeRoot "Host runtime scratch directory.";

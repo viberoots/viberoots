@@ -24,6 +24,9 @@ import { assertCloudControlSetupInput } from "./cloud-control-setup-validate";
 import { verifiedControlPlaneImageDigestContract } from "./control-plane-image-publication";
 import { artifactCredentialFiles } from "./control-plane-artifact-credential-mode";
 import { setupArtifactCredentialMode } from "./cloud-control-setup-aws-topology";
+import { runtimeAuthConfig, type RuntimeInput } from "./cloud-control-runtime-input";
+import { renderCredentialMap } from "./cloud-control-credential-map";
+import { renderResidualActionChecklist } from "./cloud-control-residual-actions";
 
 export type CloudControlSetupBundle = {
   files: Record<string, string>;
@@ -34,12 +37,18 @@ export function renderCloudControlSetupBundle(
   input: CloudControlSetupInput,
 ): CloudControlSetupBundle {
   assertCloudControlSetupInput(input);
+  const runtimeInput = setupRuntimeInput(input);
+  const requiredCredentials = credentialFiles(input);
   const capabilities = CLOUD_CAPABILITY_IDS.map((id) =>
     capabilityDeclaration(id, { deploymentLabel: input.deploymentIds[0] }),
   );
   const files = {
-    "config.yaml": renderRuntimeConfig(input),
-    "credential-manifest.json": renderCredentialManifest(input),
+    "config.yaml": renderRuntimeConfig(input, runtimeInput),
+    "credential-manifest.json": renderCredentialManifest(input, requiredCredentials),
+    "runtime-input.yaml": YAML.stringify(runtimeInput),
+    "auth-provider-profile.json": `${JSON.stringify(runtimeInput.authProvider, null, 2)}\n`,
+    "credential-map.json": renderCredentialMap(input, requiredCredentials),
+    "residual-action-checklist.json": renderResidualActionChecklist(input),
     "commands.json": renderCommands(input),
     "image-publication.json": renderImagePublication(input),
     ...(input.imagePublication?.registryProfile
@@ -60,7 +69,12 @@ export function renderCloudControlSetupBundle(
   return { files, capabilities };
 }
 
-function renderRuntimeConfig(input: CloudControlSetupInput): string {
+function setupRuntimeInput(input: CloudControlSetupInput): RuntimeInput {
+  if (!input.runtimeInput) throw new Error("cloud control-plane setup requires runtime input");
+  return input.runtimeInput;
+}
+
+function renderRuntimeConfig(input: CloudControlSetupInput, runtimeInput: RuntimeInput): string {
   return YAML.stringify({
     instanceId: input.instanceId,
     mode: "protected-shared",
@@ -97,45 +111,30 @@ function renderRuntimeConfig(input: CloudControlSetupInput): string {
         infisicalClientIdFilePattern: "{deploymentId}-infisical-client-id",
         infisicalClientSecretFilePattern: "{deploymentId}-infisical-client-secret",
       },
-      infisicalDeployments: input.deploymentIds.map((deploymentId) => ({
-        deploymentId,
-        siteUrl: "https://app.infisical.com",
-        projectId: `${deploymentId}-infisical-project`,
-        environment: "production",
+      infisicalDeployments: runtimeInput.infisicalDeployments.map((entry) => ({
+        deploymentId: entry.deploymentId,
+        siteUrl: entry.siteUrl,
+        projectId: entry.projectId,
+        environment: entry.environment,
       })),
     },
     reviewedSource: reviewedSource(input),
     webUi: { enabled: true, basePath: "/" },
     mcp: { enabled: true, basePath: "/mcp" },
-    authProvider: {
-      kind: "generic-oidc-jwks",
-      issuer: "https://auth.example.test",
-      audience: ["deployments-control-plane"],
-      jwksUrl: "https://auth.example.test/.well-known/jwks.json",
-      callback: { externalHost: input.authCallbackHost, externalPath: input.authCallbackPath },
-    },
+    authProvider: runtimeAuthConfig(runtimeInput.authProvider),
   });
 }
 
-function renderCredentialManifest(input: CloudControlSetupInput): string {
-  const reviewed =
-    input.reviewedSourceMode === "github-app"
-      ? [...GITHUB_APP_FILENAMES]
-      : [...SSH_REVIEWED_SOURCE_FILENAMES];
+function renderCredentialManifest(input: CloudControlSetupInput, requiredFiles: string[]): string {
   return `${JSON.stringify(
     {
       schemaVersion: "cloud-control-credential-manifest@1",
       credentialDirectory: "/run/deployment-control-plane/credentials",
       reviewedSourceMode: input.reviewedSourceMode,
       deploymentIds: input.deploymentIds,
-      requiredFiles: [
-        ...credentialFiles(input),
-        ...input.deploymentIds.flatMap((deploymentId) =>
-          INFISICAL_FILENAMES.map((name) => name.replace("{deploymentId}", deploymentId)),
-        ),
-        ...reviewed,
-      ],
-      placeholdersOnly: true,
+      requiredFiles,
+      placeholdersOnly: false,
+      credentialMap: "credential-map.json",
       rejectedSources: [
         "ambient environment",
         "CI environment",
@@ -150,9 +149,19 @@ function renderCredentialManifest(input: CloudControlSetupInput): string {
 
 function credentialFiles(input: CloudControlSetupInput): string[] {
   const artifact = new Set(artifactCredentialFiles(setupArtifactCredentialMode(input)));
-  return CREDENTIAL_FILENAMES.filter(
-    (name) => !name.startsWith("artifact-store-") || artifact.has(name),
-  );
+  const reviewed =
+    input.reviewedSourceMode === "github-app"
+      ? [...GITHUB_APP_FILENAMES]
+      : [...SSH_REVIEWED_SOURCE_FILENAMES];
+  return [
+    ...CREDENTIAL_FILENAMES.filter(
+      (name) => !name.startsWith("artifact-store-") || artifact.has(name),
+    ),
+    ...input.deploymentIds.flatMap((deploymentId) =>
+      INFISICAL_FILENAMES.map((name) => name.replace("{deploymentId}", deploymentId)),
+    ),
+    ...reviewed,
+  ];
 }
 
 function renderReadme(input: CloudControlSetupInput): string {
@@ -163,10 +172,10 @@ function renderReadme(input: CloudControlSetupInput): string {
     `Image: \`${input.image}\``,
     "Image publication evidence: `image-publication.json`",
     "",
-    "This bundle contains placeholders and mounted file paths only. Provider dashboards, raw IaC",
-    "state, and support-mediated actions are evidence inputs; they are not hidden deployment",
-    "authority. Protected/shared readiness is blocked until every selected provider capability has",
-    "validation evidence.",
+    "This bundle contains reviewed non-secret runtime metadata, structured evidence references,",
+    "and mounted file paths only. Provider dashboards, raw IaC state, and support-mediated actions",
+    "are evidence inputs; they are not hidden deployment authority. Protected/shared readiness is",
+    "blocked until every selected provider capability has validation evidence.",
     "",
     "Run `deployment-control-plane setup-doctor --bundle-dir <bundle> --out <bundle>/setup-doctor.json`",
     "and `deployment-control-plane credential-preflight --bundle-dir <bundle> --out <bundle>/credential-preflight.json`",

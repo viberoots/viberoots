@@ -27,6 +27,7 @@ import {
   validateProviderCapabilityHookEvidenceShape,
 } from "./cloud-control-provider-capability-hook-contract";
 import { validateSupabaseManagedPostgresProfile } from "./control-plane-supabase-postgres-validation";
+import { validateSetupRuntimeInput } from "./cloud-control-setup-runtime-validation";
 export { validateCredentialManifestFiles } from "./cloud-control-credential-manifest-validate";
 
 const IMAGE_DIGEST_PATTERN = /^[a-z0-9][a-z0-9._:-]*(\/[a-z0-9][a-z0-9._-]*)+@sha256:[a-f0-9]{64}$/;
@@ -88,9 +89,9 @@ export function validateCloudControlSetupInput(input: CloudControlSetupInput): s
   }
   if (input.mode === "aws-ec2") errors.push(...validateAwsEvidence(input));
   errors.push(...validateSetupSupabasePostgres(input));
+  errors.push(...validateSetupRuntimeInput(input));
   return errors;
 }
-
 function validateSetupSupabasePostgres(input: CloudControlSetupInput): string[] {
   if (!input.supabasePostgres)
     return ["cloud control-plane setup requires Supabase Postgres profile"];
@@ -100,7 +101,6 @@ function validateSetupSupabasePostgres(input: CloudControlSetupInput): string[] 
     expectedMode: mode,
   });
 }
-
 export function assertCloudControlSetupInput(input: CloudControlSetupInput): void {
   const errors = validateCloudControlSetupInput(input);
   if (errors.length > 0)

@@ -7,6 +7,7 @@ import { validateRenderedProfile } from "../../deployments/cloud-control-setup-p
 import { validateCloudControlSetupInput } from "../../deployments/cloud-control-setup-validate";
 import type { CloudControlSetupInput } from "../../deployments/cloud-control-setup-types";
 import { privateLinkAwsTopology } from "./cloud-control-cutover-fixture";
+import { reviewedRuntimeInput } from "./cloud-control-runtime-input.fixture";
 import { ecrRegistryProfileForImage } from "./control-plane-registry-profile.fixture";
 import { IMAGE_BUILD_IDENTITY, IMAGE_DIGEST, IMAGE_REF } from "./cloud-control-cutover-fixture";
 import { privateLinkSupabaseProfile } from "./control-plane-supabase-postgres.fixture";
@@ -154,6 +155,7 @@ function input(overrides: Partial<CloudControlSetupInput> = {}): CloudControlSet
     dryRun: false,
     awsTopology: privateLinkAwsTopology(),
     supabasePostgres: privateLinkSupabaseProfile(),
+    runtimeInput: reviewedRuntimeInput(),
     ...overrides,
   };
 }

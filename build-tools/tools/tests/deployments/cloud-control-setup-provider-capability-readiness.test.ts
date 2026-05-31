@@ -7,6 +7,7 @@ import { validateProviderCapabilityEvidence } from "../../deployments/cloud-cont
 import type { CloudControlSetupInput } from "../../deployments/cloud-control-setup-types";
 import { reviewedSupabaseManagedPostgresProfile } from "../../deployments/control-plane-supabase-postgres-profile";
 import { privateLinkAwsTopology } from "./cloud-control-cutover-fixture";
+import { reviewedRuntimeInput } from "./cloud-control-runtime-input.fixture";
 
 const DIGEST_REF =
   "registry.example.com/platform/deployment-control-plane@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
@@ -162,5 +163,6 @@ function baseInput(): CloudControlSetupInput {
     dryRun: false,
     awsTopology: privateLinkAwsTopology(),
     supabasePostgres: supabaseProfile(),
+    runtimeInput: reviewedRuntimeInput(),
   };
 }

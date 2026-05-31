@@ -1,4 +1,3 @@
-#!/usr/bin/env zx-wrapper
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -18,12 +17,12 @@ import {
   publicAwsTopology,
   topologyForPublishedImage,
 } from "./cloud-control-cutover-fixture";
+import { reviewedRuntimeInput } from "./cloud-control-runtime-input.fixture";
 import { ecrRegistryProfileForImage } from "./control-plane-registry-profile.fixture";
 import { privateLinkSupabaseProfile } from "./control-plane-supabase-postgres.fixture";
 const opts = { expectedRegion: "us-east-1", maxAgeMinutes: 60 };
-const image =
-  "registry.example.com/platform/deployment-control-plane@sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee";
 const digest = `sha256:${"e".repeat(64)}`;
+const image = `registry.example.com/platform/deployment-control-plane@${digest}`;
 const identity = `nix-source-${"f".repeat(64)}`;
 
 test("repo-owned AWS foundation OpenTofu module covers network IAM S3 state and drift outputs", () => {
@@ -241,6 +240,7 @@ function input(overrides: Partial<CloudControlSetupInput>): CloudControlSetupInp
     dryRun: false,
     awsTopology: topologyForImage(),
     supabasePostgres: privateLinkSupabaseProfile(),
+    runtimeInput: reviewedRuntimeInput(),
     ...overrides,
   };
 }

@@ -3,6 +3,7 @@ import type { CloudControlSetupInput } from "../../deployments/cloud-control-set
 import type { ManagedDependencyEvidence } from "../../deployments/control-plane-managed-dependency-types";
 import { privateLinkAwsTopology, topologyForPublishedImage } from "./cloud-control-cutover-fixture";
 import { ecrRegistryProfileForImage } from "./control-plane-registry-profile.fixture";
+import { reviewedRuntimeInput } from "./cloud-control-runtime-input.fixture";
 import { privateLinkSupabaseProfile } from "./control-plane-supabase-postgres.fixture";
 
 const DIGEST_REF =
@@ -135,6 +136,7 @@ export function setupInput(): CloudControlSetupInput {
     dryRun: false,
     awsTopology: topologyForImage(),
     supabasePostgres: privateLinkSupabaseProfile(),
+    runtimeInput: reviewedRuntimeInput(),
   };
 }
 

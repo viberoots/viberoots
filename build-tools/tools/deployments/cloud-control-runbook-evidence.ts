@@ -7,19 +7,22 @@ export function phaseMeta(id: string, input: CloudControlSetupInput) {
   const table: Record<string, { evidenceInputs: string[]; residualManualActions: string[] }> = {
     "local-review": {
       evidenceInputs: [
+        "$PROFILE_ROOT/auth-provider-profile.json",
+        "$PROFILE_ROOT/credential-map.json",
+        "$PROFILE_ROOT/residual-action-checklist.json",
         "$PROFILE_ROOT/image-publication.json",
         "$PROFILE_ROOT/provider-capabilities.json",
         "$PROFILE_ROOT/ingress-checklist.json",
         "$PROFILE_ROOT/conformance-checklist.json",
       ],
       residualManualActions: [
-        "review image digest, provider capability, ingress, and conformance checklist evidence",
+        "review runtime input, auth-provider, credential-map, image, provider, ingress, and conformance evidence",
       ],
     },
     "credential-preflight": {
       evidenceInputs: ["$PROFILE_ROOT/credential-manifest.json", CREDENTIAL_DIR],
       residualManualActions: [
-        "stage every file named by credential-manifest.json on the runtime host before startup",
+        "stage every file named by credential-manifest.json from explicit credential-map references before startup",
         "confirm reviewed-source and deployment-scoped Infisical credentials match the selected mode",
       ],
     },

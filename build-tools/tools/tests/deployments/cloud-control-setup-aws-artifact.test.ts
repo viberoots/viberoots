@@ -5,6 +5,7 @@ import YAML from "yaml";
 import { renderCloudControlSetupBundle } from "../../deployments/cloud-control-setup-render";
 import { validateCloudControlSetupInput } from "../../deployments/cloud-control-setup-validate";
 import type { CloudControlSetupInput } from "../../deployments/cloud-control-setup-types";
+import { defaultReviewedRuntimeInput } from "../../deployments/cloud-control-runtime-input";
 import { privateLinkAwsTopology, topologyForPublishedImage } from "./cloud-control-cutover-fixture";
 import { ecrRegistryProfileForImage } from "./control-plane-registry-profile.fixture";
 import { privateLinkSupabaseProfile } from "./control-plane-supabase-postgres.fixture";
@@ -45,8 +46,24 @@ function input(overrides: Partial<CloudControlSetupInput> = {}): CloudControlSet
     dryRun: false,
     awsTopology: topologyForImage(),
     supabasePostgres: privateLinkSupabaseProfile(),
+    runtimeInput: runtimeInput(overrides.artifactCredentialMode || "files"),
     ...overrides,
   };
+}
+
+function runtimeInput(artifactCredentialMode: string) {
+  return defaultReviewedRuntimeInput({
+    publicUrl: "https://deploy.example.test",
+    authCallbackHost: "deploy-auth.example.test",
+    authCallbackPath: "/oidc/callback",
+    deploymentIds: ["pleomino-staging"],
+    supabaseProjectRef: "project-review",
+    supabaseConnectionMode: "privatelink",
+    awsAccountId: "123456789012",
+    awsRegion: "us-east-1",
+    awsVpcId: "vpc-123",
+    artifactCredentialMode,
+  });
 }
 
 test("AWS EC2 alternate artifact backends require reviewed evidence", () => {

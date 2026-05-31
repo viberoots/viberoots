@@ -5,6 +5,7 @@ import { renderCloudControlSetupBundle } from "../../deployments/cloud-control-s
 import { validateProtectedSharedProfileReadiness } from "../../deployments/cloud-control-setup-profile-validate";
 import type { CloudControlSetupInput } from "../../deployments/cloud-control-setup-types";
 import { privateLinkAwsTopology } from "./cloud-control-cutover-fixture";
+import { reviewedRuntimeInput } from "./cloud-control-runtime-input.fixture";
 import { privateLinkSupabaseProfile } from "./control-plane-supabase-postgres.fixture";
 
 const DIGEST_REF =
@@ -34,6 +35,9 @@ function input(overrides: Partial<CloudControlSetupInput> = {}): CloudControlSet
     dryRun: false,
     awsTopology: privateLinkAwsTopology(),
     supabasePostgres: privateLinkSupabaseProfile(),
+    runtimeInput: reviewedRuntimeInput({
+      deploymentIds: ["pleomino-staging", "pleomino-prod"],
+    }),
     ...overrides,
   };
 }

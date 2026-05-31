@@ -13,6 +13,20 @@ let
       sshKeyFile = credentialFile cfg.reviewedSourceSshKeyCredential;
       sshKnownHostsFile = credentialFile cfg.reviewedSourceKnownHostsCredential;
     };
+  authProvider = {
+    kind = cfg.authProvider.kind;
+    issuer = cfg.authProvider.issuer;
+    audience = cfg.authProvider.audience;
+    tokenSupport = "jwt";
+    cliLoginMode = cfg.authProvider.cliLoginMode;
+    callback = {
+      externalHost = cfg.authProvider.callback.externalHost;
+      externalPath = cfg.authProvider.callback.externalPath;
+    };
+    claims = cfg.authProvider.claims;
+    roleGroups = cfg.authProvider.roleGroups;
+    servicePrincipals = cfg.authProvider.servicePrincipals;
+  } // (if cfg.authProvider.jwksUrl == null then { } else { jwksUrl = cfg.authProvider.jwksUrl; });
 in
 {
   instanceId = cfg.instanceId;
@@ -56,6 +70,7 @@ in
       cfg.infisicalDeploymentIds;
   };
   inherit reviewedSource;
+  inherit authProvider;
   webUi = { enabled = cfg.webUi.enable; basePath = cfg.webUi.basePath; };
   mcp = { enabled = cfg.mcp.enable; basePath = cfg.mcp.basePath; };
   miniMigrationPreflight = { enabled = cfg.miniMigrationPreflight.enable; };

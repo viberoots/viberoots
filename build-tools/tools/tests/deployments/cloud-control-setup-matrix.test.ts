@@ -1,4 +1,3 @@
-#!/usr/bin/env zx-wrapper
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import YAML from "yaml";
@@ -13,6 +12,7 @@ import type {
   CloudControlSetupInput,
   CloudProfileMode,
 } from "../../deployments/cloud-control-setup-types";
+import { reviewedRuntimeInput } from "./cloud-control-runtime-input.fixture";
 import { privateLinkAwsTopology, topologyForPublishedImage } from "./cloud-control-cutover-fixture";
 import { ecrRegistryProfileForImage } from "./control-plane-registry-profile.fixture";
 import { privateLinkSupabaseProfile } from "./control-plane-supabase-postgres.fixture";
@@ -55,6 +55,7 @@ function input(overrides: Partial<CloudControlSetupInput> = {}): CloudControlSet
     dryRun: false,
     awsTopology: awsTopology(),
     supabasePostgres: privateLinkSupabaseProfile(),
+    runtimeInput: reviewedRuntimeInput(),
     ...overrides,
   };
 }

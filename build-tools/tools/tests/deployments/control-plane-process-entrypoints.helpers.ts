@@ -3,6 +3,8 @@ import * as fsp from "node:fs/promises";
 import net from "node:net";
 import os from "node:os";
 import path from "node:path";
+import YAML from "yaml";
+import { defaultReviewedRuntimeInput } from "../../deployments/cloud-control-runtime-input";
 import { localHarnessControlPlaneDatabaseUrl } from "../../deployments/nixos-shared-host-control-plane-backend";
 import { privateLinkSupabaseProfile } from "./control-plane-supabase-postgres.fixture";
 
@@ -95,4 +97,27 @@ export async function supabaseProfileArgs(tmp: string): Promise<string[]> {
   const file = path.join(tmp, "supabase-postgres.profile.json");
   await fsp.writeFile(file, JSON.stringify(privateLinkSupabaseProfile()), "utf8");
   return ["--supabase-postgres-profile", file];
+}
+
+export async function runtimeInputArgs(tmp: string): Promise<string[]> {
+  const file = path.join(tmp, "runtime-input.yaml");
+  await fsp.writeFile(
+    file,
+    YAML.stringify(
+      defaultReviewedRuntimeInput({
+        publicUrl: "https://deploy.example.test",
+        authCallbackHost: "deploy-auth.example.test",
+        authCallbackPath: "/oidc/callback",
+        deploymentIds: ["cloud-control-fixture-staging"],
+        supabaseProjectRef: "project-review",
+        supabaseConnectionMode: "privatelink",
+        awsAccountId: "123456789012",
+        awsRegion: "us-east-1",
+        awsVpcId: "vpc-123",
+        artifactCredentialMode: "files",
+      }),
+    ),
+    "utf8",
+  );
+  return ["--runtime-input", file];
 }

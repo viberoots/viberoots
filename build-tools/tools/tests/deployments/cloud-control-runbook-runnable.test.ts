@@ -1,4 +1,3 @@
-#!/usr/bin/env zx-wrapper
 import assert from "node:assert/strict";
 import { exec } from "node:child_process";
 import * as fsp from "node:fs/promises";
@@ -11,6 +10,7 @@ import { renderCloudControlSetupBundle } from "../../deployments/cloud-control-s
 import type { CloudControlSetupInput } from "../../deployments/cloud-control-setup-types";
 import { foundationFromTopology } from "./cloud-control-aws-foundation-fixture";
 import { privateLinkAwsTopology, topologyForPublishedImage } from "./cloud-control-cutover-fixture";
+import { reviewedRuntimeInput } from "./cloud-control-runtime-input.fixture";
 import { ecrRegistryProfileForImage } from "./control-plane-registry-profile.fixture";
 import { privateLinkSupabaseProfile } from "./control-plane-supabase-postgres.fixture";
 import { runInScratchTemp } from "../lib/test-helpers";
@@ -68,7 +68,7 @@ test("HTTP runbook commands write outputs from repo root and bundle root", async
           "http-readiness.json",
           "http-worker-heartbeats.json",
         ]) {
-          assert.equal(await exists(path.join(tmp, output)), true, `${output} written from ${cwd}`);
+          await fsp.access(path.join(tmp, output));
           if (output.startsWith("ingress-")) {
             const text = await fsp.readFile(path.join(tmp, output), "utf8");
             assert.doesNotMatch(
@@ -143,6 +143,7 @@ function input(outDir: string, publicUrl: string): CloudControlSetupInput {
     dryRun: false,
     awsTopology: topologyForImage(publicUrl),
     supabasePostgres: privateLinkSupabaseProfile(),
+    runtimeInput: reviewedRuntimeInput(),
   };
 }
 
@@ -235,12 +236,6 @@ async function clearHttpOutputs(dir: string): Promise<void> {
     ].map((name) => fsp.rm(path.join(dir, name), { force: true })),
   );
 }
-const exists = (file: string) =>
-  fsp.access(file).then(
-    () => true,
-    () => false,
-  );
-
 function runbookCommand(commands: any, id: string) {
   const found = commands.phases
     .flatMap((phase: any) => phase.commands)

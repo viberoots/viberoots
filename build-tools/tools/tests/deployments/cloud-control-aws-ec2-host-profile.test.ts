@@ -1,4 +1,3 @@
-#!/usr/bin/env zx-wrapper
 import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
@@ -15,6 +14,7 @@ import {
   IMAGE_REF,
   privateLinkAwsTopology,
 } from "./cloud-control-cutover-fixture";
+import { reviewedRuntimeInput } from "./cloud-control-runtime-input.fixture";
 import { ecrRegistryProfileForImage } from "./control-plane-registry-profile.fixture";
 import { privateLinkSupabaseProfile } from "./control-plane-supabase-postgres.fixture";
 import { runInScratchTemp } from "../lib/test-helpers";
@@ -233,6 +233,7 @@ function input(overrides: Partial<CloudControlSetupInput> = {}): CloudControlSet
     dryRun: false,
     awsTopology: privateLinkAwsTopology(),
     supabasePostgres: privateLinkSupabaseProfile(),
+    runtimeInput: reviewedRuntimeInput(),
     ...overrides,
   };
 }
@@ -242,8 +243,8 @@ function escapeRegExp(value: string): string {
 }
 
 async function exists(file: string): Promise<boolean> {
-  return await fsp
-    .access(file)
-    .then(() => true)
-    .catch(() => false);
+  return fsp.access(file).then(
+    () => true,
+    () => false,
+  );
 }

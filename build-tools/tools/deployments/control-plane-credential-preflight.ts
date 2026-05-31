@@ -6,6 +6,8 @@ import { CONTROL_PLANE_PRODUCTION_CREDENTIAL_ENV_NAMES } from "./control-plane-r
 import { reviewedSourceCredentialFiles } from "./control-plane-runtime-reviewed-source-validation";
 import type { ControlPlaneRuntimeConfig } from "./control-plane-runtime-config-types";
 import { artifactCredentialFiles } from "./control-plane-artifact-credential-mode";
+import { validateCredentialMap, type CredentialMap } from "./cloud-control-credential-map";
+import type { SupabaseManagedPostgresProfile } from "./control-plane-supabase-postgres-profile";
 
 type PreflightOptions = {
   bundleDir: string;
@@ -23,6 +25,8 @@ type CredentialManifest = {
 export async function runCredentialPreflight(opts: PreflightOptions) {
   const bundleDir = path.resolve(opts.bundleDir);
   const manifest = await readManifest(bundleDir);
+  const credentialMap = await readCredentialMap(bundleDir);
+  const supabaseProfile = await readSupabaseProfile(bundleDir);
   const config = parseControlPlaneRuntimeConfig(
     await fsp.readFile(path.join(bundleDir, "config.yaml"), "utf8"),
   );
@@ -32,6 +36,12 @@ export async function runCredentialPreflight(opts: PreflightOptions) {
   const errors = [
     ...ambientCredentialErrors(opts.env || process.env),
     ...manifestContractErrors(manifest, config),
+    ...validateCredentialMap(credentialMap, {
+      requiredFiles: requiredFiles(manifest),
+      supabaseProjectRef: supabaseProfile?.provisioning.projectRef,
+      connectionMode: supabaseProfile?.connection.mode,
+      reviewedSourceMode: config.reviewedSource.mode,
+    }),
     ...(await fileErrors(credentialDirectory, requiredFiles(manifest))),
   ];
   return {
@@ -41,6 +51,24 @@ export async function runCredentialPreflight(opts: PreflightOptions) {
     checkedFiles: requiredFiles(manifest),
     errors,
   };
+}
+
+async function readCredentialMap(bundleDir: string): Promise<CredentialMap | undefined> {
+  const raw = await fsp
+    .readFile(path.join(bundleDir, "credential-map.json"), "utf8")
+    .catch(() => "");
+  if (!raw) return undefined;
+  return JSON.parse(raw) as CredentialMap;
+}
+
+async function readSupabaseProfile(
+  bundleDir: string,
+): Promise<SupabaseManagedPostgresProfile | undefined> {
+  const raw = await fsp
+    .readFile(path.join(bundleDir, "supabase-postgres.profile.json"), "utf8")
+    .catch(() => "");
+  if (!raw) return undefined;
+  return JSON.parse(raw) as SupabaseManagedPostgresProfile;
 }
 
 export async function runCredentialPreflightCommand(): Promise<void> {

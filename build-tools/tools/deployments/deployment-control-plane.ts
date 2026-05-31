@@ -65,6 +65,7 @@ function command():
     "registry-profile",
     "selected-capability",
     "reviewed-source-mode",
+    "runtime-input",
     "service-replicas",
     "skopeo",
     "source-revision",

@@ -7,6 +7,7 @@ import {
   imagePublicationInputs,
 } from "./cloud-control-runbook-image-publication";
 import { managedRuntimeFlags, sourceHostPrelude } from "./cloud-control-runbook-managed-runtime";
+import { rootPrelude } from "./cloud-control-runbook-root";
 import { supabasePrivateLinkEvidenceCommands } from "./cloud-control-runbook-supabase-privatelink";
 export { validateRunbookBundle, validateRunbookStructure } from "./cloud-control-runbook-doctor";
 
@@ -31,7 +32,6 @@ export type RunbookPhase = {
   residualManualActions: string[];
   commands: RunbookCommand[];
 };
-
 export function renderCommands(input: CloudControlSetupInput): string {
   return `${JSON.stringify(
     {
@@ -120,7 +120,6 @@ function phases(input: CloudControlSetupInput): RunbookPhase[] {
     ),
   ];
 }
-
 function phase(
   input: CloudControlSetupInput,
   order: number,
@@ -154,7 +153,11 @@ function command(
 function localInputs(): string[] {
   return [
     "$PROFILE_ROOT/config.yaml",
+    "$PROFILE_ROOT/runtime-input.yaml",
     "$PROFILE_ROOT/credential-manifest.json",
+    "$PROFILE_ROOT/credential-map.json",
+    "$PROFILE_ROOT/auth-provider-profile.json",
+    "$PROFILE_ROOT/residual-action-checklist.json",
     "$PROFILE_ROOT/commands.json",
   ];
 }
@@ -241,9 +244,3 @@ const doctor = (input: CloudControlSetupInput) =>
 
 const preflight = (input: CloudControlSetupInput) =>
   `${rootPrelude(input.outDir)}; deployment-control-plane credential-preflight --bundle-dir "$PROFILE_ROOT" --out "$PROFILE_ROOT/credential-preflight.json"`;
-
-function rootPrelude(outDir: string): string {
-  return `PROFILE_ROOT="\${PROFILE_ROOT:-$(pwd)}"; if [ ! -f "$PROFILE_ROOT/commands.json" ]; then PROFILE_ROOT=${shellQuote(outDir)}; fi; if [ ! -f "$PROFILE_ROOT/commands.json" ]; then echo "commands.json not found; run from repo root or bundle directory" >&2; exit 2; fi`;
-}
-
-const shellQuote = (value: string): string => `'${value.replace(/'/g, `'\\''`)}'`;

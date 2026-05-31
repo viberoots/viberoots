@@ -6,6 +6,7 @@ import { test } from "node:test";
 import YAML from "yaml";
 import { runDeploymentControlPlaneCommand } from "../../deployments/deployment-control-plane";
 import {
+  runtimeInputArgs,
   supabaseProfileArgs,
   withControlPlaneArgv,
   writeRuntimeConfig,
@@ -101,6 +102,7 @@ test("deployment-control-plane setup writes a cloud host profile bundle", async 
         "--ingress-command-evidence",
         ingressCommandEvidenceFiles.join(","),
         ...(await supabaseProfileArgs(tmp)),
+        ...(await runtimeInputArgs(tmp)),
       ],
       runDeploymentControlPlaneCommand,
     );

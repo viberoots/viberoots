@@ -34,8 +34,16 @@ deployment-control-plane credential-preflight \
 If your current working directory is the generated bundle, use
 `deployment-control-plane credential-preflight --bundle-dir . --out ./credential-preflight.json`.
 The preflight reads `credential-manifest.json` and `config.yaml`, verifies the exact file-backed
-credential contract, checks safe URL-shaped credential files, rejects ambient/env-var-only
-credential sources, and keeps diagnostics redacted.
+credential contract, checks `credential-map.json` for explicit reviewed backend or host credential
+sources, checks safe URL-shaped credential files, rejects ambient/env-var-only credential sources,
+and keeps diagnostics redacted.
+
+Production cloud setup generates `config.yaml` from a typed runtime input file plus reviewed
+provider/IaC evidence. The generated config is not a hand-edit surface for production auth or
+Infisical metadata. Setup rejects default placeholders such as `https://auth.example.test`,
+fixture-only evidence, and placeholder Infisical project metadata unless an explicit local/fixture
+mode is selected. Generated bundle provenance is recorded in `auth-provider-profile.json`,
+`credential-map.json`, and `residual-action-checklist.json` next to `config.yaml`.
 
 Service probes:
 
@@ -197,6 +205,12 @@ Auth providers only authenticate and return claims. The deployment control-plane
 the authority that turns mapped claims into deployer, admission reporter, admin, or service
 principal grants; workers and provider clients do not consume browser SSO sessions directly.
 
+Cloud setup may import auth-provider profiles for local compatibility mode, Supabase Auth, WorkOS,
+or an external OIDC provider. Supabase Auth and WorkOS remain structured OIDC/JWKS profile evidence
+layers; they do not become deployment mutation authority. The profile must bind issuer, audience,
+JWKS URL, callback registration, role/group mappings, service principals, environment, and evidence
+digest to the generated runtime config.
+
 ## Startup Validation
 
 The loader validates shape, enum values, URL base paths, and credential path policy before service
@@ -221,6 +235,15 @@ Credential paths are rejected when they point into:
 The credential directory is the only portable secret surface for container runtime credentials.
 Secrets are file-backed and are never supplied through image contents, Nix store paths, ordinary
 environment files, command-line arguments, deployment records, diagnostics, or logs.
+
+Generated AWS setup bundles include `credential-map.json`, which maps each
+`credential-manifest.json` entry to an explicit reviewed secret-backend reference or host credential
+source. The map is evidence/import shaped by default: it records Infisical project/environment/path
+evidence, Universal Auth machine identity evidence, least-privilege scope evidence, reviewed-source
+SSH or GitHub App import evidence, database URL evidence tied to the selected Supabase profile and
+public/private hostname, control-plane token generation/import evidence, and rotation/stale
+credential posture. Secret names and access policies may be generated as write plans; secret values
+must not be persisted outside the reviewed backend.
 
 Infisical Universal Auth credentials are deployment-scoped by default:
 

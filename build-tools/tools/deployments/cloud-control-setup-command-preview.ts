@@ -49,6 +49,8 @@ function setupCommand(input: CloudControlSetupInput, dryRun: boolean): string {
     input.artifactRegion,
     "--reviewed-source-mode",
     input.reviewedSourceMode,
+    "--runtime-input",
+    "$PROFILE_ROOT/runtime-input.yaml",
     "--service-replicas",
     String(input.serviceReplicas),
     "--worker-replicas",

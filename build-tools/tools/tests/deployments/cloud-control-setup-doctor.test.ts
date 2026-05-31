@@ -16,6 +16,18 @@ import {
 import { withControlPlaneArgv } from "./control-plane-process-entrypoints.helpers";
 import { ecrRegistryProfileForImage } from "./control-plane-registry-profile.fixture";
 import { privateLinkSupabaseProfile } from "./control-plane-supabase-postgres.fixture";
+import {
+  reviewedRuntimeInput,
+  reviewedRuntimeInputYaml,
+} from "./cloud-control-runtime-input.fixture";
+import {
+  phase,
+  resolveCommandRef,
+  runbookCommand,
+  setupArgPairs,
+  writeBundle,
+  writeEvidence,
+} from "./cloud-control-setup-doctor.helpers";
 const DIGEST_REF =
   "registry.example.com/platform/deployment-control-plane@sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc";
 const DIGEST = `sha256:${"c".repeat(64)}`;
@@ -96,17 +108,21 @@ test("dry-run next commands include full setup flags and runbook outputs", async
   try {
     const topologyFile = path.join("buck-out/tmp", "cloud-control-setup-doctor-topology.json");
     const supabaseFile = path.join("buck-out/tmp", "cloud-control-setup-doctor-supabase.json");
+    const runtimeFile = path.join("buck-out/tmp", "cloud-control-setup-doctor-runtime.yaml");
     await fsp.mkdir(path.dirname(topologyFile), { recursive: true });
     await fsp.writeFile(topologyFile, JSON.stringify(topologyForImage()), "utf8");
     await fsp.writeFile(supabaseFile, JSON.stringify(privateLinkSupabaseProfile()), "utf8");
+    await fsp.writeFile(runtimeFile, reviewedRuntimeInputYaml(), "utf8");
     const args = [
       "setup",
       "--dry-run",
-      ...setupArgPairs().flat(),
+      ...setupArgPairs(DIGEST_REF, BUILD_IDENTITY, DIGEST).flat(),
       "--aws-topology-evidence",
       topologyFile,
       "--supabase-postgres-profile",
       supabaseFile,
+      "--runtime-input",
+      runtimeFile,
     ];
     await withControlPlaneArgv(args, runCloudControlSetupCommand);
     const result = JSON.parse(output.join("\n"));
@@ -121,6 +137,7 @@ test("dry-run next commands include full setup flags and runbook outputs", async
       "--reviewed-source-mode",
       "--aws-topology-evidence",
       "--supabase-postgres-profile",
+      "--runtime-input",
     ]) {
       assert.ok(commands.includes(flag), `missing ${flag}`);
     }
@@ -133,6 +150,30 @@ test("dry-run next commands include full setup flags and runbook outputs", async
     console.log = previousLog;
     process.exitCode = previousExitCode;
   }
+});
+
+test("setup doctor rejects invalid generated auth and credential artifacts", async () => {
+  await runInScratchTemp("cloud-control-setup-doctor-invalid-artifacts", async (tmp) => {
+    const bundle = renderCloudControlSetupBundle(input({ outDir: tmp }));
+    await writeBundle(tmp, bundle.files);
+    const auth = JSON.parse(bundle.files["auth-provider-profile.json"]!);
+    auth.metadata.jwksCheckedAt = "2020-01-01T00:00:00.000Z";
+    await fsp.writeFile(path.join(tmp, "auth-provider-profile.json"), JSON.stringify(auth));
+    const credentialMap = JSON.parse(bundle.files["credential-map.json"]!);
+    credentialMap.entries[0].source = { kind: "secret-backend-ref" };
+    await fsp.writeFile(path.join(tmp, "credential-map.json"), JSON.stringify(credentialMap));
+    await fsp.writeFile(
+      path.join(tmp, "residual-action-checklist.json"),
+      JSON.stringify({ schemaVersion: "cloud-control-residual-actions@1", actions: [{}] }),
+    );
+
+    const result = await validateRunbookBundle(tmp);
+    assert.equal(result.ok, false);
+    assert.match(result.structureErrors.join("\n"), /auth-provider-profile\.json.*JWKS/);
+    assert.match(result.structureErrors.join("\n"), /credential-map\.json.*secret backend ref/);
+    assert.match(result.structureErrors.join("\n"), /actions\[0\] missing id/);
+    assert.match(result.structureErrors.join("\n"), /typed evidence requirements/);
+  });
 });
 
 test("conformance checklist command refs resolve into generated commands", () => {
@@ -187,61 +228,11 @@ function input(overrides: Partial<CloudControlSetupInput> = {}): CloudControlSet
     dryRun: false,
     awsTopology: topologyForImage(),
     supabasePostgres: privateLinkSupabaseProfile(),
+    runtimeInput: reviewedRuntimeInput(),
     ...overrides,
   };
 }
 
 function topologyForImage() {
   return topologyForPublishedImage(privateLinkAwsTopology(), DIGEST_REF, DIGEST);
-}
-
-function setupArgPairs(): string[][] {
-  return [
-    ["--out", "./cloud-control-profile"],
-    ["--host-mode", "aws-ec2"],
-    ["--image", DIGEST_REF],
-    ["--expected-image-build-identity", BUILD_IDENTITY],
-    ["--image-source-revision", "source-review"],
-    ["--image-build-identity", BUILD_IDENTITY],
-    ["--image-publication-digest", DIGEST],
-    ["--image-inspected-digest", DIGEST],
-    ["--public-url", "https://deploy.example.test"],
-    ["--auth-callback-host", "deploy-auth.example.test"],
-    ["--deployment-id", "pleomino-staging"],
-    ["--artifact-backend", "aws-s3"],
-    ["--artifact-bucket", "deployment-control-plane-artifacts"],
-    ["--artifact-region", "us-east-1"],
-    ["--reviewed-source-mode", "ssh"],
-  ];
-}
-
-async function writeBundle(dir: string, files: Record<string, string>): Promise<void> {
-  for (const [name, content] of Object.entries(files)) {
-    await fsp.mkdir(path.dirname(path.join(dir, name)), { recursive: true });
-    await fsp.writeFile(path.join(dir, name), content, "utf8");
-  }
-}
-
-function phase(result: any, id: string) {
-  return result.phases.find((entry: { id: string }) => entry.id === id);
-}
-
-function runbookCommand(commands: any, id: string) {
-  const found = commands.phases
-    .flatMap((entry: { commands: unknown[] }) => entry.commands)
-    .find((entry: any) => entry.id === id);
-  if (!found) throw new Error(`missing runbook command ${id}`);
-  return found;
-}
-
-function resolveCommandRef(commandRef: string, commands: any): unknown {
-  assert.match(commandRef, /^commands\.json#\/phases\/\d+\/commands\/\d+\/command$/);
-  return commandRef
-    .replace("commands.json#/", "")
-    .split("/")
-    .reduce((current: any, segment: string) => current[segment], commands);
-}
-
-async function writeEvidence(dir: string, output: string): Promise<void> {
-  await fsp.writeFile(path.join(dir, output.slice("$PROFILE_ROOT/".length)), "{}\n", "utf8");
 }
