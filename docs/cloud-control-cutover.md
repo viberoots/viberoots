@@ -308,8 +308,13 @@ redirects and the evidence proves service and callback traffic cannot complete o
 ```
 
 PrivateLink mode uses the same AWS topology shape and adds the PrivateLink security group plus
-Supabase PrivateLink resource configuration, RAM share, endpoint DNS/IP evidence, and `psql` proof
-digest:
+Supabase PrivateLink project/region evidence, regional availability, RAM acceptance and permission
+evidence, VPC Lattice endpoint or service-network association evidence, private DNS evidence,
+TCP 5432 security-group proof, endpoint DNS/IP evidence, public-connectivity status, database URL
+hostname classification, and `psql` proof digest. Supabase dashboard or support action initiates
+the share, AWS RAM acceptance makes it usable in the selected account, AWS VPC Lattice wiring
+creates the private network path, and runtime database URL selection must point at the private
+hostname.
 
 ```json
 {
@@ -532,12 +537,68 @@ digest:
     "mode": "privatelink",
     "privatelink": {
       "checkedAt": "2026-05-30T09:30:00.000Z",
+      "supabaseProjectRef": "project",
+      "supabaseRegion": "us-east-1",
+      "awsAccountId": "123456789012",
+      "awsRegion": "us-east-1",
+      "regionalAvailability": {
+        "checkedAt": "2026-05-30T09:30:00.000Z",
+        "region": "us-east-1",
+        "available": true,
+        "reviewedReference": "docs/cloud-control-cutover.md#supabase-privatelink-regions",
+        "digest": "sha256:privatelinkregion"
+      },
       "resourceConfigurationArn": "arn:aws:vpc-lattice:us-east-1:123456789012:resourceconfiguration/rcfg-123abc",
       "ramShareArn": "arn:aws:ram:us-east-1:123456789012:resource-share/share-123abc",
+      "ramShareStatus": "accepted",
+      "ramPermission": {
+        "checkedAt": "2026-05-30T09:30:00.000Z",
+        "reviewedReference": "docs/cloud-control-cutover.md#ram-permissions",
+        "digest": "sha256:rampermission"
+      },
       "endpointId": "vpce-privatelink123",
+      "latticePermission": {
+        "checkedAt": "2026-05-30T09:30:00.000Z",
+        "reviewedReference": "docs/cloud-control-cutover.md#vpc-lattice-permissions",
+        "digest": "sha256:latticepermission"
+      },
+      "privateDns": {
+        "checkedAt": "2026-05-30T09:30:00.000Z",
+        "enabled": true,
+        "hostname": "vpce-privatelink123.vpce.amazonaws.com",
+        "vpcId": "vpc-123abc",
+        "resolvesFromSelectedVpc": true
+      },
       "endpointDnsNames": ["vpce-privatelink123.vpce.amazonaws.com"],
       "endpointIps": ["10.0.1.12"],
-      "psqlProofDigest": "sha256:privatelinkpsqlproof"
+      "endpointSecurityGroupId": "sg-privatelink",
+      "serviceSecurityGroupId": "sg-service",
+      "workerSecurityGroupId": "sg-worker",
+      "securityGroupRuleProof": {
+        "checkedAt": "2026-05-30T09:30:00.000Z",
+        "protocol": "tcp",
+        "port": 5432,
+        "sourceSecurityGroupIds": ["sg-service", "sg-worker"],
+        "destinationSecurityGroupId": "sg-privatelink"
+      },
+      "psql": {
+        "checkedAt": "2026-05-30T09:30:00.000Z",
+        "success": true,
+        "sourceHostIdentity": "i-0123456789abcdef0",
+        "sourceHostKind": "aws-ec2",
+        "vpcId": "vpc-123abc"
+      },
+      "psqlProofDigest": "sha256:privatelinkpsqlproof",
+      "databaseUrl": {
+        "checkedAt": "2026-05-30T09:30:00.000Z",
+        "hostname": "vpce-privatelink123.vpce.amazonaws.com",
+        "classification": "private"
+      },
+      "publicConnectivity": {
+        "checkedAt": "2026-05-30T09:30:00.000Z",
+        "status": "retained",
+        "retainedPublicPathJustification": "reviewed rollback path during first cutover window"
+      }
     }
   }
 }

@@ -76,11 +76,7 @@ const HOOK_ADAPTERS: Record<string, HookAdapter> = {
   "aws-s3-artifact-store": awsFoundationHookAdapter("aws-s3-artifact-store"),
   "aws-network-foundation": awsFoundationHookAdapter("aws-network-foundation"),
   "supabase-managed-postgres": reviewedAdapter("supabase-managed-postgres"),
-  "supabase-privatelink-prerequisite": reviewedAdapter(
-    "supabase-privatelink-evidence-gate",
-    false,
-    true,
-  ),
+  "supabase-privatelink-prerequisite": supabasePrivateLinkAdapter(),
   "cloudflare-edge": reviewedAdapter("cloudflare-edge"),
   "vercel-operator-ui": reviewedAdapter("vercel-operator-ui"),
   "remote-build-worker-fleet": reviewedAdapter("remote-build-worker-fleet"),
@@ -200,6 +196,35 @@ function reviewedAdapter(name: string, automated = true, manualPrerequisite = fa
     name,
     automated,
     manualPrerequisite,
+    preview: phase("preview"),
+    apply: phase("apply"),
+    evidence: phase("evidence"),
+    smoke: phase("smoke"),
+    rollback: phase("rollback"),
+  };
+}
+
+function supabasePrivateLinkAdapter(): HookAdapter {
+  const base = reviewedAdapter("supabase-privatelink-evidence-gate", false, true);
+  const phase = (selectedPhase: CloudProviderCapabilityHookPhase): HookAdapterPhase => {
+    return async (opts) => {
+      const result = await base[selectedPhase](opts);
+      return {
+        ...result,
+        payload: {
+          schemaVersion: "supabase-privatelink-provider-payload@1",
+          evidenceMode: "evidence-only",
+          supportMediated: true,
+          supportEvidenceRef: "privatelink-request",
+          ramPermissionEvidenceRef: "ram-acceptance-permission",
+          latticePermissionEvidenceRef: "vpc-lattice-association-permission",
+          privateDnsEvidenceRef: "private-dns-proof",
+        },
+      };
+    };
+  };
+  return {
+    ...base,
     preview: phase("preview"),
     apply: phase("apply"),
     evidence: phase("evidence"),

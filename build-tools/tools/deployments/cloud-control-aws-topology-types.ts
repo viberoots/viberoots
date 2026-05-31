@@ -133,13 +133,59 @@ export type AwsDatabaseEvidence =
       mode: "privatelink";
       privatelink: {
         checkedAt: string;
+        supabaseProjectRef: string;
+        supabaseRegion: string;
+        awsAccountId: string;
+        awsRegion: string;
+        regionalAvailability: AwsReviewedEvidence & {
+          region: string;
+          available: boolean;
+        };
         resourceConfigurationArn: string;
         ramShareArn: string;
+        ramShareStatus: "accepted";
+        ramPermission: AwsReviewedEvidence;
         endpointId?: string;
         serviceNetworkAssociationId?: string;
+        latticePermission: AwsReviewedEvidence;
+        privateDns: {
+          checkedAt: string;
+          enabled: boolean;
+          hostname: string;
+          vpcId: string;
+          resolvesFromSelectedVpc: boolean;
+        };
         endpointDnsNames: string[];
         endpointIps: string[];
+        endpointSecurityGroupId: string;
+        serviceSecurityGroupId: string;
+        workerSecurityGroupId: string;
+        securityGroupRuleProof: {
+          checkedAt: string;
+          protocol: "tcp";
+          port: 5432;
+          sourceSecurityGroupIds: string[];
+          destinationSecurityGroupId: string;
+        };
+        psql: {
+          checkedAt: string;
+          success: boolean;
+          sourceHostIdentity: string;
+          sourceHostKind: "aws-ec2";
+          vpcId: string;
+        };
         psqlProofDigest: string;
+        databaseUrl: {
+          checkedAt: string;
+          hostname: string;
+          classification: "private";
+        };
+        publicConnectivity: {
+          checkedAt: string;
+          status: "retained" | "disabled";
+          retainedPublicPathJustification?: string;
+          privatePathClientsPassed?: boolean;
+        };
       };
     };
 

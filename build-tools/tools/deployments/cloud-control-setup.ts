@@ -2,6 +2,7 @@ import * as fsp from "node:fs/promises";
 import fs from "node:fs";
 import path from "node:path";
 import { getFlagBool, getFlagList, getFlagStr } from "../lib/cli";
+import { setupUsesSupabasePrivateLink } from "./cloud-control-setup-aws-topology";
 import { renderCloudControlSetupBundle } from "./cloud-control-setup-render";
 import {
   assertCloudControlSetupInput,
@@ -98,6 +99,7 @@ export function readCloudControlSetupInput(): CloudControlSetupInput {
     workerReplicas: numberFlag("worker-replicas", 2),
     dryRun: getFlagBool("dry-run"),
     awsTopology,
+    supabasePrivatelink: getFlagBool("supabase-privatelink"),
     ingressCommandEvidence: ingressCommandEvidenceFromFlags(),
     requireIngressCommandEvidence:
       mode === "aws-ec2" && !getFlagBool("dry-run") && Boolean(awsTopology?.ingress),
@@ -191,6 +193,7 @@ function setupCommand(input: CloudControlSetupInput, dryRun: boolean): string {
     input.artifactBackendEvidence || undefined,
     input.mode === "aws-ec2" ? "--aws-topology-evidence" : undefined,
     input.mode === "aws-ec2" ? "$PROFILE_ROOT/aws-topology-evidence.json" : undefined,
+    setupUsesSupabasePrivateLink(input) ? "--supabase-privatelink" : undefined,
     input.mode === "aws-ec2" ? "--ingress-command-evidence" : undefined,
     input.mode === "aws-ec2" ? ingressEvidencePaths() : undefined,
   ].filter((arg): arg is string => typeof arg === "string" && arg.length > 0);

@@ -1,4 +1,5 @@
 import type { CloudControlSetupInput } from "./cloud-control-setup-types";
+import { setupAwsTopology } from "./cloud-control-setup-aws-topology";
 
 const CREDENTIAL_DIR = "/run/deployment-control-plane/credentials";
 
@@ -27,10 +28,12 @@ export function phaseMeta(id: string, input: CloudControlSetupInput) {
         "$PROFILE_ROOT/managed-dependencies.profile.yaml",
         "$PROFILE_ROOT/provider-capabilities.json#supabase-managed-postgres",
         artifactEvidence(input),
+        ...supabasePrivateLinkEvidenceOutputs(input),
       ],
       residualManualActions: [
         "attach managed Postgres feature, backup, restore, and connectivity evidence",
         "attach artifact-store PUT/GET/HEAD, digest, endpoint, and VPC endpoint evidence",
+        ...supabasePrivateLinkResidualActions(input),
       ],
     },
     "process-start": {
@@ -74,6 +77,30 @@ function artifactEvidence(input: CloudControlSetupInput): string {
   return input.artifactBackend === "aws-s3"
     ? "$PROFILE_ROOT/provider-capabilities.json#aws-s3-artifact-store"
     : "$PROFILE_ROOT/managed-dependencies.json#artifactStore.reviewedAlternateEvidence";
+}
+
+function supabasePrivateLinkEvidenceOutputs(input: CloudControlSetupInput): string[] {
+  const names = [
+    "support-initiation",
+    "ram-acceptance",
+    "vpc-lattice",
+    "private-dns",
+    "tcp-5432-sg",
+    "private-psql",
+  ];
+  return usesPrivateLink(input)
+    ? names.map((name) => `$PROFILE_ROOT/supabase-privatelink-${name}.json`)
+    : [];
+}
+
+function supabasePrivateLinkResidualActions(input: CloudControlSetupInput): string[] {
+  return usesPrivateLink(input)
+    ? ["run generated Supabase PrivateLink operator-evidence commands from commands.json"]
+    : [];
+}
+
+function usesPrivateLink(input: CloudControlSetupInput): boolean {
+  return input.mode === "aws-ec2" && setupAwsTopology(input)?.database?.mode === "privatelink";
 }
 
 function hostProfile(input: CloudControlSetupInput): string {

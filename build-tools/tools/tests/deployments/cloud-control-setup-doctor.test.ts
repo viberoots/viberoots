@@ -50,6 +50,19 @@ test("setup doctor classifies local runbook phases without cloud credentials", a
       JSON.stringify(managedDependencyEvidence()),
       "utf8",
     );
+    const afterManagedOnly = await validateRunbookBundle(tmp);
+    assert.equal(phase(afterManagedOnly, "managed-dependencies").status, "ready");
+
+    for (const id of [
+      "supabase-privatelink-support-initiation",
+      "supabase-privatelink-ram-acceptance",
+      "supabase-privatelink-vpc-lattice",
+      "supabase-privatelink-private-dns",
+      "supabase-privatelink-tcp-5432-sg",
+      "supabase-privatelink-private-psql",
+    ]) {
+      await writeEvidence(tmp, runbookCommand(commands, id).outputs[0]);
+    }
     const after = await validateRunbookBundle(tmp);
     assert.equal(phase(after, "managed-dependencies").status, "complete");
     assert.equal(phase(after, "process-start").status, "ready");
@@ -89,42 +102,7 @@ test("dry-run next commands include full setup flags and runbook outputs", async
     await fsp.mkdir(path.dirname(topologyFile), { recursive: true });
     await fsp.writeFile(topologyFile, JSON.stringify(topologyForImage()), "utf8");
     await withControlPlaneArgv(
-      [
-        "setup",
-        "--dry-run",
-        "--out",
-        "./cloud-control-profile",
-        "--host-mode",
-        "aws-ec2",
-        "--image",
-        DIGEST_REF,
-        "--expected-image-build-identity",
-        BUILD_IDENTITY,
-        "--image-source-revision",
-        "source-review",
-        "--image-build-identity",
-        BUILD_IDENTITY,
-        "--image-publication-digest",
-        DIGEST,
-        "--image-inspected-digest",
-        DIGEST,
-        "--public-url",
-        "https://deploy.example.test",
-        "--auth-callback-host",
-        "deploy-auth.example.test",
-        "--deployment-id",
-        "pleomino-staging",
-        "--artifact-backend",
-        "aws-s3",
-        "--artifact-bucket",
-        "deployment-control-plane-artifacts",
-        "--artifact-region",
-        "us-east-1",
-        "--reviewed-source-mode",
-        "ssh",
-        "--aws-topology-evidence",
-        topologyFile,
-      ],
+      ["setup", "--dry-run", ...setupArgPairs().flat(), "--aws-topology-evidence", topologyFile],
       runCloudControlSetupCommand,
     );
     const result = JSON.parse(output.join("\n"));
@@ -215,6 +193,26 @@ function input(overrides: Partial<CloudControlSetupInput> = {}): CloudControlSet
 
 function topologyForImage() {
   return topologyForPublishedImage(privateLinkAwsTopology(), DIGEST_REF, DIGEST);
+}
+
+function setupArgPairs(): string[][] {
+  return [
+    ["--out", "./cloud-control-profile"],
+    ["--host-mode", "aws-ec2"],
+    ["--image", DIGEST_REF],
+    ["--expected-image-build-identity", BUILD_IDENTITY],
+    ["--image-source-revision", "source-review"],
+    ["--image-build-identity", BUILD_IDENTITY],
+    ["--image-publication-digest", DIGEST],
+    ["--image-inspected-digest", DIGEST],
+    ["--public-url", "https://deploy.example.test"],
+    ["--auth-callback-host", "deploy-auth.example.test"],
+    ["--deployment-id", "pleomino-staging"],
+    ["--artifact-backend", "aws-s3"],
+    ["--artifact-bucket", "deployment-control-plane-artifacts"],
+    ["--artifact-region", "us-east-1"],
+    ["--reviewed-source-mode", "ssh"],
+  ];
 }
 
 async function writeBundle(dir: string, files: Record<string, string>): Promise<void> {

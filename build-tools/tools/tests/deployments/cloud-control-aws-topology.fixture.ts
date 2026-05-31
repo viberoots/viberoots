@@ -1,6 +1,7 @@
 import { AWS_TOPOLOGY_EVIDENCE_SCHEMA } from "../../deployments/cloud-control-aws-topology-types";
 import { foundationFromTopology } from "./cloud-control-aws-foundation-fixture";
 import { ingressEvidence } from "./cloud-control-aws-ingress.fixture";
+import { privateLinkEndpointEvidence } from "./cloud-control-supabase-privatelink.fixture";
 
 export const IMAGE_DIGEST = `sha256:${"a".repeat(64)}`;
 export const IMAGE_REF = `registry.example.com/platform/deployment-control-plane@${IMAGE_DIGEST}`;
@@ -30,16 +31,7 @@ export function privateLinkAwsTopology(overrides: Record<string, unknown> = {}) 
     securityGroups: { ...baseSecurityGroups(), privatelink: sg("sg-privatelink") },
     database: {
       mode: "privatelink",
-      privatelink: {
-        checkedAt: freshCheckedAt(),
-        resourceConfigurationArn:
-          "arn:aws:vpc-lattice:us-east-1:123456789012:resourceconfiguration/rcfg-123",
-        ramShareArn: "arn:aws:ram:us-east-1:123456789012:resource-share/share-123",
-        endpointId: "vpce-privatelink123",
-        endpointDnsNames: ["vpce-privatelink123.vpce.amazonaws.com"],
-        endpointIps: ["10.0.1.12"],
-        psqlProofDigest: "sha256:privatelink-psql-proof",
-      },
+      privatelink: privateLinkEndpointEvidence(),
     },
     ...overrides,
   };

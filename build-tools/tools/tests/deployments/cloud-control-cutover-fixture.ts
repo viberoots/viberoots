@@ -137,6 +137,19 @@ function providerPayloadFor(id: string) {
       },
     };
   }
+  if (id === "supabase-privatelink-prerequisite") {
+    return {
+      providerPayload: {
+        schemaVersion: "supabase-privatelink-provider-payload@1",
+        evidenceMode: "evidence-only",
+        supportMediated: true,
+        supportEvidenceRef: "privatelink-request",
+        ramPermissionEvidenceRef: "ram-acceptance-permission",
+        latticePermissionEvidenceRef: "vpc-lattice-association-permission",
+        privateDnsEvidenceRef: "private-dns-proof",
+      },
+    };
+  }
   if (id !== "cloudflare-edge" && id !== "vercel-operator-ui") return {};
   return {
     providerPayload: {

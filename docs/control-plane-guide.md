@@ -157,14 +157,27 @@ Capture evidence:
 - current Supabase PrivateLink regional availability for that region
 - AWS account id
 - RAM share id or ARN
+- RAM permission evidence proving the selected AWS principal can inspect and accept the share
 - resource configuration name
 - endpoint id or service-network association id
+- VPC Lattice permission evidence proving the selected AWS principal can create and inspect the
+  endpoint or service-network association
+- private DNS enabled status, hostname, selected VPC, and resolution proof from the selected VPC
 - endpoint DNS name or private IPs
 - security group id
+- TCP 5432 rule proof from the selected service and worker security groups to the endpoint or
+  service-network security group
 - `psql` success from inside the same VPC
+- database URL hostname classification proving the runtime URL uses the private hostname
+- public database connectivity status, either disabled after private-path clients pass or retained
+  with reviewed justification
 
 Do not treat a support ticket or dashboard screenshot as sufficient by itself. The repo cutover
 checks require structured evidence tied to the selected AWS host path.
+
+The split is explicit: Supabase dashboard or support action starts the share, AWS RAM acceptance
+proves the share is available to the selected account, AWS VPC Lattice wiring proves the private
+network path and private DNS, and the runtime database URL must then select that private hostname.
 
 ## Step 3: Provision AWS Infrastructure
 
@@ -519,8 +532,10 @@ For AWS EC2 readiness, also attach evidence for:
 - ALB/NLB public reachability, listener, target group, target registration, readiness health-check
   configuration, health result, certificate lifecycle, TLS policy, DNS record, callback route, and
   security-group/port path
-- Supabase path: `public` with TLS-validated `psql` proof, or `privatelink` with resource
-  configuration, RAM share, endpoint/service-network association, endpoint DNS/IPs, and `psql`
+- Supabase path: `public` with TLS-validated `psql` proof, or `privatelink` with project/region,
+  regional availability, RAM acceptance and permission evidence, VPC Lattice endpoint or
+  service-network association plus permission evidence, private DNS, TCP 5432 security-group rule,
+  endpoint DNS/IPs, public-connectivity status, database URL hostname classification, and `psql`
   proof
 - image digest and runtime config digest
 - graceful worker shutdown evidence
@@ -567,8 +582,9 @@ selected provider-capability id; they do not satisfy protected/shared readiness 
 
 - Database validation fails: confirm the URL file points at the intended Supabase project, the
   selected hostname is reachable from the AWS host, and the Postgres user has the required rights.
-- PrivateLink DNS fails: confirm AWS RAM share acceptance, endpoint status, endpoint DNS setting,
-  VPC DNS support, subnet selection, and security group ingress on TCP 5432.
+- PrivateLink DNS fails: confirm AWS RAM share acceptance and permissions, VPC Lattice endpoint or
+  service-network association permissions, private DNS enabled status, VPC DNS support, subnet
+  selection, and security group TCP 5432 proof.
 - Readiness fails but health passes: check database, artifact-store credentials, and worker
   heartbeat rows. `/healthz` does not prove dependencies are usable.
 - Worker heartbeat missing: confirm at least two worker processes use the same config file,

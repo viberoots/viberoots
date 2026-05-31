@@ -30,6 +30,7 @@ export function validateCloudControlCutover(
   const errors = [
     ...validateIdentity(evidence, options),
     ...validateBaseHealth(evidence),
+    ...validateManagedDependencyCutoverSource(evidence),
     ...validateManagedDependencyEvidence(
       evidence.managedDependencies,
       options.maxAgeMinutes,
@@ -49,6 +50,14 @@ export function validateCloudControlCutover(
   return { ok: errors.length === 0, errors, checklist: checklist(options) };
 }
 
+function validateManagedDependencyCutoverSource(evidence: CutoverEvidence): string[] {
+  const runtime = (evidence.managedDependencies?.runtimePath || {}) as Record<string, unknown>;
+  if (runtime.databaseConnectivityMode === "privatelink" && runtime.nonCutoverDiagnostic === true) {
+    return ["PrivateLink cutover cannot use diagnostic-only managed dependency evidence"];
+  }
+  return [];
+}
+
 function managedDependencyExpectations(
   evidence: CutoverEvidence,
   options: CutoverValidationOptions,
@@ -62,6 +71,8 @@ function managedDependencyExpectations(
     expectedHostProfile: options.expectedHostProfile,
     expectedRegion: options.expectedRegion,
     expectedDatabaseConnectivityMode: topology.database?.mode,
+    expectedSupabaseProjectRef: privatelink.supabaseProjectRef,
+    expectedSupabaseRegion: privatelink.supabaseRegion,
     expectedPrivateLinkEndpointId: privatelink.endpointId,
     expectedPrivateLinkResourceId: privatelink.resourceConfigurationArn,
     expectedS3VpcEndpointId: s3Endpoint.endpointId,

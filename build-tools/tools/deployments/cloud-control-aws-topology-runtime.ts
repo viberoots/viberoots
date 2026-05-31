@@ -10,6 +10,7 @@ import {
   awsTopologyArtifactBackend,
 } from "./cloud-control-aws-artifact-backend";
 import { validateIngressEvidence } from "./cloud-control-aws-ingress-validate";
+import { validateSupabasePrivateLinkEvidence } from "./cloud-control-supabase-privatelink-evidence";
 
 export { awsTopologyArtifactBackend };
 
@@ -151,7 +152,8 @@ export function validateDatabase(
   const database = evidenceObject(evidenceObject(topology).database);
   const mode = evidenceText(database, "mode");
   if (mode === "public") return validatePublicDatabase(database.publicTls, options);
-  if (mode === "privatelink") return validatePrivateLinkDatabase(database.privatelink, options);
+  if (mode === "privatelink")
+    return validatePrivateLinkDatabase(topology, database.privatelink, options);
   return [`unsupported or missing AWS database connectivity mode ${mode || "<missing>"}`];
 }
 
@@ -209,25 +211,21 @@ function validatePublicDatabase(value: unknown, options: AwsTopologyValidationOp
 }
 
 function validatePrivateLinkDatabase(
+  topology: unknown,
   value: unknown,
   options: AwsTopologyValidationOptions,
 ): string[] {
-  const errors = requireFresh(value, "Supabase PrivateLink", options);
-  if (!evidenceText(value, "endpointId") && !evidenceText(value, "serviceNetworkAssociationId")) {
-    errors.push("missing Supabase PrivateLink endpoint or service-network association evidence");
-  }
-  for (const field of ["resourceConfigurationArn", "ramShareArn", "psqlProofDigest"])
-    if (!evidenceText(value, field)) errors.push(`missing Supabase PrivateLink ${field} evidence`);
-  if (!evidenceText(value, "psqlProofDigest").startsWith("sha256:")) {
-    errors.push("Supabase PrivateLink evidence missing psql proof digest");
-  }
-  if (evidenceList(value, "endpointDnsNames").length === 0) {
-    errors.push("missing Supabase PrivateLink endpoint DNS evidence");
-  }
-  if (evidenceList(value, "endpointIps").length === 0) {
-    errors.push("missing Supabase PrivateLink endpoint IP evidence");
-  }
-  return errors;
+  const object = evidenceObject(topology);
+  const groups = evidenceObject(object.securityGroups);
+  return validateSupabasePrivateLinkEvidence(value, {
+    ...options,
+    awsAccountId: evidenceText(object, "accountId"),
+    awsRegion: evidenceText(object, "region"),
+    vpcId: evidenceText(object.vpc, "id"),
+    serviceSecurityGroupId: evidenceText(groups.service, "id"),
+    workerSecurityGroupId: evidenceText(groups.worker, "id"),
+    privateLinkSecurityGroupId: evidenceText(groups.privatelink, "id"),
+  });
 }
 
 function requireFresh(

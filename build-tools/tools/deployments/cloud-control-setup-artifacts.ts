@@ -38,12 +38,12 @@ export function renderConformanceChecklist(input: CloudControlSetupInput): strin
         },
         {
           name: "database",
-          commandRef: "commands.json#/phases/2/commands/0/command",
+          commandRef: managedCommandRef(setupUsesSupabasePrivateLink(input) ? 6 : 0),
           passCondition: "managed Postgres SQL feature conformance succeeds",
         },
         {
           name: "artifact-store",
-          commandRef: "commands.json#/phases/2/commands/1/command",
+          commandRef: managedCommandRef(setupUsesSupabasePrivateLink(input) ? 7 : 1),
           passCondition: "temporary object PUT/GET/HEAD and digest verification succeeds",
         },
         {
@@ -159,6 +159,10 @@ function cred(name: string): string {
   return `${CREDENTIAL_DIR}/${name}`;
 }
 
+function managedCommandRef(index: number): string {
+  return `commands.json#/phases/2/commands/${index}/command`;
+}
+
 function artifactProvider(input: CloudControlSetupInput): string {
   return input.artifactBackend;
 }
@@ -171,6 +175,8 @@ function runtimePath(input: CloudControlSetupInput) {
     expectedHostProfile: input.mode,
     expectedAwsRegion: topology?.region || input.artifactRegion,
     databaseConnectivityMode: database?.mode || "public",
+    expectedSupabaseProjectRef: privatelink?.supabaseProjectRef,
+    expectedSupabaseRegion: privatelink?.supabaseRegion,
     expectedPrivateLinkEndpointId: privatelink?.endpointId,
     expectedPrivateLinkResourceId: privatelink?.resourceConfigurationArn,
     expectedS3VpcEndpointId: topology?.s3VpcEndpoint?.endpointId,

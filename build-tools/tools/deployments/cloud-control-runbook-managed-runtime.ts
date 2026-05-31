@@ -16,8 +16,8 @@ export function managedRuntimeFlags(input: CloudControlSetupInput): string {
   return [
     '--host-profile "$RUNTIME_HOST_PROFILE"',
     '--aws-region "$SOURCE_AWS_REGION"',
-    '--supabase-project-ref "$MANAGED_DEPENDENCY_SUPABASE_PROJECT_REF"',
-    '--supabase-region "$MANAGED_DEPENDENCY_SUPABASE_REGION"',
+    flag("supabase-project-ref", values.supabaseProjectRef),
+    flag("supabase-region", values.supabaseRegion),
     flag("privatelink-endpoint-id", values.privatelinkEndpointId),
     flag("privatelink-resource-id", values.privatelinkResourceId),
     flag("s3-vpc-endpoint-id", values.s3VpcEndpointId),
@@ -36,6 +36,8 @@ function managedRuntimeValues(input: CloudControlSetupInput) {
   return {
     privatelinkEndpointId: privatelink?.endpointId,
     privatelinkResourceId: privatelink?.resourceConfigurationArn,
+    supabaseProjectRef: privatelink?.supabaseProjectRef,
+    supabaseRegion: privatelink?.supabaseRegion,
     s3VpcEndpointId: topology?.s3VpcEndpoint?.endpointId,
     s3EndpointPolicyDigest: topology?.s3VpcEndpoint?.endpointPolicyDigest,
     alternateBackendEvidenceRef: topology?.artifactBackendEvidence?.reviewedReference,

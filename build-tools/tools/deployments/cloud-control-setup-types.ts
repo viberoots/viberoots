@@ -37,6 +37,7 @@ export type CloudControlSetupInput = {
   workerReplicas: number;
   dryRun: boolean;
   awsTopology?: AwsTopologyEvidence;
+  supabasePrivatelink?: boolean;
   ingressCommandEvidence?: Record<string, unknown>;
   requireIngressCommandEvidence?: boolean;
 };

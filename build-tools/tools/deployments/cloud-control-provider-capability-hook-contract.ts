@@ -57,6 +57,8 @@ export function validateProviderCapabilityHookEvidenceShape(
     errors.push(`${id}: provider-capability evidence is missing or stale`);
   }
   errors.push(...validateRedactedOutputEvidence(id, value));
+  errors.push(...validateSupabasePrivateLinkPayload(id, value));
+  errors.push(...validateNoDashboardOnlyEvidence(id, value));
   errors.push(...validateNoUnsafeEvidenceContent(id, value));
   return errors;
 }
@@ -114,6 +116,53 @@ function validateNoUnsafeEvidenceContent(id: string, value: Record<string, unkno
     : [];
 }
 
+function validateNoDashboardOnlyEvidence(id: string, value: Record<string, unknown>): string[] {
+  const invalidPath = findInvalidSourcePath(value);
+  return invalidPath
+    ? [`${id}: ${invalidPath} dashboard/manual/raw notes are not structured provider evidence`]
+    : [];
+}
+
+function findInvalidSourcePath(value: unknown, path = "$"): string | undefined {
+  if (typeof value === "string") return INVALID_SOURCE_PATTERN.test(value) ? path : undefined;
+  if (!value || typeof value !== "object") return undefined;
+  if (Array.isArray(value)) {
+    for (let index = 0; index < value.length; index += 1) {
+      const invalid = findInvalidSourcePath(value[index], `${path}[${index}]`);
+      if (invalid) return invalid;
+    }
+    return undefined;
+  }
+  for (const [key, child] of Object.entries(value as Record<string, unknown>)) {
+    const invalid = findInvalidSourcePath(child, evidencePath(path, key));
+    if (invalid) return invalid;
+  }
+  return undefined;
+}
+
+function validateSupabasePrivateLinkPayload(id: string, value: Record<string, unknown>): string[] {
+  if (id !== "supabase-privatelink-prerequisite") return [];
+  const payload = providerCapabilityHookEvidenceRecord(value.providerPayload);
+  const errors: string[] = [];
+  if (payload?.schemaVersion !== "supabase-privatelink-provider-payload@1") {
+    errors.push(`${id}: missing Supabase PrivateLink provider payload evidence`);
+  }
+  if (payload?.evidenceMode !== "evidence-only" || payload?.supportMediated !== true) {
+    errors.push(`${id}: Supabase PrivateLink payload must be support-mediated evidence-only`);
+  }
+  for (const field of [
+    "supportEvidenceRef",
+    "ramPermissionEvidenceRef",
+    "latticePermissionEvidenceRef",
+    "privateDnsEvidenceRef",
+  ]) {
+    if (typeof payload?.[field] !== "string" || !String(payload[field]).trim()) {
+      errors.push(`${id}: Supabase PrivateLink payload missing ${field}`);
+    }
+  }
+  return errors;
+}
+
 function findUnsafeEvidencePath(value: unknown, path = "$"): string | undefined {
   if (typeof value === "string") {
     return UNSAFE_EVIDENCE_PATTERN.test(value) ? path : undefined;
@@ -146,3 +195,5 @@ const UNSAFE_EVIDENCE_PATTERN =
 
 const UNSAFE_EVIDENCE_KEY_PATTERN =
   /^(authorization|cookie|passwd|password|token|api[_-]?key|apiKey|client[_-]?secret|clientSecret|private[_-]?key|privateKey)$/i;
+
+const INVALID_SOURCE_PATTERN = /\b(dashboard[- ]only|raw[- ]iac[- ]only|manual notes?)\b/i;

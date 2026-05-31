@@ -80,7 +80,16 @@ export const CONCRETE_PROVIDER_CAPABILITIES: Record<
     "supabase:privatelink:{project}:{aws-account}:{region}:{endpoint}",
     ["endpoint accepted", "private DNS path", "Postgres TLS from EC2"],
     ["disable endpoint route", "return database connectivity to reviewed public TLS path"],
-    ["privatelink-request", "privatelink-approval", "endpoint-smoke", "private-db-proof"],
+    [
+      "privatelink-request",
+      "privatelink-approval",
+      "ram-acceptance-permission",
+      "vpc-lattice-association-permission",
+      "private-dns-proof",
+      "tcp-5432-sg-proof",
+      "public-connectivity-status",
+      "private-db-proof",
+    ],
     "gated prerequisite; support-mediated steps are evidence, not hidden mutation authority",
   ),
   "cloudflare-edge": cap(

@@ -18,6 +18,7 @@ import { validateControlPlaneImagePublicationEvidence } from "./control-plane-im
 import { evidenceSecretErrors, evidenceSourceErrors } from "./cloud-control-evidence-helpers";
 import {
   awsTopologyArtifactBackend,
+  awsTopologyDatabaseMode,
   validateAwsTopologyEvidence,
 } from "./cloud-control-aws-topology-validate";
 import { validateIngressCommandEvidenceBundle } from "./cloud-control-aws-ingress-command-evidence";
@@ -237,6 +238,12 @@ function validateAwsEvidence(input: CloudControlSetupInput): string[] {
     awsTopologyArtifactBackend(input.awsTopology) !== input.artifactBackend
   ) {
     errors.push("AWS topology artifact backend does not match selected setup artifact backend");
+  }
+  if (
+    input.supabasePrivatelink === true &&
+    awsTopologyDatabaseMode(input.awsTopology) !== "privatelink"
+  ) {
+    errors.push("--supabase-privatelink requires awsTopology.database.mode privatelink");
   }
   return errors;
 }

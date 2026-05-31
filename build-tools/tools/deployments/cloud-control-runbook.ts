@@ -7,6 +7,7 @@ import {
   imagePublicationInputs,
 } from "./cloud-control-runbook-image-publication";
 import { managedRuntimeFlags, sourceHostPrelude } from "./cloud-control-runbook-managed-runtime";
+import { supabasePrivateLinkEvidenceCommands } from "./cloud-control-runbook-supabase-privatelink";
 export { validateRunbookBundle, validateRunbookStructure } from "./cloud-control-runbook-doctor";
 
 const CREDENTIAL_DIR = "/run/deployment-control-plane/credentials";
@@ -19,7 +20,7 @@ export type RunbookCommand = {
   inputs: string[];
   outputs: string[];
   mustPass: string;
-};
+} & Partial<Record<"actionType" | "evidenceGuidance", string>>;
 
 export type RunbookPhase = {
   id: string;
@@ -166,6 +167,7 @@ function managedCommands(input: CloudControlSetupInput): RunbookCommand[] {
     "$PROFILE_ROOT/credential-preflight.json",
   ];
   return [
+    ...supabasePrivateLinkEvidenceCommands(input, rootPrelude(input.outDir)),
     command(
       "database",
       body,
@@ -244,6 +246,4 @@ function rootPrelude(outDir: string): string {
   return `PROFILE_ROOT="\${PROFILE_ROOT:-$(pwd)}"; if [ ! -f "$PROFILE_ROOT/commands.json" ]; then PROFILE_ROOT=${shellQuote(outDir)}; fi; if [ ! -f "$PROFILE_ROOT/commands.json" ]; then echo "commands.json not found; run from repo root or bundle directory" >&2; exit 2; fi`;
 }
 
-function shellQuote(value: string): string {
-  return `'${value.replace(/'/g, `'\\''`)}'`;
-}
+const shellQuote = (value: string): string => `'${value.replace(/'/g, `'\\''`)}'`;

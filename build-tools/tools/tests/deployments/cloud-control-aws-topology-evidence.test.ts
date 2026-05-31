@@ -113,15 +113,12 @@ test("AWS topology schema ties support prerequisites to selected capabilities", 
 });
 
 test("AWS topology schema requires PrivateLink DNS IP and digest evidence", () => {
+  const base = privateLinkAwsTopology() as any;
   const topology = privateLinkAwsTopology({
     database: {
       mode: "privatelink",
       privatelink: {
-        checkedAt: new Date().toISOString(),
-        resourceConfigurationArn:
-          "arn:aws:vpc-lattice:us-east-1:123456789012:resourceconfiguration/rcfg-123",
-        ramShareArn: "arn:aws:ram:us-east-1:123456789012:resource-share/share-123",
-        endpointId: "vpce-privatelink123",
+        ...base.database.privatelink,
         endpointDnsNames: [],
         endpointIps: [],
         psqlProofDigest: "psql worked",
@@ -131,7 +128,7 @@ test("AWS topology schema requires PrivateLink DNS IP and digest evidence", () =
   const errors = validateAwsTopologyEvidence(topology, opts).join("\n");
   assert.match(errors, /endpoint DNS evidence/);
   assert.match(errors, /endpoint IP evidence/);
-  assert.match(errors, /PrivateLink evidence missing psql proof digest/);
+  assert.match(errors, /Supabase PrivateLink psql proof is missing or unsuccessful/);
 });
 
 test("AWS topology schema requires NAT gateway identity for NAT egress", () => {
