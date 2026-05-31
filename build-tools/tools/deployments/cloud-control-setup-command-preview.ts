@@ -11,6 +11,7 @@ export function nextCommands(input: CloudControlSetupInput): string[] {
     "stage credential files listed in credential-manifest.json",
     localCheckCommand("setup-doctor", input.outDir, "setup-doctor.json"),
     localCheckCommand("credential-preflight", input.outDir, "credential-preflight.json"),
+    localCheckCommand("credential-staging", input.outDir, "credential-staging.json"),
     "run the ordered phases in commands.json",
   ];
 }

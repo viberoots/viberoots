@@ -6,6 +6,7 @@ import { test } from "node:test";
 import { runCloudControlSetupCommand } from "../../deployments/cloud-control-setup";
 import { renderCloudControlSetupBundle } from "../../deployments/cloud-control-setup-render";
 import { validateRunbookBundle } from "../../deployments/cloud-control-runbook";
+import { runCredentialStaging } from "../../deployments/control-plane-credential-staging";
 import type { CloudControlSetupInput } from "../../deployments/cloud-control-setup-types";
 import { runInScratchTemp } from "../lib/test-helpers";
 import {
@@ -55,6 +56,10 @@ test("setup doctor classifies local runbook phases without cloud credentials", a
     assert.equal(phase(afterDoctor, "credential-preflight").status, "ready");
 
     await fsp.writeFile(path.join(tmp, "credential-preflight.json"), '{"ok":true}\n', "utf8");
+    await runCredentialStaging({
+      bundleDir: tmp,
+      out: path.join(tmp, "credential-staging.json"),
+    });
     await writeSupabaseProviderEvidence(tmp);
     await fsp.writeFile(
       path.join(tmp, "managed-dependency-evidence.json"),

@@ -10,6 +10,10 @@ import { buildSupabaseManagedPostgresEvidence } from "../../deployments/control-
 import { ecrRegistryProfileForImage } from "./control-plane-registry-profile.fixture";
 import { ingressCommandEvidence } from "./cloud-control-aws-ingress.fixture";
 import {
+  credentialStagingEvidence,
+  CUTOVER_CREDENTIAL_FILES,
+} from "./cloud-control-credential-staging.fixture";
+import {
   freshCheckedAt,
   IMAGE_BUILD_IDENTITY,
   IMAGE_DIGEST,
@@ -30,6 +34,8 @@ export {
 } from "./cloud-control-aws-topology.fixture";
 
 export function evidence(overrides: Record<string, unknown> = {}) {
+  const credentialManifestDigest = "sha256:credential-manifest";
+  const credentialMapDigest = "sha256:credential-map";
   return {
     hostProfile: "aws-ec2",
     region: "us-east-1",
@@ -81,6 +87,10 @@ export function evidence(overrides: Record<string, unknown> = {}) {
       "supabase-managed-postgres": capabilityEvidence("supabase-managed-postgres"),
       "supabase-privatelink-prerequisite": capabilityEvidence("supabase-privatelink-prerequisite"),
     },
+    credentialManifestDigest,
+    credentialMapDigest,
+    credentialManifestRequiredFiles: [...CUTOVER_CREDENTIAL_FILES],
+    credentialStaging: credentialStagingEvidence(credentialManifestDigest, credentialMapDigest),
     standby: { mode: "service-only", doubleExecutionPrevented: true },
     restore: restoreEvidence(),
     rollback: { trafficReturn: true, authoritySemanticsUnchanged: true },

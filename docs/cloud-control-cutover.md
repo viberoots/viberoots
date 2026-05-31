@@ -41,6 +41,10 @@ Required cutover evidence:
   `supabase-managed-postgres-evidence@1` shape emitted by the generated provider-capability command.
   Bare `supabase-postgres.profile.json` facts, dashboard-only notes, stale `checkedAt` values, or
   expired `maxAgeMinutes` do not satisfy cutover.
+- credential staging evidence must use `control-plane-credential-staging@1`, be fresh, match the
+  cutover file's current `credentialManifestDigest` and `credentialMapDigest`, include no stale
+  credential entries, and record service/worker restart evidence plus host mount evidence for the
+  filename set, uid/gid ownership, permissions, and `/run/deployment-control-plane/credentials`.
 - standby mode evidence proving mini service/worker controls prevent double execution
 - operation-specific audit evidence for cutover, rollback, restore, or break-glass use
 

@@ -17,6 +17,10 @@ import { runCloudControlSetupCommand } from "./cloud-control-setup";
 import { runCloudControlCutoverCommand } from "./cloud-control-cutover-cli";
 import { runCloudControlSetupDoctorCommand } from "./cloud-control-setup-doctor";
 import { runCredentialPreflightCommand } from "./control-plane-credential-preflight";
+import {
+  runCredentialRotationCommand,
+  runCredentialStagingCommand,
+} from "./control-plane-credential-staging";
 import { runControlPlaneManagedDependenciesCli } from "./control-plane-managed-dependencies";
 import { runControlPlaneImagePublicationCommand } from "./control-plane-image-publication-cli";
 
@@ -27,6 +31,8 @@ function command():
   | "cutover"
   | "setup-doctor"
   | "credential-preflight"
+  | "credential-staging"
+  | "credential-rotation"
   | "image-publication"
   | "managed-dependencies" {
   const [mode] = getPositionalsWithValueFlags([
@@ -43,6 +49,7 @@ function command():
     "config",
     "bundle-dir",
     "credential-directory",
+    "stale-credential",
     "deployment-id",
     "host-mode",
     "image",
@@ -82,11 +89,13 @@ function command():
     mode !== "cutover" &&
     mode !== "setup-doctor" &&
     mode !== "credential-preflight" &&
+    mode !== "credential-staging" &&
+    mode !== "credential-rotation" &&
     mode !== "image-publication" &&
     mode !== "managed-dependencies"
   ) {
     throw new Error(
-      "usage: deployment-control-plane <service|worker|setup|image-publication|setup-doctor|credential-preflight|managed-dependencies|cutover>",
+      "usage: deployment-control-plane <service|worker|setup|image-publication|setup-doctor|credential-preflight|credential-staging|credential-rotation|managed-dependencies|cutover>",
     );
   }
   return mode;
@@ -112,6 +121,14 @@ export async function runDeploymentControlPlaneCommand() {
   }
   if (mode === "credential-preflight") {
     await runCredentialPreflightCommand();
+    return undefined;
+  }
+  if (mode === "credential-staging") {
+    await runCredentialStagingCommand();
+    return undefined;
+  }
+  if (mode === "credential-rotation") {
+    await runCredentialRotationCommand();
     return undefined;
   }
   if (mode === "image-publication") {

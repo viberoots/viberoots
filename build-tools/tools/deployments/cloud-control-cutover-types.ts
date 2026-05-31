@@ -15,6 +15,11 @@ export type CutoverEvidence = {
   ingressCommandEvidence?: Record<string, unknown>;
   latestNonProductionDeployment?: Record<string, unknown>;
   providerCapabilities?: Record<string, Record<string, unknown>>;
+  credentialManifestDigest?: string;
+  credentialMapDigest?: string;
+  credentialManifestRequiredFiles?: string[];
+  credentialStaging?: CredentialStagingEvidence;
+  credentialRotation?: CredentialRotationEvidence;
   runtimeConfig?: Record<string, unknown>;
   standby?: Record<string, unknown>;
   restore?: Record<string, unknown>;
@@ -40,3 +45,7 @@ export type CutoverValidationResult = {
 import type { ControlPlaneImagePublicationEvidence } from "./control-plane-image-publication";
 import type { ManagedDependencyEvidence } from "./control-plane-managed-dependency-types";
 import type { SupabaseManagedPostgresProfile } from "./control-plane-supabase-postgres-profile";
+import type {
+  CredentialRotationEvidence,
+  CredentialStagingEvidence,
+} from "./control-plane-credential-staging-types";

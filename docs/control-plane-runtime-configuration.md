@@ -258,6 +258,34 @@ project, site URL, environment, client id, or client secret defaults in the runt
 Production validation checks every entry in `credentials.infisicalDeployments`; missing,
 unreadable, empty, or filename-mismatched files fail before the service or worker starts.
 
+Credential staging evidence is generated with:
+
+```bash
+deployment-control-plane credential-staging \
+  --bundle-dir ./cloud-control-profile \
+  --out ./cloud-control-profile/credential-staging.json
+```
+
+The evidence is non-secret. It records the current manifest digest, credential-map digest, runtime
+config digest, backend path references, generated secret write-plan ids, host credential source ids,
+stale detection results, service and worker restart evidence, and host mount evidence. The host
+mount evidence must name the filename set, uid/gid ownership, permissions, and target path
+`/run/deployment-control-plane/credentials`. The implemented AWS profile verifies the existing
+bind-mounted credential directory; it does not assume systemd `LoadCredential=`.
+
+Credential rotation evidence is generated separately:
+
+```bash
+deployment-control-plane credential-rotation \
+  --bundle-dir ./cloud-control-profile \
+  --out ./cloud-control-profile/credential-rotation.json
+```
+
+Rotation evidence must preserve non-secret config semantics and fail closed when active stale
+entries remain. Protected/shared setup and cutover consume fresh `credential-staging.json` tied to
+the current `credential-manifest.json` and `credential-map.json`; optional rotation evidence is
+validated when present.
+
 Credential file manifest:
 
 | Purpose                            | Required filename                                  |

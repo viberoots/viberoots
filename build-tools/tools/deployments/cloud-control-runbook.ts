@@ -8,6 +8,7 @@ import {
 } from "./cloud-control-runbook-image-publication";
 import { managedRuntimeFlags, sourceHostPrelude } from "./cloud-control-runbook-managed-runtime";
 import { rootPrelude } from "./cloud-control-runbook-root";
+import { credentialCommands } from "./cloud-control-runbook-credential-commands";
 import { supabasePrivateLinkEvidenceCommands } from "./cloud-control-runbook-supabase-privatelink";
 import { supabasePostgresEvidenceCommand } from "./cloud-control-runbook-supabase-postgres";
 export { validateRunbookBundle, validateRunbookStructure } from "./cloud-control-runbook-doctor";
@@ -80,17 +81,9 @@ function phases(input: CloudControlSetupInput): RunbookPhase[] {
       input,
       2,
       "credential-preflight",
-      "Validate staged credential files",
+      "Validate and stage credential evidence",
       ["local-review"],
-      [
-        command(
-          "credential-preflight",
-          preflight(input),
-          localInputs(),
-          ["$PROFILE_ROOT/credential-preflight.json"],
-          "credential manifest and files match",
-        ),
-      ],
+      credentialCommands(input),
     ),
     phase(
       input,
@@ -244,6 +237,3 @@ function awsEc2ProcessCommands(input: CloudControlSetupInput): RunbookCommand[] 
 
 const doctor = (input: CloudControlSetupInput) =>
   `${rootPrelude(input.outDir)}; deployment-control-plane setup-doctor --bundle-dir "$PROFILE_ROOT" --out "$PROFILE_ROOT/setup-doctor.json"`;
-
-const preflight = (input: CloudControlSetupInput) =>
-  `${rootPrelude(input.outDir)}; deployment-control-plane credential-preflight --bundle-dir "$PROFILE_ROOT" --out "$PROFILE_ROOT/credential-preflight.json"`;

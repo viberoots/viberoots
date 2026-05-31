@@ -12,6 +12,7 @@ import { validateControlPlaneImagePublicationEvidence } from "./control-plane-im
 import { validateManagedDependencyEvidence } from "./control-plane-managed-dependency-validation";
 import type { ManagedDependencyValidationExpectations } from "./control-plane-managed-dependency-types";
 import { validateSupabaseProfileSource } from "./cloud-control-cutover-supabase";
+import { validateCredentialCutoverEvidence } from "./cloud-control-cutover-credentials";
 
 const BASE_HEALTH = [
   "cloudHealth",
@@ -38,6 +39,7 @@ export function validateCloudControlCutover(
       options.maxAgeMinutes,
       managedDependencyExpectations(evidence, options),
     ),
+    ...validateCredentialCutoverEvidence(evidence, options),
     ...validateImagePublication(evidence, options),
     ...validateLatestDeployment(evidence, options),
     ...validateCutoverProviderCapabilities(

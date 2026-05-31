@@ -423,22 +423,22 @@ evidence digest to the selected runtime input.
 Ingress validation consumes the current runtime auth-provider callback shape. It checks that
 `authProvider.callback.externalHost` and `externalPath` match the AWS listener/routing rule that
 sends the callback hostname and path to the selected service target group. Runtime credential
-staging and generated runtime-config workflow changes remain out of this PR and are handled by the
-later runtime-config staging work.
+staging uses the generated credential map and records non-secret evidence bound to the current
+runtime configuration, manifest, and credential map.
 
 If you intend to disable public Supabase database connectivity after PrivateLink is working, do it
 only after the service and workers have passed readiness from the private endpoint and every other
 database client has been moved to the private hostname.
 
-## Step 7: Stage Credential Files And Run Local Checks
+## Step 7: Stage Credential Evidence And Run Local Checks
 
-Stage real secret values as files under:
+Use the generated staging workflow to validate and record how credentials are staged under:
 
 ```text
 /run/deployment-control-plane/credentials
 ```
 
-At minimum, the AWS host needs:
+At minimum, the AWS host credential surface needs:
 
 | Filename                                 | Purpose                                                                 |
 | ---------------------------------------- | ----------------------------------------------------------------------- |
@@ -464,7 +464,7 @@ managed dependency evidence must include the IAM role ARN plus least-privilege b
 digest for the reviewed artifact operations.
 
 Secret values must not be placed in Nix options, image layers, command-line arguments, ordinary
-environment files, deployment metadata, or logs.
+environment files, deployment metadata, evidence files, or logs.
 
 Use `credential-map.json` as the staging source of truth. Every file in
 `credential-manifest.json` must map to an explicit reviewed secret-backend reference or host
@@ -473,13 +473,15 @@ deployment-scoped Universal Auth machine identity evidence, least-privilege role
 reviewed-source SSH or GitHub App import evidence, control-plane token generation/import evidence,
 database URL import evidence tied to the selected Supabase profile and public/private hostname, and
 rotation/stale-credential posture for every manifest entry. Secret names and access policies may be
-generated as write plans; secret values must stay only in the reviewed backend.
+generated as write plans; secret values must stay only in the reviewed backend. Fixture/default
+staging validates and emits evidence only. Live backend writes or host mount checks require
+explicit live-gated access and must not run from ordinary CI.
 
 The current AWS EC2 compatibility units use host-specific bind-mounted credential-directory wiring
 for `/run/deployment-control-plane/credentials`. Do not assume systemd `LoadCredential=` unless the
 generated host profile explicitly emits and tests that mode.
 
-After staging files, run the local setup checks. From the repo root, use:
+Run the local setup checks and staging executor. From the repo root, use:
 
 ```bash
 deployment-control-plane setup-doctor \
@@ -488,6 +490,9 @@ deployment-control-plane setup-doctor \
 deployment-control-plane credential-preflight \
   --bundle-dir ./cloud-control-profile \
   --out ./cloud-control-profile/credential-preflight.json
+deployment-control-plane credential-staging \
+  --bundle-dir ./cloud-control-profile \
+  --out ./cloud-control-profile/credential-staging.json
 ```
 
 From inside the generated bundle directory, use:
@@ -495,9 +500,12 @@ From inside the generated bundle directory, use:
 ```bash
 deployment-control-plane setup-doctor --bundle-dir . --out ./setup-doctor.json
 deployment-control-plane credential-preflight --bundle-dir . --out ./credential-preflight.json
+deployment-control-plane credential-staging --bundle-dir . --out ./credential-staging.json
 ```
 
 The generated `commands.json` contains the same ordered runbook with profile-root-relative paths.
+Protected/shared setup and cutover remain blocked until `credential-staging.json` is present, fresh,
+and tied to the current `credential-manifest.json` and `credential-map.json`.
 
 ## Step 8: Run Managed Dependency Validation
 
@@ -655,6 +663,14 @@ selected provider-capability id; they do not satisfy protected/shared readiness 
   and key prefix.
 - Missing credential failure: compare host files against `credential-manifest.json`. Do not repair
   by switching to environment variables.
+- Stale credential failure: rerun `deployment-control-plane credential-staging` and, when stale
+  entries remain active, run `deployment-control-plane credential-rotation` after refreshing the
+  reviewed backend or encrypted host source.
+- Backend write failure: confirm the selected backend profile, least-privilege scope evidence,
+  generated write-plan ids, and reviewed source-provider access for SSH or GitHub App credentials.
+- Host mount permission mismatch: confirm the filename set, uid/gid `10001`, mode `0400`, and
+  mount target `/run/deployment-control-plane/credentials`; do not switch to `LoadCredential=`
+  unless the generated host profile explicitly implements and tests that path.
 - Cutover evidence rejected: replace dashboard-only notes with structured evidence tied to the same
   AWS instances, image digest, config digest, selected database path, and selected artifact path.
 
@@ -672,6 +688,7 @@ selected provider-capability id; they do not satisfy protected/shared readiness 
 - [ ] `config.yaml` auth-provider and Infisical metadata are generated from reviewed runtime input
       and provider evidence.
 - [ ] Credential files match `credential-manifest.json`.
+- [ ] `credential-staging.json` is fresh and matches the current credential manifest and map.
 - [ ] One service and at least two workers are running.
 - [ ] Managed dependency validation passes from the AWS runtime path.
 - [ ] Health, readiness, and worker-heartbeat checks pass.

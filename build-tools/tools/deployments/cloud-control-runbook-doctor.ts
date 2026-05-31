@@ -6,6 +6,10 @@ import { validateAuthProviderProfile } from "./cloud-control-runtime-input";
 import { validateCredentialMap } from "./cloud-control-credential-map";
 import type { SupabaseManagedPostgresProfile } from "./control-plane-supabase-postgres-profile";
 import { validateProviderCapabilityHookEvidenceShape } from "./cloud-control-provider-capability-hook-contract";
+import {
+  validateCredentialRotationOutput,
+  validateCredentialStagingOutput,
+} from "./cloud-control-runbook-credential-evidence";
 
 export async function validateRunbookBundle(bundleDir: string) {
   const profileRoot = path.resolve(bundleDir);
@@ -156,10 +160,10 @@ async function phaseStatus(profileRoot: string, phase: RunbookPhase, prior: any[
     await Promise.all(outputs.map((file) => validateOutputEvidence(profileRoot, file)))
   ).flat();
   const status =
-    existingOutputs.length === outputs.length && evidenceErrors.length === 0
-      ? "complete"
-      : blockedPrerequisites.length || missingInputs.length
-        ? "blocked"
+    blockedPrerequisites.length || missingInputs.length
+      ? "blocked"
+      : existingOutputs.length === outputs.length && evidenceErrors.length === 0
+        ? "complete"
         : "ready";
   return {
     id: phase.id,
@@ -193,12 +197,20 @@ async function exists(file: string): Promise<boolean> {
 async function validateOutputEvidence(profileRoot: string, file: string): Promise<string[]> {
   if (
     file !== "$PROFILE_ROOT/managed-dependency-evidence.json" &&
-    file !== "$PROFILE_ROOT/supabase-managed-postgres-evidence.json"
+    file !== "$PROFILE_ROOT/supabase-managed-postgres-evidence.json" &&
+    file !== "$PROFILE_ROOT/credential-staging.json" &&
+    file !== "$PROFILE_ROOT/credential-rotation.json"
   ) {
     return [];
   }
   if (file === "$PROFILE_ROOT/supabase-managed-postgres-evidence.json") {
     return validateSupabaseProviderOutput(profileRoot);
+  }
+  if (file === "$PROFILE_ROOT/credential-staging.json") {
+    return validateCredentialStagingOutput(profileRoot);
+  }
+  if (file === "$PROFILE_ROOT/credential-rotation.json") {
+    return validateCredentialRotationOutput(profileRoot);
   }
   const localPath = path.join(profileRoot, "managed-dependency-evidence.json");
   if (!(await exists(localPath))) return [];
