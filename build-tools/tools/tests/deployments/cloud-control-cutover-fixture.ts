@@ -6,6 +6,7 @@ import {
 } from "../../deployments/cloud-control-provider-capability-hook-contract";
 import { managedDependencyEvidence } from "./cloud-control-cutover-managed-dependencies.fixture";
 import { ecrRegistryProfileForImage } from "./control-plane-registry-profile.fixture";
+import { ingressCommandEvidence } from "./cloud-control-aws-ingress.fixture";
 import {
   freshCheckedAt,
   IMAGE_BUILD_IDENTITY,
@@ -48,10 +49,21 @@ export function evidence(overrides: Record<string, unknown> = {}) {
       runId: "deploy-run-1",
       hostProfile: "aws-ec2",
       image: IMAGE_REF,
+      publicUrl: "https://deploy.example.test",
       trafficIngressHostProfile: "aws-ec2",
       cloudPrimaryPath: true,
       stagingDeploymentSucceeded: true,
     },
+    runtimeConfig: {
+      publicUrl: "https://deploy.example.test",
+      authProvider: {
+        callback: {
+          externalHost: "deploy-auth.example.test",
+          externalPath: "/oidc/callback",
+        },
+      },
+    },
+    ingressCommandEvidence: ingressCommandEvidence(),
     providerCapabilities: {
       "aws-ec2-control-plane-host": capabilityEvidence("aws-ec2-control-plane-host"),
       "aws-network-foundation": capabilityEvidence("aws-network-foundation"),
@@ -106,6 +118,34 @@ export function capabilityEvidence(id = "aws-ec2-control-plane-host") {
       redacted: true,
       summary: "payload redacted (sha256:fixture)",
       fingerprint: "sha256:fixture",
+    },
+    ...providerPayloadFor(id),
+  };
+}
+
+function providerPayloadFor(id: string) {
+  if (id === "aws-network-foundation") {
+    return {
+      providerPayload: {
+        schemaVersion: "aws-foundation-hook-payload@1",
+        ingressLifecycle: {
+          schemaVersion: "aws-ingress-lifecycle-evidence@1",
+          operation: {
+            evidencePayload: { schemaVersion: "aws-ingress-hook-inspection@1" },
+          },
+        },
+      },
+    };
+  }
+  if (id !== "cloudflare-edge" && id !== "vercel-operator-ui") return {};
+  return {
+    providerPayload: {
+      schemaVersion: "edge-ingress-provider-payload@1",
+      hostname: "deploy.example.test",
+      callbackHost: "deploy-auth.example.test",
+      callbackPath: "/oidc/callback",
+      originLoadBalancerArn:
+        "arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/cp/1",
     },
   };
 }

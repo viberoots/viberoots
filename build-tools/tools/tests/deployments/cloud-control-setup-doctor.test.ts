@@ -8,7 +8,11 @@ import { renderCloudControlSetupBundle } from "../../deployments/cloud-control-s
 import { validateRunbookBundle } from "../../deployments/cloud-control-runbook";
 import type { CloudControlSetupInput } from "../../deployments/cloud-control-setup-types";
 import { runInScratchTemp } from "../lib/test-helpers";
-import { managedDependencyEvidence, privateLinkAwsTopology } from "./cloud-control-cutover-fixture";
+import {
+  managedDependencyEvidence,
+  privateLinkAwsTopology,
+  topologyForPublishedImage,
+} from "./cloud-control-cutover-fixture";
 import { withControlPlaneArgv } from "./control-plane-process-entrypoints.helpers";
 import { ecrRegistryProfileForImage } from "./control-plane-registry-profile.fixture";
 
@@ -58,7 +62,15 @@ test("setup doctor classifies local runbook phases without cloud credentials", a
     assert.equal(phase(afterProcess, "process-start").status, "complete");
     assert.equal(phase(afterProcess, "http-validation").status, "ready");
 
-    for (const id of ["health", "readiness", "worker-heartbeats"]) {
+    for (const id of [
+      "ingress-dns",
+      "ingress-tls",
+      "ingress-health",
+      "ingress-callback",
+      "health",
+      "readiness",
+      "worker-heartbeats",
+    ]) {
       await writeEvidence(tmp, runbookCommand(commands, id).outputs[0]);
     }
     const afterHttp = await validateRunbookBundle(tmp);
@@ -202,19 +214,7 @@ function input(overrides: Partial<CloudControlSetupInput> = {}): CloudControlSet
 }
 
 function topologyForImage() {
-  const topology = privateLinkAwsTopology() as any;
-  return {
-    ...topology,
-    compute: {
-      ...topology.compute,
-      processEvidence: { ...topology.compute.processEvidence, imageDigest: DIGEST },
-      registryPullProof: {
-        ...topology.compute.registryPullProof,
-        image: DIGEST_REF,
-        digest: DIGEST,
-      },
-    },
-  };
+  return topologyForPublishedImage(privateLinkAwsTopology(), DIGEST_REF, DIGEST);
 }
 
 async function writeBundle(dir: string, files: Record<string, string>): Promise<void> {

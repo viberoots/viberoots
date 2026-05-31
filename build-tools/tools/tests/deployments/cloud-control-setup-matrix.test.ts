@@ -240,8 +240,8 @@ test("provider capabilities wire preview, apply, and evidence through reviewed a
     renderCloudControlSetupBundle(input()).files["provider-capabilities.json"]!,
   );
   for (const declaration of declarations) {
-    assert.match(declaration.iac.previewCommand, /^deploy --deployment <label>/);
-    assert.match(declaration.iac.applyCommand, /^deploy --deployment <label>/);
-    assert.match(declaration.iac.evidenceCommand, /^deploy --deployment <label>/);
+    assert.match(declaration.iac.previewCommand, /^deploy --deployment 'pleomino-staging'/);
+    assert.match(declaration.iac.applyCommand, /^deploy --deployment 'pleomino-staging'/);
+    assert.match(declaration.iac.evidenceCommand, /^deploy --deployment 'pleomino-staging'/);
   }
 });

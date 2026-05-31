@@ -1,6 +1,7 @@
 import type { CloudControlSetupInput } from "./cloud-control-setup-types";
 import { phaseMeta } from "./cloud-control-runbook-evidence";
 import { httpCommands } from "./cloud-control-runbook-http";
+import { ingressEvidenceCommands } from "./cloud-control-runbook-ingress";
 import {
   imagePublicationCommand,
   imagePublicationInputs,
@@ -111,7 +112,10 @@ function phases(input: CloudControlSetupInput): RunbookPhase[] {
       "http-validation",
       "Validate service HTTP checks",
       ["process-start"],
-      httpCommands(input, rootPrelude(input.outDir)),
+      [
+        ...ingressEvidenceCommands(input, rootPrelude(input.outDir)),
+        ...httpCommands(input, rootPrelude(input.outDir)),
+      ],
     ),
   ];
 }

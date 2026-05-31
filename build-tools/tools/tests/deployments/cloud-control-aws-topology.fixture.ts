@@ -1,5 +1,6 @@
 import { AWS_TOPOLOGY_EVIDENCE_SCHEMA } from "../../deployments/cloud-control-aws-topology-types";
 import { foundationFromTopology } from "./cloud-control-aws-foundation-fixture";
+import { ingressEvidence } from "./cloud-control-aws-ingress.fixture";
 
 export const IMAGE_DIGEST = `sha256:${"a".repeat(64)}`;
 export const IMAGE_REF = `registry.example.com/platform/deployment-control-plane@${IMAGE_DIGEST}`;
@@ -51,14 +52,20 @@ export function topologyForPublishedImage<T extends { compute?: unknown }>(
   digest: string,
 ): T {
   const compute = (topology as any).compute;
-  return {
+  const ingress = (topology as any).ingress;
+  const next = {
     ...topology,
     compute: {
       ...compute,
       processEvidence: { ...compute.processEvidence, imageDigest: digest },
       registryPullProof: { ...compute.registryPullProof, image, digest },
     },
-  };
+    ingress: {
+      ...ingress,
+      targetRegistration: { ...ingress.targetRegistration, imageDigest: digest },
+    },
+  } as Record<string, unknown>;
+  return { ...next, foundation: foundationFromTopology(next) } as T;
 }
 
 function baseAwsTopology() {
@@ -75,6 +82,10 @@ function baseAwsTopology() {
       routeTableIds: ["rtb-123", "rtb-456"],
       natGatewayIds: ["nat-123"],
     },
+    publicSubnets: [
+      publicSubnet("subnet-public-123", "us-east-1a", "rtb-public-123"),
+      publicSubnet("subnet-public-456", "us-east-1b", "rtb-public-123"),
+    ],
     privateSubnets: [
       privateSubnet("subnet-123", "us-east-1a", "rtb-123"),
       privateSubnet("subnet-456", "us-east-1b", "rtb-456"),
@@ -91,17 +102,7 @@ function baseAwsTopology() {
     },
     compute: computeEvidence(),
     operationalVisibility: operationalVisibility(),
-    ingress: {
-      checkedAt: freshCheckedAt(),
-      type: "alb",
-      listenerArn: "arn:aws:elasticloadbalancing:us-east-1:123456789012:listener/app/cp/1/2",
-      targetGroupArn: "arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/cp/1",
-      targetHealth: "healthy",
-      certificateArn: "arn:aws:acm:us-east-1:123456789012:certificate/cert-123",
-      tlsPolicy: "ELBSecurityPolicy-TLS13-1-2-2021-06",
-      dnsRecord: "deploy.example.test",
-      callbackHost: "deploy-auth.example.test",
-    },
+    ingress: ingressEvidence(),
   };
 }
 
@@ -189,6 +190,17 @@ function privateSubnet(id: string, availabilityZone: string, routeTableId: strin
     availabilityZone,
     routeTableId,
     mapPublicIpOnLaunch: false,
+  };
+}
+
+function publicSubnet(id: string, availabilityZone: string, routeTableId: string) {
+  return {
+    checkedAt: freshCheckedAt(),
+    id,
+    vpcId: "vpc-123",
+    availabilityZone,
+    routeTableId,
+    mapPublicIpOnLaunch: true,
   };
 }
 

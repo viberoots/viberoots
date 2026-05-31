@@ -49,12 +49,13 @@ export function phaseMeta(id: string, input: CloudControlSetupInput) {
     "http-validation": {
       evidenceInputs: [
         "$PROFILE_ROOT/ingress-checklist.json",
+        "$PROFILE_ROOT/aws-topology-evidence.json",
         "$PROFILE_ROOT/managed-dependency-evidence.json",
         "$PROFILE_ROOT/process-service.json",
         ...processWorkerOutputPaths(input),
       ],
       residualManualActions: [
-        "attach TLS, DNS, auth callback, and public URL ingress evidence",
+        "run generated DNS, TLS, health, and callback ingress evidence commands",
         "attach captured health, readiness, and worker-heartbeat responses to conformance evidence",
       ],
     },

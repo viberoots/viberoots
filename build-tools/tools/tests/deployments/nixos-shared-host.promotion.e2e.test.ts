@@ -20,6 +20,7 @@ import {
   nixosSharedHostLanePolicyFixture,
 } from "./nixos-shared-host.fixture";
 import { startControlPlaneHarness } from "./nixos-shared-host.control-plane.helpers";
+import { freshRemoteExecBuckEnv } from "./nixos-shared-host.deploy.remote-exec.helpers";
 import {
   seedCurrentStageState,
   seedSyntheticTargetStageState,
@@ -30,10 +31,6 @@ async function writeArtifact(root: string, html: string): Promise<void> {
   await fsp.mkdir(root, { recursive: true });
   await fsp.writeFile(path.join(root, "index.html"), html, "utf8");
   await fsp.writeFile(path.join(root, "healthz"), "ok\n", "utf8");
-}
-
-async function writeDeploymentJson(filePath: string, deployment: unknown): Promise<void> {
-  await fsp.writeFile(filePath, JSON.stringify(deployment, null, 2) + "\n", "utf8");
 }
 
 async function writeWranglerConfig(filePath: string): Promise<void> {
@@ -117,19 +114,17 @@ test("nixos-shared-host allows reviewed cross-provider same-artifact promotion o
     const hostRoot = path.join(tmp, "host");
     const statePath = path.join(tmp, "platform-state.json");
     const fake = await installFakeCloudflarePagesWrangler(tmp);
-    const sourceJson = path.join(tmp, "pleomino-dev-pages.json");
-    const targetJson = path.join(tmp, "pleomino-staging-host.json");
     await writeArtifact(artifactDir, "<html>promoted release</html>\n");
     await writeArtifact(bootstrapArtifactDir, "<html>bootstrap</html>\n");
+    const env = freshRemoteExecBuckEnv(tmp, fakeCloudflareEnv(fake));
+    Object.assign(process.env, env);
     await writeWranglerConfig(
       path.join(tmp, "projects", "deployments", "pleomino", "dev-pages", "wrangler.jsonc"),
     );
-    await installCloudflarePagesTargets(tmp, [source]);
     await installNixosSharedHostTargets(tmp, [target]);
+    await installCloudflarePagesTargets(tmp, [source]);
     await ensureNixosSharedHostReviewedSourceRef(tmp, $, source);
     await ensureNixosSharedHostReviewedSourceRef(tmp, $, target);
-    await writeDeploymentJson(sourceJson, source);
-    await writeDeploymentJson(targetJson, target);
     const sourceEvidenceJson = await writeReviewedLaneAdmissionEvidenceJson({
       tmp,
       $,
@@ -157,10 +152,14 @@ test("nixos-shared-host allows reviewed cross-provider same-artifact promotion o
     try {
       await $({
         cwd: tmp,
+        env,
       })`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment ${target.label} --admission-evidence-json ${targetEvidenceJson} --artifact-dir ${bootstrapArtifactDir} --control-plane-url ${harness.controlPlane.url} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(targetServer.port)} --smoke-connect-protocol https:`;
+      await installCloudflarePagesTargets(tmp, [source]);
+      const sourceEnv = freshRemoteExecBuckEnv(tmp, fakeCloudflareEnv(fake));
+      Object.assign(process.env, sourceEnv);
       const sourceRun = await $({
         cwd: tmp,
-        env: fakeCloudflareEnv(fake),
+        env: sourceEnv,
       })`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment ${source.label} --admission-evidence-json ${sourceEvidenceJson} --artifact-dir ${artifactDir} --records-root ${recordsRoot} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(sourceServer.port)} --smoke-connect-protocol https:`;
       const sourceSummary = JSON.parse(String(sourceRun.stdout));
       const backendDatabaseUrl = await seedCurrentStageState({
@@ -193,16 +192,19 @@ test("nixos-shared-host promotion keeps retained source-run eligibility independ
     const artifactDir = path.join(tmp, "artifact");
     const recordsRoot = path.join(tmp, "records");
     const fake = await installFakeCloudflarePagesWrangler(tmp);
-    const sourceJson = path.join(tmp, "pleomino-dev-pages.json");
     await writeArtifact(artifactDir, "<html>eligible source</html>\n");
+    const env = freshRemoteExecBuckEnv(tmp, fakeCloudflareEnv(fake));
+    Object.assign(process.env, env);
     await writeWranglerConfig(
       path.join(tmp, "projects", "deployments", "pleomino", "dev-pages", "wrangler.jsonc"),
     );
-    await installCloudflarePagesTargets(tmp, [source]);
     await installNixosSharedHostTargets(tmp, [target]);
+    await installCloudflarePagesTargets(tmp, [source]);
     await ensureNixosSharedHostReviewedSourceRef(tmp, $, source);
     await ensureNixosSharedHostReviewedSourceRef(tmp, $, target);
-    await writeDeploymentJson(sourceJson, source);
+    await installCloudflarePagesTargets(tmp, [source]);
+    const sourceEnv = freshRemoteExecBuckEnv(tmp, fakeCloudflareEnv(fake));
+    Object.assign(process.env, sourceEnv);
     const sourceEvidenceJson = await writeReviewedLaneAdmissionEvidenceJson({
       tmp,
       $,
@@ -217,7 +219,7 @@ test("nixos-shared-host promotion keeps retained source-run eligibility independ
     try {
       const sourceRun = await $({
         cwd: tmp,
-        env: fakeCloudflareEnv(fake),
+        env: sourceEnv,
       })`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment ${source.label} --admission-evidence-json ${sourceEvidenceJson} --artifact-dir ${artifactDir} --records-root ${recordsRoot} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(sourceServer.port)} --smoke-connect-protocol https:`;
       const sourceSummary = JSON.parse(String(sourceRun.stdout));
       const backendDatabaseUrl = await seedCurrentStageState({

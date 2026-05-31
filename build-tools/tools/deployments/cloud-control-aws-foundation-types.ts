@@ -1,4 +1,5 @@
 import type { AwsArtifactBackend } from "./cloud-control-aws-topology-types";
+import type { AwsIngressEvidence } from "./cloud-control-aws-ingress-types";
 
 export const AWS_FOUNDATION_PROFILE_SCHEMA = "aws-foundation-profile@1" as const;
 
@@ -81,6 +82,22 @@ export type AwsFoundationNetworkProfile = {
     "service" | "worker" | "loadBalancer" | "s3Endpoint" | "privatelink",
     string
   >;
+  ingress?: {
+    mode: "create" | "import";
+    loadBalancerArn: string;
+    listenerArn: string;
+    targetGroupArn: string;
+    targetAttachmentId?: string;
+    targetInstanceId?: string;
+    targetPort?: number;
+    certificateArn: string;
+    dnsRecord: string;
+    topologyEvidence?: AwsIngressEvidence;
+    stateBackend: "s3";
+    stateLock: "dynamodb" | "s3-native";
+    drift: { checkedAt: string; status: "in-sync"; diffDigest: string };
+    rollback: { nonDestructive: boolean; approvalRequiredForSharedResources: boolean };
+  };
 };
 
 export type AwsFoundationIamProfile = {

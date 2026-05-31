@@ -20,6 +20,7 @@ import {
   awsTopologyArtifactBackend,
   validateAwsTopologyEvidence,
 } from "./cloud-control-aws-topology-validate";
+import { validateIngressCommandEvidenceBundle } from "./cloud-control-aws-ingress-command-evidence";
 import {
   hookEvidenceDeclaration,
   hookEvidenceRefs,
@@ -136,7 +137,7 @@ export function validateProviderCapabilityDeclaration(
   }
   for (const [name, command] of Object.entries(declaration.iac || {})) {
     if (name === "reviewedReference") continue;
-    if (!command.includes("deploy --deployment <label>")) {
+    if (!usesReviewedDeployAdmission(command)) {
       errors.push(`${declaration.id}: iac.${name} must use reviewed deploy admission`);
     }
   }
@@ -152,7 +153,23 @@ function matchesConcreteCapability(
   return (
     fields.every(
       (field) => JSON.stringify(declaration[field]) === JSON.stringify(concrete[field]),
-    ) && iacFields.every((field) => declaration.iac?.[field] === concrete.iac[field])
+    ) &&
+    iacFields.every(
+      (field) =>
+        normalizeProviderCommand(declaration.iac?.[field] || "") ===
+        normalizeProviderCommand(concrete.iac[field]),
+    )
+  );
+}
+
+function usesReviewedDeployAdmission(command: string): boolean {
+  return /^deploy --deployment (?:<label>|'[^']+'|[^\s]+)/.test(command);
+}
+
+function normalizeProviderCommand(command: string): string {
+  return command.replace(
+    /^deploy --deployment (?:<label>|'[^']+'|[^\s]+)/,
+    "deploy --deployment <label>",
   );
 }
 
@@ -205,6 +222,14 @@ function validateAwsEvidence(input: CloudControlSetupInput): string[] {
       maxAgeMinutes: 60,
       expectedImage: input.image,
       expectedImageDigest: input.imagePublication?.digest,
+      expectedPublicUrl: input.publicUrl,
+      expectedAuthCallbackHost: input.authCallbackHost,
+      expectedAuthCallbackPath: input.authCallbackPath,
+    }),
+    ...validateIngressCommandEvidenceBundle(input.awsTopology, input.ingressCommandEvidence, {
+      maxAgeMinutes: 60,
+      required:
+        input.requireIngressCommandEvidence === true || Boolean(input.ingressCommandEvidence),
     }),
   ];
   if (

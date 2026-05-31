@@ -77,7 +77,7 @@ test("AWS topology schema enforces endpoint variants and required runtime fields
   assert.match(errors, /unsupported compute mode/);
   assert.match(errors, /missing service process proof/);
   assert.match(errors, /missing worker process proof/);
-  assert.match(errors, /AWS ingress evidence missing callbackHost/);
+  assert.match(errors, /callback route host does not match runtime auth-provider config/);
   assert.match(errors, /unsupported load balancer type/);
   assert.match(errors, /public database connectivity validation evidence/);
 });

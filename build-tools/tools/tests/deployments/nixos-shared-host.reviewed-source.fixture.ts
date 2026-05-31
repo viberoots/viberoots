@@ -1,5 +1,6 @@
 #!/usr/bin/env zx-wrapper
 import * as fsp from "node:fs/promises";
+import path from "node:path";
 import { pathToFileURL } from "node:url";
 import type { NixosSharedHostDeployment } from "../../deployments/contract";
 
@@ -42,7 +43,7 @@ export async function ensureNixosSharedHostReviewedSourceRef(
     await $({ cwd, stdio: "pipe" })`git branch -f ${localBranch} HEAD`;
   }
   await $({ cwd, stdio: "pipe" })`git update-ref ${remoteRef} HEAD`;
-  const remoteRoot = `${cwd}/.tmp-reviewed-origin.git`;
+  const remoteRoot = path.join(path.dirname(cwd), `${path.basename(cwd)}-reviewed-origin.git`);
   const remotes = String((await $({ cwd, stdio: "pipe" })`git remote`).stdout || "")
     .split(/\r?\n/)
     .map((entry) => entry.trim())

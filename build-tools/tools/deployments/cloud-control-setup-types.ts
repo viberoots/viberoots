@@ -37,6 +37,8 @@ export type CloudControlSetupInput = {
   workerReplicas: number;
   dryRun: boolean;
   awsTopology?: AwsTopologyEvidence;
+  ingressCommandEvidence?: Record<string, unknown>;
+  requireIngressCommandEvidence?: boolean;
 };
 
 export type ProviderCapabilityDeclaration = {

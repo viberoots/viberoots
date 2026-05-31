@@ -31,7 +31,9 @@ export function renderCloudControlSetupBundle(
   input: CloudControlSetupInput,
 ): CloudControlSetupBundle {
   assertCloudControlSetupInput(input);
-  const capabilities = CLOUD_CAPABILITY_IDS.map((id) => capabilityDeclaration(id));
+  const capabilities = CLOUD_CAPABILITY_IDS.map((id) =>
+    capabilityDeclaration(id, { deploymentLabel: input.deploymentIds[0] }),
+  );
   const files = {
     "config.yaml": renderRuntimeConfig(input),
     "credential-manifest.json": renderCredentialManifest(input),

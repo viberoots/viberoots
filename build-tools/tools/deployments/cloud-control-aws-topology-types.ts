@@ -2,6 +2,7 @@ export const AWS_TOPOLOGY_EVIDENCE_SCHEMA = "aws-topology-evidence@1" as const;
 
 export type AwsDatabaseConnectivityMode = "public" | "privatelink";
 import type { AwsFoundationProfile } from "./cloud-control-aws-foundation-types";
+import type { AwsIngressEvidence } from "./cloud-control-aws-ingress-types";
 
 export type AwsArtifactBackend =
   | "aws-s3"
@@ -17,6 +18,7 @@ export type AwsTopologyEvidence = {
   artifactBackend?: AwsArtifactBackend;
   vpc: AwsVpcEvidence;
   egress: AwsEgressEvidence;
+  publicSubnets?: AwsSubnetEvidence[];
   privateSubnets: AwsSubnetEvidence[];
   securityGroups: AwsSecurityGroupsEvidence;
   s3VpcEndpoint?: AwsS3VpcEndpointEvidence;
@@ -116,18 +118,6 @@ export type AwsComputeEvidence = {
   };
 };
 
-export type AwsIngressEvidence = {
-  checkedAt: string;
-  type: "alb" | "nlb";
-  listenerArn: string;
-  targetGroupArn: string;
-  targetHealth: "healthy";
-  certificateArn: string;
-  tlsPolicy: string;
-  dnsRecord: string;
-  callbackHost: string;
-};
-
 export type AwsDatabaseEvidence =
   | {
       mode: "public";
@@ -159,6 +149,8 @@ export type AwsSelectedEdgesEvidence = {
     dnsProxy: AwsReviewedEvidence;
     tlsMode: AwsReviewedEvidence;
     wafRules: AwsReviewedEvidence;
+    bypass: AwsReviewedEvidence;
+    publicReachability: AwsReviewedEvidence;
     callbackRoute: AwsReviewedEvidence;
   };
   vercel?: {

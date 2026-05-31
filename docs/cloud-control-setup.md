@@ -20,7 +20,8 @@ deployment-control-plane setup \
   --artifact-bucket deployment-control-plane-artifacts \
   --artifact-region us-east-1 \
   --reviewed-source-mode ssh \
-  --aws-topology-evidence ./aws-topology-evidence.json
+  --aws-topology-evidence ./aws-topology-evidence.json \
+  --ingress-command-evidence ./ingress-dns-evidence.json,./ingress-tls-evidence.json,./ingress-health-evidence.json,./ingress-callback-evidence.json
 ```
 
 Run `--dry-run` first to report missing prerequisites and next commands without writing files.
@@ -30,6 +31,8 @@ endpoint, compute service/worker process proof, ALB/NLB ingress proof, and publi
 PrivateLink database proof. Setup rejects removed boolean/string-list flags and placeholder
 evidence such as literal `true`, dashboard-only notes, raw IaC state, or support-ticket text unless
 it is represented as a structured prerequisite tied to a selected provider capability.
+For non-dry-run AWS setup, `--ingress-command-evidence` must point at the generated DNS, TLS,
+target-health, and callback probe outputs.
 
 The generated bundle contains:
 
@@ -206,6 +209,17 @@ runbook can progress. That prerequisite evidence is not itself protected/shared 
 profile becomes protected/shared-ready only after setup-doctor, credential preflight, managed
 dependency validation, process, health/readiness, worker heartbeat, provider-capability hook
 evidence, and cutover validation all pass.
+
+Generated AWS ingress commands in `commands.json` collect structured DNS, TLS, public reachability,
+target health, target-group health-check configuration, and callback-route evidence from
+`aws-topology-evidence.json`. Each command declares its input paths and output evidence path, writes
+fresh timestamps, and stores redacted structured output. Stale command output or human-written
+ingress notes are not readiness evidence.
+
+Provider-capability hooks for `aws-network-foundation` cover ingress preview, apply, evidence,
+smoke, rollback, and import/reconcile semantics around the repo-owned OpenTofu resources. Import
+mode is represented as structured lifecycle evidence within the existing hook phases rather than as
+a separate CLI phase.
 
 For reviewed alternate artifact stores on AWS EC2, select `--artifact-backend
 supabase-storage-s3` or `--artifact-backend s3-compatible` and include

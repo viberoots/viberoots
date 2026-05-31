@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { validateCloudControlSetupInput } from "../../deployments/cloud-control-setup-validate";
 import type { CloudControlSetupInput } from "../../deployments/cloud-control-setup-types";
+import { ingressCommandEvidence } from "./cloud-control-aws-ingress.fixture";
 import { privateLinkAwsTopology } from "./cloud-control-cutover-fixture";
 
 const DIGEST = `sha256:${"e".repeat(64)}`;
@@ -32,6 +33,37 @@ test("AWS setup validation rejects truthy topology placeholders", () => {
   assert.match(
     validateCloudControlSetupInput(input({ awsTopology: {} as any })).join("\n"),
     /missing or empty/,
+  );
+});
+
+test("AWS setup validation rejects wrong runtime ingress callback wiring", () => {
+  const topology = privateLinkAwsTopology({
+    ingress: {
+      ...(privateLinkAwsTopology() as any).ingress,
+      callbackRoute: {
+        ...(privateLinkAwsTopology() as any).ingress.callbackRoute,
+        host: "wrong.example.test",
+      },
+    },
+  });
+  assert.match(
+    validateCloudControlSetupInput(input({ awsTopology: topology })).join("\n"),
+    /callback route host/,
+  );
+});
+
+test("AWS setup validates generated ingress command evidence when supplied", () => {
+  assert.doesNotMatch(
+    validateCloudControlSetupInput(
+      input({ ingressCommandEvidence: ingressCommandEvidence() }),
+    ).join("\n"),
+    /ingress .*command evidence/i,
+  );
+  assert.match(
+    validateCloudControlSetupInput(
+      input({ ingressCommandEvidence: ingressCommandEvidence({ dns: undefined }) }),
+    ).join("\n"),
+    /DNS command evidence is missing/i,
   );
 });
 

@@ -1,5 +1,7 @@
 import { evidenceList, evidenceObject, evidenceText } from "./cloud-control-evidence-helpers";
 import { awsTopologyArtifactBackend } from "./cloud-control-aws-artifact-backend";
+import { ingressEvidenceFromFoundationOutput } from "./cloud-control-aws-ingress-foundation-output";
+import { validateIngressEvidence } from "./cloud-control-aws-ingress-validate";
 import { validateAwsFoundationProfile } from "./cloud-control-aws-foundation-profile";
 import { awsTopologyDatabaseMode } from "./cloud-control-aws-topology-capabilities";
 import type { AwsTopologyValidationOptions } from "./cloud-control-aws-topology-runtime";
@@ -22,6 +24,7 @@ export function validateFoundation(
       requiresVpcLattice: awsTopologyDatabaseMode(topology) === "privatelink",
     }),
     ...validateFoundationTopologyBinding(topology, object.foundation),
+    ...validateFoundationIngress(topology, object.foundation, options),
   ];
 }
 
@@ -61,6 +64,63 @@ function validateFoundationTopologyBinding(topology: unknown, foundation: unknow
     if (!routeTables.has(routeTableId)) {
       errors.push(`AWS foundation missing S3 endpoint route table ${routeTableId}`);
     }
+  }
+  return errors;
+}
+
+function validateFoundationIngress(
+  topology: unknown,
+  foundation: unknown,
+  options: AwsTopologyValidationOptions,
+): string[] {
+  const topologyObject = evidenceObject(topology);
+  const ingress = evidenceObject(evidenceObject(evidenceObject(foundation).network).ingress);
+  const selected = evidenceObject(topologyObject.ingress);
+  const drift = evidenceObject(ingress.drift);
+  const errors: string[] = [];
+  if (!ingress.loadBalancerArn) return ["AWS foundation missing repo-owned ingress evidence"];
+  if (!ingress.targetAttachmentId || !ingress.targetInstanceId) {
+    errors.push("AWS foundation ingress missing selected target attachment evidence");
+  }
+  const mapped = ingressEvidenceFromFoundationOutput(ingress);
+  if (!mapped) {
+    errors.push("AWS foundation ingress cannot map OpenTofu output into topology evidence");
+  } else {
+    errors.push(
+      ...validateIngressEvidence({ ...topologyObject, ingress: mapped }, options).map(
+        (error) => `AWS foundation mapped ingress invalid: ${error}`,
+      ),
+    );
+  }
+  for (const field of ["loadBalancerArn", "listenerArn", "targetGroupArn", "certificateArn"]) {
+    const expected =
+      field === "loadBalancerArn"
+        ? evidenceText(selected.loadBalancer, "arn")
+        : evidenceText(selected, field);
+    if (expected && evidenceText(ingress, field) !== expected) {
+      errors.push(`AWS foundation ingress ${field} does not match selected topology`);
+    }
+  }
+  if (
+    mapped?.targetRegistration?.instanceId &&
+    mapped.targetRegistration.instanceId !== evidenceText(selected.targetRegistration, "instanceId")
+  ) {
+    errors.push(
+      "AWS foundation mapped ingress target registration does not match selected topology",
+    );
+  }
+  if (ingress.stateBackend !== "s3" || ingress.stateLock !== "dynamodb") {
+    errors.push("AWS foundation ingress must use repo-owned locked state");
+  }
+  if (
+    !drift.checkedAt ||
+    drift.status !== "in-sync" ||
+    !evidenceText(drift, "diffDigest").startsWith("sha256:")
+  ) {
+    errors.push("AWS foundation ingress drift evidence is missing, stale, or dirty");
+  }
+  if (evidenceObject(ingress.rollback).nonDestructive !== true) {
+    errors.push("AWS foundation ingress rollback must be non-destructive by default");
   }
   return errors;
 }

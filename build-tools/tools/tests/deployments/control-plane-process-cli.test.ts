@@ -9,6 +9,7 @@ import {
   withControlPlaneArgv,
   writeRuntimeConfig,
 } from "./control-plane-process-entrypoints.helpers";
+import { ingressCommandEvidence } from "./cloud-control-aws-ingress.fixture";
 import { runInTemp } from "../lib/test-helpers";
 import { privateLinkAwsTopology } from "./cloud-control-cutover-fixture";
 import { ecrRegistryProfileForImage } from "./control-plane-registry-profile.fixture";
@@ -82,6 +83,7 @@ test("deployment-control-plane setup writes a cloud host profile bundle", async 
     const out = path.join(tmp, "profile");
     const topologyFile = path.join(tmp, "aws-topology-evidence.json");
     const publicationFile = path.join(tmp, "image-publication.json");
+    const ingressCommandEvidenceFiles = await writeIngressCommandEvidence(tmp);
     await fsp.writeFile(topologyFile, JSON.stringify(privateLinkAwsTopology()), "utf8");
     await fsp.writeFile(publicationFile, JSON.stringify(publicationEvidence()), "utf8");
     await withControlPlaneArgv(
@@ -95,6 +97,8 @@ test("deployment-control-plane setup writes a cloud host profile bundle", async 
         publicationFile,
         "--aws-topology-evidence",
         topologyFile,
+        "--ingress-command-evidence",
+        ingressCommandEvidenceFiles.join(","),
       ],
       runDeploymentControlPlaneCommand,
     );
@@ -169,6 +173,17 @@ async function exists(file: string): Promise<boolean> {
     .access(file)
     .then(() => true)
     .catch(() => false);
+}
+
+async function writeIngressCommandEvidence(tmp: string): Promise<string[]> {
+  const bundle = ingressCommandEvidence();
+  const files: string[] = [];
+  for (const [collector, payload] of Object.entries(bundle)) {
+    const file = path.join(tmp, `ingress-${collector}-evidence.json`);
+    await fsp.writeFile(file, JSON.stringify(payload), "utf8");
+    files.push(file);
+  }
+  return files;
 }
 
 function publicationEvidence() {

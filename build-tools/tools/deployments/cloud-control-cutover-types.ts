@@ -11,8 +11,10 @@ export type CutoverEvidence = {
   imagePublication?: ControlPlaneImagePublicationEvidence;
   managedDependencies?: ManagedDependencyEvidence;
   awsTopology?: Record<string, unknown>;
+  ingressCommandEvidence?: Record<string, unknown>;
   latestNonProductionDeployment?: Record<string, unknown>;
   providerCapabilities?: Record<string, Record<string, unknown>>;
+  runtimeConfig?: Record<string, unknown>;
   standby?: Record<string, unknown>;
   restore?: Record<string, unknown>;
   rollback?: Record<string, unknown>;

@@ -1,7 +1,5 @@
 import type { ProviderCapabilityDeclaration } from "./cloud-control-setup-types";
 
-const RUN = "deploy --deployment <label>";
-
 export const CLOUD_CAPABILITY_IDS = [
   "aws-ec2-control-plane-host",
   "aws-attic-cache-service",
@@ -115,10 +113,26 @@ export const CONCRETE_PROVIDER_CAPABILITIES: Record<
   ),
 };
 
-export function capabilityDeclaration(id: string): ProviderCapabilityDeclaration {
+export function capabilityDeclaration(
+  id: string,
+  opts: { deploymentLabel?: string } = {},
+): ProviderCapabilityDeclaration {
   const declaration = CONCRETE_PROVIDER_CAPABILITIES[id as CloudCapabilityId];
   if (!declaration) throw new Error(`unknown cloud provider capability ${id}`);
-  return structuredClone(declaration);
+  const copy = structuredClone(declaration);
+  const label = opts.deploymentLabel?.trim();
+  if (!label) return copy;
+  const run = `deploy --deployment ${shellQuote(label)}`;
+  for (const field of [
+    "previewCommand",
+    "applyCommand",
+    "smokeCommand",
+    "evidenceCommand",
+    "rollbackCommand",
+  ] as const) {
+    copy.iac[field] = copy.iac[field].replace("deploy --deployment <label>", run);
+  }
+  return copy;
 }
 
 function cap(
@@ -154,12 +168,16 @@ function cap(
     auditEvidence,
     protectedSharedEligibility: eligibility,
     iac: {
-      reviewedReference: `iac/cloud-control/${id}/README.md`,
-      previewCommand: `${RUN} --preview --provider-capability ${id}`,
-      applyCommand: `${RUN} --provider-capability ${id}`,
-      smokeCommand: `${RUN} --smoke --provider-capability ${id}`,
-      evidenceCommand: `${RUN} --record --provider-capability ${id}`,
-      rollbackCommand: `${RUN} --rollback --provider-capability ${id}`,
+      reviewedReference: "docs/cloud-control-setup.md",
+      previewCommand: `deploy --deployment <label> --preview --provider-capability ${id}`,
+      applyCommand: `deploy --deployment <label> --provider-capability ${id}`,
+      smokeCommand: `deploy --deployment <label> --smoke --provider-capability ${id}`,
+      evidenceCommand: `deploy --deployment <label> --record --provider-capability ${id}`,
+      rollbackCommand: `deploy --deployment <label> --rollback --provider-capability ${id}`,
     },
   };
+}
+
+function shellQuote(value: string): string {
+  return `'${value.replace(/'/g, `'\\''`)}'`;
 }

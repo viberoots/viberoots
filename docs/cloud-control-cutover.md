@@ -46,7 +46,8 @@ S3 VPC endpoint evidence unless a reviewed alternate artifact backend is selecte
 
 AWS cutover evidence is conditional on the selected artifact, database, and edge paths:
 
-- ALB/NLB, TLS, and DNS health evidence is always required for AWS EC2 cutover.
+- ALB/NLB, TLS, DNS health, public reachability, target-group health-check configuration, target
+  registration, and callback route evidence is always required for AWS EC2 cutover.
 - AWS S3 is the default artifact backend. Omitting `artifactBackend` still requires AWS S3 VPC
   endpoint evidence. Alternate S3-compatible backends must be explicitly selected and include
   reviewed alternate backend evidence.
@@ -54,8 +55,8 @@ AWS cutover evidence is conditional on the selected artifact, database, and edge
   PrivateLink endpoint evidence; public connectivity requires explicit TLS-validated connectivity
   proof from the cloud host.
 - When Cloudflare edge is selected, include DNS proxy, TLS mode, WAF/rate-limit posture when used,
-  and auth callback route evidence. Cloudflare remains an edge prerequisite, not the deployment
-  authority.
+  edge bypass proof, public edge reachability, origin linkage back to AWS ingress identity, and auth
+  callback route evidence. Cloudflare remains an edge prerequisite, not the deployment authority.
 - When Vercel edge or an operator UI is selected, include project, domain, and auth callback route
   evidence. Vercel edge settings remain browser/API routing inputs and do not own deployment
   mutation authority.
@@ -68,6 +69,19 @@ AWS cutover evidence is conditional on the selected artifact, database, and edge
 Minimal AWS topology evidence uses schema `aws-topology-evidence@1`. Public database mode must
 include VPC, subnet, route-table, security-group, S3 endpoint, compute, ingress, and public TLS
 database proof. Use a fresh `checkedAt` value within the validation max-age window:
+
+Ingress evidence must be structured. Imported LB, ACM, DNS, WAF, Cloudflare, edge, and
+cloud-foundation ingress evidence must include freshness, provenance/ownership, selected capability
+id, topology identity, and clean drift/reconcile proof. Dashboard notes, raw IaC state, copied
+terminal text, and hand-authored assertions are rejected. Rollback evidence must be non-destructive
+for active certificates, DNS records, shared load balancers, shared edge resources, and WAF/access
+controls unless an explicit reviewed approval is attached.
+
+ACM evidence must include issued status, account/region match, selected listener attachment,
+validity window, validation ownership proof, renewal posture, SAN coverage, wildcard matching
+semantics, and DNS validation proof where applicable. The service and auth callback hostnames must
+be proven separately. Non-TLS listeners fail closed unless they are reviewed HTTP-to-HTTPS
+redirects and the evidence proves service and callback traffic cannot complete over plaintext.
 
 ```json
 {
@@ -149,13 +163,136 @@ database proof. Use a fresh `checkedAt` value within the validation max-age wind
   "ingress": {
     "checkedAt": "2026-05-30T09:30:00.000Z",
     "type": "alb",
+    "publicUrl": "https://deploy.example.test",
+    "authCallbackHost": "deploy-auth.example.test",
+    "authCallbackPath": "/oidc/callback",
     "listenerArn": "arn:aws:elasticloadbalancing:us-east-1:123456789012:listener/app/cp/1/2",
     "targetGroupArn": "arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/cp/1",
     "targetHealth": "healthy",
     "certificateArn": "arn:aws:acm:us-east-1:123456789012:certificate/cert-123abc",
     "tlsPolicy": "ELBSecurityPolicy-TLS13-1-2-2021-06",
     "dnsRecord": "deploy.example.test",
-    "callbackHost": "deploy-auth.example.test"
+    "callbackHost": "deploy-auth.example.test",
+    "loadBalancer": {
+      "checkedAt": "2026-05-30T09:30:00.000Z",
+      "arn": "arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/cp/1",
+      "dnsName": "cp-123.us-east-1.elb.amazonaws.com",
+      "scheme": "internet-facing",
+      "vpcId": "vpc-123abc",
+      "subnetIds": ["subnet-public-123abc"],
+      "securityGroupIds": ["sg-loadbalancer"],
+      "publicReachability": {
+        "checkedAt": "2026-05-30T09:30:00.000Z",
+        "path": "aws-public-lb",
+        "publicSubnets": ["subnet-public-123abc"],
+        "routeTableIds": ["rtb-public-123abc"],
+        "internetGatewayId": "igw-123abc",
+        "publicVantagePoint": "public-dns-probe-us-east-1",
+        "resolvedTarget": "cp-123.us-east-1.elb.amazonaws.com"
+      }
+    },
+    "listener": {
+      "checkedAt": "2026-05-30T09:30:00.000Z",
+      "arn": "arn:aws:elasticloadbalancing:us-east-1:123456789012:listener/app/cp/1/2",
+      "loadBalancerArn": "arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/cp/1",
+      "vpcId": "vpc-123abc",
+      "protocol": "HTTPS",
+      "port": 443,
+      "tlsPolicy": "ELBSecurityPolicy-TLS13-1-2-2021-06",
+      "certificateArn": "arn:aws:acm:us-east-1:123456789012:certificate/cert-123abc"
+    },
+    "targetGroup": {
+      "checkedAt": "2026-05-30T09:30:00.000Z",
+      "arn": "arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/cp/1",
+      "listenerArn": "arn:aws:elasticloadbalancing:us-east-1:123456789012:listener/app/cp/1/2",
+      "loadBalancerArn": "arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/cp/1",
+      "vpcId": "vpc-123abc",
+      "protocol": "HTTP",
+      "port": 7780,
+      "healthCheck": {
+        "checkedAt": "2026-05-30T09:30:00.000Z",
+        "protocol": "HTTP",
+        "port": "traffic-port",
+        "path": "/readyz",
+        "matcher": "200",
+        "readinessPath": "/readyz",
+        "proofDigest": "sha256:targethealthcheck"
+      }
+    },
+    "targetRegistration": {
+      "checkedAt": "2026-05-30T09:30:00.000Z",
+      "targetId": "i-0123456789abcdef0",
+      "instanceId": "i-0123456789abcdef0",
+      "port": 7780,
+      "serviceProcess": "pid:100",
+      "serviceUnit": "deployment-control-plane-service.service",
+      "imageDigest": "sha256:image",
+      "configDigest": "sha256:config"
+    },
+    "targetHealthEvidence": {
+      "checkedAt": "2026-05-30T09:30:00.000Z",
+      "status": "healthy",
+      "targetId": "i-0123456789abcdef0",
+      "port": 7780,
+      "serviceProcess": "pid:100"
+    },
+    "certificate": {
+      "checkedAt": "2026-05-30T09:30:00.000Z",
+      "arn": "arn:aws:acm:us-east-1:123456789012:certificate/cert-123abc",
+      "accountId": "123456789012",
+      "region": "us-east-1",
+      "status": "ISSUED",
+      "listenerArn": "arn:aws:elasticloadbalancing:us-east-1:123456789012:listener/app/cp/1/2",
+      "notBefore": "2026-01-01T00:00:00.000Z",
+      "notAfter": "2027-01-01T00:00:00.000Z",
+      "subjectAlternativeNames": ["deploy.example.test", "deploy-auth.example.test"],
+      "validationOwnership": {
+        "checkedAt": "2026-05-30T09:30:00.000Z",
+        "reviewedReference": "docs/cloud-control-cutover.md#acm-validation",
+        "digest": "sha256:acmvalidation"
+      },
+      "renewal": {
+        "checkedAt": "2026-05-30T09:30:00.000Z",
+        "reviewedReference": "docs/cloud-control-cutover.md#acm-renewal",
+        "digest": "sha256:acmrenewal"
+      },
+      "dnsValidation": {
+        "checkedAt": "2026-05-30T09:30:00.000Z",
+        "reviewedReference": "docs/cloud-control-cutover.md#acm-dns-validation",
+        "digest": "sha256:acmdnsvalidation"
+      }
+    },
+    "dns": {
+      "checkedAt": "2026-05-30T09:30:00.000Z",
+      "hostname": "deploy.example.test",
+      "recordType": "ALIAS",
+      "targetDnsName": "cp-123.us-east-1.elb.amazonaws.com",
+      "targetLoadBalancerArn": "arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/cp/1",
+      "publicResolution": ["cp-123.us-east-1.elb.amazonaws.com"],
+      "publicVantagePoint": "public-dns-probe-us-east-1"
+    },
+    "accessControl": {
+      "checkedAt": "2026-05-30T09:30:00.000Z",
+      "serviceSecurityGroupId": "sg-service",
+      "loadBalancerSecurityGroupId": "sg-loadbalancer",
+      "sourceSecurityGroupIds": ["sg-loadbalancer"],
+      "targetPort": 7780,
+      "directPublicServiceIngress": false,
+      "approvedClientCidrs": ["203.0.113.0/24"],
+      "waf": {
+        "checkedAt": "2026-05-30T09:30:00.000Z",
+        "reviewedReference": "docs/cloud-control-cutover.md#waf",
+        "digest": "sha256:waf"
+      }
+    },
+    "callbackRoute": {
+      "checkedAt": "2026-05-30T09:30:00.000Z",
+      "host": "deploy-auth.example.test",
+      "path": "/oidc/callback",
+      "listenerArn": "arn:aws:elasticloadbalancing:us-east-1:123456789012:listener/app/cp/1/2",
+      "ruleArn": "arn:aws:elasticloadbalancing:us-east-1:123456789012:listener-rule/app/cp/1/2/3",
+      "targetGroupArn": "arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/cp/1"
+    }
   },
   "database": {
     "mode": "public",
@@ -260,13 +397,136 @@ digest:
   "ingress": {
     "checkedAt": "2026-05-30T09:30:00.000Z",
     "type": "alb",
+    "publicUrl": "https://deploy.example.test",
+    "authCallbackHost": "deploy-auth.example.test",
+    "authCallbackPath": "/oidc/callback",
     "listenerArn": "arn:aws:elasticloadbalancing:us-east-1:123456789012:listener/app/cp/1/2",
     "targetGroupArn": "arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/cp/1",
     "targetHealth": "healthy",
     "certificateArn": "arn:aws:acm:us-east-1:123456789012:certificate/cert-123abc",
     "tlsPolicy": "ELBSecurityPolicy-TLS13-1-2-2021-06",
     "dnsRecord": "deploy.example.test",
-    "callbackHost": "deploy-auth.example.test"
+    "callbackHost": "deploy-auth.example.test",
+    "loadBalancer": {
+      "checkedAt": "2026-05-30T09:30:00.000Z",
+      "arn": "arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/cp/1",
+      "dnsName": "cp-123.us-east-1.elb.amazonaws.com",
+      "scheme": "internet-facing",
+      "vpcId": "vpc-123abc",
+      "subnetIds": ["subnet-public-123abc"],
+      "securityGroupIds": ["sg-loadbalancer"],
+      "publicReachability": {
+        "checkedAt": "2026-05-30T09:30:00.000Z",
+        "path": "aws-public-lb",
+        "publicSubnets": ["subnet-public-123abc"],
+        "routeTableIds": ["rtb-public-123abc"],
+        "internetGatewayId": "igw-123abc",
+        "publicVantagePoint": "public-dns-probe-us-east-1",
+        "resolvedTarget": "cp-123.us-east-1.elb.amazonaws.com"
+      }
+    },
+    "listener": {
+      "checkedAt": "2026-05-30T09:30:00.000Z",
+      "arn": "arn:aws:elasticloadbalancing:us-east-1:123456789012:listener/app/cp/1/2",
+      "loadBalancerArn": "arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/cp/1",
+      "vpcId": "vpc-123abc",
+      "protocol": "HTTPS",
+      "port": 443,
+      "tlsPolicy": "ELBSecurityPolicy-TLS13-1-2-2021-06",
+      "certificateArn": "arn:aws:acm:us-east-1:123456789012:certificate/cert-123abc"
+    },
+    "targetGroup": {
+      "checkedAt": "2026-05-30T09:30:00.000Z",
+      "arn": "arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/cp/1",
+      "listenerArn": "arn:aws:elasticloadbalancing:us-east-1:123456789012:listener/app/cp/1/2",
+      "loadBalancerArn": "arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/cp/1",
+      "vpcId": "vpc-123abc",
+      "protocol": "HTTP",
+      "port": 7780,
+      "healthCheck": {
+        "checkedAt": "2026-05-30T09:30:00.000Z",
+        "protocol": "HTTP",
+        "port": "traffic-port",
+        "path": "/readyz",
+        "matcher": "200",
+        "readinessPath": "/readyz",
+        "proofDigest": "sha256:targethealthcheck"
+      }
+    },
+    "targetRegistration": {
+      "checkedAt": "2026-05-30T09:30:00.000Z",
+      "targetId": "i-0123456789abcdef0",
+      "instanceId": "i-0123456789abcdef0",
+      "port": 7780,
+      "serviceProcess": "pid:100",
+      "serviceUnit": "deployment-control-plane-service.service",
+      "imageDigest": "sha256:image",
+      "configDigest": "sha256:config"
+    },
+    "targetHealthEvidence": {
+      "checkedAt": "2026-05-30T09:30:00.000Z",
+      "status": "healthy",
+      "targetId": "i-0123456789abcdef0",
+      "port": 7780,
+      "serviceProcess": "pid:100"
+    },
+    "certificate": {
+      "checkedAt": "2026-05-30T09:30:00.000Z",
+      "arn": "arn:aws:acm:us-east-1:123456789012:certificate/cert-123abc",
+      "accountId": "123456789012",
+      "region": "us-east-1",
+      "status": "ISSUED",
+      "listenerArn": "arn:aws:elasticloadbalancing:us-east-1:123456789012:listener/app/cp/1/2",
+      "notBefore": "2026-01-01T00:00:00.000Z",
+      "notAfter": "2027-01-01T00:00:00.000Z",
+      "subjectAlternativeNames": ["deploy.example.test", "deploy-auth.example.test"],
+      "validationOwnership": {
+        "checkedAt": "2026-05-30T09:30:00.000Z",
+        "reviewedReference": "docs/cloud-control-cutover.md#acm-validation",
+        "digest": "sha256:acmvalidation"
+      },
+      "renewal": {
+        "checkedAt": "2026-05-30T09:30:00.000Z",
+        "reviewedReference": "docs/cloud-control-cutover.md#acm-renewal",
+        "digest": "sha256:acmrenewal"
+      },
+      "dnsValidation": {
+        "checkedAt": "2026-05-30T09:30:00.000Z",
+        "reviewedReference": "docs/cloud-control-cutover.md#acm-dns-validation",
+        "digest": "sha256:acmdnsvalidation"
+      }
+    },
+    "dns": {
+      "checkedAt": "2026-05-30T09:30:00.000Z",
+      "hostname": "deploy.example.test",
+      "recordType": "ALIAS",
+      "targetDnsName": "cp-123.us-east-1.elb.amazonaws.com",
+      "targetLoadBalancerArn": "arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/cp/1",
+      "publicResolution": ["cp-123.us-east-1.elb.amazonaws.com"],
+      "publicVantagePoint": "public-dns-probe-us-east-1"
+    },
+    "accessControl": {
+      "checkedAt": "2026-05-30T09:30:00.000Z",
+      "serviceSecurityGroupId": "sg-service",
+      "loadBalancerSecurityGroupId": "sg-loadbalancer",
+      "sourceSecurityGroupIds": ["sg-loadbalancer"],
+      "targetPort": 7780,
+      "directPublicServiceIngress": false,
+      "approvedClientCidrs": ["203.0.113.0/24"],
+      "waf": {
+        "checkedAt": "2026-05-30T09:30:00.000Z",
+        "reviewedReference": "docs/cloud-control-cutover.md#waf",
+        "digest": "sha256:waf"
+      }
+    },
+    "callbackRoute": {
+      "checkedAt": "2026-05-30T09:30:00.000Z",
+      "host": "deploy-auth.example.test",
+      "path": "/oidc/callback",
+      "listenerArn": "arn:aws:elasticloadbalancing:us-east-1:123456789012:listener/app/cp/1/2",
+      "ruleArn": "arn:aws:elasticloadbalancing:us-east-1:123456789012:listener-rule/app/cp/1/2/3",
+      "targetGroupArn": "arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/cp/1"
+    }
   },
   "database": {
     "mode": "privatelink",

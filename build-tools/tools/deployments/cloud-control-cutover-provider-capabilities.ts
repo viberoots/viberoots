@@ -1,4 +1,5 @@
 import type { CutoverEvidence } from "./cloud-control-cutover-types";
+import { evidenceObject, evidenceText } from "./cloud-control-evidence-helpers";
 import type { ProviderCapabilityDeclaration } from "./cloud-control-setup-types";
 import { validateProviderCapabilityDeclaration } from "./cloud-control-setup-validate";
 import {
@@ -17,13 +18,14 @@ export function validateCutoverProviderCapabilities(
   return selected.flatMap((id) => {
     const capability = capabilities[id];
     if (!capability) return [`${id}: missing provider-capability`];
-    return validateCapability(id, capability, maxAgeMinutes);
+    return validateCapability(id, capability, evidence, maxAgeMinutes);
   });
 }
 
 function validateCapability(
   id: string,
   capability: Record<string, unknown>,
+  evidence: CutoverEvidence,
   maxAgeMinutes = 60,
 ): string[] {
   const errors: string[] = [];
@@ -52,6 +54,7 @@ function validateCapability(
   if (!capability.auditIdentity) errors.push(`${id}: missing provider-capability audit identity`);
   if (!capability.rollbackProcedure) errors.push(`${id}: missing rollback procedure evidence`);
   if (!capability.smokeEvidence) errors.push(`${id}: missing smoke evidence`);
+  errors.push(...validateIngressProviderPayload(id, capability.providerPayload, evidence));
   return errors;
 }
 
@@ -72,4 +75,75 @@ function validateEvidenceContract(
 function providerDeclaration(value: unknown): ProviderCapabilityDeclaration | undefined {
   if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
   return value as ProviderCapabilityDeclaration;
+}
+
+const INGRESS_PAYLOAD_CAPABILITIES = new Set([
+  "aws-network-foundation",
+  "cloudflare-edge",
+  "vercel-operator-ui",
+]);
+
+function validateIngressProviderPayload(
+  id: string,
+  value: unknown,
+  evidence: CutoverEvidence,
+): string[] {
+  if (!INGRESS_PAYLOAD_CAPABILITIES.has(id)) return [];
+  const payload = evidenceObject(value);
+  if (Object.keys(payload).length === 0)
+    return [`${id}: missing reviewed ingress provider payload`];
+  if (id === "aws-network-foundation") return validateAwsNetworkPayload(id, payload);
+  return validateEdgePayload(id, payload, evidence);
+}
+
+function validateAwsNetworkPayload(id: string, payload: Record<string, unknown>): string[] {
+  const lifecycle = evidenceObject(payload.ingressLifecycle);
+  const operation = evidenceObject(lifecycle.operation);
+  const inspected = evidenceObject(operation.evidencePayload);
+  const errors: string[] = [];
+  if (evidenceText(lifecycle, "schemaVersion") !== "aws-ingress-lifecycle-evidence@1") {
+    errors.push(`${id}: missing AWS ingress lifecycle provider payload`);
+  }
+  if (evidenceText(inspected, "schemaVersion") !== "aws-ingress-hook-inspection@1") {
+    errors.push(`${id}: missing structured AWS ingress inspection payload`);
+  }
+  return errors;
+}
+
+function validateEdgePayload(
+  id: string,
+  payload: Record<string, unknown>,
+  evidence: CutoverEvidence,
+): string[] {
+  const errors: string[] = [];
+  const ingress = evidenceObject(evidence.awsTopology?.ingress);
+  const expectedHost = hostFromUrl(String(evidence.runtimeConfig?.publicUrl || ""));
+  const callback = (evidence.runtimeConfig?.authProvider as any)?.callback || {};
+  if (evidenceText(payload, "schemaVersion") !== "edge-ingress-provider-payload@1") {
+    errors.push(`${id}: missing structured edge ingress provider payload`);
+  }
+  if (evidenceText(payload, "hostname") !== expectedHost) {
+    errors.push(`${id}: edge provider payload hostname does not match runtime publicUrl`);
+  }
+  if (evidenceText(payload, "callbackHost") !== String(callback.externalHost || "")) {
+    errors.push(`${id}: edge provider payload callback host does not match runtime config`);
+  }
+  if (evidenceText(payload, "callbackPath") !== String(callback.externalPath || "")) {
+    errors.push(`${id}: edge provider payload callback path does not match runtime config`);
+  }
+  if (
+    evidenceText(payload, "originLoadBalancerArn") !==
+    evidenceText(evidenceObject(ingress.loadBalancer), "arn")
+  ) {
+    errors.push(`${id}: edge provider payload origin does not match selected AWS ingress`);
+  }
+  return errors;
+}
+
+function hostFromUrl(value: string): string {
+  try {
+    return new URL(value).hostname;
+  } catch {
+    return "";
+  }
 }

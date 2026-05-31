@@ -9,6 +9,10 @@ import {
   privateLinkAwsTopology,
   publicAwsTopology,
 } from "./cloud-control-cutover-fixture";
+import {
+  completeCloudflareEdge,
+  completeVercelEdge,
+} from "./cloud-control-cutover-aws-edge.fixture";
 
 type MutableAwsTopology = Record<string, unknown> & {
   privateSubnets: Array<Record<string, unknown>>;
@@ -136,6 +140,24 @@ test("AWS cutover rejects stale TLS DNS and ingress health", () => {
   assert.match(result.errors.join("\n"), /AWS ingress/);
 });
 
+test("AWS cutover requires runtime public URL and auth callback evidence", () => {
+  const missing = evidence({ latestNonProductionDeployment: {}, runtimeConfig: undefined });
+  const result = validateCloudControlCutover(missing, opts);
+  assert.match(result.errors.join("\n"), /runtime publicUrl evidence/);
+  assert.match(result.errors.join("\n"), /runtime auth-provider callback host evidence/);
+  assert.match(result.errors.join("\n"), /runtime auth-provider callback path evidence/);
+  const wrong = validateCloudControlCutover(
+    evidence({
+      runtimeConfig: {
+        publicUrl: "https://deploy.example.test",
+        authProvider: { callback: { externalHost: "wrong.example.test", externalPath: "/bad" } },
+      },
+    }),
+    opts,
+  );
+  assert.match(wrong.errors.join("\n"), /authCallbackHost|callback route/);
+});
+
 test("selected Cloudflare and Vercel edge paths require matching evidence", () => {
   const result = validateCloudControlCutover(
     evidence({
@@ -209,14 +231,6 @@ test("AWS cutover accepts complete derived provider capabilities", () => {
 const baseAws = privateLinkAwsTopology;
 const mutableBaseAws = () => baseAws() as MutableAwsTopology;
 
-function completeCloudflareEdge() {
-  return edgeSet(["dnsProxy", "tlsMode", "wafRules", "callbackRoute"], "cf");
-}
-
-function completeVercelEdge() {
-  return edgeSet(["project", "domain", "edgeSettings", "callbackRoute"], "vercel");
-}
-
 function derivedCapabilityIds() {
   return [
     "aws-ec2-control-plane-host",
@@ -230,19 +244,4 @@ function derivedCapabilityIds() {
     "aws-attic-cache-service",
     "remote-build-worker-fleet",
   ];
-}
-
-function edgeSet(fields: string[], prefix: string) {
-  return {
-    checkedAt: new Date().toISOString(),
-    ...Object.fromEntries(fields.map((field) => [field, edgeEvidence(`${prefix}-${field}`)])),
-  };
-}
-
-function edgeEvidence(id: string) {
-  return {
-    checkedAt: new Date().toISOString(),
-    reviewedReference: `edge://${id}`,
-    digest: "sha256:edge",
-  };
 }

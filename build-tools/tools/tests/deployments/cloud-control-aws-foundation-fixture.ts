@@ -98,6 +98,26 @@ export function foundationFromTopology(
         s3Endpoint: topology.securityGroups.s3Endpoint.id,
         privatelink: topology.securityGroups.privatelink.id,
       },
+      ingress: {
+        mode,
+        loadBalancerArn: topology.ingress.loadBalancer.arn,
+        listenerArn: topology.ingress.listenerArn,
+        targetGroupArn: topology.ingress.targetGroupArn,
+        targetAttachmentId: `${topology.ingress.targetGroupArn}/${topology.ingress.targetRegistration.instanceId}`,
+        targetInstanceId: topology.ingress.targetRegistration.instanceId,
+        targetPort: topology.ingress.targetRegistration.port,
+        certificateArn: topology.ingress.certificateArn,
+        dnsRecord: topology.ingress.dnsRecord,
+        topologyEvidence: topology.ingress,
+        stateBackend: "s3",
+        stateLock: "dynamodb",
+        drift: {
+          checkedAt: new Date().toISOString(),
+          status: "in-sync",
+          diffDigest: "sha256:ingress-drift",
+        },
+        rollback: { nonDestructive: true, approvalRequiredForSharedResources: true },
+      },
     },
     iam: {
       roles: {

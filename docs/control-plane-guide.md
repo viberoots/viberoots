@@ -188,6 +188,14 @@ The repo-owned profile covers these AWS resources:
 - ACM certificate and DNS records
 - EC2 instance or launch template for the NixOS/OCI host
 
+For ingress, this implementation uses repo-owned OpenTofu resources rather than provider-hook-only
+evidence. The AWS foundation module owns the default ALB/NLB, HTTPS/TLS listener, target group,
+target registration inputs, target-group readiness health check, Route53 record, ACM attachment,
+security-group rules, and access-control/WAF evidence outputs. Provider hooks wrap those resources
+with preview, apply, evidence, smoke, rollback, and import/reconcile evidence. Import/adoption of
+existing LB, ACM, DNS, WAF, or edge resources is allowed only with ownership, capability id,
+topology identity, fresh drift proof, and non-destructive rollback posture.
+
 For the EC2 host itself, prefer the generated AWS EC2 host profile from
 `deployment-control-plane setup --host-mode aws-ec2`. The profile consumes the reviewed AWS
 foundation evidence for selected private subnets, security groups, instance profile, S3 endpoint,
@@ -318,14 +326,16 @@ deployment-control-plane setup \
   --artifact-bucket deployment-control-plane-artifacts \
   --artifact-region us-east-1 \
   --reviewed-source-mode ssh \
-  --aws-topology-evidence ./aws-topology-evidence.json
+  --aws-topology-evidence ./aws-topology-evidence.json \
+  --ingress-command-evidence ./ingress-dns-evidence.json,./ingress-tls-evidence.json,./ingress-health-evidence.json,./ingress-callback-evidence.json
 ```
 
 Then rerun without `--dry-run` after every prerequisite is resolved. The
 `image-publication.json` file must come from `deployment-control-plane image-publication`, and the
-`aws-topology-evidence.json` file must use schema `aws-topology-evidence@1`; literal `true`,
-dashboard notes, raw IaC state, subnet/security-group string lists, and other truthy placeholders do
-not satisfy AWS setup validation.
+`aws-topology-evidence.json` file must use schema `aws-topology-evidence@1`, and non-dry-run AWS
+setup must include the generated ingress command evidence files. Literal `true`, dashboard notes,
+raw IaC state, subnet/security-group string lists, and other truthy placeholders do not satisfy AWS
+setup validation.
 
 If you are using public TLS instead of Supabase PrivateLink, make the AWS topology evidence database
 mode `public`. PrivateLink mode must be `privatelink`.
@@ -365,6 +375,12 @@ The setup generator intentionally uses safe placeholders such as `https://auth.e
 derived Infisical project ids. Those placeholders are not production-ready. Keep these values
 non-secret and reviewed. Secret material still belongs only in the credential files from the
 manifest.
+
+Ingress validation consumes the current runtime auth-provider callback shape. It checks that
+`authProvider.callback.externalHost` and `externalPath` match the AWS listener/routing rule that
+sends the callback hostname and path to the selected service target group. Runtime credential
+staging and generated runtime-config workflow changes remain out of this PR and are handled by the
+later runtime-config staging work.
 
 If you intend to disable public Supabase database connectivity after PrivateLink is working, do it
 only after the service and workers have passed readiness from the private endpoint and every other
@@ -500,12 +516,27 @@ For AWS EC2 readiness, also attach evidence for:
   selected bucket/prefix
 - EC2 instance or Auto Scaling group identity, launch template, AMI, instance profile, and service
   and worker process evidence
-- ALB/NLB listener, target group health, certificate, TLS policy, DNS record, and callback host
+- ALB/NLB public reachability, listener, target group, target registration, readiness health-check
+  configuration, health result, certificate lifecycle, TLS policy, DNS record, callback route, and
+  security-group/port path
 - Supabase path: `public` with TLS-validated `psql` proof, or `privatelink` with resource
   configuration, RAM share, endpoint/service-network association, endpoint DNS/IPs, and `psql`
   proof
 - image digest and runtime config digest
 - graceful worker shutdown evidence
+
+Ingress evidence fails closed unless the selected public hostname resolves from a public vantage
+point to the selected ALB/NLB or a reviewed edge linked back to that AWS ingress identity. The
+service host must not have direct public ingress; LB/client sources may reach only the selected
+service security group and target port. Plain HTTP is rejected except for reviewed HTTP-to-HTTPS
+redirects, and service plus callback traffic must not complete over plaintext. The reviewed AWS TLS
+policy allow-list is `ELBSecurityPolicy-TLS13-1-2-2021-06` and
+`ELBSecurityPolicy-TLS13-1-2-Res-2021-06`.
+
+ACM evidence must prove issued status, account/region match, listener attachment, validity window,
+validation ownership, renewal posture, SAN coverage, wildcard semantics, and DNS validation when
+used. Target registration and target health must bind to the selected EC2 host-profile evidence:
+instance, service unit/process, image digest, config digest, and service port.
 
 When PrivateLink is selected, the runtime database evidence must prove the service and workers are
 using the PrivateLink endpoint, not the public Supabase hostname.

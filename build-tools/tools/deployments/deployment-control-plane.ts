@@ -57,6 +57,7 @@ function command():
     "image-build-identity",
     "image-publication-evidence",
     "image-tarball",
+    "ingress-command-evidence",
     "published-digest",
     "registry-profile",
     "selected-capability",

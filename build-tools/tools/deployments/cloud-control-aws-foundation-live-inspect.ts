@@ -1,5 +1,6 @@
 import { execFileSync } from "node:child_process";
 import { awsFoundationDigest } from "./cloud-control-aws-foundation-credentials";
+import { inspectLiveIngress } from "./cloud-control-aws-foundation-live-ingress";
 import type { AwsFoundationProfile } from "./cloud-control-aws-foundation-types";
 
 export function assertLiveAwsState(profile: AwsFoundationProfile, env: NodeJS.ProcessEnv): void {
@@ -41,6 +42,7 @@ export function assertLiveAwsState(profile: AwsFoundationProfile, env: NodeJS.Pr
   if (profile.artifactStore.backend === "aws-s3" && profile.artifactStore.bucket) {
     inspectLiveBucket(profile, env);
   }
+  inspectLiveIngress(profile, env, regionArgs);
   const policyDigests = new Set(
     Object.values(profile.iam.roles).flatMap((role) => inspectLiveRole(role, env)),
   );

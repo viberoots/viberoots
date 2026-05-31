@@ -9,11 +9,15 @@ import {
   AWS_ARTIFACT_BACKENDS,
   awsTopologyArtifactBackend,
 } from "./cloud-control-aws-artifact-backend";
+import { validateIngressEvidence } from "./cloud-control-aws-ingress-validate";
 
 export { awsTopologyArtifactBackend };
 
 export type AwsTopologyValidationOptions = EvidenceFreshnessOptions & {
   expectedRegion?: string;
+  expectedPublicUrl?: string;
+  expectedAuthCallbackHost?: string;
+  expectedAuthCallbackPath?: string;
   selectedCapabilityIds?: readonly string[];
 };
 
@@ -107,12 +111,10 @@ export function validateComputeAndIngress(
 ): string[] {
   const object = evidenceObject(topology);
   const compute = evidenceObject(object.compute);
-  const ingress = evidenceObject(object.ingress);
   const processEvidence = evidenceObject(compute.processEvidence);
   const errors = [
     ...requireFresh(compute, "AWS compute", options),
     ...requireFresh(processEvidence, "AWS process evidence", options),
-    ...requireFresh(ingress, "AWS ingress", options),
   ];
   const computeMode = evidenceText(compute, "mode");
   if (!["ec2-instance", "auto-scaling-group"].includes(computeMode)) {
@@ -138,20 +140,7 @@ export function validateComputeAndIngress(
   ]) {
     if (!evidenceText(compute, field)) errors.push(`AWS compute evidence missing ${field}`);
   }
-  for (const field of [
-    "listenerArn",
-    "targetGroupArn",
-    "certificateArn",
-    "tlsPolicy",
-    "dnsRecord",
-    "callbackHost",
-  ]) {
-    if (!evidenceText(ingress, field)) errors.push(`AWS ingress evidence missing ${field}`);
-  }
-  if (!["alb", "nlb"].includes(evidenceText(ingress, "type"))) {
-    errors.push("AWS ingress evidence has unsupported load balancer type");
-  }
-  if (ingress.targetHealth !== "healthy") errors.push("AWS ingress target health is not healthy");
+  errors.push(...validateIngressEvidence(topology, options));
   return errors;
 }
 

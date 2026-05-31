@@ -23,17 +23,17 @@ export function renderConformanceChecklist(input: CloudControlSetupInput): strin
         },
         {
           name: "health",
-          commandRef: "commands.json#/phases/4/commands/0/command",
+          commandRef: "commands.json#/phases/4/commands/4/command",
           passCondition: "HTTP 200 from /healthz with reviewed image digest metadata",
         },
         {
           name: "readiness",
-          commandRef: "commands.json#/phases/4/commands/1/command",
+          commandRef: "commands.json#/phases/4/commands/5/command",
           passCondition: "HTTP 200 from /readyz after database and artifact-store checks",
         },
         {
           name: "worker-heartbeats",
-          commandRef: "commands.json#/phases/4/commands/2/command",
+          commandRef: "commands.json#/phases/4/commands/6/command",
           passCondition: `${input.workerReplicas} workers visible with fresh heartbeat rows`,
         },
         {
@@ -136,6 +136,12 @@ export function renderIngressChecklist(input: CloudControlSetupInput): string {
         securityGroupEvidence: setupAwsSecurityGroupIds(input),
         tlsAlbOrNlbEvidence: setupAwsTlsEvidenceRef(input) || "<required>",
         dnsEvidence: setupAwsTlsEvidenceRef(input) ? "covered-by-tls-evidence" : "<required>",
+        generatedEvidenceCommands: [
+          "commands.json#/phases/5/commands/0",
+          "commands.json#/phases/5/commands/1",
+          "commands.json#/phases/5/commands/2",
+          "commands.json#/phases/5/commands/3",
+        ],
       },
       unsupportedMutationHosts: [
         "vercel-functions",

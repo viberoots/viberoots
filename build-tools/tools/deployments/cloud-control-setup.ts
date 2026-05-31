@@ -65,14 +65,16 @@ export async function writeCloudControlSetupBundle(input: CloudControlSetupInput
 
 export function readCloudControlSetupInput(): CloudControlSetupInput {
   const imagePublication = readSetupImagePublicationFlags();
+  const mode = enumFlag("host-mode", "compose-podman", [
+    "compose-podman",
+    "nixos",
+    "saas-oci",
+    "aws-ec2",
+  ]);
+  const awsTopology = awsTopologyFromFlags();
   return {
     outDir: getFlagStr("out", "cloud-control-profile").trim(),
-    mode: enumFlag("host-mode", "compose-podman", [
-      "compose-podman",
-      "nixos",
-      "saas-oci",
-      "aws-ec2",
-    ]),
+    mode,
     image: imagePublication.image,
     expectedImageBuildIdentity: imagePublication.expectedImageBuildIdentity,
     imagePublication: imagePublication.imagePublication,
@@ -95,7 +97,10 @@ export function readCloudControlSetupInput(): CloudControlSetupInput {
     serviceReplicas: numberFlag("service-replicas", 1),
     workerReplicas: numberFlag("worker-replicas", 2),
     dryRun: getFlagBool("dry-run"),
-    awsTopology: awsTopologyFromFlags(),
+    awsTopology,
+    ingressCommandEvidence: ingressCommandEvidenceFromFlags(),
+    requireIngressCommandEvidence:
+      mode === "aws-ec2" && !getFlagBool("dry-run") && Boolean(awsTopology?.ingress),
   };
 }
 
@@ -103,6 +108,20 @@ function awsTopologyFromFlags(): CloudControlSetupInput["awsTopology"] {
   const filePath = getFlagStr("aws-topology-evidence", "").trim();
   if (!filePath) return undefined;
   return JSON.parse(fs.readFileSync(filePath, "utf8"));
+}
+
+function ingressCommandEvidenceFromFlags(): Record<string, unknown> | undefined {
+  const paths = getFlagList("ingress-command-evidence")
+    .map((item) => item.trim())
+    .filter(Boolean);
+  if (paths.length === 0) return undefined;
+  const bundle: Record<string, unknown> = {};
+  for (const filePath of paths) {
+    const payload = JSON.parse(fs.readFileSync(filePath, "utf8"));
+    if (payload?.collector) bundle[String(payload.collector)] = payload;
+    else Object.assign(bundle, payload);
+  }
+  return bundle;
 }
 
 function deploymentIds(values: string[]): string[] {
@@ -172,8 +191,21 @@ function setupCommand(input: CloudControlSetupInput, dryRun: boolean): string {
     input.artifactBackendEvidence || undefined,
     input.mode === "aws-ec2" ? "--aws-topology-evidence" : undefined,
     input.mode === "aws-ec2" ? "$PROFILE_ROOT/aws-topology-evidence.json" : undefined,
+    input.mode === "aws-ec2" ? "--ingress-command-evidence" : undefined,
+    input.mode === "aws-ec2" ? ingressEvidencePaths() : undefined,
   ].filter((arg): arg is string => typeof arg === "string" && arg.length > 0);
   return args.map(shellArg).join(" ");
+}
+
+function ingressEvidencePaths(): string {
+  return [
+    "ingress-dns-evidence.json",
+    "ingress-tls-evidence.json",
+    "ingress-health-evidence.json",
+    "ingress-callback-evidence.json",
+  ]
+    .map((name) => `$PROFILE_ROOT/${name}`)
+    .join(",");
 }
 
 function localCheckCommand(command: string, outDir: string, outputFile: string): string {

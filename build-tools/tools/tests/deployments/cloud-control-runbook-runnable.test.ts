@@ -3,12 +3,14 @@ import assert from "node:assert/strict";
 import { exec } from "node:child_process";
 import * as fsp from "node:fs/promises";
 import http from "node:http";
+import tls from "node:tls";
 import path from "node:path";
 import { promisify } from "node:util";
 import { test } from "node:test";
 import { renderCloudControlSetupBundle } from "../../deployments/cloud-control-setup-render";
 import type { CloudControlSetupInput } from "../../deployments/cloud-control-setup-types";
-import { privateLinkAwsTopology } from "./cloud-control-cutover-fixture";
+import { foundationFromTopology } from "./cloud-control-aws-foundation-fixture";
+import { privateLinkAwsTopology, topologyForPublishedImage } from "./cloud-control-cutover-fixture";
 import { ecrRegistryProfileForImage } from "./control-plane-registry-profile.fixture";
 import { runInScratchTemp } from "../lib/test-helpers";
 
@@ -19,7 +21,7 @@ const BUILD_IDENTITY = `nix-source-${"f".repeat(64)}`;
 
 test("HTTP runbook commands write outputs from repo root and bundle root", async () => {
   await runInScratchTemp("cloud-control-http-runbook", async (tmp) => {
-    const server = await startServer();
+    const server = await startServer(tmp);
     try {
       const bundle = renderCloudControlSetupBundle(input(tmp, server.url));
       await writeBundle(tmp, bundle.files);
@@ -29,6 +31,28 @@ test("HTTP runbook commands write outputs from repo root and bundle root", async
       await fsp.writeFile(path.join(credentials, "control-plane-token"), "token-123\n");
       for (const cwd of [process.cwd(), tmp]) {
         await clearHttpOutputs(tmp);
+        for (const id of ["ingress-dns", "ingress-tls", "ingress-health", "ingress-callback"]) {
+          const entry = runbookCommand(commands, id);
+          assert.deepEqual(entry.inputs, [
+            "$PROFILE_ROOT/aws-topology-evidence.json",
+            "$PROFILE_ROOT/config.yaml",
+          ]);
+          assert.match(entry.command, /node -e/);
+          assert.match(entry.command, /dns\.lookup|tls\.connect|describe-target-health|fetch/, id);
+          const result = await sh(entry.command, {
+            cwd,
+            env: {
+              ...process.env,
+              CREDENTIAL_DIR: credentials,
+              NODE_TLS_REJECT_UNAUTHORIZED: "0",
+              VBR_INGRESS_TLS_ALLOW_UNTRUSTED: "1",
+              VBR_INGRESS_CALLBACK_URL: `${server.url}/oidc/callback`,
+              VBR_INGRESS_TLS_PORT: String(server.tlsPort),
+              VBR_INGRESS_TARGET_HEALTH_FIXTURE: await targetHealthFixture(tmp),
+            },
+          });
+          assert.doesNotMatch(`${result.stdout}${result.stderr}`, /arn:aws|amazonaws|deploy-auth/);
+        }
         for (const id of ["health", "readiness", "worker-heartbeats"]) {
           await sh(runbookCommand(commands, id).command, {
             cwd,
@@ -36,11 +60,25 @@ test("HTTP runbook commands write outputs from repo root and bundle root", async
           });
         }
         for (const output of [
+          "ingress-dns-evidence.json",
+          "ingress-tls-evidence.json",
+          "ingress-health-evidence.json",
+          "ingress-callback-evidence.json",
           "http-health.json",
           "http-readiness.json",
           "http-worker-heartbeats.json",
         ]) {
           assert.equal(await exists(path.join(tmp, output)), true, `${output} written from ${cwd}`);
+          if (output.startsWith("ingress-")) {
+            const text = await fsp.readFile(path.join(tmp, output), "utf8");
+            assert.doesNotMatch(
+              text,
+              /arn:aws[a-z-]*:[^<]|amazonaws\.com|deploy-auth\.example\.test/,
+            );
+            const payload = JSON.parse(text);
+            assert.equal(Number.isFinite(Date.parse(payload.checkedAt)), true);
+            assert.equal(Number.isFinite(Date.parse(payload.evidence.checkedAt)), true);
+          }
         }
       }
       assert.ok(server.authorizedHeartbeat);
@@ -103,24 +141,42 @@ function input(outDir: string, publicUrl: string): CloudControlSetupInput {
     serviceReplicas: 1,
     workerReplicas: 2,
     dryRun: false,
-    awsTopology: topologyForImage(),
+    awsTopology: topologyForImage(publicUrl),
   };
 }
 
-function topologyForImage() {
-  const topology = privateLinkAwsTopology() as any;
-  return {
+function topologyForImage(publicUrl: string) {
+  const host = new URL(publicUrl).hostname;
+  const topology = topologyForPublishedImage(privateLinkAwsTopology(), IMAGE, DIGEST) as any;
+  const updated = {
     ...topology,
-    compute: {
-      ...topology.compute,
-      processEvidence: { ...topology.compute.processEvidence, imageDigest: DIGEST },
-      registryPullProof: { ...topology.compute.registryPullProof, image: IMAGE, digest: DIGEST },
+    ingress: {
+      ...topology.ingress,
+      publicUrl,
+      dnsRecord: host,
+      certificate: {
+        ...topology.ingress.certificate,
+        subjectAlternativeNames: [host, ...topology.ingress.certificate.subjectAlternativeNames],
+      },
+      dns: { ...topology.ingress.dns, hostname: host },
     },
   };
+  return { ...updated, foundation: foundationFromTopology(updated) };
 }
 
-async function startServer() {
-  const state = { authorizedHeartbeat: false, url: "", close: (_done: () => void) => {} };
+async function startServer(tmp: string) {
+  const state = {
+    authorizedHeartbeat: false,
+    url: "",
+    tlsPort: 0,
+    close: (_done: () => void) => {},
+  };
+  const cert = await localCertificate(tmp);
+  const tlsServer = tls.createServer(cert, (socket) => socket.end());
+  await new Promise<void>((resolve) => tlsServer.listen(0, "127.0.0.1", resolve));
+  const tlsAddress = tlsServer.address();
+  assert.ok(tlsAddress && typeof tlsAddress === "object");
+  state.tlsPort = tlsAddress.port;
   const server = http.createServer((req, res) => {
     if (req.url === "/api/v1/worker-heartbeats") {
       state.authorizedHeartbeat = req.headers.authorization === "Bearer token-123";
@@ -132,9 +188,31 @@ async function startServer() {
   const address = server.address();
   assert.ok(address && typeof address === "object");
   state.url = `http://127.0.0.1:${address.port}`;
-  state.close = (done) => server.close(done);
+  state.close = (done) => server.close(() => tlsServer.close(done));
   return state;
 }
+
+async function localCertificate(tmp: string) {
+  const key = path.join(tmp, "local.key");
+  const cert = path.join(tmp, "local.crt");
+  await sh(
+    `openssl req -x509 -newkey rsa:2048 -nodes -keyout ${shellQuote(key)} -out ${shellQuote(cert)} -days 1 -subj /CN=127.0.0.1 -addext subjectAltName=IP:127.0.0.1`,
+  );
+  return { key: await fsp.readFile(key), cert: await fsp.readFile(cert) };
+}
+
+async function targetHealthFixture(tmp: string): Promise<string> {
+  const file = path.join(tmp, "target-health.json");
+  const health = {
+    TargetHealthDescriptions: [
+      { Target: { Id: "i-0abc1234", Port: 7780 }, TargetHealth: { State: "healthy" } },
+    ],
+  };
+  await fsp.writeFile(file, JSON.stringify(health));
+  return file;
+}
+
+const shellQuote = (value: string) => `'${value.replace(/'/g, `'\\''`)}'`;
 
 async function writeBundle(dir: string, files: Record<string, string>): Promise<void> {
   for (const [name, content] of Object.entries(files)) {
@@ -145,18 +223,22 @@ async function writeBundle(dir: string, files: Record<string, string>): Promise<
 
 async function clearHttpOutputs(dir: string): Promise<void> {
   await Promise.all(
-    ["http-health.json", "http-readiness.json", "http-worker-heartbeats.json"].map((name) =>
-      fsp.rm(path.join(dir, name), { force: true }),
-    ),
+    [
+      "ingress-dns-evidence.json",
+      "ingress-tls-evidence.json",
+      "ingress-health-evidence.json",
+      "ingress-callback-evidence.json",
+      "http-health.json",
+      "http-readiness.json",
+      "http-worker-heartbeats.json",
+    ].map((name) => fsp.rm(path.join(dir, name), { force: true })),
   );
 }
-
-async function exists(file: string): Promise<boolean> {
-  return fsp.access(file).then(
+const exists = (file: string) =>
+  fsp.access(file).then(
     () => true,
     () => false,
   );
-}
 
 function runbookCommand(commands: any, id: string) {
   const found = commands.phases

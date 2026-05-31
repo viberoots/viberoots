@@ -7,6 +7,7 @@ import {
   freshEvidenceAt,
   isEvidenceObject,
 } from "./cloud-control-evidence-helpers";
+import { validateSelectedEdges } from "./cloud-control-aws-edge-validate";
 import {
   awsTopologyArtifactBackend,
   validateArtifactStore,
@@ -65,47 +66,6 @@ export function validateAwsTopologyEvidence(
     ...evidenceSourceErrors(topology, "awsTopology"),
     ...evidenceSecretErrors(topology, "awsTopology"),
   ];
-}
-
-function validateSelectedEdges(topology: unknown, options: AwsTopologyValidationOptions): string[] {
-  const edges = evidenceObject(evidenceObject(topology).selectedEdges);
-  return [
-    ...requireEdgeFields(
-      edges.cloudflare,
-      "Cloudflare",
-      ["dnsProxy", "tlsMode", "wafRules", "callbackRoute"],
-      options,
-    ),
-    ...requireEdgeFields(
-      edges.vercel,
-      "Vercel",
-      ["project", "domain", "edgeSettings", "callbackRoute"],
-      options,
-    ),
-  ];
-}
-
-function requireEdgeFields(
-  value: unknown,
-  label: string,
-  fields: string[],
-  options: AwsTopologyValidationOptions,
-): string[] {
-  if (!value) return [];
-  const edge = evidenceObject(value);
-  const errors = requireFresh(edge, `${label} edge`, options);
-  for (const name of fields) {
-    const field = edge[name];
-    if (!isEvidenceObject(field)) {
-      errors.push(`${label} edge ${name} evidence must be structured reviewed evidence`);
-      continue;
-    }
-    errors.push(...requireFresh(field, `${label} edge ${name}`, options));
-    if (!evidenceText(field, "reviewedReference") || !evidenceText(field, "digest")) {
-      errors.push(`${label} edge ${name} evidence missing reviewed reference or digest`);
-    }
-  }
-  return errors;
 }
 
 function validateCore(topology: unknown, options: AwsTopologyValidationOptions): string[] {

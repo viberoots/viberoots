@@ -119,8 +119,8 @@ test("cloud setup bundle renders runtime, credentials, commands, and capabilitie
   for (const capability of bundle.capabilities) {
     assert.deepEqual(validateProviderCapabilityDeclaration(capability), []);
     for (const field of REQUIRED_CAPABILITY_FIELDS) assert.ok((capability as any)[field]);
-    assert.doesNotMatch(JSON.stringify(capability), /<reviewed|placeholder provider/i);
-    assert.match(capability.targetIdentity, /account|Supabase|Cloudflare|Vercel|fleet/);
+    assert.doesNotMatch(JSON.stringify(capability), /<reviewed|placeholder provider|<label>/i);
+    assert.match(capability.iac.previewCommand, /deploy --deployment 'pleomino-staging'/);
   }
 });
 
@@ -243,8 +243,8 @@ test("generated profile files do not embed secret values", async () => {
 });
 
 async function exists(file: string): Promise<boolean> {
-  return await fsp
-    .access(file)
-    .then(() => true)
-    .catch(() => false);
+  return fsp.access(file).then(
+    () => true,
+    () => false,
+  );
 }
