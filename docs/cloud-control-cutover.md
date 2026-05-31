@@ -3,17 +3,27 @@
 Use `deployment-control-plane cutover` before moving protected/shared traffic to a cloud-primary
 host, returning traffic to mini, validating a restore, or using break-glass controls.
 
-The command consumes a JSON evidence file and refuses missing, stale, host-mismatched, or
-dashboard-only evidence:
+Generate the evidence file from the setup bundle first. The collector reads the generated profile,
+provider-capability hook outputs, managed dependency evidence, HTTP checks, the real
+`latest-non-production-deployment.json` staging report, and standby evidence:
+
+```bash
+deployment-control-plane cutover-evidence \
+  --bundle-dir ./cloud-control-profile \
+  --out ./cloud-control-profile/cloud-cutover-evidence.json
+```
+
+The validation command consumes that JSON evidence file and refuses missing, stale,
+host-mismatched, boolean-placeholder, or dashboard-only evidence:
 
 ```bash
 deployment-control-plane cutover \
-  --evidence ./cloud-cutover-evidence.json \
+  --evidence ./cloud-control-profile/cloud-cutover-evidence.json \
   --expected-host-profile aws-ec2 \
   --expected-image-build-identity nix-source-<64-hex-build-identity> \
   --expected-region us-east-1 \
   --selected-capability aws-ec2-control-plane-host,aws-s3-artifact-store \
-  --out ./cloud-cutover-report.json
+  --out ./cloud-control-profile/cloud-cutover-report.json
 ```
 
 Required cutover evidence:
@@ -25,7 +35,8 @@ Required cutover evidence:
   read/write/head compatibility, auth callback reachability, UI reads, and MCP reads
 - latest non-production deployment evidence from the same host profile proving traffic/ingress was
   pointed at the cloud host and a protected/shared staging deployment succeeded through that
-  cloud-primary path
+  cloud-primary path. The collector reads this from `latest-non-production-deployment.json`; it does
+  not synthesize staging success.
 - provider-capability audit identity, rollback procedure, and smoke evidence for every selected
   external component
 - the concrete provider-capability declaration used for that component, with an `auditEvidence` list
@@ -47,6 +58,11 @@ Required cutover evidence:
   filename set, uid/gid ownership, permissions, and `/run/deployment-control-plane/credentials`.
 - standby mode evidence proving mini service/worker controls prevent double execution
 - operation-specific audit evidence for cutover, rollback, restore, or break-glass use
+- operation identity, source host, `checkedAt`, image digest, config digest, credential manifest
+  digest, and the selected provider-capability list. Literal `true` and empty objects are rejected
+  for rollback, restore, break-glass, and standby fields. Operation fields must use typed
+  `cloud-cutover-evidence-ref@1` references with source-host and checked-at metadata, and operation
+  digests must match the collected cutover evidence.
 
 For AWS EC2 profiles, the evidence must also include selected subnets, security groups, TLS/DNS or
 ALB/NLB health, database connectivity path, Supabase PrivateLink validation when selected, and AWS

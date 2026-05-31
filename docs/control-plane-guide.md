@@ -493,6 +493,11 @@ deployment-control-plane credential-preflight \
 deployment-control-plane credential-staging \
   --bundle-dir ./cloud-control-profile \
   --out ./cloud-control-profile/credential-staging.json
+deployment-control-plane credential-rotation \
+  --bundle-dir ./cloud-control-profile \
+  --apply-rotation \
+  --out ./cloud-control-profile/credential-rotation.json \
+  --rotated-map-out ./cloud-control-profile/credential-map.rotated.json
 ```
 
 From inside the generated bundle directory, use:
@@ -501,11 +506,20 @@ From inside the generated bundle directory, use:
 deployment-control-plane setup-doctor --bundle-dir . --out ./setup-doctor.json
 deployment-control-plane credential-preflight --bundle-dir . --out ./credential-preflight.json
 deployment-control-plane credential-staging --bundle-dir . --out ./credential-staging.json
+deployment-control-plane credential-rotation \
+  --bundle-dir . \
+  --apply-rotation \
+  --out ./credential-rotation.json \
+  --rotated-map-out ./credential-map.rotated.json
 ```
 
 The generated `commands.json` contains the same ordered runbook with profile-root-relative paths.
 Protected/shared setup and cutover remain blocked until `credential-staging.json` is present, fresh,
 and tied to the current `credential-manifest.json` and `credential-map.json`.
+Live backend writes and host mount verification require
+`VBR_CONTROL_PLANE_LIVE_CREDENTIAL_STAGING=1` plus reviewed non-secret
+`--secret-backend-evidence` and `--host-mount-evidence` files; ordinary CI and fixture runs do not
+write secret values.
 
 ## Step 8: Run Managed Dependency Validation
 
@@ -628,25 +642,39 @@ using the PrivateLink endpoint, not the public Supabase hostname.
 
 ## Step 11: Cut Over
 
-Before moving protected/shared traffic, run:
+Before moving protected/shared traffic, run the generated cutover evidence collector from
+`commands.json`. It reads the profile bundle, provider-capability hook outputs, runtime health
+checks, standby evidence, and managed dependency evidence, then writes
+`cloud-cutover-evidence.json`:
+It also requires `latest-non-production-deployment.json` from a real protected/shared staging
+deployment through the AWS-primary path; staging success is not inferred by the collector.
+
+```bash
+deployment-control-plane cutover-evidence \
+  --bundle-dir ./cloud-control-profile \
+  --out ./cloud-control-profile/cloud-cutover-evidence.json
+```
+
+Then validate the generated report:
 
 ```bash
 deployment-control-plane cutover \
-  --evidence ./cloud-cutover-evidence.json \
+  --evidence ./cloud-control-profile/cloud-cutover-evidence.json \
   --expected-host-profile aws-ec2 \
   --expected-image-build-identity nix-source-<build-identity> \
   --expected-region us-east-1 \
   --selected-capability aws-ec2-control-plane-host,aws-network-foundation,aws-s3-artifact-store \
-  --out ./cloud-cutover-report.json
+  --out ./cloud-control-profile/cloud-cutover-report.json
 ```
 
 The report must pass before the AWS host becomes protected/shared-ready. Keep mini or the previous
 host in a reviewed standby mode until rollback evidence is fresh.
 
 Cutover rejects literal `true`, empty objects, dashboard-only notes, raw IaC state, stale
-timestamps, unsupported database modes, and evidence containing obvious secret material. Support or
-dashboard-mediated steps must be represented as structured prerequisite evidence tied to the
-selected provider-capability id; they do not satisfy protected/shared readiness by themselves.
+timestamps, unsupported database modes, malformed operation evidence refs, mismatched operation
+digests, and evidence containing obvious secret material. Support or dashboard-mediated steps must
+be represented as structured prerequisite evidence tied to the selected provider-capability id; they
+do not satisfy protected/shared readiness by themselves.
 
 ## Troubleshooting
 
@@ -664,8 +692,9 @@ selected provider-capability id; they do not satisfy protected/shared readiness 
 - Missing credential failure: compare host files against `credential-manifest.json`. Do not repair
   by switching to environment variables.
 - Stale credential failure: rerun `deployment-control-plane credential-staging` and, when stale
-  entries remain active, run `deployment-control-plane credential-rotation` after refreshing the
-  reviewed backend or encrypted host source.
+  entries remain active, run `deployment-control-plane credential-rotation --apply-rotation
+--rotated-map-out ./credential-map.rotated.json` after refreshing the reviewed backend or
+  encrypted host source.
 - Backend write failure: confirm the selected backend profile, least-privilege scope evidence,
   generated write-plan ids, and reviewed source-provider access for SSH or GitHub App credentials.
 - Host mount permission mismatch: confirm the filename set, uid/gid `10001`, mode `0400`, and

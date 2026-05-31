@@ -10,6 +10,7 @@ import {
   validateCredentialRotationOutput,
   validateCredentialStagingOutput,
 } from "./cloud-control-runbook-credential-evidence";
+import { validateCutoverOutput } from "./cloud-control-runbook-cutover-evidence";
 
 export async function validateRunbookBundle(bundleDir: string) {
   const profileRoot = path.resolve(bundleDir);
@@ -199,7 +200,8 @@ async function validateOutputEvidence(profileRoot: string, file: string): Promis
     file !== "$PROFILE_ROOT/managed-dependency-evidence.json" &&
     file !== "$PROFILE_ROOT/supabase-managed-postgres-evidence.json" &&
     file !== "$PROFILE_ROOT/credential-staging.json" &&
-    file !== "$PROFILE_ROOT/credential-rotation.json"
+    file !== "$PROFILE_ROOT/credential-rotation.json" &&
+    file !== "$PROFILE_ROOT/cloud-cutover-evidence.json"
   ) {
     return [];
   }
@@ -212,6 +214,8 @@ async function validateOutputEvidence(profileRoot: string, file: string): Promis
   if (file === "$PROFILE_ROOT/credential-rotation.json") {
     return validateCredentialRotationOutput(profileRoot);
   }
+  if (file === "$PROFILE_ROOT/cloud-cutover-evidence.json")
+    return validateCutoverOutput(profileRoot);
   const localPath = path.join(profileRoot, "managed-dependency-evidence.json");
   if (!(await exists(localPath))) return [];
   const evidence = JSON.parse(await fsp.readFile(localPath, "utf8"));

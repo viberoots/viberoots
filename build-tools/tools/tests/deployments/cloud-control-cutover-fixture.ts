@@ -6,13 +6,13 @@ import {
 } from "../../deployments/cloud-control-provider-capability-hook-contract";
 import { managedDependencyEvidence } from "./cloud-control-cutover-managed-dependencies.fixture";
 import { reviewedSupabaseManagedPostgresProfile } from "../../deployments/control-plane-supabase-postgres-profile";
-import { buildSupabaseManagedPostgresEvidence } from "../../deployments/control-plane-supabase-postgres-evidence";
 import { ecrRegistryProfileForImage } from "./control-plane-registry-profile.fixture";
 import { ingressCommandEvidence } from "./cloud-control-aws-ingress.fixture";
 import {
   credentialStagingEvidence,
   CUTOVER_CREDENTIAL_FILES,
 } from "./cloud-control-credential-staging.fixture";
+import { restoreEvidence } from "./cloud-control-cutover-restore.fixture";
 import {
   freshCheckedAt,
   IMAGE_BUILD_IDENTITY,
@@ -21,9 +21,12 @@ import {
   privateLinkAwsTopology,
   topologyForPublishedImage,
 } from "./cloud-control-aws-topology.fixture";
+import { evidenceRef, operationEnvelope } from "./cloud-control-cutover-operation.fixture";
+import { providerPayloadFor } from "./cloud-control-cutover-provider-payload.fixture";
 
 export { managedDependencyEvidence } from "./cloud-control-cutover-managed-dependencies.fixture";
 export { foundationFromTopology } from "./cloud-control-aws-foundation-fixture";
+export { restoreEvidence } from "./cloud-control-cutover-restore.fixture";
 export {
   IMAGE_BUILD_IDENTITY,
   IMAGE_DIGEST,
@@ -36,10 +39,30 @@ export {
 export function evidence(overrides: Record<string, unknown> = {}) {
   const credentialManifestDigest = "sha256:credential-manifest";
   const credentialMapDigest = "sha256:credential-map";
+  const commonOperation = operationEnvelope(credentialManifestDigest);
   return {
+    schemaVersion: "cloud-cutover-evidence@1",
+    operationIdentity: {
+      operation: "cutover",
+      sourceHost: "aws-ec2-instance-i-123",
+      checkedAt: new Date().toISOString(),
+    },
     hostProfile: "aws-ec2",
     region: "us-east-1",
     generatedAt: new Date().toISOString(),
+    checkedAt: new Date().toISOString(),
+    sourceHost: "aws-ec2-instance-i-123",
+    imageDigest: IMAGE_REF,
+    configDigest: "sha256:config",
+    expectedImageBuildIdentity: IMAGE_BUILD_IDENTITY,
+    selectedProviderCapabilities: [
+      "aws-ec2-control-plane-host",
+      "aws-network-foundation",
+      "aws-ecr-control-plane-registry",
+      "aws-s3-artifact-store",
+      "supabase-managed-postgres",
+      "supabase-privatelink-prerequisite",
+    ],
     health: {
       cloudHealth: true,
       readiness: true,
@@ -91,14 +114,32 @@ export function evidence(overrides: Record<string, unknown> = {}) {
     credentialMapDigest,
     credentialManifestRequiredFiles: [...CUTOVER_CREDENTIAL_FILES],
     credentialStaging: credentialStagingEvidence(credentialManifestDigest, credentialMapDigest),
-    standby: { mode: "service-only", doubleExecutionPrevented: true },
-    restore: restoreEvidence(),
-    rollback: { trafficReturn: true, authoritySemanticsUnchanged: true },
+    standby: {
+      ...commonOperation,
+      mode: "service-only",
+      serviceMode: evidenceRef("standby/service-only"),
+      workerMode: evidenceRef("standby/workers-disabled"),
+      doubleExecutionPrevention: evidenceRef("standby/no-double-execution"),
+    },
+    restore: restoreEvidence(commonOperation),
+    rollback: {
+      ...commonOperation,
+      previousHostProfile: evidenceRef("rollback/previous-host"),
+      trafficTarget: evidenceRef("rollback/traffic-target"),
+      standbyServiceMode: evidenceRef("rollback/standby-service"),
+      workerDrain: evidenceRef("rollback/worker-drain"),
+      providerLocks: evidenceRef("rollback/provider-locks"),
+      inFlightQueuePosture: evidenceRef("rollback/queue-posture"),
+      doubleExecutionPrevention: evidenceRef("rollback/no-double-execution"),
+    },
     breakGlass: {
-      statusInspect: true,
-      pauseWorkers: true,
-      auditPreserved: true,
-      providerMutationBlocked: true,
+      ...commonOperation,
+      incidentRef: "incident://cutover-test",
+      statusInspect: evidenceRef("break-glass/status"),
+      workerFreeze: evidenceRef("break-glass/freeze"),
+      auditPreserved: evidenceRef("break-glass/audit"),
+      providerMutationBlocked: evidenceRef("break-glass/provider-block"),
+      incidentBoundedAccess: evidenceRef("break-glass/access-window"),
     },
     audit: { cutover: true, rollback: true, restore: true, "break-glass": true },
     ...overrides,
@@ -139,83 +180,5 @@ export function capabilityEvidence(id = "aws-ec2-control-plane-host") {
       fingerprint: "sha256:fixture",
     },
     ...providerPayloadFor(id),
-  };
-}
-
-function providerPayloadFor(id: string) {
-  if (id === "aws-network-foundation") {
-    return {
-      providerPayload: {
-        schemaVersion: "aws-foundation-hook-payload@1",
-        ingressLifecycle: {
-          schemaVersion: "aws-ingress-lifecycle-evidence@1",
-          operation: {
-            evidencePayload: { schemaVersion: "aws-ingress-hook-inspection@1" },
-          },
-        },
-      },
-    };
-  }
-  if (id === "supabase-privatelink-prerequisite") {
-    return {
-      providerPayload: {
-        schemaVersion: "supabase-privatelink-provider-payload@1",
-        evidenceMode: "evidence-only",
-        supportMediated: true,
-        supportEvidenceRef: "privatelink-request",
-        ramPermissionEvidenceRef: "ram-acceptance-permission",
-        latticePermissionEvidenceRef: "vpc-lattice-association-permission",
-        privateDnsEvidenceRef: "private-dns-proof",
-      },
-    };
-  }
-  if (id === "supabase-managed-postgres") {
-    return {
-      providerPayload: {
-        schemaVersion: "supabase-managed-postgres-provider-payload@1",
-        evidenceMode: "evidence-only",
-        automatedProvisioningSuccess: false,
-        mutationAuthority: false,
-        expectedProfileIdentity: {
-          organizationId: "org-control-plane-prod",
-          projectRef: "project-review",
-          region: "us-east-1",
-          mode: "privatelink",
-        },
-        lifecycleEvidence: buildSupabaseManagedPostgresEvidence(
-          reviewedSupabaseManagedPostgresProfile({
-            instanceId: "cloud-control-plane",
-            region: "us-east-1",
-            mode: "privatelink",
-            organizationId: "org-control-plane-prod",
-            projectRef: "project-review",
-          }),
-        ),
-      },
-    };
-  }
-  if (id !== "cloudflare-edge" && id !== "vercel-operator-ui") return {};
-  return {
-    providerPayload: {
-      schemaVersion: "edge-ingress-provider-payload@1",
-      hostname: "deploy.example.test",
-      callbackHost: "deploy-auth.example.test",
-      callbackPath: "/oidc/callback",
-      originLoadBalancerArn:
-        "arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/cp/1",
-    },
-  };
-}
-
-export function restoreEvidence() {
-  return {
-    databaseRecords: true,
-    artifactObjects: true,
-    imageDigest: true,
-    config: true,
-    exportedConfigDigest: "sha256:config",
-    credentialManifest: true,
-    authConfiguration: true,
-    durableStateReferences: ["submission:1", "artifact:1"],
   };
 }

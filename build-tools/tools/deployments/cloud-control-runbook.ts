@@ -9,6 +9,7 @@ import {
 import { managedRuntimeFlags, sourceHostPrelude } from "./cloud-control-runbook-managed-runtime";
 import { rootPrelude } from "./cloud-control-runbook-root";
 import { credentialCommands } from "./cloud-control-runbook-credential-commands";
+import { cutoverCommands } from "./cloud-control-runbook-cutover";
 import { supabasePrivateLinkEvidenceCommands } from "./cloud-control-runbook-supabase-privatelink";
 import { supabasePostgresEvidenceCommand } from "./cloud-control-runbook-supabase-postgres";
 export { validateRunbookBundle, validateRunbookStructure } from "./cloud-control-runbook-doctor";
@@ -111,6 +112,14 @@ function phases(input: CloudControlSetupInput): RunbookPhase[] {
         ...ingressEvidenceCommands(input, rootPrelude(input.outDir)),
         ...httpCommands(input, rootPrelude(input.outDir)),
       ],
+    ),
+    phase(
+      input,
+      6,
+      "cutover-readiness",
+      "Collect and validate cutover evidence",
+      ["http-validation"],
+      cutoverCommands(input),
     ),
   ];
 }

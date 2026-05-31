@@ -7,6 +7,7 @@ import { test } from "node:test";
 import type { ProviderCapabilityDeclaration } from "../../deployments/cloud-control-setup-types";
 import {
   authValidationInputs,
+  cutoverValidationInputs,
   liveSmokeEnv,
   validateLiveControlPlaneSmoke,
 } from "./control-plane-container-live-smoke.helpers";
@@ -37,6 +38,16 @@ test("enabled live smoke requires staging, auth, topology, and capability eviden
     "VBR_CONTROL_PLANE_LIVE_OIDC_DISCOVERY_URL",
   ]);
   assert.deepEqual(
+    cutoverValidationInputs({ VBR_CONTROL_PLANE_LIVE_CUTOVER: "1" } as NodeJS.ProcessEnv),
+    [
+      "VBR_CONTROL_PLANE_LIVE_CUTOVER_BUNDLE_DIR",
+      "VBR_CONTROL_PLANE_LIVE_CUTOVER_EXPECTED_HOST_PROFILE",
+      "VBR_CONTROL_PLANE_LIVE_CUTOVER_EXPECTED_IMAGE_BUILD_IDENTITY",
+      "VBR_CONTROL_PLANE_LIVE_CUTOVER_EXPECTED_REGION",
+      "VBR_CONTROL_PLANE_LIVE_CUTOVER_SELECTED_CAPABILITIES",
+    ],
+  );
+  assert.deepEqual(
     awsTopologyInputs({ VBR_CONTROL_PLANE_LIVE_AWS_TOPOLOGY: "1" } as NodeJS.ProcessEnv),
     [
       "VBR_CONTROL_PLANE_LIVE_AWS_SUBNET_EVIDENCE_FILE",
@@ -52,11 +63,15 @@ test("enabled live smoke requires staging, auth, topology, and capability eviden
     ],
   );
   withEnv(
-    { VBR_CONTROL_PLANE_LIVE_SMOKE: "1", VBR_CONTROL_PLANE_LIVE_AUTH_PROVIDER: "workos" },
+    {
+      VBR_CONTROL_PLANE_LIVE_SMOKE: "1",
+      VBR_CONTROL_PLANE_LIVE_AUTH_PROVIDER: "workos",
+      VBR_CONTROL_PLANE_LIVE_CUTOVER: "1",
+    },
     () => {
       assert.throws(
         () => liveSmokeEnv({ skip: () => assert.fail("enabled live smoke must not skip") }),
-        /VBR_CONTROL_PLANE_LIVE_STAGING_DEPLOY_SMOKE_COMMAND.*VBR_CONTROL_PLANE_LIVE_WORKOS_JWKS_URL/s,
+        /VBR_CONTROL_PLANE_LIVE_STAGING_DEPLOY_SMOKE_COMMAND.*VBR_CONTROL_PLANE_LIVE_WORKOS_JWKS_URL.*VBR_CONTROL_PLANE_LIVE_CUTOVER_BUNDLE_DIR/s,
       );
     },
   );

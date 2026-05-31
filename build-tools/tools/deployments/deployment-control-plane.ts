@@ -15,6 +15,7 @@ import { startControlPlaneServiceFromRuntimeConfig } from "./nixos-shared-host-c
 import { startControlPlaneWorkerFromRuntimeConfig } from "./nixos-shared-host-control-plane-worker";
 import { runCloudControlSetupCommand } from "./cloud-control-setup";
 import { runCloudControlCutoverCommand } from "./cloud-control-cutover-cli";
+import { runCloudControlCutoverEvidenceCommand } from "./cloud-control-cutover-evidence-collector";
 import { runCloudControlSetupDoctorCommand } from "./cloud-control-setup-doctor";
 import { runCredentialPreflightCommand } from "./control-plane-credential-preflight";
 import {
@@ -29,6 +30,7 @@ function command():
   | "worker"
   | "setup"
   | "cutover"
+  | "cutover-evidence"
   | "setup-doctor"
   | "credential-preflight"
   | "credential-staging"
@@ -52,6 +54,7 @@ function command():
     "stale-credential",
     "deployment-id",
     "host-mode",
+    "host-mount-evidence",
     "image",
     "instance-id",
     "out",
@@ -70,9 +73,11 @@ function command():
     "ingress-command-evidence",
     "published-digest",
     "registry-profile",
-    "selected-capability",
     "reviewed-source-mode",
+    "rotated-map-out",
     "runtime-input",
+    "secret-backend-evidence",
+    "selected-capability",
     "service-replicas",
     "skopeo",
     "source-revision",
@@ -87,6 +92,7 @@ function command():
     mode !== "worker" &&
     mode !== "setup" &&
     mode !== "cutover" &&
+    mode !== "cutover-evidence" &&
     mode !== "setup-doctor" &&
     mode !== "credential-preflight" &&
     mode !== "credential-staging" &&
@@ -95,7 +101,7 @@ function command():
     mode !== "managed-dependencies"
   ) {
     throw new Error(
-      "usage: deployment-control-plane <service|worker|setup|image-publication|setup-doctor|credential-preflight|credential-staging|credential-rotation|managed-dependencies|cutover>",
+      "usage: deployment-control-plane <service|worker|setup|image-publication|setup-doctor|credential-preflight|credential-staging|credential-rotation|managed-dependencies|cutover-evidence|cutover>",
     );
   }
   return mode;
@@ -113,6 +119,10 @@ export async function runDeploymentControlPlaneCommand() {
   }
   if (mode === "cutover") {
     await runCloudControlCutoverCommand();
+    return undefined;
+  }
+  if (mode === "cutover-evidence") {
+    await runCloudControlCutoverEvidenceCommand();
     return undefined;
   }
   if (mode === "setup-doctor") {

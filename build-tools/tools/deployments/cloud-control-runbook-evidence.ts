@@ -65,6 +65,15 @@ export function phaseMeta(id: string, input: CloudControlSetupInput) {
         "attach captured health, readiness, and worker-heartbeat responses to conformance evidence",
       ],
     },
+    "cutover-readiness": {
+      evidenceInputs: [
+        "$PROFILE_ROOT/cloud-cutover-evidence.json",
+        "$PROFILE_ROOT/cloud-cutover-report.json",
+      ],
+      residualManualActions: [
+        "collect provider capability, standby, rollback, restore, and break-glass evidence before moving traffic",
+      ],
+    },
   };
   return table[id]!;
 }

@@ -13,6 +13,8 @@ import {
   validateAwsProviderCapabilityEvidence,
   validateOptionalAwsTopology,
 } from "./control-plane-container-live-smoke-aws.helpers";
+import { collectCutoverEvidence } from "../../deployments/cloud-control-cutover-evidence-collector";
+import { validateCloudControlCutover } from "../../deployments/cloud-control-cutover-validate";
 
 const execFileAsync = promisify(execFile);
 
@@ -37,6 +39,7 @@ export function liveSmokeEnv(t: { skip(reason?: string): void }) {
     "VBR_CONTROL_PLANE_LIVE_PROVIDER_CAPABILITY_EVIDENCE_FILE",
     ...authValidationInputs(process.env.VBR_CONTROL_PLANE_LIVE_AUTH_PROVIDER || ""),
     ...awsTopologyInputs(process.env),
+    ...cutoverValidationInputs(process.env),
   ];
   const values = Object.fromEntries(required.map((name) => [name, process.env[name] || ""]));
   const missing = required.filter((name) => !String(values[name]).trim());
@@ -62,6 +65,17 @@ export function authValidationInputs(provider: string): string[] {
 
 export { awsTopologyInputs };
 
+export function cutoverValidationInputs(env: NodeJS.ProcessEnv): string[] {
+  if (env.VBR_CONTROL_PLANE_LIVE_CUTOVER !== "1") return [];
+  return [
+    "VBR_CONTROL_PLANE_LIVE_CUTOVER_BUNDLE_DIR",
+    "VBR_CONTROL_PLANE_LIVE_CUTOVER_EXPECTED_HOST_PROFILE",
+    "VBR_CONTROL_PLANE_LIVE_CUTOVER_EXPECTED_IMAGE_BUILD_IDENTITY",
+    "VBR_CONTROL_PLANE_LIVE_CUTOVER_EXPECTED_REGION",
+    "VBR_CONTROL_PLANE_LIVE_CUTOVER_SELECTED_CAPABILITIES",
+  ];
+}
+
 export async function validateLiveControlPlaneSmoke(env: Record<string, string>) {
   const token = (await fsp.readFile(env.VBR_CONTROL_PLANE_LIVE_TOKEN_FILE, "utf8")).trim();
   const base = new URL(env.VBR_CONTROL_PLANE_LIVE_SERVICE_URL);
@@ -79,6 +93,7 @@ export async function validateLiveControlPlaneSmoke(env: Record<string, string>)
   await validateAuthProvider(env);
   await validateOptionalAwsTopology(env, token, assertOkJson);
   await validateStagingDeploySmoke(env);
+  await validateLiveCutoverEvidence(env);
 }
 
 export async function assertOkJson(url: URL, label: string, token?: string) {
@@ -170,6 +185,22 @@ async function validateLiveProviderCapabilityEvidence(env: Record<string, string
   const errors = validateProviderCapabilityEvidence(declarations, evidenceByCapability);
   assert.deepEqual(errors, [], errors.join("; "));
   await validateAwsProviderCapabilityEvidence(env, declarations, evidenceByCapability);
+}
+
+async function validateLiveCutoverEvidence(env: Record<string, string>) {
+  if (env.VBR_CONTROL_PLANE_LIVE_CUTOVER !== "1") return;
+  const evidence = await collectCutoverEvidence(env.VBR_CONTROL_PLANE_LIVE_CUTOVER_BUNDLE_DIR);
+  const result = validateCloudControlCutover(evidence, {
+    operation: "cutover",
+    expectedHostProfile: env.VBR_CONTROL_PLANE_LIVE_CUTOVER_EXPECTED_HOST_PROFILE,
+    expectedImageBuildIdentity: env.VBR_CONTROL_PLANE_LIVE_CUTOVER_EXPECTED_IMAGE_BUILD_IDENTITY,
+    expectedRegion: env.VBR_CONTROL_PLANE_LIVE_CUTOVER_EXPECTED_REGION,
+    selectedCapabilities: env.VBR_CONTROL_PLANE_LIVE_CUTOVER_SELECTED_CAPABILITIES.split(",")
+      .map((value) => value.trim())
+      .filter(Boolean),
+    maxAgeMinutes: Number(env.VBR_CONTROL_PLANE_LIVE_CUTOVER_MAX_AGE_MINUTES || "60"),
+  });
+  assert.deepEqual(result.errors, [], result.errors.join("; "));
 }
 
 async function assertOkFetch(url: string, label: string) {

@@ -101,6 +101,7 @@ test("guide command flow stays in generated runbook phase order", async () => {
     "managed-dependencies": "## Step 8: Run Managed Dependency Validation",
     "process-start": "## Step 9: Start Service And Workers",
     "http-validation": "## Step 10: Run Runtime And AWS Evidence Checks",
+    "cutover-readiness": "## Step 11: Cut Over",
   };
   const guidePositions = commands.phases.map((phase: { id: string }) =>
     guide.indexOf(guideAnchors[phase.id]!),

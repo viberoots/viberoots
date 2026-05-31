@@ -38,7 +38,7 @@ function validateCapability(
   }
   errors.push(
     ...validateProviderCapabilityHookEvidenceShape(id, capability, {
-      allowedPhases: ["smoke"],
+      allowedPhases: id === "supabase-managed-postgres" ? ["smoke", "evidence"] : ["smoke"],
       maxAgeMinutes,
       expectedSupabasePostgresProfile: evidence.supabasePostgresProfile,
     }),
@@ -54,7 +54,9 @@ function validateCapability(
   }
   if (!capability.auditIdentity) errors.push(`${id}: missing provider-capability audit identity`);
   if (!capability.rollbackProcedure) errors.push(`${id}: missing rollback procedure evidence`);
-  if (!capability.smokeEvidence) errors.push(`${id}: missing smoke evidence`);
+  if (!capability.smokeEvidence && capability.phase !== "evidence") {
+    errors.push(`${id}: missing smoke evidence`);
+  }
   errors.push(...validateIngressProviderPayload(id, capability.providerPayload, evidence));
   return errors;
 }

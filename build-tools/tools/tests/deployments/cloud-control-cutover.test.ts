@@ -208,31 +208,28 @@ test("cloud cutover validation covers restore rollback and break-glass gates", (
     /missing restore databaseRecords evidence/,
   );
   assert.match(
-    validateCloudControlCutover(evidence({ standby: {} }), {
+    validateCloudControlCutover(evidence({ rollback: {} }), {
       ...CUTOVER_OPTIONS,
       operation: "rollback",
     }).errors.join("\n"),
-    /double-execution prevention/,
+    /missing rollback previousHostProfile evidence/,
   );
   assert.match(
-    validateCloudControlCutover(evidence({ breakGlass: { statusInspect: true } }), {
+    validateCloudControlCutover(evidence({ breakGlass: { statusInspect: {} } }), {
       ...CUTOVER_OPTIONS,
       operation: "break-glass",
     }).errors.join("\n"),
-    /providerMutationBlocked/,
+    /missing break-glass incidentRef evidence/,
   );
 });
 
 test("cloud cutover validation rejects incomplete restore provenance", () => {
   assert.match(
-    validateCloudControlCutover(
-      evidence({ restore: { ...restoreEvidence(), exportedConfigDigest: "" } }),
-      {
-        ...CUTOVER_OPTIONS,
-        operation: "restore",
-      },
-    ).errors.join("\n"),
-    /missing restore exportedConfigDigest evidence/,
+    validateCloudControlCutover(evidence({ restore: { ...restoreEvidence(), configDigest: "" } }), {
+      ...CUTOVER_OPTIONS,
+      operation: "restore",
+    }).errors.join("\n"),
+    /missing restore configDigest evidence/,
   );
   assert.match(
     validateCloudControlCutover(

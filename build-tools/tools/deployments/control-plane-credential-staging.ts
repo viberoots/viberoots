@@ -1,6 +1,6 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import { getFlagList, getFlagStr } from "../lib/cli";
+import { getFlagBool, getFlagList, getFlagStr } from "../lib/cli";
 import { validateCredentialMap, type CredentialMap } from "./cloud-control-credential-map";
 import { parseControlPlaneRuntimeConfig } from "./control-plane-runtime-config";
 import {
@@ -9,10 +9,25 @@ import {
   CREDENTIAL_STAGING_SCHEMA,
   type CredentialRotationEvidence,
   type CredentialStagingEvidence,
-  type ReloadEvidence,
+  type LiveBackendWriteEvidence,
 } from "./control-plane-credential-staging-types";
 import { digestCredentialInput } from "./control-plane-credential-staging-evidence";
 import type { SupabaseManagedPostgresProfile } from "./control-plane-supabase-postgres-profile";
+import { rotateCredentialMap } from "./control-plane-credential-rotation";
+import {
+  hostMountEvidence,
+  liveRequested,
+  type LiveHostMountInput,
+  validateLiveInputs,
+} from "./control-plane-credential-staging-live";
+import {
+  backendRefs,
+  hostSourceIds,
+  reloadEvidence,
+  requiredFiles,
+  staleDetection,
+  writePlanIds,
+} from "./control-plane-credential-staging-helpers";
 
 type Manifest = {
   credentialDirectory?: string;
@@ -25,12 +40,17 @@ type Inputs = {
   credentialMap: CredentialMap;
   configText: string;
   supabaseProfile?: SupabaseManagedPostgresProfile;
+  liveBackendWriteEvidence?: LiveBackendWriteEvidence;
+  liveHostMountEvidence?: LiveHostMountInput;
 };
 
 export async function runCredentialStagingCommand(): Promise<void> {
   const result = await runCredentialStaging({
     bundleDir: getFlagStr("bundle-dir", ".").trim(),
     out: getFlagStr("out", "").trim(),
+    live: liveRequested(),
+    secretBackendEvidence: getFlagStr("secret-backend-evidence", "").trim(),
+    hostMountEvidence: getFlagStr("host-mount-evidence", "").trim(),
   });
   emitResult(result, getFlagStr("out", "").trim());
   if (!result.ok) process.exitCode = 2;
@@ -41,18 +61,29 @@ export async function runCredentialRotationCommand(): Promise<void> {
     bundleDir: getFlagStr("bundle-dir", ".").trim(),
     out: getFlagStr("out", "").trim(),
     staleCredentials: getFlagList("stale-credential"),
+    live: liveRequested(),
+    applyRotation: getFlagBool("apply-rotation"),
+    rotatedMapOut: getFlagStr("rotated-map-out", "").trim(),
+    secretBackendEvidence: getFlagStr("secret-backend-evidence", "").trim(),
+    hostMountEvidence: getFlagStr("host-mount-evidence", "").trim(),
   });
   emitResult(result, getFlagStr("out", "").trim());
   if (!result.ok) process.exitCode = 2;
 }
 
-export async function runCredentialStaging(opts: { bundleDir: string; out?: string }) {
-  const inputs = await readInputs(opts.bundleDir);
-  const errors = validateInputs(inputs);
+export async function runCredentialStaging(opts: {
+  bundleDir: string;
+  out?: string;
+  live?: boolean;
+  secretBackendEvidence?: string;
+  hostMountEvidence?: string;
+}) {
+  const inputs = await readInputs(opts.bundleDir, opts);
+  const errors = validateInputs(inputs, opts.live === true);
   const evidence: CredentialStagingEvidence = {
     schemaVersion: CREDENTIAL_STAGING_SCHEMA,
     generatedAt: new Date().toISOString(),
-    mode: "fixture-validation",
+    mode: opts.live === true ? "live-gated-backend-write" : "fixture-validation",
     credentialDirectory: inputs.manifest.credentialDirectory || CREDENTIAL_MOUNT_TARGET,
     manifestDigest: digestCredentialInput(inputs.manifest),
     credentialMapDigest: digestCredentialInput(inputs.credentialMap),
@@ -62,7 +93,14 @@ export async function runCredentialStaging(opts: { bundleDir: string; out?: stri
     hostCredentialSourceIds: hostSourceIds(inputs.credentialMap),
     staleCredentialDetection: staleDetection(inputs.credentialMap, []),
     reloadEvidence: reloadEvidence(),
-    hostMountEvidence: hostMountEvidence(inputs),
+    hostMountEvidence: hostMountEvidence(
+      inputs.liveHostMountEvidence,
+      requiredFiles(inputs.manifest),
+      opts.live === true,
+    ),
+    ...(inputs.liveBackendWriteEvidence
+      ? { liveBackendWriteEvidence: inputs.liveBackendWriteEvidence }
+      : {}),
     externalPrerequisites: externalPrerequisites(inputs),
     ok: errors.length === 0,
     errors,
@@ -75,27 +113,48 @@ export async function runCredentialRotation(opts: {
   bundleDir: string;
   out?: string;
   staleCredentials?: string[];
+  live?: boolean;
+  applyRotation?: boolean;
+  rotatedMapOut?: string;
+  secretBackendEvidence?: string;
+  hostMountEvidence?: string;
 }) {
-  const inputs = await readInputs(opts.bundleDir);
+  const inputs = await readInputs(opts.bundleDir, opts);
   const stale = opts.staleCredentials || [];
+  const rotated = opts.applyRotation ? rotateCredentialMap(inputs.credentialMap, stale) : undefined;
   const errors = [
-    ...validateInputs(inputs),
-    ...stale.map((file) => `${file}: stale credential active`),
+    ...validateInputs(inputs, opts.live === true),
+    ...(opts.applyRotation ? [] : stale.map((file) => `${file}: stale credential active`)),
   ];
+  const rotatedPath = opts.rotatedMapOut?.trim();
+  if (rotated && rotatedPath) await writeJson(rotatedPath, rotated);
   const evidence: CredentialRotationEvidence = {
     schemaVersion: CREDENTIAL_ROTATION_SCHEMA,
     generatedAt: new Date().toISOString(),
-    mode: "fixture-validation",
+    mode: opts.live === true ? "live-gated-backend-write" : "fixture-validation",
     manifestDigest: digestCredentialInput(inputs.manifest),
     credentialMapDigest: digestCredentialInput(inputs.credentialMap),
     runtimeConfigDigest: digestCredentialInput(parseControlPlaneRuntimeConfig(inputs.configText)),
     backendRefs: backendRefs(inputs.credentialMap),
     generatedSecretWritePlanIds: writePlanIds(inputs.credentialMap),
     hostCredentialSourceIds: hostSourceIds(inputs.credentialMap),
-    staleCredentialDetection: staleDetection(inputs.credentialMap, stale),
+    staleCredentialDetection: staleDetection(inputs.credentialMap, opts.applyRotation ? [] : stale),
     nonSecretConfigSemanticsDigest: digestCredentialInput(nonSecretSemantics(inputs)),
+    ...(rotated
+      ? {
+          rotatedCredentialMapDigest: digestCredentialInput(rotated),
+          ...(rotatedPath ? { rotatedCredentialMapPath: rotatedPath } : {}),
+        }
+      : {}),
     reloadEvidence: reloadEvidence(),
-    hostMountEvidence: hostMountEvidence(inputs),
+    hostMountEvidence: hostMountEvidence(
+      inputs.liveHostMountEvidence,
+      requiredFiles(inputs.manifest),
+      opts.live === true,
+    ),
+    ...(inputs.liveBackendWriteEvidence
+      ? { liveBackendWriteEvidence: inputs.liveBackendWriteEvidence }
+      : {}),
     ok: errors.length === 0,
     errors,
   };
@@ -103,81 +162,50 @@ export async function runCredentialRotation(opts: {
   return evidence;
 }
 
-function hostMountEvidence(inputs: Inputs) {
-  return {
-    wiringMode: "bind-mounted-credential-directory" as const,
-    targetPath: CREDENTIAL_MOUNT_TARGET,
-    filenameSet: requiredFiles(inputs.manifest),
-    owner: { uid: 10001, gid: 10001 },
-    permissions: "0400",
-  };
-}
-
-async function readInputs(bundleDir: string): Promise<Inputs> {
+async function readInputs(
+  bundleDir: string,
+  opts: { live?: boolean; secretBackendEvidence?: string; hostMountEvidence?: string } = {},
+): Promise<Inputs> {
   const root = path.resolve(bundleDir);
-  const [manifest, credentialMap, configText, supabaseProfile] = await Promise.all([
-    readJson(path.join(root, "credential-manifest.json")),
-    readJson(path.join(root, "credential-map.json")),
-    fsp.readFile(path.join(root, "config.yaml"), "utf8"),
-    readJson(path.join(root, "supabase-postgres.profile.json")).catch(() => undefined),
-  ]);
-  return { manifest, credentialMap, configText, supabaseProfile };
-}
-
-function validateInputs(inputs: Inputs): string[] {
-  const config = parseControlPlaneRuntimeConfig(inputs.configText);
-  return validateCredentialMap(inputs.credentialMap, {
-    requiredFiles: requiredFiles(inputs.manifest),
-    supabaseProjectRef: inputs.supabaseProfile?.provisioning.projectRef,
-    connectionMode: inputs.supabaseProfile?.connection.mode,
-    reviewedSourceMode: config.reviewedSource.mode,
-  });
-}
-
-function backendRefs(map: CredentialMap): string[] {
-  return map.entries.flatMap((entry) => {
-    const source = entry.source as any;
-    return source.kind === "secret-backend-ref" ? [source.ref] : [];
-  });
-}
-
-function writePlanIds(map: CredentialMap): string[] {
-  return map.entries.flatMap((entry) => {
-    const source = entry.source as any;
-    return source.kind === "generated-secret-write-plan" ? [source.writePlanRef] : [];
-  });
-}
-
-function hostSourceIds(map: CredentialMap): string[] {
-  return map.entries.flatMap((entry) => {
-    const source = entry.source as any;
-    return source.kind === "host-credential-source" ? [source.hostSourceRef] : [];
-  });
-}
-
-function staleDetection(map: CredentialMap, staleFiles: string[]) {
-  const stale = new Set(staleFiles);
-  return map.entries.map((entry) => ({
-    file: entry.file,
-    stale: stale.has(entry.file),
-    evidenceRef: entry.rotation.staleDetectionEvidenceRef,
-  }));
-}
-
-function reloadEvidence(): ReloadEvidence {
+  const [manifest, credentialMap, configText, supabaseProfile, backendEvidence, mountEvidence] =
+    await Promise.all([
+      readJson(path.join(root, "credential-manifest.json")),
+      readJson(path.join(root, "credential-map.json")),
+      fsp.readFile(path.join(root, "config.yaml"), "utf8"),
+      readJson(path.join(root, "supabase-postgres.profile.json")).catch(() => undefined),
+      opts.live && opts.secretBackendEvidence ? readJson(opts.secretBackendEvidence) : undefined,
+      opts.live && opts.hostMountEvidence ? readJson(opts.hostMountEvidence) : undefined,
+    ]);
   return {
-    mode: "fixture-reload-evidence",
-    service: {
-      unit: "deployment-control-plane-service.service",
-      action: "restart-recorded",
-      evidenceRef: "evidence://credential-staging/reload/service",
-    },
-    workers: [1, 2].map((index) => ({
-      unit: `deployment-control-plane-worker-${index}.service`,
-      action: "restart-recorded",
-      evidenceRef: `evidence://credential-staging/reload/worker-${index}`,
-    })),
+    manifest,
+    credentialMap,
+    configText,
+    supabaseProfile,
+    liveBackendWriteEvidence: backendEvidence,
+    liveHostMountEvidence: mountEvidence,
   };
+}
+
+function validateInputs(inputs: Inputs, live: boolean): string[] {
+  const config = parseControlPlaneRuntimeConfig(inputs.configText);
+  return [
+    ...validateCredentialMap(inputs.credentialMap, {
+      requiredFiles: requiredFiles(inputs.manifest),
+      supabaseProjectRef: inputs.supabaseProfile?.provisioning.projectRef,
+      connectionMode: inputs.supabaseProfile?.connection.mode,
+      reviewedSourceMode: config.reviewedSource.mode,
+    }),
+    ...validateLiveInputs({
+      live,
+      backendEvidence: inputs.liveBackendWriteEvidence,
+      hostMountEvidence: inputs.liveHostMountEvidence,
+      credentialMap: inputs.credentialMap,
+      requiredFiles: requiredFiles(inputs.manifest),
+      backendRefs: backendRefs(inputs.credentialMap),
+      writePlanIds: writePlanIds(inputs.credentialMap),
+      hostSourceIds: hostSourceIds(inputs.credentialMap),
+    }),
+  ];
 }
 
 function externalPrerequisites(inputs: Inputs): string[] {
@@ -198,10 +226,6 @@ function nonSecretSemantics(inputs: Inputs): unknown {
       kind: (entry.source as any).kind,
     })),
   };
-}
-
-function requiredFiles(manifest: Manifest): string[] {
-  return [...new Set((manifest.requiredFiles || []).map(String))].sort();
 }
 
 async function readJson(file: string): Promise<any> {

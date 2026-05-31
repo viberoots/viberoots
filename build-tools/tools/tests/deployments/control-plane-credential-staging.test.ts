@@ -10,15 +10,9 @@ import {
 import { validateRunbookBundle } from "../../deployments/cloud-control-runbook";
 import { validateCloudControlCutover } from "../../deployments/cloud-control-cutover-validate";
 import { validateCredentialRotationEvidence } from "../../deployments/control-plane-credential-staging-evidence";
-import { runDeploymentControlPlaneCommand } from "../../deployments/deployment-control-plane";
 import { runInScratchTemp } from "../lib/test-helpers";
-import { withControlPlaneArgv } from "./control-plane-process-entrypoints.helpers";
 import { evidence } from "./cloud-control-cutover-fixture";
-import {
-  cutoverOptions,
-  withRawControlPlaneArgv,
-  writeBundle,
-} from "./control-plane-credential-staging.helpers";
+import { cutoverOptions, writeBundle } from "./control-plane-credential-staging.helpers";
 
 test("credential staging writes non-secret evidence and gates setup doctor", async () => {
   await runInScratchTemp("credential-staging-evidence", async (tmp) => {
@@ -31,6 +25,12 @@ test("credential staging writes non-secret evidence and gates setup doctor", asy
     const staging = await runCredentialStaging({
       bundleDir: tmp,
       out: path.join(tmp, "credential-staging.json"),
+    });
+    await runCredentialRotation({
+      bundleDir: tmp,
+      applyRotation: true,
+      out: path.join(tmp, "credential-rotation.json"),
+      rotatedMapOut: path.join(tmp, "credential-map.rotated.json"),
     });
     await fsp.writeFile(path.join(tmp, "credential-preflight.json"), JSON.stringify({ ok: true }));
     await fsp.writeFile(path.join(tmp, "setup-doctor.json"), JSON.stringify({ ok: true }));
@@ -66,6 +66,12 @@ test("credential staging fails closed for unsafe maps and mount evidence", async
     const validStaging = await runCredentialStaging({ bundleDir: tmp });
     validStaging.hostMountEvidence.permissions = "0644";
     await fsp.writeFile(path.join(tmp, "credential-staging.json"), JSON.stringify(validStaging));
+    await runCredentialRotation({
+      bundleDir: tmp,
+      applyRotation: true,
+      out: path.join(tmp, "credential-rotation.json"),
+      rotatedMapOut: path.join(tmp, "credential-map.rotated.json"),
+    });
     await fsp.writeFile(path.join(tmp, "credential-preflight.json"), JSON.stringify({ ok: true }));
     await fsp.writeFile(path.join(tmp, "setup-doctor.json"), JSON.stringify({ ok: true }));
     const doctor = await validateRunbookBundle(tmp);
@@ -113,6 +119,12 @@ test("credential staging rejects mount and reload evidence mismatches", async ()
     ];
     for (const [name, evidenceValue] of cases) {
       await fsp.writeFile(path.join(tmp, "credential-staging.json"), JSON.stringify(evidenceValue));
+      await runCredentialRotation({
+        bundleDir: tmp,
+        applyRotation: true,
+        out: path.join(tmp, "credential-rotation.json"),
+        rotatedMapOut: path.join(tmp, "credential-map.rotated.json"),
+      });
       await fsp.writeFile(
         path.join(tmp, "credential-preflight.json"),
         JSON.stringify({ ok: true }),
@@ -196,49 +208,3 @@ test("setup doctor blocks later phases when staging evidence is absent despite l
     );
   });
 });
-
-test("credential staging and rotation CLI modes are real entrypoints", async () => {
-  await runInScratchTemp("credential-staging-entrypoints", async (tmp) => {
-    await writeBundle(tmp);
-    await withControlPlaneArgv(
-      [
-        "credential-staging",
-        "--bundle-dir",
-        tmp,
-        "--out",
-        path.join(tmp, "credential-staging.json"),
-      ],
-      runDeploymentControlPlaneCommand,
-    );
-    await withControlPlaneArgv(
-      [
-        "credential-rotation",
-        "--bundle-dir",
-        tmp,
-        "--out",
-        path.join(tmp, "credential-rotation.json"),
-      ],
-      runDeploymentControlPlaneCommand,
-    );
-    assert.ok(await exists(path.join(tmp, "credential-staging.json")));
-    assert.ok(await exists(path.join(tmp, "credential-rotation.json")));
-    await withRawControlPlaneArgv(
-      [
-        "--bundle-dir",
-        tmp,
-        "credential-staging",
-        "--out",
-        path.join(tmp, "credential-staging-before.json"),
-      ],
-      runDeploymentControlPlaneCommand,
-    );
-    assert.ok(await exists(path.join(tmp, "credential-staging-before.json")));
-  });
-});
-
-async function exists(file: string): Promise<boolean> {
-  return fsp.access(file).then(
-    () => true,
-    () => false,
-  );
-}

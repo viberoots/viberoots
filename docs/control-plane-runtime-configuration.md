@@ -278,13 +278,21 @@ Credential rotation evidence is generated separately:
 ```bash
 deployment-control-plane credential-rotation \
   --bundle-dir ./cloud-control-profile \
-  --out ./cloud-control-profile/credential-rotation.json
+  --apply-rotation \
+  --out ./cloud-control-profile/credential-rotation.json \
+  --rotated-map-out ./cloud-control-profile/credential-map.rotated.json
 ```
 
 Rotation evidence must preserve non-secret config semantics and fail closed when active stale
 entries remain. Protected/shared setup and cutover consume fresh `credential-staging.json` tied to
 the current `credential-manifest.json` and `credential-map.json`; optional rotation evidence is
 validated when present.
+
+Live credential backend writes are disabled unless
+`VBR_CONTROL_PLANE_LIVE_CREDENTIAL_STAGING=1` is set and the command receives reviewed non-secret
+`--secret-backend-evidence` and `--host-mount-evidence` files. Those evidence files bind the
+Infisical write-plan ids, backend refs, host credential source ids, filename set, owner, permissions,
+and mount target without storing the secret values locally.
 
 Credential file manifest:
 

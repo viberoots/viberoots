@@ -16,6 +16,12 @@ export function credentialCommands(input: CloudControlSetupInput): RunbookComman
       ["$PROFILE_ROOT/credential-staging.json"],
       "credential staging evidence is fresh and bound to the manifest and map",
     ),
+    credentialCommand(
+      "credential-rotation",
+      `${rootPrelude(input.outDir)}; deployment-control-plane credential-rotation --bundle-dir "$PROFILE_ROOT" --apply-rotation --out "$PROFILE_ROOT/credential-rotation.json" --rotated-map-out "$PROFILE_ROOT/credential-map.rotated.json"`,
+      ["$PROFILE_ROOT/credential-rotation.json", "$PROFILE_ROOT/credential-map.rotated.json"],
+      "credential rotation evidence is available when stale credentials must be replaced",
+    ),
   ];
 }
 

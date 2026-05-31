@@ -4,9 +4,20 @@ export type CutoverOperation = (typeof CUTOVER_OPERATIONS)[number];
 
 export type CutoverEvidence = {
   schemaVersion?: string;
+  operationIdentity?: {
+    operation?: CutoverOperation;
+    sourceHost?: string;
+    checkedAt?: string;
+  };
   hostProfile: string;
   region?: string;
   generatedAt: string;
+  checkedAt?: string;
+  sourceHost?: string;
+  imageDigest?: string;
+  configDigest?: string;
+  expectedImageBuildIdentity?: string;
+  selectedProviderCapabilities?: string[];
   health?: Record<string, unknown>;
   imagePublication?: ControlPlaneImagePublicationEvidence;
   managedDependencies?: ManagedDependencyEvidence;

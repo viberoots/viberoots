@@ -23,6 +23,7 @@ export function validateCredentialStagingEvidence(
   errors.push(...validateNoStale(evidence.staleCredentialDetection, "credential staging"));
   errors.push(...validateReloadEvidence(evidence.reloadEvidence, "credential staging"));
   errors.push(...validateHostMountEvidence(evidence.hostMountEvidence, expected.requiredFiles));
+  errors.push(...validateLiveEvidence(evidence, "credential staging"));
   return errors;
 }
 
@@ -42,8 +43,15 @@ export function validateCredentialRotationEvidence(
   errors.push(...validateNoStale(evidence.staleCredentialDetection, "credential rotation"));
   errors.push(...validateReloadEvidence(evidence.reloadEvidence, "credential rotation"));
   errors.push(...validateHostMountEvidence(evidence.hostMountEvidence, expected.requiredFiles));
+  errors.push(...validateLiveEvidence(evidence, "credential rotation"));
   if (!evidence.nonSecretConfigSemanticsDigest?.startsWith("sha256:")) {
     errors.push("credential rotation non-secret config digest is missing");
+  }
+  if (
+    evidence.rotatedCredentialMapDigest &&
+    !evidence.rotatedCredentialMapDigest.startsWith("sha256:")
+  ) {
+    errors.push("credential rotation rotated map digest is invalid");
   }
   return errors;
 }
@@ -159,6 +167,34 @@ function validateHostMountEvidence(evidence: any, requiredFiles: string[] | unde
   if (evidence?.permissions !== "0400") {
     errors.push("credential host mount permissions must be 0400");
   }
+  if (
+    evidence?.verifiedBy &&
+    evidence.verifiedBy !== "fixture-manifest" &&
+    evidence.verifiedBy !== "live-host-check"
+  ) {
+    errors.push("credential host mount verification mode is unsupported");
+  }
+  if (evidence?.verifiedBy === "live-host-check" && !isEvidenceRef(evidence.evidenceRef)) {
+    errors.push("credential host mount live evidence ref missing");
+  }
+  return errors;
+}
+
+function validateLiveEvidence(evidence: any, label: string): string[] {
+  if (evidence?.mode !== "live-gated-backend-write") return [];
+  const live = evidence.liveBackendWriteEvidence;
+  const errors: string[] = [];
+  if (live?.schemaVersion !== "control-plane-credential-live-backend-write@1") {
+    errors.push(`${label} live backend write evidence missing`);
+  }
+  if (live?.liveGate !== "VBR_CONTROL_PLANE_LIVE_CREDENTIAL_STAGING=1") {
+    errors.push(`${label} live backend write evidence is not tied to the live gate`);
+  }
+  if (live?.backend !== "infisical") errors.push(`${label} live backend must be infisical`);
+  if (live?.noSecretValuesPersisted !== true) {
+    errors.push(`${label} live backend persistence proof missing`);
+  }
+  if (!isEvidenceRef(live?.evidenceRef)) errors.push(`${label} live backend evidence ref missing`);
   return errors;
 }
 

@@ -13,6 +13,8 @@ import { validateManagedDependencyEvidence } from "./control-plane-managed-depen
 import type { ManagedDependencyValidationExpectations } from "./control-plane-managed-dependency-types";
 import { validateSupabaseProfileSource } from "./cloud-control-cutover-supabase";
 import { validateCredentialCutoverEvidence } from "./cloud-control-cutover-credentials";
+import { validateCutoverOperationEvidence } from "./cloud-control-cutover-operation";
+import { validateCutoverEvidenceContract } from "./cloud-control-cutover-contract";
 
 const BASE_HEALTH = [
   "cloudHealth",
@@ -30,6 +32,7 @@ export function validateCloudControlCutover(
   options: CutoverValidationOptions,
 ): CutoverValidationResult {
   const errors = [
+    ...validateCutoverEvidenceContract(evidence, options),
     ...validateIdentity(evidence, options),
     ...validateBaseHealth(evidence),
     ...validateSupabaseProfileSource(evidence, options),
@@ -48,7 +51,7 @@ export function validateCloudControlCutover(
       options.maxAgeMinutes,
     ),
     ...validateAwsCutoverTopology(evidence, options),
-    ...validateOperation(evidence, options.operation),
+    ...validateCutoverOperationEvidence(evidence, options.operation),
     ...validateAudit(evidence, options.operation),
   ];
   return { ok: errors.length === 0, errors, checklist: checklist(options) };
@@ -172,59 +175,6 @@ function validateLatestDeployment(
     errors.push("latest protected/shared staging deployment did not succeed through cloud-primary");
   }
   return errors;
-}
-
-function validateOperation(evidence: CutoverEvidence, operation: string): string[] {
-  if (operation === "restore") return requireFields(evidence.restore, "restore", RESTORE_FIELDS);
-  if (operation === "rollback") {
-    return [
-      ...requireFields(evidence.rollback, "rollback", ROLLBACK_FIELDS),
-      ...validateStandby(evidence),
-    ];
-  }
-  if (operation === "break-glass") {
-    return requireFields(evidence.breakGlass, "break-glass", BREAK_GLASS_FIELDS);
-  }
-  return validateStandby(evidence);
-}
-
-const RESTORE_FIELDS = [
-  "databaseRecords",
-  "artifactObjects",
-  "imageDigest",
-  "config",
-  "exportedConfigDigest",
-  "credentialManifest",
-  "authConfiguration",
-  "durableStateReferences",
-];
-const ROLLBACK_FIELDS = ["trafficReturn", "authoritySemanticsUnchanged"];
-const BREAK_GLASS_FIELDS = [
-  "statusInspect",
-  "pauseWorkers",
-  "auditPreserved",
-  "providerMutationBlocked",
-];
-
-function validateStandby(evidence: CutoverEvidence): string[] {
-  const standby = evidence.standby || {};
-  if (standby.mode && standby.doubleExecutionPrevented) return [];
-  return ["standby evidence must prove mode and double-execution prevention"];
-}
-
-function requireFields(
-  section: Record<string, unknown> | undefined,
-  name: string,
-  fields: string[],
-): string[] {
-  return fields.flatMap((field) =>
-    hasEvidence(section?.[field]) ? [] : [`missing ${name} ${field} evidence`],
-  );
-}
-
-function hasEvidence(value: unknown): boolean {
-  if (Array.isArray(value)) return value.length > 0;
-  return Boolean(value);
 }
 
 function validateAudit(evidence: CutoverEvidence, operation: string): string[] {

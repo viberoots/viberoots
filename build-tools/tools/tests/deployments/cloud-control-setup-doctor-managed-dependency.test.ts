@@ -6,7 +6,10 @@ import { test } from "node:test";
 import { validateRunbookBundle } from "../../deployments/cloud-control-runbook";
 import { renderCloudControlSetupBundle } from "../../deployments/cloud-control-setup-render";
 import type { CloudControlSetupInput } from "../../deployments/cloud-control-setup-types";
-import { runCredentialStaging } from "../../deployments/control-plane-credential-staging";
+import {
+  runCredentialRotation,
+  runCredentialStaging,
+} from "../../deployments/control-plane-credential-staging";
 import { runInScratchTemp } from "../lib/test-helpers";
 import {
   managedDependencyEvidence,
@@ -31,6 +34,12 @@ test("setup doctor refuses stale managed dependency evidence completion", async 
     await runCredentialStaging({
       bundleDir: tmp,
       out: path.join(tmp, "credential-staging.json"),
+    });
+    await runCredentialRotation({
+      bundleDir: tmp,
+      applyRotation: true,
+      out: path.join(tmp, "credential-rotation.json"),
+      rotatedMapOut: path.join(tmp, "credential-map.rotated.json"),
     });
     await writeSupabaseProviderEvidence(tmp);
     const old = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
