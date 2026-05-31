@@ -20,6 +20,7 @@ postgres:
   urlFile: /run/deployment-control-plane/credentials/control-plane-database-url
 artifactStore:
   provider: cloudflare-r2
+  credentialMode: files
   bucket: deploy-artifacts
   region: auto
   endpointFile: /run/deployment-control-plane/credentials/artifact-store-endpoint
@@ -93,6 +94,19 @@ AWS S3 values:
 - Use provider `aws-s3`.
 - Include the selected bucket, AWS region, and either the S3 VPC endpoint id or endpoint policy
   digest in `runtimePath` so object conformance is tied to the reviewed AWS path.
+- For EC2 instance-profile mode, set `credentialMode: aws-instance-profile`, omit access-key files,
+  and include `expectedArtifactIamRoleArn` plus `expectedArtifactLeastPrivilegePolicyDigest` in
+  `runtimePath`. Pass the observed values with `--artifact-iam-role-arn` and
+  `--artifact-least-privilege-policy-digest`. This evidence must prove the reviewed bucket/prefix
+  operations, not only generic bucket reachability.
+
+File-backed artifact credential values:
+
+- Supabase Storage S3, Cloudflare R2, and generic S3-compatible providers must use
+  `credentialMode: files`.
+- File mode requires `endpointFile`, `accessKeyIdFile`, and `secretAccessKeyFile`.
+- Instance-profile mode still requires `endpointFile`, but temporary AWS credentials come only from
+  the reviewed IMDSv2 EC2 path and must not be written to evidence.
 
 Alternate artifact backend values:
 

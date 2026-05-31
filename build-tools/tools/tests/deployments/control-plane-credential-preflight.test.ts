@@ -28,6 +28,26 @@ test("credential preflight accepts exact generated manifest files", async () => 
   });
 });
 
+test("credential preflight accepts AWS instance-profile manifests without static S3 keys", async () => {
+  await runInScratchTemp("credential-preflight-instance-profile", async (tmp) => {
+    await writeFixture(
+      tmp,
+      input({
+        artifactCredentialMode: "aws-instance-profile",
+        artifactIamRoleArn: "arn:aws:iam::123456789012:role/control-plane-artifacts",
+        artifactLeastPrivilegePolicyDigest: "sha256:artifact-policy",
+      }),
+    );
+    const result = await runCredentialPreflight({
+      bundleDir: tmp,
+      credentialDirectory: path.join(tmp, "credentials"),
+      env: {},
+    });
+    assert.equal(result.ok, true);
+    assert.ok(!result.checkedFiles.includes("artifact-store-access-key-id"));
+  });
+});
+
 test("credential preflight rejects missing, empty, URL, env, and stale deployment inputs", async () => {
   await runInScratchTemp("credential-preflight-fail", async (tmp) => {
     await writeFixture(tmp, input());
@@ -82,7 +102,7 @@ function valueFor(file: string): string {
   return `${file}-value\n`;
 }
 
-function input(): CloudControlSetupInput {
+function input(overrides: Partial<CloudControlSetupInput> = {}): CloudControlSetupInput {
   return {
     outDir: "unused",
     mode: "aws-ec2",
@@ -112,6 +132,7 @@ function input(): CloudControlSetupInput {
     workerReplicas: 2,
     dryRun: false,
     awsTopology: topologyForImage(),
+    ...overrides,
   };
 }
 

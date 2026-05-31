@@ -4,6 +4,12 @@ import type {
   ControlPlaneArtifactStore,
   ControlPlaneArtifactStoreConfig,
 } from "./control-plane-artifact-store-types";
+import type { AwsTemporaryCredentials } from "./control-plane-aws-imds-credentials";
+
+type AwsSigningCredentials = Omit<AwsTemporaryCredentials, "sessionToken" | "roleName"> & {
+  sessionToken?: string;
+  roleName?: string;
+};
 
 function sha256Hex(value: string | Buffer): string {
   return crypto.createHash("sha256").update(value).digest("hex");
@@ -38,7 +44,7 @@ function objectUrl(config: ControlPlaneArtifactStoreConfig, key: string): URL {
   return endpoint;
 }
 
-function signingHeaders(opts: {
+async function signingHeaders(opts: {
   method: string;
   url: URL;
   config: ControlPlaneArtifactStoreConfig;
@@ -46,6 +52,7 @@ function signingHeaders(opts: {
   contentType?: string;
   metadata?: Record<string, string>;
 }) {
+  const credentials = await signingCredentials(opts.config);
   const now = new Date();
   const amzDate = now.toISOString().replace(/[:-]|\.\d{3}/g, "");
   const date = amzDate.slice(0, 8);
@@ -56,6 +63,7 @@ function signingHeaders(opts: {
     "x-amz-date": amzDate,
     ...(opts.contentType ? { "content-type": opts.contentType } : {}),
   };
+  if (credentials.sessionToken) headers["x-amz-security-token"] = credentials.sessionToken;
   for (const [key, value] of Object.entries(opts.metadata || {})) {
     headers[`x-amz-meta-${key.toLowerCase()}`] = value;
   }
@@ -72,15 +80,35 @@ function signingHeaders(opts: {
   const scope = `${date}/${opts.config.region}/s3/aws4_request`;
   const stringToSign = ["AWS4-HMAC-SHA256", amzDate, scope, sha256Hex(canonicalRequest)].join("\n");
   const signingKey = hmac(
-    hmac(hmac(hmac(`AWS4${opts.config.secretAccessKey}`, date), opts.config.region), "s3"),
+    hmac(hmac(hmac(`AWS4${credentials.secretAccessKey}`, date), opts.config.region), "s3"),
     "aws4_request",
   );
   const signature = crypto.createHmac("sha256", signingKey).update(stringToSign).digest("hex");
   return {
     ...headers,
-    authorization: `AWS4-HMAC-SHA256 Credential=${opts.config.accessKeyId}/${scope}, SignedHeaders=${signedHeaderNames.join(
+    authorization: `AWS4-HMAC-SHA256 Credential=${credentials.accessKeyId}/${scope}, SignedHeaders=${signedHeaderNames.join(
       ";",
     )}, Signature=${signature}`,
+  };
+}
+
+async function signingCredentials(
+  config: ControlPlaneArtifactStoreConfig,
+): Promise<AwsSigningCredentials> {
+  if (config.credentialMode === "aws-instance-profile") {
+    if (!config.credentialProvider) {
+      throw new Error("aws-instance-profile artifact store requires IMDSv2 credentials");
+    }
+    return config.credentialProvider();
+  }
+  if (!config.accessKeyId || !config.secretAccessKey) {
+    throw new Error("file-backed artifact store requires access key credentials");
+  }
+  return {
+    accessKeyId: config.accessKeyId,
+    secretAccessKey: config.secretAccessKey,
+    expiration: new Date(Date.now() + 60_000),
+    ...(config.sessionToken ? { sessionToken: config.sessionToken } : {}),
   };
 }
 
@@ -109,7 +137,7 @@ export function createS3CompatibleArtifactStore(
     bucket: config.bucket,
     putObject: async (input) => {
       const url = objectUrl(config, input.key);
-      const headers = signingHeaders({
+      const headers = await signingHeaders({
         method: "PUT",
         url,
         config,
@@ -125,7 +153,7 @@ export function createS3CompatibleArtifactStore(
     },
     getObject: async (input) => {
       const url = objectUrl(config, input.key);
-      const headers = signingHeaders({ method: "GET", url, config });
+      const headers = await signingHeaders({ method: "GET", url, config });
       const response = await assertOk(
         await fetch(url, { method: "GET", headers }),
         "get",
@@ -135,7 +163,7 @@ export function createS3CompatibleArtifactStore(
     },
     getObjectMetadata: async (input) => {
       const url = objectUrl(config, input.key);
-      const headers = signingHeaders({ method: "HEAD", url, config });
+      const headers = await signingHeaders({ method: "HEAD", url, config });
       const response = await assertOk(
         await fetch(url, { method: "HEAD", headers }),
         "head",

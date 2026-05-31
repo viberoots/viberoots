@@ -1,4 +1,5 @@
 import type { CloudControlSetupInput } from "./cloud-control-setup-types";
+import type { ArtifactCredentialMode } from "./control-plane-artifact-credential-mode";
 
 export function setupAwsTopology(input: CloudControlSetupInput) {
   return input.mode === "aws-ec2" ? input.awsTopology : undefined;
@@ -35,4 +36,8 @@ export function setupAwsTlsEvidenceRef(input: CloudControlSetupInput): string {
 export function setupArtifactBackendEvidenceRef(input: CloudControlSetupInput): string {
   const evidence = setupAwsTopology(input)?.artifactBackendEvidence;
   return evidence ? `${evidence.reviewedReference} ${evidence.digest}`.trim() : "";
+}
+
+export function setupArtifactCredentialMode(input: CloudControlSetupInput): ArtifactCredentialMode {
+  return input.artifactCredentialMode || "files";
 }

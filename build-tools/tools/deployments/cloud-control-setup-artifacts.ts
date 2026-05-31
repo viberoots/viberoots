@@ -2,6 +2,7 @@ import YAML from "yaml";
 import type { CloudControlSetupInput } from "./cloud-control-setup-types";
 import {
   setupArtifactBackendEvidenceRef,
+  setupArtifactCredentialMode,
   setupAwsTopology,
   setupAwsSecurityGroupIds,
   setupAwsSubnetIds,
@@ -70,11 +71,16 @@ export function renderManagedDependencyProfile(input: CloudControlSetupInput): s
     },
     artifactStore: {
       provider: artifactProvider(input),
+      credentialMode: setupArtifactCredentialMode(input),
       bucket: input.artifactBucket,
       region: input.artifactRegion,
       endpointFile: cred("artifact-store-endpoint"),
-      accessKeyIdFile: cred("artifact-store-access-key-id"),
-      secretAccessKeyFile: cred("artifact-store-secret-access-key"),
+      ...(setupArtifactCredentialMode(input) === "files"
+        ? {
+            accessKeyIdFile: cred("artifact-store-access-key-id"),
+            secretAccessKeyFile: cred("artifact-store-secret-access-key"),
+          }
+        : {}),
       keyPrefix: `${input.instanceId}/conformance`,
     },
   });
@@ -96,6 +102,7 @@ export function renderManagedDependencies(input: CloudControlSetupInput): string
       },
       artifactStore: {
         backend: input.artifactBackend,
+        credentialMode: setupArtifactCredentialMode(input),
         bucket: input.artifactBucket,
         region: input.artifactRegion,
         endpointCredentialFile: "/run/deployment-control-plane/credentials/artifact-store-endpoint",
@@ -108,6 +115,8 @@ export function renderManagedDependencies(input: CloudControlSetupInput): string
             ? setupArtifactBackendEvidenceRef(input)
             : undefined,
         requiredEvidence: ["PUT/GET/HEAD conformance", "digest verification", "temporary prefix"],
+        iamRoleArn: input.artifactIamRoleArn,
+        leastPrivilegePolicyDigest: input.artifactLeastPrivilegePolicyDigest,
       },
     },
     null,
@@ -181,6 +190,8 @@ function runtimePath(input: CloudControlSetupInput) {
     expectedPrivateLinkResourceId: privatelink?.resourceConfigurationArn,
     expectedS3VpcEndpointId: topology?.s3VpcEndpoint?.endpointId,
     expectedS3EndpointPolicyDigest: topology?.s3VpcEndpoint?.endpointPolicyDigest,
+    expectedArtifactIamRoleArn: input.artifactIamRoleArn,
+    expectedArtifactLeastPrivilegePolicyDigest: input.artifactLeastPrivilegePolicyDigest,
     expectedAlternateBackendEvidenceRef: topology?.artifactBackendEvidence?.reviewedReference,
     expectedAlternateBackendEvidenceDigest: topology?.artifactBackendEvidence?.digest,
   };

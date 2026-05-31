@@ -10,6 +10,7 @@ import {
 } from "./control-plane-artifact-store";
 import { loadControlPlaneRuntimeConfig } from "./control-plane-runtime-config";
 import type { ControlPlaneRuntimeConfig } from "./control-plane-runtime-config-types";
+import type { AwsCredentialProvider } from "./control-plane-aws-imds-credentials";
 import { createControlPlaneCredentialDirectory } from "./control-plane-credentials";
 import type { ControlPlaneProcessLogger } from "./control-plane-process-logging";
 import { startNixosSharedHostControlPlaneWorkerLoop } from "./nixos-shared-host-control-plane-worker-loop";
@@ -21,8 +22,11 @@ export async function startControlPlaneWorkerFromRuntimeConfig(opts: {
   workerId?: string;
   logger?: ControlPlaneProcessLogger;
   correlationId?: string;
+  artifactCredentialProvider?: AwsCredentialProvider;
 }) {
-  const objectStore = await artifactStoreFromRuntimeConfig(opts.runtimeConfig);
+  const objectStore = await artifactStoreFromRuntimeConfig(opts.runtimeConfig, {
+    credentialProvider: opts.artifactCredentialProvider,
+  });
   const credentialDirectory = createControlPlaneCredentialDirectory(opts.runtimeConfig, {
     repoRoot: opts.workspaceRoot,
   });

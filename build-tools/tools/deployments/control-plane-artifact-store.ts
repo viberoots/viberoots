@@ -5,6 +5,10 @@ import path from "node:path";
 import { sanitizeName } from "../lib/sanitize";
 import { materializeStaticWebappArtifactBundle } from "./static-webapp-artifact-bundle";
 import { createS3CompatibleArtifactStore } from "./control-plane-artifact-store-http";
+import {
+  createImdsV2CredentialProvider,
+  type AwsCredentialProvider,
+} from "./control-plane-aws-imds-credentials";
 import type { ControlPlaneRuntimeConfig } from "./control-plane-runtime-config-types";
 import type {
   ControlPlaneArtifactObject,
@@ -92,15 +96,25 @@ async function objectAlreadyMatches(opts: {
   }
 }
 
-export async function artifactStoreFromRuntimeConfig(config: ControlPlaneRuntimeConfig) {
+export async function artifactStoreFromRuntimeConfig(
+  config: ControlPlaneRuntimeConfig,
+  opts: { credentialProvider?: AwsCredentialProvider } = {},
+) {
   const store = config.storage.artifactStore;
   const readSecret = async (filePath: string) => (await fsp.readFile(filePath, "utf8")).trim();
+  const endpoint = await readSecret(store.endpointFile);
   return createS3CompatibleArtifactStore({
-    endpoint: await readSecret(store.endpointFile),
+    provider: store.provider,
+    credentialMode: store.credentialMode,
+    endpoint,
     bucket: store.bucket,
     region: store.region,
-    accessKeyId: await readSecret(store.accessKeyIdFile),
-    secretAccessKey: await readSecret(store.secretAccessKeyFile),
+    ...(store.credentialMode === "aws-instance-profile"
+      ? { credentialProvider: opts.credentialProvider || createImdsV2CredentialProvider() }
+      : {
+          accessKeyId: await readSecret(store.accessKeyIdFile!),
+          secretAccessKey: await readSecret(store.secretAccessKeyFile!),
+        }),
   });
 }
 

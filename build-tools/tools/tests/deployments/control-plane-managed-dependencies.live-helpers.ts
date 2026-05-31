@@ -38,6 +38,7 @@ export function liveArtifactProfile(
     postgres: { provider: "postgres-compatible", urlFile: "/dev/null" },
     artifactStore: {
       provider,
+      credentialMode: "files",
       bucket: env[`${opts.envPrefix}_BUCKET`],
       region: env[`${opts.envPrefix}_REGION`],
       endpointFile: env[`${opts.envPrefix}_ENDPOINT_FILE`],
@@ -51,6 +52,7 @@ export function liveArtifactProfile(
 export function livePlaceholderArtifactStore(): ControlPlaneManagedDependencyProfile["artifactStore"] {
   return {
     provider: "s3-compatible",
+    credentialMode: "files",
     bucket: "unused",
     region: "unused",
     endpointFile: "/dev/null",

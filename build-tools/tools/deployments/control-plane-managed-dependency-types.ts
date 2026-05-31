@@ -23,6 +23,8 @@ export type ManagedRuntimePathFacts = {
   privatelinkResourceId?: string;
   s3VpcEndpointId?: string;
   s3EndpointPolicyDigest?: string;
+  expectedArtifactIamRoleArn?: string;
+  expectedArtifactLeastPrivilegePolicyDigest?: string;
   alternateBackendEvidenceRef?: string;
   alternateBackendEvidenceDigest?: string;
 };
@@ -37,6 +39,8 @@ export type ManagedDependencyValidationExpectations = {
   expectedPrivateLinkResourceId?: string;
   expectedS3VpcEndpointId?: string;
   expectedS3EndpointPolicyDigest?: string;
+  expectedArtifactIamRoleArn?: string;
+  expectedArtifactLeastPrivilegePolicyDigest?: string;
   expectedAlternateBackendEvidenceRef?: string;
   expectedAlternateBackendEvidenceDigest?: string;
 };
@@ -48,11 +52,12 @@ export type ManagedPostgresProfile = {
 
 export type ManagedArtifactStoreProfile = {
   provider: ManagedArtifactStoreProvider;
+  credentialMode: "files" | "aws-instance-profile";
   bucket: string;
   region: string;
   endpointFile: string;
-  accessKeyIdFile: string;
-  secretAccessKeyFile: string;
+  accessKeyIdFile?: string;
+  secretAccessKeyFile?: string;
   keyPrefix?: string;
 };
 
@@ -66,6 +71,8 @@ export type ManagedRuntimePathExpectations = {
   expectedPrivateLinkResourceId?: string;
   expectedS3VpcEndpointId?: string;
   expectedS3EndpointPolicyDigest?: string;
+  expectedArtifactIamRoleArn?: string;
+  expectedArtifactLeastPrivilegePolicyDigest?: string;
   expectedAlternateBackendEvidenceRef?: string;
   expectedAlternateBackendEvidenceDigest?: string;
   nonCutoverDiagnostic?: boolean;
@@ -92,6 +99,8 @@ export type ManagedRuntimePathEvidence = {
   privatelinkResourceId?: string;
   s3VpcEndpointId?: string;
   s3EndpointPolicyDigest?: string;
+  artifactIamRoleArn?: string;
+  artifactLeastPrivilegePolicyDigest?: string;
   alternateBackendEvidenceRef?: string;
   alternateBackendEvidenceDigest?: string;
 };
@@ -126,6 +135,10 @@ export type ManagedDependencyEvidence = {
     sourceHostKind?: ManagedRuntimeSourceHostKind;
     s3VpcEndpointId?: string;
     s3EndpointPolicyDigest?: string;
+    artifactCredentialMode?: "files" | "aws-instance-profile";
+    expectedArtifactIamRoleArn?: string;
+    observedArtifactIamRoleName?: string;
+    artifactLeastPrivilegePolicyDigest?: string;
     alternateBackendEvidenceRef?: string;
     alternateBackendEvidenceDigest?: string;
     checkedOperations: string[];

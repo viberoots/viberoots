@@ -5,6 +5,11 @@ import path from "node:path";
 import pg from "pg";
 import { putVerifiedArtifactObject } from "./control-plane-artifact-store";
 import { createS3CompatibleArtifactStore } from "./control-plane-artifact-store-http";
+import {
+  createImdsV2CredentialProvider,
+  observeAwsCredentialRole,
+  type AwsCredentialProvider,
+} from "./control-plane-aws-imds-credentials";
 import { readManagedDependencyCredential } from "./control-plane-managed-dependency-profiles";
 import {
   runtimePathEvidence,
@@ -147,19 +152,30 @@ export async function validateManagedPostgresProfile(
 export async function validateManagedArtifactStoreProfile(
   profile: ControlPlaneManagedDependencyProfile,
   runtimeFacts: ManagedRuntimePathFacts = {},
+  opts: { credentialProvider?: AwsCredentialProvider } = {},
 ) {
   const artifactStore = profile.artifactStore;
-  const [endpoint, accessKeyId, secretAccessKey] = await Promise.all([
-    readManagedDependencyCredential(artifactStore.endpointFile),
-    readManagedDependencyCredential(artifactStore.accessKeyIdFile),
-    readManagedDependencyCredential(artifactStore.secretAccessKeyFile),
-  ]);
+  const endpoint = await readManagedDependencyCredential(artifactStore.endpointFile);
+  const fileCredentials =
+    artifactStore.credentialMode === "files"
+      ? await artifactStoreFileCredentials(artifactStore)
+      : {};
+  let observedArtifactIamRoleName: string | undefined;
+  const provider = opts.credentialProvider || createImdsV2CredentialProvider();
   const store = createS3CompatibleArtifactStore({
+    provider: artifactStore.provider,
+    credentialMode: artifactStore.credentialMode,
     endpoint,
     bucket: artifactStore.bucket,
     region: artifactStore.region,
-    accessKeyId,
-    secretAccessKey,
+    ...fileCredentials,
+    ...(artifactStore.credentialMode === "aws-instance-profile"
+      ? {
+          credentialProvider: observeAwsCredentialRole(provider, (identity) => {
+            observedArtifactIamRoleName = identity.roleName;
+          }),
+        }
+      : {}),
     keyPrefix: artifactStore.keyPrefix,
   });
   const object = await putVerifiedArtifactObject({
@@ -182,6 +198,10 @@ export async function validateManagedArtifactStoreProfile(
     sourceHostKind: runtimeFacts.sourceHostKind,
     s3VpcEndpointId: runtimeFacts.s3VpcEndpointId,
     s3EndpointPolicyDigest: runtimeFacts.s3EndpointPolicyDigest,
+    artifactCredentialMode: artifactStore.credentialMode,
+    expectedArtifactIamRoleArn: runtimeFacts.artifactIamRoleArn,
+    observedArtifactIamRoleName,
+    artifactLeastPrivilegePolicyDigest: runtimeFacts.artifactLeastPrivilegePolicyDigest,
     alternateBackendEvidenceRef: runtimeFacts.alternateBackendEvidenceRef,
     alternateBackendEvidenceDigest: runtimeFacts.alternateBackendEvidenceDigest,
     checkedOperations: ["PUT", "GET", "HEAD", "metadata", "content-type", "digest"],
@@ -204,9 +224,24 @@ function expectationsFromProfile(
     expectedPrivateLinkResourceId: runtime.expectedPrivateLinkResourceId,
     expectedS3VpcEndpointId: runtime.expectedS3VpcEndpointId,
     expectedS3EndpointPolicyDigest: runtime.expectedS3EndpointPolicyDigest,
+    expectedArtifactIamRoleArn: runtime.expectedArtifactIamRoleArn,
+    expectedArtifactLeastPrivilegePolicyDigest: runtime.expectedArtifactLeastPrivilegePolicyDigest,
     expectedAlternateBackendEvidenceRef: runtime.expectedAlternateBackendEvidenceRef,
     expectedAlternateBackendEvidenceDigest: runtime.expectedAlternateBackendEvidenceDigest,
   };
+}
+
+async function artifactStoreFileCredentials(
+  artifactStore: ControlPlaneManagedDependencyProfile["artifactStore"],
+) {
+  if (!artifactStore.accessKeyIdFile || !artifactStore.secretAccessKeyFile) {
+    throw new Error("file-backed managed artifact store requires access key credential files");
+  }
+  const [accessKeyId, secretAccessKey] = await Promise.all([
+    readManagedDependencyCredential(artifactStore.accessKeyIdFile),
+    readManagedDependencyCredential(artifactStore.secretAccessKeyFile),
+  ]);
+  return { accessKeyId, secretAccessKey };
 }
 
 async function writeEvidence(filePath: string, evidence: ManagedDependencyEvidence): Promise<void> {

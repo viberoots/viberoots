@@ -103,6 +103,12 @@ export type AwsFoundationNetworkProfile = {
 export type AwsFoundationIamProfile = {
   roles: Record<"ec2Host" | "s3ArtifactAccess" | "evidenceCollector" | "providerHook", string>;
   instanceProfileTrustDigest: string;
+  instanceProfiles?: {
+    arn: string;
+    roleArn: string;
+    trustDigest: string;
+    policyDigests: string[];
+  }[];
   policies: { name: string; digest: string; leastPrivilege: boolean; actions: string[] }[];
 };
 

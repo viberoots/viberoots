@@ -237,23 +237,26 @@ unreadable, empty, or filename-mismatched files fail before the service or worke
 
 Credential file manifest:
 
-| Purpose                            | Required filename                        |
-| ---------------------------------- | ---------------------------------------- |
-| Database URL                       | `control-plane-database-url`             |
-| Service bearer token               | `control-plane-token`                    |
-| Artifact-store endpoint            | `artifact-store-endpoint`                |
-| Artifact-store access key id       | `artifact-store-access-key-id`           |
-| Artifact-store secret access key   | `artifact-store-secret-access-key`       |
-| Reviewed-source SSH key            | `reviewed-source-ssh-key`                |
-| Reviewed-source known hosts        | `reviewed-source-known-hosts`            |
-| Deployment Infisical client id     | `{deploymentId}-infisical-client-id`     |
-| Deployment Infisical client secret | `{deploymentId}-infisical-client-secret` |
+| Purpose                            | Required filename                                  |
+| ---------------------------------- | -------------------------------------------------- |
+| Database URL                       | `control-plane-database-url`                       |
+| Service bearer token               | `control-plane-token`                              |
+| Artifact-store endpoint            | `artifact-store-endpoint`                          |
+| Artifact-store access key id       | `artifact-store-access-key-id` in `files` mode     |
+| Artifact-store secret access key   | `artifact-store-secret-access-key` in `files` mode |
+| Reviewed-source SSH key            | `reviewed-source-ssh-key`                          |
+| Reviewed-source known hosts        | `reviewed-source-known-hosts`                      |
+| Deployment Infisical client id     | `{deploymentId}-infisical-client-id`               |
+| Deployment Infisical client secret | `{deploymentId}-infisical-client-secret`           |
 
 ## Artifact Store Contract
 
-`storage.artifactStore` points at an S3-compatible bucket. The endpoint, access key id, and secret
-access key are file-backed credentials resolved through `credentials.directory`; the config may name
-the bucket and region, but it does not embed secret values.
+`storage.artifactStore` points at an S3-compatible bucket and declares `provider` plus
+`credentialMode`. `files` mode uses the endpoint, access key id, and secret access key files under
+`credentials.directory`. `aws-instance-profile` mode is valid only for provider `aws-s3` on EC2:
+the endpoint file remains non-secret runtime input, while access keys come from the reviewed IMDSv2
+instance-profile path and are never written to config, evidence, records, or logs. Supabase Storage
+S3, Cloudflare R2, and generic S3-compatible backends must use `files` mode.
 
 Artifact-store credentials should be scoped to the configured bucket and the control-plane artifact
 key prefix used by this instance. Normal operation needs object writes, direct object reads, and
@@ -294,8 +297,9 @@ Shared POSIX filesystems must not be used as the production artifact authority.
 
 Long-running service and worker processes read credentials from configured files. Production startup
 fails closed when database URLs, service tokens, reviewed-source tokens, artifact-store keys,
-Infisical credentials, Vault credentials, AWS/MinIO keys, or provider tokens are present in ambient
-environment variables. Local fixture mode may opt out explicitly for tests.
+Infisical credentials, Vault credentials, AWS/MinIO keys, AWS profile/default-chain inputs, or
+provider tokens are present in ambient environment variables. Local fixture mode may opt out
+explicitly for tests.
 
 Child process environments are scrubbed of database URLs, service tokens, ambient
 Vault/Infisical/provider tokens, and Kubernetes/AWS secrets by default. Provider operations may add

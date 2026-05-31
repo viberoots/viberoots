@@ -5,6 +5,7 @@ import { parseControlPlaneRuntimeConfig } from "./control-plane-runtime-config";
 import { CONTROL_PLANE_PRODUCTION_CREDENTIAL_ENV_NAMES } from "./control-plane-runtime-config-validation";
 import { reviewedSourceCredentialFiles } from "./control-plane-runtime-reviewed-source-validation";
 import type { ControlPlaneRuntimeConfig } from "./control-plane-runtime-config-types";
+import { artifactCredentialFiles } from "./control-plane-artifact-credential-mode";
 
 type PreflightOptions = {
   bundleDir: string;
@@ -101,9 +102,7 @@ function expectedFiles(config: ControlPlaneRuntimeConfig): string[] {
   return [
     path.basename(config.database.urlFile),
     path.basename(config.service.tokenFile),
-    path.basename(config.storage.artifactStore.endpointFile),
-    path.basename(config.storage.artifactStore.accessKeyIdFile),
-    path.basename(config.storage.artifactStore.secretAccessKeyFile),
+    ...artifactCredentialFiles(config.storage.artifactStore.credentialMode),
     ...reviewedSourceCredentialFiles(config).map(([, file]) => path.basename(file)),
     ...config.credentials.infisicalDeployments.flatMap((entry) => [
       entry.clientIdFileName || `${entry.deploymentId}-infisical-client-id`,

@@ -21,6 +21,8 @@ import { renderCommands } from "./cloud-control-runbook";
 import { modeFiles } from "./cloud-control-setup-profiles";
 import { assertCloudControlSetupInput } from "./cloud-control-setup-validate";
 import { verifiedControlPlaneImageDigestContract } from "./control-plane-image-publication";
+import { artifactCredentialFiles } from "./control-plane-artifact-credential-mode";
+import { setupArtifactCredentialMode } from "./cloud-control-setup-aws-topology";
 
 export type CloudControlSetupBundle = {
   files: Record<string, string>;
@@ -73,11 +75,17 @@ function renderRuntimeConfig(input: CloudControlSetupInput): string {
       runtimeRoot: "/var/lib/deployment-control-plane/runtime",
       artifactStore: {
         kind: "s3-compatible",
+        provider: input.artifactBackend,
+        credentialMode: setupArtifactCredentialMode(input),
         bucket: input.artifactBucket,
         region: input.artifactRegion,
         endpointFile: cred("artifact-store-endpoint"),
-        accessKeyIdFile: cred("artifact-store-access-key-id"),
-        secretAccessKeyFile: cred("artifact-store-secret-access-key"),
+        ...(setupArtifactCredentialMode(input) === "files"
+          ? {
+              accessKeyIdFile: cred("artifact-store-access-key-id"),
+              secretAccessKeyFile: cred("artifact-store-secret-access-key"),
+            }
+          : {}),
       },
     },
     database: { urlFile: cred("control-plane-database-url") },
@@ -119,7 +127,7 @@ function renderCredentialManifest(input: CloudControlSetupInput): string {
       reviewedSourceMode: input.reviewedSourceMode,
       deploymentIds: input.deploymentIds,
       requiredFiles: [
-        ...CREDENTIAL_FILENAMES,
+        ...credentialFiles(input),
         ...input.deploymentIds.flatMap((deploymentId) =>
           INFISICAL_FILENAMES.map((name) => name.replace("{deploymentId}", deploymentId)),
         ),
@@ -136,6 +144,13 @@ function renderCredentialManifest(input: CloudControlSetupInput): string {
     null,
     2,
   )}\n`;
+}
+
+function credentialFiles(input: CloudControlSetupInput): string[] {
+  const artifact = new Set(artifactCredentialFiles(setupArtifactCredentialMode(input)));
+  return CREDENTIAL_FILENAMES.filter(
+    (name) => !name.startsWith("artifact-store-") || artifact.has(name),
+  );
 }
 
 function renderReadme(input: CloudControlSetupInput): string {

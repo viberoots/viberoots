@@ -29,12 +29,15 @@ in
     runtimeRoot = defaults.runtimeRoot;
     artifactStore = {
       kind = cfg.artifactStore.kind;
+      provider = cfg.artifactStore.provider;
+      credentialMode = cfg.artifactStore.credentialMode;
       bucket = cfg.artifactStore.bucket;
       region = cfg.artifactStore.region;
       endpointFile = credentialFile cfg.artifactStore.endpointCredential;
+    } // (if cfg.artifactStore.credentialMode == "files" then {
       accessKeyIdFile = credentialFile cfg.artifactStore.accessKeyIdCredential;
       secretAccessKeyFile = credentialFile cfg.artifactStore.secretAccessKeyCredential;
-    };
+    } else { });
   };
   database.urlFile = credentialFile cfg.databaseUrlCredential;
   credentials = {

@@ -19,7 +19,11 @@ async function withFakeS3(fn: (endpoint: string, authHeaders: string[]) => Promi
     { body: Buffer; contentType: string; metadata: Record<string, string> }
   >();
   const server = http.createServer(async (req, res) => {
-    authHeaders.push(String(req.headers.authorization || ""));
+    authHeaders.push(
+      `${String(req.headers.authorization || "")} token=${String(
+        req.headers["x-amz-security-token"] || "",
+      )}`,
+    );
     const key = decodeURIComponent(new URL(req.url || "/", "http://localhost").pathname);
     if (req.method === "PUT") {
       const chunks: Buffer[] = [];
@@ -84,6 +88,8 @@ function runtimeConfigForTest(tmp: string, credentials: string, endpointFile: st
       runtimeRoot: path.join(tmp, "runtime"),
       artifactStore: {
         kind: "s3-compatible" as const,
+        provider: "s3-compatible" as const,
+        credentialMode: "files" as const,
         bucket: "deploy-artifacts",
         region: "us-test-1",
         endpointFile,
@@ -131,6 +137,7 @@ test("artifact-store credentials are read from runtime files and errors stay red
         payloadKind: "artifact",
       });
       assert.match(authHeaders.join("\n"), /Credential=file-access-key\//);
+      assert.doesNotMatch(authHeaders.join("\n"), /token=\S/);
       await fsp.writeFile(path.join(credentials, "bad-endpoint"), "http://127.0.0.1:1", "utf8");
       const unavailable = await artifactStoreFromRuntimeConfig(
         runtimeConfigForTest(tmp, credentials, path.join(credentials, "bad-endpoint")),
@@ -150,6 +157,32 @@ test("artifact-store credentials are read from runtime files and errors stay red
   });
 });
 
+test("artifact-store signing includes temporary session tokens", async () => {
+  await withFakeS3(async (endpoint, authHeaders) => {
+    const store = createS3CompatibleArtifactStore({
+      provider: "aws-s3",
+      credentialMode: "aws-instance-profile",
+      endpoint,
+      bucket: "deploy-artifacts",
+      region: "us-test-1",
+      credentialProvider: async () => ({
+        accessKeyId: "ASIASESSIONKEY",
+        secretAccessKey: "session-secret-key",
+        sessionToken: "session-token-value",
+        expiration: new Date(Date.now() + 60_000),
+        roleName: "control-plane-role",
+      }),
+    });
+    await putVerifiedArtifactObject({
+      store,
+      body: Buffer.from("from instance profile"),
+      payloadKind: "artifact",
+    });
+    assert.match(authHeaders.join("\n"), /Credential=ASIASESSIONKEY\//);
+    assert.match(authHeaders.join("\n"), /token=session-token-value/);
+  });
+});
+
 test(
   "live-gated S3-compatible artifact store conformance uses a temporary object prefix",
   {
@@ -162,6 +195,8 @@ test(
   },
   async () => {
     const store = createS3CompatibleArtifactStore({
+      provider: "s3-compatible",
+      credentialMode: "files",
       endpoint: process.env.VBR_ARTIFACT_STORE_LIVE_ENDPOINT!,
       bucket: process.env.VBR_ARTIFACT_STORE_LIVE_BUCKET!,
       region: process.env.VBR_ARTIFACT_STORE_LIVE_REGION!,

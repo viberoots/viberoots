@@ -12,6 +12,10 @@ import {
   validateBasePath,
 } from "./control-plane-runtime-config-paths";
 import {
+  normalizeRuntimeArtifactStore,
+  resolveRuntimeArtifactStorePaths,
+} from "./control-plane-runtime-artifact-store-config";
+import {
   normalizeRuntimeReviewedSource,
   resolveRuntimeReviewedSource,
 } from "./control-plane-runtime-reviewed-source";
@@ -80,19 +84,7 @@ export function parseControlPlaneRuntimeConfig(
     storage: {
       ...config.storage,
       artifactStore: {
-        ...config.storage.artifactStore,
-        endpointFile: assertCredentialDirectoryPath(
-          config.storage.artifactStore.endpointFile,
-          policy,
-        ),
-        accessKeyIdFile: assertCredentialDirectoryPath(
-          config.storage.artifactStore.accessKeyIdFile,
-          policy,
-        ),
-        secretAccessKeyFile: assertCredentialDirectoryPath(
-          config.storage.artifactStore.secretAccessKeyFile,
-          policy,
-        ),
+        ...resolveRuntimeArtifactStorePaths(config.storage.artifactStore, policy),
       },
     },
     reviewedSource: resolveRuntimeReviewedSource(config.reviewedSource, policy),
@@ -142,22 +134,7 @@ function withDefaults(
         "storage.runtimeRoot",
       ),
       artifactStore: {
-        kind: enumValue(
-          artifactStore.kind ?? "s3-compatible",
-          ["s3-compatible"],
-          "storage.artifactStore.kind",
-        ),
-        bucket: stringValue(artifactStore.bucket, "storage.artifactStore.bucket"),
-        region: stringValue(artifactStore.region ?? "auto", "storage.artifactStore.region"),
-        endpointFile: stringValue(artifactStore.endpointFile, "storage.artifactStore.endpointFile"),
-        accessKeyIdFile: stringValue(
-          artifactStore.accessKeyIdFile,
-          "storage.artifactStore.accessKeyIdFile",
-        ),
-        secretAccessKeyFile: stringValue(
-          artifactStore.secretAccessKeyFile,
-          "storage.artifactStore.secretAccessKeyFile",
-        ),
+        ...normalizeRuntimeArtifactStore(artifactStore),
       },
     },
     database: { urlFile: stringValue(database.urlFile, "database.urlFile") },

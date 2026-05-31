@@ -22,6 +22,8 @@ export function managedRuntimeFlags(input: CloudControlSetupInput): string {
     flag("privatelink-resource-id", values.privatelinkResourceId),
     flag("s3-vpc-endpoint-id", values.s3VpcEndpointId),
     flag("s3-endpoint-policy-digest", values.s3EndpointPolicyDigest),
+    flag("artifact-iam-role-arn", values.artifactIamRoleArn),
+    flag("artifact-least-privilege-policy-digest", values.artifactLeastPrivilegePolicyDigest),
     flag("alternate-backend-evidence-ref", values.alternateBackendEvidenceRef),
     flag("alternate-backend-evidence-digest", values.alternateBackendEvidenceDigest),
   ]
@@ -40,6 +42,8 @@ function managedRuntimeValues(input: CloudControlSetupInput) {
     supabaseRegion: privatelink?.supabaseRegion,
     s3VpcEndpointId: topology?.s3VpcEndpoint?.endpointId,
     s3EndpointPolicyDigest: topology?.s3VpcEndpoint?.endpointPolicyDigest,
+    artifactIamRoleArn: input.artifactIamRoleArn,
+    artifactLeastPrivilegePolicyDigest: input.artifactLeastPrivilegePolicyDigest,
     alternateBackendEvidenceRef: topology?.artifactBackendEvidence?.reviewedReference,
     alternateBackendEvidenceDigest: topology?.artifactBackendEvidence?.digest,
   };

@@ -31,10 +31,17 @@ export type ControlPlaneArtifactStore = {
 };
 
 export type ControlPlaneArtifactStoreConfig = {
+  provider: ArtifactBackend;
+  credentialMode: ArtifactCredentialMode;
   endpoint: string;
   bucket: string;
   region: string;
-  accessKeyId: string;
-  secretAccessKey: string;
+  accessKeyId?: string;
+  secretAccessKey?: string;
+  sessionToken?: string;
+  credentialProvider?: AwsCredentialProvider;
   keyPrefix?: string;
 };
+import type { AwsCredentialProvider } from "./control-plane-aws-imds-credentials";
+import type { ArtifactBackend } from "./cloud-control-setup-types";
+import type { ArtifactCredentialMode } from "./control-plane-artifact-credential-mode";

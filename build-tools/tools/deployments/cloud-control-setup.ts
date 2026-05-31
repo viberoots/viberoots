@@ -2,7 +2,7 @@ import * as fsp from "node:fs/promises";
 import fs from "node:fs";
 import path from "node:path";
 import { getFlagBool, getFlagList, getFlagStr } from "../lib/cli";
-import { setupUsesSupabasePrivateLink } from "./cloud-control-setup-aws-topology";
+import { nextCommands } from "./cloud-control-setup-command-preview";
 import { renderCloudControlSetupBundle } from "./cloud-control-setup-render";
 import {
   assertCloudControlSetupInput,
@@ -19,6 +19,7 @@ import type {
   CloudProfileMode,
   ReviewedSourceMode,
 } from "./cloud-control-setup-types";
+import { artifactCredentialMode } from "./control-plane-artifact-credential-mode";
 
 export async function runCloudControlSetupCommand(): Promise<void> {
   const input = readCloudControlSetupInput();
@@ -90,7 +91,11 @@ export function readCloudControlSetupInput(): CloudControlSetupInput {
       "cloudflare-r2",
       "s3-compatible",
     ]),
+    artifactCredentialMode: artifactCredentialMode(getFlagStr("artifact-credential-mode", "files")),
     artifactBackendEvidence: getFlagStr("artifact-backend-evidence", "").trim(),
+    artifactIamRoleArn: getFlagStr("artifact-iam-role-arn", "").trim() || undefined,
+    artifactLeastPrivilegePolicyDigest:
+      getFlagStr("artifact-least-privilege-policy-digest", "").trim() || undefined,
     deploymentIds: deploymentIds(getFlagList("deployment-id")),
     reviewedSourceMode: enumFlag("reviewed-source-mode", "ssh", ["ssh", "github-app"]),
     authCallbackHost: getFlagStr("auth-callback-host", "deploy-auth.example.test").trim(),
@@ -142,87 +147,6 @@ function numberFlag(name: string, fallback: number): number {
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
-function nextCommands(input: CloudControlSetupInput): string[] {
-  return [
-    setupCommand(input, true),
-    setupCommand(input, false),
-    "stage credential files listed in credential-manifest.json",
-    localCheckCommand("setup-doctor", input.outDir, "setup-doctor.json"),
-    localCheckCommand("credential-preflight", input.outDir, "credential-preflight.json"),
-    "run the ordered phases in commands.json",
-  ];
-}
-
-function setupCommand(input: CloudControlSetupInput, dryRun: boolean): string {
-  const publication = input.imagePublication;
-  const args = [
-    "deployment-control-plane",
-    "setup",
-    dryRun ? "--dry-run" : undefined,
-    "--out",
-    input.outDir,
-    "--host-mode",
-    input.mode,
-    "--image",
-    input.image || "<registry/repo@sha256:digest>",
-    "--expected-image-build-identity",
-    input.expectedImageBuildIdentity || "nix-source-<build-identity>",
-    "--image-publication-evidence",
-    publication ? "$PROFILE_ROOT/image-publication.json" : "<image-publication.json>",
-    "--public-url",
-    input.publicUrl,
-    "--auth-callback-host",
-    input.authCallbackHost,
-    "--auth-callback-path",
-    input.authCallbackPath,
-    "--deployment-id",
-    input.deploymentIds.join(","),
-    "--artifact-backend",
-    input.artifactBackend,
-    "--artifact-bucket",
-    input.artifactBucket,
-    "--artifact-region",
-    input.artifactRegion,
-    "--reviewed-source-mode",
-    input.reviewedSourceMode,
-    "--service-replicas",
-    String(input.serviceReplicas),
-    "--worker-replicas",
-    String(input.workerReplicas),
-    input.artifactBackendEvidence ? "--artifact-backend-evidence" : undefined,
-    input.artifactBackendEvidence || undefined,
-    input.mode === "aws-ec2" ? "--aws-topology-evidence" : undefined,
-    input.mode === "aws-ec2" ? "$PROFILE_ROOT/aws-topology-evidence.json" : undefined,
-    setupUsesSupabasePrivateLink(input) ? "--supabase-privatelink" : undefined,
-    input.mode === "aws-ec2" ? "--ingress-command-evidence" : undefined,
-    input.mode === "aws-ec2" ? ingressEvidencePaths() : undefined,
-  ].filter((arg): arg is string => typeof arg === "string" && arg.length > 0);
-  return args.map(shellArg).join(" ");
-}
-
-function ingressEvidencePaths(): string {
-  return [
-    "ingress-dns-evidence.json",
-    "ingress-tls-evidence.json",
-    "ingress-health-evidence.json",
-    "ingress-callback-evidence.json",
-  ]
-    .map((name) => `$PROFILE_ROOT/${name}`)
-    .join(",");
-}
-
-function localCheckCommand(command: string, outDir: string, outputFile: string): string {
-  const outPath = `${outDir.replace(/\/+$/, "")}/${outputFile}`;
-  return ["deployment-control-plane", command, "--bundle-dir", outDir, "--out", outPath]
-    .map(shellArg)
-    .join(" ");
-}
-
-function shellArg(value: string): string {
-  if (/^[A-Za-z0-9_./:@=,+$-]+$/.test(value)) return value;
-  return `'${value.replace(/'/g, `'\\''`)}'`;
-}
-
 async function assertNoSecretValues(relativePath: string, content: string): Promise<void> {
   const forbidden = [
     /AKIA[0-9A-Z]{16}/,
@@ -234,5 +158,3 @@ async function assertNoSecretValues(relativePath: string, content: string): Prom
     if (pattern.test(content)) throw new Error(`${relativePath} appears to contain a secret value`);
   }
 }
-
-export type { ArtifactBackend, CloudControlSetupInput, CloudProfileMode, ReviewedSourceMode };

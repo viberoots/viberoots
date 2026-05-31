@@ -11,12 +11,16 @@ import {
 import { loadControlPlaneRuntimeConfig } from "./control-plane-runtime-config";
 import { startNixosSharedHostControlPlaneServer } from "./nixos-shared-host-control-plane-server";
 import type { ControlPlaneRuntimeConfig } from "./control-plane-runtime-config-types";
+import type { AwsCredentialProvider } from "./control-plane-aws-imds-credentials";
 
 export async function startControlPlaneServiceFromRuntimeConfig(opts: {
   workspaceRoot: string;
   runtimeConfig: ControlPlaneRuntimeConfig;
+  artifactCredentialProvider?: AwsCredentialProvider;
 }) {
-  const objectStore = await artifactStoreFromRuntimeConfig(opts.runtimeConfig);
+  const objectStore = await artifactStoreFromRuntimeConfig(opts.runtimeConfig, {
+    credentialProvider: opts.artifactCredentialProvider,
+  });
   assertProductionArtifactStore({ objectStore });
   const token = (await fsp.readFile(opts.runtimeConfig.service.tokenFile, "utf8")).trim();
   return await startNixosSharedHostControlPlaneServer({

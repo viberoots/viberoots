@@ -34,6 +34,8 @@ let
       cfg.databaseUrlCredential
       cfg.controlPlaneTokenCredential
       cfg.artifactStore.endpointCredential
+    ]
+    ++ lib.optionals (cfg.artifactStore.credentialMode == "files") [
       cfg.artifactStore.accessKeyIdCredential
       cfg.artifactStore.secretAccessKeyCredential
     ]
@@ -45,6 +47,7 @@ let
     cfg.databaseUrlCredential
     cfg.controlPlaneTokenCredential
     cfg.artifactStore.endpointCredential
+  ] ++ lib.optionals (cfg.artifactStore.credentialMode == "files") [
     cfg.artifactStore.accessKeyIdCredential
     cfg.artifactStore.secretAccessKeyCredential
   ] ++ reviewedSourceCredentialNames ++ infisicalCredentialNames;
@@ -178,6 +181,8 @@ in
     reviewedSourceGithubAppPrivateKeyCredential = opt lib.types.str defaults.reviewedSourceGithubAppPrivateKeyCredential "GitHub App private key credential name.";
     artifactStore = {
       kind = opt (lib.types.enum [ "s3-compatible" ]) defaults.artifactStoreKind "Artifact store kind.";
+      provider = opt (lib.types.enum [ "aws-s3" "supabase-storage-s3" "cloudflare-r2" "s3-compatible" ]) "s3-compatible" "Artifact store provider.";
+      credentialMode = opt (lib.types.enum [ "files" "aws-instance-profile" ]) "files" "Artifact credential mode.";
       bucket = opt nullStr null "Artifact store bucket.";
       region = opt lib.types.str defaults.artifactStoreRegion "S3-compatible artifact store signing region.";
       endpointCredential = opt lib.types.str defaults.artifactEndpointCredential "Endpoint credential name.";
@@ -209,6 +214,7 @@ in
       { assertion = cfg.imageDigestStatus != "verified-registry-publication" || cfg.imageInspectedDigest != null; message = "deploymentControlPlaneContainer.imageInspectedDigest is required for verified registry publication metadata."; }
       { assertion = cfg.imageDigestStatus != "verified-registry-publication" || cfg.imageTag != null; message = "deploymentControlPlaneContainer.imageTag is required for verified registry publication metadata."; }
       { assertion = cfg.artifactStore.bucket != null; message = "deploymentControlPlaneContainer.artifactStore.bucket is required."; }
+      { assertion = cfg.artifactStore.credentialMode != "aws-instance-profile" || cfg.artifactStore.provider == "aws-s3"; message = "deploymentControlPlaneContainer aws-instance-profile artifact credentials require aws-s3."; }
       { assertion = missingCredentialNames == [ ]; message = "deploymentControlPlaneContainer missing credential sources: ${lib.concatStringsSep ", " missingCredentialNames}"; }
       { assertion = nullCredentialNames == [ ]; message = "deploymentControlPlaneContainer credential sources must not be null: ${lib.concatStringsSep ", " nullCredentialNames}"; }
       { assertion = !cfg.manageNginx || cfg.publicHostName != null; message = "deploymentControlPlaneContainer.publicHostName is required when manageNginx = true."; }

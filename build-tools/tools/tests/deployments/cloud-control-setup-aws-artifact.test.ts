@@ -130,6 +130,66 @@ test("AWS EC2 Cloudflare R2 artifact backend remains provider-specific", () => {
   );
 });
 
+test("AWS EC2 instance-profile artifact mode renders mode-specific credentials and evidence", () => {
+  const bundle = renderCloudControlSetupBundle(
+    input({
+      artifactCredentialMode: "aws-instance-profile",
+      artifactIamRoleArn: "arn:aws:iam::123456789012:role/control-plane-artifacts",
+      artifactLeastPrivilegePolicyDigest: "sha256:artifact-policy",
+    }),
+  );
+  const config = YAML.parse(bundle.files["config.yaml"]!);
+  assert.equal(config.storage.artifactStore.credentialMode, "aws-instance-profile");
+  assert.equal(config.storage.artifactStore.accessKeyIdFile, undefined);
+  const manifest = JSON.parse(bundle.files["credential-manifest.json"]!);
+  assert.ok(manifest.requiredFiles.includes("artifact-store-endpoint"));
+  assert.ok(!manifest.requiredFiles.includes("artifact-store-access-key-id"));
+  const managed = YAML.parse(bundle.files["managed-dependencies.profile.yaml"]!);
+  assert.equal(managed.artifactStore.credentialMode, "aws-instance-profile");
+  assert.equal(
+    managed.runtimePath.expectedArtifactLeastPrivilegePolicyDigest,
+    "sha256:artifact-policy",
+  );
+});
+
+test("AWS EC2 instance-profile artifact mode fails closed without IAM evidence", () => {
+  assert.match(
+    validateCloudControlSetupInput(input({ artifactCredentialMode: "aws-instance-profile" })).join(
+      "\n",
+    ),
+    /requires IAM role ARN/,
+  );
+  assert.match(
+    validateCloudControlSetupInput(
+      input({
+        artifactCredentialMode: "aws-instance-profile",
+        artifactIamRoleArn: "arn:aws:iam::123456789012:role/other",
+        artifactLeastPrivilegePolicyDigest: "sha256:artifact-policy",
+      }),
+    ).join("\n"),
+    /does not match reviewed foundation role evidence/,
+  );
+  assert.match(
+    validateCloudControlSetupInput(
+      input({
+        artifactCredentialMode: "aws-instance-profile",
+        artifactIamRoleArn: "arn:aws:iam::123456789012:role/control-plane-artifacts",
+        artifactLeastPrivilegePolicyDigest: "sha256:wrong",
+      }),
+    ).join("\n"),
+    /policy digest must reference reviewed least-privilege evidence/,
+  );
+  assert.match(
+    validateCloudControlSetupInput(
+      input({
+        artifactBackend: "cloudflare-r2",
+        artifactCredentialMode: "aws-instance-profile",
+      }),
+    ).join("\n"),
+    /aws-instance-profile requires aws-s3/,
+  );
+});
+
 function topologyForImage(overrides: Record<string, unknown> = {}) {
   return topologyForPublishedImage(privateLinkAwsTopology(overrides), DIGEST_REF, DIGEST);
 }

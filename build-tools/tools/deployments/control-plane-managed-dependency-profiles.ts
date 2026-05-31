@@ -11,6 +11,10 @@ import type {
   ManagedPostgresProvider,
   ManagedRuntimeSourceHostKind,
 } from "./control-plane-managed-dependency-types";
+import {
+  artifactCredentialMode,
+  assertArtifactCredentialModeAllowed,
+} from "./control-plane-artifact-credential-mode";
 
 type RawObject = Record<string, unknown>;
 
@@ -91,6 +95,14 @@ export function parseManagedDependencyProfile(
         runtimePath.expectedS3EndpointPolicyDigest,
         "runtimePath.expectedS3EndpointPolicyDigest",
       ),
+      expectedArtifactIamRoleArn: optionalString(
+        runtimePath.expectedArtifactIamRoleArn,
+        "runtimePath.expectedArtifactIamRoleArn",
+      ),
+      expectedArtifactLeastPrivilegePolicyDigest: optionalString(
+        runtimePath.expectedArtifactLeastPrivilegePolicyDigest,
+        "runtimePath.expectedArtifactLeastPrivilegePolicyDigest",
+      ),
       expectedAlternateBackendEvidenceRef: optionalString(
         runtimePath.expectedAlternateBackendEvidenceRef,
         "runtimePath.expectedAlternateBackendEvidenceRef",
@@ -110,6 +122,7 @@ export function parseManagedDependencyProfile(
     },
     artifactStore: {
       provider: enumValue(artifactStore.provider, ARTIFACT_PROVIDERS, "artifactStore.provider"),
+      credentialMode: parsedArtifactCredentialMode(artifactStore, "artifactStore.credentialMode"),
       bucket: stringValue(artifactStore.bucket, "artifactStore.bucket"),
       region: stringValue(artifactStore.region, "artifactStore.region"),
       endpointFile: credentialFile(
@@ -117,12 +130,12 @@ export function parseManagedDependencyProfile(
         "artifactStore.endpointFile",
         policy,
       ),
-      accessKeyIdFile: credentialFile(
+      accessKeyIdFile: optionalCredentialFile(
         artifactStore.accessKeyIdFile,
         "artifactStore.accessKeyIdFile",
         policy,
       ),
-      secretAccessKeyFile: credentialFile(
+      secretAccessKeyFile: optionalCredentialFile(
         artifactStore.secretAccessKeyFile,
         "artifactStore.secretAccessKeyFile",
         policy,
@@ -146,6 +159,31 @@ function credentialFile(
   policy: { credentialDirectory: string },
 ): string {
   return assertCredentialDirectoryPath(stringValue(value, fieldName), policy);
+}
+
+function optionalCredentialFile(
+  value: unknown,
+  fieldName: string,
+  policy: { credentialDirectory: string },
+): string | undefined {
+  if (value === undefined) return undefined;
+  return credentialFile(value, fieldName, policy);
+}
+
+function parsedArtifactCredentialMode(
+  artifactStore: RawObject,
+  fieldName: string,
+): "files" | "aws-instance-profile" {
+  const credentialMode = artifactCredentialMode(artifactStore.credentialMode);
+  const provider = enumValue(artifactStore.provider, ARTIFACT_PROVIDERS, "artifactStore.provider");
+  assertArtifactCredentialModeAllowed({ provider, credentialMode, fieldName });
+  if (
+    credentialMode === "files" &&
+    (artifactStore.accessKeyIdFile === undefined || artifactStore.secretAccessKeyFile === undefined)
+  ) {
+    throw new Error("artifactStore file credential mode requires access key files");
+  }
+  return credentialMode;
 }
 
 function optionalEvidenceFile(value: unknown, baseDir: string): string | undefined {

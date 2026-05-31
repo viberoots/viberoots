@@ -27,6 +27,7 @@ postgres:
   urlFile: /run/deployment-control-plane/credentials/control-plane-database-url
 artifactStore:
   provider: aws-s3
+  credentialMode: files
   bucket: deployment-control-plane-artifacts
   region: us-east-1
   endpointFile: /run/deployment-control-plane/credentials/artifact-store-endpoint
@@ -89,6 +90,7 @@ export function baseArtifactStore(): ManagedDependencyEvidence["artifactStore"] 
     sourceHostKind: "aws-ec2",
     s3VpcEndpointId: "vpce-123",
     s3EndpointPolicyDigest: "sha256:s3-endpoint-policy",
+    artifactCredentialMode: "files",
     checkedOperations: ["PUT", "GET", "HEAD", "metadata", "content-type", "digest"],
     digest: "sha256:artifact-store-proof",
     objectKey: "control-plane/proof",

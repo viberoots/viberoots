@@ -4,15 +4,12 @@ import {
   REVIEWED_SOURCE_MODES,
   type CloudControlSetupInput,
   type ProviderCapabilityDeclaration,
-  type ReviewedSourceMode,
 } from "./cloud-control-setup-types";
+import { assertArtifactCredentialModeAllowed } from "./control-plane-artifact-credential-mode";
+import { setupArtifactCredentialMode } from "./cloud-control-setup-aws-topology";
 import {
-  CREDENTIAL_FILENAMES,
   CONCRETE_PROVIDER_CAPABILITIES,
-  GITHUB_APP_FILENAMES,
-  INFISICAL_FILENAMES,
   REQUIRED_CAPABILITY_FIELDS,
-  SSH_REVIEWED_SOURCE_FILENAMES,
 } from "./cloud-control-setup-contract";
 import { validateControlPlaneImagePublicationEvidence } from "./control-plane-image-publication";
 import { evidenceSecretErrors, evidenceSourceErrors } from "./cloud-control-evidence-helpers";
@@ -22,12 +19,14 @@ import {
   validateAwsTopologyEvidence,
 } from "./cloud-control-aws-topology-validate";
 import { validateIngressCommandEvidenceBundle } from "./cloud-control-aws-ingress-command-evidence";
+import { validateSetupArtifactIamEvidence } from "./cloud-control-setup-artifact-iam-evidence";
 import {
   hookEvidenceDeclaration,
   hookEvidenceRefs,
   providerCapabilityHookEvidenceRecord,
   validateProviderCapabilityHookEvidenceShape,
 } from "./cloud-control-provider-capability-hook-contract";
+export { validateCredentialManifestFiles } from "./cloud-control-credential-manifest-validate";
 
 const IMAGE_DIGEST_PATTERN = /^[a-z0-9][a-z0-9._:-]*(\/[a-z0-9][a-z0-9._-]*)+@sha256:[a-f0-9]{64}$/;
 const SECRET_PATTERN = /(secret|token|password|private.key|access.key|database.url)=/i;
@@ -58,6 +57,15 @@ export function validateCloudControlSetupInput(input: CloudControlSetupInput): s
   if (!ARTIFACT_BACKENDS.includes(input.artifactBackend)) {
     errors.push(`unsupported artifact backend ${input.artifactBackend}`);
   }
+  try {
+    assertArtifactCredentialModeAllowed({
+      provider: input.artifactBackend,
+      credentialMode: setupArtifactCredentialMode(input),
+      fieldName: "--artifact-credential-mode",
+    });
+  } catch (error) {
+    errors.push(String((error as Error).message || error));
+  }
   if (!REVIEWED_SOURCE_MODES.includes(input.reviewedSourceMode)) {
     errors.push(`unsupported reviewed-source mode ${input.reviewedSourceMode}`);
   }
@@ -80,29 +88,6 @@ export function validateCloudControlSetupInput(input: CloudControlSetupInput): s
   }
   if (input.mode === "aws-ec2") errors.push(...validateAwsEvidence(input));
   return errors;
-}
-
-export function validateCredentialManifestFiles(
-  files: readonly string[],
-  reviewedSourceMode: ReviewedSourceMode = "ssh",
-): string[] {
-  const errors: string[] = [];
-  const required = baseCredentialFiles(reviewedSourceMode);
-  for (const file of required) {
-    if (!files.includes(file)) errors.push(`credential manifest missing ${file}`);
-  }
-  if (files.some((file) => /^env:/i.test(file))) {
-    errors.push("credential manifest must not use env-var-only secret modes");
-  }
-  return errors;
-}
-
-function baseCredentialFiles(reviewedSourceMode: ReviewedSourceMode): string[] {
-  return [
-    ...CREDENTIAL_FILENAMES,
-    ...INFISICAL_FILENAMES,
-    ...(reviewedSourceMode === "github-app" ? GITHUB_APP_FILENAMES : SSH_REVIEWED_SOURCE_FILENAMES),
-  ];
 }
 
 export function assertCloudControlSetupInput(input: CloudControlSetupInput): void {
@@ -244,6 +229,9 @@ function validateAwsEvidence(input: CloudControlSetupInput): string[] {
     awsTopologyDatabaseMode(input.awsTopology) !== "privatelink"
   ) {
     errors.push("--supabase-privatelink requires awsTopology.database.mode privatelink");
+  }
+  if (setupArtifactCredentialMode(input) === "aws-instance-profile") {
+    errors.push(...validateSetupArtifactIamEvidence(input));
   }
   return errors;
 }

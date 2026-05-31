@@ -195,8 +195,8 @@ The repo-owned profile covers these AWS resources:
 - security group for the Supabase PrivateLink endpoint
 - S3 bucket for immutable artifacts
 - S3 gateway or interface VPC endpoint
-- IAM role for the EC2 host and, with current code, narrow S3-compatible credential files for the
-  control-plane artifact store
+- IAM role for the EC2 host, preferred AWS S3 instance-profile artifact access, and file-backed
+  artifact credentials only for reviewed non-AWS S3-compatible backends
 - ALB or NLB listener and target group
 - ACM certificate and DNS records
 - EC2 instance or launch template for the NixOS/OCI host
@@ -219,9 +219,12 @@ The generated NixOS EC2 example imports the existing control-plane container mod
 inputs. The generated systemd/Podman artifacts are a compatibility mode for non-NixOS OCI hosts and
 share the same service/worker process and mount contract.
 
-AWS S3 is the generated default artifact-store path. Supabase Storage S3, Cloudflare R2, and other
+AWS S3 is the generated default artifact-store path. For EC2, prefer
+`--artifact-credential-mode aws-instance-profile` with the reviewed IAM role ARN and
+least-privilege bucket/prefix policy digest. Supabase Storage S3, Cloudflare R2, and other
 S3-compatible stores are explicit alternate profiles; they require reviewed endpoint-shape, signing
-region, path-style, metadata, retention, and network-path evidence before setup or cutover.
+region, path-style, metadata, retention, network-path evidence, and file-backed artifact credentials
+before setup or cutover.
 
 Before a live-gated apply or protected/shared cutover, keep evidence for encrypted locked IaC state,
 clean drift detection, service quota headroom, approved cost estimate, mandatory ownership and
@@ -336,8 +339,11 @@ deployment-control-plane setup \
   --auth-callback-host deploy-auth.example.com \
   --deployment-id pleomino-staging \
   --artifact-backend aws-s3 \
+  --artifact-credential-mode aws-instance-profile \
   --artifact-bucket deployment-control-plane-artifacts \
   --artifact-region us-east-1 \
+  --artifact-iam-role-arn arn:aws:iam::<account-id>:role/<control-plane-artifact-role> \
+  --artifact-least-privilege-policy-digest sha256:<policy-digest> \
   --reviewed-source-mode ssh \
   --aws-topology-evidence ./aws-topology-evidence.json \
   --ingress-command-evidence ./ingress-dns-evidence.json,./ingress-tls-evidence.json,./ingress-health-evidence.json,./ingress-callback-evidence.json
@@ -414,8 +420,8 @@ At minimum, the AWS host needs:
 | `control-plane-database-url`             | Supabase Postgres URL using the selected public or PrivateLink hostname |
 | `control-plane-token`                    | service bearer token for control-plane API checks                       |
 | `artifact-store-endpoint`                | S3-compatible endpoint                                                  |
-| `artifact-store-access-key-id`           | artifact-store access key id                                            |
-| `artifact-store-secret-access-key`       | artifact-store secret access key                                        |
+| `artifact-store-access-key-id`           | artifact-store access key id in `files` mode                            |
+| `artifact-store-secret-access-key`       | artifact-store secret access key in `files` mode                        |
 | `reviewed-source-ssh-key`                | reviewed-source SSH private key, if SSH mode is selected                |
 | `reviewed-source-known-hosts`            | reviewed-source SSH known-hosts file                                    |
 | `{deploymentId}-infisical-client-id`     | deployment-scoped Infisical Universal Auth client id                    |
@@ -426,6 +432,11 @@ If GitHub App mode is selected, replace the SSH files with:
 - `reviewed-source-github-app-id`
 - `reviewed-source-github-app-installation-id`
 - `reviewed-source-github-app-private-key`
+
+When AWS S3 instance-profile mode is selected, do not stage artifact access-key or secret-key files.
+The service and workers use IMDSv2 temporary credentials from the reviewed EC2 instance profile, and
+managed dependency evidence must include the IAM role ARN plus least-privilege bucket/prefix policy
+digest for the reviewed artifact operations.
 
 Secret values must not be placed in Nix options, image layers, command-line arguments, ordinary
 environment files, deployment metadata, or logs.

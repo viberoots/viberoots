@@ -127,6 +127,14 @@ export function foundationFromTopology(
         providerHook: `arn:aws:iam::${topology.accountId}:role/control-plane-hook`,
       },
       instanceProfileTrustDigest: "sha256:instance-profile-trust",
+      instanceProfiles: [
+        {
+          arn: topology.compute.instanceProfileArn,
+          roleArn: `arn:aws:iam::${topology.accountId}:role/control-plane-artifacts`,
+          trustDigest: "sha256:instance-profile-trust",
+          policyDigests: ["sha256:artifact-policy"],
+        },
+      ],
       policies: [
         {
           name: "control-plane-artifact-access",

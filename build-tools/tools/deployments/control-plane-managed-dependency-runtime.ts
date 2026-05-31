@@ -5,6 +5,13 @@ import type {
   ManagedRuntimePathEvidence,
   ManagedRuntimePathFacts,
 } from "./control-plane-managed-dependency-types";
+import {
+  compareExpected,
+  compareExpectedPrivateLinkIdentity,
+  isPublicSupabaseHost,
+  roleNameFromArn,
+  text,
+} from "./control-plane-managed-dependency-runtime-validation-helpers";
 
 export function runtimePathEvidence(
   profile: ControlPlaneManagedDependencyProfile,
@@ -24,6 +31,10 @@ export function runtimePathEvidence(
     privatelinkResourceId: optionalText(facts.privatelinkResourceId),
     s3VpcEndpointId: optionalText(facts.s3VpcEndpointId),
     s3EndpointPolicyDigest: optionalText(facts.s3EndpointPolicyDigest),
+    expectedArtifactIamRoleArn: optionalText(facts.artifactIamRoleArn),
+    expectedArtifactLeastPrivilegePolicyDigest: optionalText(
+      facts.artifactLeastPrivilegePolicyDigest,
+    ),
     alternateBackendEvidenceRef: optionalText(facts.alternateBackendEvidenceRef),
     alternateBackendEvidenceDigest: optionalText(facts.alternateBackendEvidenceDigest),
   };
@@ -146,6 +157,36 @@ export function validateArtifactRuntimeEvidence(
       opts.expectedS3EndpointPolicyDigest,
       "AWS S3 endpoint policy digest",
     );
+    if (artifactStore.artifactCredentialMode === "aws-instance-profile") {
+      compareExpected(
+        errors,
+        artifactStore.expectedArtifactIamRoleArn || runtime.expectedArtifactIamRoleArn,
+        opts.expectedArtifactIamRoleArn,
+        "AWS S3 artifact IAM role",
+      );
+      compareExpected(
+        errors,
+        artifactStore.artifactLeastPrivilegePolicyDigest ||
+          runtime.expectedArtifactLeastPrivilegePolicyDigest,
+        opts.expectedArtifactLeastPrivilegePolicyDigest,
+        "AWS S3 least-privilege policy digest",
+      );
+      if (!artifactStore.expectedArtifactIamRoleArn) {
+        errors.push("AWS S3 evidence missing expected IAM role proof");
+      }
+      if (!artifactStore.observedArtifactIamRoleName) {
+        errors.push("AWS S3 evidence missing observed runtime IAM role identity");
+      } else if (
+        artifactStore.expectedArtifactIamRoleArn &&
+        roleNameFromArn(artifactStore.expectedArtifactIamRoleArn) !==
+          artifactStore.observedArtifactIamRoleName
+      ) {
+        errors.push("AWS S3 observed runtime IAM role does not match expected role");
+      }
+      if (!artifactStore.artifactLeastPrivilegePolicyDigest) {
+        errors.push("AWS S3 evidence missing least-privilege bucket/prefix policy proof");
+      }
+    }
     return errors;
   }
   const awsRuntimePath =
@@ -169,52 +210,6 @@ export function validateArtifactRuntimeEvidence(
     "alternate artifact backend evidence digest",
   );
   return errors;
-}
-
-function isPublicSupabaseHost(host: string): boolean {
-  return /\.supabase\.co$/i.test(host) || /\.pooler\.supabase\.com$/i.test(host);
-}
-
-function compareExpected(
-  errors: string[],
-  actual: unknown,
-  expected: string | undefined,
-  label: string,
-): void {
-  if (!expected) return;
-  const actualText = text(actual);
-  if (!actualText) {
-    errors.push(`${label} proof is missing`);
-    return;
-  }
-  if (actualText !== expected) errors.push(`${label} does not match expected value`);
-}
-
-function compareExpectedPrivateLinkIdentity(
-  errors: string[],
-  actual: any,
-  opts: ManagedDependencyValidationExpectations,
-  label: string,
-): void {
-  if (opts.expectedPrivateLinkEndpointId) {
-    compareExpected(
-      errors,
-      actual.privatelinkEndpointId,
-      opts.expectedPrivateLinkEndpointId,
-      `${label} endpoint id`,
-    );
-    return;
-  }
-  compareExpected(
-    errors,
-    actual.privatelinkResourceId,
-    opts.expectedPrivateLinkResourceId,
-    `${label} resource identity`,
-  );
-}
-
-function text(value: unknown): string {
-  return typeof value === "string" ? value.trim() : "";
 }
 
 function optionalText(value: string | undefined): string | undefined {

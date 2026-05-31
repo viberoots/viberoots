@@ -1,4 +1,6 @@
 import type { DeploymentAuthProviderConfig } from "./deployment-auth-provider-config";
+import type { ArtifactBackend } from "./cloud-control-setup-types";
+import type { ArtifactCredentialMode } from "./control-plane-artifact-credential-mode";
 
 export const DEFAULT_CONTROL_PLANE_CONFIG_PATH = "/etc/deployment-control-plane/config.yaml";
 
@@ -26,11 +28,13 @@ export type ControlPlaneRuntimeConfig = {
     runtimeRoot: string;
     artifactStore: {
       kind: "s3-compatible";
+      provider: ArtifactBackend;
+      credentialMode: ArtifactCredentialMode;
       bucket: string;
       region: string;
       endpointFile: string;
-      accessKeyIdFile: string;
-      secretAccessKeyFile: string;
+      accessKeyIdFile?: string;
+      secretAccessKeyFile?: string;
     };
   };
   database: {

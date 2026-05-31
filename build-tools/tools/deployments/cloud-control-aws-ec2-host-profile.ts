@@ -10,6 +10,7 @@ import {
 } from "./cloud-control-process-contract";
 import {
   setupArtifactBackendEvidenceRef,
+  setupArtifactCredentialMode,
   setupAwsSecurityGroupIds,
   setupAwsSubnetIds,
   setupUsesSupabasePrivateLink,
@@ -57,7 +58,10 @@ function awsProfile(input: CloudControlSetupInput, processes: RenderedControlPla
     compatibilityHost: "systemd-podman",
     artifactBackend: {
       selected: input.artifactBackend,
+      credentialMode: setupArtifactCredentialMode(input),
       defaultPath: "AWS S3 through a VPC endpoint",
+      iamRoleArn: input.artifactIamRoleArn,
+      leastPrivilegePolicyDigest: input.artifactLeastPrivilegePolicyDigest,
       reviewedAlternateEvidence: alternate,
     },
     network: {
@@ -105,6 +109,12 @@ function nixosEc2Example(input: CloudControlSetupInput): string {
       `      ${id}-infisical-client-secret.source = "/run/secrets/${id}-infisical-client-secret";`,
     ])
     .join("\n");
+  const artifactCredentials =
+    setupArtifactCredentialMode(input) === "files"
+      ? `
+      artifact-store-access-key-id.source = "/run/secrets/artifact-store-access-key-id";
+      artifact-store-secret-access-key.source = "/run/secrets/artifact-store-secret-access-key";`
+      : "";
   return `{
   imports = [
     ./deployment-control-plane-container-module.nix
@@ -117,6 +127,8 @@ function nixosEc2Example(input: CloudControlSetupInput): string {
     publicUrl = "${input.publicUrl}";
     workerReplicas = ${Math.max(2, input.workerReplicas)};
     artifactStore.bucket = "${input.artifactBucket}";
+    artifactStore.provider = "${input.artifactBackend}";
+    artifactStore.credentialMode = "${setupArtifactCredentialMode(input)}";
     infisicalDeploymentIds = [ ${input.deploymentIds.map((id) => `"${id}"`).join(" ")} ];
     credentials = {
       control-plane-database-url.source = "/run/secrets/control-plane-database-url";
@@ -124,8 +136,7 @@ function nixosEc2Example(input: CloudControlSetupInput): string {
       reviewed-source-ssh-key.source = "/run/secrets/reviewed-source-ssh-key";
       reviewed-source-known-hosts.source = "/run/secrets/reviewed-source-known-hosts";
       artifact-store-endpoint.source = "/run/secrets/artifact-store-endpoint";
-      artifact-store-access-key-id.source = "/run/secrets/artifact-store-access-key-id";
-      artifact-store-secret-access-key.source = "/run/secrets/artifact-store-secret-access-key";
+${artifactCredentials}
 ${infisicalCredentials}
     };
   };

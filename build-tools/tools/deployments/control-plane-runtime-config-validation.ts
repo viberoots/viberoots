@@ -10,6 +10,7 @@ import {
   assertCredentialDirectoryPath,
   resolveCredentialFileName,
 } from "./control-plane-runtime-config-paths";
+import { artifactCredentialFiles } from "./control-plane-artifact-credential-mode";
 
 const INFISICAL_CLIENT_ID_PATTERN = "{deploymentId}-infisical-client-id";
 const INFISICAL_CLIENT_SECRET_PATTERN = "{deploymentId}-infisical-client-secret";
@@ -34,6 +35,12 @@ export const CONTROL_PLANE_PRODUCTION_CREDENTIAL_ENV_NAMES = [
   "AWS_SECRET_ACCESS_KEY",
   "AWS_SESSION_TOKEN",
   "AWS_ENDPOINT_URL",
+  "AWS_PROFILE",
+  "AWS_CONFIG_FILE",
+  "AWS_SHARED_CREDENTIALS_FILE",
+  "AWS_WEB_IDENTITY_TOKEN_FILE",
+  "AWS_ROLE_ARN",
+  "AWS_SDK_LOAD_CONFIG",
   "MINIO_ACCESS_KEY",
   "MINIO_SECRET_KEY",
   "CLOUDFLARE_API_TOKEN",
@@ -49,8 +56,7 @@ export async function validateControlPlaneRuntimeConfigFiles(
     ["database.urlFile", config.database.urlFile],
     ["service.tokenFile", config.service.tokenFile],
     ["storage.artifactStore.endpointFile", config.storage.artifactStore.endpointFile],
-    ["storage.artifactStore.accessKeyIdFile", config.storage.artifactStore.accessKeyIdFile],
-    ["storage.artifactStore.secretAccessKeyFile", config.storage.artifactStore.secretAccessKeyFile],
+    ...artifactSecretFiles(config),
     ...reviewedSourceCredentialFiles(config),
     ...infisicalCredentialFiles(config),
   ] as const;
@@ -80,11 +86,7 @@ export function validateControlPlaneProductionEnv(env: NodeJS.ProcessEnv = proce
 }
 
 export function validateControlPlaneCredentialContract(config: ControlPlaneRuntimeConfig): void {
-  const credentialBasenames = [
-    ["storage.artifactStore.endpointFile", config.storage.artifactStore.endpointFile],
-    ["storage.artifactStore.accessKeyIdFile", config.storage.artifactStore.accessKeyIdFile],
-    ["storage.artifactStore.secretAccessKeyFile", config.storage.artifactStore.secretAccessKeyFile],
-  ] as const;
+  const credentialBasenames = artifactRuntimeFiles(config);
   const expected = {
     "storage.artifactStore.endpointFile": "artifact-store-endpoint",
     "storage.artifactStore.accessKeyIdFile": "artifact-store-access-key-id",
@@ -130,20 +132,40 @@ async function validateCredentialFileContents(config: ControlPlaneRuntimeConfig)
     throw new Error("storage.artifactStore.endpointFile must contain an http or https URL");
   }
   await assertNonEmptyCredential(config.service.tokenFile, "service.tokenFile");
-  await assertNonEmptyCredential(
-    config.storage.artifactStore.accessKeyIdFile,
-    "storage.artifactStore.accessKeyIdFile",
-  );
-  await assertNonEmptyCredential(
-    config.storage.artifactStore.secretAccessKeyFile,
-    "storage.artifactStore.secretAccessKeyFile",
-  );
+  for (const [fieldName, filePath] of artifactSecretFiles(config)) {
+    await assertNonEmptyCredential(filePath, fieldName);
+  }
   for (const [fieldName, filePath] of reviewedSourceCredentialFiles(config)) {
     await assertNonEmptyCredential(filePath, fieldName);
   }
   for (const [fieldName, filePath] of infisicalCredentialFiles(config)) {
     await assertNonEmptyCredential(filePath, fieldName);
   }
+}
+
+function artifactRuntimeFiles(config: ControlPlaneRuntimeConfig): [string, string][] {
+  const store = config.storage.artifactStore;
+  return artifactCredentialFiles(store.credentialMode).flatMap((name) => {
+    const filePath =
+      name === "artifact-store-endpoint"
+        ? store.endpointFile
+        : name === "artifact-store-access-key-id"
+          ? store.accessKeyIdFile
+          : store.secretAccessKeyFile;
+    return filePath ? [[artifactFieldName(name), filePath] as [string, string]] : [];
+  });
+}
+
+function artifactSecretFiles(config: ControlPlaneRuntimeConfig): [string, string][] {
+  return artifactRuntimeFiles(config).filter(
+    ([fieldName]) => fieldName !== "storage.artifactStore.endpointFile",
+  );
+}
+
+function artifactFieldName(fileName: string): string {
+  if (fileName === "artifact-store-endpoint") return "storage.artifactStore.endpointFile";
+  if (fileName === "artifact-store-access-key-id") return "storage.artifactStore.accessKeyIdFile";
+  return "storage.artifactStore.secretAccessKeyFile";
 }
 
 async function readCredential(filePath: string, fieldName: string): Promise<string> {

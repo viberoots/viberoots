@@ -52,6 +52,8 @@ function runtimeFactsFromCli(): ManagedRuntimePathFacts {
     privatelinkResourceId: flagOrEnv("privatelink-resource-id"),
     s3VpcEndpointId: flagOrEnv("s3-vpc-endpoint-id"),
     s3EndpointPolicyDigest: flagOrEnv("s3-endpoint-policy-digest"),
+    artifactIamRoleArn: flagOrEnv("artifact-iam-role-arn"),
+    artifactLeastPrivilegePolicyDigest: flagOrEnv("artifact-least-privilege-policy-digest"),
     alternateBackendEvidenceRef: flagOrEnv("alternate-backend-evidence-ref"),
     alternateBackendEvidenceDigest: flagOrEnv("alternate-backend-evidence-digest"),
   };

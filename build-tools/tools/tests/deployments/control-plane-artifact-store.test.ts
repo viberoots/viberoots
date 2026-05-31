@@ -87,6 +87,8 @@ async function withFakeS3(fn: (endpoint: string, authHeaders: string[]) => Promi
 test("S3-compatible artifact store verifies put, get, missing object, digest, size, and endpoint failures", async () => {
   await withFakeS3(async (endpoint) => {
     const store = createS3CompatibleArtifactStore({
+      provider: "s3-compatible",
+      credentialMode: "files",
       endpoint,
       bucket: "deploy-artifacts",
       region: "us-test-1",
@@ -127,6 +129,8 @@ test("S3-compatible artifact store verifies put, get, missing object, digest, si
     );
   });
   const unavailable = createS3CompatibleArtifactStore({
+    provider: "s3-compatible",
+    credentialMode: "files",
     endpoint: "http://127.0.0.1:1",
     bucket: "deploy-artifacts",
     region: "us-test-1",
