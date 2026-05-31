@@ -5,6 +5,7 @@ import {
   CREDENTIAL_STAGING_SCHEMA,
   type CredentialRotationEvidence,
   type CredentialStagingEvidence,
+  type LiveHostVerifierTrustAnchor,
 } from "./control-plane-credential-staging-types";
 import type { CredentialMap } from "./cloud-control-credential-map";
 import { validateLiveEvidence } from "./control-plane-credential-staging-live-evidence";
@@ -17,6 +18,7 @@ export function validateCredentialStagingEvidence(
     requiredFiles?: string[];
     credentialMap?: CredentialMap;
     requireLive?: boolean;
+    liveHostVerifierTrustAnchor?: LiveHostVerifierTrustAnchor;
     maxAgeMinutes: number;
   },
 ): string[] {
@@ -27,7 +29,14 @@ export function validateCredentialStagingEvidence(
   errors.push(...validateNoStale(evidence.staleCredentialDetection, "credential staging"));
   errors.push(...validateReloadEvidence(evidence.reloadEvidence, "credential staging"));
   errors.push(...validateHostMountEvidence(evidence.hostMountEvidence, expected.requiredFiles));
-  errors.push(...validateLiveEvidence(evidence, "credential staging", expected.credentialMap));
+  errors.push(
+    ...validateLiveEvidence(
+      evidence,
+      "credential staging",
+      expected.credentialMap,
+      expected.liveHostVerifierTrustAnchor,
+    ),
+  );
   if (expected.requireLive && evidence.mode !== "live-gated-backend-write") {
     errors.push("credential staging evidence must be deployment-owned live evidence");
   }
@@ -42,6 +51,7 @@ export function validateCredentialRotationEvidence(
     requiredFiles?: string[];
     credentialMap?: CredentialMap;
     requireLive?: boolean;
+    liveHostVerifierTrustAnchor?: LiveHostVerifierTrustAnchor;
     maxAgeMinutes: number;
   },
 ): string[] {
@@ -52,7 +62,14 @@ export function validateCredentialRotationEvidence(
   errors.push(...validateNoStale(evidence.staleCredentialDetection, "credential rotation"));
   errors.push(...validateReloadEvidence(evidence.reloadEvidence, "credential rotation"));
   errors.push(...validateHostMountEvidence(evidence.hostMountEvidence, expected.requiredFiles));
-  errors.push(...validateLiveEvidence(evidence, "credential rotation", expected.credentialMap));
+  errors.push(
+    ...validateLiveEvidence(
+      evidence,
+      "credential rotation",
+      expected.credentialMap,
+      expected.liveHostVerifierTrustAnchor,
+    ),
+  );
   if (expected.requireLive && evidence.mode !== "live-gated-backend-write") {
     errors.push("credential rotation evidence must be deployment-owned live evidence");
   }

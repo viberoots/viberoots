@@ -1,7 +1,6 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import type { CloudControlSetupInput } from "../../deployments/cloud-control-setup-types";
-import { digestCredentialInput } from "../../deployments/control-plane-credential-staging-evidence";
 import { defaultReviewedRuntimeInput } from "../../deployments/cloud-control-runtime-input";
 import {
   privateLinkAwsTopology,
@@ -9,6 +8,7 @@ import {
 } from "./cloud-control-aws-topology.fixture";
 import { ecrRegistryProfileForImage } from "./control-plane-registry-profile.fixture";
 import { privateLinkSupabaseProfile } from "./control-plane-supabase-postgres.fixture";
+import { liveHostVerifierProfile as signedLiveHostVerifierProfile } from "./control-plane-credential-remote-verifier.fixture";
 
 const IMAGE =
   "registry.example.com/platform/deployment-control-plane@sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee";
@@ -128,14 +128,7 @@ export async function liveHostVerification(tmp: string) {
 }
 
 export function liveHostVerifierProfile(evidence: any) {
-  return {
-    schemaVersion: "control-plane-live-host-verifier-profile@1",
-    verifierIdentity: evidence.verifierIdentity,
-    sourceHostIdentity: evidence.provenance?.sourceHostIdentity || "aws-ec2:i-cloud-review",
-    evidenceDigest: digestCredentialInput({ ...evidence, reviewedVerifierProfile: undefined }),
-    evidenceRef: "evidence://credential-staging/reviewed-remote-host-verifier-profile",
-    signature: "sig:reviewed-host-verifier-profile",
-  };
+  return signedLiveHostVerifierProfile(evidence);
 }
 
 export async function liveBackendEvidence(tmp: string) {

@@ -1,10 +1,11 @@
 import { getFlagBool } from "../lib/cli";
 import type { CredentialMap } from "./cloud-control-credential-map";
-import { digestCredentialInput } from "./control-plane-credential-staging-evidence";
+import { validateRemoteHostVerifierTrust } from "./control-plane-credential-host-verifier-trust";
 import { CREDENTIAL_MOUNT_TARGET } from "./control-plane-credential-staging-types";
 import type {
   LiveBackendWriteEvidence,
   LiveHostVerificationEvidence,
+  LiveHostVerifierTrustAnchor,
 } from "./control-plane-credential-staging-types";
 
 export type LiveHostMountInput = {
@@ -28,6 +29,7 @@ export function validateLiveInputs(opts: {
   backendRefs: string[];
   writePlanIds: string[];
   hostSourceIds: string[];
+  hostVerifierTrustAnchor?: LiveHostVerifierTrustAnchor;
 }): string[] {
   if (!opts.live && process.env.VBR_CONTROL_PLANE_LIVE_CREDENTIAL_STAGING === "1") {
     return ["live credential staging requires explicit --live"];
@@ -38,7 +40,13 @@ export function validateLiveInputs(opts: {
     errors.push("live credential staging requires VBR_CONTROL_PLANE_LIVE_CREDENTIAL_STAGING=1");
   }
   errors.push(...validateLiveBackendWriteEvidence(opts));
-  errors.push(...validateLiveHostMountInput(opts.hostMountEvidence, opts.requiredFiles));
+  errors.push(
+    ...validateLiveHostMountInput(
+      opts.hostMountEvidence,
+      opts.requiredFiles,
+      opts.hostVerifierTrustAnchor,
+    ),
+  );
   return errors;
 }
 
@@ -138,6 +146,7 @@ function validateLiveBackendScope(
 function validateLiveHostMountInput(
   evidence: LiveHostMountInput | undefined,
   expected: string[],
+  trustAnchor: LiveHostVerifierTrustAnchor | undefined,
 ): string[] {
   if (!evidence) return ["live credential staging requires deployment-owned host verification"];
   const errors: string[] = [];
@@ -146,7 +155,9 @@ function validateLiveHostMountInput(
   ) {
     errors.push("live host mount evidence must be deployment-owned");
   }
-  errors.push(...validateHostVerifierProvenance(evidence as LiveHostVerificationEvidence));
+  errors.push(
+    ...validateHostVerifierProvenance(evidence as LiveHostVerificationEvidence, trustAnchor),
+  );
   if (evidence.targetPath !== CREDENTIAL_MOUNT_TARGET) {
     errors.push(`live host mount target must be ${CREDENTIAL_MOUNT_TARGET}`);
   }
@@ -164,7 +175,10 @@ function validateLiveHostMountInput(
   return errors;
 }
 
-function validateHostVerifierProvenance(evidence: LiveHostVerificationEvidence): string[] {
+function validateHostVerifierProvenance(
+  evidence: LiveHostVerificationEvidence,
+  trustAnchor: LiveHostVerifierTrustAnchor | undefined,
+): string[] {
   const errors: string[] = [];
   if (evidence.schemaVersion !== "control-plane-live-host-verification@1") {
     errors.push("live host verification schema is invalid");
@@ -186,7 +200,9 @@ function validateHostVerifierProvenance(evidence: LiveHostVerificationEvidence):
     errors.push("live host remote verifier reviewed provenance is required");
   }
   if (evidence.verifier === "reviewed-remote-verifier") {
-    errors.push(...validateReviewedVerifierProfile(evidence));
+    errors.push(
+      ...validateRemoteHostVerifierTrust(evidence, "live credential staging", trustAnchor),
+    );
   }
   if (evidence.verifier === "local-filesystem" && provenance?.kind !== "local-host-verifier") {
     errors.push("live host local verifier provenance is required");
@@ -196,28 +212,6 @@ function validateHostVerifierProvenance(evidence: LiveHostVerificationEvidence):
   }
   if (!Number.isFinite(Date.parse(String(provenance?.reviewedAt || "")))) {
     errors.push("live host verifier provenance reviewedAt is invalid");
-  }
-  return errors;
-}
-
-function validateReviewedVerifierProfile(evidence: LiveHostVerificationEvidence): string[] {
-  const profile = evidence.reviewedVerifierProfile;
-  const errors: string[] = [];
-  if (profile?.schemaVersion !== "control-plane-live-host-verifier-profile@1") {
-    return ["live host reviewed verifier profile is required"];
-  }
-  if (profile.verifierIdentity !== evidence.verifierIdentity) {
-    errors.push("live host reviewed verifier identity does not match evidence");
-  }
-  if (profile.sourceHostIdentity !== evidence.provenance?.sourceHostIdentity) {
-    errors.push("live host reviewed verifier source host does not match evidence");
-  }
-  if (!isEvidenceRef(profile.evidenceRef) || !profile.signature?.startsWith("sig:")) {
-    errors.push("live host reviewed verifier signature is required");
-  }
-  const digest = digestCredentialInput({ ...evidence, reviewedVerifierProfile: undefined });
-  if (profile.evidenceDigest !== digest) {
-    errors.push("live host reviewed verifier profile digest does not match evidence");
   }
   return errors;
 }

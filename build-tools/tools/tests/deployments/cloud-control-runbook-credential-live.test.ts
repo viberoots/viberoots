@@ -16,12 +16,13 @@ test("generated runbook exposes live credential command only through explicit ga
     /--live-backend-profile "\$PROFILE_ROOT\/live-infisical-backend\.profile\.json"/,
   );
   assert.match(live.command, /--credential-directory \/run\/deployment-control-plane\/credentials/);
-  assert.match(
-    live.command,
-    /--live-host-verifier-profile "\$PROFILE_ROOT\/live-host-verifier\.profile\.json"/,
-  );
+  assert.doesNotMatch(live.command, /--live-host-verifier-profile/);
   assert.ok(live.inputs.includes("$PROFILE_ROOT/live-infisical-backend.profile.json"));
-  assert.ok(live.inputs.includes("$PROFILE_ROOT/live-host-verifier.profile.json"));
+  assert.ok(!live.inputs.includes("$PROFILE_ROOT/live-host-verifier.profile.json"));
+  assert.match(live.evidenceGuidance, /--live-host-verification-evidence/);
+  assert.match(live.evidenceGuidance, /--live-host-verifier-profile/);
+  assert.match(live.evidenceGuidance, /--live-host-verifier-trust-profile/);
+  assert.match(live.evidenceGuidance, /live-host-verifier\.trust\.json/);
   assert.ok(live.outputs.includes("$PROFILE_ROOT/credential-staging.live.json"));
   const cutover = commands.phases
     .flatMap((phase: any) => phase.commands)

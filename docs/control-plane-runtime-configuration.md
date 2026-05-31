@@ -299,10 +299,33 @@ scope payload covering exact secret names and create/read/update permissions. Ge
 values are created in memory and written directly to the backend; evidence records only non-secret
 selectors, scope payloads, write-plan ids, backend versions, and host filesystem metadata.
 
+Local host verification is preferred when the staging command runs on the target host. The local
+verifier inspects the real `/run/deployment-control-plane/credentials` directory and records the
+filename set, uid/gid `10001`, mode `0400`, target path, and generated AWS bind-mounted directory
+wiring. It does not require a remote verifier profile.
+
+Remote host verification is accepted only with both a verifier result profile and a separate
+reviewed verifier trust profile. The result profile must bind the remote evidence payload digest to
+the verifier identity, reviewed source host, target credential directory, credential filename set,
+and AWS bind-mount wiring proof. The trust profile must provide the reviewed Ed25519 public key
+fingerprint/public key or reviewed deployment-owned verifier command digest. A result profile with
+only a matching digest, `reviewed-remote-verifier`, a self-declared public key, a hand-authored
+command attestation, or a `sig:*` marker is rejected.
+Any trust anchor embedded inside the submitted verifier result is ignored. Persisted staging,
+runbook, and cutover validation reject remote verifier evidence unless a separate reviewed trust
+anchor is supplied by the validation call site.
+
+Remote verifier trust is fresh evidence. Profiles are rejected when their review timestamp is
+invalid, their expiry has passed, or the attested command provenance is stale. Regenerate remote
+verification when the host identity, credential directory, filename set, or AWS bind-mounted
+credential wiring changes.
+
 Externally supplied `--secret-backend-evidence` and `--host-mount-evidence` files are reviewed proof
 inputs only. They remain useful for externally supplied/imported credentials, but they do not mark a
 credential-staging run as deployment-owned live backend write or deployment-owned live host
 verification.
+Persisted staging or rotation evidence containing both `externalReviewedBackendProof` and
+`deploymentOwnedLiveBackendWrite` is rejected by setup-doctor, runbook, and cutover validators.
 
 Credential file manifest:
 
@@ -354,9 +377,21 @@ Run the live-gated compatibility test only against temporary buckets or temporar
 `VBR_ARTIFACT_STORE_LIVE_ENDPOINT`, `VBR_ARTIFACT_STORE_LIVE_BUCKET`,
 `VBR_ARTIFACT_STORE_LIVE_REGION`, `VBR_ARTIFACT_STORE_LIVE_ACCESS_KEY_ID`,
 `VBR_ARTIFACT_STORE_LIVE_SECRET_ACCESS_KEY`, and optional
-`VBR_ARTIFACT_STORE_LIVE_PREFIX`. A signature or authentication failure that mentions credential
+`VBR_ARTIFACT_STORE_LIVE_PREFIX`. A signature or authentication failure that mentions artifact
+credential
 scope, `AuthorizationHeaderMalformed`, or an unexpected signing region usually means the endpoint
 and configured region do not agree.
+
+Credential staging troubleshooting:
+
+- Failed remote verifier signature: refresh the reviewed public key profile or use the local host
+  verifier on the target host.
+- Remote verifier identity mismatch: compare the verifier identity in the remote evidence with the
+  trust profile and reviewed host material.
+- Stale remote verifier provenance: regenerate the profile so the review/expiry window covers the
+  current source host, target directory, filename set, and AWS bind mount evidence.
+- Mixed proof/write artifact: do not combine `--secret-backend-evidence` proof with
+  `deploymentOwnedLiveBackendWrite`; rerun either proof-only staging or live staging.
 
 Production container mode requires this object store path. Local filesystem artifact storage is only
 for tests, local fixture mode, or temporary staging directories that are scrubbed after worker use.

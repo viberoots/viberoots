@@ -1731,3 +1731,107 @@ the deployment-owned audited command path.
 The credential staging tool becomes mutation-capable in a narrowly gated path, increasing the amount
 of provider-specific error handling, redaction coverage, and host-profile verification logic that
 must be maintained.
+
+## PR-16: Credential staging verifier trust and evidence exclusivity
+
+### 1. Intent
+
+Close the remaining PR-15 evidence-hardening gaps by making remote host verification cryptographically
+or command-provenance trustworthy, and by ensuring externally reviewed proof can never coexist with or
+masquerade as deployment-owned live execution evidence.
+
+### 2. Scope of changes
+
+- Replace self-declared remote host verifier evidence with a reviewed trust contract:
+  - verifier identity
+  - reviewed verifier public key or deployment-owned verifier command provenance
+  - canonical evidence payload digest
+  - signature or command-attestation binding over the payload digest
+  - reviewed source host and target credential directory
+- Reject hand-authored remote verifier JSON that only declares `reviewed-remote-verifier`, `sig:*`,
+  or a matching digest without proving the verifier trust root.
+- Keep local host verification as the preferred generated command path when the command runs on the
+  target host, and make any remote-verifier path explicit in generated docs and validation errors.
+- Fix persisted staging evidence validation so external reviewed proof and deployment-owned live
+  write evidence are mutually exclusive:
+  - `--secret-backend-evidence` remains proof-only
+  - `deploymentOwnedLiveBackendWrite` remains command-owned execution evidence
+  - a staging artifact containing both forms is rejected
+  - cutover and runbook validators enforce the same exclusivity
+- Clarify generated runbook inputs so local host verification does not require remote verifier
+  profiles, and remote host verification examples include the reviewed verifier trust inputs.
+
+### 3. External prerequisites
+
+- Reviewed remote verifier trust material when operators choose remote host verification instead of
+  running the local verifier on the target host.
+- Existing live credential staging, live backend writer, host verifier, and cutover wiring from
+  PR-15.
+
+### 4. Tests to be added
+
+- Add remote verifier tests proving hand-authored JSON with a matching digest and `sig:*` marker is
+  rejected when it is not signed by the reviewed verifier key or produced by the deployment-owned
+  verifier command.
+- Add positive remote verifier tests using the reviewed trust contract.
+- Add negative tests for verifier identity mismatch, source host mismatch, target path mismatch,
+  payload digest mismatch, missing signature/attestation, wrong public key, and stale verifier
+  provenance.
+- Add persisted evidence tests proving a staging artifact with both external reviewed proof and
+  `deploymentOwnedLiveBackendWrite` is rejected.
+- Add cutover/runbook validation tests proving mixed proof/write evidence cannot satisfy protected
+  cutover.
+- Add generated runbook tests proving local-host verification commands do not require remote verifier
+  profile inputs, while remote-verifier examples include all required trust inputs.
+
+### 5. Docs to be added or updated
+
+- Update `docs/control-plane-guide.md` to explain the local-host verifier path and the remote-verifier
+  trust contract separately.
+- Update `docs/control-plane-runtime-configuration.md` with the verifier signature or command
+  provenance requirements and the proof-vs-execution evidence exclusivity rule.
+- Add troubleshooting guidance for failed verifier signature, mismatched verifier identity, stale
+  verifier provenance, and mixed external-proof/live-write artifacts.
+
+### 5.5. Expected regression scope
+
+- `deployment-only` for credential staging evidence validation, remote verifier validation, generated
+  runbook command inputs, cutover evidence validation, and docs.
+- Real remote host verification remains opt-in and must not run in ordinary CI.
+
+### 6. Acceptance criteria
+
+- Hand-authored remote host verifier JSON cannot satisfy protected/shared credential staging or
+  cutover requirements.
+- Remote host verification is accepted only when bound to a reviewed verifier trust root or
+  deployment-owned verifier command provenance.
+- External reviewed backend proof and deployment-owned live backend write evidence are mutually
+  exclusive in persisted staging artifacts and in cutover/runbook validators.
+- Generated local-host verifier commands remain runnable from the bundle root without remote
+  verifier-only inputs.
+- Docs clearly separate local verifier operation, remote verifier operation, and proof-only external
+  evidence.
+
+### 7. Risks
+
+- Introducing signature or command-attestation validation can make operator setup more complex.
+- A verifier trust contract can drift from generated host profile metadata if it is not bound to the
+  same source host and credential directory facts.
+
+### 8. Mitigations
+
+- Prefer local-on-host verification in generated commands and keep remote verification as an explicit
+  alternate path.
+- Reuse canonical JSON/digest helpers so signatures and evidence validation agree on the exact payload.
+- Bind verifier trust material to source host, target path, credential filename set, and AWS bind-mount
+  wiring evidence.
+
+### 9. Consequences of not implementing this PR
+
+Operators can still hand-author remote verifier JSON or mixed proof/write staging artifacts that look
+valid to downstream validators, weakening the protected/shared readiness boundary.
+
+### 10. Downsides for implementing this PR
+
+The credential staging evidence model gains another trust contract and more negative cases that must
+stay synchronized with generated runbook commands and docs.

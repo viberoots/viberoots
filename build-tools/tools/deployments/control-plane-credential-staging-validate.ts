@@ -30,6 +30,7 @@ export function validateCredentialStagingInputs(
       backendRefs: backendRefs(inputs.credentialMap),
       writePlanIds: writePlanIds(inputs.credentialMap),
       hostSourceIds: hostSourceIds(inputs.credentialMap),
+      hostVerifierTrustAnchor: inputs.liveHostVerifierTrustAnchor,
     }),
   ];
 }

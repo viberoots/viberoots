@@ -7,6 +7,7 @@ export function liveFlagOpts() {
     credentialDirectory: getFlagStr("credential-directory", "").trim(),
     liveHostVerificationEvidence: getFlagStr("live-host-verification-evidence", "").trim(),
     liveHostVerifierProfile: getFlagStr("live-host-verifier-profile", "").trim(),
+    liveHostVerifierTrustProfile: getFlagStr("live-host-verifier-trust-profile", "").trim(),
     credentialOwnerUid: numberFlag("credential-owner-uid"),
     credentialOwnerGid: numberFlag("credential-owner-gid"),
     hostMountEvidence: getFlagStr("host-mount-evidence", "").trim(),

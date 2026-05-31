@@ -58,6 +58,22 @@ test("cutover live requirement rejects fixture credential staging", () => {
   );
 });
 
+test("persisted fixture staging rejects mixed external proof and live write evidence", () => {
+  const map = credentialMap(setupInput(), ["control-plane-token"]);
+  const fixture = {
+    ...stagingEvidence(map.entries[0]!.source as any),
+    mode: "fixture-validation",
+    externalReviewedBackendProof: {
+      source: "external-reviewed-proof",
+      evidence: { reviewed: true },
+    },
+  };
+  assert.match(
+    validateCredentialStagingEvidence(fixture as any, expectation(map)).join("\n"),
+    /external proof cannot masquerade as live backend write evidence/,
+  );
+});
+
 function expectation(map: ReturnType<typeof credentialMap>) {
   return {
     manifestDigest: "sha256:manifest",

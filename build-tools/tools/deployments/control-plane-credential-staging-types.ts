@@ -115,9 +115,45 @@ export type LiveHostVerifierProfile = {
   schemaVersion: "control-plane-live-host-verifier-profile@1";
   verifierIdentity: string;
   sourceHostIdentity: string;
+  targetPath: typeof CREDENTIAL_MOUNT_TARGET;
+  filenameSet: string[];
+  awsBindMountVerified: true;
   evidenceDigest: string;
   evidenceRef: string;
-  signature: string;
+  reviewedAt: string;
+  expiresAt?: string;
+  publicKeyFingerprint?: string;
+  signature?: string;
+  commandAttestation?: {
+    kind: "deployment-owned-verifier-command";
+    command: "deployment-control-plane credential-host-verifier";
+    commandDigest: string;
+    evidenceDigest: string;
+    producedBy: string;
+    evidenceRef: string;
+    reviewedAt: string;
+    expiresAt?: string;
+  };
+  reviewedTrustAnchor?: LiveHostVerifierTrustAnchor;
+  publicKey?: {
+    kind: "ed25519";
+    pem: string;
+    fingerprint: string;
+  };
+};
+
+export type LiveHostVerifierTrustAnchor = {
+  schemaVersion: "control-plane-live-host-verifier-trust@1";
+  verifierIdentity: string;
+  trustedPublicKeys?: {
+    kind: "ed25519";
+    pem: string;
+    fingerprint: string;
+  }[];
+  trustedCommandDigests?: string[];
+  evidenceRef: string;
+  reviewedAt: string;
+  expiresAt?: string;
 };
 
 export type ExternalReviewedBackendProof = {

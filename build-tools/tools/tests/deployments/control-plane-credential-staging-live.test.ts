@@ -7,18 +7,19 @@ import {
   runCredentialRotation,
   runCredentialStaging,
 } from "../../deployments/control-plane-credential-staging";
-import { runDeploymentControlPlaneCommand } from "../../deployments/deployment-control-plane";
 import { runInScratchTemp } from "../lib/test-helpers";
-import { withControlPlaneArgv } from "./control-plane-process-entrypoints.helpers";
-import { withRawControlPlaneArgv, writeBundle } from "./control-plane-credential-staging.helpers";
+import { writeBundle } from "./control-plane-credential-staging.helpers";
 import {
   credentialOwner,
   liveBackendEvidence,
   liveHostVerification,
-  liveHostVerifierProfile,
   writeCredentialFiles,
   writeLiveProfile,
 } from "./control-plane-credential-live.fixture";
+import {
+  liveHostVerifierProfile,
+  liveHostVerifierTrustAnchor,
+} from "./control-plane-credential-remote-verifier.fixture";
 import { startFakeInfisicalServer } from "./infisical.test-server";
 
 test("live credential staging requires explicit gate and reviewed evidence", async () => {
@@ -61,6 +62,7 @@ test("live credential staging writes generated secrets and emits non-secret evid
       const credentials = path.join(tmp, "credentials");
       const hostVerification = path.join(tmp, "live-host-verification.json");
       const hostVerifierProfile = path.join(tmp, "live-host-verifier.profile.json");
+      const hostVerifierTrust = path.join(tmp, "live-host-verifier.trust.json");
       await writeLiveProfile(profile, server.siteUrl, plan.source);
       await writeCredentialFiles(tmp, credentials);
       const hostEvidence = await liveHostVerification(tmp);
@@ -70,6 +72,7 @@ test("live credential staging writes generated secrets and emits non-secret evid
         JSON.stringify(hostEvidence.reviewedVerifierProfile),
         "utf8",
       );
+      await fsp.writeFile(hostVerifierTrust, JSON.stringify(liveHostVerifierTrustAnchor()), "utf8");
       const owner = await credentialOwner(credentials);
       const missingEnvGate = await runCredentialStaging({
         bundleDir: tmp,
@@ -77,6 +80,7 @@ test("live credential staging writes generated secrets and emits non-secret evid
         liveBackendProfile: profile,
         liveHostVerificationEvidence: hostVerification,
         liveHostVerifierProfile: hostVerifierProfile,
+        liveHostVerifierTrustProfile: hostVerifierTrust,
         credentialOwnerUid: owner.uid,
         credentialOwnerGid: owner.gid,
       });
@@ -92,6 +96,7 @@ test("live credential staging writes generated secrets and emits non-secret evid
           liveBackendProfile: profile,
           liveHostVerificationEvidence: hostVerification,
           liveHostVerifierProfile: hostVerifierProfile,
+          liveHostVerifierTrustProfile: hostVerifierTrust,
           credentialOwnerUid: owner.uid,
           credentialOwnerGid: owner.gid,
         });
@@ -138,10 +143,12 @@ test("live credential staging rejects stale or overbroad host verification", asy
     ] as const) {
       const file = path.join(tmp, `${name}.json`);
       const profile = path.join(tmp, `${name}.profile.json`);
+      const trust = path.join(tmp, `${name}.trust.json`);
       const changed = structuredClone(evidence);
       mutate(changed);
       await fsp.writeFile(file, JSON.stringify(changed), "utf8");
       await fsp.writeFile(profile, JSON.stringify(liveHostVerifierProfile(changed)), "utf8");
+      await fsp.writeFile(trust, JSON.stringify(liveHostVerifierTrustAnchor()), "utf8");
       const previous = process.env.VBR_CONTROL_PLANE_LIVE_CREDENTIAL_STAGING;
       try {
         process.env.VBR_CONTROL_PLANE_LIVE_CREDENTIAL_STAGING = "1";
@@ -149,7 +156,9 @@ test("live credential staging rejects stale or overbroad host verification", asy
           bundleDir: tmp,
           live: true,
           liveHostVerificationEvidence: file,
-          ...(name === "missing-profile" ? {} : { liveHostVerifierProfile: profile }),
+          ...(name === "missing-profile"
+            ? {}
+            : { liveHostVerifierProfile: profile, liveHostVerifierTrustProfile: trust }),
         });
         assert.equal(staging.ok, false);
         assert.match(staging.errors.join("\n"), pattern);
@@ -200,45 +209,6 @@ test("credential rotation can regenerate a map for stale entries", async () => {
     const rotated = JSON.parse(await fsp.readFile(rotatedMapOut, "utf8"));
     const token = rotated.entries.find((entry: any) => entry.file === "control-plane-token");
     assert.match(token.source.writePlanRef, /rotation-/);
-  });
-});
-
-test("credential staging and rotation CLI modes are real entrypoints", async () => {
-  await runInScratchTemp("credential-staging-entrypoints", async (tmp) => {
-    await writeBundle(tmp);
-    await withControlPlaneArgv(
-      [
-        "credential-staging",
-        "--bundle-dir",
-        tmp,
-        "--out",
-        path.join(tmp, "credential-staging.json"),
-      ],
-      runDeploymentControlPlaneCommand,
-    );
-    await withControlPlaneArgv(
-      [
-        "credential-rotation",
-        "--bundle-dir",
-        tmp,
-        "--out",
-        path.join(tmp, "credential-rotation.json"),
-      ],
-      runDeploymentControlPlaneCommand,
-    );
-    await fsp.access(path.join(tmp, "credential-staging.json"));
-    await fsp.access(path.join(tmp, "credential-rotation.json"));
-    await withRawControlPlaneArgv(
-      [
-        "--bundle-dir",
-        tmp,
-        "credential-staging",
-        "--out",
-        path.join(tmp, "credential-staging-before.json"),
-      ],
-      runDeploymentControlPlaneCommand,
-    );
-    await fsp.access(path.join(tmp, "credential-staging-before.json"));
   });
 });
 

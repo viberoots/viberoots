@@ -68,6 +68,7 @@ export async function runCredentialStaging(opts: {
   credentialDirectory?: string;
   liveHostVerificationEvidence?: string;
   liveHostVerifierProfile?: string;
+  liveHostVerifierTrustProfile?: string;
   credentialOwnerUid?: number;
   credentialOwnerGid?: number;
   hostMountEvidence?: string;
@@ -129,6 +130,7 @@ export async function runCredentialRotation(opts: {
   credentialDirectory?: string;
   liveHostVerificationEvidence?: string;
   liveHostVerifierProfile?: string;
+  liveHostVerifierTrustProfile?: string;
   credentialOwnerUid?: number;
   credentialOwnerGid?: number;
   hostMountEvidence?: string;
@@ -197,6 +199,7 @@ async function runLive(
     credentialDirectory?: string;
     liveHostVerificationEvidence?: string;
     liveHostVerifierProfile?: string;
+    liveHostVerifierTrustProfile?: string;
     credentialOwnerUid?: number;
     credentialOwnerGid?: number;
   },

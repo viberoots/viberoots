@@ -1,18 +1,18 @@
 import type { CredentialMap } from "./cloud-control-credential-map";
-import { fingerprintValue } from "./nixos-shared-host-deployment-fingerprint";
+import { validateRemoteHostVerifierTrust } from "./control-plane-credential-host-verifier-trust";
+import type { LiveHostVerifierTrustAnchor } from "./control-plane-credential-staging-types";
 
 export function validateLiveEvidence(
   evidence: any,
   label: string,
   credentialMap?: CredentialMap,
+  trustAnchor?: LiveHostVerifierTrustAnchor,
 ): string[] {
-  if (evidence?.mode !== "live-gated-backend-write") return [];
+  const exclusivityErrors = proofWriteExclusivityErrors(evidence, label);
+  if (evidence?.mode !== "live-gated-backend-write") return exclusivityErrors;
   const live = evidence.deploymentOwnedLiveBackendWrite;
   const host = evidence.deploymentOwnedLiveHostVerification;
-  const errors: string[] = [];
-  if (evidence.externalReviewedBackendProof && evidence.liveBackendWriteEvidence) {
-    errors.push(`${label} external proof cannot masquerade as live backend write evidence`);
-  }
+  const errors: string[] = [...exclusivityErrors];
   if (live?.schemaVersion !== "control-plane-credential-live-backend-write@1") {
     errors.push(`${label} live backend write evidence missing`);
   }
@@ -33,12 +33,22 @@ export function validateLiveEvidence(
   if (host?.source !== "deployment-owned-live-host-verification") {
     errors.push(`${label} live host verification evidence missing`);
   }
-  errors.push(...validateLiveHostProvenance(host, label));
+  errors.push(...validateLiveHostProvenance(host, label, trustAnchor));
   if (credentialMap) errors.push(...validateLiveBackendMapBinding(live, credentialMap, label));
   return errors;
 }
 
-function validateLiveHostProvenance(host: any, label: string): string[] {
+export function proofWriteExclusivityErrors(evidence: any, label: string): string[] {
+  return evidence?.externalReviewedBackendProof && evidence.deploymentOwnedLiveBackendWrite
+    ? [`${label} external proof cannot masquerade as live backend write evidence`]
+    : [];
+}
+
+function validateLiveHostProvenance(
+  host: any,
+  label: string,
+  trustAnchor: LiveHostVerifierTrustAnchor | undefined,
+): string[] {
   const errors: string[] = [];
   if (!host) return errors;
   if (host.schemaVersion !== "control-plane-live-host-verification@1") {
@@ -57,32 +67,10 @@ function validateLiveHostProvenance(host: any, label: string): string[] {
     errors.push(`${label} live host reviewed remote verifier provenance is required`);
   }
   if (host.verifier === "reviewed-remote-verifier") {
-    errors.push(...validateReviewedVerifierProfile(host, label));
+    errors.push(...validateRemoteHostVerifierTrust(host, label, trustAnchor));
   }
   if (!isEvidenceRef(host.provenance?.evidenceRef) || !host.provenance?.sourceHostIdentity) {
     errors.push(`${label} live host verifier provenance evidence is required`);
-  }
-  return errors;
-}
-
-function validateReviewedVerifierProfile(host: any, label: string): string[] {
-  const profile = host.reviewedVerifierProfile;
-  const errors: string[] = [];
-  if (profile?.schemaVersion !== "control-plane-live-host-verifier-profile@1") {
-    return [`${label} live host reviewed verifier profile is required`];
-  }
-  if (profile.verifierIdentity !== host.verifierIdentity) {
-    errors.push(`${label} live host reviewed verifier identity does not match evidence`);
-  }
-  if (profile.sourceHostIdentity !== host.provenance?.sourceHostIdentity) {
-    errors.push(`${label} live host reviewed verifier source host does not match evidence`);
-  }
-  if (!isEvidenceRef(profile.evidenceRef) || !profile.signature?.startsWith("sig:")) {
-    errors.push(`${label} live host reviewed verifier signature is required`);
-  }
-  const digest = fingerprintValue({ ...host, reviewedVerifierProfile: undefined });
-  if (profile.evidenceDigest !== digest) {
-    errors.push(`${label} live host reviewed verifier profile digest does not match evidence`);
   }
   return errors;
 }

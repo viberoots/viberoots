@@ -1,5 +1,4 @@
 import type { CredentialStagingEvidence } from "../../deployments/control-plane-credential-staging-types";
-import { digestCredentialInput } from "../../deployments/control-plane-credential-staging-evidence";
 
 export const CUTOVER_CREDENTIAL_FILES = ["control-plane-token"];
 
@@ -149,25 +148,15 @@ function liveHostEvidence(files = CUTOVER_CREDENTIAL_FILES) {
     schemaVersion: "control-plane-live-host-verification@1" as const,
     checkedAt: new Date().toISOString(),
     source: "deployment-owned-live-host-verification" as const,
-    verifier: "reviewed-remote-verifier" as const,
-    verifierIdentity: "reviewed-aws-ec2-credential-host-verifier",
+    verifier: "local-filesystem" as const,
+    verifierIdentity: "deployment-control-plane-local-host-verifier",
     provenance: {
-      kind: "reviewed-remote-verifier" as const,
-      evidenceRef: "evidence://credential-staging/reviewed-remote-host-verifier",
-      sourceHostIdentity: "aws-ec2:i-cloud-review",
+      kind: "local-host-verifier" as const,
+      evidenceRef: "evidence://credential-staging/local-host-verifier",
+      sourceHostIdentity: "/run/deployment-control-plane/credentials",
       reviewedAt: new Date().toISOString(),
     },
     awsBindMountVerified: true,
   };
-  return {
-    ...evidence,
-    reviewedVerifierProfile: {
-      schemaVersion: "control-plane-live-host-verifier-profile@1" as const,
-      verifierIdentity: evidence.verifierIdentity,
-      sourceHostIdentity: evidence.provenance.sourceHostIdentity,
-      evidenceDigest: digestCredentialInput({ ...evidence, reviewedVerifierProfile: undefined }),
-      evidenceRef: "evidence://credential-staging/reviewed-remote-host-verifier-profile",
-      signature: "sig:reviewed-host-verifier-profile",
-    },
-  };
+  return evidence;
 }

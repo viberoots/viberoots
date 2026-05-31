@@ -531,12 +531,39 @@ Infisical; the resulting evidence records only project, environment, path, write
 and host metadata.
 
 Local live host verification must inspect the actual
-`/run/deployment-control-plane/credentials` mount. For remote hosts, use a deployment-owned
-`--live-host-verification-evidence` result from the reviewed host verifier instead of pointing the
-local command at a copied or temporary directory.
+`/run/deployment-control-plane/credentials` mount on the target host. This is the preferred path
+when the command runs on that host:
+
+```bash
+VBR_CONTROL_PLANE_LIVE_CREDENTIAL_STAGING=1 deployment-control-plane credential-staging \
+  --live \
+  --bundle-dir . \
+  --live-backend-profile ./live-infisical-backend.profile.json \
+  --credential-directory /run/deployment-control-plane/credentials \
+  --out ./credential-staging.live.json
+```
+
+For remote hosts, use a deployment-owned `--live-host-verification-evidence` result from the
+reviewed host verifier instead of pointing the local command at a copied or temporary directory.
+The remote verifier profile must include the reviewed verifier identity, reviewed public key
+signature or deployment-owned verifier command attestation, canonical evidence payload digest,
+source host, target credential directory, credential filename set, and AWS bind-mount wiring proof:
+The trust root itself is a separate reviewed input; do not embed it in the verifier result.
+
+```bash
+VBR_CONTROL_PLANE_LIVE_CREDENTIAL_STAGING=1 deployment-control-plane credential-staging \
+  --live \
+  --bundle-dir . \
+  --live-backend-profile ./live-infisical-backend.profile.json \
+  --live-host-verification-evidence ./live-host-verification.remote.json \
+  --live-host-verifier-profile ./live-host-verifier.profile.json \
+  --live-host-verifier-trust-profile ./live-host-verifier.trust.json \
+  --out ./credential-staging.live.json
+```
 
 Use `--secret-backend-evidence` or `--host-mount-evidence` only to attach externally reviewed proof.
 Those files remain proof inputs and cannot masquerade as deployment-owned live execution evidence.
+They must not coexist with `deploymentOwnedLiveBackendWrite` in persisted staging evidence.
 
 ## Step 8: Run Managed Dependency Validation
 
@@ -718,8 +745,16 @@ do not satisfy protected/shared readiness by themselves.
 - Host mount permission mismatch: confirm the filename set, uid/gid `10001`, mode `0400`, and
   mount target `/run/deployment-control-plane/credentials`; do not switch to `LoadCredential=`
   unless the generated host profile explicitly implements and tests that path.
-- Remote host verifier failure: refresh the reviewed remote verifier result or run the local
-  verifier from the host that owns the generated AWS bind-mounted credential directory.
+- Remote host verifier signature failure: regenerate the remote verifier result and trust profile
+  from the reviewed verifier key, or run the local verifier on the host that owns the generated AWS
+  bind-mounted credential directory.
+- Remote verifier identity mismatch: confirm the verifier identity in the trust profile matches the
+  remote evidence and the reviewed operator material for this host.
+- Stale remote verifier provenance: refresh the verifier profile before the expiry window, and make
+  sure it still binds the same source host, target directory, filename set, and AWS bind-mount proof.
+- Mixed credential proof/write artifact: rerun live credential staging without
+  `--secret-backend-evidence`, or keep external proof in the proof-only staging path. Do not merge
+  `externalReviewedBackendProof` with `deploymentOwnedLiveBackendWrite`.
 - Cutover evidence rejected: replace dashboard-only notes with structured evidence tied to the same
   AWS instances, image digest, config digest, selected database path, and selected artifact path.
 

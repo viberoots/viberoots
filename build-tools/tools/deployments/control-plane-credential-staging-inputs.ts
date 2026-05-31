@@ -8,6 +8,7 @@ import type {
   LiveBackendWriteEvidence,
   LiveHostVerificationEvidence,
   LiveHostVerifierProfile,
+  LiveHostVerifierTrustAnchor,
 } from "./control-plane-credential-staging-types";
 
 export type CredentialManifestInput = {
@@ -23,6 +24,7 @@ export type CredentialStagingInputs = {
   supabaseProfile?: SupabaseManagedPostgresProfile;
   liveBackendWriteEvidence?: LiveBackendWriteEvidence;
   liveHostMountEvidence?: LiveHostVerificationEvidence;
+  liveHostVerifierTrustAnchor?: LiveHostVerifierTrustAnchor;
   externalReviewedBackendProof?: ExternalReviewedBackendProof;
   externalReviewedHostProof?: ExternalReviewedHostProof;
 };
@@ -35,6 +37,7 @@ export async function readCredentialStagingInputs(
     hostMountEvidence?: string;
     liveHostVerificationEvidence?: string;
     liveHostVerifierProfile?: string;
+    liveHostVerifierTrustProfile?: string;
   } = {},
 ): Promise<CredentialStagingInputs> {
   const root = path.resolve(bundleDir);
@@ -47,6 +50,7 @@ export async function readCredentialStagingInputs(
     mountEvidence,
     liveHostVerification,
     liveHostVerifierProfile,
+    liveHostVerifierTrustProfile,
   ] = await Promise.all([
     readJson(path.join(root, "credential-manifest.json")),
     readJson(path.join(root, "credential-map.json")),
@@ -58,6 +62,9 @@ export async function readCredentialStagingInputs(
       ? readJson(opts.liveHostVerificationEvidence)
       : undefined,
     opts.live && opts.liveHostVerifierProfile ? readJson(opts.liveHostVerifierProfile) : undefined,
+    opts.live && opts.liveHostVerifierTrustProfile
+      ? readJson(opts.liveHostVerifierTrustProfile)
+      : undefined,
   ]);
   return {
     manifest,
@@ -65,6 +72,7 @@ export async function readCredentialStagingInputs(
     configText,
     supabaseProfile,
     liveHostMountEvidence: bindRemoteHostVerifier(liveHostVerification, liveHostVerifierProfile),
+    liveHostVerifierTrustAnchor: liveHostVerifierTrustProfile,
     externalReviewedBackendProof: externalProof(backendEvidence),
     externalReviewedHostProof: externalProof(mountEvidence),
   };
@@ -76,7 +84,10 @@ function bindRemoteHostVerifier(
 ): LiveHostVerificationEvidence | undefined {
   if (!evidence) return undefined;
   const { reviewedVerifierProfile: _ignored, ...untrustedEvidence } = evidence as any;
-  return profile ? { ...untrustedEvidence, reviewedVerifierProfile: profile } : untrustedEvidence;
+  const { reviewedTrustAnchor: _ignoredAnchor, ...untrustedProfile } = (profile || {}) as any;
+  return profile
+    ? { ...untrustedEvidence, reviewedVerifierProfile: untrustedProfile }
+    : untrustedEvidence;
 }
 
 function externalProof(

@@ -62,6 +62,7 @@ function command():
     "live-backend-profile",
     "live-host-verification-evidence",
     "live-host-verifier-profile",
+    "live-host-verifier-trust-profile",
     "out",
     "poll-ms",
     "profile",
