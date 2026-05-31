@@ -108,6 +108,18 @@ test("AWS EC2 generated entrypoint artifacts reject missing worker units and wri
     validateRenderedProfile(writableCredentials).join("\n"),
     /deployment-control-plane-worker-1\.service credential mount must be read-only/,
   );
+
+  const staleMountWiring = {
+    ...files,
+    "aws-ec2-profile.yaml": files["aws-ec2-profile.yaml"]!.replace(
+      "bind-mounted-credential-directory",
+      "load-credential",
+    ),
+  };
+  assert.match(
+    validateRenderedProfile(staleMountWiring).join("\n"),
+    /AWS profile credential mount wiring is stale/,
+  );
 });
 
 function assertRejects(overrides: Record<string, any>, pattern: RegExp): void {

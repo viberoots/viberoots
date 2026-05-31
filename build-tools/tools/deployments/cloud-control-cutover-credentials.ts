@@ -12,13 +12,17 @@ export function validateCredentialCutoverEvidence(
     ...validateCredentialStagingEvidence(evidence.credentialStaging, {
       manifestDigest: evidence.credentialManifestDigest,
       credentialMapDigest: evidence.credentialMapDigest,
+      credentialMap: evidence.credentialMap as any,
       requiredFiles: evidence.credentialManifestRequiredFiles,
+      requireLive: true,
       maxAgeMinutes: options.maxAgeMinutes,
     }),
     ...validateCredentialRotationEvidence(evidence.credentialRotation, {
       manifestDigest: evidence.credentialManifestDigest,
       credentialMapDigest: evidence.credentialMapDigest,
+      credentialMap: evidence.credentialMap as any,
       requiredFiles: evidence.credentialManifestRequiredFiles,
+      requireLive: true,
       maxAgeMinutes: options.maxAgeMinutes,
     }),
   ];

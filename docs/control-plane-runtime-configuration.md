@@ -289,10 +289,20 @@ the current `credential-manifest.json` and `credential-map.json`; optional rotat
 validated when present.
 
 Live credential backend writes are disabled unless
-`VBR_CONTROL_PLANE_LIVE_CREDENTIAL_STAGING=1` is set and the command receives reviewed non-secret
-`--secret-backend-evidence` and `--host-mount-evidence` files. Those evidence files bind the
-Infisical write-plan ids, backend refs, host credential source ids, filename set, owner, permissions,
-and mount target without storing the secret values locally.
+`VBR_CONTROL_PLANE_LIVE_CREDENTIAL_STAGING=1` is set and the operator also selects the explicit
+`--live` command path. The live path requires a reviewed `--live-backend-profile` file and either
+local inspection of `--credential-directory /run/deployment-control-plane/credentials` or a
+deployment-owned `--live-host-verification-evidence` result from the reviewed remote host verifier.
+The profile supplies the Infisical site, Universal Auth credential file contents, concrete project,
+environment, generated secret path, deployment identity evidence, and a concrete least-privilege
+scope payload covering exact secret names and create/read/update permissions. Generated secret
+values are created in memory and written directly to the backend; evidence records only non-secret
+selectors, scope payloads, write-plan ids, backend versions, and host filesystem metadata.
+
+Externally supplied `--secret-backend-evidence` and `--host-mount-evidence` files are reviewed proof
+inputs only. They remain useful for externally supplied/imported credentials, but they do not mark a
+credential-staging run as deployment-owned live backend write or deployment-owned live host
+verification.
 
 Credential file manifest:
 

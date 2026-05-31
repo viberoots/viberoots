@@ -19,6 +19,7 @@ import {
   managedDependencyEvidence,
   privateLinkAwsTopology,
 } from "./cloud-control-cutover-fixture";
+import { liveCredentialStagingEvidence } from "./cloud-control-credential-staging.fixture";
 import { ingressCommandEvidence } from "./cloud-control-aws-ingress.fixture";
 import { reviewedRuntimeInput } from "./cloud-control-runtime-input.fixture";
 import { writeBundle, writeSupabaseProviderEvidence } from "./cloud-control-setup-doctor.helpers";
@@ -47,10 +48,26 @@ async function writeCutoverInputs(tmp: string): Promise<void> {
     bundleDir: tmp,
     out: path.join(tmp, "credential-staging.json"),
   });
+  const liveStaging = liveCredentialStagingEvidence(
+    credentialStaging.manifestDigest,
+    credentialStaging.credentialMapDigest,
+    {
+      requiredFiles: JSON.parse(
+        await fsp.readFile(path.join(tmp, "credential-manifest.json"), "utf8"),
+      ).requiredFiles,
+      credentialMap: JSON.parse(await fsp.readFile(path.join(tmp, "credential-map.json"), "utf8")),
+    },
+  );
+  await fsp.writeFile(
+    path.join(tmp, "credential-staging.live.json"),
+    JSON.stringify(liveStaging, null, 2),
+    "utf8",
+  );
   const config = YAML.parse(await fsp.readFile(path.join(tmp, "config.yaml"), "utf8"));
   const operationBinding = {
     configDigest: digestCredentialInput(config),
-    credentialManifestDigest: credentialStaging.manifestDigest,
+    credentialManifestDigest: liveStaging.manifestDigest,
+    credentialMapDigest: liveStaging.credentialMapDigest,
   };
   for (const id of providerEvidenceIds()) {
     await fsp.writeFile(

@@ -200,6 +200,7 @@ async function validateOutputEvidence(profileRoot: string, file: string): Promis
     file !== "$PROFILE_ROOT/managed-dependency-evidence.json" &&
     file !== "$PROFILE_ROOT/supabase-managed-postgres-evidence.json" &&
     file !== "$PROFILE_ROOT/credential-staging.json" &&
+    file !== "$PROFILE_ROOT/credential-staging.live.json" &&
     file !== "$PROFILE_ROOT/credential-rotation.json" &&
     file !== "$PROFILE_ROOT/cloud-cutover-evidence.json"
   ) {
@@ -208,8 +209,10 @@ async function validateOutputEvidence(profileRoot: string, file: string): Promis
   if (file === "$PROFILE_ROOT/supabase-managed-postgres-evidence.json") {
     return validateSupabaseProviderOutput(profileRoot);
   }
-  if (file === "$PROFILE_ROOT/credential-staging.json") {
+  if (file === "$PROFILE_ROOT/credential-staging.json")
     return validateCredentialStagingOutput(profileRoot);
+  if (file === "$PROFILE_ROOT/credential-staging.live.json") {
+    return validateCredentialStagingOutput(profileRoot, "credential-staging.live.json");
   }
   if (file === "$PROFILE_ROOT/credential-rotation.json") {
     return validateCredentialRotationOutput(profileRoot);

@@ -8,6 +8,15 @@ export function validateAwsEc2SystemdArtifacts(files: Record<string, string>): s
   const profile = YAML.parse(files["aws-ec2-profile.yaml"] || "") as any;
   const processes = Array.isArray(profile?.processes) ? profile.processes : [];
   const errors: string[] = [];
+  if (profile?.credentialMountWiring?.mode !== "bind-mounted-credential-directory") {
+    errors.push("AWS profile credential mount wiring is stale");
+  }
+  if (
+    profile?.credentialMountWiring?.target !== CREDS ||
+    profile?.credentialMountWiring?.readOnly !== true
+  ) {
+    errors.push("AWS profile credential mount must target read-only credential directory");
+  }
   for (const process of processes) {
     const unitName = String(process?.systemdUnit || "");
     const raw = files[`systemd/${unitName}`];

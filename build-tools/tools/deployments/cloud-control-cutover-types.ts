@@ -28,6 +28,7 @@ export type CutoverEvidence = {
   providerCapabilities?: Record<string, Record<string, unknown>>;
   credentialManifestDigest?: string;
   credentialMapDigest?: string;
+  credentialMap?: Record<string, unknown>;
   credentialManifestRequiredFiles?: string[];
   credentialStaging?: CredentialStagingEvidence;
   credentialRotation?: CredentialRotationEvidence;

@@ -12,6 +12,7 @@ import { validateCloudControlCutover } from "../../deployments/cloud-control-cut
 import { validateCredentialRotationEvidence } from "../../deployments/control-plane-credential-staging-evidence";
 import { runInScratchTemp } from "../lib/test-helpers";
 import { evidence } from "./cloud-control-cutover-fixture";
+import { liveCredentialStagingEvidence } from "./cloud-control-credential-staging.fixture";
 import { cutoverOptions, writeBundle } from "./control-plane-credential-staging.helpers";
 
 test("credential staging writes non-secret evidence and gates setup doctor", async () => {
@@ -26,6 +27,7 @@ test("credential staging writes non-secret evidence and gates setup doctor", asy
       bundleDir: tmp,
       out: path.join(tmp, "credential-staging.json"),
     });
+    await writeLiveCredentialStagingOutput(tmp, staging);
     await runCredentialRotation({
       bundleDir: tmp,
       applyRotation: true,
@@ -64,6 +66,7 @@ test("credential staging fails closed for unsafe maps and mount evidence", async
     assert.match(staging.errors.join("\n"), /unsupported|secret values/);
     await writeBundle(tmp);
     const validStaging = await runCredentialStaging({ bundleDir: tmp });
+    await writeLiveCredentialInputs(tmp);
     validStaging.hostMountEvidence.permissions = "0644";
     await fsp.writeFile(path.join(tmp, "credential-staging.json"), JSON.stringify(validStaging));
     await runCredentialRotation({
@@ -83,6 +86,7 @@ test("credential staging rejects mount and reload evidence mismatches", async ()
   await runInScratchTemp("credential-staging-mount-reload-negative", async (tmp) => {
     await writeBundle(tmp);
     const staging = await runCredentialStaging({ bundleDir: tmp });
+    await writeLiveCredentialInputs(tmp);
     const cases = [
       [
         "filename",
@@ -143,6 +147,7 @@ test("credential staging rejects mount and reload evidence mismatches", async ()
 test("credential rotation records complete evidence and stale entries", async () => {
   await runInScratchTemp("credential-rotation-cutover", async (tmp) => {
     await writeBundle(tmp);
+    await writeLiveCredentialInputs(tmp);
     const cleanRotation = await runCredentialRotation({ bundleDir: tmp });
     assert.deepEqual(cleanRotation.backendRefs.length > 0, true);
     assert.deepEqual(cleanRotation.generatedSecretWritePlanIds.length > 0, true);
@@ -174,6 +179,33 @@ test("credential rotation records complete evidence and stale entries", async ()
   });
 });
 
+async function writeLiveCredentialInputs(tmp: string): Promise<void> {
+  await fsp.writeFile(path.join(tmp, "live-infisical-backend.profile.json"), "{}\n", "utf8");
+  await fsp.writeFile(path.join(tmp, "live-host-verifier.profile.json"), "{}\n", "utf8");
+}
+
+async function writeLiveCredentialStagingOutput(tmp: string, staging: any): Promise<void> {
+  await writeLiveCredentialInputs(tmp);
+  const manifest = JSON.parse(
+    await fsp.readFile(path.join(tmp, "credential-manifest.json"), "utf8"),
+  );
+  const credentialMap = JSON.parse(
+    await fsp.readFile(path.join(tmp, "credential-map.json"), "utf8"),
+  );
+  await fsp.writeFile(
+    path.join(tmp, "credential-staging.live.json"),
+    JSON.stringify(
+      liveCredentialStagingEvidence(staging.manifestDigest, staging.credentialMapDigest, {
+        requiredFiles: manifest.requiredFiles,
+        credentialMap,
+      }),
+      null,
+      2,
+    ),
+    "utf8",
+  );
+}
+
 test("cutover requires current credential manifest and map digest binding", async () => {
   const noDigests = validateCloudControlCutover(
     evidence({ credentialManifestDigest: undefined, credentialMapDigest: undefined }) as any,
@@ -191,6 +223,7 @@ test("cutover requires current credential manifest and map digest binding", asyn
 test("setup doctor blocks later phases when staging evidence is absent despite later outputs", async () => {
   await runInScratchTemp("credential-staging-late-output-bypass", async (tmp) => {
     await writeBundle(tmp);
+    await writeLiveCredentialInputs(tmp);
     await fsp.writeFile(path.join(tmp, "setup-doctor.json"), JSON.stringify({ ok: true }));
     await fsp.writeFile(path.join(tmp, "credential-preflight.json"), JSON.stringify({ ok: true }));
     await fsp.writeFile(

@@ -26,7 +26,8 @@ export async function collectCutoverEvidence(bundleDir: string): Promise<Cutover
   ]);
   const config = YAML.parse(configText);
   const selected = awsTopologyRequiredCapabilityIds(topology);
-  const credentialStaging = await readJson(path.join(root, "credential-staging.json"));
+  const credentialStaging = await readJson(path.join(root, "credential-staging.live.json"));
+  const credentialMap = await readJson(path.join(root, "credential-map.json"));
   return {
     schemaVersion: "cloud-cutover-evidence@1",
     operationIdentity: {
@@ -59,6 +60,7 @@ export async function collectCutoverEvidence(bundleDir: string): Promise<Cutover
     providerCapabilities: await providerCapabilityEvidence(root, selected),
     credentialManifestDigest: String(credentialStaging?.manifestDigest || ""),
     credentialMapDigest: String(credentialStaging?.credentialMapDigest || ""),
+    credentialMap,
     credentialManifestRequiredFiles: await requiredCredentialFiles(root),
     credentialStaging,
     standby: await readJson(path.join(root, "standby-evidence.json")),

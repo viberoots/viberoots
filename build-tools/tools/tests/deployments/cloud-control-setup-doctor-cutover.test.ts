@@ -17,6 +17,7 @@ import {
   privateLinkAwsTopology,
   topologyForPublishedImage,
 } from "./cloud-control-cutover-fixture";
+import { liveCredentialStagingEvidence } from "./cloud-control-credential-staging.fixture";
 import { reviewedRuntimeInput } from "./cloud-control-runtime-input.fixture";
 import { ecrRegistryProfileForImage } from "./control-plane-registry-profile.fixture";
 import { privateLinkSupabaseProfile } from "./control-plane-supabase-postgres.fixture";
@@ -54,7 +55,11 @@ test("setup doctor blocks and unlocks cutover-readiness from generated evidence"
 async function completePrerequisites(tmp: string, commands: any) {
   await fsp.writeFile(path.join(tmp, "setup-doctor.json"), '{"ok":true}\n', "utf8");
   await fsp.writeFile(path.join(tmp, "credential-preflight.json"), '{"ok":true}\n', "utf8");
-  await runCredentialStaging({ bundleDir: tmp, out: path.join(tmp, "credential-staging.json") });
+  const staging = await runCredentialStaging({
+    bundleDir: tmp,
+    out: path.join(tmp, "credential-staging.json"),
+  });
+  await writeLiveCredentialStagingOutput(tmp, staging);
   await runCredentialRotation({
     bundleDir: tmp,
     applyRotation: true,
@@ -87,6 +92,29 @@ async function completePrerequisites(tmp: string, commands: any) {
   ]) {
     await writeEvidence(tmp, runbookCommand(commands, id).outputs[0]);
   }
+}
+
+async function writeLiveCredentialStagingOutput(tmp: string, staging: any): Promise<void> {
+  await fsp.writeFile(path.join(tmp, "live-infisical-backend.profile.json"), "{}\n", "utf8");
+  await fsp.writeFile(path.join(tmp, "live-host-verifier.profile.json"), "{}\n", "utf8");
+  const manifest = JSON.parse(
+    await fsp.readFile(path.join(tmp, "credential-manifest.json"), "utf8"),
+  );
+  const credentialMap = JSON.parse(
+    await fsp.readFile(path.join(tmp, "credential-map.json"), "utf8"),
+  );
+  await fsp.writeFile(
+    path.join(tmp, "credential-staging.live.json"),
+    JSON.stringify(
+      liveCredentialStagingEvidence(staging.manifestDigest, staging.credentialMapDigest, {
+        requiredFiles: manifest.requiredFiles,
+        credentialMap,
+      }),
+      null,
+      2,
+    ),
+    "utf8",
+  );
 }
 
 function cutoverFiles(cutoverEvidence: any): Record<string, unknown> {

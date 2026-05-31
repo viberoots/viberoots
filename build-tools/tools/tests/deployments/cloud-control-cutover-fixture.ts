@@ -9,7 +9,7 @@ import { reviewedSupabaseManagedPostgresProfile } from "../../deployments/contro
 import { ecrRegistryProfileForImage } from "./control-plane-registry-profile.fixture";
 import { ingressCommandEvidence } from "./cloud-control-aws-ingress.fixture";
 import {
-  credentialStagingEvidence,
+  liveCredentialStagingEvidence,
   CUTOVER_CREDENTIAL_FILES,
 } from "./cloud-control-credential-staging.fixture";
 import { restoreEvidence } from "./cloud-control-cutover-restore.fixture";
@@ -113,7 +113,7 @@ export function evidence(overrides: Record<string, unknown> = {}) {
     credentialManifestDigest,
     credentialMapDigest,
     credentialManifestRequiredFiles: [...CUTOVER_CREDENTIAL_FILES],
-    credentialStaging: credentialStagingEvidence(credentialManifestDigest, credentialMapDigest),
+    credentialStaging: liveCredentialStagingEvidence(credentialManifestDigest, credentialMapDigest),
     standby: {
       ...commonOperation,
       mode: "service-only",

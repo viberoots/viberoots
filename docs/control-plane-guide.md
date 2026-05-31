@@ -474,8 +474,10 @@ reviewed-source SSH or GitHub App import evidence, control-plane token generatio
 database URL import evidence tied to the selected Supabase profile and public/private hostname, and
 rotation/stale-credential posture for every manifest entry. Secret names and access policies may be
 generated as write plans; secret values must stay only in the reviewed backend. Fixture/default
-staging validates and emits evidence only. Live backend writes or host mount checks require
-explicit live-gated access and must not run from ordinary CI.
+staging validates and emits evidence only. Live backend writes or host mount checks require both
+`VBR_CONTROL_PLANE_LIVE_CREDENTIAL_STAGING=1` and an explicit `--live` command path; neither the
+environment variable nor the flag is sufficient alone. Existing externally reviewed proof files may
+be attached as proof, but they do not count as deployment-owned backend writes.
 
 The current AWS EC2 compatibility units use host-specific bind-mounted credential-directory wiring
 for `/run/deployment-control-plane/credentials`. Do not assume systemd `LoadCredential=` unless the
@@ -517,9 +519,24 @@ The generated `commands.json` contains the same ordered runbook with profile-roo
 Protected/shared setup and cutover remain blocked until `credential-staging.json` is present, fresh,
 and tied to the current `credential-manifest.json` and `credential-map.json`.
 Live backend writes and host mount verification require
-`VBR_CONTROL_PLANE_LIVE_CREDENTIAL_STAGING=1` plus reviewed non-secret
-`--secret-backend-evidence` and `--host-mount-evidence` files; ordinary CI and fixture runs do not
-write secret values.
+`VBR_CONTROL_PLANE_LIVE_CREDENTIAL_STAGING=1`, `--live`, a reviewed
+`--live-backend-profile` file, and `--credential-directory /run/deployment-control-plane/credentials`.
+The live backend profile is an operator-owned credential file, not a generated bundle artifact. It
+contains the reviewed Infisical site, Universal Auth client credentials, concrete project,
+environment, generated-secret path, deployment identity evidence, and a concrete least-privilege
+scope payload. That scope must name the exact project, environment, path, allowed generated secret
+names, and create/read/update permissions; wildcard names, root paths, or mismatched selectors are
+rejected before any write. The generated secret values are created in memory and written directly to
+Infisical; the resulting evidence records only project, environment, path, write-plan ids, versions,
+and host metadata.
+
+Local live host verification must inspect the actual
+`/run/deployment-control-plane/credentials` mount. For remote hosts, use a deployment-owned
+`--live-host-verification-evidence` result from the reviewed host verifier instead of pointing the
+local command at a copied or temporary directory.
+
+Use `--secret-backend-evidence` or `--host-mount-evidence` only to attach externally reviewed proof.
+Those files remain proof inputs and cannot masquerade as deployment-owned live execution evidence.
 
 ## Step 8: Run Managed Dependency Validation
 
@@ -696,10 +713,13 @@ do not satisfy protected/shared readiness by themselves.
 --rotated-map-out ./credential-map.rotated.json` after refreshing the reviewed backend or
   encrypted host source.
 - Backend write failure: confirm the selected backend profile, least-privilege scope evidence,
+  concrete Infisical project, environment, generated-secret path, deployment identity evidence,
   generated write-plan ids, and reviewed source-provider access for SSH or GitHub App credentials.
 - Host mount permission mismatch: confirm the filename set, uid/gid `10001`, mode `0400`, and
   mount target `/run/deployment-control-plane/credentials`; do not switch to `LoadCredential=`
   unless the generated host profile explicitly implements and tests that path.
+- Remote host verifier failure: refresh the reviewed remote verifier result or run the local
+  verifier from the host that owns the generated AWS bind-mounted credential directory.
 - Cutover evidence rejected: replace dashboard-only notes with structured evidence tied to the same
   AWS instances, image digest, config digest, selected database path, and selected artifact path.
 

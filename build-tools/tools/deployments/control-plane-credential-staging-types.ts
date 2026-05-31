@@ -20,7 +20,10 @@ export type CredentialStagingEvidence = {
   }[];
   reloadEvidence: ReloadEvidence;
   hostMountEvidence: HostMountEvidence;
-  liveBackendWriteEvidence?: LiveBackendWriteEvidence;
+  externalReviewedBackendProof?: ExternalReviewedBackendProof;
+  externalReviewedHostProof?: ExternalReviewedHostProof;
+  deploymentOwnedLiveBackendWrite?: LiveBackendWriteEvidence;
+  deploymentOwnedLiveHostVerification?: LiveHostVerificationEvidence;
   externalPrerequisites: string[];
   ok: boolean;
   errors: string[];
@@ -42,7 +45,10 @@ export type CredentialRotationEvidence = {
   rotatedCredentialMapPath?: string;
   reloadEvidence: ReloadEvidence;
   hostMountEvidence: HostMountEvidence;
-  liveBackendWriteEvidence?: LiveBackendWriteEvidence;
+  externalReviewedBackendProof?: ExternalReviewedBackendProof;
+  externalReviewedHostProof?: ExternalReviewedHostProof;
+  deploymentOwnedLiveBackendWrite?: LiveBackendWriteEvidence;
+  deploymentOwnedLiveHostVerification?: LiveHostVerificationEvidence;
   ok: boolean;
   errors: string[];
 };
@@ -63,14 +69,63 @@ export type HostMountEvidence = {
   evidenceRef?: string;
 };
 
+export type InfisicalLeastPrivilegeScope = {
+  projectId: string;
+  environment: string;
+  secretPath: string;
+  allowedSecretNames: string[];
+  permissions: ("create" | "read" | "update")[];
+};
+
 export type LiveBackendWriteEvidence = {
   schemaVersion: "control-plane-credential-live-backend-write@1";
   checkedAt: string;
   liveGate: "VBR_CONTROL_PLANE_LIVE_CREDENTIAL_STAGING=1";
   backend: "infisical";
+  source: "deployment-owned-live-write";
+  projectId: string;
+  environment: string;
+  secretPath: string;
+  deploymentIdentityEvidenceRef: string;
+  leastPrivilegeScopeEvidenceRef: string;
+  leastPrivilegeScope: InfisicalLeastPrivilegeScope;
   generatedSecretWritePlanIds: string[];
-  backendRefs: string[];
-  hostCredentialSourceIds: string[];
+  writtenSecrets: { file: string; secretName: string; writePlanRef: string; version?: string }[];
   noSecretValuesPersisted: true;
   evidenceRef: string;
+};
+
+export type LiveHostVerificationEvidence = HostMountEvidence & {
+  schemaVersion: "control-plane-live-host-verification@1";
+  checkedAt: string;
+  source: "deployment-owned-live-host-verification";
+  verifier: "local-filesystem" | "reviewed-remote-verifier";
+  verifierIdentity: string;
+  provenance: {
+    kind: "local-host-verifier" | "reviewed-remote-verifier";
+    evidenceRef: string;
+    sourceHostIdentity: string;
+    reviewedAt: string;
+  };
+  awsBindMountVerified?: boolean;
+  reviewedVerifierProfile?: LiveHostVerifierProfile;
+};
+
+export type LiveHostVerifierProfile = {
+  schemaVersion: "control-plane-live-host-verifier-profile@1";
+  verifierIdentity: string;
+  sourceHostIdentity: string;
+  evidenceDigest: string;
+  evidenceRef: string;
+  signature: string;
+};
+
+export type ExternalReviewedBackendProof = {
+  source: "external-reviewed-proof";
+  evidence: unknown;
+};
+
+export type ExternalReviewedHostProof = {
+  source: "external-reviewed-proof";
+  evidence: unknown;
 };

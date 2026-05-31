@@ -32,7 +32,7 @@ export function validateCredentialMap(
     errors.push(...validateRotation(entry));
     if (
       JSON.stringify(entry).match(
-        /secret-value|-----BEGIN|postgres:\/\/[^<\s]+:[^<\s]+@|placeholder|self-attested|dashboard-only/i,
+        /secret-value|secretValue|rawValue|-----BEGIN|postgres:\/\/[^<\s]+:[^<\s]+@|placeholder|self-attested|dashboard-only/i,
       )
     ) {
       errors.push(`${entry.file}: credential map must not persist secret values`);
@@ -78,16 +78,51 @@ function validateCredentialSource(entry: CredentialMapEntry): string[] {
     if (
       source.backend !== "infisical" ||
       !source.secretName ||
+      !selectorComplete(source.selector) ||
       !evidenceRef(source.writePlanRef) ||
-      !evidenceRef(source.policyEvidenceRef)
+      !evidenceRef(source.policyEvidenceRef) ||
+      !evidenceRef(source.deploymentIdentityEvidenceRef) ||
+      !evidenceRef(source.leastPrivilegeScopeEvidenceRef) ||
+      !scopeMatchesSelector(source.leastPrivilegeScope, source.selector)
     ) {
       errors.push(`${entry.file}: generated-secret write plan is incomplete`);
+    }
+    if (source.rawValue || source.value || source.secretValue) {
+      errors.push(`${entry.file}: generated-secret write plan must not contain raw values`);
     }
     if (!evidenceRef(source.evidenceRef)) errors.push(`${entry.file}: source evidence is required`);
   } else {
     errors.push(`${entry.file}: credential source kind is unsupported`);
   }
   return errors;
+}
+
+function scopeMatchesSelector(scope: any, selector: any): boolean {
+  return (
+    scope?.projectId === selector?.projectId &&
+    scope?.environment === selector?.environment &&
+    scope?.secretPath === selector?.secretPath &&
+    Array.isArray(scope?.allowedSecretNames) &&
+    scope.allowedSecretNames.length === 1 &&
+    scope.allowedSecretNames[0] === selector?.secretName &&
+    Array.isArray(scope?.permissions) &&
+    scope.permissions.every((permission: unknown) =>
+      ["create", "read", "update"].includes(String(permission)),
+    )
+  );
+}
+
+function selectorComplete(selector: any): boolean {
+  return (
+    typeof selector?.projectId === "string" &&
+    selector.projectId.trim() !== "" &&
+    typeof selector?.environment === "string" &&
+    selector.environment.trim() !== "" &&
+    typeof selector?.secretPath === "string" &&
+    selector.secretPath.startsWith("/") &&
+    typeof selector?.secretName === "string" &&
+    selector.secretName.trim() !== ""
+  );
 }
 
 function validateRotation(entry: CredentialMapEntry): string[] {

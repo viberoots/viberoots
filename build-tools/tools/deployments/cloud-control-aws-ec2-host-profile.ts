@@ -77,6 +77,11 @@ function awsProfile(input: CloudControlSetupInput, processes: RenderedControlPla
     imagePublication: input.imagePublication,
     registryProfile: input.imagePublication?.registryProfile,
     mounts: controlPlaneMountSpecs("host-path"),
+    credentialMountWiring: {
+      mode: "bind-mounted-credential-directory",
+      target: "/run/deployment-control-plane/credentials",
+      readOnly: true,
+    },
     runtimeUser: { uid: CONTROL_PLANE_UID, gid: CONTROL_PLANE_GID },
     observabilityProfile: "aws-ec2-observability-profile.json",
     hostProfileEvidenceContract: "aws-ec2-host-profile-evidence.contract.json",

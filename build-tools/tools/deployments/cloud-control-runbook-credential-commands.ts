@@ -17,6 +17,16 @@ export function credentialCommands(input: CloudControlSetupInput): RunbookComman
       "credential staging evidence is fresh and bound to the manifest and map",
     ),
     credentialCommand(
+      "credential-staging-live",
+      `${rootPrelude(input.outDir)}; VBR_CONTROL_PLANE_LIVE_CREDENTIAL_STAGING=1 deployment-control-plane credential-staging --live --bundle-dir "$PROFILE_ROOT" --live-backend-profile "$PROFILE_ROOT/live-infisical-backend.profile.json" --credential-directory /run/deployment-control-plane/credentials --live-host-verifier-profile "$PROFILE_ROOT/live-host-verifier.profile.json" --out "$PROFILE_ROOT/credential-staging.live.json"`,
+      ["$PROFILE_ROOT/credential-staging.live.json"],
+      "deployment-owned live backend write and host mount verification pass",
+      [
+        "$PROFILE_ROOT/live-infisical-backend.profile.json",
+        "$PROFILE_ROOT/live-host-verifier.profile.json",
+      ],
+    ),
+    credentialCommand(
       "credential-rotation",
       `${rootPrelude(input.outDir)}; deployment-control-plane credential-rotation --bundle-dir "$PROFILE_ROOT" --apply-rotation --out "$PROFILE_ROOT/credential-rotation.json" --rotated-map-out "$PROFILE_ROOT/credential-map.rotated.json"`,
       ["$PROFILE_ROOT/credential-rotation.json", "$PROFILE_ROOT/credential-map.rotated.json"],
@@ -30,6 +40,7 @@ function credentialCommand(
   body: string,
   outputs: string[],
   mustPass: string,
+  extraInputs: string[] = [],
 ): RunbookCommand {
   return {
     id,
@@ -41,6 +52,7 @@ function credentialCommand(
       "$PROFILE_ROOT/credential-manifest.json",
       "$PROFILE_ROOT/credential-map.json",
       "$PROFILE_ROOT/supabase-postgres.profile.json",
+      ...extraInputs,
     ],
     outputs,
     mustPass,

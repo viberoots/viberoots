@@ -1,5 +1,7 @@
 import type { CloudControlSetupInput } from "./cloud-control-setup-types";
 import { setupArtifactCredentialMode } from "./cloud-control-setup-aws-topology";
+import type { DeploymentInfisicalSelector } from "./deployment-secret-infisical-selectors";
+import type { InfisicalLeastPrivilegeScope } from "./control-plane-credential-staging-types";
 
 export const CREDENTIAL_MAP_SCHEMA = "cloud-control-credential-map@1";
 export { validateCredentialMap } from "./cloud-control-credential-map-validation";
@@ -21,10 +23,14 @@ type CredentialSource =
   | {
       kind: "generated-secret-write-plan";
       backend: "infisical";
+      selector: DeploymentInfisicalSelector;
       secretName: string;
       evidenceRef: string;
       writePlanRef: string;
       policyEvidenceRef: string;
+      deploymentIdentityEvidenceRef: string;
+      leastPrivilegeScopeEvidenceRef: string;
+      leastPrivilegeScope: InfisicalLeastPrivilegeScope;
     };
 
 export type CredentialMapEntry = {
@@ -105,10 +111,14 @@ function credentialEntry(input: CloudControlSetupInput, file: string): Credentia
       source: {
         kind: "generated-secret-write-plan",
         backend: "infisical",
-        secretName: "/deployment-control-plane/control-plane-token",
+        selector: generatedSecretSelector(input, "control-plane-token"),
+        secretName: "control-plane-token",
         evidenceRef: "evidence://secret-backend/control-plane-token-write-plan",
         writePlanRef: "evidence://secret-backend/control-plane-token-name-policy",
         policyEvidenceRef: "evidence://secret-backend/control-plane-token-access-policy",
+        deploymentIdentityEvidenceRef: "evidence://infisical/universal-auth-machine-identity",
+        leastPrivilegeScopeEvidenceRef: "evidence://infisical/least-privilege-secret-paths",
+        leastPrivilegeScope: generatedSecretScope(input, "control-plane-token"),
       },
       rotation: rotation("regenerate-write-plan", file),
     };
@@ -138,6 +148,33 @@ function credentialEntry(input: CloudControlSetupInput, file: string): Credentia
     return secretRef(file, "evidence://infisical/universal-auth-import");
   }
   return secretRef(file, `evidence://secret-backend/${file}`);
+}
+
+function generatedSecretScope(
+  input: CloudControlSetupInput,
+  secretName: string,
+): InfisicalLeastPrivilegeScope {
+  const selector = generatedSecretSelector(input, secretName);
+  return {
+    projectId: selector.projectId,
+    environment: selector.environment,
+    secretPath: selector.secretPath,
+    allowedSecretNames: [selector.secretName],
+    permissions: ["create", "read", "update"],
+  };
+}
+
+function generatedSecretSelector(
+  input: CloudControlSetupInput,
+  secretName: string,
+): DeploymentInfisicalSelector {
+  const runtime = input.runtimeInput?.infisicalDeployments[0];
+  return {
+    projectId: runtime?.projectId || "unavailable",
+    environment: runtime?.environment || "production",
+    secretPath: "/deployment-control-plane/generated",
+    secretName,
+  };
 }
 
 function secretRef(file: string, evidenceRef: string): CredentialMapEntry {

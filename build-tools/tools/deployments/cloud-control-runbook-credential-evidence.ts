@@ -6,13 +6,16 @@ import {
   validateCredentialStagingEvidence,
 } from "./control-plane-credential-staging-evidence";
 
-export async function validateCredentialStagingOutput(profileRoot: string): Promise<string[]> {
-  const localPath = path.join(profileRoot, "credential-staging.json");
+export async function validateCredentialStagingOutput(
+  profileRoot: string,
+  fileName = "credential-staging.json",
+): Promise<string[]> {
+  const localPath = path.join(profileRoot, fileName);
   if (!(await exists(localPath))) return [];
-  return validateCredentialStagingEvidence(
-    await readJson(localPath),
-    await credentialDigestExpectations(profileRoot),
-  );
+  return validateCredentialStagingEvidence(await readJson(localPath), {
+    ...(await credentialDigestExpectations(profileRoot)),
+    requireLive: fileName === "credential-staging.live.json",
+  });
 }
 
 export async function validateCredentialRotationOutput(profileRoot: string): Promise<string[]> {
@@ -33,6 +36,7 @@ async function credentialDigestExpectations(profileRoot: string) {
     manifestDigest: digestCredentialInput(manifest),
     credentialMapDigest: digestCredentialInput(map),
     requiredFiles: requiredFiles(manifest),
+    credentialMap: map,
     maxAgeMinutes: 60,
   };
 }

@@ -30,7 +30,7 @@ function evidenceInputs(input: CloudControlSetupInput, capabilities: string[]): 
     "$PROFILE_ROOT/config.yaml",
     "$PROFILE_ROOT/image-publication.json",
     "$PROFILE_ROOT/managed-dependency-evidence.json",
-    "$PROFILE_ROOT/credential-staging.json",
+    "$PROFILE_ROOT/credential-staging.live.json",
     "$PROFILE_ROOT/aws-topology-evidence.json",
     "$PROFILE_ROOT/supabase-postgres.profile.json",
     "$PROFILE_ROOT/supabase-managed-postgres-evidence.json",

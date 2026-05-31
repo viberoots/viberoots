@@ -16,6 +16,7 @@ import {
   privateLinkAwsTopology,
   topologyForPublishedImage,
 } from "./cloud-control-cutover-fixture";
+import { liveCredentialStagingEvidence } from "./cloud-control-credential-staging.fixture";
 import { ecrRegistryProfileForImage } from "./control-plane-registry-profile.fixture";
 import { privateLinkSupabaseProfile } from "./control-plane-supabase-postgres.fixture";
 import { reviewedRuntimeInput } from "./cloud-control-runtime-input.fixture";
@@ -49,14 +50,16 @@ test("setup doctor classifies local runbook phases without cloud credentials", a
     assert.equal(phase(before, "managed-dependencies").status, "blocked");
 
     await fsp.writeFile(path.join(tmp, "setup-doctor.json"), '{"ok":true}\n', "utf8");
+    await writeLiveCredentialInputs(tmp);
     const afterDoctor = await validateRunbookBundle(tmp);
     assert.equal(phase(afterDoctor, "credential-preflight").status, "ready");
 
     await fsp.writeFile(path.join(tmp, "credential-preflight.json"), '{"ok":true}\n', "utf8");
-    await runCredentialStaging({
+    const staging = await runCredentialStaging({
       bundleDir: tmp,
       out: path.join(tmp, "credential-staging.json"),
     });
+    await writeLiveCredentialStagingOutput(tmp, staging);
     await runCredentialRotation({
       bundleDir: tmp,
       applyRotation: true,
@@ -188,6 +191,33 @@ function input(overrides: Partial<CloudControlSetupInput> = {}): CloudControlSet
     runtimeInput: reviewedRuntimeInput(),
     ...overrides,
   };
+}
+
+async function writeLiveCredentialInputs(tmp: string): Promise<void> {
+  await fsp.writeFile(path.join(tmp, "live-infisical-backend.profile.json"), "{}\n", "utf8");
+  await fsp.writeFile(path.join(tmp, "live-host-verifier.profile.json"), "{}\n", "utf8");
+}
+
+async function writeLiveCredentialStagingOutput(tmp: string, staging: any): Promise<void> {
+  await writeLiveCredentialInputs(tmp);
+  const manifest = JSON.parse(
+    await fsp.readFile(path.join(tmp, "credential-manifest.json"), "utf8"),
+  );
+  const credentialMap = JSON.parse(
+    await fsp.readFile(path.join(tmp, "credential-map.json"), "utf8"),
+  );
+  await fsp.writeFile(
+    path.join(tmp, "credential-staging.live.json"),
+    JSON.stringify(
+      liveCredentialStagingEvidence(staging.manifestDigest, staging.credentialMapDigest, {
+        requiredFiles: manifest.requiredFiles,
+        credentialMap,
+      }),
+      null,
+      2,
+    ),
+    "utf8",
+  );
 }
 
 function topologyForImage() {
