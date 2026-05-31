@@ -4,6 +4,7 @@ import net from "node:net";
 import os from "node:os";
 import path from "node:path";
 import { localHarnessControlPlaneDatabaseUrl } from "../../deployments/nixos-shared-host-control-plane-backend";
+import { privateLinkSupabaseProfile } from "./control-plane-supabase-postgres.fixture";
 
 export function withControlPlaneArgv<T>(argv: string[], run: () => Promise<T>): Promise<T> {
   const previous = process.argv;
@@ -88,4 +89,10 @@ export async function writeRuntimeConfig(
     "utf8",
   );
   return { configPath, recordsRoot };
+}
+
+export async function supabaseProfileArgs(tmp: string): Promise<string[]> {
+  const file = path.join(tmp, "supabase-postgres.profile.json");
+  await fsp.writeFile(file, JSON.stringify(privateLinkSupabaseProfile()), "utf8");
+  return ["--supabase-postgres-profile", file];
 }

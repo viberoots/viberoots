@@ -26,6 +26,7 @@ import {
   providerCapabilityHookEvidenceRecord,
   validateProviderCapabilityHookEvidenceShape,
 } from "./cloud-control-provider-capability-hook-contract";
+import { validateSupabaseManagedPostgresProfile } from "./control-plane-supabase-postgres-validation";
 export { validateCredentialManifestFiles } from "./cloud-control-credential-manifest-validate";
 
 const IMAGE_DIGEST_PATTERN = /^[a-z0-9][a-z0-9._:-]*(\/[a-z0-9][a-z0-9._-]*)+@sha256:[a-f0-9]{64}$/;
@@ -54,9 +55,8 @@ export function validateCloudControlSetupInput(input: CloudControlSetupInput): s
       },
     ),
   );
-  if (!ARTIFACT_BACKENDS.includes(input.artifactBackend)) {
+  if (!ARTIFACT_BACKENDS.includes(input.artifactBackend))
     errors.push(`unsupported artifact backend ${input.artifactBackend}`);
-  }
   try {
     assertArtifactCredentialModeAllowed({
       provider: input.artifactBackend,
@@ -87,7 +87,18 @@ export function validateCloudControlSetupInput(input: CloudControlSetupInput): s
     }
   }
   if (input.mode === "aws-ec2") errors.push(...validateAwsEvidence(input));
+  errors.push(...validateSetupSupabasePostgres(input));
   return errors;
+}
+
+function validateSetupSupabasePostgres(input: CloudControlSetupInput): string[] {
+  if (!input.supabasePostgres)
+    return ["cloud control-plane setup requires Supabase Postgres profile"];
+  const mode = awsTopologyDatabaseMode(input.awsTopology) || "public";
+  return validateSupabaseManagedPostgresProfile(input.supabasePostgres, {
+    expectedRegion: input.mode === "aws-ec2" ? input.awsTopology?.region : input.artifactRegion,
+    expectedMode: mode,
+  });
 }
 
 export function assertCloudControlSetupInput(input: CloudControlSetupInput): void {
@@ -162,6 +173,7 @@ function normalizeProviderCommand(command: string): string {
 export function validateProviderCapabilityEvidence(
   declarations: ProviderCapabilityDeclaration[],
   evidenceByCapability: Record<string, unknown>,
+  opts: { supabasePostgresProfile?: CloudControlSetupInput["supabasePostgres"] } = {},
 ): string[] {
   const errors: string[] = [];
   for (const declaration of declarations) {
@@ -174,6 +186,7 @@ export function validateProviderCapabilityEvidence(
     errors.push(
       ...validateProviderCapabilityHookEvidenceShape(declaration.id, evidence, {
         allowedPhases: ["evidence"],
+        expectedSupabasePostgresProfile: opts.supabasePostgresProfile,
       }),
     );
     const evidenceDeclaration = hookEvidenceDeclaration(evidence);

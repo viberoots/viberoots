@@ -25,9 +25,13 @@ test("managed dependency profile parses public and PrivateLink runtime expectati
   assert.equal(privateProfile.runtimePath.expectedAlternateBackendEvidenceRef, "reviewed-alt");
   assert.throws(
     () =>
-      parseManagedDependencyProfile(profileYaml("public").replace("public", "dashboard"), {
-        credentialDirectory: "/run/deployment-control-plane/credentials",
-      }),
+      parseManagedDependencyProfile(
+        profileYaml("public").replace(
+          "databaseConnectivityMode: public",
+          "databaseConnectivityMode: dashboard",
+        ),
+        { credentialDirectory: "/run/deployment-control-plane/credentials" },
+      ),
     /runtimePath\.databaseConnectivityMode/,
   );
 });

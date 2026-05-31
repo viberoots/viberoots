@@ -34,6 +34,9 @@ import {
 } from "./cloud-control-evidence-helpers";
 import { redactConfigDiagnostic } from "./control-plane-runtime-config-validation";
 import { validateManagedPostgresFeatures } from "./nixos-shared-host-control-plane-backend-features";
+import { SUPABASE_POSTGRES_EVIDENCE_SCHEMA } from "./control-plane-supabase-postgres-profile";
+import { validateSupabasePostgresLifecycle } from "./control-plane-managed-dependency-supabase";
+import { expectationsFromProfile } from "./control-plane-managed-dependency-expectations";
 
 export async function validateManagedDependencyProfile(
   profile: ControlPlaneManagedDependencyProfile,
@@ -51,6 +54,15 @@ export async function validateManagedDependencyProfile(
     schemaVersion: "control-plane-managed-dependency-evidence@1",
     profileName: profile.profileName,
     checkedAt: new Date().toISOString(),
+    ...(profile.supabasePostgres
+      ? {
+          supabasePostgres: {
+            schemaVersion: SUPABASE_POSTGRES_EVIDENCE_SCHEMA,
+            checkedAt: new Date().toISOString(),
+            profile: profile.supabasePostgres,
+          },
+        }
+      : {}),
     runtimePath: runtimePathEvidence(profile, runtimeFacts),
     postgres,
     artifactStore,
@@ -84,6 +96,7 @@ export function validateManagedDependencyEvidence(
   const artifactStore = evidenceObject(evidence.artifactStore);
   const runtimePath = evidenceObject(evidence.runtimePath);
   errors.push(...validateRuntimePathEvidence(runtimePath, opts));
+  errors.push(...validateSupabasePostgresLifecycle(evidence, opts));
   if (!Array.isArray(postgres.checkedFeatures) || postgres.checkedFeatures.length === 0) {
     errors.push("managed dependency evidence missing Postgres feature checks");
   }
@@ -207,27 +220,6 @@ export async function validateManagedArtifactStoreProfile(
     checkedOperations: ["PUT", "GET", "HEAD", "metadata", "content-type", "digest"],
     digest: object.digest,
     objectKey: object.key,
-  };
-}
-
-function expectationsFromProfile(
-  profile: ControlPlaneManagedDependencyProfile,
-): ManagedDependencyValidationExpectations {
-  const runtime = profile.runtimePath;
-  return {
-    expectedHostProfile: runtime.expectedHostProfile,
-    expectedRegion: runtime.expectedAwsRegion,
-    expectedDatabaseConnectivityMode: runtime.databaseConnectivityMode,
-    expectedSupabaseProjectRef: runtime.expectedSupabaseProjectRef,
-    expectedSupabaseRegion: runtime.expectedSupabaseRegion,
-    expectedPrivateLinkEndpointId: runtime.expectedPrivateLinkEndpointId,
-    expectedPrivateLinkResourceId: runtime.expectedPrivateLinkResourceId,
-    expectedS3VpcEndpointId: runtime.expectedS3VpcEndpointId,
-    expectedS3EndpointPolicyDigest: runtime.expectedS3EndpointPolicyDigest,
-    expectedArtifactIamRoleArn: runtime.expectedArtifactIamRoleArn,
-    expectedArtifactLeastPrivilegePolicyDigest: runtime.expectedArtifactLeastPrivilegePolicyDigest,
-    expectedAlternateBackendEvidenceRef: runtime.expectedAlternateBackendEvidenceRef,
-    expectedAlternateBackendEvidenceDigest: runtime.expectedAlternateBackendEvidenceDigest,
   };
 }
 

@@ -40,6 +40,7 @@ function validateCapability(
     ...validateProviderCapabilityHookEvidenceShape(id, capability, {
       allowedPhases: ["smoke"],
       maxAgeMinutes,
+      expectedSupabasePostgresProfile: evidence.supabasePostgresProfile,
     }),
   );
   if (!declaration) {

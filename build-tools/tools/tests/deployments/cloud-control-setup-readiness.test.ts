@@ -5,6 +5,7 @@ import { renderCloudControlSetupBundle } from "../../deployments/cloud-control-s
 import { validateProtectedSharedProfileReadiness } from "../../deployments/cloud-control-setup-profile-validate";
 import type { CloudControlSetupInput } from "../../deployments/cloud-control-setup-types";
 import { privateLinkAwsTopology } from "./cloud-control-cutover-fixture";
+import { privateLinkSupabaseProfile } from "./control-plane-supabase-postgres.fixture";
 
 const DIGEST_REF =
   "registry.example.com/platform/deployment-control-plane@sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd";
@@ -32,6 +33,7 @@ function input(overrides: Partial<CloudControlSetupInput> = {}): CloudControlSet
     workerReplicas: 2,
     dryRun: false,
     awsTopology: privateLinkAwsTopology(),
+    supabasePostgres: privateLinkSupabaseProfile(),
     ...overrides,
   };
 }

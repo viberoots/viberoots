@@ -13,6 +13,7 @@ import {
   topologyForPublishedImage,
 } from "./cloud-control-cutover-fixture";
 import { ecrRegistryProfileForImage } from "./control-plane-registry-profile.fixture";
+import { privateLinkSupabaseProfile } from "./control-plane-supabase-postgres.fixture";
 
 const DIGEST = `sha256:${"d".repeat(64)}`;
 const IMAGE = `registry.example.com/platform/deployment-control-plane@${DIGEST}`;
@@ -78,6 +79,7 @@ function input(outDir: string): CloudControlSetupInput {
     workerReplicas: 2,
     dryRun: false,
     awsTopology: topologyForImage(),
+    supabasePostgres: privateLinkSupabaseProfile(),
   };
 }
 

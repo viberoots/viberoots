@@ -16,6 +16,7 @@ import {
   renderIngressChecklist,
   renderManagedDependencies,
   renderManagedDependencyProfile,
+  renderSupabasePostgresProfile,
 } from "./cloud-control-setup-artifacts";
 import { renderCommands } from "./cloud-control-runbook";
 import { modeFiles } from "./cloud-control-setup-profiles";
@@ -47,6 +48,7 @@ export function renderCloudControlSetupBundle(
     "conformance-checklist.json": renderConformanceChecklist(input),
     "managed-dependencies.profile.yaml": renderManagedDependencyProfile(input),
     "managed-dependencies.json": renderManagedDependencies(input),
+    "supabase-postgres.profile.json": renderSupabasePostgresProfile(input),
     "ingress-checklist.json": renderIngressChecklist(input),
     "provider-capabilities.json": `${JSON.stringify(capabilities, null, 2)}\n`,
     ...(input.awsTopology

@@ -8,6 +8,8 @@ import {
 } from "./cloud-control-provider-capability-hook-contract";
 import { awsFoundationHookAdapter } from "./cloud-control-aws-foundation-hooks";
 import type { AwsFoundationProfile } from "./cloud-control-aws-foundation-types";
+import { supabaseManagedPostgresAdapter } from "./cloud-control-supabase-postgres-hooks";
+import type { SupabaseManagedPostgresProfile } from "./control-plane-supabase-postgres-profile";
 
 export const CLOUD_PROVIDER_CAPABILITY_HOOK_PHASES = [
   "preview",
@@ -67,6 +69,7 @@ export type HookAdapterPhaseOptions = {
   deploymentLabel: string;
   declaration: ProviderCapabilityDeclaration;
   awsFoundationInspection?: AwsFoundationProfile;
+  supabasePostgresProfile?: SupabaseManagedPostgresProfile;
 };
 
 const HOOK_ADAPTERS: Record<string, HookAdapter> = {
@@ -75,7 +78,9 @@ const HOOK_ADAPTERS: Record<string, HookAdapter> = {
   "aws-ecr-control-plane-registry": reviewedAdapter("aws-ecr-control-plane-registry"),
   "aws-s3-artifact-store": awsFoundationHookAdapter("aws-s3-artifact-store"),
   "aws-network-foundation": awsFoundationHookAdapter("aws-network-foundation"),
-  "supabase-managed-postgres": reviewedAdapter("supabase-managed-postgres"),
+  "supabase-managed-postgres": supabaseManagedPostgresAdapter(
+    reviewedAdapter("supabase-managed-postgres-evidence-gate", false, true),
+  ),
   "supabase-privatelink-prerequisite": supabasePrivateLinkAdapter(),
   "cloudflare-edge": reviewedAdapter("cloudflare-edge"),
   "vercel-operator-ui": reviewedAdapter("vercel-operator-ui"),
@@ -89,6 +94,7 @@ export async function runCloudProviderCapabilityHook(opts: {
   targetIdentity?: string;
   declaration?: ProviderCapabilityDeclaration;
   awsFoundationInspection?: AwsFoundationProfile;
+  supabasePostgresProfile?: SupabaseManagedPostgresProfile;
 }): Promise<CloudProviderCapabilityHookEvidence> {
   assertSupportedPhase(opts.phase);
   const declaration = opts.declaration || concreteDeclaration(opts.capabilityId);
@@ -107,6 +113,9 @@ export async function runCloudProviderCapabilityHook(opts: {
     declaration,
     ...(opts.awsFoundationInspection
       ? { awsFoundationInspection: opts.awsFoundationInspection }
+      : {}),
+    ...(opts.supabasePostgresProfile
+      ? { supabasePostgresProfile: opts.supabasePostgresProfile }
       : {}),
   });
   const output = redactOperatorText(result.rawOutput);

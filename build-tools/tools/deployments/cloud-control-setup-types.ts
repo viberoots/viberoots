@@ -1,6 +1,7 @@
 import type { ControlPlaneImagePublicationEvidence } from "./control-plane-image-publication";
 import type { AwsTopologyEvidence } from "./cloud-control-aws-topology-types";
 import type { ArtifactCredentialMode } from "./control-plane-artifact-credential-mode";
+import type { SupabaseManagedPostgresProfile } from "./control-plane-supabase-postgres-profile";
 
 export const CLOUD_PROFILE_MODES = ["compose-podman", "nixos", "saas-oci", "aws-ec2"] as const;
 
@@ -41,6 +42,7 @@ export type CloudControlSetupInput = {
   workerReplicas: number;
   dryRun: boolean;
   awsTopology?: AwsTopologyEvidence;
+  supabasePostgres?: SupabaseManagedPostgresProfile;
   supabasePrivatelink?: boolean;
   ingressCommandEvidence?: Record<string, unknown>;
   requireIngressCommandEvidence?: boolean;

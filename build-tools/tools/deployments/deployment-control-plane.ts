@@ -68,6 +68,7 @@ function command():
     "service-replicas",
     "skopeo",
     "source-revision",
+    "supabase-postgres-profile",
     "tag",
     "token",
     "worker-id",

@@ -5,6 +5,10 @@ import {
   CLOUD_PROVIDER_CAPABILITY_HOOK_EVIDENCE_SOURCE,
 } from "../../deployments/cloud-control-provider-capability-hook-contract";
 import { managedDependencyEvidence } from "./cloud-control-cutover-managed-dependencies.fixture";
+import {
+  SUPABASE_POSTGRES_EVIDENCE_SCHEMA,
+  reviewedSupabaseManagedPostgresProfile,
+} from "../../deployments/control-plane-supabase-postgres-profile";
 import { ecrRegistryProfileForImage } from "./control-plane-registry-profile.fixture";
 import { ingressCommandEvidence } from "./cloud-control-aws-ingress.fixture";
 import {
@@ -44,6 +48,13 @@ export function evidence(overrides: Record<string, unknown> = {}) {
     },
     imagePublication: imagePublicationEvidence(),
     managedDependencies: managedDependencyEvidence(),
+    supabasePostgresProfile: reviewedSupabaseManagedPostgresProfile({
+      instanceId: "cloud-control-plane",
+      region: "us-east-1",
+      mode: "privatelink",
+      organizationId: "org-control-plane-prod",
+      projectRef: "project-review",
+    }),
     awsTopology: privateLinkAwsTopology(),
     latestNonProductionDeployment: {
       runId: "deploy-run-1",
@@ -147,6 +158,33 @@ function providerPayloadFor(id: string) {
         ramPermissionEvidenceRef: "ram-acceptance-permission",
         latticePermissionEvidenceRef: "vpc-lattice-association-permission",
         privateDnsEvidenceRef: "private-dns-proof",
+      },
+    };
+  }
+  if (id === "supabase-managed-postgres") {
+    return {
+      providerPayload: {
+        schemaVersion: "supabase-managed-postgres-provider-payload@1",
+        evidenceMode: "evidence-only",
+        automatedProvisioningSuccess: false,
+        mutationAuthority: false,
+        expectedProfileIdentity: {
+          organizationId: "org-control-plane-prod",
+          projectRef: "project-review",
+          region: "us-east-1",
+          mode: "privatelink",
+        },
+        lifecycleEvidence: {
+          schemaVersion: SUPABASE_POSTGRES_EVIDENCE_SCHEMA,
+          checkedAt: freshCheckedAt(),
+          profile: reviewedSupabaseManagedPostgresProfile({
+            instanceId: "cloud-control-plane",
+            region: "us-east-1",
+            mode: "privatelink",
+            organizationId: "org-control-plane-prod",
+            projectRef: "project-review",
+          }),
+        },
       },
     };
   }

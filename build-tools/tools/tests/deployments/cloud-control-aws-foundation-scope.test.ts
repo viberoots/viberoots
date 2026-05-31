@@ -19,7 +19,7 @@ import {
   topologyForPublishedImage,
 } from "./cloud-control-cutover-fixture";
 import { ecrRegistryProfileForImage } from "./control-plane-registry-profile.fixture";
-
+import { privateLinkSupabaseProfile } from "./control-plane-supabase-postgres.fixture";
 const opts = { expectedRegion: "us-east-1", maxAgeMinutes: 60 };
 const image =
   "registry.example.com/platform/deployment-control-plane@sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee";
@@ -210,7 +210,6 @@ test("alternate artifact backends keep selected provider and reviewed import evi
     "sha256:cloudflare-r2-import",
   );
 });
-
 function input(overrides: Partial<CloudControlSetupInput>): CloudControlSetupInput {
   return {
     outDir: "unused",
@@ -241,6 +240,7 @@ function input(overrides: Partial<CloudControlSetupInput>): CloudControlSetupInp
     workerReplicas: 2,
     dryRun: false,
     awsTopology: topologyForImage(),
+    supabasePostgres: privateLinkSupabaseProfile(),
     ...overrides,
   };
 }

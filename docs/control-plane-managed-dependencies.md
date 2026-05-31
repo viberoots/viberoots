@@ -29,6 +29,14 @@ artifactStore:
   keyPrefix: tmp/control-plane-conformance
 ```
 
+When Supabase Postgres is selected, the generated profile also embeds non-secret
+`supabasePostgres` lifecycle expectations. These expectations prove the selected organization and
+project are readable by the operator, the selected Supabase plan supports the region and connection
+mode, and the backup, point-in-time recovery, retention, restore, migration, and schema
+compatibility posture has been reviewed. The schema authority is the existing control-plane backend
+schema metadata in `nixos-shared-host-control-plane-backend-schema.ts`; Supabase dashboard state is
+not a schema authority.
+
 Supported providers are explicit candidate labels:
 
 - Postgres: `supabase-postgres`, `postgres-compatible`
@@ -58,6 +66,12 @@ host, TLS status, non-secret bucket/region/endpoint host, checked operations, di
 S3 VPC endpoint proof for AWS S3, and Postgres feature results. It must not contain database URLs,
 access keys, secret keys, or credential file contents.
 
+For Supabase Postgres, evidence also includes a `supabase-managed-postgres-evidence@1` lifecycle
+record. Plan, region, backup, PITR, retention, restore, migration lock, schema version, and schema
+compatibility failures are blocking validation failures. Dashboard or support-mediated actions may
+appear only as evidence-only records with `mutationAuthority: false`; they are not automated
+provisioning success.
+
 Expected runtime fields in `runtimePath`, including the selected database connectivity mode, are
 compared against observed command inputs or connection facts. The validator does not copy expected
 PrivateLink, Supabase, or S3 endpoint identities into evidence. For PrivateLink and AWS S3 cutover
@@ -72,6 +86,8 @@ Database connectivity mode is explicit:
 - `privatelink` rejects public Supabase database hostnames and requires PrivateLink endpoint or
   resource identity. Cutover evidence must come from the AWS EC2 runtime path unless the profile is
   explicitly marked `nonCutoverDiagnostic: true`.
+- The selected Supabase plan must support the chosen mode. PrivateLink additionally requires plan
+  and region capability evidence for the exact Supabase/AWS region path.
 
 Supabase project, Supabase region, PrivateLink endpoint/resource, and S3 VPC endpoint expectations
 may be explicit operator-reviewed profile inputs until the generated Supabase lifecycle profile

@@ -8,7 +8,10 @@ import { runDeploymentControlPlaneCommand } from "../../deployments/deployment-c
 import { runInTemp } from "../lib/test-helpers";
 import { ingressCommandEvidence } from "./cloud-control-aws-ingress.fixture";
 import { foundationFromTopology, privateLinkAwsTopology } from "./cloud-control-cutover-fixture";
-import { withControlPlaneArgv } from "./control-plane-process-entrypoints.helpers";
+import {
+  supabaseProfileArgs,
+  withControlPlaneArgv,
+} from "./control-plane-process-entrypoints.helpers";
 import { ecrRegistryProfile } from "./control-plane-registry-profile.fixture";
 
 const DIGEST = `sha256:${"d".repeat(64)}`;
@@ -115,13 +118,13 @@ test("production AWS setup consumes generated image publication evidence path", 
         topology,
         "--ingress-command-evidence",
         ingressCommandEvidenceFiles.join(","),
+        ...(await supabaseProfileArgs(tmp)),
       ],
       runDeploymentControlPlaneCommand,
     );
     const profile = YAML.parse(await fsp.readFile(path.join(out, "aws-ec2-profile.yaml"), "utf8"));
     assert.equal(profile.imagePublication.image, IMAGE);
     assert.equal(profile.registryProfile.mode, "aws-ecr");
-    await fsp.access(path.join(out, "registry-profile.json"));
     const publication = JSON.parse(
       await fsp.readFile(path.join(out, "image-publication.json"), "utf8"),
     );

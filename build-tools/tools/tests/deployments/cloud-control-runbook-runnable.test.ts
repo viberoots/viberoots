@@ -12,8 +12,8 @@ import type { CloudControlSetupInput } from "../../deployments/cloud-control-set
 import { foundationFromTopology } from "./cloud-control-aws-foundation-fixture";
 import { privateLinkAwsTopology, topologyForPublishedImage } from "./cloud-control-cutover-fixture";
 import { ecrRegistryProfileForImage } from "./control-plane-registry-profile.fixture";
+import { privateLinkSupabaseProfile } from "./control-plane-supabase-postgres.fixture";
 import { runInScratchTemp } from "../lib/test-helpers";
-
 const sh = promisify(exec);
 const DIGEST = `sha256:${"e".repeat(64)}`;
 const IMAGE = `registry.example.com/platform/deployment-control-plane@${DIGEST}`;
@@ -142,6 +142,7 @@ function input(outDir: string, publicUrl: string): CloudControlSetupInput {
     workerReplicas: 2,
     dryRun: false,
     awsTopology: topologyForImage(publicUrl),
+    supabasePostgres: privateLinkSupabaseProfile(),
   };
 }
 

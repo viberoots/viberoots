@@ -5,6 +5,7 @@ import { runCloudProviderCapabilityHook } from "../../deployments/cloud-control-
 import { renderCloudControlSetupBundle } from "../../deployments/cloud-control-setup-render";
 import { validateProviderCapabilityEvidence } from "../../deployments/cloud-control-setup-validate";
 import type { CloudControlSetupInput } from "../../deployments/cloud-control-setup-types";
+import { reviewedSupabaseManagedPostgresProfile } from "../../deployments/control-plane-supabase-postgres-profile";
 import { privateLinkAwsTopology } from "./cloud-control-cutover-fixture";
 
 const DIGEST_REF =
@@ -26,7 +27,26 @@ test("provider-capability hook evidence is required before protected readiness",
     /protected\/shared readiness requires hook evidence/,
   );
   const completeEvidence = await hookEvidenceFor(capabilities);
-  assert.deepEqual(validateProviderCapabilityEvidence(capabilities, completeEvidence), []);
+  assert.deepEqual(
+    validateProviderCapabilityEvidence(capabilities, completeEvidence, {
+      supabasePostgresProfile: supabaseProfile(),
+    }),
+    [],
+  );
+  const wrongSupabase = await runCloudProviderCapabilityHook({
+    capabilityId: "supabase-managed-postgres",
+    phase: "evidence",
+    deploymentLabel: "//deployments:staging",
+    supabasePostgresProfile: wrongSupabaseProfile(),
+  });
+  assert.match(
+    validateProviderCapabilityEvidence(
+      capabilities,
+      { ...completeEvidence, "supabase-managed-postgres": wrongSupabase },
+      { supabasePostgresProfile: supabaseProfile() },
+    ).join("\n"),
+    /does not match selected setup profile/,
+  );
   const incompleteEvidence = {
     ...completeEvidence,
     "aws-s3-artifact-store": {
@@ -84,10 +104,33 @@ async function hookEvidenceFor(capabilities: Array<{ id: string }>) {
           capability.id === "aws-s3-artifact-store"
             ? { awsFoundationInspection: foundation }
             : {}),
+          ...(capability.id === "supabase-managed-postgres"
+            ? { supabasePostgresProfile: supabaseProfile() }
+            : {}),
         }),
       ]),
     ),
   );
+}
+
+function supabaseProfile() {
+  return reviewedSupabaseManagedPostgresProfile({
+    instanceId: "cloud-staging",
+    region: "us-east-1",
+    mode: "privatelink",
+    organizationId: "org-control-plane-prod",
+    projectRef: "project-review",
+  });
+}
+
+function wrongSupabaseProfile() {
+  return reviewedSupabaseManagedPostgresProfile({
+    instanceId: "cloud-staging",
+    region: "us-west-2",
+    mode: "public",
+    organizationId: "org-other",
+    projectRef: "other-project",
+  });
 }
 
 function baseInput(): CloudControlSetupInput {
@@ -118,5 +161,6 @@ function baseInput(): CloudControlSetupInput {
     workerReplicas: 2,
     dryRun: false,
     awsTopology: privateLinkAwsTopology(),
+    supabasePostgres: supabaseProfile(),
   };
 }

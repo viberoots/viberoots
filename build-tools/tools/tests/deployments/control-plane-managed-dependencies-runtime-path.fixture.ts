@@ -3,6 +3,7 @@ import type { CloudControlSetupInput } from "../../deployments/cloud-control-set
 import type { ManagedDependencyEvidence } from "../../deployments/control-plane-managed-dependency-types";
 import { privateLinkAwsTopology, topologyForPublishedImage } from "./cloud-control-cutover-fixture";
 import { ecrRegistryProfileForImage } from "./control-plane-registry-profile.fixture";
+import { privateLinkSupabaseProfile } from "./control-plane-supabase-postgres.fixture";
 
 const DIGEST_REF =
   "registry.example.com/platform/deployment-control-plane@sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
@@ -12,6 +13,7 @@ const BUILD_IDENTITY = `nix-source-${"c".repeat(64)}`;
 export function profileYaml(mode: "public" | "privatelink"): string {
   return `
 profileName: aws-runtime-review
+supabasePostgres: ${JSON.stringify(privateLinkSupabaseProfile())}
 runtimePath:
   expectedHostProfile: aws-ec2
   expectedAwsRegion: us-east-1
@@ -43,6 +45,11 @@ export function evidence(
     schemaVersion: "control-plane-managed-dependency-evidence@1",
     profileName: "aws-runtime-review",
     checkedAt: new Date().toISOString(),
+    supabasePostgres: {
+      schemaVersion: "supabase-managed-postgres-evidence@1",
+      checkedAt: new Date().toISOString(),
+      profile: privateLinkSupabaseProfile(),
+    },
     runtimePath: baseRuntimePath(),
     postgres: basePostgres(),
     artifactStore: baseArtifactStore(),
@@ -127,6 +134,7 @@ export function setupInput(): CloudControlSetupInput {
     workerReplicas: 2,
     dryRun: false,
     awsTopology: topologyForImage(),
+    supabasePostgres: privateLinkSupabaseProfile(),
   };
 }
 

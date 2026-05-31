@@ -1,4 +1,8 @@
 #!/usr/bin/env zx-wrapper
+import type {
+  SupabaseManagedPostgresEvidence,
+  SupabaseManagedPostgresProfile,
+} from "./control-plane-supabase-postgres-profile";
 
 export type ManagedPostgresProvider = "supabase-postgres" | "postgres-compatible";
 
@@ -43,6 +47,7 @@ export type ManagedDependencyValidationExpectations = {
   expectedArtifactLeastPrivilegePolicyDigest?: string;
   expectedAlternateBackendEvidenceRef?: string;
   expectedAlternateBackendEvidenceDigest?: string;
+  supabasePostgres?: SupabaseManagedPostgresProfile;
 };
 
 export type ManagedPostgresProfile = {
@@ -81,6 +86,7 @@ export type ManagedRuntimePathExpectations = {
 export type ControlPlaneManagedDependencyProfile = {
   profileName: string;
   compatibilityEvidenceFile?: string;
+  supabasePostgres?: SupabaseManagedPostgresProfile;
   runtimePath: ManagedRuntimePathExpectations;
   postgres: ManagedPostgresProfile;
   artifactStore: ManagedArtifactStoreProfile;
@@ -109,6 +115,7 @@ export type ManagedDependencyEvidence = {
   schemaVersion: "control-plane-managed-dependency-evidence@1";
   profileName: string;
   checkedAt: string;
+  supabasePostgres?: SupabaseManagedPostgresEvidence;
   runtimePath: ManagedRuntimePathEvidence;
   postgres: {
     provider: ManagedPostgresProvider;

@@ -15,6 +15,8 @@ import {
   artifactCredentialMode,
   assertArtifactCredentialModeAllowed,
 } from "./control-plane-artifact-credential-mode";
+import { validateSupabaseManagedPostgresProfile } from "./control-plane-supabase-postgres-validation";
+import type { SupabaseManagedPostgresProfile } from "./control-plane-supabase-postgres-profile";
 
 type RawObject = Record<string, unknown>;
 
@@ -51,12 +53,18 @@ export function parseManagedDependencyProfile(
   const artifactStore = objectValue(value.artifactStore, "artifactStore");
   const runtimePath = objectValue(value.runtimePath, "runtimePath");
   const policy = { credentialDirectory: path.resolve(opts.credentialDirectory) };
+  const postgresProvider = enumValue(postgres.provider, POSTGRES_PROVIDERS, "postgres.provider");
+  const supabasePostgres = optionalSupabasePostgres(value.supabasePostgres);
+  if (postgresProvider === "supabase-postgres" && !supabasePostgres) {
+    throw new Error("supabase-postgres managed dependency profile requires supabasePostgres");
+  }
   return {
     profileName: stringValue(value.profileName, "profileName"),
     compatibilityEvidenceFile: optionalEvidenceFile(
       value.compatibilityEvidenceFile,
       opts.baseDir || process.cwd(),
     ),
+    supabasePostgres,
     runtimePath: {
       expectedHostProfile: stringValue(
         runtimePath.expectedHostProfile,
@@ -117,7 +125,7 @@ export function parseManagedDependencyProfile(
       ),
     },
     postgres: {
-      provider: enumValue(postgres.provider, POSTGRES_PROVIDERS, "postgres.provider"),
+      provider: postgresProvider,
       urlFile: credentialFile(postgres.urlFile, "postgres.urlFile", policy),
     },
     artifactStore: {
@@ -143,6 +151,17 @@ export function parseManagedDependencyProfile(
       keyPrefix: optionalString(artifactStore.keyPrefix, "artifactStore.keyPrefix"),
     },
   };
+}
+
+function optionalSupabasePostgres(value: unknown): SupabaseManagedPostgresProfile | undefined {
+  if (value === undefined) return undefined;
+  const profile = objectValue(
+    value,
+    "supabasePostgres",
+  ) as unknown as SupabaseManagedPostgresProfile;
+  const errors = validateSupabaseManagedPostgresProfile(profile);
+  if (errors.length > 0) throw new Error(errors.join("; "));
+  return profile;
 }
 
 export async function readManagedDependencyCredential(filePath: string): Promise<string> {

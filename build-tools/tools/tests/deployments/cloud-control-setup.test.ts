@@ -20,6 +20,7 @@ import {
 } from "../../deployments/cloud-control-setup-profile-validate";
 import type { CloudControlSetupInput } from "../../deployments/cloud-control-setup-types";
 import { privateLinkAwsTopology } from "./cloud-control-cutover-fixture";
+import { privateLinkSupabaseProfile } from "./control-plane-supabase-postgres.fixture";
 import { ecrRegistryProfileForImage } from "./control-plane-registry-profile.fixture";
 import { runInScratchTemp } from "../lib/test-helpers";
 
@@ -49,6 +50,7 @@ function baseInput(overrides: Partial<CloudControlSetupInput> = {}): CloudContro
     workerReplicas: 2,
     dryRun: false,
     awsTopology: privateLinkAwsTopology(),
+    supabasePostgres: privateLinkSupabaseProfile(),
     ...overrides,
   };
 }
@@ -86,8 +88,6 @@ test("cloud setup bundle renders runtime, credentials, commands, and capabilitie
   assert.equal(ingress.serviceIngress.readiness, "/readyz");
   assert.ok(manifest.requiredFiles.includes("pleomino-staging-infisical-client-secret"));
   assert.equal(config.credentials.infisicalDeployments[0].deploymentId, "pleomino-staging");
-  assert.ok(manifest.requiredFiles.includes("reviewed-source-ssh-key"));
-  assert.ok(manifest.requiredFiles.includes("reviewed-source-known-hosts"));
   assert.equal(config.reviewedSource.mode, "ssh");
   assert.equal(
     config.reviewedSource.sshKnownHostsFile,

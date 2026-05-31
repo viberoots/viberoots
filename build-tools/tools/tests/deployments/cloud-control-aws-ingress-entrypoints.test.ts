@@ -17,6 +17,7 @@ import {
   privateLinkAwsTopology,
 } from "./cloud-control-cutover-fixture";
 import { ecrRegistryProfileForImage } from "./control-plane-registry-profile.fixture";
+import { privateLinkSupabaseProfile } from "./control-plane-supabase-postgres.fixture";
 
 test("setup and cutover entrypoints enforce generated ingress command evidence", () => {
   assert.match(
@@ -127,6 +128,7 @@ function setupInput(overrides: Partial<CloudControlSetupInput> = {}): CloudContr
     workerReplicas: 2,
     dryRun: false,
     awsTopology: privateLinkAwsTopology(),
+    supabasePostgres: privateLinkSupabaseProfile(),
     ...overrides,
   };
 }

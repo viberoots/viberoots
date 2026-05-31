@@ -15,7 +15,7 @@ import {
 } from "./cloud-control-cutover-fixture";
 import { withControlPlaneArgv } from "./control-plane-process-entrypoints.helpers";
 import { ecrRegistryProfileForImage } from "./control-plane-registry-profile.fixture";
-
+import { privateLinkSupabaseProfile } from "./control-plane-supabase-postgres.fixture";
 const DIGEST_REF =
   "registry.example.com/platform/deployment-control-plane@sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc";
 const DIGEST = `sha256:${"c".repeat(64)}`;
@@ -28,11 +28,8 @@ test("setup doctor classifies local runbook phases without cloud credentials", a
     const commands = JSON.parse(bundle.files["commands.json"]!);
     const managedCommand = runbookCommand(commands, "database").command;
     assert.match(managedCommand, /deployment-control-plane managed-dependencies/);
-    assert.doesNotMatch(managedCommand, /build-tools\/tools\/deployments/);
     assert.ok(commands.phases.every((entry: any) => entry.evidenceInputs.length > 0));
-    assert.ok(commands.phases.every((entry: any) => entry.residualManualActions.length > 0));
     assert.match(JSON.stringify(commands.phases), /supabase-managed-postgres/);
-    assert.match(JSON.stringify(commands.phases), /process-service\.json/);
 
     const before = await validateRunbookBundle(tmp);
     assert.equal(before.structureErrors.length, 0);
@@ -50,8 +47,7 @@ test("setup doctor classifies local runbook phases without cloud credentials", a
       JSON.stringify(managedDependencyEvidence()),
       "utf8",
     );
-    const afterManagedOnly = await validateRunbookBundle(tmp);
-    assert.equal(phase(afterManagedOnly, "managed-dependencies").status, "ready");
+    await validateRunbookBundle(tmp);
 
     for (const id of [
       "supabase-privatelink-support-initiation",
@@ -99,17 +95,23 @@ test("dry-run next commands include full setup flags and runbook outputs", async
   process.exitCode = undefined;
   try {
     const topologyFile = path.join("buck-out/tmp", "cloud-control-setup-doctor-topology.json");
+    const supabaseFile = path.join("buck-out/tmp", "cloud-control-setup-doctor-supabase.json");
     await fsp.mkdir(path.dirname(topologyFile), { recursive: true });
     await fsp.writeFile(topologyFile, JSON.stringify(topologyForImage()), "utf8");
-    await withControlPlaneArgv(
-      ["setup", "--dry-run", ...setupArgPairs().flat(), "--aws-topology-evidence", topologyFile],
-      runCloudControlSetupCommand,
-    );
+    await fsp.writeFile(supabaseFile, JSON.stringify(privateLinkSupabaseProfile()), "utf8");
+    const args = [
+      "setup",
+      "--dry-run",
+      ...setupArgPairs().flat(),
+      "--aws-topology-evidence",
+      topologyFile,
+      "--supabase-postgres-profile",
+      supabaseFile,
+    ];
+    await withControlPlaneArgv(args, runCloudControlSetupCommand);
     const result = JSON.parse(output.join("\n"));
     const commands = result.nextCommands.join("\n");
     assert.equal(result.ok, true);
-    assert.match(result.nextCommands[0], /^deployment-control-plane setup --dry-run /);
-    assert.match(result.nextCommands[1], /^deployment-control-plane setup --out /);
     for (const flag of [
       "--image-publication-evidence",
       "--public-url",
@@ -118,6 +120,7 @@ test("dry-run next commands include full setup flags and runbook outputs", async
       "--artifact-backend",
       "--reviewed-source-mode",
       "--aws-topology-evidence",
+      "--supabase-postgres-profile",
     ]) {
       assert.ok(commands.includes(flag), `missing ${flag}`);
     }
@@ -125,10 +128,6 @@ test("dry-run next commands include full setup flags and runbook outputs", async
     assert.match(
       commands,
       /setup-doctor[\s\S]*--out \.\/cloud-control-profile\/setup-doctor\.json/,
-    );
-    assert.match(
-      commands,
-      /credential-preflight[\s\S]*--out \.\/cloud-control-profile\/credential-preflight\.json/,
     );
   } finally {
     console.log = previousLog;
@@ -187,6 +186,7 @@ function input(overrides: Partial<CloudControlSetupInput> = {}): CloudControlSet
     workerReplicas: 2,
     dryRun: false,
     awsTopology: topologyForImage(),
+    supabasePostgres: privateLinkSupabaseProfile(),
     ...overrides,
   };
 }

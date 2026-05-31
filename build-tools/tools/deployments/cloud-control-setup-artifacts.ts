@@ -65,6 +65,7 @@ export function renderManagedDependencyProfile(input: CloudControlSetupInput): s
     profileName: input.instanceId,
     compatibilityEvidenceFile: "./managed-dependency-evidence.json",
     runtimePath: runtimePath(input),
+    supabasePostgres: supabaseProfile(input),
     postgres: {
       provider: "supabase-postgres",
       urlFile: cred("control-plane-database-url"),
@@ -93,12 +94,20 @@ export function renderManagedDependencies(input: CloudControlSetupInput): string
       postgres: {
         profile: "managed-postgres",
         candidate: "supabase-managed-postgres",
+        supabaseProfile: "supabase-postgres.profile.json",
         urlCredentialFile: "/run/deployment-control-plane/credentials/control-plane-database-url",
         privateConnectivity:
           input.mode === "aws-ec2" && setupUsesSupabasePrivateLink(input)
             ? "supabase-privatelink-prerequisite"
             : "public-tls",
-        requiredEvidence: ["feature conformance", "restore check", "backup policy"],
+        requiredEvidence: [
+          "feature conformance",
+          "plan and region capability",
+          "organization/project access",
+          "migration readiness",
+          "restore check",
+          "backup policy",
+        ],
       },
       artifactStore: {
         backend: input.artifactBackend,
@@ -122,6 +131,10 @@ export function renderManagedDependencies(input: CloudControlSetupInput): string
     null,
     2,
   )}\n`;
+}
+
+export function renderSupabasePostgresProfile(input: CloudControlSetupInput): string {
+  return `${JSON.stringify(supabaseProfile(input), null, 2)}\n`;
 }
 
 export function renderIngressChecklist(input: CloudControlSetupInput): string {
@@ -195,4 +208,9 @@ function runtimePath(input: CloudControlSetupInput) {
     expectedAlternateBackendEvidenceRef: topology?.artifactBackendEvidence?.reviewedReference,
     expectedAlternateBackendEvidenceDigest: topology?.artifactBackendEvidence?.digest,
   };
+}
+
+function supabaseProfile(input: CloudControlSetupInput) {
+  if (input.supabasePostgres) return input.supabasePostgres;
+  throw new Error("cloud control-plane setup requires --supabase-postgres-profile");
 }

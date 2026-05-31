@@ -19,6 +19,7 @@ import {
   livePlaceholderArtifactStore,
   requireLiveEnv,
 } from "./control-plane-managed-dependencies.live-helpers";
+import { privateLinkSupabaseProfile } from "./control-plane-supabase-postgres.fixture";
 
 async function withScratch(name: string, fn: (tmp: string) => Promise<void>) {
   const tmp = await fsp.mkdtemp(path.join(os.tmpdir(), `${name}-`));
@@ -44,6 +45,7 @@ function profileYaml(credentials: string, evidenceFile = "evidence/managed.json"
   return `
 profileName: supabase-and-r2-review
 compatibilityEvidenceFile: ${evidenceFile}
+supabasePostgres: ${JSON.stringify(privateLinkSupabaseProfile())}
 runtimePath:
   expectedHostProfile: aws-ec2
   expectedAwsRegion: us-east-1

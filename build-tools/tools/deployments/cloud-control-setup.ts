@@ -20,6 +20,7 @@ import type {
   ReviewedSourceMode,
 } from "./cloud-control-setup-types";
 import { artifactCredentialMode } from "./control-plane-artifact-credential-mode";
+import type { SupabaseManagedPostgresProfile } from "./control-plane-supabase-postgres-profile";
 
 export async function runCloudControlSetupCommand(): Promise<void> {
   const input = readCloudControlSetupInput();
@@ -104,11 +105,18 @@ export function readCloudControlSetupInput(): CloudControlSetupInput {
     workerReplicas: numberFlag("worker-replicas", 2),
     dryRun: getFlagBool("dry-run"),
     awsTopology,
+    supabasePostgres: supabasePostgresFromFlags(),
     supabasePrivatelink: getFlagBool("supabase-privatelink"),
     ingressCommandEvidence: ingressCommandEvidenceFromFlags(),
     requireIngressCommandEvidence:
       mode === "aws-ec2" && !getFlagBool("dry-run") && Boolean(awsTopology?.ingress),
   };
+}
+
+function supabasePostgresFromFlags(): SupabaseManagedPostgresProfile | undefined {
+  const filePath = getFlagStr("supabase-postgres-profile", "").trim();
+  if (!filePath) return undefined;
+  return JSON.parse(fs.readFileSync(filePath, "utf8")) as SupabaseManagedPostgresProfile;
 }
 
 function awsTopologyFromFlags(): CloudControlSetupInput["awsTopology"] {

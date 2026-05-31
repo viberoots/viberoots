@@ -18,6 +18,7 @@ import {
   privateLinkAwsTopology,
 } from "./cloud-control-cutover-fixture";
 import { setupInput } from "./control-plane-managed-dependencies-runtime-path.fixture";
+import { privateLinkSupabaseProfile } from "./control-plane-supabase-postgres.fixture";
 
 test("setup CLI rejects --supabase-privatelink when topology selects public database mode", async () => {
   await runInScratchTemp("setup-privatelink-flag-conflict", async (tmp) => {
@@ -205,6 +206,7 @@ async function writeArtifactCredentials(creds: string) {
 function managedProfile(creds: string) {
   return `
 profileName: aws-runtime-review
+supabasePostgres: ${JSON.stringify(privateLinkSupabaseProfile())}
 runtimePath:
   expectedHostProfile: aws-ec2
   expectedAwsRegion: us-east-1

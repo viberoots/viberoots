@@ -1,5 +1,10 @@
 #!/usr/bin/env zx-wrapper
 
+export const CONTROL_PLANE_SCHEMA_AUTHORITY = "nixos-shared-host-control-plane-backend-schema";
+export const CONTROL_PLANE_SCHEMA_VERSION = "control-plane-backend-schema@2026-05-31";
+export const CONTROL_PLANE_SCHEMA_PATH =
+  "build-tools/tools/deployments/nixos-shared-host-control-plane-backend-schema.ts";
+
 export const NIXOS_SHARED_HOST_CONTROL_PLANE_BACKEND_SCHEMA_SQL = `
   CREATE TABLE IF NOT EXISTS submissions (
     submission_id TEXT PRIMARY KEY,

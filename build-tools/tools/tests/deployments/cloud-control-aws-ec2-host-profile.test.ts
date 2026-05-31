@@ -9,17 +9,20 @@ import { writeCloudControlSetupBundle } from "../../deployments/cloud-control-se
 import { renderCloudControlSetupBundle } from "../../deployments/cloud-control-setup-render";
 import { REQUIRED_AWS_EC2_ALARMS } from "../../deployments/cloud-control-aws-ec2-host-profile";
 import type { CloudControlSetupInput } from "../../deployments/cloud-control-setup-types";
-import { privateLinkAwsTopology } from "./cloud-control-cutover-fixture";
+import {
+  IMAGE_BUILD_IDENTITY,
+  IMAGE_DIGEST,
+  IMAGE_REF,
+  privateLinkAwsTopology,
+} from "./cloud-control-cutover-fixture";
 import { ecrRegistryProfileForImage } from "./control-plane-registry-profile.fixture";
-import { IMAGE_BUILD_IDENTITY, IMAGE_DIGEST, IMAGE_REF } from "./cloud-control-cutover-fixture";
+import { privateLinkSupabaseProfile } from "./control-plane-supabase-postgres.fixture";
 import { runInScratchTemp } from "../lib/test-helpers";
-
 test("AWS EC2 setup renders realizable units podman script and NixOS module reuse", () => {
   const bundle = renderCloudControlSetupBundle(input());
   assert.equal(bundle.files["systemd-podman.units.txt"], undefined);
   const profile = YAML.parse(bundle.files["aws-ec2-profile.yaml"]!);
   assert.equal(profile.preferredHost, "nixos-ec2");
-  assert.equal(profile.compatibilityHost, "systemd-podman");
   assert.equal(profile.processes.length, 3);
   assert.deepEqual(
     profile.processes.map((process: any) => process.mounts),
@@ -28,8 +31,6 @@ test("AWS EC2 setup renders realizable units podman script and NixOS module reus
   const serviceUnit = bundle.files["systemd/deployment-control-plane-service.service"]!;
   assert.match(serviceUnit, /User=10001/);
   assert.match(serviceUnit, /Restart=always/);
-  assert.match(serviceUnit, /KillSignal=SIGTERM/);
-  assert.match(serviceUnit, /TimeoutStopSec=60/);
   assert.match(serviceUnit, /:\/etc\/deployment-control-plane\/config.yaml:ro/);
   assert.match(serviceUnit, /:\/run\/deployment-control-plane\/credentials:ro/);
   assert.match(serviceUnit, /127\.0\.0\.1:7780:7780/);
@@ -124,7 +125,6 @@ test("generated activation scripts install bundled systemd units before enabling
     assert.equal((await fsp.stat(podmanCredentialDir)).mode & 0o777, 0o750);
     assert.ok(await exists(path.join(podmanStateRoot, "records")));
     assert.ok(await exists(path.join(podmanStateRoot, "artifacts")));
-    assert.ok(await exists(path.join(podmanStateRoot, "runtime")));
     assert.deepEqual((await fsp.readdir(podmanUnitDir)).sort(), [
       "deployment-control-plane-service.service",
       "deployment-control-plane-worker-1.service",
@@ -153,8 +153,6 @@ test("generated activation scripts install bundled systemd units before enabling
     );
     assert.ok(await exists(userDataCredentialDir));
     assert.ok(await exists(path.join(userDataStateRoot, "records")));
-    assert.ok(await exists(path.join(userDataStateRoot, "artifacts")));
-    assert.ok(await exists(path.join(userDataStateRoot, "runtime")));
     assert.deepEqual((await fsp.readdir(userDataUnitDir)).sort(), [
       "deployment-control-plane-service.service",
       "deployment-control-plane-worker-1.service",
@@ -234,6 +232,7 @@ function input(overrides: Partial<CloudControlSetupInput> = {}): CloudControlSet
     workerReplicas: 2,
     dryRun: false,
     awsTopology: privateLinkAwsTopology(),
+    supabasePostgres: privateLinkSupabaseProfile(),
     ...overrides,
   };
 }

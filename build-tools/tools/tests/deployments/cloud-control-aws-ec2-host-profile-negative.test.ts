@@ -9,6 +9,7 @@ import type { CloudControlSetupInput } from "../../deployments/cloud-control-set
 import { privateLinkAwsTopology } from "./cloud-control-cutover-fixture";
 import { ecrRegistryProfileForImage } from "./control-plane-registry-profile.fixture";
 import { IMAGE_BUILD_IDENTITY, IMAGE_DIGEST, IMAGE_REF } from "./cloud-control-cutover-fixture";
+import { privateLinkSupabaseProfile } from "./control-plane-supabase-postgres.fixture";
 
 test("AWS EC2 host profile validation rejects AMI pin and network placement gaps", () => {
   assertRejects({ compute: { amiBuildIdentity: "" } }, /missing AMI build identity/);
@@ -152,6 +153,7 @@ function input(overrides: Partial<CloudControlSetupInput> = {}): CloudControlSet
     workerReplicas: 2,
     dryRun: false,
     awsTopology: privateLinkAwsTopology(),
+    supabasePostgres: privateLinkSupabaseProfile(),
     ...overrides,
   };
 }

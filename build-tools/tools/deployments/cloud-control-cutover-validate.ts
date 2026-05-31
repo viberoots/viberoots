@@ -11,6 +11,7 @@ import { validateCutoverProviderCapabilities } from "./cloud-control-cutover-pro
 import { validateControlPlaneImagePublicationEvidence } from "./control-plane-image-publication";
 import { validateManagedDependencyEvidence } from "./control-plane-managed-dependency-validation";
 import type { ManagedDependencyValidationExpectations } from "./control-plane-managed-dependency-types";
+import { validateSupabaseProfileSource } from "./cloud-control-cutover-supabase";
 
 const BASE_HEALTH = [
   "cloudHealth",
@@ -30,6 +31,7 @@ export function validateCloudControlCutover(
   const errors = [
     ...validateIdentity(evidence, options),
     ...validateBaseHealth(evidence),
+    ...validateSupabaseProfileSource(evidence, options),
     ...validateManagedDependencyCutoverSource(evidence),
     ...validateManagedDependencyEvidence(
       evidence.managedDependencies,
@@ -67,18 +69,22 @@ function managedDependencyExpectations(
     topology.database?.mode === "privatelink" ? topology.database.privatelink || {} : {};
   const s3Endpoint = topology.s3VpcEndpoint || {};
   const alternate = topology.artifactBackendEvidence || {};
+  const profile = evidence.supabasePostgresProfile;
+  const profileProject = profile?.project || {};
+  const profileConnection = profile?.connection || {};
   return {
     expectedHostProfile: options.expectedHostProfile,
     expectedRegion: options.expectedRegion,
-    expectedDatabaseConnectivityMode: topology.database?.mode,
-    expectedSupabaseProjectRef: privatelink.supabaseProjectRef,
-    expectedSupabaseRegion: privatelink.supabaseRegion,
+    expectedDatabaseConnectivityMode: profileConnection.mode || topology.database?.mode,
+    expectedSupabaseProjectRef: profile?.provisioning?.projectRef || privatelink.supabaseProjectRef,
+    expectedSupabaseRegion: profileProject.region || privatelink.supabaseRegion,
     expectedPrivateLinkEndpointId: privatelink.endpointId,
     expectedPrivateLinkResourceId: privatelink.resourceConfigurationArn,
     expectedS3VpcEndpointId: s3Endpoint.endpointId,
     expectedS3EndpointPolicyDigest: s3Endpoint.endpointPolicyDigest,
     expectedAlternateBackendEvidenceRef: alternate.reviewedReference,
     expectedAlternateBackendEvidenceDigest: alternate.digest,
+    supabasePostgres: profile,
   };
 }
 

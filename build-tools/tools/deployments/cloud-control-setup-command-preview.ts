@@ -63,6 +63,8 @@ function setupCommand(input: CloudControlSetupInput, dryRun: boolean): string {
     input.artifactLeastPrivilegePolicyDigest,
     input.mode === "aws-ec2" ? "--aws-topology-evidence" : undefined,
     input.mode === "aws-ec2" ? "$PROFILE_ROOT/aws-topology-evidence.json" : undefined,
+    input.supabasePostgres ? "--supabase-postgres-profile" : undefined,
+    input.supabasePostgres ? "$PROFILE_ROOT/supabase-postgres.profile.json" : undefined,
     setupUsesSupabasePrivateLink(input) ? "--supabase-privatelink" : undefined,
     input.mode === "aws-ec2" ? "--ingress-command-evidence" : undefined,
     input.mode === "aws-ec2" ? ingressEvidencePaths() : undefined,

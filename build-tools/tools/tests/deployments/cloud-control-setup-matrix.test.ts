@@ -15,6 +15,7 @@ import type {
 } from "../../deployments/cloud-control-setup-types";
 import { privateLinkAwsTopology, topologyForPublishedImage } from "./cloud-control-cutover-fixture";
 import { ecrRegistryProfileForImage } from "./control-plane-registry-profile.fixture";
+import { privateLinkSupabaseProfile } from "./control-plane-supabase-postgres.fixture";
 import { withControlPlaneArgv } from "./control-plane-process-entrypoints.helpers";
 
 const DIGEST_REF =
@@ -53,6 +54,7 @@ function input(overrides: Partial<CloudControlSetupInput> = {}): CloudControlSet
     workerReplicas: 2,
     dryRun: false,
     awsTopology: awsTopology(),
+    supabasePostgres: privateLinkSupabaseProfile(),
     ...overrides,
   };
 }

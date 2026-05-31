@@ -113,17 +113,25 @@ You need these accounts and choices before starting:
 
 ## Step 1: Provision Supabase Postgres
 
-Create or select the Supabase project that will hold the control-plane database. Separate projects
-per environment are easier to reason about than one shared project with schemas.
+Create or select the Supabase project that will hold the control-plane database, then record it in
+the generated `supabase-postgres.profile.json`. Separate projects per environment are easier to
+reason about than one shared project with schemas.
 
 Record these non-secret values:
 
 - Supabase project ref
+- organization id plus structured evidence that the operator can read the selected organization and
+  project
 - region
+- plan class and evidence that the plan supports the selected region, connection mode, backup,
+  point-in-time recovery, and retention posture
 - database identity label, for example `control-plane-prod-supabase`
 - whether the selected path is `public` or `privatelink`
 - PrivateLink resource configuration name once Supabase shares it
 - PrivateLink endpoint DNS name once AWS creates it
+- backup policy evidence and a non-production restore evidence reference
+- migration readiness evidence that references the reviewed control-plane schema authority:
+  `nixos-shared-host-control-plane-backend-schema`
 
 Store the database URL itself as a secret file value only:
 
@@ -134,6 +142,10 @@ Store the database URL itself as a secret file value only:
 Use the direct Postgres connection string for migrations and conformance checks unless a reviewed
 PgBouncer path has been proven for the specific operation. The control plane relies on Postgres
 features such as JSONB, `FOR UPDATE SKIP LOCKED`, `INSERT ON CONFLICT`, and `RETURNING`.
+
+Dashboard or support-mediated Supabase steps may be attached as structured evidence, but they do not
+count as automated provisioning success and must not become mutation authority. New project creation
+remains live-gated and requires explicit organization selection plus cost confirmation.
 
 ## Step 2: Enable Supabase PrivateLink
 

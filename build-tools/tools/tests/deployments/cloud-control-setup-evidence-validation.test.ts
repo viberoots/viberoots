@@ -5,6 +5,7 @@ import { validateCloudControlSetupInput } from "../../deployments/cloud-control-
 import type { CloudControlSetupInput } from "../../deployments/cloud-control-setup-types";
 import { ingressCommandEvidence } from "./cloud-control-aws-ingress.fixture";
 import { privateLinkAwsTopology } from "./cloud-control-cutover-fixture";
+import { privateLinkSupabaseProfile } from "./control-plane-supabase-postgres.fixture";
 
 const DIGEST = `sha256:${"e".repeat(64)}`;
 const IMAGE = `registry.example.com/platform/deployment-control-plane@${DIGEST}`;
@@ -95,6 +96,7 @@ function input(overrides: Partial<CloudControlSetupInput> = {}): CloudControlSet
     workerReplicas: 2,
     dryRun: false,
     awsTopology: privateLinkAwsTopology(),
+    supabasePostgres: privateLinkSupabaseProfile(),
     ...overrides,
   };
 }
