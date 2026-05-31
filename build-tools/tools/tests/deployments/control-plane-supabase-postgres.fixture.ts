@@ -10,3 +10,13 @@ export function privateLinkSupabaseProfile() {
     projectRef: "project-review",
   });
 }
+
+export function publicSupabaseProfile() {
+  return reviewedSupabaseManagedPostgresProfile({
+    instanceId: "cloud-control-plane",
+    region: "us-east-1",
+    mode: "public",
+    organizationId: "org-control-plane-prod",
+    projectRef: "project-review",
+  });
+}

@@ -3,7 +3,7 @@ import type {
   HookAdapter,
   HookAdapterPhase,
 } from "./cloud-control-provider-capability-hooks";
-import { SUPABASE_POSTGRES_EVIDENCE_SCHEMA } from "./control-plane-supabase-postgres-profile";
+import { buildSupabaseManagedPostgresEvidence } from "./control-plane-supabase-postgres-evidence";
 
 export function supabaseManagedPostgresAdapter(base: HookAdapter): HookAdapter {
   const phase = (selectedPhase: CloudProviderCapabilityHookPhase): HookAdapterPhase => {
@@ -25,11 +25,7 @@ export function supabaseManagedPostgresAdapter(base: HookAdapter): HookAdapter {
                   region: profile.project.region,
                   mode: profile.connection.mode,
                 },
-                lifecycleEvidence: {
-                  schemaVersion: SUPABASE_POSTGRES_EVIDENCE_SCHEMA,
-                  checkedAt: new Date().toISOString(),
-                  profile,
-                },
+                lifecycleEvidence: buildSupabaseManagedPostgresEvidence(profile),
               }
             : {}),
         },

@@ -8,6 +8,7 @@ Profiles are setup inputs, not browser-visible config. They reference credential
 ```yaml
 profileName: supabase-postgres-r2
 compatibilityEvidenceFile: ./evidence/supabase-postgres-r2.json
+supabasePostgresEvidenceFile: ./supabase-managed-postgres-evidence.json
 runtimePath:
   expectedHostProfile: aws-ec2
   expectedAwsRegion: us-east-1
@@ -36,6 +37,12 @@ mode, and the backup, point-in-time recovery, retention, restore, migration, and
 compatibility posture has been reviewed. The schema authority is the existing control-plane backend
 schema metadata in `nixos-shared-host-control-plane-backend-schema.ts`; Supabase dashboard state is
 not a schema authority.
+
+The generated runbook first writes `supabase-managed-postgres-evidence.json` through
+`deploy --deployment <label> --record --provider-capability supabase-managed-postgres
+--supabase-postgres-profile "$PROFILE_ROOT/supabase-postgres.profile.json"`. The managed dependency
+profile consumes that file through `supabasePostgresEvidenceFile`; it does not synthesize fresh
+evidence from inline profile facts.
 
 Supported providers are explicit candidate labels:
 
@@ -67,10 +74,17 @@ S3 VPC endpoint proof for AWS S3, and Postgres feature results. It must not cont
 access keys, secret keys, or credential file contents.
 
 For Supabase Postgres, evidence also includes a `supabase-managed-postgres-evidence@1` lifecycle
-record. Plan, region, backup, PITR, retention, restore, migration lock, schema version, and schema
-compatibility failures are blocking validation failures. Dashboard or support-mediated actions may
-appear only as evidence-only records with `mutationAuthority: false`; they are not automated
-provisioning success.
+record. The envelope contains the selected profile identity, evidence source, `checkedAt`,
+`maxAgeMinutes`, lifecycle profile payload, plan capability binding, user separation policy binding,
+and migration/schema authority plus digest. Plan, region, backup, PITR, retention, restore,
+migration lock, schema version, schema compatibility, selected plan capability, and user separation
+policy failures are blocking validation failures. Dashboard or support-mediated actions may appear
+only as evidence-only records with `mutationAuthority: false`; they are not automated provisioning
+success.
+
+Freshness is enforced from the envelope, not from the profile file. A bare
+`supabase-postgres.profile.json`, stale `checkedAt`, expired `maxAgeMinutes`, mismatched profile
+identity, mismatched plan capability, or mismatched user separation policy fails closed.
 
 Expected runtime fields in `runtimePath`, including the selected database connectivity mode, are
 compared against observed command inputs or connection facts. The validator does not copy expected

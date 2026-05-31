@@ -9,6 +9,7 @@ import {
 import { managedRuntimeFlags, sourceHostPrelude } from "./cloud-control-runbook-managed-runtime";
 import { rootPrelude } from "./cloud-control-runbook-root";
 import { supabasePrivateLinkEvidenceCommands } from "./cloud-control-runbook-supabase-privatelink";
+import { supabasePostgresEvidenceCommand } from "./cloud-control-runbook-supabase-postgres";
 export { validateRunbookBundle, validateRunbookStructure } from "./cloud-control-runbook-doctor";
 
 const CREDENTIAL_DIR = "/run/deployment-control-plane/credentials";
@@ -167,9 +168,11 @@ function managedCommands(input: CloudControlSetupInput): RunbookCommand[] {
   const inputs = [
     ...localInputs(),
     "$PROFILE_ROOT/managed-dependencies.profile.yaml",
+    "$PROFILE_ROOT/supabase-managed-postgres-evidence.json",
     "$PROFILE_ROOT/credential-preflight.json",
   ];
   return [
+    supabasePostgresEvidenceCommand(input),
     ...supabasePrivateLinkEvidenceCommands(input, rootPrelude(input.outDir)),
     command(
       "database",

@@ -5,6 +5,7 @@ import { validateManagedDependencyEvidence } from "./control-plane-managed-depen
 import { validateAuthProviderProfile } from "./cloud-control-runtime-input";
 import { validateCredentialMap } from "./cloud-control-credential-map";
 import type { SupabaseManagedPostgresProfile } from "./control-plane-supabase-postgres-profile";
+import { validateProviderCapabilityHookEvidenceShape } from "./cloud-control-provider-capability-hook-contract";
 
 export async function validateRunbookBundle(bundleDir: string) {
   const profileRoot = path.resolve(bundleDir);
@@ -190,9 +191,30 @@ async function exists(file: string): Promise<boolean> {
 }
 
 async function validateOutputEvidence(profileRoot: string, file: string): Promise<string[]> {
-  if (file !== "$PROFILE_ROOT/managed-dependency-evidence.json") return [];
+  if (
+    file !== "$PROFILE_ROOT/managed-dependency-evidence.json" &&
+    file !== "$PROFILE_ROOT/supabase-managed-postgres-evidence.json"
+  ) {
+    return [];
+  }
+  if (file === "$PROFILE_ROOT/supabase-managed-postgres-evidence.json") {
+    return validateSupabaseProviderOutput(profileRoot);
+  }
   const localPath = path.join(profileRoot, "managed-dependency-evidence.json");
   if (!(await exists(localPath))) return [];
   const evidence = JSON.parse(await fsp.readFile(localPath, "utf8"));
   return validateManagedDependencyEvidence(evidence, 60);
+}
+
+async function validateSupabaseProviderOutput(profileRoot: string): Promise<string[]> {
+  const localPath = path.join(profileRoot, "supabase-managed-postgres-evidence.json");
+  if (!(await exists(localPath))) return [];
+  const [evidence, profile] = await Promise.all([
+    readJson(localPath),
+    readJson(path.join(profileRoot, "supabase-postgres.profile.json")),
+  ]);
+  return validateProviderCapabilityHookEvidenceShape("supabase-managed-postgres", evidence, {
+    allowedPhases: ["evidence"],
+    expectedSupabasePostgresProfile: profile,
+  });
 }

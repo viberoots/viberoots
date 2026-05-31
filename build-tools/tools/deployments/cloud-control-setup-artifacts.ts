@@ -39,12 +39,12 @@ export function renderConformanceChecklist(input: CloudControlSetupInput): strin
         },
         {
           name: "database",
-          commandRef: managedCommandRef(setupUsesSupabasePrivateLink(input) ? 6 : 0),
+          commandRef: managedCommandRef(setupUsesSupabasePrivateLink(input) ? 7 : 1),
           passCondition: "managed Postgres SQL feature conformance succeeds",
         },
         {
           name: "artifact-store",
-          commandRef: managedCommandRef(setupUsesSupabasePrivateLink(input) ? 7 : 1),
+          commandRef: managedCommandRef(setupUsesSupabasePrivateLink(input) ? 8 : 2),
           passCondition: "temporary object PUT/GET/HEAD and digest verification succeeds",
         },
         {
@@ -64,6 +64,7 @@ export function renderManagedDependencyProfile(input: CloudControlSetupInput): s
   return YAML.stringify({
     profileName: input.instanceId,
     compatibilityEvidenceFile: "./managed-dependency-evidence.json",
+    supabasePostgresEvidenceFile: "./supabase-managed-postgres-evidence.json",
     runtimePath: runtimePath(input),
     supabasePostgres: supabaseProfile(input),
     postgres: {

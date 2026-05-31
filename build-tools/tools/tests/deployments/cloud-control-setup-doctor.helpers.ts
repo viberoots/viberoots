@@ -2,6 +2,8 @@
 import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
+import { runCloudProviderCapabilityHook } from "../../deployments/cloud-control-provider-capability-hooks";
+import { privateLinkSupabaseProfile } from "./control-plane-supabase-postgres.fixture";
 
 export async function writeBundle(dir: string, files: Record<string, string>): Promise<void> {
   for (const [name, content] of Object.entries(files)) {
@@ -32,6 +34,21 @@ export function resolveCommandRef(commandRef: string, commands: any): unknown {
 
 export async function writeEvidence(dir: string, output: string): Promise<void> {
   await fsp.writeFile(path.join(dir, output.slice("$PROFILE_ROOT/".length)), "{}\n", "utf8");
+}
+
+export async function writeSupabaseProviderEvidence(dir: string): Promise<void> {
+  await fsp.writeFile(
+    path.join(dir, "supabase-managed-postgres-evidence.json"),
+    JSON.stringify(
+      await runCloudProviderCapabilityHook({
+        capabilityId: "supabase-managed-postgres",
+        phase: "evidence",
+        deploymentLabel: "//deployments:staging",
+        supabasePostgresProfile: privateLinkSupabaseProfile(),
+      }),
+    ),
+    "utf8",
+  );
 }
 
 export function setupArgPairs(

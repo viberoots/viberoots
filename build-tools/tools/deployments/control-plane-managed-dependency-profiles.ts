@@ -15,8 +15,11 @@ import {
   artifactCredentialMode,
   assertArtifactCredentialModeAllowed,
 } from "./control-plane-artifact-credential-mode";
-import { validateSupabaseManagedPostgresProfile } from "./control-plane-supabase-postgres-validation";
-import type { SupabaseManagedPostgresProfile } from "./control-plane-supabase-postgres-profile";
+import {
+  loadSupabasePostgresEvidence,
+  optionalEvidenceFile,
+  parseSupabasePostgresProfile,
+} from "./control-plane-managed-dependency-supabase-profile";
 
 type RawObject = Record<string, unknown>;
 
@@ -35,10 +38,14 @@ export async function loadManagedDependencyProfile(opts: {
   credentialDirectory: string;
 }): Promise<ControlPlaneManagedDependencyProfile> {
   const raw = await fsp.readFile(opts.profilePath, "utf8");
-  return parseManagedDependencyProfile(raw, {
+  const profile = parseManagedDependencyProfile(raw, {
     credentialDirectory: opts.credentialDirectory,
     baseDir: path.dirname(opts.profilePath),
   });
+  profile.supabasePostgresEvidence = await loadSupabasePostgresEvidence(
+    profile.supabasePostgresEvidenceFile,
+  );
+  return profile;
 }
 
 export function parseManagedDependencyProfile(
@@ -54,7 +61,7 @@ export function parseManagedDependencyProfile(
   const runtimePath = objectValue(value.runtimePath, "runtimePath");
   const policy = { credentialDirectory: path.resolve(opts.credentialDirectory) };
   const postgresProvider = enumValue(postgres.provider, POSTGRES_PROVIDERS, "postgres.provider");
-  const supabasePostgres = optionalSupabasePostgres(value.supabasePostgres);
+  const supabasePostgres = parseSupabasePostgresProfile(objectValue, value.supabasePostgres);
   if (postgresProvider === "supabase-postgres" && !supabasePostgres) {
     throw new Error("supabase-postgres managed dependency profile requires supabasePostgres");
   }
@@ -62,6 +69,10 @@ export function parseManagedDependencyProfile(
     profileName: stringValue(value.profileName, "profileName"),
     compatibilityEvidenceFile: optionalEvidenceFile(
       value.compatibilityEvidenceFile,
+      opts.baseDir || process.cwd(),
+    ),
+    supabasePostgresEvidenceFile: optionalEvidenceFile(
+      value.supabasePostgresEvidenceFile,
       opts.baseDir || process.cwd(),
     ),
     supabasePostgres,
@@ -153,17 +164,6 @@ export function parseManagedDependencyProfile(
   };
 }
 
-function optionalSupabasePostgres(value: unknown): SupabaseManagedPostgresProfile | undefined {
-  if (value === undefined) return undefined;
-  const profile = objectValue(
-    value,
-    "supabasePostgres",
-  ) as unknown as SupabaseManagedPostgresProfile;
-  const errors = validateSupabaseManagedPostgresProfile(profile);
-  if (errors.length > 0) throw new Error(errors.join("; "));
-  return profile;
-}
-
 export async function readManagedDependencyCredential(filePath: string): Promise<string> {
   try {
     return (await fsp.readFile(filePath, "utf8")).trimEnd();
@@ -203,12 +203,6 @@ function parsedArtifactCredentialMode(
     throw new Error("artifactStore file credential mode requires access key files");
   }
   return credentialMode;
-}
-
-function optionalEvidenceFile(value: unknown, baseDir: string): string | undefined {
-  if (value === undefined) return undefined;
-  const raw = stringValue(value, "compatibilityEvidenceFile");
-  return path.isAbsolute(raw) ? raw : path.resolve(baseDir, raw);
 }
 
 function objectValue(value: unknown, fieldName: string): RawObject {

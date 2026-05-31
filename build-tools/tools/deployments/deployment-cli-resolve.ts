@@ -40,6 +40,7 @@ const DEPLOY_POSITIONAL_PRECEDING_VALUE_FLAGS = [
   "smoke-connect-protocol",
   "source-run-id",
   "ssh-mode",
+  "supabase-postgres-profile",
   "target-exception",
 ];
 

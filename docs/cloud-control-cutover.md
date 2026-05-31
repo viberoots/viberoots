@@ -37,6 +37,10 @@ Required cutover evidence:
   `control-plane-provider-capability-hook` and be attached under the same selected capability id;
   evidence produced for another capability, static declarations, or hand-written JSON without the
   hook evidence contract cannot satisfy this report
+- Supabase managed Postgres lifecycle evidence must use the freshness-gated
+  `supabase-managed-postgres-evidence@1` shape emitted by the generated provider-capability command.
+  Bare `supabase-postgres.profile.json` facts, dashboard-only notes, stale `checkedAt` values, or
+  expired `maxAgeMinutes` do not satisfy cutover.
 - standby mode evidence proving mini service/worker controls prevent double execution
 - operation-specific audit evidence for cutover, rollback, restore, or break-glass use
 
@@ -69,6 +73,74 @@ AWS cutover evidence is conditional on the selected artifact, database, and edge
 Minimal AWS topology evidence uses schema `aws-topology-evidence@1`. Public database mode must
 include VPC, subnet, route-table, security-group, S3 endpoint, compute, ingress, and public TLS
 database proof. Use a fresh `checkedAt` value within the validation max-age window:
+
+Supabase lifecycle evidence is generated before managed dependency and cutover validation:
+
+```bash
+deploy --deployment <label> \
+  --record \
+  --provider-capability supabase-managed-postgres \
+  --supabase-postgres-profile "$PROFILE_ROOT/supabase-postgres.profile.json" \
+  > "$PROFILE_ROOT/supabase-managed-postgres-evidence.json"
+```
+
+The resulting provider hook evidence includes a `providerPayload.lifecycleEvidence` envelope with
+selected profile identity, evidence source, freshness window, profile payload, plan capability
+binding, user separation policy binding, and migration/schema authority plus digest. Cutover
+examples attach that freshness-gated evidence under the selected `supabase-managed-postgres`
+capability and in managed dependency evidence rather than copying stale profile fields.
+
+```json
+{
+  "providerCapabilities": {
+    "supabase-managed-postgres": {
+      "schemaVersion": "cloud-provider-capability-hook-evidence@1",
+      "source": "control-plane-provider-capability-hook",
+      "capabilityId": "supabase-managed-postgres",
+      "phase": "evidence",
+      "providerPayload": {
+        "schemaVersion": "supabase-managed-postgres-provider-payload@1",
+        "evidenceMode": "evidence-only",
+        "mutationAuthority": false,
+        "lifecycleEvidence": {
+          "schemaVersion": "supabase-managed-postgres-evidence@1",
+          "source": "generated-provider-hook",
+          "checkedAt": "2026-05-30T09:30:00.000Z",
+          "maxAgeMinutes": 60,
+          "selectedProfileIdentity": {
+            "organizationId": "org-control-plane-prod",
+            "projectRef": "project",
+            "region": "us-east-1",
+            "mode": "privatelink"
+          },
+          "planCapabilityBinding": {
+            "source": "reviewed-plan-evidence",
+            "planClass": "team",
+            "region": "us-east-1",
+            "connectionMode": "privatelink",
+            "backup": true,
+            "pitr": true,
+            "retentionDays": 7
+          },
+          "userSeparationPolicyBinding": {
+            "required": true,
+            "separated": true,
+            "migrationUserRef": "evidence://supabase/migration-user",
+            "runtimeUserRef": "evidence://supabase/runtime-user"
+          },
+          "migrationSchemaBinding": {
+            "authority": "control-plane-reviewed-schema",
+            "version": "1",
+            "path": "build-tools/tools/deployments/nixos-shared-host-control-plane-backend-schema.ts",
+            "migrationVersion": "1",
+            "digest": "sha256:<schema-binding-digest>"
+          }
+        }
+      }
+    }
+  }
+}
+```
 
 Ingress evidence must be structured. Imported LB, ACM, DNS, WAF, Cloudflare, edge, and
 cloud-foundation ingress evidence must include freshness, provenance/ownership, selected capability

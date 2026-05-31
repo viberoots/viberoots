@@ -5,10 +5,8 @@ import {
   CLOUD_PROVIDER_CAPABILITY_HOOK_EVIDENCE_SOURCE,
 } from "../../deployments/cloud-control-provider-capability-hook-contract";
 import { managedDependencyEvidence } from "./cloud-control-cutover-managed-dependencies.fixture";
-import {
-  SUPABASE_POSTGRES_EVIDENCE_SCHEMA,
-  reviewedSupabaseManagedPostgresProfile,
-} from "../../deployments/control-plane-supabase-postgres-profile";
+import { reviewedSupabaseManagedPostgresProfile } from "../../deployments/control-plane-supabase-postgres-profile";
+import { buildSupabaseManagedPostgresEvidence } from "../../deployments/control-plane-supabase-postgres-evidence";
 import { ecrRegistryProfileForImage } from "./control-plane-registry-profile.fixture";
 import { ingressCommandEvidence } from "./cloud-control-aws-ingress.fixture";
 import {
@@ -174,17 +172,15 @@ function providerPayloadFor(id: string) {
           region: "us-east-1",
           mode: "privatelink",
         },
-        lifecycleEvidence: {
-          schemaVersion: SUPABASE_POSTGRES_EVIDENCE_SCHEMA,
-          checkedAt: freshCheckedAt(),
-          profile: reviewedSupabaseManagedPostgresProfile({
+        lifecycleEvidence: buildSupabaseManagedPostgresEvidence(
+          reviewedSupabaseManagedPostgresProfile({
             instanceId: "cloud-control-plane",
             region: "us-east-1",
             mode: "privatelink",
             organizationId: "org-control-plane-prod",
             projectRef: "project-review",
           }),
-        },
+        ),
       },
     };
   }

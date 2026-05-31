@@ -15,6 +15,7 @@ import {
 import { reviewedRuntimeInput } from "./cloud-control-runtime-input.fixture";
 import { ecrRegistryProfileForImage } from "./control-plane-registry-profile.fixture";
 import { privateLinkSupabaseProfile } from "./control-plane-supabase-postgres.fixture";
+import { writeSupabaseProviderEvidence } from "./cloud-control-setup-doctor.helpers";
 
 const DIGEST = `sha256:${"d".repeat(64)}`;
 const IMAGE = `registry.example.com/platform/deployment-control-plane@${DIGEST}`;
@@ -26,6 +27,7 @@ test("setup doctor refuses stale managed dependency evidence completion", async 
     await writeBundle(tmp, bundle.files);
     await fsp.writeFile(path.join(tmp, "setup-doctor.json"), "{}\n", "utf8");
     await fsp.writeFile(path.join(tmp, "credential-preflight.json"), "{}\n", "utf8");
+    await writeSupabaseProviderEvidence(tmp);
     const old = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
     await fsp.writeFile(
       path.join(tmp, "managed-dependency-evidence.json"),

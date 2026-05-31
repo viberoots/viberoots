@@ -7,6 +7,7 @@ import {
   defaultSupabaseManagedPostgresProfile,
   reviewedSupabaseManagedPostgresProfile,
 } from "../../deployments/control-plane-supabase-postgres-profile";
+import { buildSupabaseManagedPostgresEvidence } from "../../deployments/control-plane-supabase-postgres-evidence";
 import { validateSupabaseManagedPostgresProfile } from "../../deployments/control-plane-supabase-postgres-validation";
 import { managedDependencyEvidence } from "./cloud-control-cutover-managed-dependencies.fixture";
 
@@ -93,19 +94,78 @@ test("managed dependency evidence requires profile-derived Supabase lifecycle re
   const invalid = validateManagedDependencyEvidence(
     managedDependencyEvidence({
       supabasePostgres: {
-        schemaVersion: "supabase-managed-postgres-evidence@1",
-        checkedAt: new Date().toISOString(),
-        profile: {
-          ...profile,
-          backup: { ...profile.backup, restore: { ...profile.backup.restore, status: "missing" } },
-        },
+        ...buildSupabaseManagedPostgresEvidence(profile),
+        profile: brokenRestoreProfile(profile),
       },
     }),
     60,
     { supabasePostgres: profile },
   ).join("\n");
   assert.match(invalid, /restore evidence must prove non-production restore/);
+
+  const planMismatch = validateManagedDependencyEvidence(
+    managedDependencyEvidence({
+      supabasePostgres: {
+        ...buildSupabaseManagedPostgresEvidence(profile),
+        planCapabilityBinding: {
+          ...buildSupabaseManagedPostgresEvidence(profile).planCapabilityBinding,
+          planClass: "free",
+        },
+      },
+    }),
+    60,
+    { supabasePostgres: profile },
+  ).join("\n");
+  assert.match(planMismatch, /plan capability binding planClass/);
+
+  const userMismatch = validateManagedDependencyEvidence(
+    managedDependencyEvidence({
+      supabasePostgres: {
+        ...buildSupabaseManagedPostgresEvidence(profile),
+        userSeparationPolicyBinding: {
+          ...buildSupabaseManagedPostgresEvidence(profile).userSeparationPolicyBinding,
+          separated: false,
+        },
+      },
+    }),
+    60,
+    { supabasePostgres: profile },
+  ).join("\n");
+  assert.match(userMismatch, /user separation policy binding separated/);
+
+  const missingBindings = validateManagedDependencyEvidence(
+    managedDependencyEvidence({
+      supabasePostgres: {
+        ...buildSupabaseManagedPostgresEvidence(profile),
+        planCapabilityBinding: undefined,
+        userSeparationPolicyBinding: undefined,
+      },
+    }),
+    60,
+    { supabasePostgres: profile },
+  ).join("\n");
+  assert.match(missingBindings, /plan capability binding source/);
+  assert.match(missingBindings, /user separation policy binding required/);
+
+  const stale = validateManagedDependencyEvidence(
+    managedDependencyEvidence({
+      supabasePostgres: buildSupabaseManagedPostgresEvidence(profile, {
+        checkedAt: new Date(Date.now() - 120_000).toISOString(),
+        maxAgeMinutes: 1,
+      }),
+    }),
+    60,
+    { supabasePostgres: profile },
+  ).join("\n");
+  assert.match(stale, /Supabase Postgres evidence is missing or stale/);
 });
+
+function brokenRestoreProfile(profile: any) {
+  return {
+    ...profile,
+    backup: { ...profile.backup, restore: { ...profile.backup.restore, status: "missing" } },
+  };
+}
 
 test("managed dependency profile import rejects fixture Supabase lifecycle profiles", () => {
   const fixture = defaultSupabaseManagedPostgresProfile({

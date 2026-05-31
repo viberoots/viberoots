@@ -5,6 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
 import { readCloudControlSetupInput } from "../../deployments/cloud-control-setup";
+import { maybeRunProviderCapabilityHookForCli } from "../../deployments/deploy-cli-provider-capability";
 import { renderCloudControlSetupBundle } from "../../deployments/cloud-control-setup-render";
 import { validateCloudControlSetupInput } from "../../deployments/cloud-control-setup-validate";
 import type { CloudControlSetupInput } from "../../deployments/cloud-control-setup-types";
@@ -13,6 +14,7 @@ import { privateLinkAwsTopology } from "./cloud-control-cutover-fixture";
 import { reviewedRuntimeInput } from "./cloud-control-runtime-input.fixture";
 import { runtimeInputArgs } from "./control-plane-process-entrypoints.helpers";
 import { ecrRegistryProfileForImage } from "./control-plane-registry-profile.fixture";
+import { publicSupabaseProfile } from "./control-plane-supabase-postgres.fixture";
 
 const IMAGE =
   "registry.example.com/platform/deployment-control-plane@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
@@ -29,9 +31,21 @@ test("setup renders Supabase profile as a managed dependency consumer input", ()
   const managedCommand = commands.phases
     .find((phase: any) => phase.id === "managed-dependencies")
     .commands.at(-1).command;
+  const evidenceCommand = commands.phases
+    .find((phase: any) => phase.id === "managed-dependencies")
+    .commands.find((entry: any) => entry.id === "supabase-managed-postgres-evidence");
   assert.match(managedCommand, /deployment-control-plane managed-dependencies/);
   assert.match(managedCommand, /PROFILE_ROOT="\$\{PROFILE_ROOT:-\$\(pwd\)\}"/);
   assert.match(managedCommand, /commands\.json not found; run from repo root or bundle directory/);
+  assert.match(evidenceCommand.command, /deploy --deployment/);
+  assert.match(evidenceCommand.command, /--provider-capability supabase-managed-postgres/);
+  assert.match(
+    evidenceCommand.command,
+    /--supabase-postgres-profile "\$PROFILE_ROOT\/supabase-postgres\.profile\.json"/,
+  );
+  assert.deepEqual(evidenceCommand.outputs, [
+    "$PROFILE_ROOT/supabase-managed-postgres-evidence.json",
+  ]);
 });
 
 test("setup entrypoint validation rejects Supabase plan and region capability failures", () => {
@@ -103,6 +117,53 @@ test("setup CLI input consumes Supabase profile file for entrypoint validation",
     );
   } finally {
     process.argv = oldArgv;
+    await fsp.rm(tmp, { recursive: true, force: true });
+  }
+});
+
+test("deploy provider-capability CLI loads Supabase profile and emits lifecycle evidence", async () => {
+  const tmp = await fsp.mkdtemp(path.join(os.tmpdir(), "supabase-hook-cli-"));
+  const oldArgv = process.argv;
+  const oldLog = console.log;
+  const output: string[] = [];
+  try {
+    const profilePath = path.join(tmp, "supabase-postgres.profile.json");
+    await fsp.writeFile(profilePath, JSON.stringify(publicSupabaseProfile()));
+    console.log = (message?: unknown) => output.push(String(message));
+    process.argv = [
+      "node",
+      "deploy",
+      "--record",
+      "--provider-capability",
+      "supabase-managed-postgres",
+      "--supabase-postgres-profile",
+      profilePath,
+    ];
+    assert.equal(
+      await maybeRunProviderCapabilityHookForCli({ deployment: { label: "//d:s" } as any }),
+      true,
+    );
+    const emitted = JSON.parse(output.join("\n"));
+    assert.equal(
+      emitted.providerPayload.lifecycleEvidence.schemaVersion,
+      "supabase-managed-postgres-evidence@1",
+    );
+    assert.equal(emitted.providerPayload.lifecycleEvidence.source, "generated-provider-hook");
+
+    process.argv = [
+      "node",
+      "deploy",
+      "--record",
+      "--provider-capability",
+      "supabase-managed-postgres",
+    ];
+    await assert.rejects(
+      () => maybeRunProviderCapabilityHookForCli({ deployment: { label: "//d:s" } as any }),
+      /requires --supabase-postgres-profile/,
+    );
+  } finally {
+    process.argv = oldArgv;
+    console.log = oldLog;
     await fsp.rm(tmp, { recursive: true, force: true });
   }
 });

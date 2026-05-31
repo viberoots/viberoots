@@ -34,7 +34,6 @@ import {
 } from "./cloud-control-evidence-helpers";
 import { redactConfigDiagnostic } from "./control-plane-runtime-config-validation";
 import { validateManagedPostgresFeatures } from "./nixos-shared-host-control-plane-backend-features";
-import { SUPABASE_POSTGRES_EVIDENCE_SCHEMA } from "./control-plane-supabase-postgres-profile";
 import { validateSupabasePostgresLifecycle } from "./control-plane-managed-dependency-supabase";
 import { expectationsFromProfile } from "./control-plane-managed-dependency-expectations";
 
@@ -54,14 +53,8 @@ export async function validateManagedDependencyProfile(
     schemaVersion: "control-plane-managed-dependency-evidence@1",
     profileName: profile.profileName,
     checkedAt: new Date().toISOString(),
-    ...(profile.supabasePostgres
-      ? {
-          supabasePostgres: {
-            schemaVersion: SUPABASE_POSTGRES_EVIDENCE_SCHEMA,
-            checkedAt: new Date().toISOString(),
-            profile: profile.supabasePostgres,
-          },
-        }
+    ...(profile.supabasePostgresEvidence
+      ? { supabasePostgres: profile.supabasePostgresEvidence }
       : {}),
     runtimePath: runtimePathEvidence(profile, runtimeFacts),
     postgres,

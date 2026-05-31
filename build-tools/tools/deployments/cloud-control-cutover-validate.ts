@@ -69,7 +69,11 @@ function managedDependencyExpectations(
     topology.database?.mode === "privatelink" ? topology.database.privatelink || {} : {};
   const s3Endpoint = topology.s3VpcEndpoint || {};
   const alternate = topology.artifactBackendEvidence || {};
-  const profile = evidence.supabasePostgresProfile;
+  const profile =
+    evidence.managedDependencies?.supabasePostgres?.profile ||
+    (evidence.providerCapabilities?.["supabase-managed-postgres"] as any)?.providerPayload
+      ?.lifecycleEvidence?.profile ||
+    evidence.supabasePostgresProfile;
   const profileProject = profile?.project || {};
   const profileConnection = profile?.connection || {};
   return {

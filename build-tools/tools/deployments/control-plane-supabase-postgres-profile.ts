@@ -62,8 +62,40 @@ export type SupabaseManagedPostgresProfile = {
 
 export type SupabaseManagedPostgresEvidence = {
   schemaVersion: typeof SUPABASE_POSTGRES_EVIDENCE_SCHEMA;
+  source: "generated-provider-hook" | "reviewed-lifecycle-export";
   checkedAt: string;
+  maxAgeMinutes: number;
+  selectedProfileIdentity: SupabaseProfileIdentity;
+  planCapabilityBinding: {
+    source: SupabaseManagedPostgresProfile["planCapabilities"]["source"];
+    planClass: string;
+    region: string;
+    connectionMode: SupabaseConnectionMode;
+    backup: boolean;
+    pitr: boolean;
+    retentionDays: number;
+  };
+  userSeparationPolicyBinding: {
+    required: true;
+    separated: boolean;
+    migrationUserRef?: string;
+    runtimeUserRef?: string;
+  };
+  migrationSchemaBinding: {
+    authority: string;
+    version: string;
+    path: string;
+    migrationVersion: string;
+    digest: string;
+  };
   profile: SupabaseManagedPostgresProfile;
+};
+
+export type SupabaseProfileIdentity = {
+  organizationId: string;
+  projectRef: string;
+  region: string;
+  mode: SupabaseConnectionMode;
 };
 
 type EvidenceRef = {

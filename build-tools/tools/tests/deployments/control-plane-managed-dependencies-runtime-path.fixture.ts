@@ -5,6 +5,7 @@ import { privateLinkAwsTopology, topologyForPublishedImage } from "./cloud-contr
 import { ecrRegistryProfileForImage } from "./control-plane-registry-profile.fixture";
 import { reviewedRuntimeInput } from "./cloud-control-runtime-input.fixture";
 import { privateLinkSupabaseProfile } from "./control-plane-supabase-postgres.fixture";
+import { buildSupabaseManagedPostgresEvidence } from "../../deployments/control-plane-supabase-postgres-evidence";
 
 const DIGEST_REF =
   "registry.example.com/platform/deployment-control-plane@sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
@@ -46,11 +47,7 @@ export function evidence(
     schemaVersion: "control-plane-managed-dependency-evidence@1",
     profileName: "aws-runtime-review",
     checkedAt: new Date().toISOString(),
-    supabasePostgres: {
-      schemaVersion: "supabase-managed-postgres-evidence@1",
-      checkedAt: new Date().toISOString(),
-      profile: privateLinkSupabaseProfile(),
-    },
+    supabasePostgres: buildSupabaseManagedPostgresEvidence(privateLinkSupabaseProfile()),
     runtimePath: baseRuntimePath(),
     postgres: basePostgres(),
     artifactStore: baseArtifactStore(),

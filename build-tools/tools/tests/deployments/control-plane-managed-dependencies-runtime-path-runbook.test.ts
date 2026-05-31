@@ -35,7 +35,8 @@ test("AWS setup runbook surfaces PrivateLink operator evidence actions from bund
   const commands = JSON.parse(renderCloudControlSetupBundle(setupInput()).files["commands.json"]!);
   const managedPhase = commands.phases.find((phase: any) => phase.id === "managed-dependencies");
   const ids = managedPhase.commands.map((command: any) => command.id);
-  assert.deepEqual(ids.slice(0, 6), [
+  assert.equal(ids[0], "supabase-managed-postgres-evidence");
+  assert.deepEqual(ids.slice(1, 7), [
     "supabase-privatelink-support-initiation",
     "supabase-privatelink-ram-acceptance",
     "supabase-privatelink-vpc-lattice",
@@ -43,7 +44,7 @@ test("AWS setup runbook surfaces PrivateLink operator evidence actions from bund
     "supabase-privatelink-tcp-5432-sg",
     "supabase-privatelink-private-psql",
   ]);
-  for (const id of ids.slice(0, 6)) {
+  for (const id of ids.slice(1, 7)) {
     const action = runbookCommand(commands, id);
     assert.equal(action.cwd, "profile-root");
     assert.equal(action.actionType, "operator-evidence");

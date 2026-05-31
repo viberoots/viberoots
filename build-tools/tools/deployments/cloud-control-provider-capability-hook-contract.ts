@@ -123,7 +123,9 @@ function validateNoUnsafeEvidenceContent(id: string, value: Record<string, unkno
 function validateNoDashboardOnlyEvidence(id: string, value: Record<string, unknown>): string[] {
   const invalidPath = findInvalidSourcePath(value);
   return invalidPath
-    ? [`${id}: ${invalidPath} dashboard/manual/raw notes are not structured provider evidence`]
+    ? [
+        `${id}: ${invalidPath} self-attested/dashboard/manual/raw notes are not structured provider evidence`,
+      ]
     : [];
 }
 
@@ -200,4 +202,5 @@ const UNSAFE_EVIDENCE_PATTERN =
 const UNSAFE_EVIDENCE_KEY_PATTERN =
   /^(authorization|cookie|passwd|password|token|api[_-]?key|apiKey|client[_-]?secret|clientSecret|private[_-]?key|privateKey)$/i;
 
-const INVALID_SOURCE_PATTERN = /\b(dashboard[- ]only|raw[- ]iac[- ]only|manual notes?)\b/i;
+const INVALID_SOURCE_PATTERN =
+  /\b(self[- ]attested|dashboard[- ]only|raw[- ]iac[- ]only|manual[- ]only|manual[- ]notes?|notes?[- ]only|screenshots?|screen[- ]shots?)\b/i;

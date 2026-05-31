@@ -536,6 +536,13 @@ crash.
 
 ## Step 9: Start Service And Workers
 
+Before starting processes, run the generated Supabase lifecycle evidence command from
+`commands.json`. It uses the reviewed provider-capability hook path and writes
+`$PROFILE_ROOT/supabase-managed-postgres-evidence.json` from
+`$PROFILE_ROOT/supabase-postgres.profile.json`; operators should not hand-assemble hook payloads.
+The emitted evidence binds the selected Supabase project, organization, region, connection mode,
+plan capability, migration/schema metadata, backup/restore posture, and user separation policy.
+
 Use the generated AWS profile or equivalent host configuration to start:
 
 ```bash
@@ -559,6 +566,7 @@ Service probes:
 
 From the ordered phases in `commands.json`, run:
 
+- Supabase managed Postgres lifecycle evidence
 - database validation
 - artifact-store validation
 - health check
@@ -567,6 +575,11 @@ From the ordered phases in `commands.json`, run:
 
 The generated HTTP checks use the configured public URL and read bearer tokens from the staged
 `control-plane-token` file without embedding token values in the runbook.
+
+Setup readiness and cutover consume the freshness-gated
+`supabase-managed-postgres-evidence@1` lifecycle envelope. A stale bare
+`supabase-postgres.profile.json`, dashboard-only note, or self-attested profile export is not
+accepted as lifecycle proof.
 
 For AWS EC2 readiness, also attach evidence for:
 

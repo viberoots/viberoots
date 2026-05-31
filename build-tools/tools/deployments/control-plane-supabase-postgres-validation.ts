@@ -1,11 +1,11 @@
 #!/usr/bin/env zx-wrapper
 import {
-  SUPABASE_POSTGRES_EVIDENCE_SCHEMA,
   SUPABASE_POSTGRES_PROFILE_SCHEMA,
   type SupabaseConnectionMode,
   type SupabaseManagedPostgresEvidence,
   type SupabaseManagedPostgresProfile,
 } from "./control-plane-supabase-postgres-profile";
+import { validateSupabaseEvidenceEnvelope } from "./control-plane-supabase-postgres-evidence-validation";
 import {
   CONTROL_PLANE_SCHEMA_PATH,
   CONTROL_PLANE_SCHEMA_AUTHORITY,
@@ -60,21 +60,24 @@ export function validateSupabaseManagedPostgresEvidence(
   opts: { expectedRegion?: string; expectedMode?: SupabaseConnectionMode } = {},
 ): string[] {
   const evidence = value as Partial<SupabaseManagedPostgresEvidence> | undefined;
-  if (!evidence || typeof evidence !== "object") return ["Supabase Postgres evidence is missing"];
-  const errors: string[] = [];
-  if (evidence.schemaVersion !== SUPABASE_POSTGRES_EVIDENCE_SCHEMA) {
-    errors.push("Supabase Postgres evidence has unsupported schemaVersion");
-  }
-  if (!Date.parse(String(evidence.checkedAt || ""))) {
-    errors.push("Supabase Postgres evidence missing checkedAt");
-  }
-  return [...errors, ...validateSupabaseManagedPostgresProfile(evidence.profile, opts)];
+  return validateSupabaseEvidenceEnvelope(evidence, {
+    ...opts,
+    validateProfile: validateSupabaseManagedPostgresProfile,
+  });
 }
 
 function validateAccessEvidence(errors: string[], provisioning: any): void {
   const access = provisioning.accessEvidence || {};
   for (const field of ACCESS_EVIDENCE_FIELDS) {
     requireText(errors, access[field], `Supabase import access evidence ${field}`);
+    rejectUnsupportedProfileEvidence(
+      errors,
+      access[field],
+      `Supabase import access evidence ${field}`,
+    );
+  }
+  if (typeof access.source === "string" && !SUPPORTED_ACCESS_EVIDENCE_SOURCES.has(access.source)) {
+    errors.push("Supabase import access evidence source is unsupported");
   }
   requireEvidenceRef(errors, access.evidenceRef, "Supabase import access evidence ref");
 }
@@ -175,15 +178,20 @@ function requireEvidenceRef(errors: string[], value: unknown, label: string): vo
     errors.push(`${label} must be a structured evidence reference`);
   }
   rejectPlaceholder(errors, text, label);
+  rejectUnsupportedProfileEvidence(errors, text, label);
 }
 
 function rejectPlaceholder(errors: string[], value: unknown, label: string): void {
   if (
-    /\b(fixture-only|placeholder|reviewed-supabase|reviewed-import|manual-notes?)\b/i.test(
-      String(value || ""),
-    )
+    /\b(fixture[- ]only|placeholder|reviewed-supabase|reviewed-import)\b/i.test(String(value || ""))
   ) {
     errors.push(`${label} must not be placeholder evidence`);
+  }
+}
+
+function rejectUnsupportedProfileEvidence(errors: string[], value: unknown, label: string): void {
+  if (UNSUPPORTED_PROFILE_EVIDENCE_PATTERN.test(String(value || ""))) {
+    errors.push(`${label} must be reviewed provider evidence`);
   }
 }
 
@@ -195,5 +203,8 @@ const ACCESS_EVIDENCE_FIELDS = [
   "projectRole",
   "evidenceRef",
 ] as const;
+const SUPPORTED_ACCESS_EVIDENCE_SOURCES = new Set<string>(["supabase-api", "reviewed-import"]);
+const UNSUPPORTED_PROFILE_EVIDENCE_PATTERN =
+  /\b(self[- ]attested|dashboard[- ]only|raw[- ]iac[- ]only|manual[- ]only|manual[- ]notes?|notes?[- ]only|screenshots?|screen[- ]shots?)\b|(?:^|[/:_-])test(?:[/:_-]|$)|\btest-ref\b|placeholder|fixture[- ]only/i;
 const SECRET_PATTERN =
   /postgres(?:ql)?:\/\/[^<\s]+:[^<\s]+@|service[_-]?role|password|secret|token/i;

@@ -86,6 +86,8 @@ export type ManagedRuntimePathExpectations = {
 export type ControlPlaneManagedDependencyProfile = {
   profileName: string;
   compatibilityEvidenceFile?: string;
+  supabasePostgresEvidenceFile?: string;
+  supabasePostgresEvidence?: SupabaseManagedPostgresEvidence;
   supabasePostgres?: SupabaseManagedPostgresProfile;
   runtimePath: ManagedRuntimePathExpectations;
   postgres: ManagedPostgresProfile;

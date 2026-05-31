@@ -27,6 +27,7 @@ import {
   setupArgPairs,
   writeBundle,
   writeEvidence,
+  writeSupabaseProviderEvidence,
 } from "./cloud-control-setup-doctor.helpers";
 const DIGEST_REF =
   "registry.example.com/platform/deployment-control-plane@sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc";
@@ -54,6 +55,7 @@ test("setup doctor classifies local runbook phases without cloud credentials", a
     assert.equal(phase(afterDoctor, "credential-preflight").status, "ready");
 
     await fsp.writeFile(path.join(tmp, "credential-preflight.json"), '{"ok":true}\n', "utf8");
+    await writeSupabaseProviderEvidence(tmp);
     await fsp.writeFile(
       path.join(tmp, "managed-dependency-evidence.json"),
       JSON.stringify(managedDependencyEvidence()),

@@ -1,25 +1,21 @@
 #!/usr/bin/env zx-wrapper
-import {
-  SUPABASE_POSTGRES_EVIDENCE_SCHEMA,
-  reviewedSupabaseManagedPostgresProfile,
-} from "../../deployments/control-plane-supabase-postgres-profile";
+import { reviewedSupabaseManagedPostgresProfile } from "../../deployments/control-plane-supabase-postgres-profile";
+import { buildSupabaseManagedPostgresEvidence } from "../../deployments/control-plane-supabase-postgres-evidence";
 
 export function managedDependencyEvidence(overrides: Record<string, unknown> = {}) {
   return {
     schemaVersion: "control-plane-managed-dependency-evidence@1",
     profileName: "cloud-control-plane",
     checkedAt: new Date().toISOString(),
-    supabasePostgres: {
-      schemaVersion: SUPABASE_POSTGRES_EVIDENCE_SCHEMA,
-      checkedAt: new Date().toISOString(),
-      profile: reviewedSupabaseManagedPostgresProfile({
+    supabasePostgres: buildSupabaseManagedPostgresEvidence(
+      reviewedSupabaseManagedPostgresProfile({
         instanceId: "cloud-control-plane",
         region: "us-east-1",
         mode: "privatelink",
         organizationId: "org-control-plane-prod",
         projectRef: "project-review",
       }),
-    },
+    ),
     runtimePath: {
       hostProfile: "aws-ec2",
       awsRegion: "us-east-1",
