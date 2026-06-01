@@ -104,8 +104,10 @@ You need these accounts and choices before starting:
 - Secret backend for credential files. The current deployment-secret path normally uses Infisical,
   but the runtime host only sees files.
 - Reviewed source mode:
-  - SSH key and known-hosts file, or
-  - GitHub App id, installation id, and private key.
+  - SSH mode stages `reviewed-source-ssh-key` and `reviewed-source-known-hosts`, or
+  - GitHub App mode stages `reviewed-source-github-app-id`,
+    `reviewed-source-github-app-installation-id`, and
+    `reviewed-source-github-app-private-key`.
 - Artifact-store decision:
   - preferred AWS path: AWS S3 bucket plus VPC endpoint
   - alternate reviewed path: Supabase Storage S3 or another S3-compatible store after live
@@ -312,10 +314,11 @@ Recommended network rules:
 - Service and workers to S3: through the S3 VPC endpoint.
 - Service and workers to Infisical/provider APIs: controlled outbound HTTPS.
 
-Current runtime configuration still expects S3-compatible access key files for the artifact store.
-Use credentials scoped to the artifact bucket and key prefix. Pure EC2 instance-profile/IAM-role
-artifact access is a best-practice improvement, but it needs the code work captured in
-[Control Plane Gaps](./control-plane-gaps.md).
+When `--artifact-credential-mode files` is selected, runtime configuration expects
+S3-compatible access key files scoped to the artifact bucket and key prefix. When
+`--artifact-credential-mode aws-instance-profile` is selected for AWS S3 on EC2, runtime
+configuration omits artifact access-key and secret-key files and uses IMDSv2 credentials from the
+reviewed instance profile.
 
 For production, prefer a NixOS host when viberoots directly controls the VM. Non-NixOS hosts are
 acceptable only as OCI substrates for the same digest-pinned Nix-built image.
@@ -471,11 +474,11 @@ At minimum, the AWS host credential surface needs:
 | `artifact-store-access-key-id`           | artifact-store access key id in `files` mode                            |
 | `artifact-store-secret-access-key`       | artifact-store secret access key in `files` mode                        |
 | `reviewed-source-ssh-key`                | reviewed-source SSH private key, if SSH mode is selected                |
-| `reviewed-source-known-hosts`            | reviewed-source SSH known-hosts file                                    |
+| `reviewed-source-known-hosts`            | reviewed-source SSH known-hosts file, if SSH mode is selected           |
 | `{deploymentId}-infisical-client-id`     | deployment-scoped Infisical Universal Auth client id                    |
 | `{deploymentId}-infisical-client-secret` | deployment-scoped Infisical Universal Auth client secret                |
 
-If GitHub App mode is selected, replace the SSH files with:
+If GitHub App mode is selected, replace both SSH files with:
 
 - `reviewed-source-github-app-id`
 - `reviewed-source-github-app-installation-id`

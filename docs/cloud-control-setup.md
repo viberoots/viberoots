@@ -243,9 +243,11 @@ evidence. The default `aws-s3` backend still requires S3 gateway or interface en
 --artifact-backend-evidence <reviewed-evidence-id>` and include the matching reviewed alternate
    backend evidence in `aws-topology-evidence.json` instead of relying on the default AWS S3
    endpoint path.
-5. Mount the Supabase Postgres URL, AWS S3 endpoint and credential files, service token,
-   reviewed-source credential files, and Infisical deployment credential files through the generated
-   credential manifest.
+5. Mount the Supabase Postgres URL, AWS S3 endpoint, any artifact credential files required by the
+   selected artifact credential mode, service token, reviewed-source credential files, and
+   Infisical deployment credential files through the generated credential manifest. AWS S3
+   instance-profile mode uses the reviewed EC2 instance profile and does not stage artifact
+   access-key or secret-key files.
 6. Start the systemd/Podman service and worker units on EC2.
 7. Run setup-doctor, credential-preflight, database, artifact-store, health, readiness, and
    worker-heartbeat phases from `commands.json`. The profile is not protected/shared-ready until

@@ -9,6 +9,10 @@ import {
   type RenderedControlPlaneProcess,
 } from "./cloud-control-process-contract";
 import {
+  GITHUB_APP_FILENAMES,
+  SSH_REVIEWED_SOURCE_FILENAMES,
+} from "./cloud-control-setup-contract";
+import {
   setupArtifactBackendEvidenceRef,
   setupArtifactCredentialMode,
   setupAwsSecurityGroupIds,
@@ -126,6 +130,7 @@ function nixosEc2Example(input: CloudControlSetupInput): string {
       artifact-store-access-key-id.source = "/run/secrets/artifact-store-access-key-id";
       artifact-store-secret-access-key.source = "/run/secrets/artifact-store-secret-access-key";`
       : "";
+  const reviewedSourceCredentials = reviewedSourceCredentialSources(input);
   return `{
   imports = [
     ./deployment-control-plane-container-module.nix
@@ -137,6 +142,7 @@ function nixosEc2Example(input: CloudControlSetupInput): string {
     instanceId = "${input.instanceId}";
     publicUrl = "${input.publicUrl}";
     workerReplicas = ${Math.max(2, input.workerReplicas)};
+    reviewedSourceMode = "${input.reviewedSourceMode}";
     artifactStore.bucket = "${input.artifactBucket}";
     artifactStore.provider = "${input.artifactBackend}";
     artifactStore.credentialMode = "${setupArtifactCredentialMode(input)}";
@@ -144,14 +150,21 @@ function nixosEc2Example(input: CloudControlSetupInput): string {
     credentials = {
       control-plane-database-url.source = "/run/secrets/control-plane-database-url";
       control-plane-token.source = "/run/secrets/control-plane-token";
-      reviewed-source-ssh-key.source = "/run/secrets/reviewed-source-ssh-key";
-      reviewed-source-known-hosts.source = "/run/secrets/reviewed-source-known-hosts";
+${reviewedSourceCredentials}
       artifact-store-endpoint.source = "/run/secrets/artifact-store-endpoint";
 ${artifactCredentials}
 ${infisicalCredentials}
     };
   };
 }`;
+}
+
+function reviewedSourceCredentialSources(input: CloudControlSetupInput): string {
+  const filenames =
+    input.reviewedSourceMode === "github-app"
+      ? GITHUB_APP_FILENAMES
+      : SSH_REVIEWED_SOURCE_FILENAMES;
+  return filenames.map((name) => `      ${name}.source = "/run/secrets/${name}";`).join("\n");
 }
 
 function observabilityProfile(
