@@ -130,21 +130,46 @@ test("generated ECR bundle carries OpenTofu evidence files and bundle-root comma
   const bundle = renderCloudControlSetupBundle(ec2HostProfileInput());
   const commands = JSON.parse(bundle.files["commands.json"]!);
   const ecrPlan = JSON.parse(bundle.files["ecr-opentofu-plan.json"]!);
+  const tfvars = JSON.parse(bundle.files["ecr-opentofu.tfvars.json"]!);
   assert.ok(bundle.files["ecr-opentofu-plan.json"]);
   assert.ok(bundle.files["ecr-opentofu-apply.json"]);
   assert.ok(bundle.files["ecr-readonly-evidence.json"]);
-  assert.equal(
-    ecrPlan.workingDirectory,
-    "$PROFILE_ROOT/build-tools/deployments/aws-control-plane-foundation/opentofu",
-  );
+  assert.ok(bundle.files["opentofu/aws-control-plane-foundation/ecr.tf"]);
+  assert.match(bundle.files["ecr-backend.hcl"]!, /dynamodb_table/);
+  assert.match(bundle.files["ecr-evidence-template.json"]!, /Do not submit this template/);
+  assert.equal(tfvars.ecr_enabled, true);
+  assert.equal(tfvars.ecr_repository_name, "deployment-control-plane");
+  assert.equal(ecrPlan.workingDirectory, "$PROFILE_ROOT/opentofu/aws-control-plane-foundation");
   assert.equal(ecrPlan.evidencePath, "$PROFILE_ROOT/ecr-opentofu-plan.json");
   assert.equal(ecrPlan.outputPath, "$PROFILE_ROOT/ecr-opentofu-plan.out.json");
   const managed = commands.phases.find((phase: any) => phase.id === "managed-dependencies");
+  const plan = managed.commands.find((entry: any) => entry.id === "ecr-opentofu-plan");
+  assert.match(plan.command, /tofu .* plan /);
+  assert.match(plan.command, /-backend-config="\$PROFILE_ROOT\/ecr-backend\.hcl"/);
+  assert.doesNotMatch(plan.command, /-backend=false/);
+  assert.match(plan.command, /\$PROFILE_ROOT\/opentofu\/aws-control-plane-foundation/);
+  assert.match(plan.command, /ecr-opentofu\.tfvars\.json/);
+  assert.ok(plan.inputs.includes("$PROFILE_ROOT/ecr-backend.hcl"));
+  assert.ok(plan.inputs.includes("$PROFILE_ROOT/opentofu/aws-control-plane-foundation/ecr.tf"));
+  const apply = managed.commands.find((entry: any) => entry.id === "ecr-opentofu-apply");
+  assert.match(apply.command, /tofu .* apply /);
+  assert.match(apply.command, /tofu .* init .*backend-config/);
+  assert.doesNotMatch(apply.command, /-backend=false/);
+  const readOnly = managed.commands.find((entry: any) => entry.id === "ecr-readonly-evidence");
+  assert.match(readOnly.command, /aws ecr describe-repositories/);
+  assert.match(readOnly.command, /aws ecr get-lifecycle-policy/);
+  assert.match(readOnly.command, /aws ecr get-repository-policy/);
   const ecr = managed.commands.find(
     (entry: any) => entry.id === "provider-capability-aws-ecr-control-plane-registry",
   );
   assert.equal(ecr.cwd, "profile-root");
   assert.match(ecr.command, /PROFILE_ROOT="\$\{PROFILE_ROOT:-\$\(pwd\)\}"/);
+  assert.match(ecr.command, /--preview --provider-capability aws-ecr-control-plane-registry/);
+  assert.match(
+    ecr.command,
+    /--provider-capability-phase apply --provider-capability aws-ecr-control-plane-registry/,
+  );
+  assert.ok(managed.commands.indexOf(readOnly) < managed.commands.indexOf(ecr));
   for (const file of ["ecr-opentofu-plan", "ecr-opentofu-apply", "ecr-readonly-evidence"]) {
     assert.match(ecr.command, new RegExp(`\\$PROFILE_ROOT/${file}\\.json`));
     assert.ok(ecr.inputs.includes(`$PROFILE_ROOT/${file}.json`));

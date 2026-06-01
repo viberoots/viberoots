@@ -28,6 +28,8 @@ import { runtimeAuthConfig, type RuntimeInput } from "./cloud-control-runtime-in
 import { renderCredentialMap } from "./cloud-control-credential-map";
 import { renderResidualActionChecklist } from "./cloud-control-residual-actions";
 import { renderPrivateLinkOpenTofuFiles } from "./cloud-control-setup-privatelink-iac";
+import { renderEcrIacEvidence, renderEcrOpenTofuFiles } from "./cloud-control-setup-ecr-iac";
+import { renderPrivateLinkPsqlHelper } from "./cloud-control-setup-privatelink-psql-helper";
 
 export type CloudControlSetupBundle = {
   files: Record<string, string>;
@@ -55,8 +57,10 @@ export function renderCloudControlSetupBundle(
     ...(input.imagePublication?.registryProfile
       ? { "registry-profile.json": renderRegistryProfile(input) }
       : {}),
+    ...renderEcrOpenTofuFiles(input),
     ...renderEcrIacEvidence(input),
     ...renderPrivateLinkOpenTofuFiles(input),
+    ...renderPrivateLinkPsqlHelper(input),
     "conformance-checklist.json": renderConformanceChecklist(input),
     "managed-dependencies.profile.yaml": renderManagedDependencyProfile(input),
     "managed-dependencies.json": renderManagedDependencies(input),
@@ -204,18 +208,6 @@ function renderImagePublication(input: CloudControlSetupInput): string {
 
 function renderRegistryProfile(input: CloudControlSetupInput): string {
   return `${JSON.stringify(input.imagePublication!.registryProfile, null, 2)}\n`;
-}
-
-function renderEcrIacEvidence(input: CloudControlSetupInput): Record<string, string> {
-  const iac = input.imagePublication?.registryProfile?.iac;
-  if (!iac) return {};
-  return {
-    ...(iac.plan ? { "ecr-opentofu-plan.json": `${JSON.stringify(iac.plan, null, 2)}\n` } : {}),
-    ...(iac.apply ? { "ecr-opentofu-apply.json": `${JSON.stringify(iac.apply, null, 2)}\n` } : {}),
-    ...(iac.readOnly
-      ? { "ecr-readonly-evidence.json": `${JSON.stringify(iac.readOnly, null, 2)}\n` }
-      : {}),
-  };
 }
 
 function reviewedSource(input: CloudControlSetupInput) {

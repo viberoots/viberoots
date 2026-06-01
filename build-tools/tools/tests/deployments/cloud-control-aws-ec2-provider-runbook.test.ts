@@ -37,6 +37,7 @@ test("AWS runbook produces provider capability evidence before cutover", () => {
     bundle.files["opentofu/aws-control-plane-foundation/privatelink.tf"]!,
     /aws_ram_resource_share_accepter/,
   );
+  assert.match(bundle.files["scripts/supabase-privatelink-psql-proof.mjs"]!, /PGPASSFILE/);
   const template = JSON.parse(bundle.files["supabase-privatelink-evidence-template.json"]!);
   assert.equal(template.bundleRoot, "$PROFILE_ROOT");
   assert.equal(template.workingDirectory, "$PROFILE_ROOT/opentofu/aws-control-plane-foundation");
@@ -79,8 +80,15 @@ test("AWS runbook produces provider capability evidence before cutover", () => {
   assert.match(readOnly.command, /aws ram get-resource-shares/);
   assert.match(readOnly.command, /describe-vpc-endpoints/);
   assert.match(readOnly.command, /describe-security-group-rules/);
-  assert.match(readOnly.command, /psql "\$CONTROL_PLANE_DATABASE_URL"/);
+  assert.match(readOnly.command, /supabase-privatelink-psql-proof\.mjs/);
+  assert.match(
+    readOnly.command,
+    /\/run\/deployment-control-plane\/credentials\/control-plane-database-url/,
+  );
+  assert.doesNotMatch(readOnly.command, /CONTROL_PLANE_DATABASE_URL/);
+  assert.doesNotMatch(readOnly.command, /psql "\$/);
   assert.ok(readOnly.outputs.includes("$PROFILE_ROOT/supabase-privatelink-readonly-evidence.json"));
+  assert.ok(readOnly.outputs.includes("$PROFILE_ROOT/supabase-privatelink-readonly-psql.json"));
   assert.ok(managed.commands.indexOf(readOnly) < managed.commands.indexOf(privatelink));
   assert.match(privatelink.command, /deployment-control-plane provider-capability/);
   assert.match(privatelink.command, /--provider-capability supabase-privatelink-prerequisite/);

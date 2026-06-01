@@ -144,32 +144,64 @@ function setupWorker(workerId: string) {
 }
 
 export async function writeProviderCapabilityEvidence(dir: string, commands: any): Promise<void> {
+  await writeEcrIacCommandOutputs(dir, commands);
   const [topology, awsEc2Profile] = await Promise.all([
     readJson(path.join(dir, "aws-topology-evidence.json")),
     readYaml(path.join(dir, "aws-ec2-profile.yaml")),
   ]);
-  const ids = commands.phases
+  const providerCommands = commands.phases
     .flatMap((entry: { commands: Array<{ id: string }> }) => entry.commands)
-    .map((entry: { id: string }) => entry.id)
-    .filter((id: string) => id.startsWith("provider-capability-"))
-    .map((id: string) => id.slice("provider-capability-".length));
+    .filter((entry: { id: string }) => entry.id.startsWith("provider-capability-"));
   await Promise.all(
-    ids.map(async (capabilityId: string) => {
-      const evidence = await runEvidenceHook(capabilityId, topology, awsEc2Profile);
-      await fsp.writeFile(
-        path.join(dir, `provider-capability-${capabilityId}.json`),
-        JSON.stringify(evidence),
-        "utf8",
-      );
+    providerCommands.flatMap((command: { id: string; outputs: string[] }) => {
+      const capabilityId = command.id.slice("provider-capability-".length);
+      return command.outputs.map(async (output) => {
+        const phase = providerOutputPhase(output);
+        const evidence = await runEvidenceHook(capabilityId, phase, topology, awsEc2Profile);
+        await fsp.writeFile(
+          path.join(dir, output.slice("$PROFILE_ROOT/".length)),
+          JSON.stringify(evidence),
+          "utf8",
+        );
+      });
     }),
   );
 }
 
-async function runEvidenceHook(capabilityId: string, topology: any, awsEc2Profile: any) {
+async function writeEcrIacCommandOutputs(dir: string, commands: any): Promise<void> {
+  const ecrOutputs = commands.phases
+    .flatMap((entry: { commands: Array<{ id: string; outputs: string[] }> }) => entry.commands)
+    .filter((entry: { id: string }) => entry.id.startsWith("ecr-"))
+    .flatMap((entry: { outputs: string[] }) => entry.outputs);
+  for (const output of ecrOutputs) {
+    const relative = output.slice("$PROFILE_ROOT/".length);
+    if (
+      await fsp.access(path.join(dir, relative)).then(
+        () => true,
+        () => false,
+      )
+    )
+      continue;
+    await fsp.writeFile(path.join(dir, relative), rawEvidenceFor(relative), "utf8");
+  }
+}
+
+function providerOutputPhase(output: string): "preview" | "apply" | "evidence" {
+  if (output.endsWith("-preview.json")) return "preview";
+  if (output.endsWith("-apply.json")) return "apply";
+  return "evidence";
+}
+
+async function runEvidenceHook(
+  capabilityId: string,
+  phase: "preview" | "apply" | "evidence",
+  topology: any,
+  awsEc2Profile: any,
+) {
   const run = () =>
     runCloudProviderCapabilityHook({
       capabilityId,
-      phase: "evidence",
+      phase,
       deploymentLabel: "//deployments:staging",
       awsTopologyEvidence: topology,
       ...(capabilityId === "aws-ec2-control-plane-host" ? { awsEc2Profile } : {}),
@@ -189,7 +221,6 @@ async function runEvidenceHook(capabilityId: string, topology: any, awsEc2Profil
 async function readJson(file: string): Promise<any> {
   return JSON.parse(await fsp.readFile(file, "utf8"));
 }
-
 async function readYaml(file: string): Promise<any> {
   return YAML.parse(await fsp.readFile(file, "utf8"));
 }

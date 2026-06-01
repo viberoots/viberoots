@@ -4,6 +4,8 @@ export const SUPABASE_PRIVATELINK_OPENTOFU_DIR =
   "$PROFILE_ROOT/opentofu/aws-control-plane-foundation";
 export const SUPABASE_PRIVATELINK_OPENTOFU_TFVARS =
   "$PROFILE_ROOT/supabase-privatelink-opentofu.tfvars.json";
+export const SUPABASE_PRIVATELINK_OPENTOFU_BACKEND =
+  "$PROFILE_ROOT/supabase-privatelink-backend.hcl";
 
 export const SUPABASE_PRIVATELINK_IAC_PATHS = {
   plan: "$PROFILE_ROOT/supabase-privatelink-opentofu-plan.json",

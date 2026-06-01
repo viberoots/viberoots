@@ -259,12 +259,17 @@ explicitly reviewed assume-role or instance-profile path; ambient laptop/default
 are rejected.
 
 The ECR hook phases are IaC preview, IaC apply orchestration, read-only evidence, smoke, and
-rollback plan. Preview/apply consume `ecr-opentofu-plan.json` and `ecr-opentofu-apply.json` from
-the setup bundle root, and read-only AWS inspection consumes `ecr-readonly-evidence.json`. Custom
-hook code must not directly create or update ECR repositories, lifecycle policies, repository
-policies, tag mutability, scanning, or KMS settings. Smoke evidence proves repository existence,
-auth/pull reachability for the exact published digest, policy digest, scanning posture, KMS posture,
-and image-publication binding without pushing mutable test images. Reviewed import is allowed only
+rollback plan. Generated `ecr-opentofu-plan` and `ecr-opentofu-apply` commands run OpenTofu from
+`$PROFILE_ROOT/opentofu/aws-control-plane-foundation` with
+`$PROFILE_ROOT/ecr-opentofu.tfvars.json` and reviewed remote-state backend config such as
+`$PROFILE_ROOT/ecr-backend.hcl`; operators then review the raw plan/apply output and write typed
+`ecr-opentofu-plan.json` and `ecr-opentofu-apply.json` evidence at the setup bundle root.
+Generated read-only AWS inspection writes repository, lifecycle, and repository-policy outputs that
+back `ecr-readonly-evidence.json`. Custom hook code must not directly create or update ECR
+repositories, lifecycle policies, repository policies, tag mutability, scanning, or KMS settings.
+Smoke evidence proves repository existence, auth/pull reachability for the exact published digest,
+policy digest, scanning posture, KMS posture, and image-publication binding without pushing mutable
+test images. Reviewed import is allowed only
 when the imported profile satisfies the same registry contract and is represented in IaC
 import/adoption metadata; imports are refused for mutable tags, missing repository policy digest,
 missing lifecycle or scanning posture, missing KMS posture, missing runtime pull proof, mismatched
@@ -442,6 +447,7 @@ deployment-control-plane setup \
   --artifact-least-privilege-policy-digest sha256:<policy-digest> \
   --reviewed-source-mode ssh \
   --runtime-input ./runtime-input.yaml \
+  --supabase-postgres-profile ./supabase-postgres.profile.json \
   --aws-topology-evidence ./aws-topology-evidence.json \
   --ingress-command-evidence ./ingress-dns-evidence.json,./ingress-tls-evidence.json,./ingress-health-evidence.json,./ingress-callback-evidence.json
 ```
@@ -466,9 +472,13 @@ The bundle contains:
 - `commands.json`
 - `image-publication.json`
 - `registry-profile.json` when registry evidence was generated with a reviewed profile
+- `supabase-postgres.profile.json`
 - `aws-topology-evidence.json` for AWS EC2 profiles
 - `managed-dependencies.profile.yaml`
 - `provider-capabilities.json`
+- `opentofu/aws-control-plane-foundation/*`, generated `*-opentofu.tfvars.json` files, and generated
+  backend configs such as `ecr-backend.hcl` when selected capabilities require reviewed IaC
+  plan/apply orchestration
 - conformance and ingress checklists
 - an AWS EC2 profile artifact
 
@@ -549,6 +559,15 @@ digest for the reviewed artifact operations.
 
 Secret values must not be placed in Nix options, image layers, command-line arguments, ordinary
 environment files, deployment metadata, evidence files, or logs.
+
+Generated PrivateLink psql proof reads the database URL from
+`/run/deployment-control-plane/credentials/control-plane-database-url` through a file-backed helper
+and records only non-secret connection proof and output digests. Do not export the database URL in
+`CONTROL_PLANE_DATABASE_URL` or pass it directly to `psql`.
+
+Generated PrivateLink AWS-side IaC commands use the same bundle-root OpenTofu stack with
+`$PROFILE_ROOT/supabase-privatelink-opentofu.tfvars.json` and the reviewed backend config at
+`$PROFILE_ROOT/supabase-privatelink-backend.hcl`; they must not run unmanaged local-state applies.
 
 Use `credential-map.json` as the staging source of truth. Every file in
 `credential-manifest.json` must map to an explicit reviewed secret-backend reference or host

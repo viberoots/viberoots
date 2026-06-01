@@ -4,9 +4,11 @@ import { setupAwsTopology } from "./cloud-control-setup-aws-topology";
 import type { CloudControlSetupInput } from "./cloud-control-setup-types";
 import {
   SUPABASE_PRIVATELINK_IAC_PATHS,
+  SUPABASE_PRIVATELINK_OPENTOFU_BACKEND,
   SUPABASE_PRIVATELINK_OPENTOFU_DIR,
   SUPABASE_PRIVATELINK_OPENTOFU_TFVARS,
 } from "./cloud-control-supabase-privatelink-iac-rules";
+import { PRIVATELINK_PSQL_PROOF_HELPER } from "./cloud-control-setup-privatelink-psql-helper";
 
 type PrivateLinkAction = {
   id: string;
@@ -93,7 +95,7 @@ export function supabasePrivateLinkIacCommands(
         "$PROFILE_ROOT/supabase-privatelink-readonly-lattice.json",
         "$PROFILE_ROOT/supabase-privatelink-readonly-private-dns.txt",
         "$PROFILE_ROOT/supabase-privatelink-readonly-security-groups.json",
-        "$PROFILE_ROOT/supabase-privatelink-readonly-psql.txt",
+        "$PROFILE_ROOT/supabase-privatelink-readonly-psql.json",
         SUPABASE_PRIVATELINK_IAC_PATHS.readOnly,
       ],
       mustPass: "read-only AWS and psql evidence is supplied from selected VPC path",
@@ -149,7 +151,9 @@ function opentofuPlanCommand(prelude: string): string {
     prelude,
     `test -d "${SUPABASE_PRIVATELINK_OPENTOFU_DIR}"`,
     `test -f "${SUPABASE_PRIVATELINK_OPENTOFU_TFVARS}"`,
-    `TF_DATA_DIR="$PROFILE_ROOT/.tofu/supabase-privatelink" tofu -chdir="${SUPABASE_PRIVATELINK_OPENTOFU_DIR}" init -input=false -backend=false`,
+    `test -f "${SUPABASE_PRIVATELINK_OPENTOFU_BACKEND}"`,
+    `TF_DATA_DIR="$PROFILE_ROOT/.tofu/supabase-privatelink" tofu -chdir="${SUPABASE_PRIVATELINK_OPENTOFU_DIR}" init -input=false -backend-config="${SUPABASE_PRIVATELINK_OPENTOFU_BACKEND}"`,
+    workspaceCommand(),
     `TF_DATA_DIR="$PROFILE_ROOT/.tofu/supabase-privatelink" tofu -chdir="${SUPABASE_PRIVATELINK_OPENTOFU_DIR}" plan -input=false -var-file="${SUPABASE_PRIVATELINK_OPENTOFU_TFVARS}" -out="$PROFILE_ROOT/supabase-privatelink-opentofu.tfplan"`,
     `TF_DATA_DIR="$PROFILE_ROOT/.tofu/supabase-privatelink" tofu -chdir="${SUPABASE_PRIVATELINK_OPENTOFU_DIR}" show -json "$PROFILE_ROOT/supabase-privatelink-opentofu.tfplan" > "$PROFILE_ROOT/supabase-privatelink-opentofu-plan.out.json"`,
     requireEvidenceFile(
@@ -163,13 +167,23 @@ function opentofuApplyCommand(prelude: string): string {
   return [
     prelude,
     `test -f "${SUPABASE_PRIVATELINK_IAC_PATHS.plan}"`,
+    `test -f "${SUPABASE_PRIVATELINK_OPENTOFU_BACKEND}"`,
     `test -f "$PROFILE_ROOT/supabase-privatelink-opentofu.tfplan"`,
+    `TF_DATA_DIR="$PROFILE_ROOT/.tofu/supabase-privatelink" tofu -chdir="${SUPABASE_PRIVATELINK_OPENTOFU_DIR}" init -input=false -backend-config="${SUPABASE_PRIVATELINK_OPENTOFU_BACKEND}"`,
+    workspaceCommand(),
     `TF_DATA_DIR="$PROFILE_ROOT/.tofu/supabase-privatelink" tofu -chdir="${SUPABASE_PRIVATELINK_OPENTOFU_DIR}" apply -input=false "$PROFILE_ROOT/supabase-privatelink-opentofu.tfplan"`,
     `TF_DATA_DIR="$PROFILE_ROOT/.tofu/supabase-privatelink" tofu -chdir="${SUPABASE_PRIVATELINK_OPENTOFU_DIR}" output -json > "$PROFILE_ROOT/supabase-privatelink-opentofu-apply.out.json"`,
     requireEvidenceFile(
       SUPABASE_PRIVATELINK_IAC_PATHS.apply,
       "write reviewed typed OpenTofu apply evidence after reviewing supabase-privatelink-opentofu-apply.out.json",
     ),
+  ].join("; ");
+}
+
+function workspaceCommand(): string {
+  return [
+    `SUPABASE_PRIVATELINK_TOFU_WORKSPACE="${"${SUPABASE_PRIVATELINK_TOFU_WORKSPACE:-deployment-control-plane}"}"`,
+    `TF_DATA_DIR="$PROFILE_ROOT/.tofu/supabase-privatelink" tofu -chdir="${SUPABASE_PRIVATELINK_OPENTOFU_DIR}" workspace select "$SUPABASE_PRIVATELINK_TOFU_WORKSPACE" || TF_DATA_DIR="$PROFILE_ROOT/.tofu/supabase-privatelink" tofu -chdir="${SUPABASE_PRIVATELINK_OPENTOFU_DIR}" workspace new "$SUPABASE_PRIVATELINK_TOFU_WORKSPACE"`,
   ].join("; ");
 }
 
@@ -186,7 +200,7 @@ function readOnlyEvidenceCommand(prelude: string): string {
     `if [ -n "$PRIVATELINK_ASSOCIATION_ID" ]; then aws vpc-lattice get-service-network-resource-association --service-network-resource-association-identifier "$PRIVATELINK_ASSOCIATION_ID" --region "$AWS_REGION" > "$PROFILE_ROOT/supabase-privatelink-readonly-lattice.json"; fi`,
     `aws ec2 describe-security-group-rules --region "$AWS_REGION" > "$PROFILE_ROOT/supabase-privatelink-readonly-security-groups.json"`,
     `getent hosts "$PRIVATELINK_HOSTNAME" > "$PROFILE_ROOT/supabase-privatelink-readonly-private-dns.txt"`,
-    `psql "$CONTROL_PLANE_DATABASE_URL" -c 'select 1' > "$PROFILE_ROOT/supabase-privatelink-readonly-psql.txt"`,
+    `node "$PROFILE_ROOT/${PRIVATELINK_PSQL_PROOF_HELPER}" "/run/deployment-control-plane/credentials/control-plane-database-url" "$PROFILE_ROOT/supabase-privatelink-readonly-psql.json"`,
     requireEvidenceFile(
       SUPABASE_PRIVATELINK_IAC_PATHS.readOnly,
       "write typed read-only evidence after reviewing AWS read-only and psql outputs",

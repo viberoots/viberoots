@@ -145,9 +145,25 @@ test("AWS setup runbook surfaces PrivateLink operator evidence actions from bund
     runbookCommand(commands, "supabase-privatelink-opentofu-plan").command,
     /tofu .* plan .*supabase-privatelink-opentofu\.tfplan/,
   );
+  assert.match(
+    runbookCommand(commands, "supabase-privatelink-opentofu-plan").command,
+    /-backend-config="\$PROFILE_ROOT\/supabase-privatelink-backend\.hcl"/,
+  );
+  assert.doesNotMatch(
+    runbookCommand(commands, "supabase-privatelink-opentofu-plan").command,
+    /-backend=false/,
+  );
   assert.equal(
     runbookCommand(commands, "supabase-privatelink-opentofu-apply").actionType,
     "reviewed-iac",
+  );
+  assert.match(
+    runbookCommand(commands, "supabase-privatelink-opentofu-apply").command,
+    /tofu .* init .*backend-config/,
+  );
+  assert.doesNotMatch(
+    runbookCommand(commands, "supabase-privatelink-opentofu-apply").command,
+    /-backend=false/,
   );
   assert.equal(
     runbookCommand(commands, "supabase-privatelink-readonly-evidence").actionType,

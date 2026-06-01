@@ -90,6 +90,11 @@ test("AWS ECR generated commands use deployment-control-plane and reviewed evide
     (entry: any) => entry.id === "provider-capability-aws-ecr-control-plane-registry",
   );
   assert.match(ecr.command, /deployment-control-plane provider-capability/);
+  assert.match(ecr.command, /--preview --provider-capability aws-ecr-control-plane-registry/);
+  assert.match(
+    ecr.command,
+    /--provider-capability-phase apply --provider-capability aws-ecr-control-plane-registry/,
+  );
   assert.match(ecr.command, /--registry-profile "\$PROFILE_ROOT\/registry-profile\.json"/);
   assert.match(
     ecr.command,
@@ -104,6 +109,16 @@ test("AWS ECR generated commands use deployment-control-plane and reviewed evide
   assert.ok(ecr.inputs.includes("$PROFILE_ROOT/ecr-opentofu-plan.json"));
   assert.ok(ecr.inputs.includes("$PROFILE_ROOT/ecr-opentofu-apply.json"));
   assert.ok(ecr.inputs.includes("$PROFILE_ROOT/ecr-readonly-evidence.json"));
+  assert.ok(
+    ecr.outputs.includes(
+      "$PROFILE_ROOT/provider-capability-aws-ecr-control-plane-registry-preview.json",
+    ),
+  );
+  assert.ok(
+    ecr.outputs.includes(
+      "$PROFILE_ROOT/provider-capability-aws-ecr-control-plane-registry-apply.json",
+    ),
+  );
 });
 
 test("deployment-control-plane provider-capability emits ECR hook evidence", async () => {

@@ -16,11 +16,36 @@ function providerCapabilityEvidenceCommand(
   capabilityId: string,
 ): RunbookCommand {
   const output = `$PROFILE_ROOT/provider-capability-${capabilityId}.json`;
+  const base = `${rootPrelude(input.outDir)}; deployment-control-plane provider-capability --deployment-id ${shellQuote(
+    input.deploymentIds[0] || "<missing-deployment>",
+  )} --provider-capability ${capabilityId}`;
+  if (capabilityId === "aws-ecr-control-plane-registry") {
+    const previewOutput = `$PROFILE_ROOT/provider-capability-${capabilityId}-preview.json`;
+    const applyOutput = `$PROFILE_ROOT/provider-capability-${capabilityId}-apply.json`;
+    return {
+      id: `provider-capability-${capabilityId}`,
+      command: [
+        rootPrelude(input.outDir),
+        `deployment-control-plane provider-capability --deployment-id ${shellQuote(
+          input.deploymentIds[0] || "<missing-deployment>",
+        )} --preview --provider-capability ${capabilityId}${inputFlags(capabilityId)} > "${previewOutput}"`,
+        `deployment-control-plane provider-capability --deployment-id ${shellQuote(
+          input.deploymentIds[0] || "<missing-deployment>",
+        )} --provider-capability-phase apply --provider-capability ${capabilityId}${inputFlags(
+          capabilityId,
+        )} > "${applyOutput}"`,
+        `${base} --record${inputFlags(capabilityId)} > "${output}"`,
+      ].join("; "),
+      cwd: "profile-root",
+      inputs: inputs(capabilityId),
+      outputs: [previewOutput, applyOutput, output],
+      mustPass:
+        "aws-ecr-control-plane-registry preview, apply-intent, and evidence phases validate reviewed OpenTofu artifacts",
+    };
+  }
   return {
     id: `provider-capability-${capabilityId}`,
-    command: `${rootPrelude(input.outDir)}; deployment-control-plane provider-capability --deployment-id ${shellQuote(
-      input.deploymentIds[0] || "<missing-deployment>",
-    )} --record --provider-capability ${capabilityId}${inputFlags(capabilityId)} > "${output}"`,
+    command: `${base} --record${inputFlags(capabilityId)} > "${output}"`,
     cwd: "profile-root",
     inputs: inputs(capabilityId),
     outputs: [output],

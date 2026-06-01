@@ -1,6 +1,6 @@
 import YAML from "yaml";
 import type { CloudControlSetupInput } from "./cloud-control-setup-types";
-import { awsTopologyRequiredCapabilityIds } from "./cloud-control-aws-topology-capabilities";
+import { renderCommands } from "./cloud-control-runbook";
 import {
   setupArtifactBackendEvidenceRef,
   setupArtifactCredentialMode,
@@ -14,6 +14,7 @@ import {
 const CREDENTIAL_DIR = "/run/deployment-control-plane/credentials";
 
 export function renderConformanceChecklist(input: CloudControlSetupInput): string {
+  const commands = JSON.parse(renderCommands(input));
   return `${JSON.stringify(
     {
       schemaVersion: "cloud-control-conformance-checklist@1",
@@ -25,27 +26,27 @@ export function renderConformanceChecklist(input: CloudControlSetupInput): strin
         },
         {
           name: "health",
-          commandRef: "commands.json#/phases/4/commands/4/command",
+          commandRef: commandRef(commands, "health"),
           passCondition: "HTTP 200 from /healthz with reviewed image digest metadata",
         },
         {
           name: "readiness",
-          commandRef: "commands.json#/phases/4/commands/5/command",
+          commandRef: commandRef(commands, "readiness"),
           passCondition: "HTTP 200 from /readyz after database and artifact-store checks",
         },
         {
           name: "worker-heartbeats",
-          commandRef: "commands.json#/phases/4/commands/6/command",
+          commandRef: commandRef(commands, "worker-heartbeats"),
           passCondition: `${input.workerReplicas} workers visible with fresh heartbeat rows`,
         },
         {
           name: "database",
-          commandRef: managedCommandRef(managedDependencyCheckIndex(input)),
+          commandRef: commandRef(commands, "database"),
           passCondition: "managed Postgres SQL feature conformance succeeds",
         },
         {
           name: "artifact-store",
-          commandRef: managedCommandRef(managedDependencyCheckIndex(input) + 1),
+          commandRef: commandRef(commands, "artifact-store"),
           passCondition: "temporary object PUT/GET/HEAD and digest verification succeeds",
         },
         {
@@ -183,22 +184,20 @@ function cred(name: string): string {
   return `${CREDENTIAL_DIR}/${name}`;
 }
 
-function managedCommandRef(index: number): string {
-  return `commands.json#/phases/2/commands/${index}/command`;
-}
-
-function managedDependencyCheckIndex(input: CloudControlSetupInput): number {
-  const providerEvidenceCount = input.awsTopology
-    ? awsTopologyRequiredCapabilityIds(input.awsTopology).filter(
-        (id) => id !== "supabase-managed-postgres",
-      ).length
-    : 0;
-  const privateLinkEvidenceCount = setupUsesSupabasePrivateLink(input) ? 9 : 0;
-  return 1 + providerEvidenceCount + privateLinkEvidenceCount;
-}
-
 function artifactProvider(input: CloudControlSetupInput): string {
   return input.artifactBackend;
+}
+
+function commandRef(runbook: any, id: string): string {
+  for (const [phaseIndex, phase] of (runbook.phases || []).entries()) {
+    const commandIndex = (phase.commands || []).findIndex(
+      (entry: { id?: string }) => entry.id === id,
+    );
+    if (commandIndex >= 0) {
+      return `commands.json#/phases/${phaseIndex}/commands/${commandIndex}/command`;
+    }
+  }
+  throw new Error(`missing generated runbook command ${id}`);
 }
 
 function runtimePath(input: CloudControlSetupInput) {

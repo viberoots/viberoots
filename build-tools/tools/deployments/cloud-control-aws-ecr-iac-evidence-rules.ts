@@ -1,8 +1,9 @@
 import { freshEvidenceAt } from "./cloud-control-evidence-helpers";
 
 const BUNDLE_ROOT = "$PROFILE_ROOT";
-const OPENTOFU_WORKING_DIRECTORY =
-  "$PROFILE_ROOT/build-tools/deployments/aws-control-plane-foundation/opentofu";
+export const AWS_ECR_OPENTOFU_DIR = "$PROFILE_ROOT/opentofu/aws-control-plane-foundation";
+export const AWS_ECR_OPENTOFU_TFVARS = "$PROFILE_ROOT/ecr-opentofu.tfvars.json";
+export const AWS_ECR_OPENTOFU_BACKEND = "$PROFILE_ROOT/ecr-backend.hcl";
 
 export const AWS_ECR_EVIDENCE_PATHS = {
   plan: "$PROFILE_ROOT/ecr-opentofu-plan.json",
@@ -24,7 +25,7 @@ export function ecrCommonEvidenceErrors(
   if (text(record, "bundleRoot") !== BUNDLE_ROOT) {
     errors.push(`ECR IaC ${label} must resolve from setup bundle root`);
   }
-  if (text(record, "workingDirectory") !== OPENTOFU_WORKING_DIRECTORY) {
+  if (text(record, "workingDirectory") !== AWS_ECR_OPENTOFU_DIR) {
     errors.push(`ECR IaC ${label} working directory must resolve from setup bundle root`);
   }
   if (text(record, "evidencePath") !== evidencePath) {

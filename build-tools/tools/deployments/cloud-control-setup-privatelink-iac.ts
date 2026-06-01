@@ -1,14 +1,13 @@
-import { readFileSync, readdirSync } from "node:fs";
-import path from "node:path";
-import { repoRoot } from "../lib/repo";
 import type { CloudControlSetupInput } from "./cloud-control-setup-types";
 import {
+  opentofuStackInputs,
+  renderOpenTofuStackFiles,
+} from "./cloud-control-setup-opentofu-stack";
+import {
+  SUPABASE_PRIVATELINK_OPENTOFU_BACKEND,
   SUPABASE_PRIVATELINK_OPENTOFU_DIR,
   SUPABASE_PRIVATELINK_OPENTOFU_TFVARS,
 } from "./cloud-control-supabase-privatelink-iac-rules";
-
-const OPENTOFU_SOURCE_DIR = "build-tools/deployments/aws-control-plane-foundation/opentofu";
-const OPENTOFU_BUNDLE_DIR = "opentofu/aws-control-plane-foundation";
 
 export function renderPrivateLinkOpenTofuFiles(
   input: CloudControlSetupInput,
@@ -22,6 +21,7 @@ export function renderPrivateLinkOpenTofuFiles(
       null,
       2,
     )}\n`,
+    "supabase-privatelink-backend.hcl": privateLinkBackendConfig(input),
     "supabase-privatelink-evidence-template.json": `${JSON.stringify(
       privateLinkEvidenceTemplate(),
       null,
@@ -32,24 +32,22 @@ export function renderPrivateLinkOpenTofuFiles(
 
 export function supabasePrivateLinkStackInputs(): string[] {
   return [
+    SUPABASE_PRIVATELINK_OPENTOFU_BACKEND,
     SUPABASE_PRIVATELINK_OPENTOFU_TFVARS,
-    ...opentofuSourceFilenames().map((name) => `$PROFILE_ROOT/${OPENTOFU_BUNDLE_DIR}/${name}`),
+    ...opentofuStackInputs(),
   ];
 }
 
-function renderOpenTofuStackFiles(): Record<string, string> {
-  return Object.fromEntries(
-    opentofuSourceFilenames().map((name) => [
-      `${OPENTOFU_BUNDLE_DIR}/${name}`,
-      readFileSync(path.join(repoRoot(), OPENTOFU_SOURCE_DIR, name), "utf8"),
-    ]),
-  );
-}
-
-function opentofuSourceFilenames(): string[] {
-  return readdirSync(path.join(repoRoot(), OPENTOFU_SOURCE_DIR))
-    .filter((name) => name.endsWith(".tf") || name.endsWith(".hcl.example"))
-    .sort();
+function privateLinkBackendConfig(input: CloudControlSetupInput) {
+  const region = input.awsTopology?.region || input.artifactRegion;
+  return [
+    `bucket         = ${JSON.stringify(`${input.instanceId}-tofu-state`)}`,
+    `key            = ${JSON.stringify(`aws-foundation/${input.instanceId}/supabase-privatelink.tfstate`)}`,
+    `region         = ${JSON.stringify(region)}`,
+    `dynamodb_table = ${JSON.stringify(`${input.instanceId}-tofu-lock`)}`,
+    "encrypt        = true",
+    "",
+  ].join("\n");
 }
 
 function privateLinkTfvars(evidence: any) {
@@ -78,6 +76,7 @@ function privateLinkEvidenceTemplate() {
     templateOnly: true,
     bundleRoot: "$PROFILE_ROOT",
     workingDirectory: SUPABASE_PRIVATELINK_OPENTOFU_DIR,
+    backendConfig: SUPABASE_PRIVATELINK_OPENTOFU_BACKEND,
     requiredEvidenceFiles: [
       "$PROFILE_ROOT/supabase-privatelink-opentofu-plan.json",
       "$PROFILE_ROOT/supabase-privatelink-opentofu-apply.json",

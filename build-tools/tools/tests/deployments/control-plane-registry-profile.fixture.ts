@@ -94,8 +94,7 @@ export function ecrIacEvidence(repositoryUri = DEFAULT_REPOSITORY, digest = DEFA
       source: "reviewed-opentofu-plan",
       checkedAt: new Date().toISOString(),
       bundleRoot: "$PROFILE_ROOT",
-      workingDirectory:
-        "$PROFILE_ROOT/build-tools/deployments/aws-control-plane-foundation/opentofu",
+      workingDirectory: "$PROFILE_ROOT/opentofu/aws-control-plane-foundation",
       evidencePath: "$PROFILE_ROOT/ecr-opentofu-plan.json",
       outputPath: "$PROFILE_ROOT/ecr-opentofu-plan.out.json",
       planDigest: "sha256:plan",
@@ -108,8 +107,7 @@ export function ecrIacEvidence(repositoryUri = DEFAULT_REPOSITORY, digest = DEFA
       source: "reviewed-opentofu-apply",
       checkedAt: new Date().toISOString(),
       bundleRoot: "$PROFILE_ROOT",
-      workingDirectory:
-        "$PROFILE_ROOT/build-tools/deployments/aws-control-plane-foundation/opentofu",
+      workingDirectory: "$PROFILE_ROOT/opentofu/aws-control-plane-foundation",
       evidencePath: "$PROFILE_ROOT/ecr-opentofu-apply.json",
       outputPath: "$PROFILE_ROOT/ecr-opentofu-apply.out.json",
       planDigest: "sha256:plan",
@@ -122,8 +120,7 @@ export function ecrIacEvidence(repositoryUri = DEFAULT_REPOSITORY, digest = DEFA
       source: "aws-ecr-readonly-inspection",
       checkedAt: new Date().toISOString(),
       bundleRoot: "$PROFILE_ROOT",
-      workingDirectory:
-        "$PROFILE_ROOT/build-tools/deployments/aws-control-plane-foundation/opentofu",
+      workingDirectory: "$PROFILE_ROOT/opentofu/aws-control-plane-foundation",
       evidencePath: "$PROFILE_ROOT/ecr-readonly-evidence.json",
       outputPath: "$PROFILE_ROOT/ecr-readonly-evidence.out.json",
       evidenceDigest: digest,
