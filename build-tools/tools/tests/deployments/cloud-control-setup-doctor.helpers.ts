@@ -2,6 +2,7 @@
 import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
+import YAML from "yaml";
 import { runCloudProviderCapabilityHook } from "../../deployments/cloud-control-provider-capability-hooks";
 import { privateLinkSupabaseProfile } from "./control-plane-supabase-postgres.fixture";
 
@@ -49,6 +50,45 @@ export async function writeSupabaseProviderEvidence(dir: string): Promise<void> 
     ),
     "utf8",
   );
+}
+
+export async function writeProviderCapabilityEvidence(dir: string, commands: any): Promise<void> {
+  const [topology, awsEc2Profile] = await Promise.all([
+    readJson(path.join(dir, "aws-topology-evidence.json")),
+    readYaml(path.join(dir, "aws-ec2-profile.yaml")),
+  ]);
+  const ids = commands.phases
+    .flatMap((entry: { commands: Array<{ id: string }> }) => entry.commands)
+    .map((entry: { id: string }) => entry.id)
+    .filter((id: string) => id.startsWith("provider-capability-"))
+    .map((id: string) => id.slice("provider-capability-".length));
+  await Promise.all(
+    ids.map(async (capabilityId: string) => {
+      const evidence = await runCloudProviderCapabilityHook({
+        capabilityId,
+        phase: "evidence",
+        deploymentLabel: "//deployments:staging",
+        awsTopologyEvidence: topology,
+        ...(capabilityId === "aws-ec2-control-plane-host" ? { awsEc2Profile } : {}),
+        ...(capabilityId === "aws-network-foundation" || capabilityId === "aws-s3-artifact-store"
+          ? { awsFoundationInspection: topology.foundation }
+          : {}),
+      });
+      await fsp.writeFile(
+        path.join(dir, `provider-capability-${capabilityId}.json`),
+        JSON.stringify(evidence),
+        "utf8",
+      );
+    }),
+  );
+}
+
+async function readJson(file: string): Promise<any> {
+  return JSON.parse(await fsp.readFile(file, "utf8"));
+}
+
+async function readYaml(file: string): Promise<any> {
+  return YAML.parse(await fsp.readFile(file, "utf8"));
 }
 
 export function setupArgPairs(

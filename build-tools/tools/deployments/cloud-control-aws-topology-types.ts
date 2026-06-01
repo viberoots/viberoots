@@ -107,9 +107,10 @@ export type AwsComputeEvidence = {
   mode: "ec2-instance" | "auto-scaling-group";
   instanceId?: string;
   autoScalingGroupName?: string;
-  launchTemplateId: string;
-  launchTemplateVersion: string;
+  launchTemplateId?: string;
+  launchTemplateVersion?: string;
   amiId: string;
+  instanceType?: string;
   instanceProfileArn: string;
   processEvidence: {
     checkedAt: string;

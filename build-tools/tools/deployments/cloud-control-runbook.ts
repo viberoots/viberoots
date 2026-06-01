@@ -6,15 +6,12 @@ import {
   imagePublicationCommand,
   imagePublicationInputs,
 } from "./cloud-control-runbook-image-publication";
-import { managedRuntimeFlags, sourceHostPrelude } from "./cloud-control-runbook-managed-runtime";
+import { managedCommands } from "./cloud-control-runbook-managed";
 import { rootPrelude } from "./cloud-control-runbook-root";
 import { credentialCommands } from "./cloud-control-runbook-credential-commands";
 import { cutoverCommands } from "./cloud-control-runbook-cutover";
-import { supabasePrivateLinkEvidenceCommands } from "./cloud-control-runbook-supabase-privatelink";
-import { supabasePostgresEvidenceCommand } from "./cloud-control-runbook-supabase-postgres";
 export { validateRunbookBundle, validateRunbookStructure } from "./cloud-control-runbook-doctor";
 
-const CREDENTIAL_DIR = "/run/deployment-control-plane/credentials";
 export const RUNBOOK_SCHEMA = "cloud-control-runbook@1";
 
 export type RunbookCommand = {
@@ -162,34 +159,6 @@ function localInputs(): string[] {
     "$PROFILE_ROOT/auth-provider-profile.json",
     "$PROFILE_ROOT/residual-action-checklist.json",
     "$PROFILE_ROOT/commands.json",
-  ];
-}
-
-function managedCommands(input: CloudControlSetupInput): RunbookCommand[] {
-  const body = `${rootPrelude(input.outDir)}; ${sourceHostPrelude()}; deployment-control-plane managed-dependencies --profile "$PROFILE_ROOT/managed-dependencies.profile.yaml" --credential-directory ${CREDENTIAL_DIR} --source-host-identity "$SOURCE_HOST_IDENTITY" --source-host-kind "$SOURCE_HOST_KIND" ${managedRuntimeFlags(input)}`;
-  const inputs = [
-    ...localInputs(),
-    "$PROFILE_ROOT/managed-dependencies.profile.yaml",
-    "$PROFILE_ROOT/supabase-managed-postgres-evidence.json",
-    "$PROFILE_ROOT/credential-preflight.json",
-  ];
-  return [
-    supabasePostgresEvidenceCommand(input),
-    ...supabasePrivateLinkEvidenceCommands(input, rootPrelude(input.outDir)),
-    command(
-      "database",
-      body,
-      inputs,
-      ["$PROFILE_ROOT/managed-dependency-evidence.json"],
-      "managed Postgres feature conformance passes",
-    ),
-    command(
-      "artifact-store",
-      body,
-      inputs,
-      ["$PROFILE_ROOT/managed-dependency-evidence.json"],
-      "artifact store PUT, GET, HEAD, metadata, content-type, and digest checks pass",
-    ),
   ];
 }
 

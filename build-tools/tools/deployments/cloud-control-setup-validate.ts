@@ -20,19 +20,12 @@ import {
 } from "./cloud-control-aws-topology-validate";
 import { validateIngressCommandEvidenceBundle } from "./cloud-control-aws-ingress-command-evidence";
 import { validateSetupArtifactIamEvidence } from "./cloud-control-setup-artifact-iam-evidence";
-import {
-  hookEvidenceDeclaration,
-  hookEvidenceRefs,
-  providerCapabilityHookEvidenceRecord,
-  validateProviderCapabilityHookEvidenceShape,
-} from "./cloud-control-provider-capability-hook-contract";
 import { validateSupabaseManagedPostgresProfile } from "./control-plane-supabase-postgres-validation";
 import { validateSetupRuntimeInput } from "./cloud-control-setup-runtime-validation";
 export { validateCredentialManifestFiles } from "./cloud-control-credential-manifest-validate";
 
 const IMAGE_DIGEST_PATTERN = /^[a-z0-9][a-z0-9._:-]*(\/[a-z0-9][a-z0-9._-]*)+@sha256:[a-f0-9]{64}$/;
 const SECRET_PATTERN = /(secret|token|password|private.key|access.key|database.url)=/i;
-const INVALID_EVIDENCE_SOURCE = /\b(dashboard-only|raw-iac-only|manual-notes?)\b/i;
 
 export function validateCloudControlSetupInput(input: CloudControlSetupInput): string[] {
   const errors: string[] = [];
@@ -168,49 +161,6 @@ function normalizeProviderCommand(command: string): string {
     /^deploy --deployment (?:<label>|'[^']+'|[^\s]+)/,
     "deploy --deployment <label>",
   );
-}
-
-export function validateProviderCapabilityEvidence(
-  declarations: ProviderCapabilityDeclaration[],
-  evidenceByCapability: Record<string, unknown>,
-  opts: { supabasePostgresProfile?: CloudControlSetupInput["supabasePostgres"] } = {},
-): string[] {
-  const errors: string[] = [];
-  for (const declaration of declarations) {
-    errors.push(...validateProviderCapabilityDeclaration(declaration));
-    const evidence = providerCapabilityHookEvidenceRecord(evidenceByCapability[declaration.id]);
-    if (!evidence) {
-      errors.push(`${declaration.id}: protected/shared readiness requires hook evidence`);
-      continue;
-    }
-    errors.push(
-      ...validateProviderCapabilityHookEvidenceShape(declaration.id, evidence, {
-        allowedPhases: ["evidence"],
-        expectedSupabasePostgresProfile: opts.supabasePostgresProfile,
-      }),
-    );
-    const evidenceDeclaration = hookEvidenceDeclaration(evidence);
-    if (!evidenceDeclaration) {
-      errors.push(`${declaration.id}: missing hook declaration evidence`);
-    } else if (!matchesConcreteCapability(evidenceDeclaration, declaration)) {
-      errors.push(`${declaration.id}: hook declaration does not match selected capability`);
-    }
-    const refs = hookEvidenceRefs(evidence);
-    if (refs.length === 0) {
-      errors.push(`${declaration.id}: protected/shared readiness requires hook audit evidence`);
-      continue;
-    }
-    const invalidEvidence = refs.find((item) => INVALID_EVIDENCE_SOURCE.test(item));
-    if (invalidEvidence) {
-      errors.push(`${declaration.id}: ${invalidEvidence} is not control-plane audit evidence`);
-    }
-    for (const required of declaration.auditEvidence) {
-      if (!refs.includes(required)) {
-        errors.push(`${declaration.id}: missing evidence "${required}"`);
-      }
-    }
-  }
-  return errors;
 }
 
 function validateAwsEvidence(input: CloudControlSetupInput): string[] {

@@ -133,12 +133,13 @@ export function validateComputeAndIngress(
   if (evidenceList(processEvidence, "workers").length === 0) {
     errors.push("AWS process evidence missing worker process proof");
   }
-  for (const field of [
-    "launchTemplateId",
-    "launchTemplateVersion",
-    "amiId",
-    "instanceProfileArn",
-  ]) {
+  if (
+    !evidenceText(compute, "instanceId") &&
+    (!evidenceText(compute, "launchTemplateId") || !evidenceText(compute, "launchTemplateVersion"))
+  ) {
+    errors.push("AWS compute evidence missing launch template identity");
+  }
+  for (const field of ["amiId", "instanceType", "instanceProfileArn"]) {
     if (!evidenceText(compute, field)) errors.push(`AWS compute evidence missing ${field}`);
   }
   errors.push(...validateIngressEvidence(topology, options));

@@ -1835,3 +1835,245 @@ valid to downstream validators, weakening the protected/shared readiness boundar
 
 The credential staging evidence model gains another trust contract and more negative cases that must
 stay synchronized with generated runbook commands and docs.
+
+## PR-17: Repo-owned EC2 host provisioning hook
+
+### 1. Intent
+
+Close the guide gap where AWS EC2 host realization is still evidence-shaped by adding repo-owned EC2
+launch-template or instance/ASG provisioning semantics behind the reviewed provider capability hook.
+
+### 2. Scope of changes
+
+- Add a concrete AWS EC2 host provisioning adapter for `aws-ec2-control-plane-host` that produces
+  structured preview/apply/record/smoke/rollback evidence for one of:
+  - launch template plus Auto Scaling Group
+  - launch template plus explicitly managed instance
+  - a narrow documented instance-only profile if that is the current repo-owned path
+- Validate the generated host profile against the provisioned EC2 identity:
+  - AMI or image source
+  - instance type
+  - subnet and security-group attachment
+  - IAM instance profile
+  - launch template id/version or instance id
+  - user-data or bootstrap command digest
+  - expected container runtime and credential mount wiring
+- Replace generic EC2 capability hook evidence with typed payload validation for preview, apply,
+  smoke, and rollback phases.
+- Keep fixture/default behavior non-mutating in CI while proving generated commands map to the real
+  adapter and structured payload shape.
+- If full live AWS mutation remains intentionally out of scope, narrow `docs/control-plane-guide.md`
+  so it no longer claims repo-owned EC2 launch-template or instance provisioning.
+
+### 3. External prerequisites
+
+- Reviewed AWS account, region, IAM role, subnet, security-group, instance-profile, and AMI or image
+  metadata for live EC2 provisioning.
+- Existing AWS topology/profile generation and provider capability hook dispatch from PR-5 through
+  PR-16.
+
+### 4. Tests to be added
+
+- Add fixture tests proving the EC2 host capability hook emits typed preview/apply/record/smoke and
+  rollback evidence instead of generic reviewed stubs.
+- Add generated-command tests proving `deploy --deployment <label> --provider-capability
+aws-ec2-control-plane-host` dispatches to the concrete adapter and validates structured payloads.
+- Add negative tests for missing launch-template/instance identity, subnet mismatch, security-group
+  mismatch, instance-profile mismatch, unpinned AMI/image identity, missing bootstrap digest, missing
+  smoke evidence, and rollback evidence shape drift.
+- Add docs tests or guide checks proving the guide matches the implemented EC2 provisioning boundary.
+
+### 5. Docs to be added or updated
+
+- Update `docs/control-plane-guide.md` to describe the exact repo-owned EC2 provisioning boundary:
+  launch template, ASG, instance-only, or explicitly evidence-only if narrowed.
+- Update troubleshooting for EC2 provisioning identity, launch-template drift, bootstrap digest drift,
+  and rollback evidence failures.
+
+### 5.5. Expected regression scope
+
+- `deployment-only` for provider capability hook dispatch, EC2 host profile rendering, generated
+  commands, fixture evidence, and docs.
+- Live AWS EC2 mutation remains gated and must not run in ordinary CI.
+
+### 6. Acceptance criteria
+
+- The EC2 host capability is no longer a generic reviewed stub when the guide claims repo-owned EC2
+  provisioning.
+- Generated EC2 host commands dispatch to a concrete adapter with typed evidence for preview, apply,
+  record, smoke, and rollback phases.
+- Protected/shared readiness rejects stale, generic, self-attested, or profile-mismatched EC2 host
+  provisioning evidence.
+- The guide accurately describes the implemented EC2 provisioning boundary.
+
+### 7. Risks
+
+- Adding EC2 provisioning can expand the provider mutation surface beyond the current fixture-driven
+  evidence model.
+- Live EC2 launch-template or ASG semantics can diverge from host profile rendering if identity fields
+  are duplicated.
+
+### 8. Mitigations
+
+- Keep fixture validation authoritative in CI and require explicit live provider gates for AWS
+  mutation.
+- Generate or validate all host identity fields from the same typed AWS topology/profile input.
+- Treat rollback evidence as required before protected/shared use.
+
+### 9. Consequences of not implementing this PR
+
+The guide continues to imply repo-owned EC2 host provisioning while the implementation only accepts
+evidence-shaped host facts and generic capability hook output.
+
+### 10. Downsides for implementing this PR
+
+The EC2 provider adapter must maintain typed AWS identity, smoke, and rollback evidence contracts
+that may need updates as the host profile grows.
+
+## PR-18: Runtime HTTP evidence consumption for cutover
+
+### 1. Intent
+
+Ensure protected/shared cutover validates the contents of runtime health, readiness, and worker
+heartbeat evidence instead of only carrying file paths or truthy placeholders.
+
+### 2. Scope of changes
+
+- Parse generated HTTP check output during cutover evidence collection for:
+  - service health
+  - service readiness
+  - worker heartbeat/readiness
+- Validate each HTTP evidence payload for:
+  - success status
+  - fresh `checkedAt`
+  - expected deployment label or profile identity
+  - expected URL/host binding
+  - token-file or credential-source use rather than inline token values
+  - readiness dependency details for database, artifact store, worker queue/locks, and runtime config
+  - worker heartbeat identity and freshness
+- Carry parsed HTTP evidence into cutover validation and reject placeholder `{ evidenceRef, checkedAt
+}` records that do not prove runtime health.
+- Update setup-doctor/runbook cutover evidence checks to report precise HTTP evidence failures.
+
+### 3. External prerequisites
+
+- Existing generated HTTP check commands and output files from the setup/runbook workflow.
+- Existing runtime config and credential staging evidence from PR-11 through PR-16.
+
+### 4. Tests to be added
+
+- Add collector tests proving health, readiness, and worker heartbeat JSON files are parsed and
+  included as typed cutover evidence.
+- Add negative tests for failed HTTP status, stale check time, host/URL mismatch, deployment label
+  mismatch, inline token use, missing readiness dependency details, missing worker heartbeat, stale
+  worker heartbeat, and placeholder evidence objects.
+- Add setup-doctor or cutover runbook tests proving protected/shared cutover blocks on invalid HTTP
+  evidence.
+
+### 5. Docs to be added or updated
+
+- Update `docs/control-plane-guide.md` to describe the concrete runtime HTTP evidence fields required
+  for cutover.
+- Add troubleshooting for stale health checks, readiness dependency failures, worker heartbeat drift,
+  URL/host mismatch, and token-file misuse.
+
+### 5.5. Expected regression scope
+
+- `deployment-only` for cutover evidence collection, cutover validation, runbook doctor checks, and
+  docs.
+
+### 6. Acceptance criteria
+
+- Cutover validation consumes parsed runtime HTTP check results, not only file paths or placeholder
+  evidence refs.
+- Protected/shared cutover rejects stale, failed, mismatched, or incomplete health/readiness/heartbeat
+  evidence.
+- Tests cover both collector and validator negative cases for every required HTTP evidence rule.
+
+### 7. Risks
+
+- Tightening HTTP evidence validation can break existing fixtures that intentionally used placeholder
+  health evidence.
+- Runtime health payloads may drift if service readiness fields change.
+
+### 8. Mitigations
+
+- Centralize HTTP evidence parsing and validation in typed helper functions.
+- Update fixtures to use realistic generated HTTP evidence payloads.
+- Produce clear validation errors naming the failed runtime check field.
+
+### 9. Consequences of not implementing this PR
+
+Cutover can appear to validate runtime health while only proving that placeholder files or path refs
+exist.
+
+### 10. Downsides for implementing this PR
+
+Cutover evidence fixtures become more detailed and must stay aligned with runtime health/readiness
+payload schemas.
+
+## PR-19: EC2 NixOS example reviewed-source modes and guide cleanup
+
+### 1. Intent
+
+Align the generated AWS EC2 NixOS example and guide with both reviewed-source modes, and remove stale
+documentation that says instance-profile artifact credentials still need implementation.
+
+### 2. Scope of changes
+
+- Update the AWS EC2 NixOS example renderer so it branches on `reviewedSourceMode`:
+  - SSH mode emits SSH private key and known-host credential sources.
+  - GitHub App mode emits GitHub App id, installation id, and private-key credential sources.
+  - GitHub App mode does not emit stale SSH credential source files.
+- Keep the main credential manifest and runtime config source-of-truth aligned with the EC2 example.
+- Remove or update stale guide text that says AWS instance-profile artifact-store support still needs
+  code work when the implementation already supports it.
+
+### 3. External prerequisites
+
+- Existing reviewed-source mode support from generated runtime input and credential manifests.
+- Existing AWS instance-profile artifact credential support.
+
+### 4. Tests to be added
+
+- Add EC2 host profile tests for SSH reviewed-source mode credential source rendering.
+- Add EC2 host profile tests for GitHub App reviewed-source mode credential source rendering.
+- Add negative tests proving GitHub App mode does not emit SSH credential source entries and SSH mode
+  does not emit GitHub App private-key source entries.
+- Add docs or guide checks proving stale instance-profile “later work” text is removed.
+
+### 5. Docs to be added or updated
+
+- Update `docs/control-plane-guide.md` so reviewed-source credential examples match SSH versus GitHub
+  App mode.
+- Remove stale instance-profile artifact-store support caveats or replace them with current
+  operational requirements.
+
+### 5.5. Expected regression scope
+
+- `deployment-only` for AWS EC2 host profile example rendering, reviewed-source fixtures, and docs.
+
+### 6. Acceptance criteria
+
+- The generated AWS EC2 NixOS example is correct for both SSH and GitHub App reviewed-source modes.
+- GitHub App mode no longer emits SSH credential files in the EC2 example.
+- The guide no longer contradicts implemented AWS instance-profile artifact credential support.
+
+### 7. Risks
+
+- The example renderer can drift from the main credential manifest if reviewed-source filenames are
+  duplicated.
+
+### 8. Mitigations
+
+- Reuse the same reviewed-source credential constants or helper functions where possible.
+- Add mode-specific tests for rendered example files.
+
+### 9. Consequences of not implementing this PR
+
+Operators using GitHub App reviewed-source mode receive an EC2 NixOS example that still stages SSH
+credentials, and the guide continues to contain a stale instance-profile caveat.
+
+### 10. Downsides for implementing this PR
+
+The EC2 example renderer gains another mode branch and corresponding tests.

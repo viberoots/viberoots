@@ -222,10 +222,15 @@ existing LB, ACM, DNS, WAF, or edge resources is allowed only with ownership, ca
 topology identity, fresh drift proof, and non-destructive rollback posture.
 
 For the EC2 host itself, prefer the generated AWS EC2 host profile from
-`deployment-control-plane setup --host-mode aws-ec2`. The profile consumes the reviewed AWS
-foundation evidence for selected private subnets, security groups, instance profile, S3 endpoint,
-and registry access. The generated launch-template or Auto Scaling profile must place instances only
-in the selected private subnets from that evidence.
+`deployment-control-plane setup --host-mode aws-ec2`. The current repo-owned boundary is a
+non-mutating structured EC2 host adapter: it validates the generated instance host profile against
+reviewed AWS topology evidence and emits typed preview, apply-intent, evidence, smoke, and rollback
+payloads. It does not create or update EC2 instances, launch templates, or Auto Scaling groups in
+ordinary runs. Live EC2 realization still comes from reviewed AWS foundation/IaC or an imported
+cloud-foundation process, and the adapter proves that the selected host identity, AMI, instance
+type, subnets, security groups, instance profile, bootstrap digest, container runtime, and
+credential mount wiring match the selected AWS topology evidence and generated host profile before
+protected/shared use.
 
 The generated NixOS EC2 example imports the existing control-plane container module with AWS-specific
 inputs. The generated systemd/Podman artifacts are a compatibility mode for non-NixOS OCI hosts and
@@ -262,6 +267,24 @@ Operator procedure for `aws-network-foundation`:
 5. Rollback: preserve the state bucket and drift evidence, detach new runtime references, and
    remove only newly-created network resources after retained artifacts and active endpoints have
    a reviewed replacement path.
+
+Operator procedure for `aws-ec2-control-plane-host`:
+
+1. Preview: run the generated provider-capability command with `--preview` and the generated
+   `aws-topology-evidence.json` plus `aws-ec2-profile.yaml`. Review the typed payload for the
+   selected instance or ASG identity, launch-template id/version when present, AMI pin, instance
+   type, private subnet ids, service/worker security groups, instance profile, bootstrap digest,
+   container runtime, and credential mount mode.
+2. Apply-intent: run the generated apply hook only after EC2 host realization has been completed by
+   the reviewed external foundation process. The hook records non-mutating structured evidence that
+   the generated profile still matches the realized EC2 identity.
+3. Evidence: run the generated record command from `commands.json`; it writes
+   `provider-capability-aws-ec2-control-plane-host.json` for setup-doctor and cutover collection.
+4. Smoke: after service and workers are running, run the smoke hook and keep its typed payload with
+   process, readiness, worker-heartbeat, and rollback posture evidence.
+5. Rollback: keep the previous host profile, previous systemd/Podman unit set, worker shutdown
+   proof, and non-destructive replacement path. The default hook validates rollback evidence shape;
+   it does not destroy EC2 resources.
 
 Operator procedure for `aws-s3-artifact-store`:
 
@@ -757,6 +780,16 @@ do not satisfy protected/shared readiness by themselves.
   `externalReviewedBackendProof` with `deploymentOwnedLiveBackendWrite`.
 - Cutover evidence rejected: replace dashboard-only notes with structured evidence tied to the same
   AWS instances, image digest, config digest, selected database path, and selected artifact path.
+- EC2 provider evidence rejected: rerun the generated `aws-ec2-control-plane-host` command with the
+  current `aws-topology-evidence.json` and `aws-ec2-profile.yaml`; check instance or launch-template
+  identity, instance type, AMI pin, private subnet ids, service/worker security groups, instance
+  profile ARN, bootstrap digest, container runtime, and credential mount mode.
+- Launch-template or bootstrap drift: refresh the reviewed AWS topology evidence from the realized
+  host, then regenerate the setup bundle if the launch-template version, AMI, user-data digest, or
+  systemd/Podman artifact set intentionally changed.
+- EC2 rollback evidence rejected: attach the previous host profile, previous unit set, worker
+  shutdown proof, and non-destructive replacement evidence before attempting protected/shared
+  cutover.
 
 ## Operator Checklist
 

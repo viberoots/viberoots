@@ -2,6 +2,7 @@ import type { ProviderCapabilityDeclaration } from "./cloud-control-setup-types"
 import { freshEvidenceAt } from "./cloud-control-evidence-helpers";
 import type { SupabaseManagedPostgresProfile } from "./control-plane-supabase-postgres-profile";
 import { validateSupabaseManagedPostgresPayload } from "./cloud-control-supabase-postgres-hook-validation";
+import { validateAwsEc2HostProviderPayload } from "./cloud-control-aws-ec2-host-hook-validation";
 
 export const CLOUD_PROVIDER_CAPABILITY_HOOK_EVIDENCE_SCHEMA =
   "cloud-provider-capability-hook-evidence@1";
@@ -21,6 +22,7 @@ export type CloudProviderCapabilityHookEvidenceLike = {
 export type ProviderCapabilityHookEvidenceValidationOptions = {
   allowedPhases?: readonly string[];
   maxAgeMinutes?: number;
+  expectedAwsTopology?: unknown;
   expectedSupabasePostgresProfile?: SupabaseManagedPostgresProfile;
 };
 
@@ -60,6 +62,7 @@ export function validateProviderCapabilityHookEvidenceShape(
     errors.push(`${id}: provider-capability evidence is missing or stale`);
   }
   errors.push(...validateRedactedOutputEvidence(id, value));
+  errors.push(...validateAwsEc2HostProviderPayload(id, value, opts));
   errors.push(...validateSupabaseManagedPostgresPayload(id, value, opts));
   errors.push(...validateSupabasePrivateLinkPayload(id, value));
   errors.push(...validateNoDashboardOnlyEvidence(id, value));

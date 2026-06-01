@@ -2,6 +2,7 @@ import { buildSupabaseManagedPostgresEvidence } from "../../deployments/control-
 import { reviewedSupabaseManagedPostgresProfile } from "../../deployments/control-plane-supabase-postgres-profile";
 
 export function providerPayloadFor(id: string) {
+  if (id === "aws-ec2-control-plane-host") return awsEc2Payload();
   if (id === "aws-network-foundation") {
     return {
       providerPayload: {
@@ -38,6 +39,59 @@ export function providerPayloadFor(id: string) {
       callbackPath: "/oidc/callback",
       originLoadBalancerArn:
         "arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/cp/1",
+    },
+  };
+}
+
+function awsEc2Payload() {
+  return {
+    providerPayload: {
+      schemaVersion: "aws-ec2-host-hook-payload@1",
+      capabilityId: "aws-ec2-control-plane-host",
+      phase: "smoke",
+      provisioningBoundary: "non-mutating-structured-ec2-host-adapter",
+      hostProfile: "aws-ec2",
+      mutationAuthority: false,
+      identity: {
+        accountId: "123456789012",
+        region: "us-east-1",
+        computeMode: "ec2-instance",
+        instanceId: "i-0abc1234",
+        launchTemplateId: "lt-123",
+        launchTemplateVersion: "7",
+        amiId: "ami-123",
+        amiPinPath: "sha256:nixos-ami-import",
+        instanceType: "m7i.large",
+        instanceProfileArn: "arn:aws:iam::123456789012:instance-profile/control-plane",
+        privateSubnetIds: ["subnet-123", "subnet-456"],
+        securityGroupIds: ["sg-service", "sg-worker"],
+        bootstrapDigest: "sha256:user",
+        containerRuntime: "podman-systemd",
+        credentialMountMode: "bind-mounted-credential-directory",
+      },
+      generatedProfile: {
+        credentialMountMode: "bind-mounted-credential-directory",
+        compute: {
+          amiId: "ami-123",
+          amiPinPath: "sha256:nixos-ami-import",
+          instanceId: "i-0abc1234",
+          launchTemplateId: "lt-123",
+          launchTemplateVersion: "7",
+          selectedSubnetIds: ["subnet-123", "subnet-456"],
+          securityGroupIds: ["sg-service", "sg-worker"],
+          instanceType: "m7i.large",
+          instanceProfileArn: "arn:aws:iam::123456789012:instance-profile/control-plane",
+          bootstrapDigest: "sha256:user",
+          containerRuntime: "podman-systemd",
+        },
+        network: {
+          subnetIds: ["subnet-123", "subnet-456"],
+          securityGroupIds: ["sg-service", "sg-worker"],
+        },
+      },
+      operation: { executed: false, mutationAuthority: false, outputDigest: "sha256:ec2" },
+      smokeEvidence: true,
+      rollback: { nonDestructive: true, proofRefs: ["worker-shutdown-proof"] },
     },
   };
 }

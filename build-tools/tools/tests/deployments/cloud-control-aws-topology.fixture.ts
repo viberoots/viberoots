@@ -106,6 +106,7 @@ function computeEvidence() {
     launchTemplateId: "lt-123",
     launchTemplateVersion: "7",
     amiId: "ami-123",
+    instanceType: "m7i.large",
     amiBuildIdentity: IMAGE_BUILD_IDENTITY,
     amiSelection: {
       source: "reviewed-nixos-build-import",

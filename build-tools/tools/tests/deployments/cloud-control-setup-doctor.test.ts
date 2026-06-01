@@ -26,6 +26,7 @@ import {
   runbookCommand,
   writeBundle,
   writeEvidence,
+  writeProviderCapabilityEvidence,
   writeSupabaseProviderEvidence,
 } from "./cloud-control-setup-doctor.helpers";
 const DIGEST_REF =
@@ -73,6 +74,7 @@ test("setup doctor classifies local runbook phases without cloud credentials", a
       "utf8",
     );
     await validateRunbookBundle(tmp);
+    await writeProviderCapabilityEvidence(tmp, commands);
 
     for (const id of [
       "supabase-privatelink-support-initiation",

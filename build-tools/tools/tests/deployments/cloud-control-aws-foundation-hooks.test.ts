@@ -9,7 +9,7 @@ import { AWS_FOUNDATION_HOOK_PAYLOAD_SCHEMA } from "../../deployments/cloud-cont
 import { AWS_FOUNDATION_PROFILE_SCHEMA } from "../../deployments/cloud-control-aws-foundation-types";
 import { runCloudProviderCapabilityHook } from "../../deployments/cloud-control-provider-capability-hooks";
 import { validateCutoverProviderCapabilities } from "../../deployments/cloud-control-cutover-provider-capabilities";
-import { validateProviderCapabilityEvidence } from "../../deployments/cloud-control-setup-validate";
+import { validateProviderCapabilityEvidence } from "../../deployments/cloud-control-provider-capability-readiness";
 import { publicAwsTopology } from "./cloud-control-cutover-fixture";
 
 const awsFoundationInspection = publicAwsTopology().foundation;

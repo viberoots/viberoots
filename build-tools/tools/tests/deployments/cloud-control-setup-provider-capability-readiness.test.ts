@@ -3,11 +3,12 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { runCloudProviderCapabilityHook } from "../../deployments/cloud-control-provider-capability-hooks";
 import { renderCloudControlSetupBundle } from "../../deployments/cloud-control-setup-render";
-import { validateProviderCapabilityEvidence } from "../../deployments/cloud-control-setup-validate";
+import { validateProviderCapabilityEvidence } from "../../deployments/cloud-control-provider-capability-readiness";
 import type { CloudControlSetupInput } from "../../deployments/cloud-control-setup-types";
 import { reviewedSupabaseManagedPostgresProfile } from "../../deployments/control-plane-supabase-postgres-profile";
 import { privateLinkAwsTopology } from "./cloud-control-cutover-fixture";
 import { reviewedRuntimeInput } from "./cloud-control-runtime-input.fixture";
+import { awsEc2HookProfile } from "./cloud-control-aws-ec2-hook-profile.fixture";
 
 const DIGEST_REF =
   "registry.example.com/platform/deployment-control-plane@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
@@ -101,6 +102,9 @@ async function hookEvidenceFor(capabilities: Array<{ id: string }>) {
           capabilityId: capability.id,
           phase: "evidence",
           deploymentLabel: "//deployments:staging",
+          ...(capability.id === "aws-ec2-control-plane-host"
+            ? { awsTopologyEvidence: privateLinkAwsTopology(), awsEc2Profile: awsEc2HookProfile() }
+            : {}),
           ...(capability.id === "aws-network-foundation" ||
           capability.id === "aws-s3-artifact-store"
             ? { awsFoundationInspection: foundation }

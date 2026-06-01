@@ -4,6 +4,7 @@ import { test } from "node:test";
 import { CLOUD_CAPABILITY_IDS } from "../../deployments/cloud-control-setup-contract";
 import { runCloudProviderCapabilityHook } from "../../deployments/cloud-control-provider-capability-hooks";
 import { publicAwsTopology } from "./cloud-control-cutover-fixture";
+import { awsEc2HookProfile } from "./cloud-control-aws-ec2-hook-profile.fixture";
 
 test("provider-capability hook dispatch covers every concrete capability", async () => {
   for (const capabilityId of CLOUD_CAPABILITY_IDS) {
@@ -11,6 +12,9 @@ test("provider-capability hook dispatch covers every concrete capability", async
       capabilityId,
       phase: "evidence",
       deploymentLabel: "//deployments:staging",
+      ...(capabilityId === "aws-ec2-control-plane-host"
+        ? { awsTopologyEvidence: publicAwsTopology(), awsEc2Profile: awsEc2HookProfile() }
+        : {}),
       ...awsFoundationInspection(capabilityId),
     });
     assert.equal(hook.capabilityId, capabilityId);

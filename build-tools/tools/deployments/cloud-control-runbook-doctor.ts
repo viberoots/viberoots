@@ -6,6 +6,7 @@ import { validateAuthProviderProfile } from "./cloud-control-runtime-input";
 import { validateCredentialMap } from "./cloud-control-credential-map";
 import type { SupabaseManagedPostgresProfile } from "./control-plane-supabase-postgres-profile";
 import { validateProviderCapabilityHookEvidenceShape } from "./cloud-control-provider-capability-hook-contract";
+import { validateProviderCapabilityRunbookOutput } from "./cloud-control-runbook-provider-output";
 import {
   validateCredentialRotationOutput,
   validateCredentialStagingOutput,
@@ -199,6 +200,7 @@ async function validateOutputEvidence(profileRoot: string, file: string): Promis
   if (
     file !== "$PROFILE_ROOT/managed-dependency-evidence.json" &&
     file !== "$PROFILE_ROOT/supabase-managed-postgres-evidence.json" &&
+    !file.startsWith("$PROFILE_ROOT/provider-capability-") &&
     file !== "$PROFILE_ROOT/credential-staging.json" &&
     file !== "$PROFILE_ROOT/credential-staging.live.json" &&
     file !== "$PROFILE_ROOT/credential-rotation.json" &&
@@ -208,6 +210,9 @@ async function validateOutputEvidence(profileRoot: string, file: string): Promis
   }
   if (file === "$PROFILE_ROOT/supabase-managed-postgres-evidence.json") {
     return validateSupabaseProviderOutput(profileRoot);
+  }
+  if (file.startsWith("$PROFILE_ROOT/provider-capability-")) {
+    return validateProviderCapabilityRunbookOutput(profileRoot, file);
   }
   if (file === "$PROFILE_ROOT/credential-staging.json")
     return validateCredentialStagingOutput(profileRoot);

@@ -3,7 +3,9 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { validateCutoverProviderCapabilities } from "../../deployments/cloud-control-cutover-provider-capabilities";
 import { runCloudProviderCapabilityHook } from "../../deployments/cloud-control-provider-capability-hooks";
-import { validateProviderCapabilityEvidence } from "../../deployments/cloud-control-setup-validate";
+import { validateProviderCapabilityEvidence } from "../../deployments/cloud-control-provider-capability-readiness";
+import { publicAwsTopology } from "./cloud-control-cutover-fixture";
+import { awsEc2HookProfile } from "./cloud-control-aws-ec2-hook-profile.fixture";
 
 test("readiness and cutover reject stale provider-capability hook evidence", async () => {
   const old = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
@@ -32,5 +34,8 @@ function hookEvidence(capabilityId: string, phase: "evidence" | "smoke") {
     capabilityId,
     phase,
     deploymentLabel: "//deployments:staging",
+    ...(capabilityId === "aws-ec2-control-plane-host"
+      ? { awsTopologyEvidence: publicAwsTopology(), awsEc2Profile: awsEc2HookProfile() }
+      : {}),
   });
 }

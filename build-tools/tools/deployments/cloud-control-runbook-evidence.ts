@@ -1,5 +1,6 @@
 import type { CloudControlSetupInput } from "./cloud-control-setup-types";
 import { setupAwsTopology } from "./cloud-control-setup-aws-topology";
+import { awsTopologyRequiredCapabilityIds } from "./cloud-control-aws-topology-capabilities";
 
 const CREDENTIAL_DIR = "/run/deployment-control-plane/credentials";
 
@@ -30,6 +31,7 @@ export function phaseMeta(id: string, input: CloudControlSetupInput) {
       evidenceInputs: [
         "$PROFILE_ROOT/managed-dependencies.profile.yaml",
         "$PROFILE_ROOT/provider-capabilities.json#supabase-managed-postgres",
+        ...providerCapabilityEvidenceOutputs(input),
         artifactEvidence(input),
         ...supabasePrivateLinkEvidenceOutputs(input),
       ],
@@ -83,6 +85,13 @@ export function processWorkerOutputPaths(input: CloudControlSetupInput): string[
     { length: input.workerReplicas },
     (_, index) => `$PROFILE_ROOT/process-worker-${index + 1}.json`,
   );
+}
+
+function providerCapabilityEvidenceOutputs(input: CloudControlSetupInput): string[] {
+  if (input.mode !== "aws-ec2") return [];
+  return awsTopologyRequiredCapabilityIds(input.awsTopology)
+    .filter((id) => id !== "supabase-managed-postgres")
+    .map((id) => `$PROFILE_ROOT/provider-capability-${id}.json`);
 }
 
 function artifactEvidence(input: CloudControlSetupInput): string {

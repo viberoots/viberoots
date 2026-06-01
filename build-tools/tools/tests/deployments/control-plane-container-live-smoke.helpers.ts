@@ -4,7 +4,7 @@ import { execFile } from "node:child_process";
 import * as fsp from "node:fs/promises";
 import { promisify } from "node:util";
 import pg from "pg";
-import { validateProviderCapabilityEvidence } from "../../deployments/cloud-control-setup-validate";
+import { validateProviderCapabilityEvidence } from "../../deployments/cloud-control-provider-capability-readiness";
 import type { ControlPlaneManagedDependencyProfile } from "../../deployments/control-plane-managed-dependency-types";
 import { validateManagedArtifactStoreProfile } from "../../deployments/control-plane-managed-dependency-validation";
 import type { ProviderCapabilityDeclaration } from "../../deployments/cloud-control-setup-types";

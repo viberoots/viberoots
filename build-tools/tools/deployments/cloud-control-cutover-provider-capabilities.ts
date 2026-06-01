@@ -40,6 +40,7 @@ function validateCapability(
     ...validateProviderCapabilityHookEvidenceShape(id, capability, {
       allowedPhases: id === "supabase-managed-postgres" ? ["smoke", "evidence"] : ["smoke"],
       maxAgeMinutes,
+      expectedAwsTopology: evidence.awsTopology,
       expectedSupabasePostgresProfile: evidence.supabasePostgresProfile,
     }),
   );

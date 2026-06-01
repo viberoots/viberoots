@@ -7,8 +7,14 @@ import {
   runCloudProviderCapabilityHook,
 } from "../../deployments/cloud-control-provider-capability-hooks";
 import { validateCutoverProviderCapabilities } from "../../deployments/cloud-control-cutover-provider-capabilities";
-import { validateProviderCapabilityEvidence } from "../../deployments/cloud-control-setup-validate";
+import { validateProviderCapabilityEvidence } from "../../deployments/cloud-control-provider-capability-readiness";
 import { publicAwsTopology } from "./cloud-control-cutover-fixture";
+import { awsEc2HookProfile } from "./cloud-control-aws-ec2-hook-profile.fixture";
+import {
+  liveCapabilityIds,
+  liveProviderInputs,
+  requiredLiveEnv,
+} from "./cloud-control-provider-capability-live.fixture";
 
 test("provider-capability hook dispatch binds every phase to the concrete declaration", async () => {
   for (const phase of CLOUD_PROVIDER_CAPABILITY_HOOK_PHASES) {
@@ -201,11 +207,16 @@ test("live-gated selected provider capability preview and smoke dispatch hooks",
     t.skip("set VBR_CLOUD_PROVIDER_CAPABILITY_LIVE=1 for live provider preview/smoke hooks");
     return;
   }
-  const deploymentLabel = requiredEnv("VBR_CLOUD_PROVIDER_CAPABILITY_LIVE_DEPLOYMENT_LABEL");
+  const deploymentLabel = requiredLiveEnv("VBR_CLOUD_PROVIDER_CAPABILITY_LIVE_DEPLOYMENT_LABEL");
   assert.doesNotMatch(deploymentLabel, /^(prod|production)$/i);
   for (const capabilityId of liveCapabilityIds()) {
     for (const phase of ["preview", "smoke"] as const) {
-      const hook = await runCloudProviderCapabilityHook({ capabilityId, phase, deploymentLabel });
+      const hook = await runCloudProviderCapabilityHook({
+        capabilityId,
+        phase,
+        deploymentLabel,
+        ...(await liveProviderInputs(capabilityId)),
+      });
       assert.equal(hook.capabilityId, capabilityId);
       assert.equal(hook.phase, phase);
     }
@@ -217,6 +228,9 @@ function hookEvidence(capabilityId: string, phase: any) {
     capabilityId,
     phase,
     deploymentLabel: "//deployments:staging",
+    ...(capabilityId === "aws-ec2-control-plane-host"
+      ? { awsTopologyEvidence: publicAwsTopology(), awsEc2Profile: awsEc2HookProfile() }
+      : {}),
     ...(capabilityId.startsWith("aws-s3-") || capabilityId === "aws-network-foundation"
       ? { awsFoundationInspection: publicAwsTopology().foundation }
       : {}),
@@ -233,17 +247,4 @@ function badDeclarations(capability: ReturnType<typeof capabilityDeclaration>) {
 
 function cutoverErrors(caps: Record<string, unknown>, selected: string[]) {
   return validateCutoverProviderCapabilities({ providerCapabilities: caps } as any, selected);
-}
-
-function liveCapabilityIds(): string[] {
-  return (process.env.VBR_CLOUD_PROVIDER_CAPABILITY_LIVE_IDS || "aws-ec2-control-plane-host")
-    .split(",")
-    .map((value) => value.trim())
-    .filter(Boolean);
-}
-
-function requiredEnv(name: string): string {
-  const value = process.env[name]?.trim();
-  assert.ok(value, `${name} is required when live provider capability hooks are enabled`);
-  return value;
 }

@@ -5,6 +5,7 @@ import * as os from "node:os";
 import * as path from "node:path";
 import { test } from "node:test";
 import type { ProviderCapabilityDeclaration } from "../../deployments/cloud-control-setup-types";
+import { runCloudProviderCapabilityHook } from "../../deployments/cloud-control-provider-capability-hooks";
 import {
   authValidationInputs,
   cutoverValidationInputs,
@@ -16,6 +17,8 @@ import {
   validateAwsProviderCapabilityEvidence,
   validateAwsRuntimeEvidenceFiles,
 } from "./control-plane-container-live-smoke-aws.helpers";
+import { publicAwsTopology } from "./cloud-control-cutover-fixture";
+import { awsEc2HookProfile } from "./cloud-control-aws-ec2-hook-profile.fixture";
 import { writeAwsRuntimeEvidence } from "./control-plane-container-live-smoke-fixtures.helpers";
 
 function withEnv(env: Record<string, string>, fn: () => void) {
@@ -50,6 +53,7 @@ test("enabled live smoke requires staging, auth, topology, and capability eviden
   assert.deepEqual(
     awsTopologyInputs({ VBR_CONTROL_PLANE_LIVE_AWS_TOPOLOGY: "1" } as NodeJS.ProcessEnv),
     [
+      "VBR_CONTROL_PLANE_LIVE_AWS_TOPOLOGY_EVIDENCE_FILE",
       "VBR_CONTROL_PLANE_LIVE_AWS_SUBNET_EVIDENCE_FILE",
       "VBR_CONTROL_PLANE_LIVE_AWS_SECURITY_GROUP_EVIDENCE_FILE",
       "VBR_CONTROL_PLANE_LIVE_AWS_S3_ENDPOINT_EVIDENCE_FILE",
@@ -121,37 +125,54 @@ test("AWS runtime topology evidence ties DB, S3, and shutdown to same runtime id
 
 test("AWS runtime topology evidence is attached to provider capabilities", async () => {
   const env = await writeAwsRuntimeEvidence();
-  const capabilities = [
-    {
-      id: "aws-ec2-control-plane-host",
-      auditEvidence: ["aws-runtime-db", "aws-runtime-s3", "aws-shutdown"],
-    },
-    { id: "unrelated-provider", auditEvidence: ["unrelated"] },
-  ] as ProviderCapabilityDeclaration[];
-  await assert.rejects(
-    () =>
-      validateAwsProviderCapabilityEvidence(env, capabilities, {
-        "aws-ec2-control-plane-host": ["aws-runtime-db"],
-      }),
-    /aws-ec2-control-plane-host evidence must reference/,
-  );
-  await assert.rejects(
-    () =>
-      validateAwsProviderCapabilityEvidence(env, capabilities, {
-        "unrelated-provider": [
-          env.VBR_CONTROL_PLANE_LIVE_AWS_RUNTIME_DB_EVIDENCE_FILE,
-          env.VBR_CONTROL_PLANE_LIVE_AWS_RUNTIME_S3_EVIDENCE_FILE,
-          env.VBR_CONTROL_PLANE_LIVE_AWS_WORKER_SHUTDOWN_EVIDENCE_FILE,
-        ],
-      }),
-    /aws-ec2-control-plane-host evidence must reference/,
-  );
-  await validateAwsProviderCapabilityEvidence(env, capabilities, {
-    "aws-ec2-control-plane-host": [
+  const hook = await runCloudProviderCapabilityHook({
+    capabilityId: "aws-ec2-control-plane-host",
+    phase: "evidence",
+    deploymentLabel: "//deployments:staging",
+    awsTopologyEvidence: publicAwsTopology(),
+    awsEc2Profile: awsEc2HookProfile(),
+  });
+  const capabilities = [hook.declaration] as ProviderCapabilityDeclaration[];
+  const completeEvidence = {
+    ...hook,
+    auditEvidence: [
+      ...hook.auditEvidence,
       env.VBR_CONTROL_PLANE_LIVE_AWS_RUNTIME_DB_EVIDENCE_FILE,
       env.VBR_CONTROL_PLANE_LIVE_AWS_RUNTIME_S3_EVIDENCE_FILE,
       env.VBR_CONTROL_PLANE_LIVE_AWS_WORKER_SHUTDOWN_EVIDENCE_FILE,
     ],
+  };
+  await assert.rejects(
+    () =>
+      validateAwsProviderCapabilityEvidence(env, capabilities, {
+        "aws-ec2-control-plane-host": {
+          ...completeEvidence,
+          auditEvidence: [
+            ...hook.auditEvidence,
+            env.VBR_CONTROL_PLANE_LIVE_AWS_RUNTIME_DB_EVIDENCE_FILE,
+          ],
+        },
+      }),
+    /aws-ec2-control-plane-host evidence must reference/,
+  );
+  await assert.rejects(
+    () =>
+      validateAwsProviderCapabilityEvidence(env, capabilities, {
+        "aws-ec2-control-plane-host": {
+          ...completeEvidence,
+          providerPayload: {
+            ...(completeEvidence.providerPayload as any),
+            identity: {
+              ...((completeEvidence.providerPayload as any).identity as Record<string, unknown>),
+              privateSubnetIds: ["subnet-unreviewed"],
+            },
+          },
+        },
+      }),
+    /privateSubnetIds do not match selected topology/,
+  );
+  await validateAwsProviderCapabilityEvidence(env, capabilities, {
+    "aws-ec2-control-plane-host": completeEvidence,
   });
 });
 

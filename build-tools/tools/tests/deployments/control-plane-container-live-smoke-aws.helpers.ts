@@ -1,13 +1,13 @@
 #!/usr/bin/env zx-wrapper
 import assert from "node:assert/strict";
-import { createHash } from "node:crypto";
-import * as path from "node:path";
 import * as fsp from "node:fs/promises";
-import type { ProviderCapabilityDeclaration } from "../../deployments/cloud-control-setup-types";
+
+export { validateAwsProviderCapabilityEvidence } from "./control-plane-container-live-smoke-aws-provider.helpers";
 
 export function awsTopologyInputs(env: NodeJS.ProcessEnv): string[] {
   if (env.VBR_CONTROL_PLANE_LIVE_AWS_TOPOLOGY !== "1") return [];
   return [
+    "VBR_CONTROL_PLANE_LIVE_AWS_TOPOLOGY_EVIDENCE_FILE",
     "VBR_CONTROL_PLANE_LIVE_AWS_SUBNET_EVIDENCE_FILE",
     "VBR_CONTROL_PLANE_LIVE_AWS_SECURITY_GROUP_EVIDENCE_FILE",
     "VBR_CONTROL_PLANE_LIVE_AWS_S3_ENDPOINT_EVIDENCE_FILE",
@@ -66,32 +66,6 @@ export async function validateAwsRuntimeEvidenceFiles(env: Record<string, string
   validateS3RuntimeEvidence(s3.s3, env.VBR_CONTROL_PLANE_LIVE_AWS_S3_ENDPOINT_PATH, worker);
   validateShutdownEvidence(shutdown.shutdown, worker);
   validateInstanceTopology([service.instanceId, worker.instanceId], topology);
-}
-
-export async function validateAwsProviderCapabilityEvidence(
-  env: Record<string, string>,
-  declarations: ProviderCapabilityDeclaration[],
-  evidenceByCapability: Record<string, string[]>,
-) {
-  if (env.VBR_CONTROL_PLANE_LIVE_AWS_TOPOLOGY !== "1") return;
-  const selected = declarations.find(
-    (capability) =>
-      capability.id ===
-      (env.VBR_CONTROL_PLANE_LIVE_AWS_PROVIDER_CAPABILITY_ID || "aws-ec2-control-plane-host"),
-  );
-  assert.ok(selected, "selected AWS provider capability is required for topology evidence");
-  const attached = new Set(evidenceByCapability[selected.id] || []);
-  for (const file of [
-    env.VBR_CONTROL_PLANE_LIVE_AWS_RUNTIME_DB_EVIDENCE_FILE,
-    env.VBR_CONTROL_PLANE_LIVE_AWS_RUNTIME_S3_EVIDENCE_FILE,
-    env.VBR_CONTROL_PLANE_LIVE_AWS_WORKER_SHUTDOWN_EVIDENCE_FILE,
-  ]) {
-    const refs = await evidenceRefs(file);
-    assert.ok(
-      refs.some((ref) => attached.has(ref)),
-      `${selected.id} evidence must reference ${path.basename(file)} by file or digest`,
-    );
-  }
 }
 
 async function validateAwsEvidenceFiles(env: Record<string, string>) {
@@ -217,13 +191,6 @@ function validateInstanceTopology(
 function findInstance(instances: unknown, instanceId: string) {
   assert.ok(Array.isArray(instances), "AWS topology evidence must list runtime instances");
   return instances.find((entry) => asRecord(entry, "topology instance").instanceId === instanceId);
-}
-
-async function evidenceRefs(file: string) {
-  const digest = createHash("sha256")
-    .update(await fsp.readFile(file))
-    .digest("hex");
-  return [file, `file:${file}`, `sha256:${digest}`, `${path.basename(file)}:sha256:${digest}`];
 }
 
 function asRecord(value: unknown, label: string): Record<string, unknown> {

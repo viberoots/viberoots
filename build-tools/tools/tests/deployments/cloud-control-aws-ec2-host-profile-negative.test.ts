@@ -14,6 +14,7 @@ import { privateLinkSupabaseProfile } from "./control-plane-supabase-postgres.fi
 
 test("AWS EC2 host profile validation rejects AMI pin and network placement gaps", () => {
   assertRejects({ compute: { amiBuildIdentity: "" } }, /missing AMI build identity/);
+  assertRejects({ compute: { instanceType: "" } }, /missing instanceType/);
   assertRejects(
     { compute: { amiSelection: { pinPath: "latest-marketplace-alias" } } },
     /reviewed NixOS build\/import.*selected AMI id.*mutable marketplace/s,

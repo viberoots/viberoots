@@ -2,12 +2,14 @@ import { redactOperatorText } from "./deployment-control-plane-redaction";
 import { capabilityDeclaration } from "./cloud-control-setup-contract";
 import type { ProviderCapabilityDeclaration } from "./cloud-control-setup-types";
 import { validateProviderCapabilityDeclaration } from "./cloud-control-setup-validate";
+import { awsEc2HostHookAdapter } from "./cloud-control-aws-ec2-host-hooks";
 import {
   CLOUD_PROVIDER_CAPABILITY_HOOK_EVIDENCE_SCHEMA,
   CLOUD_PROVIDER_CAPABILITY_HOOK_EVIDENCE_SOURCE,
 } from "./cloud-control-provider-capability-hook-contract";
 import { awsFoundationHookAdapter } from "./cloud-control-aws-foundation-hooks";
 import type { AwsFoundationProfile } from "./cloud-control-aws-foundation-types";
+import type { AwsTopologyEvidence } from "./cloud-control-aws-topology-types";
 import { supabaseManagedPostgresAdapter } from "./cloud-control-supabase-postgres-hooks";
 import type { SupabaseManagedPostgresProfile } from "./control-plane-supabase-postgres-profile";
 
@@ -68,12 +70,14 @@ export type HookAdapterPhaseOptions = {
   phase: CloudProviderCapabilityHookPhase;
   deploymentLabel: string;
   declaration: ProviderCapabilityDeclaration;
+  awsEc2Profile?: Record<string, unknown>;
   awsFoundationInspection?: AwsFoundationProfile;
+  awsTopologyEvidence?: AwsTopologyEvidence;
   supabasePostgresProfile?: SupabaseManagedPostgresProfile;
 };
 
 const HOOK_ADAPTERS: Record<string, HookAdapter> = {
-  "aws-ec2-control-plane-host": reviewedAdapter("aws-ec2-host-profile"),
+  "aws-ec2-control-plane-host": awsEc2HostHookAdapter(),
   "aws-attic-cache-service": reviewedAdapter("aws-attic-cache-service"),
   "aws-ecr-control-plane-registry": reviewedAdapter("aws-ecr-control-plane-registry"),
   "aws-s3-artifact-store": awsFoundationHookAdapter("aws-s3-artifact-store"),
@@ -93,7 +97,9 @@ export async function runCloudProviderCapabilityHook(opts: {
   deploymentLabel: string;
   targetIdentity?: string;
   declaration?: ProviderCapabilityDeclaration;
+  awsEc2Profile?: Record<string, unknown>;
   awsFoundationInspection?: AwsFoundationProfile;
+  awsTopologyEvidence?: AwsTopologyEvidence;
   supabasePostgresProfile?: SupabaseManagedPostgresProfile;
 }): Promise<CloudProviderCapabilityHookEvidence> {
   assertSupportedPhase(opts.phase);
@@ -111,9 +117,11 @@ export async function runCloudProviderCapabilityHook(opts: {
     phase: opts.phase,
     deploymentLabel: opts.deploymentLabel,
     declaration,
+    ...(opts.awsEc2Profile ? { awsEc2Profile: opts.awsEc2Profile } : {}),
     ...(opts.awsFoundationInspection
       ? { awsFoundationInspection: opts.awsFoundationInspection }
       : {}),
+    ...(opts.awsTopologyEvidence ? { awsTopologyEvidence: opts.awsTopologyEvidence } : {}),
     ...(opts.supabasePostgresProfile
       ? { supabasePostgresProfile: opts.supabasePostgresProfile }
       : {}),
@@ -173,7 +181,6 @@ function assertValidDeclaration(declaration: ProviderCapabilityDeclaration): voi
     throw new Error(`provider-capability hook rejected: ${errors.join("; ")}`);
   }
 }
-
 function hookOutput(
   adapterName: string,
   phase: CloudProviderCapabilityHookPhase,

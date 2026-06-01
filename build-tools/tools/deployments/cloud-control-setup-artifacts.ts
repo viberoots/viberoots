@@ -1,5 +1,6 @@
 import YAML from "yaml";
 import type { CloudControlSetupInput } from "./cloud-control-setup-types";
+import { awsTopologyRequiredCapabilityIds } from "./cloud-control-aws-topology-capabilities";
 import {
   setupArtifactBackendEvidenceRef,
   setupArtifactCredentialMode,
@@ -39,12 +40,12 @@ export function renderConformanceChecklist(input: CloudControlSetupInput): strin
         },
         {
           name: "database",
-          commandRef: managedCommandRef(setupUsesSupabasePrivateLink(input) ? 7 : 1),
+          commandRef: managedCommandRef(managedDependencyCheckIndex(input)),
           passCondition: "managed Postgres SQL feature conformance succeeds",
         },
         {
           name: "artifact-store",
-          commandRef: managedCommandRef(setupUsesSupabasePrivateLink(input) ? 8 : 2),
+          commandRef: managedCommandRef(managedDependencyCheckIndex(input) + 1),
           passCondition: "temporary object PUT/GET/HEAD and digest verification succeeds",
         },
         {
@@ -184,6 +185,16 @@ function cred(name: string): string {
 
 function managedCommandRef(index: number): string {
   return `commands.json#/phases/2/commands/${index}/command`;
+}
+
+function managedDependencyCheckIndex(input: CloudControlSetupInput): number {
+  const providerEvidenceCount = input.awsTopology
+    ? awsTopologyRequiredCapabilityIds(input.awsTopology).filter(
+        (id) => id !== "supabase-managed-postgres",
+      ).length
+    : 0;
+  const privateLinkEvidenceCount = setupUsesSupabasePrivateLink(input) ? 6 : 0;
+  return 1 + providerEvidenceCount + privateLinkEvidenceCount;
 }
 
 function artifactProvider(input: CloudControlSetupInput): string {

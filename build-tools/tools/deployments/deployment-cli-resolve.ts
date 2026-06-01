@@ -17,6 +17,8 @@ const DEPLOY_POSITIONAL_PRECEDING_VALUE_FLAGS = [
   "admit-for-commit",
   "admit-only",
   "artifact-dir",
+  "aws-ec2-profile",
+  "aws-topology-evidence",
   "cleanup-reason",
   "component-artifacts",
   "control-plane-token",
@@ -41,6 +43,8 @@ const DEPLOY_POSITIONAL_PRECEDING_VALUE_FLAGS = [
   "source-run-id",
   "ssh-mode",
   "supabase-postgres-profile",
+  "provider-capability",
+  "provider-capability-phase",
   "target-exception",
 ];
 
