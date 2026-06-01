@@ -254,7 +254,7 @@ prefixes without an explicit reviewed approval.
 Operator procedure for `aws-network-foundation`:
 
 1. Preview: run OpenTofu plan from
-   `build-tools/deployments/aws-control-plane-foundation/opentofu` with the reviewed variable file
+   `build-tools/deployments/aws-control-plane-foundation/opentofu` with the reviewed variable inputs
    for the account, region, VPC mode, subnet CIDRs or imported VPC id, tags, state bucket, and
    allowed HTTPS egress CIDRs. Save the plan digest and ensure no public subnet is selected as a
    private subnet.

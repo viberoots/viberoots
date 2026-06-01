@@ -2222,3 +2222,76 @@ worker-count fields even though the guide requires them.
 
 Runtime HTTP evidence tests and fixtures become more explicit about deployment identity and worker
 count expectations.
+
+## PR-22: OpenTofu AWS foundation variable file methodology split
+
+### 1. Intent
+
+Close the remaining methodology gap where the AWS control-plane foundation OpenTofu variable file
+exceeds the repository file-size guardrail even though the functional control-plane design is
+implemented.
+
+### 2. Scope of changes
+
+- Split `build-tools/deployments/aws-control-plane-foundation/opentofu/variables.tf` into focused
+  sibling variable files that each stay under the methodology file-size limit.
+- Preserve every existing OpenTofu variable name, type, default, validation rule, and description so
+  generated setup bundles and operator-provided variable files remain compatible.
+- Keep the AWS foundation OpenTofu stack consumable from its existing directory without requiring
+  callers to change paths, imports, generated commands, or variable names.
+- Avoid introducing a methodology exception for this stack.
+
+### 3. External prerequisites
+
+- Existing AWS control-plane foundation OpenTofu stack under
+  `build-tools/deployments/aws-control-plane-foundation/opentofu`.
+- Existing deployment-domain file-size guardrail and source file-size lint flow.
+
+### 4. Tests to be added
+
+- Add or run focused verification proving the AWS foundation OpenTofu files remain parseable or
+  valid after the split.
+- Run the deployment-domain or source file-size guardrail proving the split OpenTofu files are under
+  the methodology limit.
+- Run the existing control-plane foundation tests that cover generated setup bundle consumption of
+  the OpenTofu stack.
+
+### 5. Docs to be added or updated
+
+- Update `docs/control-plane-guide.md` only if variable file path wording needs to distinguish the
+  stack directory from the individual split variable files.
+
+### 5.5. Expected regression scope
+
+- `deployment-only` for AWS control-plane foundation OpenTofu stack validation, generated setup
+  bundle consumption, and methodology file-size guardrails.
+
+### 6. Acceptance criteria
+
+- No AWS control-plane foundation OpenTofu `.tf` file exceeds the methodology file-size limit.
+- Existing variable names and generated/consumer-facing OpenTofu interfaces do not change.
+- Existing validation for the AWS foundation stack and generated setup artifacts still passes.
+
+### 7. Risks
+
+- Moving variable blocks can accidentally drop validation rules or split related variable
+  descriptions in a way that makes operator review harder.
+- A generated artifact or doc may refer to the old single `variables.tf` file instead of the stack
+  directory.
+
+### 8. Mitigations
+
+- Move whole variable blocks without rewriting their contents.
+- Keep all split files in the same OpenTofu directory so Terraform/OpenTofu automatic file loading
+  preserves behavior.
+- Inspect generated artifact consumers and docs for single-file assumptions before implementation.
+
+### 9. Consequences of not implementing this PR
+
+The completed control-plane work remains out of compliance with the repository methodology even
+though the functional design and validation pass.
+
+### 10. Downsides for implementing this PR
+
+The AWS foundation variable definitions become spread across multiple files and require reviewers to
+look at the whole OpenTofu directory instead of one consolidated variable file.

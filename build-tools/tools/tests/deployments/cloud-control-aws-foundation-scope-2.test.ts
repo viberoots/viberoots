@@ -1,6 +1,8 @@
 #!/usr/bin/env zx-wrapper
 import assert from "node:assert/strict";
 import fs from "node:fs";
+import * as fsp from "node:fs/promises";
+import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
 import { validateAwsFoundationProfile } from "../../deployments/cloud-control-aws-foundation-profile";
@@ -13,6 +15,24 @@ const opts = {
   maxAgeMinutes: 60,
 };
 
+const moduleDir = "build-tools/deployments/aws-control-plane-foundation/opentofu";
+const expectedVariableNames = `
+  region name_prefix tags vpc_cidr existing_vpc_id existing_internet_gateway_id
+  public_subnet_cidrs private_subnet_cidrs availability_zones outbound_https_cidrs
+  artifact_bucket_name artifact_prefix state_bucket_name state_lock_table_name
+  kms_deletion_window_days ingress_enabled ingress_type ingress_public_host
+  ingress_callback_host ingress_callback_path ingress_service_port ingress_target_instance_id
+  ingress_service_process ingress_service_unit ingress_image_digest ingress_config_digest
+  ingress_target_health_status ingress_certificate_arn ingress_certificate_not_before
+  ingress_certificate_not_after ingress_certificate_sans
+  ingress_certificate_validation_ownership_reference ingress_certificate_validation_ownership_digest
+  ingress_certificate_renewal_reference ingress_certificate_renewal_digest
+  ingress_certificate_dns_validation_reference ingress_certificate_dns_validation_digest
+  ingress_route53_zone_id ingress_allowed_client_cidrs ingress_waf_enabled
+`
+  .trim()
+  .split(/\s+/);
+
 test("AWS foundation OpenTofu module has concrete NAT and public HTTPS egress path", () => {
   const source = moduleSource();
   for (const expected of [
@@ -24,6 +44,41 @@ test("AWS foundation OpenTofu module has concrete NAT and public HTTPS egress pa
     'resource "aws_vpc_endpoint" "s3"',
   ]) {
     assert.match(source, new RegExp(escapeRegExp(expected)));
+  }
+});
+
+test("AWS foundation OpenTofu variable split preserves interface and methodology size", () => {
+  const tfFiles = fs.readdirSync(moduleDir).filter((file) => file.endsWith(".tf"));
+  assert.ok(tfFiles.includes("variables.tf"));
+  assert.ok(tfFiles.includes("variables-network.tf"));
+  assert.ok(tfFiles.includes("variables-ingress.tf"));
+  const oversizeFiles = tfFiles
+    .map((file) => ({
+      file,
+      lines: fs.readFileSync(path.join(moduleDir, file), "utf8").trimEnd().split("\n").length,
+    }))
+    .filter(({ lines }) => lines > 250);
+  assert.deepEqual(oversizeFiles, []);
+
+  const variableNames = [...moduleSource().matchAll(/^variable "([^"]+)"/gm)].map(
+    ([, name]) => name,
+  );
+  assert.deepEqual(variableNames.sort(), [...expectedVariableNames].sort());
+});
+
+test("AWS foundation OpenTofu module validates after variable split", async () => {
+  const workDir = await fsp.mkdtemp(path.join(os.tmpdir(), "aws-foundation-tofu-"));
+  try {
+    for (const file of fs.readdirSync(moduleDir).filter((entry) => entry.endsWith(".tf"))) {
+      await fsp.copyFile(path.join(moduleDir, file), path.join(workDir, file));
+    }
+    await $({ cwd: workDir })`tofu init -backend=false -input=false`.quiet();
+    const validate = await $({ cwd: workDir })`tofu validate -json`.quiet();
+    const result = JSON.parse(String(validate.stdout || "{}"));
+    assert.equal(result.valid, true);
+    assert.equal(result.error_count, 0);
+  } finally {
+    await fsp.rm(workDir, { recursive: true, force: true });
   }
 });
 
@@ -164,7 +219,6 @@ test("foundation profile carries and live inspection checks S3 VPC endpoint iden
 });
 
 function moduleSource(): string {
-  const moduleDir = "build-tools/deployments/aws-control-plane-foundation/opentofu";
   return fs
     .readdirSync(moduleDir)
     .filter((file) => file.endsWith(".tf"))
