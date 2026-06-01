@@ -2978,3 +2978,128 @@ ownership is repo-owned, externally owned, or merely evidence-validated.
 The AWS foundation and provider-capability evidence model become more complex because they must
 support both external-reviewed EC2 hosts and an opt-in repo-owned ASG path without allowing custom
 imperative EC2 mutation code.
+
+## PR-31: Greenfield repo-owned ASG bootstrap and runnable OpenTofu inputs
+
+### 1. Intent
+
+Close the post-PR-30 gap where `repo-owned-asg` is documented as an operator path, but generated
+setup still assumes live EC2 topology that may not exist before the OpenTofu-owned ASG is created,
+and the generated ASG OpenTofu command can target the whole foundation stack with incomplete
+variable inputs. Make the repo-owned ASG path bootstrapable from reviewed declarative inputs while
+preserving fail-closed validation after the ASG exists.
+
+### 2. Scope of changes
+
+- Split the `repo-owned-asg` lifecycle into explicit pre-apply and post-apply evidence modes:
+  - pre-apply setup may render the ASG OpenTofu stack from reviewed desired inputs before launch
+    template, ASG, instance, and process evidence exist.
+  - post-apply setup, setup-doctor, readiness, and cutover must require live read-only ASG/EC2
+    evidence and runtime process evidence that matches the applied IaC outputs.
+- Adjust setup validation so `--ec2-host-mode repo-owned-asg` does not require already-created
+  launch-template, ASG, instance, or process evidence during the pre-apply bundle generation phase.
+- Keep `external-reviewed-host` unchanged: it must continue to require reviewed existing topology and
+  host evidence before protected/shared use.
+- Make the generated `ec2-asg-opentofu-plan` and `ec2-asg-opentofu-apply` commands executable from
+  the setup bundle:
+  - either generate a complete foundation variable file containing every required variable for the
+    whole stack, or generate an ASG-specific OpenTofu root that does not require unrelated network,
+    ingress, ECR, S3, or PrivateLink variables.
+  - keep backend config explicit, remote-state/locking reviewed, and no `-backend=false`.
+  - preserve `$PROFILE_ROOT` path resolution for tfvars, backend config, bootstrap/user-data
+    artifacts, raw outputs, and typed evidence.
+- Preserve the explicit opt-in in all generated follow-up setup commands:
+  - dry-run/next-command output must include `--ec2-host-mode repo-owned-asg` when selected.
+  - generated operator docs and command previews must not silently fall back to
+    `external-reviewed-host`.
+- Keep typed ASG plan/apply/read-only evidence tied to the same desired inputs and applied outputs,
+  including AMI id/build/pin evidence, user-data path/base64/digest, launch-template identity, ASG
+  identity, capacity, subnets, security groups, instance profile, log sink, alarms, and rollback
+  metadata.
+- Update docs so the operator flow is clear:
+  - first generate/review/apply the ASG IaC bundle using desired inputs.
+  - then collect read-only AWS and runtime evidence after the ASG host is active.
+  - only then run setup-doctor, readiness, and cutover gates for protected/shared use.
+
+### 3. External prerequisites
+
+- Existing PR-30 EC2 host ownership mode API, ASG OpenTofu resources, typed ASG evidence, mutation
+  scanner, and guide updates.
+- Existing AWS foundation OpenTofu stack and generated bundle-root command pattern.
+- Reviewed desired AWS foundation inputs for network, ingress, artifact store, ECR, PrivateLink, and
+  EC2 ASG when using a whole-stack plan path, or a reviewed state/output import surface when using an
+  ASG-specific root.
+
+### 4. Tests to be added
+
+- Add setup validation tests proving greenfield `repo-owned-asg` setup can render before launch
+  template, ASG, instance, process, and worker-heartbeat evidence exist.
+- Add negative tests proving post-apply setup-doctor/readiness/cutover still reject missing or stale
+  ASG/EC2 read-only evidence and runtime process evidence.
+- Add generated OpenTofu command tests proving the ASG plan/apply path is variable-complete and
+  runnable from the bundle root:
+  - every required variable for the selected root is supplied by generated tfvars or has a reviewed
+    default.
+  - generated commands use `$PROFILE_ROOT` absolute paths for tfvars/backend/bootstrap artifacts.
+  - generated commands do not use `-backend=false`.
+- Add generated setup command-preview tests proving `--ec2-host-mode repo-owned-asg` is preserved in
+  dry-run follow-up commands and any generated rerun instructions.
+- Add docs tests proving the guide distinguishes pre-apply desired-input generation from post-apply
+  read-only/runtime evidence collection and protected/shared gating.
+- Add regression tests proving `external-reviewed-host` behavior and validation remain unchanged.
+
+### 5. Docs to be added or updated
+
+- Update `docs/control-plane-guide.md` Step 3 and Step 5 to describe the greenfield
+  `repo-owned-asg` bootstrap path and the reviewed desired inputs required before OpenTofu apply.
+- Update Step 8, Step 10, and Step 11 to clarify that post-apply ASG read-only evidence and runtime
+  process evidence are required before setup-doctor, readiness, and cutover pass.
+- Update `docs/cloud-control-cutover.md` or equivalent cutover docs so examples no longer show a
+  short selected-capability list that omits ECR, network foundation, Supabase managed Postgres, or
+  PrivateLink for AWS-primary profiles.
+
+### 5.5. Expected regression scope
+
+- `deployment-only` for setup validation, setup command previews, ASG OpenTofu input generation,
+  generated runbook commands, setup-doctor/readiness/cutover evidence gating, and operator docs.
+
+### 6. Acceptance criteria
+
+- `repo-owned-asg` can generate a reviewed OpenTofu plan/apply bundle before EC2 launch-template,
+  ASG, instance, and process evidence exist.
+- The generated ASG OpenTofu command path is executable from the bundle root with complete variable
+  inputs and reviewed backend config.
+- Generated follow-up setup commands preserve `--ec2-host-mode repo-owned-asg`.
+- Protected/shared setup-doctor, readiness, and cutover remain fail-closed until post-apply ASG/EC2
+  read-only evidence and runtime process evidence match the selected IaC outputs.
+- `external-reviewed-host` behavior remains non-mutating and unchanged.
+
+### 7. Risks
+
+- Relaxing setup validation for greenfield ASG creation could accidentally weaken protected/shared
+  evidence gates if pre-apply and post-apply modes are not separated cleanly.
+- Producing whole-stack variable files may duplicate foundation input generation already owned by
+  other capability paths.
+- Introducing an ASG-specific OpenTofu root can create state/output drift if it is not clearly tied
+  to the reviewed foundation stack.
+
+### 8. Mitigations
+
+- Make pre-apply mode explicit and only valid for bundle generation and OpenTofu plan/apply commands.
+- Keep protected/shared readiness and cutover exclusively post-apply and evidence-backed.
+- Prefer reusing existing foundation variable renderers or shared OpenTofu input helpers rather than
+  hand-assembling partial tfvars.
+- Add generated-artifact tests that parse the selected OpenTofu variable declarations and prove the
+  generated tfvars cover the required variables.
+
+### 9. Consequences of not implementing this PR
+
+`repo-owned-asg` remains a partially documented path: operators can see generated ASG resources and
+evidence validators, but cannot reliably bootstrap a new ASG from the generated setup bundle or
+follow generated dry-run commands without silently falling back to the external-reviewed host mode.
+
+### 10. Downsides for implementing this PR
+
+The setup lifecycle becomes more explicit because repo-owned ASG has distinct pre-apply and
+post-apply phases, and the OpenTofu input renderer must either become whole-stack complete or split
+the ASG root cleanly from unrelated foundation resources.
