@@ -121,7 +121,7 @@ test("cloud setup bundle renders runtime, credentials, commands, and capabilitie
     assert.deepEqual(validateProviderCapabilityDeclaration(capability), []);
     for (const field of REQUIRED_CAPABILITY_FIELDS) assert.ok((capability as any)[field]);
     assert.doesNotMatch(JSON.stringify(capability), /<reviewed|placeholder provider|<label>/i);
-    assert.match(capability.iac.previewCommand, /deploy --deployment 'pleomino-staging'/);
+    assert.match(capability.iac.previewCommand, /deployment-control-plane provider-capability/);
   }
 });
 

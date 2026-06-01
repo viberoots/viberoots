@@ -2295,3 +2295,340 @@ though the functional design and validation pass.
 
 The AWS foundation variable definitions become spread across multiple files and require reviewers to
 look at the whole OpenTofu directory instead of one consolidated variable file.
+
+## PR-23: AWS ECR control-plane registry provisioning hook
+
+### 1. Intent
+
+Close the remaining PR-3 gap where `aws-ecr-control-plane-registry` is validated as reviewed
+evidence but still lacks repo-owned provisioning or import support for the recommended AWS registry
+path.
+
+### 2. Scope of changes
+
+- Add a concrete AWS ECR provider-capability hook path for preview, apply, evidence, smoke,
+  rollback, and reviewed import.
+- Treat preview, apply-intent, evidence collection, smoke, rollback-plan, and reviewed import as
+  mandatory hook phases; destructive repository deletion is out of scope unless a future reviewed
+  exception is added.
+- Keep the existing `control-plane-registry-profile@1` validation as the fail-closed evidence
+  contract.
+- Preserve and emit the registry evidence fields for repository identity, account, region,
+  repository policy digest, lifecycle posture, scanning posture, pull evidence, and publish evidence.
+- Ensure generated setup/provider-capability commands select the concrete ECR hook rather than the
+  generic reviewed adapter when the registry provider is AWS ECR.
+- Require file-backed AWS credentials or an explicitly reviewed instance-profile/assume-role path;
+  do not allow ambient laptop AWS credentials or default-chain AWS SDK credential discovery.
+
+### 3. External prerequisites
+
+- Existing registry profile validation and image-publication evidence.
+- Existing provider-capability hook dispatch.
+
+### 4. Tests to be added
+
+- Add hook tests for ECR preview/apply/evidence/smoke/rollback/import payloads and credential
+  boundaries.
+- Add negative tests proving missing repository policy, lifecycle/scanning posture, pull evidence,
+  or publish evidence is rejected at setup/cutover entrypoints.
+- Add negative tests proving mismatched ECR account or region is rejected when trusted AWS topology
+  inputs are present.
+- Add generated command tests proving AWS ECR uses the concrete hook path.
+
+### 5. Docs to be added or updated
+
+- Update `docs/control-plane-guide.md` to document the ECR provisioning/import procedure and the
+  evidence files operators must retain, including credential modes, expected evidence filenames,
+  rollback-plan behavior, import refusal cases, and smoke proof semantics.
+
+### 5.5. Expected regression scope
+
+- `deployment-only` for registry profile validation, provider-capability hooks, generated setup
+  commands, and image-publication/cutover registry evidence.
+
+### 6. Acceptance criteria
+
+- `aws-ecr-control-plane-registry` no longer routes only through the generic reviewed adapter.
+- Operators can use repo tooling to produce or import the reviewed ECR registry evidence required by
+  setup and cutover.
+- ECR validation remains fail-closed for incomplete policy, lifecycle, scanning, pull, or publish
+  evidence.
+- ECR smoke proves repository existence, auth/pull reachability, policy digest, scanning posture,
+  and image-publication digest binding without pushing mutable test images.
+
+### 7. Risks
+
+- ECR account/region identity can drift from the control-plane AWS topology if the hook trusts
+  operator-supplied fields.
+
+### 8. Mitigations
+
+- Derive expected account and region from trusted setup/topology inputs where available.
+- Keep live AWS calls behind explicit file-backed credentials or reviewed assume-role inputs.
+
+### 9. Consequences of not implementing this PR
+
+The recommended AWS registry path remains evidence-only and cannot be provisioned or imported
+through repo-owned control-plane tooling.
+
+### 10. Downsides for implementing this PR
+
+The provider-capability hook surface grows another AWS-specific adapter that must be maintained with
+AWS API behavior.
+
+## PR-24: Supabase PrivateLink AWS-side automation hook
+
+### 1. Intent
+
+Close the remaining PR-8 gap where Supabase PrivateLink validation is strong but AWS-side RAM
+acceptance and VPC Lattice association remain evidence-gated rather than automated where AWS APIs
+support them.
+
+### 2. Scope of changes
+
+- Add an AWS-side PrivateLink provider-capability hook for RAM share acceptance and VPC Lattice
+  service-network or endpoint association.
+- Preserve support-mediated evidence paths for steps Supabase or AWS account boundaries still make
+  manual.
+- Emit typed evidence for accepted RAM shares, Lattice association identity, private DNS posture,
+  route/security-group posture, and psql proof.
+- Ensure generated setup/provider-capability commands can execute the AWS-side automation path with
+  reviewed credentials.
+
+### 3. External prerequisites
+
+- Existing Supabase PrivateLink profile and managed-dependency validation.
+- Existing provider-capability hook dispatch and AWS credential boundary helpers.
+
+### 4. Tests to be added
+
+- Add hook tests proving RAM/Lattice automation commands are generated and recorded with typed
+  evidence.
+- Add negative tests for mismatched account, region, share ARN, service-network id, endpoint id, and
+  stale or missing private DNS/psql evidence.
+- Add generated artifact tests proving commands resolve from the setup bundle location.
+
+### 5. Docs to be added or updated
+
+- Update `docs/control-plane-guide.md` to distinguish AWS-side automated PrivateLink steps from
+  support-mediated Supabase-side prerequisites.
+
+### 5.5. Expected regression scope
+
+- `deployment-only` for Supabase PrivateLink provider capabilities, managed-dependency setup,
+  setup-doctor, and generated runbook commands.
+
+### 6. Acceptance criteria
+
+- AWS-side PrivateLink work is no longer represented only as `evidence-only` when the required AWS
+  API inputs are present.
+- Support-mediated evidence remains accepted only for steps that cannot be automated by this repo.
+- Setup and cutover reject mismatched or stale RAM/Lattice/private DNS/psql evidence.
+
+### 7. Risks
+
+- Automating account-shared network resources can create confusing partial state when an AWS call
+  succeeds after a later validation failure.
+
+### 8. Mitigations
+
+- Keep preview and apply payloads explicit, record every mutation outcome, and require rollback or
+  detach evidence in the generated runbook.
+
+### 9. Consequences of not implementing this PR
+
+The PrivateLink path continues to depend on external AWS-side realization while the plan calls for
+automation where APIs support it.
+
+### 10. Downsides for implementing this PR
+
+PrivateLink setup gains additional AWS-specific operational complexity and rollback evidence.
+
+## PR-25: EC2 service ingress binding for load balancers
+
+### 1. Intent
+
+Close the guide gap where generated EC2 compatibility units publish the control-plane service on
+loopback only, making ALB/NLB instance-target ingress unable to reach port 7780.
+
+### 2. Scope of changes
+
+- Change generated EC2 service unit/container runtime bindings so the service listens on the
+  reviewed private or load-balancer-reachable interface for port 7780.
+- Keep workers unexposed and ensure only the service process is reachable from the reviewed service
+  security group.
+- Update host-profile validation and generated profile evidence to distinguish service bind address
+  from worker/internal-only bindings.
+
+### 3. External prerequisites
+
+- Existing EC2 host profile and systemd/Podman profile generation.
+- Existing AWS ingress evidence and service security-group validation.
+
+### 4. Tests to be added
+
+- Add generated unit tests proving service port 7780 is not loopback-only for AWS EC2 ingress mode.
+- Add negative tests proving worker ports remain unbound/unpublished.
+- Add ingress/runbook tests proving LB target evidence matches the generated service bind contract.
+
+### 5. Docs to be added or updated
+
+- Update `docs/control-plane-guide.md` only if needed to clarify the service-only ingress binding.
+
+### 5.5. Expected regression scope
+
+- `deployment-only` for EC2 systemd/Podman generation, EC2 host profile validation, and AWS ingress
+  tests.
+
+### 6. Acceptance criteria
+
+- Generated EC2 service units are reachable from the reviewed LB/client path on port 7780.
+- Generated worker units remain inaccessible from the LB/client path.
+- Existing AWS ingress validation no longer depends on a loopback-only service bind.
+
+### 7. Risks
+
+- Widening the service bind address could accidentally expose workers or non-service ports.
+
+### 8. Mitigations
+
+- Keep worker unit tests explicit and bind only the reviewed service port.
+
+### 9. Consequences of not implementing this PR
+
+The generated EC2 host profile can pass local process tests while remaining unreachable from the
+documented ALB/NLB ingress path.
+
+### 10. Downsides for implementing this PR
+
+EC2 host profile generation must carry a more precise service ingress binding contract.
+
+## PR-26: EC2 instance-profile artifact IAM binding
+
+### 1. Intent
+
+Close the guide gap where AWS S3 artifact access is validated as instance-profile-backed, but the
+repo-owned AWS foundation attaches artifact S3 policy to a separate role rather than the EC2 host
+instance-profile role.
+
+### 2. Scope of changes
+
+- Wire artifact S3 access into the actual EC2 host instance-profile role, or make the reviewed
+  artifact role the role used by the EC2 instance profile.
+- Preserve least-privilege artifact bucket/prefix, KMS, object-lock, and immutable-prefix policy
+  evidence.
+- Emit setup/foundation evidence whose instance-profile ARN, role ARN, and artifact policy digest
+  match the runtime profile expected by setup and cutover.
+
+### 3. External prerequisites
+
+- Existing AWS foundation OpenTofu IAM module.
+- Existing setup artifact IAM evidence validation.
+
+### 4. Tests to be added
+
+- Add OpenTofu/static IAM tests proving the EC2 instance profile role has the reviewed artifact
+  access policy.
+- Add negative setup validation tests for mismatched instance-profile role ARN, missing artifact
+  policy digest, and artifact policy attached to an unused role.
+- Add generated setup evidence tests proving emitted profile/role evidence matches the runtime
+  profile.
+
+### 5. Docs to be added or updated
+
+- Update `docs/control-plane-guide.md` only if the artifact IAM role wording changes.
+
+### 5.5. Expected regression scope
+
+- `deployment-only` for AWS foundation IAM, artifact store setup, runtime profile validation, and
+  cutover artifact credential checks.
+
+### 6. Acceptance criteria
+
+- EC2 runtime artifact access can use IMDSv2 credentials from the reviewed instance profile.
+- Setup and cutover reject artifact IAM evidence that names a role not attached to the runtime
+  instance profile.
+- Least-privilege artifact policy evidence remains required.
+
+### 7. Risks
+
+- Combining host and artifact permissions can broaden EC2 role privileges if policy boundaries are
+  not kept explicit.
+
+### 8. Mitigations
+
+- Attach only the existing reviewed artifact bucket/prefix policy and keep policy-digest validation.
+
+### 9. Consequences of not implementing this PR
+
+Generated AWS foundation evidence can claim instance-profile-backed artifact access while the actual
+EC2 profile lacks the required S3 permissions.
+
+### 10. Downsides for implementing this PR
+
+The AWS foundation IAM model becomes more tightly coupled to the EC2 host runtime profile.
+
+## PR-27: EC2 IMDSv2 runbook metadata and cutover region source
+
+### 1. Intent
+
+Close the remaining guide gaps where generated managed-dependency runbooks use IMDSv1-style
+metadata curls and cutover validation derives expected AWS region from artifact region instead of
+trusted AWS topology.
+
+### 2. Scope of changes
+
+- Generate IMDSv2 token-based metadata access for EC2 instance identity and region discovery.
+- Reuse existing IMDSv2 helper semantics where practical and fail closed when token or metadata
+  fetches fail on EC2.
+- Derive generated cutover `--expected-region` from trusted AWS topology/control-plane region for
+  AWS EC2 profiles, not from artifact storage region.
+- Preserve non-AWS or non-EC2 profile behavior where no AWS topology is available.
+
+### 3. External prerequisites
+
+- Existing managed-dependency runtime runbook generation.
+- Existing cutover runbook generation and AWS topology evidence.
+
+### 4. Tests to be added
+
+- Add generated runbook tests proving IMDSv2 token commands are emitted and unauthenticated IMDSv1
+  metadata curls are not used for EC2 identity/region.
+- Add negative tests proving metadata discovery fails closed when token acquisition fails.
+- Add cutover generated-command tests proving AWS EC2 expected region comes from topology while
+  artifact region can differ.
+- Add non-AWS regression tests proving existing fallback behavior remains stable.
+
+### 5. Docs to be added or updated
+
+- Update `docs/control-plane-guide.md` only if needed to clarify IMDSv2 metadata discovery and
+  expected-region source.
+
+### 5.5. Expected regression scope
+
+- `deployment-only` for managed-dependency runbook generation, EC2 runtime evidence, cutover
+  commands, and setup-doctor/cutover validation.
+
+### 6. Acceptance criteria
+
+- Generated EC2 runbooks work on IMDSv2-only hosts.
+- Generated cutover validation uses trusted AWS topology/control-plane region for AWS EC2 profiles.
+- Artifact storage region no longer silently drives AWS runtime expected-region checks.
+
+### 7. Risks
+
+- Generated shell quoting for IMDSv2 tokens can be brittle across bundle locations.
+
+### 8. Mitigations
+
+- Add executable generated-script tests that parse or run enough of the generated commands to prove
+  token variables and relative paths resolve.
+
+### 9. Consequences of not implementing this PR
+
+IMDSv2-only EC2 hosts can produce `unknown` runtime evidence, and cutover can validate the wrong AWS
+region when artifact storage and control-plane regions differ.
+
+### 10. Downsides for implementing this PR
+
+Generated runbook commands become longer and require more explicit shell-level validation.

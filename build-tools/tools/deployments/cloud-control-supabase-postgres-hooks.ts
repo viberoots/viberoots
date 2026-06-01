@@ -8,7 +8,9 @@ import { buildSupabaseManagedPostgresEvidence } from "./control-plane-supabase-p
 export function supabaseManagedPostgresAdapter(base: HookAdapter): HookAdapter {
   const phase = (selectedPhase: CloudProviderCapabilityHookPhase): HookAdapterPhase => {
     return async (opts) => {
-      const result = await base[selectedPhase](opts);
+      const basePhase =
+        selectedPhase === "reviewed-import" ? base.reviewedImport : base[selectedPhase];
+      const result = await basePhase(opts);
       const profile = opts.supabasePostgresProfile;
       return {
         ...result,
@@ -39,5 +41,6 @@ export function supabaseManagedPostgresAdapter(base: HookAdapter): HookAdapter {
     evidence: phase("evidence"),
     smoke: phase("smoke"),
     rollback: phase("rollback"),
+    reviewedImport: phase("reviewed-import"),
   };
 }

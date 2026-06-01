@@ -18,7 +18,7 @@ function providerCapabilityEvidenceCommand(
   const output = `$PROFILE_ROOT/provider-capability-${capabilityId}.json`;
   return {
     id: `provider-capability-${capabilityId}`,
-    command: `${rootPrelude(input.outDir)}; deploy --deployment ${shellQuote(
+    command: `${rootPrelude(input.outDir)}; deployment-control-plane provider-capability --deployment-id ${shellQuote(
       input.deploymentIds[0] || "<missing-deployment>",
     )} --record --provider-capability ${capabilityId}${inputFlags(capabilityId)} > "${output}"`,
     cwd: "profile-root",
@@ -30,6 +30,9 @@ function providerCapabilityEvidenceCommand(
 
 function inputFlags(capabilityId: string): string {
   const topology = ' --aws-topology-evidence "$PROFILE_ROOT/aws-topology-evidence.json"';
+  if (capabilityId === "aws-ecr-control-plane-registry") {
+    return `${topology} --registry-profile "$PROFILE_ROOT/registry-profile.json" --image-publication-evidence "$PROFILE_ROOT/image-publication.json"`;
+  }
   if (capabilityId !== "aws-ec2-control-plane-host") return topology;
   return `${topology} --aws-ec2-profile "$PROFILE_ROOT/aws-ec2-profile.yaml"`;
 }
@@ -39,6 +42,13 @@ function inputs(capabilityId: string): string[] {
     "$PROFILE_ROOT/provider-capabilities.json",
     "$PROFILE_ROOT/aws-topology-evidence.json",
   ];
+  if (capabilityId === "aws-ecr-control-plane-registry") {
+    return [
+      ...values,
+      "$PROFILE_ROOT/registry-profile.json",
+      "$PROFILE_ROOT/image-publication.json",
+    ];
+  }
   return capabilityId === "aws-ec2-control-plane-host"
     ? [...values, "$PROFILE_ROOT/aws-ec2-profile.yaml"]
     : values;

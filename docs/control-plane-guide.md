@@ -215,6 +215,26 @@ The repo-owned profile covers these AWS resources:
 - ACM certificate and DNS records
 - EC2 instance or launch template for the NixOS/OCI host
 
+For the recommended AWS registry path, use the generated
+`aws-ecr-control-plane-registry` provider-capability command rather than hand-written ECR notes.
+The hook reads `$PROFILE_ROOT/registry-profile.json`,
+`$PROFILE_ROOT/image-publication.json`, and `$PROFILE_ROOT/aws-topology-evidence.json`, then emits
+`$PROFILE_ROOT/provider-capability-aws-ecr-control-plane-registry.json`. Keep those files with the
+setup evidence bundle. The ECR profile must bind repository URI and ARN to the trusted AWS account
+and region, include repository policy digest evidence, lifecycle policy posture, scanning posture,
+runtime pull evidence, and publish evidence. The hook accepts file-backed AWS credentials or an
+explicitly reviewed assume-role or instance-profile path; ambient laptop/default-chain credentials
+are rejected.
+
+The ECR hook phases are preview, apply intent, evidence, smoke, and rollback plan. Smoke evidence
+proves repository existence, auth/pull reachability for the exact published digest, policy digest,
+scanning posture, and image-publication binding without pushing mutable test images. Reviewed import
+is allowed only when the imported profile satisfies the same registry contract; imports are refused
+for mutable tags, missing repository policy digest, missing lifecycle or scanning posture, missing
+runtime pull proof, mismatched account/region, or shared publish/runtime principals. Rollback is
+non-destructive by default: retain the repository and immutable image digests, restore reviewed
+policy/lifecycle settings, and do not delete production image digests.
+
 For ingress, this implementation uses repo-owned OpenTofu resources rather than provider-hook-only
 evidence. The AWS foundation module owns the default ALB/NLB, HTTPS/TLS listener, target group,
 target registration inputs, target-group readiness health check, Route53 record, ACM attachment,

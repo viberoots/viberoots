@@ -94,6 +94,7 @@ test("AWS foundation hooks produce preview apply evidence smoke and rollback pay
       { phase: "evidence", action: "collect-evidence" },
       { phase: "smoke", action: "smoke" },
       { phase: "rollback", action: "destroy-plan" },
+      { phase: "reviewed-import", action: "plan" },
     ].map(({ phase, action }) => ({
       phase,
       action,
@@ -244,7 +245,6 @@ function input(overrides: Partial<CloudControlSetupInput>): CloudControlSetupInp
     ...overrides,
   };
 }
-
 function topologyForImage(overrides: Record<string, unknown> = {}) {
   return topologyForPublishedImage(privateLinkAwsTopology(overrides), image, digest);
 }

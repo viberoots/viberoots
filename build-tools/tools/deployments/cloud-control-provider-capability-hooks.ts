@@ -12,6 +12,10 @@ import type { AwsFoundationProfile } from "./cloud-control-aws-foundation-types"
 import type { AwsTopologyEvidence } from "./cloud-control-aws-topology-types";
 import { supabaseManagedPostgresAdapter } from "./cloud-control-supabase-postgres-hooks";
 import type { SupabaseManagedPostgresProfile } from "./control-plane-supabase-postgres-profile";
+import { awsEcrRegistryHookAdapter } from "./cloud-control-aws-ecr-registry-hooks";
+import type { ControlPlaneRegistryProfile } from "./control-plane-registry-profile";
+import type { ControlPlaneImagePublicationEvidence } from "./control-plane-image-publication";
+import { supabasePrivateLinkAdapter } from "./cloud-control-supabase-privatelink-hooks";
 
 export const CLOUD_PROVIDER_CAPABILITY_HOOK_PHASES = [
   "preview",
@@ -19,6 +23,7 @@ export const CLOUD_PROVIDER_CAPABILITY_HOOK_PHASES = [
   "evidence",
   "smoke",
   "rollback",
+  "reviewed-import",
 ] as const;
 
 export type CloudProviderCapabilityHookPhase =
@@ -58,6 +63,7 @@ export type HookAdapter = {
   evidence: HookAdapterPhase;
   smoke: HookAdapterPhase;
   rollback: HookAdapterPhase;
+  reviewedImport: HookAdapterPhase;
 };
 
 export type HookAdapterResult = {
@@ -74,18 +80,22 @@ export type HookAdapterPhaseOptions = {
   awsFoundationInspection?: AwsFoundationProfile;
   awsTopologyEvidence?: AwsTopologyEvidence;
   supabasePostgresProfile?: SupabaseManagedPostgresProfile;
+  registryProfile?: ControlPlaneRegistryProfile;
+  imagePublication?: ControlPlaneImagePublicationEvidence;
 };
 
 const HOOK_ADAPTERS: Record<string, HookAdapter> = {
   "aws-ec2-control-plane-host": awsEc2HostHookAdapter(),
   "aws-attic-cache-service": reviewedAdapter("aws-attic-cache-service"),
-  "aws-ecr-control-plane-registry": reviewedAdapter("aws-ecr-control-plane-registry"),
+  "aws-ecr-control-plane-registry": awsEcrRegistryHookAdapter(),
   "aws-s3-artifact-store": awsFoundationHookAdapter("aws-s3-artifact-store"),
   "aws-network-foundation": awsFoundationHookAdapter("aws-network-foundation"),
   "supabase-managed-postgres": supabaseManagedPostgresAdapter(
     reviewedAdapter("supabase-managed-postgres-evidence-gate", false, true),
   ),
-  "supabase-privatelink-prerequisite": supabasePrivateLinkAdapter(),
+  "supabase-privatelink-prerequisite": supabasePrivateLinkAdapter(
+    reviewedAdapter("supabase-privatelink-evidence-gate", false, true),
+  ),
   "cloudflare-edge": reviewedAdapter("cloudflare-edge"),
   "vercel-operator-ui": reviewedAdapter("vercel-operator-ui"),
   "remote-build-worker-fleet": reviewedAdapter("remote-build-worker-fleet"),
@@ -101,6 +111,8 @@ export async function runCloudProviderCapabilityHook(opts: {
   awsFoundationInspection?: AwsFoundationProfile;
   awsTopologyEvidence?: AwsTopologyEvidence;
   supabasePostgresProfile?: SupabaseManagedPostgresProfile;
+  registryProfile?: ControlPlaneRegistryProfile;
+  imagePublication?: ControlPlaneImagePublicationEvidence;
 }): Promise<CloudProviderCapabilityHookEvidence> {
   assertSupportedPhase(opts.phase);
   const declaration = opts.declaration || concreteDeclaration(opts.capabilityId);
@@ -113,7 +125,10 @@ export async function runCloudProviderCapabilityHook(opts: {
   }
   const adapter = HOOK_ADAPTERS[opts.capabilityId];
   if (!adapter) throw new Error(`${opts.capabilityId}: missing reviewed hook adapter`);
-  const result = await adapter[opts.phase]({
+  const result = await hookAdapterPhase(
+    adapter,
+    opts.phase,
+  )({
     phase: opts.phase,
     deploymentLabel: opts.deploymentLabel,
     declaration,
@@ -125,6 +140,8 @@ export async function runCloudProviderCapabilityHook(opts: {
     ...(opts.supabasePostgresProfile
       ? { supabasePostgresProfile: opts.supabasePostgresProfile }
       : {}),
+    ...(opts.registryProfile ? { registryProfile: opts.registryProfile } : {}),
+    ...(opts.imagePublication ? { imagePublication: opts.imagePublication } : {}),
   });
   const output = redactOperatorText(result.rawOutput);
   if (!output) throw new Error(`${opts.capabilityId}: hook produced no audit output`);
@@ -151,6 +168,10 @@ export async function runCloudProviderCapabilityHook(opts: {
     output,
     ...(result.payload ? { providerPayload: result.payload } : {}),
   };
+}
+
+function hookAdapterPhase(adapter: HookAdapter, phase: CloudProviderCapabilityHookPhase) {
+  return phase === "reviewed-import" ? adapter.reviewedImport : adapter[phase];
 }
 
 export function assertSupportedPhase(
@@ -217,34 +238,6 @@ function reviewedAdapter(name: string, automated = true, manualPrerequisite = fa
     evidence: phase("evidence"),
     smoke: phase("smoke"),
     rollback: phase("rollback"),
-  };
-}
-
-function supabasePrivateLinkAdapter(): HookAdapter {
-  const base = reviewedAdapter("supabase-privatelink-evidence-gate", false, true);
-  const phase = (selectedPhase: CloudProviderCapabilityHookPhase): HookAdapterPhase => {
-    return async (opts) => {
-      const result = await base[selectedPhase](opts);
-      return {
-        ...result,
-        payload: {
-          schemaVersion: "supabase-privatelink-provider-payload@1",
-          evidenceMode: "evidence-only",
-          supportMediated: true,
-          supportEvidenceRef: "privatelink-request",
-          ramPermissionEvidenceRef: "ram-acceptance-permission",
-          latticePermissionEvidenceRef: "vpc-lattice-association-permission",
-          privateDnsEvidenceRef: "private-dns-proof",
-        },
-      };
-    };
-  };
-  return {
-    ...base,
-    preview: phase("preview"),
-    apply: phase("apply"),
-    evidence: phase("evidence"),
-    smoke: phase("smoke"),
-    rollback: phase("rollback"),
+    reviewedImport: phase("reviewed-import"),
   };
 }

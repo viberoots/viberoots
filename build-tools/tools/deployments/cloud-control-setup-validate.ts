@@ -46,6 +46,8 @@ export function validateCloudControlSetupInput(input: CloudControlSetupInput): s
         requireGeneratedEvidence: input.mode === "aws-ec2" && !input.dryRun,
         requireRegistryProfile: input.mode === "aws-ec2" && !input.dryRun,
         expectedRuntimeHostProfile: input.mode === "aws-ec2" ? "aws-ec2" : undefined,
+        expectedRegistryAccountId: input.awsTopology?.accountId,
+        expectedRegistryRegion: input.awsTopology?.region,
       },
     ),
   );
@@ -153,13 +155,15 @@ function matchesConcreteCapability(
 }
 
 function usesReviewedDeployAdmission(command: string): boolean {
-  return /^deploy --deployment (?:<label>|'[^']+'|[^\s]+)/.test(command);
+  return /^deployment-control-plane provider-capability --deployment-id (?:<label>|'[^']+'|[^\s]+)/.test(
+    command,
+  );
 }
 
 function normalizeProviderCommand(command: string): string {
   return command.replace(
-    /^deploy --deployment (?:<label>|'[^']+'|[^\s]+)/,
-    "deploy --deployment <label>",
+    /^deployment-control-plane provider-capability --deployment-id (?:<label>|'[^']+'|[^\s]+)/,
+    "deployment-control-plane provider-capability --deployment-id <label>",
   );
 }
 

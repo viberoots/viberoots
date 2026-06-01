@@ -35,6 +35,7 @@ export function awsFoundationHookAdapter(capabilityId: string): HookAdapter {
     evidence: phase("evidence"),
     smoke: phase("smoke"),
     rollback: phase("rollback"),
+    reviewedImport: phase("reviewed-import"),
   };
 }
 

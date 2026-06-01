@@ -24,6 +24,7 @@ export function awsEc2HostHookAdapter(): HookAdapter {
     evidence: phase("evidence"),
     smoke: phase("smoke"),
     rollback: phase("rollback"),
+    reviewedImport: phase("reviewed-import"),
   };
 }
 

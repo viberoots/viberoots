@@ -88,7 +88,7 @@ function matchesConcreteCapability(
 
 function normalizeProviderCommand(command: string): string {
   return command.replace(
-    /^deploy --deployment (?:<label>|'[^']+'|[^\s]+)/,
-    "deploy --deployment <label>",
+    /^deployment-control-plane provider-capability --deployment-id (?:<label>|'[^']+'|[^\s]+)/,
+    "deployment-control-plane provider-capability --deployment-id <label>",
   );
 }

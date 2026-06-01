@@ -12,6 +12,8 @@ export function validateControlPlaneImagePublicationEvidence(
     requireGeneratedEvidence?: boolean;
     requireRegistryProfile?: boolean;
     expectedRuntimeHostProfile?: string;
+    expectedRegistryAccountId?: string;
+    expectedRegistryRegion?: string;
   } = {},
 ): string[] {
   const errors: string[] = [];
@@ -39,6 +41,8 @@ export function validateControlPlaneImagePublicationEvidence(
         expectedImageRef,
         expectedDigest: evidence.digest,
         expectedHostProfile: opts.expectedRuntimeHostProfile,
+        expectedAccountId: opts.expectedRegistryAccountId,
+        expectedRegion: opts.expectedRegistryRegion,
       }),
     );
   }

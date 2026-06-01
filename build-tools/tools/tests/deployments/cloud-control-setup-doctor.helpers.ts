@@ -6,6 +6,11 @@ import YAML from "yaml";
 import { runCloudProviderCapabilityHook } from "../../deployments/cloud-control-provider-capability-hooks";
 import { privateLinkSupabaseProfile } from "./control-plane-supabase-postgres.fixture";
 import { runtimeHttpEvidence } from "./cloud-control-cutover-fixture";
+import {
+  imagePublication,
+  registryProfile,
+  withAwsCredentialFile,
+} from "./cloud-control-aws-ecr-registry.fixture";
 
 export async function writeBundle(dir: string, files: Record<string, string>): Promise<void> {
   for (const [name, content] of Object.entries(files)) {
@@ -118,16 +123,7 @@ export async function writeProviderCapabilityEvidence(dir: string, commands: any
     .map((id: string) => id.slice("provider-capability-".length));
   await Promise.all(
     ids.map(async (capabilityId: string) => {
-      const evidence = await runCloudProviderCapabilityHook({
-        capabilityId,
-        phase: "evidence",
-        deploymentLabel: "//deployments:staging",
-        awsTopologyEvidence: topology,
-        ...(capabilityId === "aws-ec2-control-plane-host" ? { awsEc2Profile } : {}),
-        ...(capabilityId === "aws-network-foundation" || capabilityId === "aws-s3-artifact-store"
-          ? { awsFoundationInspection: topology.foundation }
-          : {}),
-      });
+      const evidence = await runEvidenceHook(capabilityId, topology, awsEc2Profile);
       await fsp.writeFile(
         path.join(dir, `provider-capability-${capabilityId}.json`),
         JSON.stringify(evidence),
@@ -135,6 +131,24 @@ export async function writeProviderCapabilityEvidence(dir: string, commands: any
       );
     }),
   );
+}
+
+async function runEvidenceHook(capabilityId: string, topology: any, awsEc2Profile: any) {
+  const run = () =>
+    runCloudProviderCapabilityHook({
+      capabilityId,
+      phase: "evidence",
+      deploymentLabel: "//deployments:staging",
+      awsTopologyEvidence: topology,
+      ...(capabilityId === "aws-ec2-control-plane-host" ? { awsEc2Profile } : {}),
+      ...(capabilityId === "aws-ecr-control-plane-registry"
+        ? { registryProfile: registryProfile(), imagePublication: imagePublication() }
+        : {}),
+      ...(capabilityId === "aws-network-foundation" || capabilityId === "aws-s3-artifact-store"
+        ? { awsFoundationInspection: topology.foundation }
+        : {}),
+    });
+  return capabilityId === "aws-ecr-control-plane-registry" ? withAwsCredentialFile(run) : run();
 }
 
 async function readJson(file: string): Promise<any> {

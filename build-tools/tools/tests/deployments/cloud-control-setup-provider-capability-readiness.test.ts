@@ -9,6 +9,11 @@ import { reviewedSupabaseManagedPostgresProfile } from "../../deployments/contro
 import { privateLinkAwsTopology } from "./cloud-control-cutover-fixture";
 import { reviewedRuntimeInput } from "./cloud-control-runtime-input.fixture";
 import { awsEc2HookProfile } from "./cloud-control-aws-ec2-hook-profile.fixture";
+import {
+  imagePublication,
+  registryProfile,
+  withAwsCredentialFile,
+} from "./cloud-control-aws-ecr-registry.fixture";
 
 const DIGEST_REF =
   "registry.example.com/platform/deployment-control-plane@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
@@ -98,24 +103,36 @@ async function hookEvidenceFor(capabilities: Array<{ id: string }>) {
     await Promise.all(
       capabilities.map(async (capability) => [
         capability.id,
-        await runCloudProviderCapabilityHook({
-          capabilityId: capability.id,
-          phase: "evidence",
-          deploymentLabel: "//deployments:staging",
-          ...(capability.id === "aws-ec2-control-plane-host"
-            ? { awsTopologyEvidence: privateLinkAwsTopology(), awsEc2Profile: awsEc2HookProfile() }
-            : {}),
-          ...(capability.id === "aws-network-foundation" ||
-          capability.id === "aws-s3-artifact-store"
-            ? { awsFoundationInspection: foundation }
-            : {}),
-          ...(capability.id === "supabase-managed-postgres"
-            ? { supabasePostgresProfile: supabaseProfile() }
-            : {}),
-        }),
+        await runEvidenceHook(capability.id, foundation),
       ]),
     ),
   );
+}
+
+async function runEvidenceHook(capabilityId: string, foundation: unknown) {
+  const run = () =>
+    runCloudProviderCapabilityHook({
+      capabilityId,
+      phase: "evidence",
+      deploymentLabel: "//deployments:staging",
+      ...(capabilityId === "aws-ec2-control-plane-host"
+        ? { awsTopologyEvidence: privateLinkAwsTopology(), awsEc2Profile: awsEc2HookProfile() }
+        : {}),
+      ...(capabilityId === "aws-ecr-control-plane-registry"
+        ? {
+            awsTopologyEvidence: privateLinkAwsTopology(),
+            registryProfile: registryProfile(),
+            imagePublication: imagePublication(),
+          }
+        : {}),
+      ...(capabilityId === "aws-network-foundation" || capabilityId === "aws-s3-artifact-store"
+        ? { awsFoundationInspection: foundation }
+        : {}),
+      ...(capabilityId === "supabase-managed-postgres"
+        ? { supabasePostgresProfile: supabaseProfile() }
+        : {}),
+    });
+  return capabilityId === "aws-ecr-control-plane-registry" ? withAwsCredentialFile(run) : run();
 }
 
 function supabaseProfile() {

@@ -16,8 +16,8 @@ test("concrete cloud provider capabilities validate structurally", () => {
     const capability = capabilityDeclaration(id);
     assert.equal(capability.id, id);
     assert.deepEqual(validateProviderCapabilityDeclaration(capability), []);
-    assert.match(capability.iac.previewCommand, /^deploy --deployment <label>/);
-    assert.match(capability.iac.smokeCommand, /^deploy --deployment <label>/);
+    assert.match(capability.iac.previewCommand, /^deployment-control-plane provider-capability/);
+    assert.match(capability.iac.smokeCommand, /^deployment-control-plane provider-capability/);
     assert.doesNotMatch(JSON.stringify(capability), /<reviewed|placeholder provider/i);
   }
 });

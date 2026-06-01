@@ -1,6 +1,6 @@
 #!/usr/bin/env zx-wrapper
 import { pathToFileURL } from "node:url";
-import { getFlagBool, getFlagStr, getPositionalsWithValueFlags } from "../lib/cli";
+import { getFlagBool, getFlagStr } from "../lib/cli";
 import { findRepoRoot } from "../lib/repo";
 import { loadControlPlaneRuntimeConfig } from "./control-plane-runtime-config";
 import type {
@@ -24,97 +24,11 @@ import {
 } from "./control-plane-credential-staging";
 import { runControlPlaneManagedDependenciesCli } from "./control-plane-managed-dependencies";
 import { runControlPlaneImagePublicationCommand } from "./control-plane-image-publication-cli";
-
-function command():
-  | "service"
-  | "worker"
-  | "setup"
-  | "cutover"
-  | "cutover-evidence"
-  | "setup-doctor"
-  | "credential-preflight"
-  | "credential-staging"
-  | "credential-rotation"
-  | "image-publication"
-  | "managed-dependencies" {
-  const [mode] = getPositionalsWithValueFlags([
-    "artifact-backend",
-    "artifact-backend-evidence",
-    "artifact-bucket",
-    "artifact-credential-mode",
-    "artifact-iam-role-arn",
-    "artifact-least-privilege-policy-digest",
-    "artifact-region",
-    "aws-topology-evidence",
-    "auth-callback-host",
-    "auth-callback-path",
-    "config",
-    "bundle-dir",
-    "credential-directory",
-    "credential-owner-gid",
-    "credential-owner-uid",
-    "stale-credential",
-    "deployment-id",
-    "host-mode",
-    "host-mount-evidence",
-    "image",
-    "instance-id",
-    "live-backend-profile",
-    "live-host-verification-evidence",
-    "live-host-verifier-profile",
-    "live-host-verifier-trust-profile",
-    "out",
-    "poll-ms",
-    "profile",
-    "process-mode",
-    "public-url",
-    "evidence",
-    "expected-host-profile",
-    "expected-region",
-    "max-age-minutes",
-    "operation",
-    "image-build-identity",
-    "image-publication-evidence",
-    "image-tarball",
-    "ingress-command-evidence",
-    "published-digest",
-    "registry-profile",
-    "reviewed-source-mode",
-    "rotated-map-out",
-    "runtime-input",
-    "secret-backend-evidence",
-    "selected-capability",
-    "service-replicas",
-    "skopeo",
-    "source-revision",
-    "supabase-postgres-profile",
-    "tag",
-    "token",
-    "worker-id",
-    "worker-replicas",
-  ]);
-  if (
-    mode !== "service" &&
-    mode !== "worker" &&
-    mode !== "setup" &&
-    mode !== "cutover" &&
-    mode !== "cutover-evidence" &&
-    mode !== "setup-doctor" &&
-    mode !== "credential-preflight" &&
-    mode !== "credential-staging" &&
-    mode !== "credential-rotation" &&
-    mode !== "image-publication" &&
-    mode !== "managed-dependencies"
-  ) {
-    throw new Error(
-      "usage: deployment-control-plane <service|worker|setup|image-publication|setup-doctor|credential-preflight|credential-staging|credential-rotation|managed-dependencies|cutover-evidence|cutover>",
-    );
-  }
-  return mode;
-}
+import { runControlPlaneProviderCapabilityCommand } from "./control-plane-provider-capability-command";
+import { selectedControlPlaneCommand } from "./deployment-control-plane-command";
 
 export async function runDeploymentControlPlaneCommand() {
-  const mode = command();
+  const mode = selectedControlPlaneCommand();
   if (getFlagBool("help")) {
     console.log(`usage: deployment-control-plane ${mode} --config <path>`);
     return undefined;
@@ -153,6 +67,10 @@ export async function runDeploymentControlPlaneCommand() {
   }
   if (mode === "managed-dependencies") {
     await runControlPlaneManagedDependenciesCli();
+    return undefined;
+  }
+  if (mode === "provider-capability") {
+    await runControlPlaneProviderCapabilityCommand();
     return undefined;
   }
   const correlationId = createControlPlaneCorrelationId(mode);
@@ -235,7 +153,8 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
           process.exit(0);
         });
       }
-      if (command() === "worker" && !getFlagBool("help")) await new Promise(() => {});
+      if (selectedControlPlaneCommand() === "worker" && !getFlagBool("help"))
+        await new Promise(() => {});
     })
     .catch((error) => {
       console.error(error);

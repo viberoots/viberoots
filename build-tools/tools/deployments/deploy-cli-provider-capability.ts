@@ -10,6 +10,11 @@ import {
 } from "./cloud-control-provider-capability-hooks";
 import type { AwsTopologyEvidence } from "./cloud-control-aws-topology-types";
 import { validateSupabaseManagedPostgresProfile } from "./control-plane-supabase-postgres-validation";
+import {
+  validateControlPlaneImagePublicationEvidence,
+  type ControlPlaneImagePublicationEvidence,
+} from "./control-plane-image-publication";
+import type { ControlPlaneRegistryProfile } from "./control-plane-registry-profile";
 
 export async function maybeRunProviderCapabilityHookForCli(opts: {
   deployment: DeploymentTarget;
@@ -17,18 +22,36 @@ export async function maybeRunProviderCapabilityHookForCli(opts: {
   const capabilityId = getFlagStr("provider-capability", "").trim();
   if (!capabilityId) return false;
   const phase = selectedProviderCapabilityPhase();
-  const evidence = await runCloudProviderCapabilityHook({
+  const evidence = await runProviderCapabilityHookForCli({
     capabilityId,
     phase,
     deploymentLabel: opts.deployment.label,
-    ...(await providerInputs(capabilityId)),
   });
   printDeployJson(evidence);
   return true;
 }
 
+export async function runProviderCapabilityHookForCli(opts: {
+  capabilityId: string;
+  phase: CloudProviderCapabilityHookPhase;
+  deploymentLabel: string;
+}) {
+  return runCloudProviderCapabilityHook({
+    capabilityId: opts.capabilityId,
+    phase: opts.phase,
+    deploymentLabel: opts.deploymentLabel,
+    ...(await providerInputs(opts.capabilityId)),
+  });
+}
+
 async function providerInputs(capabilityId: string) {
   const topology = await awsTopologyInput();
+  if (capabilityId === "aws-ecr-control-plane-registry") {
+    return {
+      ...(topology ? { awsTopologyEvidence: topology } : {}),
+      ...(await ecrInputs()),
+    };
+  }
   if (capabilityId === "aws-ec2-control-plane-host") {
     if (!topology) {
       throw new Error(
@@ -61,10 +84,41 @@ async function providerInputs(capabilityId: string) {
   return { supabasePostgresProfile: profile };
 }
 
+async function ecrInputs() {
+  const registryProfilePath = getFlagStr("registry-profile", "").trim();
+  if (!registryProfilePath) {
+    throw new Error(
+      "aws-ecr-control-plane-registry provider-capability requires --registry-profile",
+    );
+  }
+  const registryProfile = JSON.parse(
+    await fsp.readFile(registryProfilePath, "utf8"),
+  ) as ControlPlaneRegistryProfile;
+  const publicationPath = getFlagStr("image-publication-evidence", "").trim();
+  if (!publicationPath) {
+    throw new Error(
+      "aws-ecr-control-plane-registry provider-capability requires --image-publication-evidence",
+    );
+  }
+  const imagePublication = (await readJson(
+    publicationPath,
+  )) as ControlPlaneImagePublicationEvidence;
+  const errors = validateControlPlaneImagePublicationEvidence(
+    imagePublication,
+    imagePublication.image,
+    imagePublication.imageBuildIdentity,
+    { requireRegistryProfile: true, expectedRuntimeHostProfile: "aws-ec2" },
+  );
+  if (errors.length > 0) {
+    throw new Error(`image publication evidence rejected: ${errors.join("; ")}`);
+  }
+  return { registryProfile, imagePublication };
+}
+
 async function awsTopologyInput(): Promise<AwsTopologyEvidence | undefined> {
   const topologyPath = getFlagStr("aws-topology-evidence", "").trim();
   if (!topologyPath) return undefined;
-  return JSON.parse(await fsp.readFile(topologyPath, "utf8"));
+  return readJson(topologyPath) as Promise<AwsTopologyEvidence>;
 }
 
 async function awsEc2ProfileInput(): Promise<Record<string, unknown>> {
@@ -75,7 +129,11 @@ async function awsEc2ProfileInput(): Promise<Record<string, unknown>> {
   return YAML.parse(await fsp.readFile(profilePath, "utf8"));
 }
 
-function selectedProviderCapabilityPhase(): CloudProviderCapabilityHookPhase {
+async function readJson(filePath: string): Promise<unknown> {
+  return JSON.parse(await fsp.readFile(filePath, "utf8"));
+}
+
+export function selectedProviderCapabilityPhase(): CloudProviderCapabilityHookPhase {
   const selected = [
     getFlagBool("preview") ? "preview" : "",
     getFlagBool("smoke") ? "smoke" : "",

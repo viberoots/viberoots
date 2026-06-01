@@ -131,7 +131,7 @@ export function capabilityDeclaration(
   const copy = structuredClone(declaration);
   const label = opts.deploymentLabel?.trim();
   if (!label) return copy;
-  const run = `deploy --deployment ${shellQuote(label)}`;
+  const run = `deployment-control-plane provider-capability --deployment-id ${shellQuote(label)}`;
   for (const field of [
     "previewCommand",
     "applyCommand",
@@ -139,7 +139,10 @@ export function capabilityDeclaration(
     "evidenceCommand",
     "rollbackCommand",
   ] as const) {
-    copy.iac[field] = copy.iac[field].replace("deploy --deployment <label>", run);
+    copy.iac[field] = copy.iac[field].replace(
+      "deployment-control-plane provider-capability --deployment-id <label>",
+      run,
+    );
   }
   return copy;
 }
@@ -178,11 +181,11 @@ function cap(
     protectedSharedEligibility: eligibility,
     iac: {
       reviewedReference: "docs/cloud-control-setup.md",
-      previewCommand: `deploy --deployment <label> --preview --provider-capability ${id}`,
-      applyCommand: `deploy --deployment <label> --provider-capability ${id}`,
-      smokeCommand: `deploy --deployment <label> --smoke --provider-capability ${id}`,
-      evidenceCommand: `deploy --deployment <label> --record --provider-capability ${id}`,
-      rollbackCommand: `deploy --deployment <label> --rollback --provider-capability ${id}`,
+      previewCommand: `deployment-control-plane provider-capability --deployment-id <label> --preview --provider-capability ${id}`,
+      applyCommand: `deployment-control-plane provider-capability --deployment-id <label> --provider-capability ${id}`,
+      smokeCommand: `deployment-control-plane provider-capability --deployment-id <label> --smoke --provider-capability ${id}`,
+      evidenceCommand: `deployment-control-plane provider-capability --deployment-id <label> --record --provider-capability ${id}`,
+      rollbackCommand: `deployment-control-plane provider-capability --deployment-id <label> --rollback --provider-capability ${id}`,
     },
   };
 }

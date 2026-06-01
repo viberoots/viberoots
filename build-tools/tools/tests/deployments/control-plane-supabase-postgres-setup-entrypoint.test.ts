@@ -37,7 +37,7 @@ test("setup renders Supabase profile as a managed dependency consumer input", ()
   assert.match(managedCommand, /deployment-control-plane managed-dependencies/);
   assert.match(managedCommand, /PROFILE_ROOT="\$\{PROFILE_ROOT:-\$\(pwd\)\}"/);
   assert.match(managedCommand, /commands\.json not found; run from repo root or bundle directory/);
-  assert.match(evidenceCommand.command, /deploy --deployment/);
+  assert.match(evidenceCommand.command, /deployment-control-plane provider-capability/);
   assert.match(evidenceCommand.command, /--provider-capability supabase-managed-postgres/);
   assert.match(
     evidenceCommand.command,

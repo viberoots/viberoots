@@ -127,6 +127,8 @@ function validateImagePublication(
       {
         requireRegistryProfile: options.expectedHostProfile === "aws-ec2",
         expectedRuntimeHostProfile: options.expectedHostProfile,
+        expectedRegistryAccountId: (evidence.awsTopology as any)?.accountId,
+        expectedRegistryRegion: (evidence.awsTopology as any)?.region,
       },
     ),
   ];

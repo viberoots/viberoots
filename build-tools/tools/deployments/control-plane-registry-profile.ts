@@ -1,3 +1,5 @@
+import { evidenceSecretErrors } from "./cloud-control-evidence-helpers";
+
 export const CONTROL_PLANE_REGISTRY_PROFILE_SCHEMA = "control-plane-registry-profile@1";
 
 export type ControlPlaneRegistryProfile = {
@@ -49,12 +51,11 @@ export type ControlPlaneRegistryProfileValidationOptions = {
   expectedImageRef?: string;
   expectedDigest?: string;
   expectedHostProfile?: string;
+  expectedAccountId?: string;
+  expectedRegion?: string;
 };
 
 const REPOSITORY_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:-]*(\/[A-Za-z0-9][A-Za-z0-9._-]*)+$/;
-const SECRET_PATTERN =
-  /authorization\s*[:=]|bearer\s+\S+|cookie\s*[:=]|password\s*[:=]|private[_-]?key\s*[:=]|secret\s*[:=]|token\s*[:=]|api[_-]?key\s*[:=]|-----begin/i;
-
 export function validateControlPlaneRegistryProfile(
   profile: ControlPlaneRegistryProfile | undefined,
   opts: ControlPlaneRegistryProfileValidationOptions = {},
@@ -78,12 +79,17 @@ export function validateControlPlaneRegistryProfile(
   if (!Number.isFinite(Date.parse(profile.checkedAt || ""))) {
     errors.push("control-plane registry profile checkedAt is missing or invalid");
   }
-  errors.push(...validateIdentity(profile));
+  errors.push(...validateIdentity(profile, opts));
   errors.push(...validatePolicy(profile));
   errors.push(...validatePermissions(profile, opts));
-  const unsafe = unsafeEvidencePath(profile);
-  if (unsafe)
-    errors.push(`control-plane registry profile contains unsafe credential content at ${unsafe}`);
+  errors.push(
+    ...evidenceSecretErrors(profile).map(
+      (error) => `control-plane registry profile contains unsafe credential content: ${error}`,
+    ),
+  );
+  if (/authorization\s*:|bearer\s+\S+/i.test(JSON.stringify(profile))) {
+    errors.push("control-plane registry profile contains unsafe credential content");
+  }
   return errors;
 }
 
@@ -110,7 +116,10 @@ export function registryProfileSummary(profile: ControlPlaneRegistryProfile) {
   };
 }
 
-function validateIdentity(profile: ControlPlaneRegistryProfile): string[] {
+function validateIdentity(
+  profile: ControlPlaneRegistryProfile,
+  opts: ControlPlaneRegistryProfileValidationOptions,
+): string[] {
   const errors: string[] = [];
   if (profile.mode === "aws-ecr") {
     if (!/^\d{12}$/.test(profile.identity?.accountId || "")) {
@@ -124,6 +133,12 @@ function validateIdentity(profile: ControlPlaneRegistryProfile): string[] {
     }
     if (!profile.identity?.repositoryUri) {
       errors.push("AWS ECR registry profile requires repository URI evidence");
+    }
+    if (opts.expectedAccountId && profile.identity?.accountId !== opts.expectedAccountId) {
+      errors.push("AWS ECR registry profile account does not match trusted AWS topology");
+    }
+    if (opts.expectedRegion && profile.identity?.region !== opts.expectedRegion) {
+      errors.push("AWS ECR registry profile region does not match trusted AWS topology");
     }
   }
   if (profile.mode === "imported" && !profile.identity?.reviewedReference) {
@@ -218,24 +233,4 @@ function validateRuntimePullProof(
     errors.push("registry runtime pull proof host profile does not match selected host");
   }
   return errors;
-}
-
-function unsafeEvidencePath(value: unknown, path = "$"): string | undefined {
-  if (typeof value === "string") return SECRET_PATTERN.test(value) ? path : undefined;
-  if (!value || typeof value !== "object") return undefined;
-  if (Array.isArray(value)) {
-    for (let index = 0; index < value.length; index += 1) {
-      const unsafe = unsafeEvidencePath(value[index], `${path}[${index}]`);
-      if (unsafe) return unsafe;
-    }
-    return undefined;
-  }
-  for (const [key, child] of Object.entries(value as Record<string, unknown>)) {
-    const childPath = /^[A-Za-z_$][\w$]*$/.test(key)
-      ? `${path}.${key}`
-      : `${path}[${JSON.stringify(key)}]`;
-    const unsafe = unsafeEvidencePath(child, childPath);
-    if (unsafe) return unsafe;
-  }
-  return undefined;
 }
