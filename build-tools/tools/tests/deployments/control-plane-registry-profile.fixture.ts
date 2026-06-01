@@ -35,6 +35,7 @@ export function ecrRegistryProfile(
       principal: "arn:aws:iam::123456789012:role/control-plane-image-publisher",
       evidence: "publisher can PutImage only during reviewed publication",
     },
+    iac: ecrIacEvidence(DEFAULT_REPOSITORY, DEFAULT_DIGEST),
     ...overrides,
   };
 }
@@ -57,6 +58,7 @@ export function ecrRegistryProfileForImage(
       ...ecrRegistryProfile().runtimePull,
       proof: runtimePullProof(image, digest),
     },
+    iac: ecrIacEvidence(repository, digest),
   };
 }
 
@@ -68,5 +70,65 @@ export function runtimePullProof(image: string, digest: string, principal = DEFA
     checkedAt: new Date().toISOString(),
     principal,
     evidence: "podman pull by digest succeeded from selected EC2 host profile",
+  };
+}
+
+export function ecrIacEvidence(repositoryUri = DEFAULT_REPOSITORY, digest = DEFAULT_DIGEST) {
+  const repository = {
+    accountId: "123456789012",
+    region: "us-east-1",
+    repositoryArn: "arn:aws:ecr:us-east-1:123456789012:repository/deployment-control-plane",
+    repositoryUri,
+  };
+  const posture = {
+    tagMutability: "IMMUTABLE",
+    lifecyclePolicyDigest: "sha256:lifecycle",
+    lifecycleRuleCount: 2,
+    scanOnPush: true,
+    repositoryPolicyDigest: "sha256:policy",
+    kms: { mode: "aws-managed" },
+  };
+  return {
+    plan: {
+      schemaVersion: "aws-ecr-opentofu-plan@1",
+      source: "reviewed-opentofu-plan",
+      checkedAt: new Date().toISOString(),
+      bundleRoot: "$PROFILE_ROOT",
+      workingDirectory:
+        "$PROFILE_ROOT/build-tools/deployments/aws-control-plane-foundation/opentofu",
+      evidencePath: "$PROFILE_ROOT/ecr-opentofu-plan.json",
+      outputPath: "$PROFILE_ROOT/ecr-opentofu-plan.out.json",
+      planDigest: "sha256:plan",
+      repository,
+      posture,
+      importAdoption: { mode: "managed" },
+    },
+    apply: {
+      schemaVersion: "aws-ecr-opentofu-apply@1",
+      source: "reviewed-opentofu-apply",
+      checkedAt: new Date().toISOString(),
+      bundleRoot: "$PROFILE_ROOT",
+      workingDirectory:
+        "$PROFILE_ROOT/build-tools/deployments/aws-control-plane-foundation/opentofu",
+      evidencePath: "$PROFILE_ROOT/ecr-opentofu-apply.json",
+      outputPath: "$PROFILE_ROOT/ecr-opentofu-apply.out.json",
+      planDigest: "sha256:plan",
+      applyDigest: "sha256:apply",
+      repository,
+      posture,
+    },
+    readOnly: {
+      schemaVersion: "aws-ecr-readonly-evidence@1",
+      source: "aws-ecr-readonly-inspection",
+      checkedAt: new Date().toISOString(),
+      bundleRoot: "$PROFILE_ROOT",
+      workingDirectory:
+        "$PROFILE_ROOT/build-tools/deployments/aws-control-plane-foundation/opentofu",
+      evidencePath: "$PROFILE_ROOT/ecr-readonly-evidence.json",
+      outputPath: "$PROFILE_ROOT/ecr-readonly-evidence.out.json",
+      evidenceDigest: digest,
+      repository,
+      posture,
+    },
   };
 }

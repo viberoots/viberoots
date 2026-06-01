@@ -179,15 +179,31 @@ function cap(
       "replay uses control-plane audit records, immutable artifact digests, and declared target identity",
     auditEvidence,
     protectedSharedEligibility: eligibility,
-    iac: {
-      reviewedReference: "docs/cloud-control-setup.md",
-      previewCommand: `deployment-control-plane provider-capability --deployment-id <label> --preview --provider-capability ${id}`,
-      applyCommand: `deployment-control-plane provider-capability --deployment-id <label> --provider-capability ${id}`,
-      smokeCommand: `deployment-control-plane provider-capability --deployment-id <label> --smoke --provider-capability ${id}`,
-      evidenceCommand: `deployment-control-plane provider-capability --deployment-id <label> --record --provider-capability ${id}`,
-      rollbackCommand: `deployment-control-plane provider-capability --deployment-id <label> --rollback --provider-capability ${id}`,
-    },
+    iac: iacCommands(id),
   };
+}
+
+function iacCommands(id: CloudCapabilityId): ProviderCapabilityDeclaration["iac"] {
+  const base = `deployment-control-plane provider-capability --deployment-id <label> --provider-capability ${id}`;
+  const flags = id === "aws-ecr-control-plane-registry" ? ecrBundleFlags() : "";
+  return {
+    reviewedReference: "docs/cloud-control-setup.md",
+    previewCommand: `${base} --preview${flags}`,
+    applyCommand: `${base}${flags}`,
+    smokeCommand: `${base} --smoke${flags}`,
+    evidenceCommand: `${base} --record${flags}`,
+    rollbackCommand: `${base} --rollback${flags}`,
+  };
+}
+
+function ecrBundleFlags(): string {
+  return [
+    ' --registry-profile "$PROFILE_ROOT/registry-profile.json"',
+    ' --image-publication-evidence "$PROFILE_ROOT/image-publication.json"',
+    ' --ecr-opentofu-plan "$PROFILE_ROOT/ecr-opentofu-plan.json"',
+    ' --ecr-opentofu-apply "$PROFILE_ROOT/ecr-opentofu-apply.json"',
+    ' --ecr-readonly-evidence "$PROFILE_ROOT/ecr-readonly-evidence.json"',
+  ].join("");
 }
 
 function shellQuote(value: string): string {

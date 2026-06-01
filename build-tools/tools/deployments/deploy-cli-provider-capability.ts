@@ -97,6 +97,10 @@ async function ecrInputs() {
   const registryProfile = JSON.parse(
     await fsp.readFile(registryProfilePath, "utf8"),
   ) as ControlPlaneRegistryProfile;
+  registryProfile.iac = {
+    ...(registryProfile.iac || {}),
+    ...(await ecrIacInputs()),
+  };
   const publicationPath = getFlagStr("image-publication-evidence", "").trim();
   if (!publicationPath) {
     throw new Error(
@@ -106,6 +110,7 @@ async function ecrInputs() {
   const imagePublication = (await readJson(
     publicationPath,
   )) as ControlPlaneImagePublicationEvidence;
+  imagePublication.registryProfile = registryProfile;
   const errors = validateControlPlaneImagePublicationEvidence(
     imagePublication,
     imagePublication.image,
@@ -116,6 +121,14 @@ async function ecrInputs() {
     throw new Error(`image publication evidence rejected: ${errors.join("; ")}`);
   }
   return { registryProfile, imagePublication };
+}
+
+async function ecrIacInputs() {
+  return {
+    ...(await optionalJsonFlag("ecr-opentofu-plan", "plan")),
+    ...(await optionalJsonFlag("ecr-opentofu-apply", "apply")),
+    ...(await optionalJsonFlag("ecr-readonly-evidence", "readOnly")),
+  };
 }
 
 async function awsTopologyInput(): Promise<AwsTopologyEvidence | undefined> {
@@ -134,6 +147,11 @@ async function awsEc2ProfileInput(): Promise<Record<string, unknown>> {
 
 async function readJson(filePath: string): Promise<unknown> {
   return JSON.parse(await fsp.readFile(filePath, "utf8"));
+}
+
+async function optionalJsonFlag(flag: string, key: string) {
+  const filePath = getFlagStr(flag, "").trim();
+  return filePath ? { [key]: await readJson(filePath) } : {};
 }
 
 export function selectedProviderCapabilityPhase(): CloudProviderCapabilityHookPhase {

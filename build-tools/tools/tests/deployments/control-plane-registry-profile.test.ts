@@ -5,7 +5,11 @@ import {
   registryProfileSummary,
   validateControlPlaneRegistryProfile,
 } from "../../deployments/control-plane-registry-profile";
-import { ecrRegistryProfile, runtimePullProof } from "./control-plane-registry-profile.fixture";
+import {
+  ecrIacEvidence,
+  ecrRegistryProfile,
+  runtimePullProof,
+} from "./control-plane-registry-profile.fixture";
 
 test("registry profile validates AWS ECR provisioning evidence", () => {
   const profile = ecrRegistryProfile();
@@ -84,6 +88,30 @@ test("registry profile rejects missing runtime pull proof", () => {
   });
   const errors = validateControlPlaneRegistryProfile(profile).join("\n");
   assert.match(errors, /requires runtime pull proof/);
+});
+
+test("registry profile rejects missing ECR IaC KMS and lifecycle posture", () => {
+  const iac = ecrIacEvidence();
+  const profile = ecrRegistryProfile({
+    iac: {
+      ...iac,
+      plan: {
+        ...iac.plan,
+        posture: {
+          tagMutability: "MUTABLE",
+          lifecycleRuleCount: 0,
+          scanOnPush: false,
+          repositoryPolicyDigest: "",
+          kms: {},
+        },
+      },
+    },
+  });
+  const errors = validateControlPlaneRegistryProfile(profile).join("\n");
+  assert.match(errors, /immutable tags/);
+  assert.match(errors, /lifecycle policy posture/);
+  assert.match(errors, /scan-on-push/);
+  assert.match(errors, /KMS encryption posture/);
 });
 
 test("registry profile runtime pull proof must match selected image digest", () => {

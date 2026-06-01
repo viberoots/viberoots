@@ -1,4 +1,6 @@
 import { evidenceSecretErrors } from "./cloud-control-evidence-helpers";
+import type { AwsEcrIacEvidenceBundle } from "./cloud-control-aws-ecr-iac-evidence";
+import { validateAwsEcrIacBundle } from "./cloud-control-aws-ecr-iac-evidence";
 
 export const CONTROL_PLANE_REGISTRY_PROFILE_SCHEMA = "control-plane-registry-profile@1";
 
@@ -36,6 +38,7 @@ export type ControlPlaneRegistryProfile = {
     principal: string;
     evidence: string;
   };
+  iac?: AwsEcrIacEvidenceBundle;
 };
 
 export type RuntimePullProof = {
@@ -82,6 +85,9 @@ export function validateControlPlaneRegistryProfile(
   errors.push(...validateIdentity(profile, opts));
   errors.push(...validatePolicy(profile));
   errors.push(...validatePermissions(profile, opts));
+  if (profile.mode === "aws-ecr") {
+    errors.push(...validateAwsEcrIacBundle({ profile, phase: "preview" }));
+  }
   errors.push(
     ...evidenceSecretErrors(profile).map(
       (error) => `control-plane registry profile contains unsafe credential content: ${error}`,

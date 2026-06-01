@@ -10,6 +10,7 @@ import {
   validateControlPlaneRegistryProfile,
   type ControlPlaneRegistryProfile,
 } from "./control-plane-registry-profile";
+import { awsEcrIacSummary, validateAwsEcrIacBundle } from "./cloud-control-aws-ecr-iac-evidence";
 
 const REQUIRED_PHASES = [
   "preview",
@@ -62,6 +63,16 @@ function ecrPayload(opts: HookAdapterPhaseOptions, phase: string) {
   if (errors.length > 0) {
     throw new Error(`aws-ecr-control-plane-registry evidence rejected: ${errors.join("; ")}`);
   }
+  const iacErrors = validateAwsEcrIacBundle({
+    profile: registryProfile,
+    phase: opts.phase,
+    topology: opts.awsTopologyEvidence,
+  });
+  if (iacErrors.length > 0) {
+    throw new Error(
+      `aws-ecr-control-plane-registry IaC evidence rejected: ${iacErrors.join("; ")}`,
+    );
+  }
   const credentialSource = reviewedAwsCredentialSource();
   return {
     schemaVersion: "aws-ecr-control-plane-registry-hook-payload@1",
@@ -73,7 +84,13 @@ function ecrPayload(opts: HookAdapterPhaseOptions, phase: string) {
     scanning: registryProfile.scanning,
     pull: registryProfile.runtimePull,
     publish: publishPayload(registryProfile, publication),
-    provisioningPlan: provisioningPlan(registryProfile),
+    iac: {
+      ownership: registryProfile.mode === "aws-ecr" ? "opentofu-managed" : "reviewed-import",
+      orchestration: "reviewed-opentofu-artifacts",
+      workingDirectory: String(registryProfile.iac?.plan?.workingDirectory || ""),
+      outcomes: awsEcrIacSummary(registryProfile),
+    },
+    registryProfile,
     rollbackPlan: [
       "retain repository and immutable image digests",
       "restore previous repository and lifecycle policies from reviewed evidence",
@@ -123,21 +140,6 @@ function publishPayload(
     image: publication.image,
     digest: publication.digest,
     inspectedDigest: publication.inspectedDigest,
-  };
-}
-
-function provisioningPlan(profile: ControlPlaneRegistryProfile) {
-  return {
-    operation:
-      profile.mode === "aws-ecr" ? "aws-ecr-reviewed-provision-or-reconcile" : "reviewed-import",
-    repository: profile.repository,
-    commands: [
-      "aws ecr describe-repositories",
-      "aws ecr create-repository --image-tag-mutability IMMUTABLE",
-      "aws ecr put-lifecycle-policy",
-      "aws ecr set-repository-policy",
-      "aws ecr describe-image-scan-findings",
-    ],
   };
 }
 

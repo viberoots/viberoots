@@ -31,7 +31,14 @@ function providerCapabilityEvidenceCommand(
 function inputFlags(capabilityId: string): string {
   const topology = ' --aws-topology-evidence "$PROFILE_ROOT/aws-topology-evidence.json"';
   if (capabilityId === "aws-ecr-control-plane-registry") {
-    return `${topology} --registry-profile "$PROFILE_ROOT/registry-profile.json" --image-publication-evidence "$PROFILE_ROOT/image-publication.json"`;
+    return [
+      topology,
+      ' --registry-profile "$PROFILE_ROOT/registry-profile.json"',
+      ' --image-publication-evidence "$PROFILE_ROOT/image-publication.json"',
+      ' --ecr-opentofu-plan "$PROFILE_ROOT/ecr-opentofu-plan.json"',
+      ' --ecr-opentofu-apply "$PROFILE_ROOT/ecr-opentofu-apply.json"',
+      ' --ecr-readonly-evidence "$PROFILE_ROOT/ecr-readonly-evidence.json"',
+    ].join("");
   }
   if (capabilityId !== "aws-ec2-control-plane-host") return topology;
   return `${topology} --aws-ec2-profile "$PROFILE_ROOT/aws-ec2-profile.yaml"`;
@@ -47,6 +54,9 @@ function inputs(capabilityId: string): string[] {
       ...values,
       "$PROFILE_ROOT/registry-profile.json",
       "$PROFILE_ROOT/image-publication.json",
+      "$PROFILE_ROOT/ecr-opentofu-plan.json",
+      "$PROFILE_ROOT/ecr-opentofu-apply.json",
+      "$PROFILE_ROOT/ecr-readonly-evidence.json",
     ];
   }
   return capabilityId === "aws-ec2-control-plane-host"

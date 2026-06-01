@@ -883,8 +883,8 @@ connectivity.
   - public database connectivity status and disablement or retained-public-path justification
 - Add provider-capability hook support for `supabase-privatelink-prerequisite`:
   - support-mediated Supabase dashboard/share initiation remains a gated prerequisite
-  - AWS-side RAM acceptance and endpoint or service-network association are automated where AWS APIs
-    support it
+  - AWS-side RAM acceptance and endpoint or service-network association are tied to reviewed IaC
+    plan/apply outputs where the selected AWS account owns them
   - evidence capture is required even for manual/support-mediated steps
 - Update setup, managed dependency validation, and cutover validation to require this evidence when
   `--supabase-privatelink` or `databaseConnectivity = "privatelink"` is selected.
@@ -2296,18 +2296,18 @@ though the functional design and validation pass.
 The AWS foundation variable definitions become spread across multiple files and require reviewers to
 look at the whole OpenTofu directory instead of one consolidated variable file.
 
-## PR-23: AWS ECR control-plane registry provisioning hook
+## PR-23: AWS ECR control-plane registry IaC evidence hook
 
 ### 1. Intent
 
 Close the remaining PR-3 gap where `aws-ecr-control-plane-registry` is validated as reviewed
-evidence but still lacks repo-owned provisioning or import support for the recommended AWS registry
-path.
+evidence but still lacks repo-owned IaC orchestration and import evidence support for the
+recommended AWS registry path.
 
 ### 2. Scope of changes
 
-- Add a concrete AWS ECR provider-capability hook path for preview, apply, evidence, smoke,
-  rollback, and reviewed import.
+- Add a concrete AWS ECR provider-capability hook path for IaC preview, IaC apply orchestration,
+  read-only evidence, smoke, rollback, and reviewed import.
 - Treat preview, apply-intent, evidence collection, smoke, rollback-plan, and reviewed import as
   mandatory hook phases; destructive repository deletion is out of scope unless a future reviewed
   exception is added.
@@ -2317,8 +2317,9 @@ path.
   repository policy digest, lifecycle posture, scanning posture, pull evidence, and publish evidence.
 - Ensure generated setup/provider-capability commands select the concrete ECR hook rather than the
   generic reviewed adapter when the registry provider is AWS ECR.
-- Require file-backed AWS credentials or an explicitly reviewed instance-profile/assume-role path;
-  do not allow ambient laptop AWS credentials or default-chain AWS SDK credential discovery.
+- Require file-backed read-only evidence credentials or an explicitly reviewed instance-profile/
+  assume-role path; do not allow ambient laptop AWS credentials or default-chain AWS SDK credential
+  discovery. Durable ECR mutations must happen through reviewed IaC, not custom hook AWS API calls.
 
 ### 3. External prerequisites
 
@@ -2327,7 +2328,7 @@ path.
 
 ### 4. Tests to be added
 
-- Add hook tests for ECR preview/apply/evidence/smoke/rollback/import payloads and credential
+- Add hook tests for ECR IaC preview/apply/evidence/smoke/rollback/import payloads and credential
   boundaries.
 - Add negative tests proving missing repository policy, lifecycle/scanning posture, pull evidence,
   or publish evidence is rejected at setup/cutover entrypoints.
@@ -2337,7 +2338,7 @@ path.
 
 ### 5. Docs to be added or updated
 
-- Update `docs/control-plane-guide.md` to document the ECR provisioning/import procedure and the
+- Update `docs/control-plane-guide.md` to document the ECR IaC provisioning/import procedure and the
   evidence files operators must retain, including credential modes, expected evidence filenames,
   rollback-plan behavior, import refusal cases, and smoke proof semantics.
 
@@ -2349,8 +2350,8 @@ path.
 ### 6. Acceptance criteria
 
 - `aws-ecr-control-plane-registry` no longer routes only through the generic reviewed adapter.
-- Operators can use repo tooling to produce or import the reviewed ECR registry evidence required by
-  setup and cutover.
+- Operators can use repo tooling to drive reviewed IaC and produce or import the reviewed ECR
+  registry evidence required by setup and cutover.
 - ECR validation remains fail-closed for incomplete policy, lifecycle, scanning, pull, or publish
   evidence.
 - ECR smoke proves repository existence, auth/pull reachability, policy digest, scanning posture,
@@ -2364,53 +2365,56 @@ path.
 ### 8. Mitigations
 
 - Derive expected account and region from trusted setup/topology inputs where available.
-- Keep live AWS calls behind explicit file-backed credentials or reviewed assume-role inputs.
+- Keep read-only AWS evidence calls behind explicit file-backed credentials or reviewed assume-role
+  inputs; keep durable mutations in IaC.
 
 ### 9. Consequences of not implementing this PR
 
-The recommended AWS registry path remains evidence-only and cannot be provisioned or imported
-through repo-owned control-plane tooling.
+The recommended AWS registry path remains evidence-only and cannot be driven or imported through
+repo-owned IaC/control-plane tooling.
 
 ### 10. Downsides for implementing this PR
 
 The provider-capability hook surface grows another AWS-specific adapter that must be maintained with
-AWS API behavior.
+OpenTofu/IaC evidence behavior.
 
-## PR-24: Supabase PrivateLink AWS-side automation hook
+## PR-24: Supabase PrivateLink AWS-side IaC evidence hook
 
 ### 1. Intent
 
 Close the remaining PR-8 gap where Supabase PrivateLink validation is strong but AWS-side RAM
-acceptance and VPC Lattice association remain evidence-gated rather than automated where AWS APIs
-support them.
+acceptance and VPC Lattice association remain topology-only evidence rather than tied to reviewed
+IaC plan/apply and read-only AWS evidence.
 
 ### 2. Scope of changes
 
-- Add an AWS-side PrivateLink provider-capability hook for RAM share acceptance and VPC Lattice
-  service-network or endpoint association.
+- Add an AWS-side PrivateLink provider-capability hook for reviewed IaC plan/apply evidence covering
+  RAM share acceptance and VPC Lattice service-network or endpoint association.
 - Preserve support-mediated evidence paths for steps Supabase or AWS account boundaries still make
   manual.
 - Emit typed evidence for accepted RAM shares, Lattice association identity, private DNS posture,
   route/security-group posture, and psql proof.
-- Ensure generated setup/provider-capability commands can execute the AWS-side automation path with
-  reviewed credentials.
+- Ensure generated setup/provider-capability commands can orchestrate the AWS-side IaC path and
+  read-only evidence collection with reviewed credentials, without directly mutating persistent AWS
+  resources through custom hook code.
 
 ### 3. External prerequisites
 
 - Existing Supabase PrivateLink profile and managed-dependency validation.
-- Existing provider-capability hook dispatch and AWS credential boundary helpers.
+- Existing provider-capability hook dispatch, OpenTofu/IaC evidence, and AWS credential boundary
+  helpers.
 
 ### 4. Tests to be added
 
-- Add hook tests proving RAM/Lattice automation commands are generated and recorded with typed
-  evidence.
+- Add hook tests proving RAM/Lattice IaC orchestration and read-only evidence commands are generated
+  and recorded with typed evidence.
 - Add negative tests for mismatched account, region, share ARN, service-network id, endpoint id, and
   stale or missing private DNS/psql evidence.
 - Add generated artifact tests proving commands resolve from the setup bundle location.
 
 ### 5. Docs to be added or updated
 
-- Update `docs/control-plane-guide.md` to distinguish AWS-side automated PrivateLink steps from
+- Update `docs/control-plane-guide.md` to distinguish IaC-owned AWS-side PrivateLink steps from
   support-mediated Supabase-side prerequisites.
 
 ### 5.5. Expected regression scope
@@ -2420,9 +2424,10 @@ support them.
 
 ### 6. Acceptance criteria
 
-- AWS-side PrivateLink work is no longer represented only as `evidence-only` when the required AWS
-  API inputs are present.
-- Support-mediated evidence remains accepted only for steps that cannot be automated by this repo.
+- AWS-side PrivateLink work is no longer represented only as topology evidence when reviewed IaC
+  outputs are expected.
+- Support-mediated evidence remains accepted only for steps outside the selected AWS account's IaC
+  authority.
 - Setup and cutover reject mismatched or stale RAM/Lattice/private DNS/psql evidence.
 
 ### 7. Risks
@@ -2432,13 +2437,14 @@ support them.
 
 ### 8. Mitigations
 
-- Keep preview and apply payloads explicit, record every mutation outcome, and require rollback or
-  detach evidence in the generated runbook.
+- Keep preview and apply payloads explicit, record every IaC plan/apply outcome, and require
+  rollback or detach evidence in the generated runbook.
 
 ### 9. Consequences of not implementing this PR
 
 The PrivateLink path continues to depend on external AWS-side realization while the plan calls for
-automation where APIs support it.
+repo-driven IaC orchestration and fail-closed evidence where the selected AWS account owns the
+resources.
 
 ### 10. Downsides for implementing this PR
 
@@ -2632,3 +2638,196 @@ region when artifact storage and control-plane regions differ.
 ### 10. Downsides for implementing this PR
 
 Generated runbook commands become longer and require more explicit shell-level validation.
+
+## PR-28: IaC-owned ECR provisioning and evidence gating
+
+### 1. Intent
+
+Close the remaining plan gap where the recommended AWS ECR registry path is represented by evidence
+payloads, but durable ECR repository, lifecycle, policy, tag-mutability, and KMS posture must remain
+declarative/IaC-owned instead of being mutated by custom provider-hook AWS API calls.
+
+### 2. Scope of changes
+
+- Retarget the completed PR-23 ECR provider hook artifacts away from command-template/direct ECR
+  provisioning semantics and toward IaC orchestration plus read-only evidence.
+- Add or extend reviewed OpenTofu inputs/modules for the ECR repository, encryption/KMS posture,
+  tag immutability, lifecycle policy, repository policy, scanning posture, and import/adoption
+  metadata.
+- Wire the existing `provider-capability` CLI phases so `preview` and `apply` orchestrate reviewed
+  OpenTofu plan/apply artifacts, not direct ECR create/update calls.
+- Keep provider-capability code read-only after IaC apply: collect AWS evidence, parse repository
+  output, smoke exact image pull/auth posture, and fail closed against the IaC plan/apply outputs.
+- Emit typed IaC plan/apply/evidence outcomes that cutover/readiness validation can distinguish
+  from static command-template or dashboard-note payloads.
+- Ensure generated commands, OpenTofu working directory inputs, evidence files, and output paths
+  resolve from the generated setup bundle root.
+
+### 3. External prerequisites
+
+- Existing AWS ECR registry provider hook and provider-capability lifecycle contract.
+- Existing PR-23 ECR hook implementation, generated command wiring, registry fixtures, and
+  provider-capability readiness/cutover tests.
+- Existing image publication and registry-profile evidence validation.
+- Existing AWS foundation OpenTofu layout or a dedicated ECR module/import block.
+- Reviewed OpenTofu state/backend inputs and read-only AWS evidence credentials or a fake command
+  harness for tests.
+
+### 4. Tests to be added
+
+- Update existing PR-23 ECR hook and generated-command tests so they reject direct `aws ecr
+create-repository`, `put-lifecycle-policy`, `set-repository-policy`, or equivalent persistent
+  mutations from custom hook code.
+- Add OpenTofu/static tests proving generated ECR plan inputs include repository identity,
+  lifecycle/tag-mutability/KMS/scanning/repository-policy posture, and import/adoption metadata.
+- Add fake-command tests proving `preview`, `apply`, `evidence`, `smoke`, `rollback`, and
+  `reviewed-import` orchestrate OpenTofu plan/apply plus read-only evidence collection, never direct
+  ECR create/update commands from custom hook code.
+- Add negative tests rejecting missing plan/apply evidence, stale or mismatched repository/account/
+  region output, mutable tags, missing lifecycle/KMS posture, and command-template-only payloads
+  where IaC-owned ECR execution was expected.
+- Add generated-runbook consumer tests proving ECR provider-capability commands execute from the
+  bundle root with resolving input/output paths.
+- Add cutover/readiness tests proving typed IaC plan/apply/evidence payloads are accepted and static
+  placeholder or evidence-only payloads are rejected when IaC-owned ECR execution was expected.
+
+### 5. Docs to be added or updated
+
+- Update `docs/control-plane-guide.md` to describe the IaC-owned ECR boundary, reviewed OpenTofu
+  inputs, evidence output files, read-only AWS evidence collection, and import fallback boundary.
+
+### 5.5. Expected regression scope
+
+- `deployment-only` for ECR OpenTofu inputs, provider-capability orchestration, generated setup
+  runbooks, registry evidence, image publication validation, and cutover/readiness provider evidence.
+
+### 6. Acceptance criteria
+
+- Existing PR-23 ECR hook payloads no longer advertise direct ECR mutation command templates as the
+  repo-owned provisioning path.
+- The recommended ECR path can be provisioned or imported through reviewed OpenTofu/IaC driven by
+  repo tooling.
+- Generated ECR provider commands are executable from the setup bundle and record typed OpenTofu
+  plan/apply plus read-only evidence outcomes rather than only command templates.
+- Cutover/readiness reject placeholder or evidence-only ECR payloads when reviewed IaC-owned ECR
+  execution was expected.
+
+### 7. Risks
+
+- ECR IaC plan/apply can create or alter AWS registry resources if reviewed inputs are wrong.
+
+### 8. Mitigations
+
+- Keep preview and evidence phases separate from apply, require explicit reviewed OpenTofu inputs,
+  and use fake-command tests plus typed plan/apply summaries before apply semantics are trusted.
+
+### 9. Consequences of not implementing this PR
+
+The guide can recommend ECR while the repo only validates pre-existing registry evidence and cannot
+drive or verify the IaC path it claims to own.
+
+### 10. Downsides for implementing this PR
+
+The provider-capability hook surface must carry OpenTofu plan/apply evidence and a larger fake
+command harness, while avoiding custom persistent AWS mutation code.
+
+## PR-29: IaC-owned Supabase PrivateLink RAM and Lattice evidence orchestration
+
+### 1. Intent
+
+Close the remaining plan gap where Supabase PrivateLink evidence is strongly validated, but the
+repo-owned provider-capability hook still labels topology-derived evidence as AWS-side automated.
+AWS-side RAM acceptance, VPC Lattice endpoint or service-network association, security groups, and
+related network resources must be driven by reviewed IaC, with provider hooks collecting and
+validating evidence rather than directly mutating persistent AWS resources.
+
+### 2. Scope of changes
+
+- Retarget the completed PR-24 Supabase PrivateLink provider hook artifacts away from
+  `aws-side-automated`/mutation-outcome semantics and toward IaC plan/apply plus read-only evidence.
+- Add or extend reviewed OpenTofu inputs/modules/imports for RAM share acceptance, VPC Lattice
+  endpoint or service-network association, endpoint/service-network security groups, private DNS,
+  and route evidence.
+- Wire `provider-capability --provider-capability supabase-privatelink-prerequisite` phases so
+  `preview` and `apply` orchestrate reviewed OpenTofu plan/apply artifacts, not direct RAM, Lattice,
+  IAM, or security-group AWS API mutations from custom hook code.
+- Preserve support-mediated evidence only for Supabase-side or cross-account steps outside the AWS
+  account's IaC authority.
+- Replace topology-only `aws-side-automated` payloads with typed OpenTofu plan/apply and read-only
+  evidence outcomes that prove which IaC state/output produced the RAM, Lattice, DNS,
+  security-group, and `psql` posture.
+- Ensure generated OpenTofu, DNS, security-group inspection, and `psql` commands and outputs resolve
+  from the generated setup bundle root.
+
+### 3. External prerequisites
+
+- Existing Supabase PrivateLink evidence validator and provider-capability hook contract.
+- Existing PR-24 Supabase PrivateLink hook implementation, generated provider-capability command
+  wiring, setup-doctor consumption, and cutover/readiness tests.
+- Existing AWS topology evidence for VPC, RAM share, Lattice endpoint/service-network, DNS, and
+  security groups.
+- Existing AWS foundation OpenTofu layout or a dedicated PrivateLink module/import block.
+- Reviewed OpenTofu state/backend inputs and read-only AWS evidence credentials or a fake command
+  harness for tests.
+
+### 4. Tests to be added
+
+- Update existing PR-24 hook and cutover tests so they reject topology-only payloads labeled
+  `aws-side-automated` and any custom hook mutation outcomes for RAM, Lattice, IAM, or security
+  groups.
+- Add OpenTofu/static tests proving generated PrivateLink plan inputs include RAM share, Lattice
+  endpoint/service-network, DNS, security-group, route, and import/adoption metadata.
+- Add fake-command tests proving RAM/Lattice/DNS/security-group/`psql` phases orchestrate OpenTofu
+  plan/apply plus read-only evidence collection, never direct RAM, Lattice, IAM, or security-group
+  mutations from custom hook code.
+- Add negative tests rejecting support-mediated evidence for AWS-side steps when reviewed IaC
+  outputs are expected.
+- Add negative tests for stale or mismatched RAM share ARN/status, account, region, endpoint,
+  service network, DNS, security-group rule, and `psql` output across setup, generated runbook, and
+  cutover entrypoints.
+- Add generated-output consumer tests proving provider commands run from the bundle root and write
+  the evidence files consumed by setup doctor and cutover readiness.
+
+### 5. Docs to be added or updated
+
+- Update `docs/control-plane-guide.md` to describe the IaC-owned AWS-side PrivateLink phases,
+  reviewed OpenTofu inputs, support-mediated boundary, generated evidence files, read-only
+  collection, and failure modes.
+
+### 5.5. Expected regression scope
+
+- `deployment-only` for Supabase PrivateLink OpenTofu inputs, provider-capability orchestration,
+  generated setup runbooks, setup-doctor evidence consumption, topology evidence validation, and
+  cutover/readiness provider evidence.
+
+### 6. Acceptance criteria
+
+- Existing PR-24 PrivateLink hook payloads no longer label topology-derived evidence as
+  `aws-side-automated` or expose custom AWS mutation outcomes.
+- AWS-side RAM and VPC Lattice PrivateLink work can be planned, applied, or imported through
+  reviewed OpenTofu/IaC driven by repo tooling.
+- Support-mediated evidence is accepted only for non-automatable Supabase-side or cross-account
+  steps and is rejected for AWS-side steps when reviewed IaC outputs are expected.
+- Cutover/readiness validate typed IaC plan/apply and read-only AWS-side evidence outcomes instead
+  of accepting topology-only payloads labeled as automated.
+
+### 7. Risks
+
+- RAM and VPC Lattice IaC plan/apply can change network connectivity and account sharing if reviewed
+  inputs are wrong.
+
+### 8. Mitigations
+
+- Keep preview/import/evidence/smoke phases explicit, require exact account/region/resource IDs, and
+  add fake-command plus fail-closed negative tests before apply semantics are trusted.
+
+### 9. Consequences of not implementing this PR
+
+Supabase PrivateLink remains externally realized and only recorded by the repo, despite the plan
+requiring repo-driven IaC orchestration and fail-closed evidence for RAM and VPC Lattice operations.
+
+### 10. Downsides for implementing this PR
+
+The PrivateLink hook and test harness become more complex because they must model IaC-owned
+AWS-side plan/apply evidence and support-mediated Supabase-side evidence without becoming a second
+infrastructure engine.

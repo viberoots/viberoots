@@ -4,6 +4,7 @@ import type { SupabaseManagedPostgresProfile } from "./control-plane-supabase-po
 import { validateSupabaseManagedPostgresPayload } from "./cloud-control-supabase-postgres-hook-validation";
 import { validateAwsEc2HostProviderPayload } from "./cloud-control-aws-ec2-host-hook-validation";
 import { validateSupabasePrivateLinkPayload } from "./cloud-control-supabase-privatelink-hook-validation";
+import { validateAwsEcrProviderPayload } from "./cloud-control-aws-ecr-iac-evidence";
 
 export const CLOUD_PROVIDER_CAPABILITY_HOOK_EVIDENCE_SCHEMA =
   "cloud-provider-capability-hook-evidence@1";
@@ -64,6 +65,14 @@ export function validateProviderCapabilityHookEvidenceShape(
   }
   errors.push(...validateRedactedOutputEvidence(id, value));
   errors.push(...validateAwsEc2HostProviderPayload(id, value, opts));
+  errors.push(
+    ...validateAwsEcrProviderPayload(
+      id,
+      String(value.phase || ""),
+      value.providerPayload,
+      opts.expectedAwsTopology,
+    ),
+  );
   errors.push(...validateSupabaseManagedPostgresPayload(id, value, opts));
   errors.push(...validateSupabasePrivateLinkPayload(id, value, opts));
   errors.push(...validateNoDashboardOnlyEvidence(id, value));

@@ -7,7 +7,9 @@ import {
   capabilityDeclaration,
   CLOUD_CAPABILITY_IDS,
 } from "../../deployments/cloud-control-setup-contract";
+import { renderCloudControlSetupBundle } from "../../deployments/cloud-control-setup-render";
 import { validateProviderCapabilityDeclaration } from "../../deployments/cloud-control-setup-validate";
+import { ec2HostProfileInput } from "./cloud-control-aws-ec2-host-profile.fixture";
 
 const execFileAsync = promisify(execFile);
 
@@ -50,6 +52,21 @@ test("provider capability validation rejects missing reviewed hook commands", ()
       /concrete capability catalog|reviewed deploy admission/,
       field,
     );
+  }
+});
+
+test("generated provider-capabilities.json carries executable ECR bundle-root commands", () => {
+  const bundle = renderCloudControlSetupBundle(ec2HostProfileInput());
+  const capabilities = JSON.parse(bundle.files["provider-capabilities.json"]!);
+  const ecr = capabilities.find((entry: any) => entry.id === "aws-ecr-control-plane-registry");
+  assert.ok(ecr);
+  for (const command of Object.values(ecr.iac) as string[]) {
+    if (!command.startsWith("deployment-control-plane provider-capability")) continue;
+    assert.match(command, /--registry-profile "\$PROFILE_ROOT\/registry-profile\.json"/);
+    assert.match(command, /--image-publication-evidence "\$PROFILE_ROOT\/image-publication\.json"/);
+    assert.match(command, /--ecr-opentofu-plan "\$PROFILE_ROOT\/ecr-opentofu-plan\.json"/);
+    assert.match(command, /--ecr-opentofu-apply "\$PROFILE_ROOT\/ecr-opentofu-apply\.json"/);
+    assert.match(command, /--ecr-readonly-evidence "\$PROFILE_ROOT\/ecr-readonly-evidence\.json"/);
   }
 });
 

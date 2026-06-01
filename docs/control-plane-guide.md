@@ -75,6 +75,12 @@ The current repo can already define or generate these pieces:
 - NixOS container module for hosts we control directly
 - cutover, rollback, restore, and break-glass evidence checks
 
+Durable AWS infrastructure changes are owned by reviewed declarative IaC, normally OpenTofu. The
+repo may generate IaC inputs, orchestrate reviewed plan/apply steps, collect read-only AWS evidence,
+and fail closed against IaC outputs. Provider-capability commands must not become a second
+imperative infrastructure engine for persistent ECR, RAM, VPC Lattice, IAM, security-group, EC2,
+load-balancer, DNS, or TLS resources.
+
 The current repo does not yet own full AWS infrastructure provisioning for:
 
 - VPC, subnets, route tables, NAT, security groups, and VPC endpoints
@@ -82,12 +88,13 @@ The current repo does not yet own full AWS infrastructure provisioning for:
 - ALB/NLB, ACM certificate, listeners, target groups, DNS, and TLS policy
 
 Use reviewed IaC outside this repo or a manually reviewed cloud-foundation process for those gaps
-today. Supabase PrivateLink remains support-mediated until Supabase shares the resource, but the
-generated provider-capability command consumes reviewed `aws-topology-evidence.json` and records the
-AWS-side RAM acceptance, VPC Lattice association, private DNS, security-group posture, and `psql`
-proof as typed provider evidence once those AWS-side artifacts exist. Capture every non-secret
-output as evidence and feed it into the setup and cutover commands. The code/design work needed to
-bring the remaining pieces under repo-owned IaC is listed in
+today. Supabase PrivateLink remains support-mediated until Supabase shares the resource, and
+AWS-side RAM acceptance, VPC Lattice association, private DNS, and security-group posture should be
+realized by reviewed IaC. The generated provider-capability command consumes reviewed
+`aws-topology-evidence.json`, IaC plan/apply outputs, and read-only AWS/`psql` evidence once those
+AWS-side artifacts exist. Capture every non-secret output as evidence and feed it into the setup and
+cutover commands. The code/design work needed to bring the remaining pieces under repo-owned IaC is
+listed in
 [Control Plane Gaps](./control-plane-gaps.md).
 
 ## Prerequisites
@@ -158,12 +165,13 @@ If you are using private database traffic:
 1. In the Supabase dashboard, open the project and go to Settings > Integrations.
 2. Add the AWS account id under the AWS PrivateLink section.
 3. Wait for Supabase to create the VPC Lattice Resource Configuration and send the AWS RAM share.
-4. In AWS RAM, accept the resource share in the same region as the Supabase project, then run the
-   generated `provider-capability-supabase-privatelink-prerequisite` command to record the typed
-   AWS-side evidence from reviewed topology inputs.
-5. Create a security group for the endpoint or service network that allows Postgres TCP 5432 from
-   the control-plane service and worker security group.
-6. Create either:
+4. Use reviewed IaC to accept or import the AWS RAM resource share in the same region as the
+   Supabase project, then run the generated
+   `provider-capability-supabase-privatelink-prerequisite` command to record the typed IaC and
+   read-only AWS-side evidence from reviewed topology inputs.
+5. Use reviewed IaC to create or import a security group for the endpoint or service network that
+   allows Postgres TCP 5432 from the control-plane service and worker security group.
+6. Use reviewed IaC to create or import either:
    - a PrivateLink endpoint of type `Resources`, or
    - an association from an existing VPC Lattice service network.
 7. Enable DNS names where possible so the database URL can use a stable private hostname.
@@ -193,13 +201,14 @@ Capture evidence:
 Do not treat a support ticket or dashboard screenshot as sufficient by itself. The repo cutover
 checks require structured evidence tied to the selected AWS host path. When
 `--aws-topology-evidence` is supplied for `supabase-privatelink-prerequisite`, support-mediated
-evidence is accepted only for Supabase-side prerequisites that AWS cannot mutate; AWS-side RAM,
-Lattice, DNS, security-group, and `psql` checks must appear in the generated provider-capability
-payload.
+evidence is accepted only for Supabase-side prerequisites outside the selected AWS account's IaC
+authority; AWS-side RAM, Lattice, DNS, security-group, and `psql` checks must appear in the
+generated provider-capability payload as IaC plan/apply output plus read-only evidence.
 
-The split is explicit: Supabase dashboard or support action starts the share, AWS RAM acceptance
-proves the share is available to the selected account, AWS VPC Lattice wiring proves the private
-network path and private DNS, and the runtime database URL must then select that private hostname.
+The split is explicit: Supabase dashboard or support action starts the share, reviewed IaC accepts
+or imports the AWS RAM share, reviewed IaC owns VPC Lattice wiring and security groups, read-only
+evidence proves the private network path and private DNS, and the runtime database URL must then
+select that private hostname.
 
 ## Step 3: Provision AWS Infrastructure
 
@@ -234,22 +243,28 @@ runtime pull evidence, and publish evidence. The hook accepts file-backed AWS cr
 explicitly reviewed assume-role or instance-profile path; ambient laptop/default-chain credentials
 are rejected.
 
-The ECR hook phases are preview, apply intent, evidence, smoke, and rollback plan. Smoke evidence
-proves repository existence, auth/pull reachability for the exact published digest, policy digest,
-scanning posture, and image-publication binding without pushing mutable test images. Reviewed import
-is allowed only when the imported profile satisfies the same registry contract; imports are refused
-for mutable tags, missing repository policy digest, missing lifecycle or scanning posture, missing
-runtime pull proof, mismatched account/region, or shared publish/runtime principals. Rollback is
-non-destructive by default: retain the repository and immutable image digests, restore reviewed
-policy/lifecycle settings, and do not delete production image digests.
+The ECR hook phases are IaC preview, IaC apply orchestration, read-only evidence, smoke, and
+rollback plan. Preview/apply consume `ecr-opentofu-plan.json` and `ecr-opentofu-apply.json` from
+the setup bundle root, and read-only AWS inspection consumes `ecr-readonly-evidence.json`. Custom
+hook code must not directly create or update ECR repositories, lifecycle policies, repository
+policies, tag mutability, scanning, or KMS settings. Smoke evidence proves repository existence,
+auth/pull reachability for the exact published digest, policy digest, scanning posture, KMS posture,
+and image-publication binding without pushing mutable test images. Reviewed import is allowed only
+when the imported profile satisfies the same registry contract and is represented in IaC
+import/adoption metadata; imports are refused for mutable tags, missing repository policy digest,
+missing lifecycle or scanning posture, missing KMS posture, missing runtime pull proof, mismatched
+account/region, or shared publish/runtime principals. Rollback is non-destructive by default:
+retain the repository and immutable image digests, restore reviewed policy/lifecycle settings
+through IaC, and do not delete production image digests.
 
 For ingress, this implementation uses repo-owned OpenTofu resources rather than provider-hook-only
 evidence. The AWS foundation module owns the default ALB/NLB, HTTPS/TLS listener, target group,
 target registration inputs, target-group readiness health check, Route53 record, ACM attachment,
 security-group rules, and access-control/WAF evidence outputs. Provider hooks wrap those resources
-with preview, apply, evidence, smoke, rollback, and import/reconcile evidence. Import/adoption of
-existing LB, ACM, DNS, WAF, or edge resources is allowed only with ownership, capability id,
-topology identity, fresh drift proof, and non-destructive rollback posture.
+with IaC preview, IaC apply orchestration, read-only evidence, smoke, rollback, and import/reconcile
+evidence. Import/adoption of existing LB, ACM, DNS, WAF, or edge resources is allowed only with
+ownership, capability id, topology identity, fresh drift proof, and non-destructive rollback
+posture.
 
 For the EC2 host itself, prefer the generated AWS EC2 host profile from
 `deployment-control-plane setup --host-mode aws-ec2`. The current repo-owned boundary is a

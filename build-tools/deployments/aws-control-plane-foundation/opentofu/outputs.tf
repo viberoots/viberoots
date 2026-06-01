@@ -23,6 +23,32 @@ output "foundation_evidence" {
     provider_hook_role_arn          = aws_iam_role.provider_hook.arn
     artifact_bucket_policy_id       = aws_s3_bucket_policy.artifacts.id
     artifact_object_lock_id         = aws_s3_bucket_object_lock_configuration.artifacts.id
+    ecr_repository = var.ecr_enabled ? {
+      schemaVersion = "aws-ecr-opentofu-output@1"
+      repository = {
+        accountId      = data.aws_caller_identity.current.account_id
+        region         = var.region
+        repositoryArn  = aws_ecr_repository.control_plane[0].arn
+        repositoryUri  = aws_ecr_repository.control_plane[0].repository_url
+        repositoryName = aws_ecr_repository.control_plane[0].name
+      }
+      posture = {
+        tagMutability          = aws_ecr_repository.control_plane[0].image_tag_mutability
+        lifecyclePolicyDigest  = "sha256:${sha256(local.ecr_lifecycle_policy)}"
+        lifecycleRuleCount     = length(jsondecode(local.ecr_lifecycle_policy).rules)
+        scanOnPush             = var.ecr_scan_on_push
+        repositoryPolicyDigest = "sha256:${sha256(local.ecr_repository_policy)}"
+        kms = {
+          mode   = local.ecr_kms_mode
+          keyArn = var.ecr_kms_key_arn
+        }
+      }
+      importAdoption = {
+        mode              = var.ecr_import_adoption_metadata.mode
+        reviewedReference = var.ecr_import_adoption_metadata.reviewed_reference
+        importBlock       = var.ecr_import_adoption_metadata.import_block
+      }
+    } : null
     state_bucket                    = aws_s3_bucket.state.bucket
     state_lock_table                = aws_dynamodb_table.state_lock.name
     state_backend                   = "s3"

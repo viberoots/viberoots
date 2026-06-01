@@ -20,6 +20,9 @@ const expectedVariableNames = `
   region name_prefix tags vpc_cidr existing_vpc_id existing_internet_gateway_id
   public_subnet_cidrs private_subnet_cidrs availability_zones outbound_https_cidrs
   artifact_bucket_name artifact_prefix state_bucket_name state_lock_table_name
+  ecr_enabled ecr_repository_name ecr_image_tag_mutability ecr_scan_on_push
+  ecr_lifecycle_policy_json ecr_repository_policy_json ecr_kms_key_arn
+  ecr_import_adoption_metadata
   kms_deletion_window_days ingress_enabled ingress_type ingress_public_host
   ingress_callback_host ingress_callback_path ingress_service_port ingress_target_instance_id
   ingress_service_process ingress_service_unit ingress_image_digest ingress_config_digest

@@ -37,10 +37,14 @@ test("AWS ECR provider hook emits mandatory non-destructive payload phases", asy
       assert.equal(payload.scanning.status, "enabled");
       assert.equal(payload.pull.proof.digest, ECR_DIGEST);
       assert.equal(payload.publish.digest, ECR_DIGEST);
+      assert.equal(payload.iac.ownership, "opentofu-managed");
+      assert.equal(payload.iac.orchestration, "reviewed-opentofu-artifacts");
+      assert.equal(payload.iac.outcomes.plan.schemaVersion, "aws-ecr-opentofu-plan@1");
       assert.ok(payload.requiredPhases.includes("apply-intent"));
       assert.ok(payload.requiredPhases.includes("rollback-plan"));
       assert.ok(payload.requiredPhases.includes("reviewed-import"));
-      assert.match(payload.provisioningPlan.commands.join("\n"), /aws ecr create-repository/);
+      assert.doesNotMatch(JSON.stringify(payload), /aws ecr create-repository/);
+      assert.doesNotMatch(JSON.stringify(payload), /put-lifecycle-policy|set-repository-policy/);
       assert.equal(payload.reviewedImport.evidenceProfile.repository, registryProfile().repository);
       assert.doesNotMatch(JSON.stringify(payload), /delete-repository|docker push|skopeo copy/i);
     }
@@ -91,6 +95,15 @@ test("AWS ECR generated commands use deployment-control-plane and reviewed evide
     ecr.command,
     /--image-publication-evidence "\$PROFILE_ROOT\/image-publication\.json"/,
   );
+  assert.match(ecr.command, /--ecr-opentofu-plan "\$PROFILE_ROOT\/ecr-opentofu-plan\.json"/);
+  assert.match(ecr.command, /--ecr-opentofu-apply "\$PROFILE_ROOT\/ecr-opentofu-apply\.json"/);
+  assert.match(
+    ecr.command,
+    /--ecr-readonly-evidence "\$PROFILE_ROOT\/ecr-readonly-evidence\.json"/,
+  );
+  assert.ok(ecr.inputs.includes("$PROFILE_ROOT/ecr-opentofu-plan.json"));
+  assert.ok(ecr.inputs.includes("$PROFILE_ROOT/ecr-opentofu-apply.json"));
+  assert.ok(ecr.inputs.includes("$PROFILE_ROOT/ecr-readonly-evidence.json"));
 });
 
 test("deployment-control-plane provider-capability emits ECR hook evidence", async () => {

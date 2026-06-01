@@ -1,9 +1,12 @@
 import { buildSupabaseManagedPostgresEvidence } from "../../deployments/control-plane-supabase-postgres-evidence";
 import { reviewedSupabaseManagedPostgresProfile } from "../../deployments/control-plane-supabase-postgres-profile";
+import { IMAGE_DIGEST, IMAGE_REF } from "./cloud-control-aws-topology.fixture";
 import { privateLinkEndpointEvidence } from "./cloud-control-supabase-privatelink.fixture";
+import { ecrRegistryProfileForImage } from "./control-plane-registry-profile.fixture";
 
 export function providerPayloadFor(id: string) {
   if (id === "aws-ec2-control-plane-host") return awsEc2Payload();
+  if (id === "aws-ecr-control-plane-registry") return awsEcrPayload();
   if (id === "aws-network-foundation") {
     return {
       providerPayload: {
@@ -28,6 +31,15 @@ export function providerPayloadFor(id: string) {
       callbackPath: "/oidc/callback",
       originLoadBalancerArn:
         "arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/cp/1",
+    },
+  };
+}
+
+function awsEcrPayload() {
+  return {
+    providerPayload: {
+      schemaVersion: "aws-ecr-control-plane-registry-hook-payload@1",
+      registryProfile: ecrRegistryProfileForImage(IMAGE_REF, IMAGE_DIGEST),
     },
   };
 }

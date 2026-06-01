@@ -14,6 +14,7 @@ REVIEWED_DEPLOYMENT_TEST_OWNERSHIP.update({
 })
 
 REVIEWED_DEPLOYMENT_TEST_OWNERSHIP.update({
+    "build-tools/tools/tests/deployments/cloud-control-aws-ecr-iac-evidence.test.ts": True,
     "build-tools/tools/tests/deployments/cloud-control-aws-ecr-registry.fixture.ts": False,
     "build-tools/tools/tests/deployments/cloud-control-aws-ecr-registry-hooks.test.ts": True,
     "build-tools/tools/tests/deployments/cloud-control-aws-ecr-registry-validation.test.ts": True,
