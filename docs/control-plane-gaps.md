@@ -2831,3 +2831,150 @@ requiring repo-driven IaC orchestration and fail-closed evidence for RAM and VPC
 The PrivateLink hook and test harness become more complex because they must model IaC-owned
 AWS-side plan/apply evidence and support-mediated Supabase-side evidence without becoming a second
 infrastructure engine.
+
+## PR-30: Optional IaC-owned EC2 host ASG module and guide boundary alignment
+
+### 1. Intent
+
+Close the remaining design gap where the code correctly avoids imperative EC2 mutations, but the
+guide still contains contradictory AWS ownership wording and the default EC2 host realization path is
+external-reviewed rather than optionally repo-owned declarative IaC. Add a narrow opt-in OpenTofu
+host module for launch-template plus Auto Scaling Group ownership while preserving the current
+non-mutating external-reviewed host path as the default.
+
+### 2. Scope of changes
+
+- Update `docs/control-plane-guide.md` so the IaC boundary is internally consistent:
+  - repo-owned OpenTofu covers network, S3, IAM, ingress, ECR, and AWS-side PrivateLink where the
+    selected profile enables those capabilities.
+  - the default EC2 host path remains `external-reviewed-host`, where provider-capability commands
+    validate reviewed topology and host-profile evidence without creating or updating instances.
+  - the new opt-in path is `repo-owned-asg`, where reviewed OpenTofu owns the EC2 launch template
+    and Auto Scaling Group lifecycle.
+- Correct the guide's cutover example so the documented AWS-primary path includes every generated
+  required capability, including ECR, Supabase managed Postgres, and Supabase PrivateLink when
+  selected, and prefer the generated `commands.json` cutover command over hand-curated capability
+  lists.
+- Add an optional OpenTofu EC2 host module or inputs under the AWS control-plane foundation for
+  `ec2_host_mode = "repo-owned-asg"`:
+  - launch template with pinned AMI id and AMI build/pin evidence.
+  - Auto Scaling Group with explicit desired/min/max capacity for one service host and reviewed
+    worker process placement semantics.
+  - IMDSv2 enforcement, encrypted root volume, reviewed instance type, private subnet placement,
+    service and worker security groups, EC2 instance profile, SSM/no-standing-SSH posture, user-data
+    or bootstrap digest, log sink, alarm/notification posture, and non-destructive rollback metadata.
+  - import/adoption metadata for existing launch templates or ASGs when the operator is migrating
+    from an external foundation.
+- Keep `external-reviewed-host` as the default and require an explicit profile/input choice before
+  any generated plan can include EC2 launch-template or ASG resources.
+- Extend provider-capability evidence so `aws-ec2-control-plane-host` distinguishes:
+  - `external-reviewed-host`: non-mutating preview/apply-intent/evidence against reviewed topology.
+  - `repo-owned-asg`: OpenTofu plan/apply/read-only evidence proving the launch template, ASG,
+    instance profile, subnets, security groups, bootstrap digest, and rollback posture.
+- Ensure setup-doctor, readiness, and cutover fail closed when the selected EC2 host mode and the
+  supplied evidence disagree.
+- Preserve the durable infrastructure boundary: custom provider-capability code may orchestrate
+  OpenTofu plan/apply and collect read-only EC2/Auto Scaling evidence, but must not directly call EC2
+  or Auto Scaling create/update/delete APIs from custom hook code.
+
+### 3. External prerequisites
+
+- Existing AWS foundation OpenTofu layout, backend config generation, and bundle-root OpenTofu
+  command pattern from PR-28 and PR-29.
+- Existing AWS EC2 host profile generation, systemd/Podman/NixOS artifacts, IMDSv2 metadata helpers,
+  instance-profile artifact IAM binding, and provider-capability hook validation.
+- Reviewed NixOS AMI or OCI host AMI build/import process and an explicit AMI pin path.
+- AWS permissions for OpenTofu to manage launch templates and Auto Scaling Groups when
+  `repo-owned-asg` is selected, or fake-command/read-only fixtures for ordinary tests.
+
+### 4. Tests to be added
+
+- Add guide/docs tests proving:
+  - cutover examples include the generated full selected-capability set for AWS-primary ECR and
+    PrivateLink profiles.
+  - the guide no longer claims repo-owned EC2 instance/launch-template/ASG creation for the default
+    external-reviewed host path.
+  - the guide documents both `external-reviewed-host` and `repo-owned-asg` boundaries.
+- Add OpenTofu/static tests proving the optional EC2 module declares launch-template, ASG, IMDSv2,
+  encrypted root volume, instance profile, private subnets, security groups, bootstrap digest,
+  SSM/no-standing-SSH posture, logs/alarms, rollback metadata, and import/adoption inputs only when
+  `ec2_host_mode = "repo-owned-asg"`.
+- Add generated-runbook tests proving repo-owned ASG plan/apply/read-only evidence commands run from
+  the setup bundle root with backend config, reviewed tfvars, and no `-backend=false`.
+- Add negative tests proving custom provider hooks reject direct `aws ec2 create-*`,
+  `aws autoscaling create-*`, `modify-launch-template`, `update-auto-scaling-group`, instance
+  termination, security-group mutation, or equivalent persistent EC2/Auto Scaling mutation commands.
+- Add setup/readiness/cutover negative tests for mode mismatches:
+  - `repo-owned-asg` selected with external-reviewed-only evidence.
+  - `external-reviewed-host` selected with accidental repo-owned ASG apply evidence.
+  - stale or mismatched AMI, launch-template version, ASG name, instance profile, subnet,
+    security-group, bootstrap digest, worker count, log sink, alarm posture, or rollback evidence.
+- Add import/adoption tests for an existing launch template or ASG that prove reviewed import
+  metadata and read-only evidence are required before protected/shared use.
+- Add executable generated-artifact tests proving generated user-data/bootstrap references resolve
+  from the bundle root and do not contain database URLs, tokens, access keys, private keys, or other
+  secret material.
+
+### 5. Docs to be added or updated
+
+- Update `docs/control-plane-guide.md` Step 3, Step 5, Step 8, and Step 11 with the corrected AWS
+  ownership boundary, generated cutover capability set, and the optional `repo-owned-asg` flow.
+- Document the operator decision point between `external-reviewed-host` and `repo-owned-asg`,
+  including when platform-team-owned EC2 remains preferable.
+- Document rollback expectations for repo-owned ASG changes, including non-destructive launch
+  template version rollback and worker drain/shutdown evidence.
+- Document that the optional EC2 module is still declarative/IaC-owned and that custom
+  provider-capability code must remain read-only except for OpenTofu orchestration.
+
+### 5.5. Expected regression scope
+
+- `deployment-only` for AWS foundation OpenTofu inputs, EC2 host profile evidence,
+  provider-capability orchestration, generated setup runbooks, setup-doctor/readiness/cutover
+  validation, and guide/docs tests.
+
+### 6. Acceptance criteria
+
+- The guide has one consistent AWS ownership story and its cutover example cannot accidentally skip
+  ECR, Supabase managed Postgres, or Supabase PrivateLink provider-capability validation for the
+  documented AWS-primary path.
+- `external-reviewed-host` remains the default EC2 host realization mode and continues to be
+  non-mutating.
+- `repo-owned-asg` is available as an explicit opt-in declarative OpenTofu path for launch-template
+  plus ASG ownership.
+- Provider-capability, setup-doctor, readiness, and cutover evidence distinguish external-reviewed
+  EC2 hosts from repo-owned ASG hosts and reject mismatched or stale evidence.
+- No custom provider-capability hook directly creates, updates, or deletes persistent EC2,
+  Auto Scaling, IAM, or security-group resources.
+
+### 7. Risks
+
+- Adding repo-owned ASG support increases the OpenTofu plan blast radius and can replace live hosts
+  if reviewed inputs are wrong.
+- A too-general EC2 module could duplicate platform-team cloud-foundation responsibilities or become
+  an underpowered abstraction for organizations with hardened golden AMI and endpoint security
+  requirements.
+- Mixing external-reviewed and repo-owned host modes can confuse operators if evidence files are not
+  clearly mode-labeled.
+
+### 8. Mitigations
+
+- Keep `repo-owned-asg` opt-in and require explicit mode selection before EC2 launch-template or ASG
+  resources appear in generated OpenTofu inputs.
+- Keep preview, apply, read-only evidence, smoke, rollback, and import/adoption phases separate, and
+  require typed evidence before protected/shared readiness.
+- Treat host replacement as a reviewed operation with worker drain/shutdown evidence and
+  non-destructive rollback metadata.
+- Use mode-specific evidence schemas and fail closed when evidence from one mode is supplied for the
+  other.
+
+### 9. Consequences of not implementing this PR
+
+The repo remains correctly non-imperative for EC2, but it does not maximize declarative IaC for host
+lifecycle, and the guide can continue to confuse operators about whether EC2 launch-template or ASG
+ownership is repo-owned, externally owned, or merely evidence-validated.
+
+### 10. Downsides for implementing this PR
+
+The AWS foundation and provider-capability evidence model become more complex because they must
+support both external-reviewed EC2 hosts and an opt-in repo-owned ASG path without allowing custom
+imperative EC2 mutation code.
