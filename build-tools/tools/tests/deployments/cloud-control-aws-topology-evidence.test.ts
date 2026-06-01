@@ -112,7 +112,7 @@ test("AWS topology schema ties support prerequisites to selected capabilities", 
   assert.match(errors, /dashboardNotes is not protected\/shared readiness evidence/);
 });
 
-test("AWS topology schema requires PrivateLink DNS IP and digest evidence", () => {
+test("AWS topology schema requires PrivateLink DNS or IP and digest evidence", () => {
   const base = privateLinkAwsTopology() as any;
   const topology = privateLinkAwsTopology({
     database: {
@@ -126,8 +126,7 @@ test("AWS topology schema requires PrivateLink DNS IP and digest evidence", () =
     },
   });
   const errors = validateAwsTopologyEvidence(topology, opts).join("\n");
-  assert.match(errors, /endpoint DNS evidence/);
-  assert.match(errors, /endpoint IP evidence/);
+  assert.match(errors, /endpoint DNS or IP evidence/);
   assert.match(errors, /Supabase PrivateLink psql proof is missing or unsuccessful/);
 });
 

@@ -123,6 +123,35 @@ test("AWS EC2 generated entrypoint artifacts reject missing worker units and wri
   );
 });
 
+test("AWS EC2 generated entrypoint artifacts reject loopback service or worker ingress", () => {
+  const files = renderCloudControlSetupBundle(input()).files;
+  const loopbackService = {
+    ...files,
+    "aws-ec2-profile.yaml": files["aws-ec2-profile.yaml"]!.replace(
+      "bindHost: 0.0.0.0",
+      "bindHost: 127.0.0.1",
+    ),
+    "systemd/deployment-control-plane-service.service": files[
+      "systemd/deployment-control-plane-service.service"
+    ]!.replace("--publish 0.0.0.0:7780:7780", "--publish 127.0.0.1:7780:7780"),
+  };
+  assert.match(
+    validateRenderedProfile(loopbackService).join("\n"),
+    /service ingress bind must be load-balancer reachable/,
+  );
+
+  const workerPublished = {
+    ...files,
+    "systemd/deployment-control-plane-worker-1.service": files[
+      "systemd/deployment-control-plane-worker-1.service"
+    ]!.replace("--user 10001:10001", "--user 10001:10001 --publish 0.0.0.0:7780:7780"),
+  };
+  assert.match(
+    validateRenderedProfile(workerPublished).join("\n"),
+    /worker unit must not publish ingress ports/,
+  );
+});
+
 function assertRejects(overrides: Record<string, any>, pattern: RegExp): void {
   const topology = privateLinkAwsTopology() as any;
   const next = {

@@ -25,13 +25,13 @@ test("AWS EC2 setup renders realizable units podman script and NixOS module reus
   assert.match(serviceUnit, /Restart=always/);
   assert.match(serviceUnit, /:\/etc\/deployment-control-plane\/config.yaml:ro/);
   assert.match(serviceUnit, /:\/run\/deployment-control-plane\/credentials:ro/);
-  assert.match(serviceUnit, /127\.0\.0\.1:7780:7780/);
+  assert.match(serviceUnit, /--publish 0\.0\.0\.0:7780:7780/);
   assert.match(serviceUnit, /\/healthz.*\/readyz/);
   assert.match(serviceUnit, new RegExp(`${escapeRegExp(IMAGE_REF)} service --config`));
   assert.doesNotMatch(serviceUnit, /deployment-control-plane service --config/);
   for (const name of ["worker-1", "worker-2"]) {
     const unit = bundle.files[`systemd/deployment-control-plane-${name}.service`]!;
-    assert.doesNotMatch(unit, /127\.0\.0\.1:7780:7780/);
+    assert.doesNotMatch(unit, /--publish/);
     assert.match(unit, new RegExp(`${escapeRegExp(IMAGE_REF)} worker --config`));
     assert.match(unit, new RegExp(`--worker-id ${name}`));
     assert.match(unit, /podman inspect --format "\{\{\.State\.Running\}\}"/);
@@ -41,6 +41,17 @@ test("AWS EC2 setup renders realizable units podman script and NixOS module reus
     bundle.files["nixos/aws-ec2-control-plane-host.example.nix"]!,
     /\.\/deployment-control-plane-container-module\.nix/,
   );
+  assert.deepEqual(profile.network.serviceIngress, {
+    process: "deployment-control-plane-service",
+    systemdUnit: "deployment-control-plane-service.service",
+    bindHost: "0.0.0.0",
+    bindPort: 7780,
+    containerPort: 7780,
+    sourceSecurityGroupIds: ["sg-alb"],
+    serviceSecurityGroupId: "sg-service",
+    loadBalancerSecurityGroupId: "sg-alb",
+    targetGroupArn: "arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/cp/1",
+  });
 });
 
 test("generated NixOS EC2 wrapper evaluates through the existing container module import", async () => {

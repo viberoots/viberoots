@@ -72,6 +72,7 @@ function awsProfile(input: CloudControlSetupInput, processes: RenderedControlPla
       subnetIds: setupAwsSubnetIds(input),
       securityGroupIds: setupAwsSecurityGroupIds(input),
       supabasePrivatelink: setupUsesSupabasePrivateLink(input),
+      serviceIngress: serviceIngress(input, processes),
     },
     compute: computeProfile(input),
     systemdUnits: processes.map((process) => process.systemdUnit),
@@ -91,6 +92,23 @@ function awsProfile(input: CloudControlSetupInput, processes: RenderedControlPla
     hostProfileEvidenceContract: "aws-ec2-host-profile-evidence.contract.json",
     protectedSharedReady: false,
   });
+}
+
+function serviceIngress(input: CloudControlSetupInput, processes: RenderedControlPlaneProcess[]) {
+  const service = processes.find((process) => process.role === "service");
+  const ingress = (input.awsTopology as any)?.ingress || {};
+  const access = ingress.accessControl || {};
+  return {
+    process: service?.name,
+    systemdUnit: service?.systemdUnit,
+    bindHost: service?.serviceBindHost,
+    bindPort: service?.servicePort,
+    containerPort: 7780,
+    sourceSecurityGroupIds: access.sourceSecurityGroupIds || [],
+    serviceSecurityGroupId: access.serviceSecurityGroupId,
+    loadBalancerSecurityGroupId: access.loadBalancerSecurityGroupId,
+    targetGroupArn: ingress.targetGroupArn,
+  };
 }
 
 function computeProfile(input: CloudControlSetupInput) {

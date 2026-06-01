@@ -20,6 +20,46 @@ test("Supabase PrivateLink topology accepts endpoint and service-network variant
   );
 });
 
+test("Supabase PrivateLink topology accepts endpoint DNS or IP evidence", () => {
+  const base = privateLinkAwsTopology() as any;
+  assert.deepEqual(
+    validateAwsTopologyEvidence(
+      privateLinkAwsTopology({
+        database: {
+          mode: "privatelink",
+          privatelink: {
+            ...base.database.privatelink,
+            endpointDnsNames: [],
+            endpointIps: ["10.0.1.12"],
+          },
+        },
+      }),
+      opts,
+    ),
+    [],
+  );
+  assert.deepEqual(
+    validateAwsTopologyEvidence(
+      privateLinkAwsTopology({
+        database: {
+          mode: "privatelink",
+          privatelink: {
+            ...base.database.privatelink,
+            endpointDnsNames: ["vpce-privatelink123.vpce.amazonaws.com"],
+            endpointIps: [],
+          },
+        },
+      }),
+      opts,
+    ),
+    [],
+  );
+  assert.match(
+    errorsFor({ endpointDnsNames: [], endpointIps: [] }),
+    /missing Supabase PrivateLink endpoint DNS or IP evidence/,
+  );
+});
+
 test("Supabase PrivateLink topology requires project region availability and permissions", () => {
   const errors = errorsFor({
     supabaseProjectRef: "",

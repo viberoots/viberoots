@@ -120,11 +120,11 @@ function validatePrivateDns(value: unknown, opts: SupabasePrivateLinkValidationO
 
 function validateEndpointAddresses(value: Record<string, unknown>) {
   const errors: string[] = [];
-  if (evidenceList(value, "endpointDnsNames").length === 0) {
-    errors.push("missing Supabase PrivateLink endpoint DNS evidence");
-  }
-  if (evidenceList(value, "endpointIps").length === 0) {
-    errors.push("missing Supabase PrivateLink endpoint IP evidence");
+  if (
+    evidenceList(value, "endpointDnsNames").length === 0 &&
+    evidenceList(value, "endpointIps").length === 0
+  ) {
+    errors.push("missing Supabase PrivateLink endpoint DNS or IP evidence");
   }
   return errors;
 }

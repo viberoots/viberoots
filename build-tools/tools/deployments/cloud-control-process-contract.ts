@@ -17,6 +17,7 @@ export type RenderedControlPlaneProcess = {
   environment: Record<string, string>;
   workerId?: string;
   servicePort?: number;
+  serviceBindHost?: string;
   systemdUnit?: string;
 };
 
@@ -32,6 +33,7 @@ export function controlPlaneProcessSpecs(
       mounts: mountedPaths(),
       environment: Object.fromEntries(controlPlaneMetadataEnv(input)),
       servicePort: 7780,
+      serviceBindHost: input.mode === "aws-ec2" ? "0.0.0.0" : undefined,
       systemdUnit: "deployment-control-plane-service.service",
     },
     ...workerIndexes(input).map((index) => {

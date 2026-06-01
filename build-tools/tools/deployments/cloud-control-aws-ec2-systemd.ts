@@ -68,7 +68,9 @@ function podmanCommand(process: RenderedControlPlaneProcess, containerName: stri
     "/usr/bin/podman run --replace --name",
     containerName,
     "--user 10001:10001",
-    process.role === "service" ? "--publish 127.0.0.1:7780:7780" : "",
+    process.role === "service"
+      ? `--publish ${process.serviceBindHost || "0.0.0.0"}:${process.servicePort || 7780}:7780`
+      : "",
     mountArgs(),
     envArgs(process),
     process.image,
