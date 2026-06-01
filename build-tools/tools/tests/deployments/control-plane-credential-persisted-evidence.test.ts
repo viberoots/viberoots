@@ -6,6 +6,7 @@ import {
   input as setupInput,
   liveHostVerifierProfile,
 } from "./control-plane-credential-live.fixture";
+import { liveHostVerifierTrustAnchor } from "./control-plane-credential-remote-verifier.fixture";
 
 test("persisted staging evidence rejects live backend drift from current map", () => {
   const map = credentialMap(setupInput(), ["control-plane-token"]);
@@ -70,7 +71,33 @@ test("persisted fixture staging rejects mixed external proof and live write evid
   };
   assert.match(
     validateCredentialStagingEvidence(fixture as any, expectation(map)).join("\n"),
-    /external proof cannot masquerade as live backend write evidence/,
+    /mixed external backend proof\/live backend write/,
+  );
+});
+
+test("persisted staging evidence rejects external host proof with live backend write", () => {
+  const map = credentialMap(setupInput(), ["control-plane-token"]);
+  const evidence = {
+    ...stagingEvidence(map.entries[0]!.source as any),
+    externalReviewedHostProof: {
+      source: "external-reviewed-proof",
+      evidence: { ref: "reviewed-host-mount" },
+    },
+  };
+  assert.match(
+    validateCredentialStagingEvidence(evidence as any, expectation(map)).join("\n"),
+    /mixed external host proof\/live backend write/,
+  );
+});
+
+test("persisted staging evidence accepts live backend write with deployment-owned host verification", () => {
+  const map = credentialMap(setupInput(), ["control-plane-token"]);
+  assert.deepEqual(
+    validateCredentialStagingEvidence(stagingEvidence(map.entries[0]!.source as any) as any, {
+      ...expectation(map),
+      liveHostVerifierTrustAnchor: liveHostVerifierTrustAnchor(),
+    }),
+    [],
   );
 });
 

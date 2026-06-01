@@ -1,6 +1,7 @@
 import { validateCredentialMap } from "./cloud-control-credential-map";
 import { parseControlPlaneRuntimeConfig } from "./control-plane-runtime-config";
 import { validateLiveInputs } from "./control-plane-credential-staging-live";
+import { proofWriteExclusivityErrors } from "./control-plane-credential-staging-live-evidence";
 import {
   backendRefs,
   hostSourceIds,
@@ -21,6 +22,14 @@ export function validateCredentialStagingInputs(
       connectionMode: inputs.supabaseProfile?.connection.mode,
       reviewedSourceMode: config.reviewedSource.mode,
     }),
+    ...proofWriteExclusivityErrors(
+      {
+        externalReviewedBackendProof: inputs.externalReviewedBackendProof,
+        externalReviewedHostProof: inputs.externalReviewedHostProof,
+        deploymentOwnedLiveBackendWrite: inputs.liveBackendWriteEvidence,
+      },
+      "credential staging",
+    ),
     ...validateLiveInputs({
       live,
       backendEvidence: inputs.liveBackendWriteEvidence,

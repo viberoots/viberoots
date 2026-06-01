@@ -39,9 +39,15 @@ export function validateLiveEvidence(
 }
 
 export function proofWriteExclusivityErrors(evidence: any, label: string): string[] {
-  return evidence?.externalReviewedBackendProof && evidence.deploymentOwnedLiveBackendWrite
-    ? [`${label} external proof cannot masquerade as live backend write evidence`]
-    : [];
+  if (!evidence?.deploymentOwnedLiveBackendWrite) return [];
+  const errors: string[] = [];
+  if (evidence.externalReviewedBackendProof) {
+    errors.push(`${label} mixed external backend proof/live backend write is not allowed`);
+  }
+  if (evidence.externalReviewedHostProof) {
+    errors.push(`${label} mixed external host proof/live backend write is not allowed`);
+  }
+  return errors;
 }
 
 function validateLiveHostProvenance(

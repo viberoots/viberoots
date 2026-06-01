@@ -2077,3 +2077,148 @@ credentials, and the guide continues to contain a stale instance-profile caveat.
 ### 10. Downsides for implementing this PR
 
 The EC2 example renderer gains another mode branch and corresponding tests.
+
+## PR-20: Credential staging proof/live exclusivity for host evidence
+
+### 1. Intent
+
+Close the remaining guide/design gap where proof-only host mount evidence can coexist with
+deployment-owned live credential staging evidence. Persisted staging evidence must treat both
+`--secret-backend-evidence` and `--host-mount-evidence` as external proof-only inputs that cannot be
+combined with deployment-owned live backend writes.
+
+### 2. Scope of changes
+
+- Reject generated or persisted live credential staging evidence when external reviewed host proof is
+  present alongside `deploymentOwnedLiveBackendWrite`.
+- Keep the existing backend-proof exclusivity rule and extend the same fail-closed behavior to host
+  proof.
+- Ensure cutover and setup-doctor validation report a precise error when external host proof is mixed
+  with deployment-owned live execution evidence.
+- Preserve valid live evidence that contains deployment-owned live backend write plus
+  deployment-owned live host verification.
+
+### 3. External prerequisites
+
+- Existing PR-15 live credential backend writer and host verifier evidence.
+- Existing PR-16 verifier trust and proof/live exclusivity validation.
+
+### 4. Tests to be added
+
+- Add staging evidence tests proving external host proof cannot coexist with
+  `deploymentOwnedLiveBackendWrite`.
+- Add cutover or runbook/setup-doctor tests proving persisted live evidence with mixed host proof is
+  rejected with a precise error.
+- Add positive coverage proving deployment-owned live host verification remains accepted when no
+  external host proof is present.
+
+### 5. Docs to be added or updated
+
+- Update `docs/control-plane-guide.md` only if needed to clarify that both backend proof and host
+  proof are proof-only modes and cannot be mixed with deployment-owned live execution evidence.
+
+### 5.5. Expected regression scope
+
+- `deployment-only` for credential staging evidence validation, cutover credential checks, and
+  setup-doctor/runbook evidence validation.
+
+### 6. Acceptance criteria
+
+- Any external host proof plus deployment-owned live backend write fails persisted staging evidence
+  validation.
+- The failure is visible from staging validation and from cutover/setup-doctor consumers.
+- Existing valid deployment-owned live backend write plus live host verification still passes.
+
+### 7. Risks
+
+- Tightening exclusivity can break fixtures that carried legacy proof-only host evidence alongside
+  live evidence.
+
+### 8. Mitigations
+
+- Update fixtures to choose either proof-only evidence or deployment-owned live evidence per
+  validation path.
+- Keep error messages specific enough to name the mixed host proof/live execution conflict.
+
+### 9. Consequences of not implementing this PR
+
+Operators can persist evidence that appears deployment-owned and live while still depending on
+external proof-only host mount assertions.
+
+### 10. Downsides for implementing this PR
+
+Credential staging fixtures become stricter and must choose one evidence mode explicitly.
+
+## PR-21: Runtime HTTP expected-field validation for cutover
+
+### 1. Intent
+
+Close the remaining guide/design gap where generated runtime HTTP envelopes include
+`expected.deploymentIds` and `expected.workerCount`, but cutover validation does not enforce those
+fields against trusted setup/runtime configuration.
+
+### 2. Scope of changes
+
+- Carry trusted deployment ids into collected cutover evidence from the generated setup/runtime
+  configuration source of truth.
+- Validate every runtime HTTP evidence envelope for:
+  - required `expected.deploymentIds`
+  - required `expected.workerCount`
+  - deployment ids matching trusted setup/runtime configuration
+  - worker count matching trusted setup/runtime configuration
+- Keep the PR-18 trust boundary: do not trust the runtime HTTP envelope or loose top-level cutover
+  fields as the source of expected deployment ids or worker count.
+- Ensure setup-doctor/runbook cutover evidence validation reports precise missing or mismatched
+  expected-field errors.
+
+### 3. External prerequisites
+
+- Existing PR-18 typed runtime HTTP evidence envelopes and cutover validation.
+- Existing generated setup runtime config and command output evidence.
+
+### 4. Tests to be added
+
+- Add validator negative tests for missing `expected.deploymentIds`, mismatched deployment ids,
+  missing `expected.workerCount`, and mismatched worker count.
+- Add collector or setup-doctor tests proving trusted deployment ids and worker count are derived
+  from setup/runtime configuration, not from the HTTP envelope being validated.
+- Add generated artifact tests proving the runtime HTTP command still emits the required expected
+  fields for health, readiness, and worker heartbeat envelopes.
+
+### 5. Docs to be added or updated
+
+- Update `docs/control-plane-guide.md` only if needed to keep the documented runtime HTTP envelope
+  required fields aligned with validation behavior.
+
+### 5.5. Expected regression scope
+
+- `deployment-only` for runtime HTTP evidence validation, cutover evidence collection, setup-doctor,
+  and generated runbook HTTP command tests.
+
+### 6. Acceptance criteria
+
+- Cutover rejects runtime HTTP evidence that omits or tampers with `expected.deploymentIds`.
+- Cutover rejects runtime HTTP evidence that omits or tampers with `expected.workerCount`.
+- Trusted deployment ids and worker count come from setup/runtime configuration, not from untrusted
+  HTTP evidence fields.
+
+### 7. Risks
+
+- Enforcing additional envelope fields can expose fixtures that were updated for PR-18 before the
+  guide-required expected fields were checked.
+
+### 8. Mitigations
+
+- Centralize expected-field validation with the existing runtime HTTP evidence helper.
+- Update fixtures to use the generated envelope shape rather than hand-written partial objects where
+  practical.
+
+### 9. Consequences of not implementing this PR
+
+Runtime HTTP evidence can satisfy cutover with missing or tampered expected deployment identity and
+worker-count fields even though the guide requires them.
+
+### 10. Downsides for implementing this PR
+
+Runtime HTTP evidence tests and fixtures become more explicit about deployment identity and worker
+count expectations.

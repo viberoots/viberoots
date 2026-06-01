@@ -202,16 +202,16 @@ test("mixed external proof and live write evidence fails persisted, cutover, and
     };
     assert.match(
       validateCredentialStagingEvidence(staging, expectation()).join("\n"),
-      /external proof/,
+      /mixed external backend proof\/live backend write/,
     );
     const cutover = validateCloudControlCutover(
       evidence({ credentialStaging: staging }) as any,
       cutoverOptions(),
     );
-    assert.match(cutover.errors.join("\n"), /external proof/);
+    assert.match(cutover.errors.join("\n"), /mixed external backend proof\/live backend write/);
     await writeRunbookEvidence(tmp, staging);
     const doctor = await validateRunbookBundle(tmp);
-    assert.match(JSON.stringify(doctor.phases), /external proof/);
+    assert.match(JSON.stringify(doctor.phases), /mixed external backend proof\/live backend write/);
   });
 });
 

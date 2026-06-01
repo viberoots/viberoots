@@ -4,3 +4,7 @@ REVIEWED_DEPLOYMENT_TEST_OWNERSHIP = { "build-tools/tools/tests/deployments/app-
 REVIEWED_DEPLOYMENT_TEST_OWNERSHIP.update({
     "build-tools/tools/tests/deployments/cloud-control-aws-ec2-reviewed-source-modes.test.ts": True,
 })
+
+REVIEWED_DEPLOYMENT_TEST_OWNERSHIP.update({
+    "build-tools/tools/tests/deployments/control-plane-credential-host-proof-exclusivity.test.ts": True,
+})
