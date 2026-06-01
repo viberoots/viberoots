@@ -38,6 +38,8 @@ test("generated cutover evidence collector output is accepted by cutover validat
     assert.equal((collected.health?.readiness as any)?.dependencies?.database?.ok, true);
     assert.equal((collected.health?.workerHeartbeats as any)?.body?.workers.length, 2);
     assert.equal(collected.expectedWorkerCount, 2);
+    assert.deepEqual((collected.runtimeConfig as any).deploymentIds, ["pleomino-staging"]);
+    assert.equal((collected.runtimeConfig as any).workers.expectedCount, 2);
     const result = validateCloudControlCutover(collected, {
       operation: "cutover",
       expectedHostProfile: "aws-ec2",
@@ -47,6 +49,14 @@ test("generated cutover evidence collector output is accepted by cutover validat
       maxAgeMinutes: 60,
     });
     assert.equal(result.ok, true, result.errors.join("\n"));
+    await fsp.writeFile(
+      path.join(tmp, "http-health.json"),
+      JSON.stringify(withTamperedExpected(collected.health?.cloudHealth)),
+      "utf8",
+    );
+    const tampered = await collectCutoverEvidence(tmp);
+    assert.deepEqual(tampered.runtimeConfig?.deploymentIds, ["pleomino-staging"]);
+    assert.equal((tampered.runtimeConfig?.workers as any).expectedCount, 2);
   });
 });
 
@@ -148,7 +158,7 @@ function collectorRuntimeHttp(check: "health" | "readiness" | "worker-heartbeats
     expected: {
       ...(value as any).expected,
       profileIdentity: "i-0abc1234",
-      workerCount: 1,
+      workerCount: 2,
     },
     body:
       check === "worker-heartbeats"
@@ -160,6 +170,10 @@ function collectorRuntimeHttp(check: "health" | "readiness" | "worker-heartbeats
             : (value as any).body,
     ...(check === "readiness" ? { dependencies: readinessDependencies("i-0abc1234") } : {}),
   };
+}
+
+function withTamperedExpected(value: unknown) {
+  return { ...(value as any), expected: { deploymentIds: ["tampered"], workerCount: 99 } };
 }
 
 function readinessDependencies(profileIdentity: string) {

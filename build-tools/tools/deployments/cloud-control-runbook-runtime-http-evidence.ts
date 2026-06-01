@@ -29,6 +29,7 @@ export async function validateRuntimeHttpOutput(
     expectedPublicUrl: String(config?.service?.publicUrl || ""),
     expectedHostProfile: "aws-ec2",
     expectedProfileIdentity: String(topology?.compute?.instanceId || config?.instanceId || ""),
+    expectedDeploymentIds: deploymentIds(config),
     expectedWorkerCount: expectedWorkerCount(config),
     maxAgeMinutes: 1440,
   });
@@ -37,6 +38,13 @@ export async function validateRuntimeHttpOutput(
 function expectedWorkerCount(config: any): number {
   const count = Number(config?.workers?.expectedCount);
   return Number.isFinite(count) && count > 0 ? count : 1;
+}
+
+function deploymentIds(config: any): string[] {
+  const deployments = config?.credentials?.infisicalDeployments;
+  return Array.isArray(deployments)
+    ? deployments.map((entry) => String(entry?.deploymentId || "")).filter(Boolean)
+    : [];
 }
 
 async function exists(file: string): Promise<boolean> {

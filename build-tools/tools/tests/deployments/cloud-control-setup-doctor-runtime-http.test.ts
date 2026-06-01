@@ -35,6 +35,39 @@ test("setup doctor uses config worker count for runtime HTTP validation", async 
   });
 });
 
+test("setup doctor reports runtime HTTP expected field drift from config", async () => {
+  await runInScratchTemp("cloud-control-setup-doctor-expected-fields", async (tmp) => {
+    await writeBundle(tmp, renderCloudControlSetupBundle(input(tmp)).files);
+    await fsp.writeFile(
+      path.join(tmp, "http-health.json"),
+      JSON.stringify(withExpected(runtimeHttpEvidence("health"), {})),
+      "utf8",
+    );
+    const missing = await validateRuntimeHttpOutput(tmp, "$PROFILE_ROOT/http-health.json");
+    assert.match(missing.join("\n"), /expected\.deploymentIds missing/);
+    assert.match(missing.join("\n"), /expected\.workerCount missing/);
+    await fsp.writeFile(
+      path.join(tmp, "http-health.json"),
+      JSON.stringify(
+        withExpected(runtimeHttpEvidence("health"), {
+          deploymentIds: ["tampered"],
+          workerCount: 99,
+        }),
+      ),
+      "utf8",
+    );
+    const mismatched = await validateRuntimeHttpOutput(tmp, "$PROFILE_ROOT/http-health.json");
+    assert.match(
+      mismatched.join("\n"),
+      /expected\.deploymentIds do not match trusted runtime config/,
+    );
+    assert.match(
+      mismatched.join("\n"),
+      /expected\.workerCount does not match trusted runtime config/,
+    );
+  });
+});
+
 function loweredWorkerHeartbeatEvidence() {
   const value = runtimeHttpEvidence("worker-heartbeats");
   return {
@@ -51,6 +84,10 @@ function loweredWorkerHeartbeatEvidence() {
       ],
     },
   };
+}
+
+function withExpected(value: unknown, expected: Record<string, unknown>) {
+  return { ...(value as any), expected };
 }
 
 function input(outDir: string) {

@@ -58,6 +58,7 @@ export async function collectCutoverEvidence(bundleDir: string): Promise<Cutover
     ),
     runtimeConfig: {
       publicUrl: config?.service?.publicUrl,
+      deploymentIds: deploymentIds(config),
       workers: { expectedCount: expectedWorkerCount(config) },
       authProvider: config?.authProvider,
     },
@@ -124,6 +125,13 @@ function hostIdentity(topology: any): string {
 function expectedWorkerCount(config: any): number {
   const count = Number(config?.workers?.expectedCount);
   return Number.isFinite(count) && count > 0 ? count : 1;
+}
+
+function deploymentIds(config: any): string[] {
+  const deployments = config?.credentials?.infisicalDeployments;
+  return Array.isArray(deployments)
+    ? deployments.map((entry) => String(entry?.deploymentId || "")).filter(Boolean)
+    : [];
 }
 
 async function readJson(file: string): Promise<any> {

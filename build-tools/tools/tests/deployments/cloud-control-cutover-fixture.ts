@@ -96,6 +96,7 @@ export function evidence(overrides: Record<string, unknown> = {}) {
     },
     runtimeConfig: {
       publicUrl: "https://deploy.example.test",
+      deploymentIds: ["pleomino-staging"],
       workers: { expectedCount: 2 },
       authProvider: {
         callback: {

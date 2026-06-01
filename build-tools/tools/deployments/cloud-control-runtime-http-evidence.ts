@@ -1,8 +1,19 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
+import {
+  type RuntimeHttpExpectedOptions,
+  validateRuntimeHttpExpectedFields,
+} from "./cloud-control-runtime-http-expected";
 
 export const RUNTIME_HTTP_SCHEMA = "cloud-control-runtime-http-evidence@1";
 export const RUNTIME_HTTP_CHECKS = ["health", "readiness", "worker-heartbeats"] as const;
+const RUNTIME_HTTP_EVIDENCE_FIELDS = [
+  ["cloudHealth", "health"],
+  ["readiness", "readiness"],
+  ["workerHeartbeats", "worker-heartbeats"],
+  ["uiReads", "health"],
+  ["mcpReads", "readiness"],
+] as const;
 
 export type RuntimeHttpCheck = (typeof RUNTIME_HTTP_CHECKS)[number];
 
@@ -30,9 +41,8 @@ export type RuntimeHttpValidationOptions = {
   expectedPublicUrl?: string;
   expectedHostProfile: string;
   expectedProfileIdentity?: string;
-  expectedWorkerCount?: number;
   maxAgeMinutes: number;
-};
+} & RuntimeHttpExpectedOptions;
 
 export async function readRuntimeHttpEvidence(
   root: string,
@@ -45,8 +55,8 @@ export function validateRuntimeHttpEvidenceSet(
   health: Record<string, unknown> | undefined,
   options: RuntimeHttpValidationOptions,
 ): string[] {
-  return RUNTIME_HTTP_CHECKS.flatMap((check) =>
-    validateRuntimeHttpEvidence(health?.[keyFor(check)], check, options),
+  return RUNTIME_HTTP_EVIDENCE_FIELDS.flatMap(([key, check]) =>
+    validateRuntimeHttpEvidence(health?.[key], check, options),
   );
 }
 
@@ -62,20 +72,13 @@ export function validateRuntimeHttpEvidence(
     ...validateEnvelope(evidence, check, label),
     ...validateFreshness(evidence, label, options.maxAgeMinutes),
     ...validateBinding(evidence, check, label, options),
+    ...validateRuntimeHttpExpectedFields(evidence, label, options),
     ...validateCredentialSource(evidence, label, check),
     ...validateNoInlineToken(evidence, label),
   ];
   if (check === "readiness") errors.push(...validateReadiness(evidence));
   if (check === "worker-heartbeats") errors.push(...validateHeartbeats(evidence, options));
   return errors;
-}
-
-function keyFor(check: RuntimeHttpCheck): string {
-  return check === "worker-heartbeats"
-    ? "workerHeartbeats"
-    : check === "health"
-      ? "cloudHealth"
-      : check;
 }
 
 function validateEnvelope(evidence: RuntimeHttpEvidence, check: RuntimeHttpCheck, label: string) {

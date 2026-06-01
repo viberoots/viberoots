@@ -41,6 +41,7 @@ export function validateCloudControlCutover(
       expectedPublicUrl: String(evidence.runtimeConfig?.publicUrl || ""),
       expectedHostProfile: options.expectedHostProfile,
       expectedProfileIdentity: String(evidence.sourceHost || ""),
+      expectedDeploymentIds: expectedDeploymentIds(evidence),
       expectedWorkerCount: expectedWorkerCount(evidence),
       maxAgeMinutes: options.maxAgeMinutes,
     }),
@@ -165,14 +166,24 @@ function validateBaseHealth(evidence: CutoverEvidence): string[] {
 }
 
 function validateRuntimeConfigContract(evidence: CutoverEvidence): string[] {
-  return expectedWorkerCount(evidence) > 0
-    ? []
-    : ["runtime config missing trusted expected worker count"];
+  return [
+    ...(expectedDeploymentIds(evidence).length > 0
+      ? []
+      : ["runtime config missing trusted deployment ids"]),
+    ...(expectedWorkerCount(evidence) > 0
+      ? []
+      : ["runtime config missing trusted expected worker count"]),
+  ];
 }
 
 function expectedWorkerCount(evidence: CutoverEvidence): number {
   const count = Number((evidence.runtimeConfig?.workers as any)?.expectedCount);
   return Number.isFinite(count) && count > 0 ? count : 0;
+}
+
+function expectedDeploymentIds(evidence: CutoverEvidence): string[] {
+  const deploymentIds = evidence.runtimeConfig?.deploymentIds;
+  return Array.isArray(deploymentIds) ? deploymentIds.map(String).filter(Boolean) : [];
 }
 
 function validateLatestDeployment(

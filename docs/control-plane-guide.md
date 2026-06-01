@@ -677,6 +677,8 @@ Each file is a `cloud-control-runtime-http-evidence@1` envelope with `checkedAt`
 `status.ok`, and the parsed response `body`. Authenticated worker-heartbeat evidence must record a
 token-file credential source such as `control-plane-token`; it must not contain bearer token values,
 raw authorization headers, or copied credential contents.
+Cutover validation compares `expected.deploymentIds` and `expected.workerCount` to generated
+`config.yaml` runtime configuration, not to HTTP envelope or top-level cutover fields.
 
 Readiness evidence must include passing dependency details for:
 
