@@ -41,12 +41,35 @@ test("AWS EC2 instance-profile artifact mode rejects role and policy binding mis
   assert.match(
     validateCloudControlSetupInput(
       input({
-        awsTopology: topologyWithProfile(reviewedTopology, "role/control-plane-artifacts", [
+        awsTopology: topologyWithProfile(reviewedTopology, "role/control-plane-host", [
           "sha256:other",
         ]),
       }),
     ).join("\n"),
     /instance profile policy does not include expected artifact policy/,
+  );
+});
+
+test("AWS EC2 instance-profile artifact mode rejects missing policy digest", () => {
+  assert.match(
+    validateCloudControlSetupInput(input({ artifactLeastPrivilegePolicyDigest: "" })).join("\n"),
+    /requires least-privilege policy digest/,
+  );
+});
+
+test("AWS EC2 instance-profile artifact mode rejects artifact policy on unused role", () => {
+  const reviewedTopology = topologyForImage();
+  const topology = topologyWithProfile(reviewedTopology, "role/control-plane-host", []);
+  topology.foundation.iam.roles.s3ArtifactAccess =
+    "arn:aws:iam::123456789012:role/control-plane-unused-artifacts";
+  assert.match(
+    validateCloudControlSetupInput(
+      input({
+        artifactIamRoleArn: "arn:aws:iam::123456789012:role/control-plane-unused-artifacts",
+        awsTopology: topology,
+      }),
+    ).join("\n"),
+    /instance profile role does not match expected artifact role/,
   );
 });
 
@@ -72,7 +95,7 @@ function input(overrides: Partial<CloudControlSetupInput> = {}): CloudControlSet
     artifactRegion: "us-east-1",
     artifactBackend: "aws-s3",
     artifactCredentialMode: "aws-instance-profile",
-    artifactIamRoleArn: "arn:aws:iam::123456789012:role/control-plane-artifacts",
+    artifactIamRoleArn: "arn:aws:iam::123456789012:role/control-plane-host",
     artifactLeastPrivilegePolicyDigest: "sha256:artifact-policy",
     artifactBackendEvidence: "",
     deploymentIds: ["pleomino-staging"],

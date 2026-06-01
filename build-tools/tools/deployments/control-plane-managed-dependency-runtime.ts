@@ -157,7 +157,19 @@ export function validateArtifactRuntimeEvidence(
       opts.expectedS3EndpointPolicyDigest,
       "AWS S3 endpoint policy digest",
     );
-    if (artifactStore.artifactCredentialMode === "aws-instance-profile") {
+    const expectsInstanceProfileArtifact =
+      Boolean(opts.expectedArtifactIamRoleArn) ||
+      Boolean(opts.expectedArtifactLeastPrivilegePolicyDigest);
+    if (
+      expectsInstanceProfileArtifact &&
+      artifactStore.artifactCredentialMode !== "aws-instance-profile"
+    ) {
+      errors.push("AWS S3 evidence missing aws-instance-profile artifact credential mode");
+    }
+    if (
+      artifactStore.artifactCredentialMode === "aws-instance-profile" ||
+      expectsInstanceProfileArtifact
+    ) {
       compareExpected(
         errors,
         artifactStore.expectedArtifactIamRoleArn || runtime.expectedArtifactIamRoleArn,

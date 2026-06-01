@@ -48,7 +48,6 @@ test("repo-owned AWS foundation OpenTofu module covers network IAM S3 state and 
     "outbound_https_cidrs",
     "control-plane ${each.value.target} HTTPS egress",
     'resource "aws_iam_role"',
-    'resource "aws_iam_role" "s3_artifact_access"',
     'resource "aws_iam_role" "evidence_collector"',
     'resource "aws_iam_role" "provider_hook"',
     'resource "aws_iam_instance_profile"',

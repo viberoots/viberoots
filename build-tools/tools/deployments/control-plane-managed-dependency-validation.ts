@@ -84,6 +84,7 @@ export function validateManagedDependencyEvidence(
   if (typeof evidence.profileName !== "string" || !evidence.profileName.trim()) {
     errors.push("managed dependency evidence missing profileName");
   }
+  errors.push(...(opts.expectationErrors || []));
   errors.push(...evidenceSecretErrors(evidence, "managedDependencies"));
   const postgres = evidenceObject(evidence.postgres);
   const artifactStore = evidenceObject(evidence.artifactStore);

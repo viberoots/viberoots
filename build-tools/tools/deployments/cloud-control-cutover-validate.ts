@@ -10,12 +10,12 @@ import {
 import { validateCutoverProviderCapabilities } from "./cloud-control-cutover-provider-capabilities";
 import { validateControlPlaneImagePublicationEvidence } from "./control-plane-image-publication";
 import { validateManagedDependencyEvidence } from "./control-plane-managed-dependency-validation";
-import type { ManagedDependencyValidationExpectations } from "./control-plane-managed-dependency-types";
 import { validateSupabaseProfileSource } from "./cloud-control-cutover-supabase";
 import { validateCredentialCutoverEvidence } from "./cloud-control-cutover-credentials";
 import { validateCutoverOperationEvidence } from "./cloud-control-cutover-operation";
 import { validateCutoverEvidenceContract } from "./cloud-control-cutover-contract";
 import { validateRuntimeHttpEvidenceSet } from "./cloud-control-runtime-http-evidence";
+import { managedDependencyExpectations } from "./cloud-control-cutover-managed-expectations";
 
 const BASE_HEALTH = [
   "cloudHealth",
@@ -73,38 +73,6 @@ function validateManagedDependencyCutoverSource(evidence: CutoverEvidence): stri
     return ["PrivateLink cutover cannot use diagnostic-only managed dependency evidence"];
   }
   return [];
-}
-
-function managedDependencyExpectations(
-  evidence: CutoverEvidence,
-  options: CutoverValidationOptions,
-): ManagedDependencyValidationExpectations {
-  const topology = (evidence.awsTopology || {}) as any;
-  const privatelink =
-    topology.database?.mode === "privatelink" ? topology.database.privatelink || {} : {};
-  const s3Endpoint = topology.s3VpcEndpoint || {};
-  const alternate = topology.artifactBackendEvidence || {};
-  const profile =
-    evidence.managedDependencies?.supabasePostgres?.profile ||
-    (evidence.providerCapabilities?.["supabase-managed-postgres"] as any)?.providerPayload
-      ?.lifecycleEvidence?.profile ||
-    evidence.supabasePostgresProfile;
-  const profileProject = profile?.project || {};
-  const profileConnection = profile?.connection || {};
-  return {
-    expectedHostProfile: options.expectedHostProfile,
-    expectedRegion: options.expectedRegion,
-    expectedDatabaseConnectivityMode: profileConnection.mode || topology.database?.mode,
-    expectedSupabaseProjectRef: profile?.provisioning?.projectRef || privatelink.supabaseProjectRef,
-    expectedSupabaseRegion: profileProject.region || privatelink.supabaseRegion,
-    expectedPrivateLinkEndpointId: privatelink.endpointId,
-    expectedPrivateLinkResourceId: privatelink.resourceConfigurationArn,
-    expectedS3VpcEndpointId: s3Endpoint.endpointId,
-    expectedS3EndpointPolicyDigest: s3Endpoint.endpointPolicyDigest,
-    expectedAlternateBackendEvidenceRef: alternate.reviewedReference,
-    expectedAlternateBackendEvidenceDigest: alternate.digest,
-    supabasePostgres: profile,
-  };
 }
 
 function validateImagePublication(

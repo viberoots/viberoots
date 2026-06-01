@@ -181,7 +181,7 @@ test("credential map records instance-profile artifact credentials as host sourc
         },
       },
       artifactCredentialMode: "aws-instance-profile",
-      artifactIamRoleArn: "arn:aws:iam::123456789012:role/control-plane-artifacts",
+      artifactIamRoleArn: "arn:aws:iam::123456789012:role/control-plane-host",
       artifactLeastPrivilegePolicyDigest: "sha256:artifact-policy",
     }),
   );
@@ -214,7 +214,7 @@ test("generated NixOS profile carries auth and instance-profile artifact mode", 
         },
       },
       artifactCredentialMode: "aws-instance-profile",
-      artifactIamRoleArn: "arn:aws:iam::123456789012:role/control-plane-artifacts",
+      artifactIamRoleArn: "arn:aws:iam::123456789012:role/control-plane-host",
       artifactLeastPrivilegePolicyDigest: "sha256:artifact-policy",
       supabasePostgres: reviewedSupabaseManagedPostgresProfile({
         instanceId: "cloud-control-plane",

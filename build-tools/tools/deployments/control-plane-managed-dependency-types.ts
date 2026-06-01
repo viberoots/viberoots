@@ -34,6 +34,7 @@ export type ManagedRuntimePathFacts = {
 };
 
 export type ManagedDependencyValidationExpectations = {
+  expectationErrors?: string[];
   expectedHostProfile?: string;
   expectedRegion?: string;
   expectedDatabaseConnectivityMode?: ManagedDatabaseConnectivityMode;

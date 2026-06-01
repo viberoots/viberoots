@@ -9,7 +9,9 @@ import { renderCloudControlSetupBundle } from "../../deployments/cloud-control-s
 import { REQUIRED_AWS_EC2_ALARMS } from "../../deployments/cloud-control-aws-ec2-host-profile";
 import { IMAGE_REF } from "./cloud-control-cutover-fixture";
 import { ec2HostProfileInput as input } from "./cloud-control-aws-ec2-host-profile.fixture";
+import { reviewedRuntimeInput } from "./cloud-control-runtime-input.fixture";
 import { runInScratchTemp } from "../lib/test-helpers";
+
 test("AWS EC2 setup renders realizable units podman script and NixOS module reuse", () => {
   const bundle = renderCloudControlSetupBundle(input());
   assert.equal(bundle.files["systemd-podman.units.txt"], undefined);
@@ -203,6 +205,27 @@ test("AWS EC2 setup renders observability and host-profile evidence contract", (
   assert.equal(contract.requiredWorkerCount, 2);
   assert.ok(contract.requiredFields.includes("registryPullProof"));
   assert.doesNotMatch(JSON.stringify(bundle.files), /postgres:\/\/|BEGIN .*PRIVATE KEY|AKIA/);
+});
+
+test("AWS EC2 instance-profile artifact mode emits runtime IAM binding evidence", () => {
+  const bundle = renderCloudControlSetupBundle(
+    input({
+      artifactCredentialMode: "aws-instance-profile",
+      artifactIamRoleArn: "arn:aws:iam::123456789012:role/control-plane-host",
+      artifactLeastPrivilegePolicyDigest: "sha256:artifact-policy",
+      runtimeInput: reviewedRuntimeInput({ artifactCredentialMode: "aws-instance-profile" }),
+    }),
+  );
+  const profile = YAML.parse(bundle.files["aws-ec2-profile.yaml"]!);
+  assert.deepEqual(profile.artifactBackend.instanceProfileBinding, {
+    instanceProfileArn: "arn:aws:iam::123456789012:instance-profile/control-plane",
+    roleArn: "arn:aws:iam::123456789012:role/control-plane-host",
+    expectedRoleArn: "arn:aws:iam::123456789012:role/control-plane-host",
+    trustDigest: "sha256:instance-profile-trust",
+    policyDigests: ["sha256:artifact-policy"],
+    leastPrivilegePolicyDigest: "sha256:artifact-policy",
+  });
+  assert.doesNotMatch(bundle.files["nixos/aws-ec2-control-plane-host.example.nix"]!, /access-key/);
 });
 
 function escapeRegExp(value: string): string {

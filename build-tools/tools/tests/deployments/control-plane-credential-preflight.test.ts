@@ -36,7 +36,7 @@ test("credential preflight accepts AWS instance-profile manifests without static
       tmp,
       input({
         artifactCredentialMode: "aws-instance-profile",
-        artifactIamRoleArn: "arn:aws:iam::123456789012:role/control-plane-artifacts",
+        artifactIamRoleArn: "arn:aws:iam::123456789012:role/control-plane-host",
         artifactLeastPrivilegePolicyDigest: "sha256:artifact-policy",
       }),
     );

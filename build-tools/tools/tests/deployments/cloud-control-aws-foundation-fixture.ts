@@ -122,7 +122,7 @@ export function foundationFromTopology(
     iam: {
       roles: {
         ec2Host: `arn:aws:iam::${topology.accountId}:role/control-plane-host`,
-        s3ArtifactAccess: `arn:aws:iam::${topology.accountId}:role/control-plane-artifacts`,
+        s3ArtifactAccess: `arn:aws:iam::${topology.accountId}:role/control-plane-host`,
         evidenceCollector: `arn:aws:iam::${topology.accountId}:role/control-plane-evidence`,
         providerHook: `arn:aws:iam::${topology.accountId}:role/control-plane-hook`,
       },
@@ -130,7 +130,7 @@ export function foundationFromTopology(
       instanceProfiles: [
         {
           arn: topology.compute.instanceProfileArn,
-          roleArn: `arn:aws:iam::${topology.accountId}:role/control-plane-artifacts`,
+          roleArn: `arn:aws:iam::${topology.accountId}:role/control-plane-host`,
           trustDigest: "sha256:instance-profile-trust",
           policyDigests: ["sha256:artifact-policy"],
         },

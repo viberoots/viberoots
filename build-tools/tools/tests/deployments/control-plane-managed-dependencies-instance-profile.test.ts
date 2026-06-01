@@ -33,14 +33,14 @@ test("AWS S3 instance-profile evidence requires role and least-privilege prefix 
       artifactStore: {
         ...baseArtifactStore(),
         artifactCredentialMode: "aws-instance-profile",
-        expectedArtifactIamRoleArn: "arn:aws:iam::123456789012:role/control-plane-artifacts",
+        expectedArtifactIamRoleArn: "arn:aws:iam::123456789012:role/control-plane-host",
         observedArtifactIamRoleName: "other",
         artifactLeastPrivilegePolicyDigest: "sha256:wrong",
       },
     }),
     60,
     {
-      expectedArtifactIamRoleArn: "arn:aws:iam::123456789012:role/control-plane-artifacts",
+      expectedArtifactIamRoleArn: "arn:aws:iam::123456789012:role/control-plane-host",
       expectedArtifactLeastPrivilegePolicyDigest: "sha256:least-privilege",
     },
   ).join("\n");
@@ -75,7 +75,7 @@ test("managed conformance records observed role from runtime credential provider
           sourceHostIdentity: "i-123",
           sourceHostKind: "aws-ec2",
           s3VpcEndpointId: "vpce-s3",
-          artifactIamRoleArn: "arn:aws:iam::123456789012:role/control-plane-artifacts",
+          artifactIamRoleArn: "arn:aws:iam::123456789012:role/control-plane-host",
           artifactLeastPrivilegePolicyDigest: "sha256:artifact-policy",
         },
         {
@@ -84,14 +84,14 @@ test("managed conformance records observed role from runtime credential provider
             secretAccessKey: "observed-secret",
             sessionToken: "observed-token",
             expiration: new Date(Date.now() + 60_000),
-            roleName: "control-plane-artifacts",
+            roleName: "control-plane-host",
           }),
         },
       );
-      assert.equal(evidence.observedArtifactIamRoleName, "control-plane-artifacts");
+      assert.equal(evidence.observedArtifactIamRoleName, "control-plane-host");
       assert.equal(
         evidence.expectedArtifactIamRoleArn,
-        "arn:aws:iam::123456789012:role/control-plane-artifacts",
+        "arn:aws:iam::123456789012:role/control-plane-host",
       );
       assert.doesNotMatch(JSON.stringify(evidence), /observed-secret|observed-token/);
     } finally {

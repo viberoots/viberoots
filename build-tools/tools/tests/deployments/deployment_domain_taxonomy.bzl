@@ -18,3 +18,7 @@ REVIEWED_DEPLOYMENT_TEST_OWNERSHIP.update({
     "build-tools/tools/tests/deployments/cloud-control-aws-ecr-registry-hooks.test.ts": True,
     "build-tools/tools/tests/deployments/cloud-control-aws-ecr-registry-validation.test.ts": True,
 })
+
+REVIEWED_DEPLOYMENT_TEST_OWNERSHIP.update({
+    "build-tools/tools/tests/deployments/cloud-control-aws-foundation-iam-binding.test.ts": True,
+})

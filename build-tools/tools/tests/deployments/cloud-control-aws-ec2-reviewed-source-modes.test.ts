@@ -126,7 +126,7 @@ function instanceProfileInput() {
   const base = ec2HostProfileInput();
   return ec2HostProfileInput({
     artifactCredentialMode: "aws-instance-profile",
-    artifactIamRoleArn: "arn:aws:iam::123456789012:role/control-plane-artifacts",
+    artifactIamRoleArn: "arn:aws:iam::123456789012:role/control-plane-host",
     artifactLeastPrivilegePolicyDigest: "sha256:artifact-policy",
     reviewedSourceMode: "ssh",
     runtimeInput: {

@@ -267,7 +267,7 @@ inputs. The generated systemd/Podman artifacts are a compatibility mode for non-
 share the same service/worker process and mount contract.
 
 AWS S3 is the generated default artifact-store path. For EC2, prefer
-`--artifact-credential-mode aws-instance-profile` with the reviewed IAM role ARN and
+`--artifact-credential-mode aws-instance-profile` with the reviewed EC2 instance-profile role ARN and
 least-privilege bucket/prefix policy digest. Supabase Storage S3, Cloudflare R2, and other
 S3-compatible stores are explicit alternate profiles; they require reviewed endpoint-shape, signing
 region, path-style, metadata, retention, network-path evidence, and file-backed artifact credentials
@@ -408,7 +408,7 @@ deployment-control-plane setup \
   --artifact-credential-mode aws-instance-profile \
   --artifact-bucket deployment-control-plane-artifacts \
   --artifact-region us-east-1 \
-  --artifact-iam-role-arn arn:aws:iam::<account-id>:role/<control-plane-artifact-role> \
+  --artifact-iam-role-arn arn:aws:iam::<account-id>:role/<control-plane-host-role> \
   --artifact-least-privilege-policy-digest sha256:<policy-digest> \
   --reviewed-source-mode ssh \
   --runtime-input ./runtime-input.yaml \

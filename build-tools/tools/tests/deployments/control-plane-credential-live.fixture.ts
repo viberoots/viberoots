@@ -57,7 +57,7 @@ export function input(): CloudControlSetupInput {
       awsVpcId: "vpc-123",
       artifactCredentialMode: "aws-instance-profile",
     }),
-    artifactIamRoleArn: "arn:aws:iam::123456789012:role/control-plane-artifacts",
+    artifactIamRoleArn: "arn:aws:iam::123456789012:role/control-plane-host",
     artifactLeastPrivilegePolicyDigest: "sha256:artifact-policy",
     supabasePostgres: privateLinkSupabaseProfile(),
     awsTopology: topologyForPublishedImage(privateLinkAwsTopology(), IMAGE, DIGEST),

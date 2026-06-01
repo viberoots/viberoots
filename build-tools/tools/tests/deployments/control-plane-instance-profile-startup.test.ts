@@ -26,7 +26,7 @@ test("service startup config uses instance-profile artifact signing through read
           secretAccessKey: "startup-secret",
           sessionToken: "startup-session-token",
           expiration: new Date(Date.now() + 60_000),
-          roleName: "control-plane-artifacts",
+          roleName: "control-plane-host",
         }),
       });
       try {

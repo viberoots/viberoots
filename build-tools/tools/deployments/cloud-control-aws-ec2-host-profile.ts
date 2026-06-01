@@ -20,6 +20,7 @@ import {
   setupUsesSupabasePrivateLink,
 } from "./cloud-control-setup-aws-topology";
 import { podmanRun, systemdUnit, userDataScript } from "./cloud-control-aws-ec2-systemd";
+import { awsEc2ArtifactIamBindingField } from "./cloud-control-aws-ec2-artifact-iam-binding";
 
 export const REQUIRED_AWS_EC2_ALARMS = [
   "service-down",
@@ -66,6 +67,7 @@ function awsProfile(input: CloudControlSetupInput, processes: RenderedControlPla
       defaultPath: "AWS S3 through a VPC endpoint",
       iamRoleArn: input.artifactIamRoleArn,
       leastPrivilegePolicyDigest: input.artifactLeastPrivilegePolicyDigest,
+      ...awsEc2ArtifactIamBindingField(input),
       reviewedAlternateEvidence: alternate,
     },
     network: {

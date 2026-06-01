@@ -18,6 +18,7 @@ export function validateAwsEc2SystemdArtifacts(files: Record<string, string>): s
   ) {
     errors.push("AWS profile credential mount must target read-only credential directory");
   }
+  errors.push(...validateArtifactIamBinding(profile));
   errors.push(...validateServiceIngress(profile));
   for (const process of processes) {
     const unitName = String(process?.systemdUnit || "");
@@ -49,6 +50,43 @@ export function validateAwsEc2SystemdArtifacts(files: Record<string, string>): s
     } else if (raw.includes("--publish")) {
       errors.push(`${unitName} worker unit must not publish ingress ports`);
     }
+  }
+  return errors;
+}
+
+function validateArtifactIamBinding(profile: Record<string, any>): string[] {
+  const artifact = profile?.artifactBackend || {};
+  if (artifact.credentialMode !== "aws-instance-profile") return [];
+  const binding = artifact.instanceProfileBinding || {};
+  const errors: string[] = [];
+  if (binding.instanceProfileArn !== profile?.compute?.instanceProfileArn) {
+    errors.push("AWS profile artifact IAM binding instance profile does not match compute profile");
+  }
+  if (!binding.roleArn || binding.roleArn !== artifact.iamRoleArn) {
+    errors.push("AWS profile artifact IAM binding role does not match reviewed role");
+  }
+  if (!binding.expectedRoleArn || binding.expectedRoleArn !== artifact.iamRoleArn) {
+    errors.push("AWS profile artifact IAM binding expected role does not match reviewed role");
+  }
+  if (!String(binding.trustDigest || "").startsWith("sha256:")) {
+    errors.push("AWS profile artifact IAM binding missing reviewed trust digest");
+  }
+  if (!String(artifact.leastPrivilegePolicyDigest || "").startsWith("sha256:")) {
+    errors.push("AWS profile artifact IAM binding missing least-privilege policy digest");
+  }
+  if (
+    !String(binding.leastPrivilegePolicyDigest || "").startsWith("sha256:") ||
+    binding.leastPrivilegePolicyDigest !== artifact.leastPrivilegePolicyDigest
+  ) {
+    errors.push(
+      "AWS profile artifact IAM binding least-privilege policy does not match reviewed policy",
+    );
+  }
+  if (
+    !Array.isArray(binding.policyDigests) ||
+    !binding.policyDigests.includes(artifact.leastPrivilegePolicyDigest)
+  ) {
+    errors.push("AWS profile artifact IAM binding missing attached artifact policy digest");
   }
   return errors;
 }

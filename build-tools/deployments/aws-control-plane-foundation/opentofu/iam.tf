@@ -13,11 +13,6 @@ resource "aws_iam_role" "ec2_host" {
   assume_role_policy = data.aws_iam_policy_document.ec2_assume_role.json
 }
 
-resource "aws_iam_role" "s3_artifact_access" {
-  name_prefix        = "${var.name_prefix}-artifact-"
-  assume_role_policy = data.aws_iam_policy_document.ec2_assume_role.json
-}
-
 resource "aws_iam_role" "evidence_collector" {
   name_prefix        = "${var.name_prefix}-evidence-"
   assume_role_policy = data.aws_iam_policy_document.ec2_assume_role.json
@@ -68,7 +63,7 @@ resource "aws_iam_policy" "artifact_access" {
 }
 
 resource "aws_iam_role_policy_attachment" "artifact_access" {
-  role       = aws_iam_role.s3_artifact_access.name
+  role       = aws_iam_role.ec2_host.name
   policy_arn = aws_iam_policy.artifact_access.arn
 }
 
@@ -132,7 +127,6 @@ data "aws_iam_policy_document" "provider_hook" {
       aws_iam_role.ec2_host.arn,
       aws_iam_role.evidence_collector.arn,
       aws_iam_role.provider_hook.arn,
-      aws_iam_role.s3_artifact_access.arn,
     ]
   }
 

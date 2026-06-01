@@ -153,7 +153,7 @@ test("AWS EC2 instance-profile artifact mode renders mode-specific credentials a
   const bundle = renderCloudControlSetupBundle(
     input({
       artifactCredentialMode: "aws-instance-profile",
-      artifactIamRoleArn: "arn:aws:iam::123456789012:role/control-plane-artifacts",
+      artifactIamRoleArn: "arn:aws:iam::123456789012:role/control-plane-host",
       artifactLeastPrivilegePolicyDigest: "sha256:artifact-policy",
     }),
   );
@@ -192,7 +192,7 @@ test("AWS EC2 instance-profile artifact mode fails closed without IAM evidence",
     validateCloudControlSetupInput(
       input({
         artifactCredentialMode: "aws-instance-profile",
-        artifactIamRoleArn: "arn:aws:iam::123456789012:role/control-plane-artifacts",
+        artifactIamRoleArn: "arn:aws:iam::123456789012:role/control-plane-host",
         artifactLeastPrivilegePolicyDigest: "sha256:wrong",
       }),
     ).join("\n"),

@@ -5,12 +5,10 @@ import { validateAwsTopologyEvidence } from "../../deployments/cloud-control-aws
 import { renderCloudControlSetupBundle } from "../../deployments/cloud-control-setup-render";
 import { validateRenderedProfile } from "../../deployments/cloud-control-setup-profile-validate";
 import { validateCloudControlSetupInput } from "../../deployments/cloud-control-setup-validate";
-import type { CloudControlSetupInput } from "../../deployments/cloud-control-setup-types";
 import { privateLinkAwsTopology } from "./cloud-control-cutover-fixture";
+import { ec2HostProfileInput as input } from "./cloud-control-aws-ec2-host-profile.fixture";
 import { reviewedRuntimeInput } from "./cloud-control-runtime-input.fixture";
 import { ecrRegistryProfileForImage } from "./control-plane-registry-profile.fixture";
-import { IMAGE_BUILD_IDENTITY, IMAGE_DIGEST, IMAGE_REF } from "./cloud-control-cutover-fixture";
-import { privateLinkSupabaseProfile } from "./control-plane-supabase-postgres.fixture";
 
 test("AWS EC2 host profile validation rejects AMI pin and network placement gaps", () => {
   assertRejects({ compute: { amiBuildIdentity: "" } }, /missing AMI build identity/);
@@ -152,6 +150,76 @@ test("AWS EC2 generated entrypoint artifacts reject loopback service or worker i
   );
 });
 
+test("AWS EC2 generated profile rejects stale instance-profile artifact IAM binding", () => {
+  const files = renderCloudControlSetupBundle(
+    input({
+      artifactCredentialMode: "aws-instance-profile",
+      artifactIamRoleArn: "arn:aws:iam::123456789012:role/control-plane-host",
+      artifactLeastPrivilegePolicyDigest: "sha256:artifact-policy",
+      runtimeInput: reviewedRuntimeInput({ artifactCredentialMode: "aws-instance-profile" }),
+    }),
+  ).files;
+  const wrongRole = {
+    ...files,
+    "aws-ec2-profile.yaml": files["aws-ec2-profile.yaml"]!.replace(
+      "roleArn: arn:aws:iam::123456789012:role/control-plane-host",
+      "roleArn: arn:aws:iam::123456789012:role/control-plane-unused",
+    ),
+  };
+  assert.match(
+    validateRenderedProfile(wrongRole).join("\n"),
+    /artifact IAM binding role does not match reviewed role/,
+  );
+
+  const wrongExpectedRole = {
+    ...files,
+    "aws-ec2-profile.yaml": files["aws-ec2-profile.yaml"]!.replace(
+      "expectedRoleArn: arn:aws:iam::123456789012:role/control-plane-host",
+      "expectedRoleArn: arn:aws:iam::123456789012:role/control-plane-unused",
+    ),
+  };
+  assert.match(
+    validateRenderedProfile(wrongExpectedRole).join("\n"),
+    /artifact IAM binding expected role does not match reviewed role/,
+  );
+
+  const wrongProfile = {
+    ...files,
+    "aws-ec2-profile.yaml": files["aws-ec2-profile.yaml"]!.replace(
+      "instanceProfileArn: arn:aws:iam::123456789012:instance-profile/control-plane",
+      "instanceProfileArn: arn:aws:iam::123456789012:instance-profile/unused",
+    ),
+  };
+  assert.match(
+    validateRenderedProfile(wrongProfile).join("\n"),
+    /artifact IAM binding instance profile does not match compute profile/,
+  );
+
+  const missingPolicy = {
+    ...files,
+    "aws-ec2-profile.yaml": files["aws-ec2-profile.yaml"]!.replace(
+      "- sha256:artifact-policy",
+      "[]",
+    ),
+  };
+  assert.match(
+    validateRenderedProfile(missingPolicy).join("\n"),
+    /artifact IAM binding missing attached artifact policy digest/,
+  );
+
+  const wrongBindingPolicy = {
+    ...files,
+    "aws-ec2-profile.yaml": files["aws-ec2-profile.yaml"]!.replace(
+      "policyDigests:\n      - sha256:artifact-policy\n    leastPrivilegePolicyDigest: sha256:artifact-policy",
+      "policyDigests:\n      - sha256:artifact-policy\n    leastPrivilegePolicyDigest: sha256:unused-artifact-policy",
+    ),
+  };
+  assert.match(
+    validateRenderedProfile(wrongBindingPolicy).join("\n"),
+    /artifact IAM binding least-privilege policy does not match reviewed policy/,
+  );
+});
+
 function assertRejects(overrides: Record<string, any>, pattern: RegExp): void {
   const topology = privateLinkAwsTopology() as any;
   const next = {
@@ -164,40 +232,4 @@ function assertRejects(overrides: Record<string, any>, pattern: RegExp): void {
     },
   };
   assert.match(validateCloudControlSetupInput(input({ awsTopology: next })).join("\n"), pattern);
-}
-
-function input(overrides: Partial<CloudControlSetupInput> = {}): CloudControlSetupInput {
-  return {
-    outDir: "unused",
-    mode: "aws-ec2",
-    image: IMAGE_REF,
-    expectedImageBuildIdentity: IMAGE_BUILD_IDENTITY,
-    imagePublication: {
-      image: IMAGE_REF,
-      sourceRevision: "source-ec2-host",
-      imageBuildIdentity: IMAGE_BUILD_IDENTITY,
-      digest: IMAGE_DIGEST,
-      inspectedDigest: IMAGE_DIGEST,
-      tag: "registry.example.com/platform/deployment-control-plane:source-ec2-host",
-      evidenceSource: "generated-command",
-      registryProfile: ecrRegistryProfileForImage(IMAGE_REF, IMAGE_DIGEST),
-    },
-    instanceId: "cloud-review",
-    publicUrl: "https://deploy.example.test",
-    artifactBucket: "deployment-control-plane-artifacts",
-    artifactRegion: "us-east-1",
-    artifactBackend: "aws-s3",
-    artifactBackendEvidence: "",
-    deploymentIds: ["pleomino-staging"],
-    reviewedSourceMode: "ssh",
-    authCallbackHost: "deploy-auth.example.test",
-    authCallbackPath: "/oidc/callback",
-    serviceReplicas: 1,
-    workerReplicas: 2,
-    dryRun: false,
-    awsTopology: privateLinkAwsTopology(),
-    supabasePostgres: privateLinkSupabaseProfile(),
-    runtimeInput: reviewedRuntimeInput(),
-    ...overrides,
-  };
 }

@@ -18,7 +18,7 @@ output "foundation_evidence" {
     artifact_kms_key_arn            = aws_kms_key.artifacts.arn
     ec2_instance_profile_arn        = aws_iam_instance_profile.ec2_host.arn
     ec2_host_role_arn               = aws_iam_role.ec2_host.arn
-    s3_artifact_access_role_arn     = aws_iam_role.s3_artifact_access.arn
+    s3_artifact_access_role_arn     = aws_iam_role.ec2_host.arn
     evidence_collector_role_arn     = aws_iam_role.evidence_collector.arn
     provider_hook_role_arn          = aws_iam_role.provider_hook.arn
     artifact_bucket_policy_id       = aws_s3_bucket_policy.artifacts.id
