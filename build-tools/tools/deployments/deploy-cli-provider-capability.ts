@@ -69,6 +69,9 @@ async function providerInputs(capabilityId: string) {
   ) {
     return { awsFoundationInspection: topology.foundation };
   }
+  if (capabilityId === "supabase-privatelink-prerequisite") {
+    return topology ? { awsTopologyEvidence: topology } : {};
+  }
   if (capabilityId !== "supabase-managed-postgres") return {};
   const profilePath = getFlagStr("supabase-postgres-profile", "").trim();
   if (!profilePath) {

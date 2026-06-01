@@ -32,10 +32,31 @@ test("AWS runbook produces provider capability evidence before cutover", () => {
   assert.deepEqual(ec2.outputs, [
     "$PROFILE_ROOT/provider-capability-aws-ec2-control-plane-host.json",
   ]);
+  const privatelink = managed.commands.find(
+    (entry: any) => entry.id === "provider-capability-supabase-privatelink-prerequisite",
+  );
+  assert.match(privatelink.command, /deployment-control-plane provider-capability/);
+  assert.match(privatelink.command, /--provider-capability supabase-privatelink-prerequisite/);
+  assert.match(
+    privatelink.command,
+    /--aws-topology-evidence "\$PROFILE_ROOT\/aws-topology-evidence\.json"/,
+  );
+  assert.deepEqual(privatelink.inputs, [
+    "$PROFILE_ROOT/provider-capabilities.json",
+    "$PROFILE_ROOT/aws-topology-evidence.json",
+  ]);
+  assert.deepEqual(privatelink.outputs, [
+    "$PROFILE_ROOT/provider-capability-supabase-privatelink-prerequisite.json",
+  ]);
   const cutover = commands.phases.find((phase: any) => phase.id === "cutover-readiness");
   assert.ok(
     cutover.commands[0].inputs.includes(
       "$PROFILE_ROOT/provider-capability-aws-ec2-control-plane-host.json",
+    ),
+  );
+  assert.ok(
+    cutover.commands[0].inputs.includes(
+      "$PROFILE_ROOT/provider-capability-supabase-privatelink-prerequisite.json",
     ),
   );
 });

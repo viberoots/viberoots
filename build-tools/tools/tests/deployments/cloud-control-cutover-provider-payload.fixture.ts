@@ -1,5 +1,6 @@
 import { buildSupabaseManagedPostgresEvidence } from "../../deployments/control-plane-supabase-postgres-evidence";
 import { reviewedSupabaseManagedPostgresProfile } from "../../deployments/control-plane-supabase-postgres-profile";
+import { privateLinkEndpointEvidence } from "./cloud-control-supabase-privatelink.fixture";
 
 export function providerPayloadFor(id: string) {
   if (id === "aws-ec2-control-plane-host") return awsEc2Payload();
@@ -16,19 +17,7 @@ export function providerPayloadFor(id: string) {
       },
     };
   }
-  if (id === "supabase-privatelink-prerequisite") {
-    return {
-      providerPayload: {
-        schemaVersion: "supabase-privatelink-provider-payload@1",
-        evidenceMode: "evidence-only",
-        supportMediated: true,
-        supportEvidenceRef: "privatelink-request",
-        ramPermissionEvidenceRef: "ram-acceptance-permission",
-        latticePermissionEvidenceRef: "vpc-lattice-association-permission",
-        privateDnsEvidenceRef: "private-dns-proof",
-      },
-    };
-  }
+  if (id === "supabase-privatelink-prerequisite") return supabasePrivateLinkPayload();
   if (id === "supabase-managed-postgres") return supabasePayload();
   if (id !== "cloudflare-edge" && id !== "vercel-operator-ui") return {};
   return {
@@ -39,6 +28,48 @@ export function providerPayloadFor(id: string) {
       callbackPath: "/oidc/callback",
       originLoadBalancerArn:
         "arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/cp/1",
+    },
+  };
+}
+
+function supabasePrivateLinkPayload() {
+  const evidence = privateLinkEndpointEvidence();
+  return {
+    providerPayload: {
+      schemaVersion: "supabase-privatelink-provider-payload@1",
+      evidenceMode: "aws-side-automated",
+      supportMediated: true,
+      supportEvidenceRef: "privatelink-request",
+      awsApiInputsPresent: true,
+      expected: {
+        accountId: "123456789012",
+        region: "us-east-1",
+        ramShareArn: evidence.ramShareArn,
+        resourceConfigurationArn: evidence.resourceConfigurationArn,
+        endpointId: evidence.endpointId,
+      },
+      ram: {
+        ramShareArn: evidence.ramShareArn,
+        ramShareStatus: evidence.ramShareStatus,
+      },
+      lattice: {
+        resourceConfigurationArn: evidence.resourceConfigurationArn,
+        endpointId: evidence.endpointId,
+      },
+      privateDns: evidence.privateDns,
+      routeSecurityGroupPosture: {
+        endpointSecurityGroupId: evidence.endpointSecurityGroupId,
+        serviceSecurityGroupId: evidence.serviceSecurityGroupId,
+        workerSecurityGroupId: evidence.workerSecurityGroupId,
+        rule: evidence.securityGroupRuleProof,
+      },
+      psql: {
+        checkedAt: evidence.psql.checkedAt,
+        proofDigest: evidence.psqlProofDigest,
+        success: evidence.psql.success,
+        vpcId: evidence.psql.vpcId,
+      },
+      mutationOutcomes: [{ action: "ram-share-acceptance", status: "accepted" }],
     },
   };
 }

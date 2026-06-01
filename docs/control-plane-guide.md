@@ -80,12 +80,14 @@ The current repo does not yet own full AWS infrastructure provisioning for:
 - VPC, subnets, route tables, NAT, security groups, and VPC endpoints
 - EC2 instance profile, launch template, AMI selection, and systemd/Podman host realization
 - ALB/NLB, ACM certificate, listeners, target groups, DNS, and TLS policy
-- RAM share acceptance for Supabase PrivateLink
-- VPC Lattice endpoint or service-network association
 
 Use reviewed IaC outside this repo or a manually reviewed cloud-foundation process for those gaps
-today. Capture every non-secret output as evidence and feed it into the setup and cutover commands.
-The code/design work needed to bring those pieces under repo-owned IaC is listed in
+today. Supabase PrivateLink remains support-mediated until Supabase shares the resource, but the
+generated provider-capability command consumes reviewed `aws-topology-evidence.json` and records the
+AWS-side RAM acceptance, VPC Lattice association, private DNS, security-group posture, and `psql`
+proof as typed provider evidence once those AWS-side artifacts exist. Capture every non-secret
+output as evidence and feed it into the setup and cutover commands. The code/design work needed to
+bring the remaining pieces under repo-owned IaC is listed in
 [Control Plane Gaps](./control-plane-gaps.md).
 
 ## Prerequisites
@@ -156,7 +158,9 @@ If you are using private database traffic:
 1. In the Supabase dashboard, open the project and go to Settings > Integrations.
 2. Add the AWS account id under the AWS PrivateLink section.
 3. Wait for Supabase to create the VPC Lattice Resource Configuration and send the AWS RAM share.
-4. In AWS RAM, accept the resource share in the same region as the Supabase project.
+4. In AWS RAM, accept the resource share in the same region as the Supabase project, then run the
+   generated `provider-capability-supabase-privatelink-prerequisite` command to record the typed
+   AWS-side evidence from reviewed topology inputs.
 5. Create a security group for the endpoint or service network that allows Postgres TCP 5432 from
    the control-plane service and worker security group.
 6. Create either:
@@ -187,7 +191,11 @@ Capture evidence:
   with reviewed justification
 
 Do not treat a support ticket or dashboard screenshot as sufficient by itself. The repo cutover
-checks require structured evidence tied to the selected AWS host path.
+checks require structured evidence tied to the selected AWS host path. When
+`--aws-topology-evidence` is supplied for `supabase-privatelink-prerequisite`, support-mediated
+evidence is accepted only for Supabase-side prerequisites that AWS cannot mutate; AWS-side RAM,
+Lattice, DNS, security-group, and `psql` checks must appear in the generated provider-capability
+payload.
 
 The split is explicit: Supabase dashboard or support action starts the share, AWS RAM acceptance
 proves the share is available to the selected account, AWS VPC Lattice wiring proves the private

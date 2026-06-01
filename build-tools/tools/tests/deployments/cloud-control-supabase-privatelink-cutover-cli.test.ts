@@ -4,9 +4,14 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
 import { runDeploymentControlPlaneCommand } from "../../deployments/deployment-control-plane";
+import { runCloudProviderCapabilityHook } from "../../deployments/cloud-control-provider-capability-hooks";
 import { runInScratchTemp } from "../lib/test-helpers";
 import { withControlPlaneArgv } from "./control-plane-process-entrypoints.helpers";
-import { evidence, IMAGE_BUILD_IDENTITY } from "./cloud-control-cutover-fixture";
+import {
+  evidence,
+  IMAGE_BUILD_IDENTITY,
+  privateLinkAwsTopology,
+} from "./cloud-control-cutover-fixture";
 
 test("cutover CLI rejects PrivateLink topology with wrong managed dependency identity", async () => {
   await runInScratchTemp("cutover-privatelink-identity", async (tmp) => {
@@ -56,6 +61,40 @@ test("cutover CLI rejects diagnostic-only PrivateLink managed dependency evidenc
       }),
     );
     await assert.rejects(() => runCutover(evidencePath), /diagnostic-only/);
+  });
+});
+
+test("cutover CLI rejects mismatched AWS-side PrivateLink provider evidence", async () => {
+  await runInScratchTemp("cutover-privatelink-provider-mismatch", async (tmp) => {
+    const evidencePath = path.join(tmp, "evidence.json");
+    const imported = evidence() as any;
+    const hook = await runCloudProviderCapabilityHook({
+      capabilityId: "supabase-privatelink-prerequisite",
+      phase: "smoke",
+      deploymentLabel: "//deployments:staging",
+      awsTopologyEvidence: privateLinkAwsTopology() as any,
+    });
+    await fsp.writeFile(
+      evidencePath,
+      JSON.stringify({
+        ...imported,
+        providerCapabilities: {
+          ...imported.providerCapabilities,
+          "supabase-privatelink-prerequisite": {
+            ...hook,
+            providerPayload: {
+              ...hook.providerPayload,
+              ram: { ...(hook.providerPayload?.ram as any), ramShareArn: "arn:aws:ram:wrong" },
+              lattice: {
+                ...(hook.providerPayload?.lattice as any),
+                endpointId: "vpce-wrong",
+              },
+            },
+          },
+        },
+      }),
+    );
+    await assert.rejects(() => runCutover(evidencePath), /RAM share ARN|VPC Lattice association/);
   });
 });
 

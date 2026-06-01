@@ -3,6 +3,7 @@ import { freshEvidenceAt } from "./cloud-control-evidence-helpers";
 import type { SupabaseManagedPostgresProfile } from "./control-plane-supabase-postgres-profile";
 import { validateSupabaseManagedPostgresPayload } from "./cloud-control-supabase-postgres-hook-validation";
 import { validateAwsEc2HostProviderPayload } from "./cloud-control-aws-ec2-host-hook-validation";
+import { validateSupabasePrivateLinkPayload } from "./cloud-control-supabase-privatelink-hook-validation";
 
 export const CLOUD_PROVIDER_CAPABILITY_HOOK_EVIDENCE_SCHEMA =
   "cloud-provider-capability-hook-evidence@1";
@@ -64,7 +65,7 @@ export function validateProviderCapabilityHookEvidenceShape(
   errors.push(...validateRedactedOutputEvidence(id, value));
   errors.push(...validateAwsEc2HostProviderPayload(id, value, opts));
   errors.push(...validateSupabaseManagedPostgresPayload(id, value, opts));
-  errors.push(...validateSupabasePrivateLinkPayload(id, value));
+  errors.push(...validateSupabasePrivateLinkPayload(id, value, opts));
   errors.push(...validateNoDashboardOnlyEvidence(id, value));
   errors.push(...validateNoUnsafeEvidenceContent(id, value));
   return errors;
@@ -147,29 +148,6 @@ function findInvalidSourcePath(value: unknown, path = "$"): string | undefined {
     if (invalid) return invalid;
   }
   return undefined;
-}
-
-function validateSupabasePrivateLinkPayload(id: string, value: Record<string, unknown>): string[] {
-  if (id !== "supabase-privatelink-prerequisite") return [];
-  const payload = providerCapabilityHookEvidenceRecord(value.providerPayload);
-  const errors: string[] = [];
-  if (payload?.schemaVersion !== "supabase-privatelink-provider-payload@1") {
-    errors.push(`${id}: missing Supabase PrivateLink provider payload evidence`);
-  }
-  if (payload?.evidenceMode !== "evidence-only" || payload?.supportMediated !== true) {
-    errors.push(`${id}: Supabase PrivateLink payload must be support-mediated evidence-only`);
-  }
-  for (const field of [
-    "supportEvidenceRef",
-    "ramPermissionEvidenceRef",
-    "latticePermissionEvidenceRef",
-    "privateDnsEvidenceRef",
-  ]) {
-    if (typeof payload?.[field] !== "string" || !String(payload[field]).trim()) {
-      errors.push(`${id}: Supabase PrivateLink payload missing ${field}`);
-    }
-  }
-  return errors;
 }
 
 function findUnsafeEvidencePath(value: unknown, path = "$"): string | undefined {

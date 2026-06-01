@@ -188,6 +188,40 @@ test("AWS EC2 default artifact path requires S3 VPC endpoint evidence", () => {
   );
 });
 
+test("setup validation rejects stale AWS-side PrivateLink RAM Lattice DNS and psql evidence", () => {
+  const stale = new Date(Date.now() - 2 * 60 * 60_000).toISOString();
+  const topology = awsTopology() as any;
+  const privatelink = topology.database.privatelink;
+  const errors = validateCloudControlSetupInput(
+    input({
+      mode: "aws-ec2",
+      awsTopology: {
+        ...topology,
+        database: {
+          mode: "privatelink",
+          privatelink: {
+            ...privatelink,
+            checkedAt: stale,
+            ramShareStatus: "pending",
+            endpointId: undefined,
+            serviceNetworkAssociationId: undefined,
+            privateDns: {
+              ...privatelink.privateDns,
+              checkedAt: stale,
+              resolvesFromSelectedVpc: false,
+            },
+            psql: { ...privatelink.psql, checkedAt: stale, success: false },
+          },
+        },
+      },
+    }),
+  ).join("\n");
+  assert.match(errors, /RAM share is not accepted/);
+  assert.match(errors, /endpoint or service-network association/);
+  assert.match(errors, /private DNS/);
+  assert.match(errors, /psql proof/);
+});
+
 test("provider capabilities wire preview, apply, and evidence through reviewed admission", () => {
   const declarations = JSON.parse(
     renderCloudControlSetupBundle(input()).files["provider-capabilities.json"]!,
