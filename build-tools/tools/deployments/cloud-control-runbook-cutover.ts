@@ -1,12 +1,13 @@
 import type { CloudControlSetupInput } from "./cloud-control-setup-types";
 import type { RunbookCommand } from "./cloud-control-runbook";
 import { awsTopologyRequiredCapabilityIds } from "./cloud-control-aws-topology-capabilities";
+import { setupAwsTopology } from "./cloud-control-setup-aws-topology";
 import { rootPrelude } from "./cloud-control-runbook-root";
 
 export function cutoverCommands(input: CloudControlSetupInput): RunbookCommand[] {
   const capabilities = awsTopologyRequiredCapabilityIds(input.awsTopology);
   const selected = capabilities.join(",");
-  const expectedRegion = input.artifactRegion || "";
+  const expectedRegion = setupAwsTopology(input)?.region || input.artifactRegion || "";
   return [
     command(
       "cutover-evidence",

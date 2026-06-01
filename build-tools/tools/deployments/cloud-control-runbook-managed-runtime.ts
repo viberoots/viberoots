@@ -1,13 +1,27 @@
-import type { CloudControlSetupInput } from "./cloud-control-setup-types";
+import type { CloudControlSetupInput, CloudProfileMode } from "./cloud-control-setup-types";
 import { setupAwsTopology } from "./cloud-control-setup-aws-topology";
 
-export function sourceHostPrelude(): string {
+export function sourceHostPrelude(mode: CloudProfileMode): string {
+  if (mode === "aws-ec2") return ec2SourceHostPrelude();
   return [
     "SOURCE_HOST_KIND=unknown",
     "RUNTIME_HOST_PROFILE=unknown",
     'SOURCE_HOST_IDENTITY="$(curl -fsS --connect-timeout 1 http://169.254.169.254/latest/meta-data/instance-id 2>/dev/null || true)"',
     'SOURCE_AWS_REGION="$(curl -fsS --connect-timeout 1 http://169.254.169.254/latest/meta-data/placement/region 2>/dev/null || true)"',
     'if [ -n "$SOURCE_HOST_IDENTITY" ]; then SOURCE_HOST_KIND=aws-ec2; RUNTIME_HOST_PROFILE=aws-ec2; else SOURCE_HOST_IDENTITY="$(hostname -f 2>/dev/null || hostname)"; fi',
+  ].join("; ");
+}
+
+function ec2SourceHostPrelude(): string {
+  return [
+    "SOURCE_HOST_KIND=aws-ec2",
+    "RUNTIME_HOST_PROFILE=aws-ec2",
+    'IMDS_ENDPOINT="${AWS_EC2_METADATA_SERVICE_ENDPOINT:-http://169.254.169.254}"',
+    'IMDS_TOKEN="$(curl -fsS --connect-timeout 1 -X PUT -H "x-aws-ec2-metadata-token-ttl-seconds: 21600" "$IMDS_ENDPOINT/latest/api/token")" || exit 2',
+    'SOURCE_HOST_IDENTITY="$(curl -fsS --connect-timeout 1 -H "x-aws-ec2-metadata-token: $IMDS_TOKEN" "$IMDS_ENDPOINT/latest/meta-data/instance-id")" || exit 2',
+    'SOURCE_AWS_REGION="$(curl -fsS --connect-timeout 1 -H "x-aws-ec2-metadata-token: $IMDS_TOKEN" "$IMDS_ENDPOINT/latest/meta-data/placement/region")" || exit 2',
+    'test -n "$SOURCE_HOST_IDENTITY" || exit 2',
+    'test -n "$SOURCE_AWS_REGION" || exit 2',
   ].join("; ");
 }
 
