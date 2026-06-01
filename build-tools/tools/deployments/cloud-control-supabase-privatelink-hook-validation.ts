@@ -1,4 +1,6 @@
 import { freshEvidenceAt } from "./cloud-control-evidence-helpers";
+import { validateSupabasePrivateLinkIacBundle } from "./cloud-control-supabase-privatelink-iac-evidence";
+import { privateLinkDirectMutationErrors } from "./cloud-control-supabase-privatelink-iac-rules";
 
 export function validateSupabasePrivateLinkPayload(
   id: string,
@@ -14,8 +16,10 @@ export function validateSupabasePrivateLinkPayload(
   }
   if (payload?.evidenceMode === "evidence-only") {
     errors.push(...validateEvidenceOnlyPayload(id, payload, trusted));
+  } else if (payload?.evidenceMode === "iac-reviewed") {
+    errors.push(...validateIacPayload(id, payload, trusted, opts.maxAgeMinutes ?? 60));
   } else if (payload?.evidenceMode === "aws-side-automated") {
-    errors.push(...validateAwsSidePayload(id, payload, trusted, opts.maxAgeMinutes ?? 60));
+    errors.push(`${id}: topology-only aws-side-automated payloads are no longer accepted`);
   } else {
     errors.push(`${id}: Supabase PrivateLink payload has unsupported evidence mode`);
   }
@@ -47,7 +51,7 @@ function validateEvidenceOnlyPayload(
   return errors;
 }
 
-function validateAwsSidePayload(
+function validateIacPayload(
   id: string,
   payload: Record<string, unknown> | undefined,
   trusted: TrustedPrivateLink | undefined,
@@ -55,15 +59,19 @@ function validateAwsSidePayload(
 ) {
   const errors = validateSupportBoundary(id, payload);
   const expected = record(payload?.expected);
-  const ram = record(payload?.ram);
-  const lattice = record(payload?.lattice);
-  const privateDns = record(payload?.privateDns);
-  const psql = record(payload?.psql);
-  const route = record(payload?.routeSecurityGroupPosture);
+  const iac = record(payload?.iac);
+  const plan = record(iac?.plan);
+  const apply = record(iac?.apply);
+  const readOnly = record(iac?.readOnly);
+  const ram = record(readOnly?.ram);
+  const lattice = record(readOnly?.lattice);
+  const privateDns = record(readOnly?.privateDns);
+  const psql = record(readOnly?.psql);
+  const route = record(readOnly?.routeSecurityGroupPosture);
   const rule = record(route?.rule);
   if (!expected) errors.push(`${id}: missing AWS-side PrivateLink expected identity`);
   if (!trusted) {
-    errors.push(`${id}: AWS-side PrivateLink automation requires selected topology evidence`);
+    errors.push(`${id}: AWS-side PrivateLink IaC evidence requires selected topology evidence`);
   }
   if (trusted && text(expected, "accountId") !== trusted.accountId) {
     errors.push(`${id}: AWS-side PrivateLink account does not match selected topology`);
@@ -98,7 +106,7 @@ function validateAwsSidePayload(
   if (trusted && text(privateDns, "vpcId") !== trusted.vpcId) {
     errors.push(`${id}: PrivateLink private DNS VPC does not match selected topology`);
   }
-  if (psql?.success !== true || !text(psql, "proofDigest").startsWith("sha256:")) {
+  if (psql?.success !== true || !text(readOnly, "psqlProofDigest").startsWith("sha256:")) {
     errors.push(`${id}: PrivateLink psql proof is missing or unsuccessful`);
   }
   if (!freshEvidenceAt(psql, { maxAgeMinutes })) {
@@ -107,16 +115,23 @@ function validateAwsSidePayload(
   if (trusted && text(psql, "vpcId") !== trusted.vpcId) {
     errors.push(`${id}: PrivateLink psql proof VPC does not match selected topology`);
   }
-  if (!Array.isArray(payload?.mutationOutcomes) || payload.mutationOutcomes.length === 0) {
-    errors.push(`${id}: missing AWS-side PrivateLink mutation outcome evidence`);
-  }
+  errors.push(
+    ...validateSupabasePrivateLinkIacBundle({
+      iac: { plan, apply, readOnly },
+      phase: "smoke",
+      topology: trusted
+        ? ({ ...trusted, database: { mode: "privatelink", privatelink: trusted } } as any)
+        : undefined,
+    }).map((error) => `${id}: ${error}`),
+  );
+  errors.push(...privateLinkDirectMutationErrors(payload).map((error) => `${id}: ${error}`));
   return errors;
 }
 
 function validateSupportBoundary(id: string, payload: Record<string, unknown> | undefined) {
   const errors: string[] = [];
-  if (payload?.awsApiInputsPresent !== true) {
-    errors.push(`${id}: AWS-side PrivateLink automation requires reviewed AWS API inputs`);
+  if (payload?.awsApiInputsPresent === true) {
+    errors.push(`${id}: AWS-side PrivateLink payload must use reviewed IaC, not AWS API inputs`);
   }
   if (payload?.supportMediated !== true || !text(payload, "supportEvidenceRef")) {
     errors.push(`${id}: Supabase-side PrivateLink prerequisite must remain support-mediated`);

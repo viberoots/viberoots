@@ -28,6 +28,7 @@ import {
   writeEvidence,
   writeProviderCapabilityEvidence,
   writeRuntimeHttpEvidenceOutput,
+  writeSupabasePrivateLinkIacEvidence,
   writeSupabaseProviderEvidence,
 } from "./cloud-control-setup-doctor.helpers";
 const DIGEST_REF =
@@ -69,6 +70,7 @@ test("setup doctor classifies local runbook phases without cloud credentials", a
       rotatedMapOut: path.join(tmp, "credential-map.rotated.json"),
     });
     await writeSupabaseProviderEvidence(tmp);
+    await writeSupabasePrivateLinkIacEvidence(tmp, commands);
     await fsp.writeFile(
       path.join(tmp, "managed-dependency-evidence.json"),
       JSON.stringify(managedDependencyEvidence()),
@@ -84,7 +86,11 @@ test("setup doctor classifies local runbook phases without cloud credentials", a
       "supabase-privatelink-private-dns",
       "supabase-privatelink-tcp-5432-sg",
       "supabase-privatelink-private-psql",
+      "supabase-privatelink-opentofu-plan",
+      "supabase-privatelink-opentofu-apply",
+      "supabase-privatelink-readonly-evidence",
     ]) {
+      if (id.includes("opentofu") || id.endsWith("readonly-evidence")) continue;
       const output = runbookCommand(commands, id).outputs[0];
       if (["health", "readiness", "worker-heartbeats"].includes(id)) {
         await writeRuntimeHttpEvidenceOutput(tmp, output, id);

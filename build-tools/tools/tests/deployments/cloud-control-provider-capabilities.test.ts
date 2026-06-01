@@ -70,6 +70,35 @@ test("generated provider-capabilities.json carries executable ECR bundle-root co
   }
 });
 
+test("generated provider-capabilities.json carries PrivateLink IaC evidence commands", () => {
+  const bundle = renderCloudControlSetupBundle(ec2HostProfileInput());
+  const capabilities = JSON.parse(bundle.files["provider-capabilities.json"]!);
+  const privatelink = capabilities.find(
+    (entry: any) => entry.id === "supabase-privatelink-prerequisite",
+  );
+  assert.ok(privatelink);
+  for (const command of [
+    privatelink.iac.previewCommand,
+    privatelink.iac.applyCommand,
+    privatelink.iac.smokeCommand,
+    privatelink.iac.evidenceCommand,
+  ]) {
+    assert.match(command, /--aws-topology-evidence "\$PROFILE_ROOT\/aws-topology-evidence\.json"/);
+    assert.match(
+      command,
+      /--supabase-privatelink-opentofu-plan "\$PROFILE_ROOT\/supabase-privatelink-opentofu-plan\.json"/,
+    );
+    assert.match(
+      command,
+      /--supabase-privatelink-opentofu-apply "\$PROFILE_ROOT\/supabase-privatelink-opentofu-apply\.json"/,
+    );
+    assert.match(
+      command,
+      /--supabase-privatelink-readonly-evidence "\$PROFILE_ROOT\/supabase-privatelink-readonly-evidence\.json"/,
+    );
+  }
+});
+
 test("live-gated selected provider capability preview and smoke hooks", async (t) => {
   if (process.env.VBR_CLOUD_PROVIDER_CAPABILITY_LIVE !== "1") {
     t.skip("set VBR_CLOUD_PROVIDER_CAPABILITY_LIVE=1 for live provider preview/smoke hooks");

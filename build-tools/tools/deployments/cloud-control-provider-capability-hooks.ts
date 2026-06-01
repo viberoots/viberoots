@@ -16,6 +16,7 @@ import { awsEcrRegistryHookAdapter } from "./cloud-control-aws-ecr-registry-hook
 import type { ControlPlaneRegistryProfile } from "./control-plane-registry-profile";
 import type { ControlPlaneImagePublicationEvidence } from "./control-plane-image-publication";
 import { supabasePrivateLinkAdapter } from "./cloud-control-supabase-privatelink-hooks";
+import type { SupabasePrivateLinkIacBundle } from "./cloud-control-supabase-privatelink-iac-evidence";
 
 export const CLOUD_PROVIDER_CAPABILITY_HOOK_PHASES = [
   "preview",
@@ -82,6 +83,7 @@ export type HookAdapterPhaseOptions = {
   supabasePostgresProfile?: SupabaseManagedPostgresProfile;
   registryProfile?: ControlPlaneRegistryProfile;
   imagePublication?: ControlPlaneImagePublicationEvidence;
+  supabasePrivateLinkIac?: SupabasePrivateLinkIacBundle;
 };
 
 const HOOK_ADAPTERS: Record<string, HookAdapter> = {
@@ -113,6 +115,7 @@ export async function runCloudProviderCapabilityHook(opts: {
   supabasePostgresProfile?: SupabaseManagedPostgresProfile;
   registryProfile?: ControlPlaneRegistryProfile;
   imagePublication?: ControlPlaneImagePublicationEvidence;
+  supabasePrivateLinkIac?: SupabasePrivateLinkIacBundle;
 }): Promise<CloudProviderCapabilityHookEvidence> {
   assertSupportedPhase(opts.phase);
   const declaration = opts.declaration || concreteDeclaration(opts.capabilityId);
@@ -142,6 +145,7 @@ export async function runCloudProviderCapabilityHook(opts: {
       : {}),
     ...(opts.registryProfile ? { registryProfile: opts.registryProfile } : {}),
     ...(opts.imagePublication ? { imagePublication: opts.imagePublication } : {}),
+    ...(opts.supabasePrivateLinkIac ? { supabasePrivateLinkIac: opts.supabasePrivateLinkIac } : {}),
   });
   const output = redactOperatorText(result.rawOutput);
   if (!output) throw new Error(`${opts.capabilityId}: hook produced no audit output`);

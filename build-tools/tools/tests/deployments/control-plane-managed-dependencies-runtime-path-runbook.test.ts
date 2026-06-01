@@ -124,8 +124,11 @@ test("AWS setup runbook surfaces PrivateLink operator evidence actions from bund
     "supabase-privatelink-private-dns",
     "supabase-privatelink-tcp-5432-sg",
     "supabase-privatelink-private-psql",
+    "supabase-privatelink-opentofu-plan",
+    "supabase-privatelink-opentofu-apply",
+    "supabase-privatelink-readonly-evidence",
   ]);
-  for (const id of privateLinkIds) {
+  for (const id of privateLinkIds.slice(0, 6)) {
     const action = runbookCommand(commands, id);
     assert.equal(action.cwd, "profile-root");
     assert.equal(action.actionType, "operator-evidence");
@@ -134,6 +137,26 @@ test("AWS setup runbook surfaces PrivateLink operator evidence actions from bund
     assert.match(action.command, /test -f "\$PROFILE_ROOT\/supabase-privatelink-/);
     assert.doesNotMatch(action.command, /--out/);
   }
+  assert.equal(
+    runbookCommand(commands, "supabase-privatelink-opentofu-plan").actionType,
+    "reviewed-iac",
+  );
+  assert.match(
+    runbookCommand(commands, "supabase-privatelink-opentofu-plan").command,
+    /tofu .* plan .*supabase-privatelink-opentofu\.tfplan/,
+  );
+  assert.equal(
+    runbookCommand(commands, "supabase-privatelink-opentofu-apply").actionType,
+    "reviewed-iac",
+  );
+  assert.equal(
+    runbookCommand(commands, "supabase-privatelink-readonly-evidence").actionType,
+    "read-only-evidence",
+  );
+  assert.match(
+    runbookCommand(commands, "supabase-privatelink-readonly-evidence").command,
+    /aws ram get-resource-shares/,
+  );
   assert.match(managedPhase.residualManualActions.join("\n"), /PrivateLink operator-evidence/);
   assert.match(managedPhase.evidenceInputs.join("\n"), /supabase-privatelink-ram-acceptance\.json/);
 });

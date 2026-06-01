@@ -12,6 +12,7 @@ import {
   IMAGE_BUILD_IDENTITY,
   privateLinkAwsTopology,
 } from "./cloud-control-cutover-fixture";
+import { privateLinkIacEvidence } from "./cloud-control-supabase-privatelink.fixture";
 
 test("cutover CLI rejects PrivateLink topology with wrong managed dependency identity", async () => {
   await runInScratchTemp("cutover-privatelink-identity", async (tmp) => {
@@ -73,7 +74,9 @@ test("cutover CLI rejects mismatched AWS-side PrivateLink provider evidence", as
       phase: "smoke",
       deploymentLabel: "//deployments:staging",
       awsTopologyEvidence: privateLinkAwsTopology() as any,
+      supabasePrivateLinkIac: privateLinkIacEvidence(),
     });
+    const iac = hook.providerPayload?.iac as any;
     await fsp.writeFile(
       evidencePath,
       JSON.stringify({
@@ -84,10 +87,13 @@ test("cutover CLI rejects mismatched AWS-side PrivateLink provider evidence", as
             ...hook,
             providerPayload: {
               ...hook.providerPayload,
-              ram: { ...(hook.providerPayload?.ram as any), ramShareArn: "arn:aws:ram:wrong" },
-              lattice: {
-                ...(hook.providerPayload?.lattice as any),
-                endpointId: "vpce-wrong",
+              iac: {
+                ...iac,
+                readOnly: {
+                  ...iac.readOnly,
+                  ram: { ...iac.readOnly.ram, ramShareArn: "arn:aws:ram:wrong" },
+                  lattice: { ...iac.readOnly.lattice, endpointId: "vpce-wrong" },
+                },
               },
             },
           },

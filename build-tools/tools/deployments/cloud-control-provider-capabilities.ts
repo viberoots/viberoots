@@ -185,7 +185,7 @@ function cap(
 
 function iacCommands(id: CloudCapabilityId): ProviderCapabilityDeclaration["iac"] {
   const base = `deployment-control-plane provider-capability --deployment-id <label> --provider-capability ${id}`;
-  const flags = id === "aws-ecr-control-plane-registry" ? ecrBundleFlags() : "";
+  const flags = providerBundleFlags(id);
   return {
     reviewedReference: "docs/cloud-control-setup.md",
     previewCommand: `${base} --preview${flags}`,
@@ -196,6 +196,12 @@ function iacCommands(id: CloudCapabilityId): ProviderCapabilityDeclaration["iac"
   };
 }
 
+function providerBundleFlags(id: CloudCapabilityId): string {
+  if (id === "aws-ecr-control-plane-registry") return ecrBundleFlags();
+  if (id === "supabase-privatelink-prerequisite") return supabasePrivateLinkBundleFlags();
+  return "";
+}
+
 function ecrBundleFlags(): string {
   return [
     ' --registry-profile "$PROFILE_ROOT/registry-profile.json"',
@@ -203,6 +209,15 @@ function ecrBundleFlags(): string {
     ' --ecr-opentofu-plan "$PROFILE_ROOT/ecr-opentofu-plan.json"',
     ' --ecr-opentofu-apply "$PROFILE_ROOT/ecr-opentofu-apply.json"',
     ' --ecr-readonly-evidence "$PROFILE_ROOT/ecr-readonly-evidence.json"',
+  ].join("");
+}
+
+function supabasePrivateLinkBundleFlags(): string {
+  return [
+    ' --aws-topology-evidence "$PROFILE_ROOT/aws-topology-evidence.json"',
+    ' --supabase-privatelink-opentofu-plan "$PROFILE_ROOT/supabase-privatelink-opentofu-plan.json"',
+    ' --supabase-privatelink-opentofu-apply "$PROFILE_ROOT/supabase-privatelink-opentofu-apply.json"',
+    ' --supabase-privatelink-readonly-evidence "$PROFILE_ROOT/supabase-privatelink-readonly-evidence.json"',
   ].join("");
 }
 

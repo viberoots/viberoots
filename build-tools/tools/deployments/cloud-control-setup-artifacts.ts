@@ -193,7 +193,7 @@ function managedDependencyCheckIndex(input: CloudControlSetupInput): number {
         (id) => id !== "supabase-managed-postgres",
       ).length
     : 0;
-  const privateLinkEvidenceCount = setupUsesSupabasePrivateLink(input) ? 6 : 0;
+  const privateLinkEvidenceCount = setupUsesSupabasePrivateLink(input) ? 9 : 0;
   return 1 + providerEvidenceCount + privateLinkEvidenceCount;
 }
 

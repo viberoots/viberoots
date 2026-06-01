@@ -18,7 +18,28 @@ import { ecrRegistryProfileForImage } from "./control-plane-registry-profile.fix
 import { privateLinkSupabaseProfile } from "./control-plane-supabase-postgres.fixture";
 
 test("AWS runbook produces provider capability evidence before cutover", () => {
-  const commands = JSON.parse(renderCloudControlSetupBundle(input()).files["commands.json"]!);
+  const bundle = renderCloudControlSetupBundle(input());
+  const commands = JSON.parse(bundle.files["commands.json"]!);
+  assert.equal(bundle.files["supabase-privatelink-opentofu-plan.json"], undefined);
+  assert.equal(bundle.files["supabase-privatelink-opentofu-apply.json"], undefined);
+  assert.equal(bundle.files["supabase-privatelink-readonly-evidence.json"], undefined);
+  const tfvars = JSON.parse(bundle.files["supabase-privatelink-opentofu.tfvars.json"]!);
+  assert.equal(tfvars.supabase_privatelink_enabled, true);
+  assert.equal(
+    tfvars.supabase_privatelink_resource_configuration_arn,
+    privateLinkAwsTopology().database.privatelink.resourceConfigurationArn,
+  );
+  assert.match(
+    bundle.files["supabase-privatelink-evidence-template.json"]!,
+    /Do not submit this template as evidence/,
+  );
+  assert.match(
+    bundle.files["opentofu/aws-control-plane-foundation/privatelink.tf"]!,
+    /aws_ram_resource_share_accepter/,
+  );
+  const template = JSON.parse(bundle.files["supabase-privatelink-evidence-template.json"]!);
+  assert.equal(template.bundleRoot, "$PROFILE_ROOT");
+  assert.equal(template.workingDirectory, "$PROFILE_ROOT/opentofu/aws-control-plane-foundation");
   const managed = commands.phases.find((phase: any) => phase.id === "managed-dependencies");
   const ec2 = managed.commands.find(
     (entry: any) => entry.id === "provider-capability-aws-ec2-control-plane-host",
@@ -35,15 +56,51 @@ test("AWS runbook produces provider capability evidence before cutover", () => {
   const privatelink = managed.commands.find(
     (entry: any) => entry.id === "provider-capability-supabase-privatelink-prerequisite",
   );
+  const plan = managed.commands.find(
+    (entry: any) => entry.id === "supabase-privatelink-opentofu-plan",
+  );
+  assert.match(plan.command, /tofu .* plan /);
+  assert.match(plan.command, /\$PROFILE_ROOT\/opentofu\/aws-control-plane-foundation/);
+  assert.match(plan.command, /supabase-privatelink-opentofu\.tfvars\.json/);
+  assert.match(plan.command, /supabase-privatelink-opentofu-plan\.out\.json/);
+  assert.ok(plan.inputs.includes("$PROFILE_ROOT/supabase-privatelink-opentofu.tfvars.json"));
+  assert.ok(
+    plan.inputs.includes("$PROFILE_ROOT/opentofu/aws-control-plane-foundation/privatelink.tf"),
+  );
+  assert.ok(plan.outputs.includes("$PROFILE_ROOT/supabase-privatelink-opentofu-plan.json"));
+  const apply = managed.commands.find(
+    (entry: any) => entry.id === "supabase-privatelink-opentofu-apply",
+  );
+  assert.match(apply.command, /tofu .* apply /);
+  assert.ok(apply.outputs.includes("$PROFILE_ROOT/supabase-privatelink-opentofu-apply.json"));
+  const readOnly = managed.commands.find(
+    (entry: any) => entry.id === "supabase-privatelink-readonly-evidence",
+  );
+  assert.match(readOnly.command, /aws ram get-resource-shares/);
+  assert.match(readOnly.command, /describe-vpc-endpoints/);
+  assert.match(readOnly.command, /describe-security-group-rules/);
+  assert.match(readOnly.command, /psql "\$CONTROL_PLANE_DATABASE_URL"/);
+  assert.ok(readOnly.outputs.includes("$PROFILE_ROOT/supabase-privatelink-readonly-evidence.json"));
+  assert.ok(managed.commands.indexOf(readOnly) < managed.commands.indexOf(privatelink));
   assert.match(privatelink.command, /deployment-control-plane provider-capability/);
   assert.match(privatelink.command, /--provider-capability supabase-privatelink-prerequisite/);
   assert.match(
     privatelink.command,
     /--aws-topology-evidence "\$PROFILE_ROOT\/aws-topology-evidence\.json"/,
   );
+  for (const file of [
+    "supabase-privatelink-opentofu-plan",
+    "supabase-privatelink-opentofu-apply",
+    "supabase-privatelink-readonly-evidence",
+  ]) {
+    assert.match(privatelink.command, new RegExp(`\\$PROFILE_ROOT/${file}\\.json`));
+  }
   assert.deepEqual(privatelink.inputs, [
     "$PROFILE_ROOT/provider-capabilities.json",
     "$PROFILE_ROOT/aws-topology-evidence.json",
+    "$PROFILE_ROOT/supabase-privatelink-opentofu-plan.json",
+    "$PROFILE_ROOT/supabase-privatelink-opentofu-apply.json",
+    "$PROFILE_ROOT/supabase-privatelink-readonly-evidence.json",
   ]);
   assert.deepEqual(privatelink.outputs, [
     "$PROFILE_ROOT/provider-capability-supabase-privatelink-prerequisite.json",

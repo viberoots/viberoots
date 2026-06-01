@@ -236,8 +236,10 @@ test("cloud setup validation rejects tag-only images, weak topology, and missing
 test("generated profile files do not embed secret values", async () => {
   await runInScratchTemp("cloud-control-secret-free", async (tmp) => {
     await writeCloudControlSetupBundle(baseInput({ outDir: tmp }));
-    for (const name of await fsp.readdir(tmp)) {
-      const text = await fsp.readFile(path.join(tmp, name), "utf8");
+    for (const entry of await fsp.readdir(tmp, { recursive: true, withFileTypes: true })) {
+      if (entry.isDirectory()) continue;
+      const file = path.join(entry.parentPath, entry.name);
+      const text = await fsp.readFile(file, "utf8");
       assert.doesNotMatch(
         text,
         /AKIA[0-9A-Z]{16}|DATABASE_URL|SECRET_ACCESS_KEY|BEGIN .*PRIVATE KEY/,

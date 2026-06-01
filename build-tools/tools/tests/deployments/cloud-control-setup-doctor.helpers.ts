@@ -11,6 +11,7 @@ import {
   registryProfile,
   withAwsCredentialFile,
 } from "./cloud-control-aws-ecr-registry.fixture";
+import { privateLinkIacEvidence } from "./cloud-control-supabase-privatelink.fixture";
 
 export async function writeBundle(dir: string, files: Record<string, string>): Promise<void> {
   for (const [name, content] of Object.entries(files)) {
@@ -70,6 +71,37 @@ export async function writeSupabaseProviderEvidence(dir: string): Promise<void> 
     ),
     "utf8",
   );
+}
+
+export async function writeSupabasePrivateLinkIacEvidence(
+  dir: string,
+  commands: any,
+): Promise<void> {
+  const evidence = privateLinkIacEvidence();
+  const values: Record<string, unknown> = {
+    "supabase-privatelink-opentofu-plan.json": evidence.plan,
+    "supabase-privatelink-opentofu-apply.json": evidence.apply,
+    "supabase-privatelink-readonly-evidence.json": evidence.readOnly,
+  };
+  for (const id of [
+    "supabase-privatelink-opentofu-plan",
+    "supabase-privatelink-opentofu-apply",
+    "supabase-privatelink-readonly-evidence",
+  ]) {
+    for (const output of runbookCommand(commands, id).outputs) {
+      const relative = output.slice("$PROFILE_ROOT/".length);
+      const value = values[relative] ?? rawEvidenceFor(relative);
+      await fsp.writeFile(
+        path.join(dir, relative),
+        typeof value === "string" ? value : JSON.stringify(value),
+        "utf8",
+      );
+    }
+  }
+}
+
+function rawEvidenceFor(relative: string): string {
+  return relative.endsWith(".txt") ? "ok\n" : "{}\n";
 }
 
 function setupRuntimeHttp(check: "health" | "readiness" | "worker-heartbeats") {
@@ -146,6 +178,9 @@ async function runEvidenceHook(capabilityId: string, topology: any, awsEc2Profil
         : {}),
       ...(capabilityId === "aws-network-foundation" || capabilityId === "aws-s3-artifact-store"
         ? { awsFoundationInspection: topology.foundation }
+        : {}),
+      ...(capabilityId === "supabase-privatelink-prerequisite"
+        ? { supabasePrivateLinkIac: privateLinkIacEvidence() }
         : {}),
     });
   return capabilityId === "aws-ecr-control-plane-registry" ? withAwsCredentialFile(run) : run();

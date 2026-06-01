@@ -6,6 +6,10 @@ import type {
 } from "./cloud-control-provider-capability-hooks";
 import type { AwsDatabaseEvidence } from "./cloud-control-aws-topology-types";
 import { validateSupabasePrivateLinkEvidence } from "./cloud-control-supabase-privatelink-evidence";
+import {
+  summarizeSupabasePrivateLinkIac,
+  validateSupabasePrivateLinkIacBundle,
+} from "./cloud-control-supabase-privatelink-iac-evidence";
 
 export function supabasePrivateLinkAdapter(base: HookAdapter): HookAdapter {
   const phase = (selectedPhase: CloudProviderCapabilityHookPhase): HookAdapterPhase => {
@@ -14,17 +18,18 @@ export function supabasePrivateLinkAdapter(base: HookAdapter): HookAdapter {
         selectedPhase === "reviewed-import" ? base.reviewedImport : base[selectedPhase];
       const result = await basePhase(opts);
       const privatelink = privateLinkEvidence(opts);
+      const iac = opts.supabasePrivateLinkIac || {};
       return {
         ...result,
         summary: privatelink
-          ? `${result.summary} AWS-side PrivateLink automation evidence`
+          ? `${result.summary} AWS-side PrivateLink IaC evidence`
           : result.summary,
         rawOutput: privatelink
-          ? `${result.rawOutput} awsSideAutomation=ram,lattice,private-dns,psql`
+          ? `${result.rawOutput} iac=opentofu readOnlyEvidence=ram,lattice,private-dns,sg,psql`
           : result.rawOutput,
         payload: {
           schemaVersion: "supabase-privatelink-provider-payload@1",
-          ...(privatelink ? automatedPayload(selectedPhase, opts, privatelink) : evidencePayload()),
+          ...(privatelink ? iacPayload(selectedPhase, opts, privatelink, iac) : evidencePayload()),
         },
       };
     };
@@ -70,16 +75,26 @@ function evidencePayload() {
   };
 }
 
-function automatedPayload(
+function iacPayload(
   phase: CloudProviderCapabilityHookPhase,
   opts: HookAdapterPhaseOptions,
   evidence: NonNullable<ReturnType<typeof privateLinkEvidence>>,
+  iac: NonNullable<HookAdapterPhaseOptions["supabasePrivateLinkIac"]>,
 ) {
+  const errors = validateSupabasePrivateLinkIacBundle({
+    iac,
+    phase,
+    topology: opts.awsTopologyEvidence,
+  });
+  if (errors.length > 0) {
+    throw new Error(
+      `supabase-privatelink-prerequisite IaC evidence rejected: ${errors.join("; ")}`,
+    );
+  }
   return {
-    evidenceMode: "aws-side-automated",
+    evidenceMode: "iac-reviewed",
     supportMediated: true,
     supportEvidenceRef: "privatelink-request",
-    awsApiInputsPresent: true,
     expected: {
       accountId: opts.awsTopologyEvidence?.accountId,
       region: opts.awsTopologyEvidence?.region,
@@ -88,48 +103,13 @@ function automatedPayload(
       endpointId: evidence.endpointId,
       serviceNetworkAssociationId: evidence.serviceNetworkAssociationId,
     },
-    ram: {
-      ramShareArn: evidence.ramShareArn,
-      ramShareStatus: evidence.ramShareStatus,
-      permissionDigest: evidence.ramPermission.digest,
+    iac: {
+      orchestration: "reviewed-opentofu-artifacts",
+      ownership: "opentofu-managed-or-reviewed-import",
+      outcomes: summarizeSupabasePrivateLinkIac(iac),
+      plan: iac.plan,
+      apply: iac.apply,
+      readOnly: iac.readOnly,
     },
-    lattice: {
-      resourceConfigurationArn: evidence.resourceConfigurationArn,
-      endpointId: evidence.endpointId,
-      serviceNetworkAssociationId: evidence.serviceNetworkAssociationId,
-      permissionDigest: evidence.latticePermission.digest,
-    },
-    privateDns: evidence.privateDns,
-    routeSecurityGroupPosture: {
-      endpointSecurityGroupId: evidence.endpointSecurityGroupId,
-      serviceSecurityGroupId: evidence.serviceSecurityGroupId,
-      workerSecurityGroupId: evidence.workerSecurityGroupId,
-      rule: evidence.securityGroupRuleProof,
-    },
-    psql: {
-      checkedAt: evidence.psql.checkedAt,
-      proofDigest: evidence.psqlProofDigest,
-      success: evidence.psql.success,
-      sourceHostIdentity: evidence.psql.sourceHostIdentity,
-      vpcId: evidence.psql.vpcId,
-    },
-    mutationOutcomes: mutationOutcomes(phase, evidence),
   };
-}
-
-function mutationOutcomes(
-  phase: CloudProviderCapabilityHookPhase,
-  evidence: NonNullable<ReturnType<typeof privateLinkEvidence>>,
-) {
-  const mode = phase === "apply" || phase === "rollback" ? "recorded-or-reconciled" : "verified";
-  return [
-    { action: "ram-share-acceptance", status: evidence.ramShareStatus, mode },
-    {
-      action: evidence.endpointId
-        ? "vpc-lattice-endpoint-association"
-        : "vpc-lattice-service-network-association",
-      status: "associated",
-      mode,
-    },
-  ];
 }

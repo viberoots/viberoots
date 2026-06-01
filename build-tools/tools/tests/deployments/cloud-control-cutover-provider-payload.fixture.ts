@@ -1,7 +1,7 @@
 import { buildSupabaseManagedPostgresEvidence } from "../../deployments/control-plane-supabase-postgres-evidence";
 import { reviewedSupabaseManagedPostgresProfile } from "../../deployments/control-plane-supabase-postgres-profile";
 import { IMAGE_DIGEST, IMAGE_REF } from "./cloud-control-aws-topology.fixture";
-import { privateLinkEndpointEvidence } from "./cloud-control-supabase-privatelink.fixture";
+import { privateLinkIacEvidence } from "./cloud-control-supabase-privatelink.fixture";
 import { ecrRegistryProfileForImage } from "./control-plane-registry-profile.fixture";
 
 export function providerPayloadFor(id: string) {
@@ -45,43 +45,25 @@ function awsEcrPayload() {
 }
 
 function supabasePrivateLinkPayload() {
-  const evidence = privateLinkEndpointEvidence();
   return {
     providerPayload: {
       schemaVersion: "supabase-privatelink-provider-payload@1",
-      evidenceMode: "aws-side-automated",
+      evidenceMode: "iac-reviewed",
       supportMediated: true,
       supportEvidenceRef: "privatelink-request",
-      awsApiInputsPresent: true,
       expected: {
         accountId: "123456789012",
         region: "us-east-1",
-        ramShareArn: evidence.ramShareArn,
-        resourceConfigurationArn: evidence.resourceConfigurationArn,
-        endpointId: evidence.endpointId,
+        ramShareArn: "arn:aws:ram:us-east-1:123456789012:resource-share/share-123",
+        resourceConfigurationArn:
+          "arn:aws:vpc-lattice:us-east-1:123456789012:resourceconfiguration/rcfg-123",
+        endpointId: "vpce-privatelink123",
       },
-      ram: {
-        ramShareArn: evidence.ramShareArn,
-        ramShareStatus: evidence.ramShareStatus,
+      iac: {
+        orchestration: "reviewed-opentofu-artifacts",
+        ownership: "opentofu-managed-or-reviewed-import",
+        ...privateLinkIacEvidence(),
       },
-      lattice: {
-        resourceConfigurationArn: evidence.resourceConfigurationArn,
-        endpointId: evidence.endpointId,
-      },
-      privateDns: evidence.privateDns,
-      routeSecurityGroupPosture: {
-        endpointSecurityGroupId: evidence.endpointSecurityGroupId,
-        serviceSecurityGroupId: evidence.serviceSecurityGroupId,
-        workerSecurityGroupId: evidence.workerSecurityGroupId,
-        rule: evidence.securityGroupRuleProof,
-      },
-      psql: {
-        checkedAt: evidence.psql.checkedAt,
-        proofDigest: evidence.psqlProofDigest,
-        success: evidence.psql.success,
-        vpcId: evidence.psql.vpcId,
-      },
-      mutationOutcomes: [{ action: "ram-share-acceptance", status: "accepted" }],
     },
   };
 }

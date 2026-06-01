@@ -2,7 +2,10 @@ import type { CloudControlSetupInput } from "./cloud-control-setup-types";
 import type { RunbookCommand } from "./cloud-control-runbook";
 import { managedRuntimeFlags, sourceHostPrelude } from "./cloud-control-runbook-managed-runtime";
 import { rootPrelude } from "./cloud-control-runbook-root";
-import { supabasePrivateLinkEvidenceCommands } from "./cloud-control-runbook-supabase-privatelink";
+import {
+  supabasePrivateLinkEvidenceCommands,
+  supabasePrivateLinkIacCommands,
+} from "./cloud-control-runbook-supabase-privatelink";
 import { supabasePostgresEvidenceCommand } from "./cloud-control-runbook-supabase-postgres";
 import { providerCapabilityEvidenceCommands } from "./cloud-control-runbook-provider-capabilities";
 
@@ -18,8 +21,9 @@ export function managedCommands(input: CloudControlSetupInput): RunbookCommand[]
   ];
   return [
     supabasePostgresEvidenceCommand(input),
-    ...providerCapabilityEvidenceCommands(input),
     ...supabasePrivateLinkEvidenceCommands(input, rootPrelude(input.outDir)),
+    ...supabasePrivateLinkIacCommands(input, rootPrelude(input.outDir)),
+    ...providerCapabilityEvidenceCommands(input),
     command(
       "database",
       body,

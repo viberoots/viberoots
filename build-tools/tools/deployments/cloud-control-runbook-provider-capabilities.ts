@@ -40,6 +40,14 @@ function inputFlags(capabilityId: string): string {
       ' --ecr-readonly-evidence "$PROFILE_ROOT/ecr-readonly-evidence.json"',
     ].join("");
   }
+  if (capabilityId === "supabase-privatelink-prerequisite") {
+    return [
+      topology,
+      ' --supabase-privatelink-opentofu-plan "$PROFILE_ROOT/supabase-privatelink-opentofu-plan.json"',
+      ' --supabase-privatelink-opentofu-apply "$PROFILE_ROOT/supabase-privatelink-opentofu-apply.json"',
+      ' --supabase-privatelink-readonly-evidence "$PROFILE_ROOT/supabase-privatelink-readonly-evidence.json"',
+    ].join("");
+  }
   if (capabilityId !== "aws-ec2-control-plane-host") return topology;
   return `${topology} --aws-ec2-profile "$PROFILE_ROOT/aws-ec2-profile.yaml"`;
 }
@@ -57,6 +65,14 @@ function inputs(capabilityId: string): string[] {
       "$PROFILE_ROOT/ecr-opentofu-plan.json",
       "$PROFILE_ROOT/ecr-opentofu-apply.json",
       "$PROFILE_ROOT/ecr-readonly-evidence.json",
+    ];
+  }
+  if (capabilityId === "supabase-privatelink-prerequisite") {
+    return [
+      ...values,
+      "$PROFILE_ROOT/supabase-privatelink-opentofu-plan.json",
+      "$PROFILE_ROOT/supabase-privatelink-opentofu-apply.json",
+      "$PROFILE_ROOT/supabase-privatelink-readonly-evidence.json",
     ];
   }
   return capabilityId === "aws-ec2-control-plane-host"

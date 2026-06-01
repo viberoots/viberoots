@@ -27,6 +27,7 @@ import { setupArtifactCredentialMode } from "./cloud-control-setup-aws-topology"
 import { runtimeAuthConfig, type RuntimeInput } from "./cloud-control-runtime-input";
 import { renderCredentialMap } from "./cloud-control-credential-map";
 import { renderResidualActionChecklist } from "./cloud-control-residual-actions";
+import { renderPrivateLinkOpenTofuFiles } from "./cloud-control-setup-privatelink-iac";
 
 export type CloudControlSetupBundle = {
   files: Record<string, string>;
@@ -55,6 +56,7 @@ export function renderCloudControlSetupBundle(
       ? { "registry-profile.json": renderRegistryProfile(input) }
       : {}),
     ...renderEcrIacEvidence(input),
+    ...renderPrivateLinkOpenTofuFiles(input),
     "conformance-checklist.json": renderConformanceChecklist(input),
     "managed-dependencies.profile.yaml": renderManagedDependencyProfile(input),
     "managed-dependencies.json": renderManagedDependencies(input),

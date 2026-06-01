@@ -165,17 +165,27 @@ If you are using private database traffic:
 1. In the Supabase dashboard, open the project and go to Settings > Integrations.
 2. Add the AWS account id under the AWS PrivateLink section.
 3. Wait for Supabase to create the VPC Lattice Resource Configuration and send the AWS RAM share.
-4. Use reviewed IaC to accept or import the AWS RAM resource share in the same region as the
-   Supabase project, then run the generated
-   `provider-capability-supabase-privatelink-prerequisite` command to record the typed IaC and
-   read-only AWS-side evidence from reviewed topology inputs.
-5. Use reviewed IaC to create or import a security group for the endpoint or service network that
+4. Run the generated `supabase-privatelink-opentofu-plan`,
+   `supabase-privatelink-opentofu-apply`, and `supabase-privatelink-readonly-evidence` commands
+   from `commands.json`. The bundle contains the reviewed OpenTofu stack under
+   `$PROFILE_ROOT/opentofu/aws-control-plane-foundation` plus
+   `supabase-privatelink-opentofu.tfvars.json`; it does not contain completed evidence.
+5. After reviewing the raw OpenTofu plan/apply outputs and read-only AWS/`psql` collection outputs,
+   write the typed evidence files
+   `supabase-privatelink-opentofu-plan.json`,
+   `supabase-privatelink-opentofu-apply.json`, and
+   `supabase-privatelink-readonly-evidence.json` at the setup bundle root.
+6. Run the generated
+   `deployment-control-plane provider-capability --provider-capability supabase-privatelink-prerequisite`
+   command. It fails closed when the typed evidence files are missing, stale, mismatched, or not
+   rooted in the setup bundle.
+7. Use reviewed IaC to create or import a security group for the endpoint or service network that
    allows Postgres TCP 5432 from the control-plane service and worker security group.
-6. Use reviewed IaC to create or import either:
+8. Use reviewed IaC to create or import either:
    - a PrivateLink endpoint of type `Resources`, or
    - an association from an existing VPC Lattice service network.
-7. Enable DNS names where possible so the database URL can use a stable private hostname.
-8. Test `psql` from an instance inside the VPC.
+9. Enable DNS names where possible so the database URL can use a stable private hostname.
+10. Test `psql` from an instance inside the VPC.
 
 Capture evidence:
 
@@ -209,6 +219,11 @@ The split is explicit: Supabase dashboard or support action starts the share, re
 or imports the AWS RAM share, reviewed IaC owns VPC Lattice wiring and security groups, read-only
 evidence proves the private network path and private DNS, and the runtime database URL must then
 select that private hostname.
+
+The provider-capability hook must not issue direct RAM, VPC Lattice, IAM, or security-group AWS API
+mutations from custom hook code. Preview/apply phases may orchestrate reviewed OpenTofu artifacts;
+setup-doctor and cutover reject topology-only `aws-side-automated` payloads and support-mediated
+AWS-side substitutes when the typed IaC outputs are expected.
 
 ## Step 3: Provision AWS Infrastructure
 
@@ -297,7 +312,7 @@ prefixes without an explicit reviewed approval.
 Operator procedure for `aws-network-foundation`:
 
 1. Preview: run OpenTofu plan from
-   `build-tools/deployments/aws-control-plane-foundation/opentofu` with the reviewed variable inputs
+   `$PROFILE_ROOT/opentofu/aws-control-plane-foundation` with the reviewed variable inputs
    for the account, region, VPC mode, subnet CIDRs or imported VPC id, tags, state bucket, and
    allowed HTTPS egress CIDRs. Save the plan digest and ensure no public subnet is selected as a
    private subnet.

@@ -32,6 +32,12 @@ const expectedVariableNames = `
   ingress_certificate_renewal_reference ingress_certificate_renewal_digest
   ingress_certificate_dns_validation_reference ingress_certificate_dns_validation_digest
   ingress_route53_zone_id ingress_allowed_client_cidrs ingress_waf_enabled
+  supabase_privatelink_enabled supabase_privatelink_ram_share_arn
+  supabase_privatelink_resource_configuration_arn
+  supabase_privatelink_endpoint_subnet_ids
+  supabase_privatelink_service_network_identifier
+  supabase_privatelink_private_dns_enabled
+  supabase_privatelink_connection_mode supabase_privatelink_import_adoption_metadata
 `
   .trim()
   .split(/\s+/);

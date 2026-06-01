@@ -49,10 +49,36 @@ output "foundation_evidence" {
         importBlock       = var.ecr_import_adoption_metadata.import_block
       }
     } : null
-    state_bucket                    = aws_s3_bucket.state.bucket
-    state_lock_table                = aws_dynamodb_table.state_lock.name
-    state_backend                   = "s3"
-    state_lock                      = "dynamodb"
+    supabase_privatelink = var.supabase_privatelink_enabled ? {
+      schemaVersion            = "supabase-privatelink-opentofu-output@1"
+      connectionMode           = var.supabase_privatelink_connection_mode
+      ramShareArn              = var.supabase_privatelink_ram_share_arn
+      ramShareStatus           = "accepted"
+      resourceConfigurationArn = var.supabase_privatelink_resource_configuration_arn
+      endpointId               = local.supabase_privatelink_endpoint_id
+      serviceNetworkAssociationId = (
+        local.supabase_privatelink_service_network_association_id
+      )
+      privateDns = {
+        enabled  = var.supabase_privatelink_private_dns_enabled
+        dnsNames = local.supabase_privatelink_dns_names
+      }
+      routeSecurityGroupPosture = {
+        endpointSecurityGroupId = aws_security_group.privatelink.id
+        serviceSecurityGroupId  = aws_security_group.service.id
+        workerSecurityGroupId   = aws_security_group.worker.id
+        routeTableIds           = [for table in aws_route_table.private : table.id]
+      }
+      importAdoption = {
+        mode              = var.supabase_privatelink_import_adoption_metadata.mode
+        reviewedReference = var.supabase_privatelink_import_adoption_metadata.reviewed_reference
+        importBlock       = var.supabase_privatelink_import_adoption_metadata.import_block
+      }
+    } : null
+    state_bucket     = aws_s3_bucket.state.bucket
+    state_lock_table = aws_dynamodb_table.state_lock.name
+    state_backend    = "s3"
+    state_lock       = "dynamodb"
     ingress = var.ingress_enabled ? {
       mode                 = local.ingress_managed_cert ? "create" : "import"
       load_balancer_arn    = aws_lb.control_plane[0].arn

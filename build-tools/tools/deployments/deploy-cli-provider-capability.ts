@@ -70,7 +70,10 @@ async function providerInputs(capabilityId: string) {
     return { awsFoundationInspection: topology.foundation };
   }
   if (capabilityId === "supabase-privatelink-prerequisite") {
-    return topology ? { awsTopologyEvidence: topology } : {};
+    return {
+      ...(topology ? { awsTopologyEvidence: topology } : {}),
+      supabasePrivateLinkIac: await privateLinkIacInputs(),
+    };
   }
   if (capabilityId !== "supabase-managed-postgres") return {};
   const profilePath = getFlagStr("supabase-postgres-profile", "").trim();
@@ -128,6 +131,14 @@ async function ecrIacInputs() {
     ...(await optionalJsonFlag("ecr-opentofu-plan", "plan")),
     ...(await optionalJsonFlag("ecr-opentofu-apply", "apply")),
     ...(await optionalJsonFlag("ecr-readonly-evidence", "readOnly")),
+  };
+}
+
+async function privateLinkIacInputs() {
+  return {
+    ...(await optionalJsonFlag("supabase-privatelink-opentofu-plan", "plan")),
+    ...(await optionalJsonFlag("supabase-privatelink-opentofu-apply", "apply")),
+    ...(await optionalJsonFlag("supabase-privatelink-readonly-evidence", "readOnly")),
   };
 }
 

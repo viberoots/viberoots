@@ -14,6 +14,7 @@ import {
   registryProfile,
   withAwsCredentialFile,
 } from "./cloud-control-aws-ecr-registry.fixture";
+import { privateLinkIacEvidence } from "./cloud-control-supabase-privatelink.fixture";
 
 const DIGEST_REF =
   "registry.example.com/platform/deployment-control-plane@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
@@ -36,6 +37,7 @@ test("provider-capability hook evidence is required before protected readiness",
   const completeEvidence = await hookEvidenceFor(capabilities);
   assert.deepEqual(
     validateProviderCapabilityEvidence(capabilities, completeEvidence, {
+      awsTopology: privateLinkAwsTopology(),
       supabasePostgresProfile: supabaseProfile(),
     }),
     [],
@@ -50,7 +52,7 @@ test("provider-capability hook evidence is required before protected readiness",
     validateProviderCapabilityEvidence(
       capabilities,
       { ...completeEvidence, "supabase-managed-postgres": wrongSupabase },
-      { supabasePostgresProfile: supabaseProfile() },
+      { awsTopology: privateLinkAwsTopology(), supabasePostgresProfile: supabaseProfile() },
     ).join("\n"),
     /does not match selected setup profile/,
   );
@@ -130,6 +132,12 @@ async function runEvidenceHook(capabilityId: string, foundation: unknown) {
         : {}),
       ...(capabilityId === "supabase-managed-postgres"
         ? { supabasePostgresProfile: supabaseProfile() }
+        : {}),
+      ...(capabilityId === "supabase-privatelink-prerequisite"
+        ? {
+            awsTopologyEvidence: privateLinkAwsTopology(),
+            supabasePrivateLinkIac: privateLinkIacEvidence(),
+          }
         : {}),
     });
   return capabilityId === "aws-ecr-control-plane-registry" ? withAwsCredentialFile(run) : run();
