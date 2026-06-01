@@ -15,6 +15,7 @@ import { validateSupabaseProfileSource } from "./cloud-control-cutover-supabase"
 import { validateCredentialCutoverEvidence } from "./cloud-control-cutover-credentials";
 import { validateCutoverOperationEvidence } from "./cloud-control-cutover-operation";
 import { validateCutoverEvidenceContract } from "./cloud-control-cutover-contract";
+import { validateRuntimeHttpEvidenceSet } from "./cloud-control-runtime-http-evidence";
 
 const BASE_HEALTH = [
   "cloudHealth",
@@ -34,7 +35,15 @@ export function validateCloudControlCutover(
   const errors = [
     ...validateCutoverEvidenceContract(evidence, options),
     ...validateIdentity(evidence, options),
+    ...validateRuntimeConfigContract(evidence),
     ...validateBaseHealth(evidence),
+    ...validateRuntimeHttpEvidenceSet(evidence.health, {
+      expectedPublicUrl: String(evidence.runtimeConfig?.publicUrl || ""),
+      expectedHostProfile: options.expectedHostProfile,
+      expectedProfileIdentity: String(evidence.sourceHost || ""),
+      expectedWorkerCount: expectedWorkerCount(evidence),
+      maxAgeMinutes: options.maxAgeMinutes,
+    }),
     ...validateSupabaseProfileSource(evidence, options),
     ...validateManagedDependencyCutoverSource(evidence),
     ...validateManagedDependencyEvidence(
@@ -153,6 +162,17 @@ function validateBaseHealth(evidence: CutoverEvidence): string[] {
   return BASE_HEALTH.flatMap((name) =>
     evidence.health?.[name] ? [] : [`missing ${name} evidence`],
   );
+}
+
+function validateRuntimeConfigContract(evidence: CutoverEvidence): string[] {
+  return expectedWorkerCount(evidence) > 0
+    ? []
+    : ["runtime config missing trusted expected worker count"];
+}
+
+function expectedWorkerCount(evidence: CutoverEvidence): number {
+  const count = Number((evidence.runtimeConfig?.workers as any)?.expectedCount);
+  return Number.isFinite(count) && count > 0 ? count : 0;
 }
 
 function validateLatestDeployment(

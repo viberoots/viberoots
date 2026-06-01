@@ -5,6 +5,7 @@ import path from "node:path";
 import YAML from "yaml";
 import { runCloudProviderCapabilityHook } from "../../deployments/cloud-control-provider-capability-hooks";
 import { privateLinkSupabaseProfile } from "./control-plane-supabase-postgres.fixture";
+import { runtimeHttpEvidence } from "./cloud-control-cutover-fixture";
 
 export async function writeBundle(dir: string, files: Record<string, string>): Promise<void> {
   for (const [name, content] of Object.entries(files)) {
@@ -37,6 +38,20 @@ export async function writeEvidence(dir: string, output: string): Promise<void> 
   await fsp.writeFile(path.join(dir, output.slice("$PROFILE_ROOT/".length)), "{}\n", "utf8");
 }
 
+export async function writeRuntimeHttpEvidenceOutput(
+  dir: string,
+  output: string,
+  id: string,
+): Promise<void> {
+  const check = id === "worker-heartbeats" ? "worker-heartbeats" : id;
+  const value = setupRuntimeHttp(check as "health" | "readiness" | "worker-heartbeats");
+  await fsp.writeFile(
+    path.join(dir, output.slice("$PROFILE_ROOT/".length)),
+    JSON.stringify(value),
+    "utf8",
+  );
+}
+
 export async function writeSupabaseProviderEvidence(dir: string): Promise<void> {
   await fsp.writeFile(
     path.join(dir, "supabase-managed-postgres-evidence.json"),
@@ -50,6 +65,45 @@ export async function writeSupabaseProviderEvidence(dir: string): Promise<void> 
     ),
     "utf8",
   );
+}
+
+function setupRuntimeHttp(check: "health" | "readiness" | "worker-heartbeats") {
+  const value = runtimeHttpEvidence(check);
+  return {
+    ...value,
+    expected: { ...(value as any).expected, profileIdentity: "i-0abc1234" },
+    body:
+      check === "worker-heartbeats"
+        ? { workers: ["worker-1", "worker-2"].map((workerId) => setupWorker(workerId)) }
+        : check === "readiness"
+          ? readinessBody("i-0abc1234")
+          : check === "health"
+            ? { ok: true, instanceId: "i-0abc1234" }
+            : (value as any).body,
+    ...(check === "readiness" ? { dependencies: readinessDependencies("i-0abc1234") } : {}),
+  };
+}
+
+function readinessDependencies(profileIdentity: string) {
+  return {
+    database: { ok: true },
+    artifactStore: { ok: true },
+    workerQueueLocks: { ok: true },
+    runtimeConfig: { ok: true, profileIdentity },
+  };
+}
+
+function readinessBody(profileIdentity: string) {
+  return { ok: true, ...readinessDependencies(profileIdentity) };
+}
+
+function setupWorker(workerId: string) {
+  return {
+    workerId,
+    instanceId: "i-0abc1234",
+    status: "running",
+    lastSeenAt: new Date().toISOString(),
+  };
 }
 
 export async function writeProviderCapabilityEvidence(dir: string, commands: any): Promise<void> {

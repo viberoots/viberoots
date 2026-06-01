@@ -18,6 +18,7 @@ import {
   imagePublicationEvidence,
   managedDependencyEvidence,
   privateLinkAwsTopology,
+  runtimeHttpEvidence,
 } from "./cloud-control-cutover-fixture";
 import { liveCredentialStagingEvidence } from "./cloud-control-credential-staging.fixture";
 import { ingressCommandEvidence } from "./cloud-control-aws-ingress.fixture";
@@ -30,6 +31,13 @@ test("generated cutover evidence collector output is accepted by cutover validat
     await writeBundle(tmp, renderCloudControlSetupBundle(setupInput(tmp)).files);
     await writeCutoverInputs(tmp);
     const collected = await collectCutoverEvidence(tmp);
+    assert.equal(
+      (collected.health?.cloudHealth as any)?.schemaVersion,
+      "cloud-control-runtime-http-evidence@1",
+    );
+    assert.equal((collected.health?.readiness as any)?.dependencies?.database?.ok, true);
+    assert.equal((collected.health?.workerHeartbeats as any)?.body?.workers.length, 2);
+    assert.equal(collected.expectedWorkerCount, 2);
     const result = validateCloudControlCutover(collected, {
       operation: "cutover",
       expectedHostProfile: "aws-ec2",
@@ -127,7 +135,53 @@ function inputEvidence(file: string, binding: Record<string, string>): unknown {
   if (file === "ingress-tls-evidence.json") return ingress.tls;
   if (file === "ingress-health-evidence.json") return ingress.health;
   if (file === "ingress-callback-evidence.json") return ingress.callback;
+  if (file === "http-health.json") return collectorRuntimeHttp("health");
+  if (file === "http-readiness.json") return collectorRuntimeHttp("readiness");
+  if (file === "http-worker-heartbeats.json") return collectorRuntimeHttp("worker-heartbeats");
   return { evidenceRef: file, checkedAt: new Date().toISOString() };
+}
+
+function collectorRuntimeHttp(check: "health" | "readiness" | "worker-heartbeats") {
+  const value = runtimeHttpEvidence(check);
+  return {
+    ...value,
+    expected: {
+      ...(value as any).expected,
+      profileIdentity: "i-0abc1234",
+      workerCount: 1,
+    },
+    body:
+      check === "worker-heartbeats"
+        ? { workers: ["worker-1", "worker-2"].map((workerId) => worker(workerId)) }
+        : check === "readiness"
+          ? readinessBody("i-0abc1234")
+          : check === "health"
+            ? { ok: true, instanceId: "i-0abc1234" }
+            : (value as any).body,
+    ...(check === "readiness" ? { dependencies: readinessDependencies("i-0abc1234") } : {}),
+  };
+}
+
+function readinessDependencies(profileIdentity: string) {
+  return {
+    database: { ok: true },
+    artifactStore: { ok: true },
+    workerQueueLocks: { ok: true },
+    runtimeConfig: { ok: true, profileIdentity },
+  };
+}
+
+function readinessBody(profileIdentity: string) {
+  return { ok: true, ...readinessDependencies(profileIdentity) };
+}
+
+function worker(workerId: string) {
+  return {
+    workerId,
+    instanceId: "i-0abc1234",
+    status: "running",
+    lastSeenAt: new Date().toISOString(),
+  };
 }
 
 function collectorHost(value: unknown, binding: Record<string, string>): unknown {

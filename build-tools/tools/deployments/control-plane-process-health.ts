@@ -48,16 +48,22 @@ function timestampString(value: unknown): string {
 export async function checkControlPlaneReadiness(opts: {
   backend: NixosSharedHostControlPlaneBackendTarget;
   objectStore?: ControlPlaneArtifactStore;
+  runtimeConfig?: { publicUrl?: string; profileIdentity?: string };
 }) {
   const database = await checkDatabaseReadiness(opts.backend);
   const artifactStore = opts.objectStore
     ? await checkArtifactStoreReadiness(opts.objectStore)
     : { ok: false, reason: "not_configured" };
   const workers = database.ok ? await readWorkerHeartbeats(opts.backend) : [];
+  const workerQueueLocks = database.ok
+    ? await checkWorkerQueueLocksReadiness(opts.backend)
+    : { ok: false, reason: "database_unavailable" };
   return {
-    ok: database.ok && artifactStore.ok,
+    ok: database.ok && artifactStore.ok && workerQueueLocks.ok,
     database,
     artifactStore,
+    workerQueueLocks,
+    runtimeConfig: { ok: true, ...(opts.runtimeConfig || {}) },
     workers,
   };
 }
@@ -81,5 +87,17 @@ async function checkArtifactStoreReadiness(store: ControlPlaneArtifactStore) {
       return { ok: true, bucket: store.bucket };
     }
     return { ok: false, bucket: store.bucket, reason: "metadata_check_failed" };
+  }
+}
+
+async function checkWorkerQueueLocksReadiness(backend: NixosSharedHostControlPlaneBackendTarget) {
+  try {
+    await queryBackend(
+      backend,
+      "SELECT (SELECT COUNT(*) FROM queue) AS queue_count, (SELECT COUNT(*) FROM locks) AS lock_count",
+    );
+    return { ok: true };
+  } catch {
+    return { ok: false, reason: "queue_or_locks_check_failed" };
   }
 }

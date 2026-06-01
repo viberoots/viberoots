@@ -85,6 +85,7 @@ function renderRuntimeConfig(input: CloudControlSetupInput, runtimeInput: Runtim
       publicUrl: input.publicUrl,
       tokenFile: cred("control-plane-token"),
     },
+    workers: { expectedCount: input.workerReplicas },
     storage: {
       recordsRoot: "/var/lib/deployment-control-plane/records",
       artifactStagingRoot: "/var/lib/deployment-control-plane/artifacts",

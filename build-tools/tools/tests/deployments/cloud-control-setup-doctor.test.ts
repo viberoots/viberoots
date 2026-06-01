@@ -27,6 +27,7 @@ import {
   writeBundle,
   writeEvidence,
   writeProviderCapabilityEvidence,
+  writeRuntimeHttpEvidenceOutput,
   writeSupabaseProviderEvidence,
 } from "./cloud-control-setup-doctor.helpers";
 const DIGEST_REF =
@@ -84,7 +85,12 @@ test("setup doctor classifies local runbook phases without cloud credentials", a
       "supabase-privatelink-tcp-5432-sg",
       "supabase-privatelink-private-psql",
     ]) {
-      await writeEvidence(tmp, runbookCommand(commands, id).outputs[0]);
+      const output = runbookCommand(commands, id).outputs[0];
+      if (["health", "readiness", "worker-heartbeats"].includes(id)) {
+        await writeRuntimeHttpEvidenceOutput(tmp, output, id);
+      } else {
+        await writeEvidence(tmp, output);
+      }
     }
     const after = await validateRunbookBundle(tmp);
     assert.equal(phase(after, "managed-dependencies").status, "complete");
@@ -107,7 +113,12 @@ test("setup doctor classifies local runbook phases without cloud credentials", a
       "readiness",
       "worker-heartbeats",
     ]) {
-      await writeEvidence(tmp, runbookCommand(commands, id).outputs[0]);
+      const output = runbookCommand(commands, id).outputs[0];
+      if (["health", "readiness", "worker-heartbeats"].includes(id)) {
+        await writeRuntimeHttpEvidenceOutput(tmp, output, id);
+      } else {
+        await writeEvidence(tmp, output);
+      }
     }
     const afterHttp = await validateRunbookBundle(tmp);
     assert.equal(phase(afterHttp, "http-validation").status, "complete");

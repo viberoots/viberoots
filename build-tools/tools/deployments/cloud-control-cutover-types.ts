@@ -19,6 +19,7 @@ export type CutoverEvidence = {
   expectedImageBuildIdentity?: string;
   selectedProviderCapabilities?: string[];
   health?: Record<string, unknown>;
+  expectedWorkerCount?: number;
   imagePublication?: ControlPlaneImagePublicationEvidence;
   managedDependencies?: ManagedDependencyEvidence;
   supabasePostgresProfile?: SupabaseManagedPostgresProfile;

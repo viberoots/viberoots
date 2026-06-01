@@ -5,6 +5,7 @@ import { getFlagStr } from "../lib/cli";
 import type { CutoverEvidence } from "./cloud-control-cutover-types";
 import { awsTopologyRequiredCapabilityIds } from "./cloud-control-aws-topology-capabilities";
 import { digestCredentialInput } from "./control-plane-credential-staging-evidence";
+import { readRuntimeHttpEvidence } from "./cloud-control-runtime-http-evidence";
 
 export async function runCloudControlCutoverEvidenceCommand(): Promise<CutoverEvidence> {
   const bundleDir = path.resolve(getFlagStr("bundle-dir", ".").trim());
@@ -28,6 +29,7 @@ export async function collectCutoverEvidence(bundleDir: string): Promise<Cutover
   const selected = awsTopologyRequiredCapabilityIds(topology);
   const credentialStaging = await readJson(path.join(root, "credential-staging.live.json"));
   const credentialMap = await readJson(path.join(root, "credential-map.json"));
+  const health = await healthEvidence(root);
   return {
     schemaVersion: "cloud-cutover-evidence@1",
     operationIdentity: {
@@ -44,7 +46,8 @@ export async function collectCutoverEvidence(bundleDir: string): Promise<Cutover
     imageDigest: String(imagePublication?.image || ""),
     expectedImageBuildIdentity: String(imagePublication?.imageBuildIdentity || ""),
     selectedProviderCapabilities: selected,
-    health: healthEvidence(root),
+    health,
+    expectedWorkerCount: expectedWorkerCount(config),
     imagePublication,
     managedDependencies,
     supabasePostgresProfile: await readJson(path.join(root, "supabase-postgres.profile.json")),
@@ -55,6 +58,7 @@ export async function collectCutoverEvidence(bundleDir: string): Promise<Cutover
     ),
     runtimeConfig: {
       publicUrl: config?.service?.publicUrl,
+      workers: { expectedCount: expectedWorkerCount(config) },
       authProvider: config?.authProvider,
     },
     providerCapabilities: await providerCapabilityEvidence(root, selected),
@@ -92,18 +96,18 @@ async function readIngressEvidence(root: string) {
   return Object.fromEntries(files.map((name, index) => [name, values[index]]));
 }
 
-function healthEvidence(root: string) {
+async function healthEvidence(root: string) {
   return {
-    cloudHealth: { evidencePath: path.join(root, "http-health.json") },
-    readiness: { evidencePath: path.join(root, "http-readiness.json") },
-    workerHeartbeats: { evidencePath: path.join(root, "http-worker-heartbeats.json") },
+    cloudHealth: await readRuntimeHttpEvidence(root, "health"),
+    readiness: await readRuntimeHttpEvidence(root, "readiness"),
+    workerHeartbeats: await readRuntimeHttpEvidence(root, "worker-heartbeats"),
     databaseConnectivity: { evidencePath: path.join(root, "managed-dependency-evidence.json") },
     artifactStoreCompatibility: {
       evidencePath: path.join(root, "managed-dependency-evidence.json"),
     },
-    authCallbackReachability: { evidencePath: path.join(root, "ingress-callback.json") },
-    uiReads: { evidencePath: path.join(root, "http-health.json") },
-    mcpReads: { evidencePath: path.join(root, "http-readiness.json") },
+    authCallbackReachability: await readJson(path.join(root, "ingress-callback-evidence.json")),
+    uiReads: await readRuntimeHttpEvidence(root, "health"),
+    mcpReads: await readRuntimeHttpEvidence(root, "readiness"),
   };
 }
 
@@ -115,6 +119,11 @@ async function requiredCredentialFiles(root: string): Promise<string[]> {
 
 function hostIdentity(topology: any): string {
   return String(topology?.host?.instanceId || topology?.compute?.instanceId || "aws-ec2");
+}
+
+function expectedWorkerCount(config: any): number {
+  const count = Number(config?.workers?.expectedCount);
+  return Number.isFinite(count) && count > 0 ? count : 1;
 }
 
 async function readJson(file: string): Promise<any> {

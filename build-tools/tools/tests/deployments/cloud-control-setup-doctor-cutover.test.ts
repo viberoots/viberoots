@@ -15,6 +15,7 @@ import {
   evidence,
   managedDependencyEvidence,
   privateLinkAwsTopology,
+  runtimeHttpEvidence,
   topologyForPublishedImage,
 } from "./cloud-control-cutover-fixture";
 import { liveCredentialStagingEvidence } from "./cloud-control-credential-staging.fixture";
@@ -26,6 +27,7 @@ import {
   runbookCommand,
   writeBundle,
   writeEvidence,
+  writeRuntimeHttpEvidenceOutput,
   writeSupabaseProviderEvidence,
 } from "./cloud-control-setup-doctor.helpers";
 
@@ -49,6 +51,32 @@ test("setup doctor blocks and unlocks cutover-readiness from generated evidence"
     }
     const after = await validateRunbookBundle(tmp);
     assert.equal(phase(after, "cutover-readiness").status, "complete");
+  });
+});
+
+test("setup doctor reports precise invalid runtime HTTP cutover evidence", async () => {
+  await runInScratchTemp("cloud-control-setup-doctor-cutover-http-invalid", async (tmp) => {
+    const bundle = renderCloudControlSetupBundle(input(tmp));
+    await writeBundle(tmp, bundle.files);
+    const commands = JSON.parse(bundle.files["commands.json"]!);
+    await completePrerequisites(tmp, commands);
+    const cutoverEvidence = evidence({
+      health: {
+        ...(evidence().health as any),
+        readiness: {
+          ...runtimeHttpEvidence("readiness"),
+          dependencies: { database: { ok: true } },
+        },
+      },
+    });
+    for (const [file, value] of Object.entries(cutoverFiles(cutoverEvidence))) {
+      await fsp.writeFile(path.join(tmp, file), JSON.stringify(value), "utf8");
+    }
+    const result = await validateRunbookBundle(tmp);
+    assert.match(
+      phase(result, "cutover-readiness").evidenceErrors.join("\n"),
+      /runtime HTTP readiness missing passing artifact store dependency detail/,
+    );
   });
 });
 
@@ -90,7 +118,12 @@ async function completePrerequisites(tmp: string, commands: any) {
     "readiness",
     "worker-heartbeats",
   ]) {
-    await writeEvidence(tmp, runbookCommand(commands, id).outputs[0]);
+    const output = runbookCommand(commands, id).outputs[0];
+    if (["health", "readiness", "worker-heartbeats"].includes(id)) {
+      await writeRuntimeHttpEvidenceOutput(tmp, output, id);
+    } else {
+      await writeEvidence(tmp, output);
+    }
   }
 }
 

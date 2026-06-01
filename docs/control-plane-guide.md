@@ -647,8 +647,8 @@ only.
 Service probes:
 
 - `GET /healthz` checks process liveness and image metadata.
-- `GET /readyz` checks database connectivity, artifact-store metadata-read connectivity, and worker
-  heartbeat visibility.
+- `GET /readyz` checks database connectivity, artifact-store metadata-read connectivity, worker
+  queue/lock tables, and worker heartbeat visibility.
 - `GET /api/v1/worker-heartbeats` reports authenticated worker heartbeat summaries.
 
 ## Step 10: Run Runtime And AWS Evidence Checks
@@ -662,8 +662,28 @@ From the ordered phases in `commands.json`, run:
 - readiness check
 - worker-heartbeat check
 
-The generated HTTP checks use the configured public URL and read bearer tokens from the staged
-`control-plane-token` file without embedding token values in the runbook.
+The generated HTTP checks use the configured public URL and write typed runtime HTTP evidence files:
+
+- `http-health.json`
+- `http-readiness.json`
+- `http-worker-heartbeats.json`
+
+Each file is a `cloud-control-runtime-http-evidence@1` envelope with `checkedAt`, `url`, `host`,
+`expected.publicUrl`, `expected.hostProfile`, `expected.profileIdentity`,
+`expected.deploymentIds`, `expected.workerCount`, `credentialSource`, `status.httpStatus`,
+`status.ok`, and the parsed response `body`. Authenticated worker-heartbeat evidence must record a
+token-file credential source such as `control-plane-token`; it must not contain bearer token values,
+raw authorization headers, or copied credential contents.
+
+Readiness evidence must include passing dependency details for:
+
+- `database`
+- `artifactStore`
+- `workerQueueLocks`
+- `runtimeConfig`
+
+Worker-heartbeat evidence must include at least the expected worker count, each worker id, matching
+profile identity, `running` status, and fresh `lastSeenAt` timestamps.
 
 Setup readiness and cutover consume the freshness-gated
 `supabase-managed-postgres-evidence@1` lifecycle envelope. A stale bare
@@ -754,6 +774,16 @@ do not satisfy protected/shared readiness by themselves.
   heartbeat rows. `/healthz` does not prove dependencies are usable.
 - Worker heartbeat missing: confirm at least two worker processes use the same config file,
   database URL, artifact store, and image digest as the service.
+- Stale runtime HTTP evidence: rerun the generated `health`, `readiness`, and `worker-heartbeats`
+  commands from `commands.json` immediately before cutover.
+- URL or host mismatch: regenerate the setup bundle or fix `--public-url`; cutover requires the
+  evidence URL host to match `config.yaml` and the selected public ingress.
+- Readiness dependency failure: inspect `/readyz` for the failing `database`, `artifactStore`,
+  `workerQueueLocks`, or `runtimeConfig` entry before collecting cutover evidence again.
+- Worker heartbeat drift: confirm all expected worker units are running on the selected profile and
+  writing fresh heartbeats with matching instance/profile identity.
+- Token-file misuse: rerun the generated worker-heartbeat command so evidence records
+  `credentialSource.kind: token_file` without inline bearer token material.
 - S3 check fails: confirm bucket, endpoint, signing region, IAM role or access key, endpoint policy,
   and key prefix.
 - Missing credential failure: compare host files against `credential-manifest.json`. Do not repair

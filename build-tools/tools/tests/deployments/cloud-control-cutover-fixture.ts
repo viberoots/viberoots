@@ -23,6 +23,7 @@ import {
 } from "./cloud-control-aws-topology.fixture";
 import { evidenceRef, operationEnvelope } from "./cloud-control-cutover-operation.fixture";
 import { providerPayloadFor } from "./cloud-control-cutover-provider-payload.fixture";
+import { RUNTIME_HTTP_SCHEMA } from "../../deployments/cloud-control-runtime-http-evidence";
 
 export { managedDependencyEvidence } from "./cloud-control-cutover-managed-dependencies.fixture";
 export { foundationFromTopology } from "./cloud-control-aws-foundation-fixture";
@@ -64,15 +65,16 @@ export function evidence(overrides: Record<string, unknown> = {}) {
       "supabase-privatelink-prerequisite",
     ],
     health: {
-      cloudHealth: true,
-      readiness: true,
-      workerHeartbeats: 2,
+      cloudHealth: runtimeHttpEvidence("health"),
+      readiness: runtimeHttpEvidence("readiness"),
+      workerHeartbeats: runtimeHttpEvidence("worker-heartbeats"),
       databaseConnectivity: true,
       artifactStoreCompatibility: true,
       authCallbackReachability: true,
-      uiReads: true,
-      mcpReads: true,
+      uiReads: runtimeHttpEvidence("health"),
+      mcpReads: runtimeHttpEvidence("readiness"),
     },
+    expectedWorkerCount: 2,
     imagePublication: imagePublicationEvidence(),
     managedDependencies: managedDependencyEvidence(),
     supabasePostgresProfile: reviewedSupabaseManagedPostgresProfile({
@@ -94,6 +96,7 @@ export function evidence(overrides: Record<string, unknown> = {}) {
     },
     runtimeConfig: {
       publicUrl: "https://deploy.example.test",
+      workers: { expectedCount: 2 },
       authProvider: {
         callback: {
           externalHost: "deploy-auth.example.test",
@@ -143,6 +146,67 @@ export function evidence(overrides: Record<string, unknown> = {}) {
     },
     audit: { cutover: true, rollback: true, restore: true, "break-glass": true },
     ...overrides,
+  };
+}
+
+export function runtimeHttpEvidence(check: "health" | "readiness" | "worker-heartbeats") {
+  const body =
+    check === "worker-heartbeats"
+      ? { workers: [workerHeartbeat("worker-1"), workerHeartbeat("worker-2")] }
+      : check === "readiness"
+        ? {
+            ok: true,
+            database: { ok: true },
+            artifactStore: { ok: true },
+            workerQueueLocks: { ok: true },
+            runtimeConfig: { ok: true, profileIdentity: "aws-ec2-instance-i-123" },
+          }
+        : { ok: true, instanceId: "aws-ec2-instance-i-123" };
+  return {
+    schemaVersion: RUNTIME_HTTP_SCHEMA,
+    check,
+    checkedAt: new Date().toISOString(),
+    url: `https://deploy.example.test/${
+      check === "health" ? "healthz" : check === "readiness" ? "readyz" : "api/v1/worker-heartbeats"
+    }`,
+    host: "deploy.example.test",
+    expected: {
+      publicUrl: "https://deploy.example.test",
+      host: "deploy.example.test",
+      hostProfile: "aws-ec2",
+      profileIdentity: "aws-ec2-instance-i-123",
+      deploymentIds: ["pleomino-staging"],
+      workerCount: 2,
+    },
+    credentialSource:
+      check === "worker-heartbeats"
+        ? {
+            kind: "token_file",
+            tokenFile: "control-plane-token",
+            credentialRootEnv: "CREDENTIAL_DIR",
+          }
+        : { kind: "none" },
+    status: { ok: true, httpStatus: 200 },
+    ...(check === "readiness"
+      ? {
+          dependencies: {
+            database: { ok: true },
+            artifactStore: { ok: true },
+            workerQueueLocks: { ok: true },
+            runtimeConfig: { ok: true, profileIdentity: "aws-ec2-instance-i-123" },
+          },
+        }
+      : {}),
+    body,
+  };
+}
+
+function workerHeartbeat(workerId: string) {
+  return {
+    workerId,
+    instanceId: "aws-ec2-instance-i-123",
+    status: "running",
+    lastSeenAt: new Date().toISOString(),
   };
 }
 

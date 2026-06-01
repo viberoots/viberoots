@@ -79,6 +79,7 @@ export async function startNixosSharedHostControlPlaneServer(opts: {
         const readiness = await checkControlPlaneReadiness({
           backend,
           objectStore: opts.objectStore,
+          runtimeConfig: { profileIdentity: opts.instanceId || "unknown" },
         });
         writeJson(response, readiness.ok ? 200 : 503, readiness);
         return;

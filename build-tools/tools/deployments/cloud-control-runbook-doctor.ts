@@ -12,6 +12,7 @@ import {
   validateCredentialStagingOutput,
 } from "./cloud-control-runbook-credential-evidence";
 import { validateCutoverOutput } from "./cloud-control-runbook-cutover-evidence";
+import { validateRuntimeHttpOutput } from "./cloud-control-runbook-runtime-http-evidence";
 
 export async function validateRunbookBundle(bundleDir: string) {
   const profileRoot = path.resolve(bundleDir);
@@ -204,10 +205,12 @@ async function validateOutputEvidence(profileRoot: string, file: string): Promis
     file !== "$PROFILE_ROOT/credential-staging.json" &&
     file !== "$PROFILE_ROOT/credential-staging.live.json" &&
     file !== "$PROFILE_ROOT/credential-rotation.json" &&
-    file !== "$PROFILE_ROOT/cloud-cutover-evidence.json"
+    file !== "$PROFILE_ROOT/cloud-cutover-evidence.json" &&
+    !file.startsWith("$PROFILE_ROOT/http-")
   ) {
     return [];
   }
+  if (file.startsWith("$PROFILE_ROOT/http-")) return validateRuntimeHttpOutput(profileRoot, file);
   if (file === "$PROFILE_ROOT/supabase-managed-postgres-evidence.json") {
     return validateSupabaseProviderOutput(profileRoot);
   }
