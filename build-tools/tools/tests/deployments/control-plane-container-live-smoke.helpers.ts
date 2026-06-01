@@ -10,6 +10,7 @@ import { validateManagedArtifactStoreProfile } from "../../deployments/control-p
 import type { ProviderCapabilityDeclaration } from "../../deployments/cloud-control-setup-types";
 import {
   awsTopologyInputs,
+  expectedEc2HostModeFromLiveProfile,
   validateAwsProviderCapabilityEvidence,
   validateOptionalAwsTopology,
 } from "./control-plane-container-live-smoke-aws.helpers";
@@ -182,7 +183,10 @@ async function validateLiveProviderCapabilityEvidence(env: Record<string, string
   const evidenceByCapability = JSON.parse(
     await fsp.readFile(env.VBR_CONTROL_PLANE_LIVE_PROVIDER_CAPABILITY_EVIDENCE_FILE, "utf8"),
   ) as Record<string, string[]>;
-  const errors = validateProviderCapabilityEvidence(declarations, evidenceByCapability);
+  const expectedEc2HostMode = await expectedEc2HostModeFromLiveProfile(env);
+  const errors = validateProviderCapabilityEvidence(declarations, evidenceByCapability, {
+    expectedEc2HostMode,
+  });
   assert.deepEqual(errors, [], errors.join("; "));
   await validateAwsProviderCapabilityEvidence(env, declarations, evidenceByCapability);
 }

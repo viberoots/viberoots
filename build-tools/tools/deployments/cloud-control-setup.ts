@@ -19,6 +19,7 @@ import type {
   CloudProfileMode,
   ReviewedSourceMode,
 } from "./cloud-control-setup-types";
+import { EC2_HOST_MODES, DEFAULT_EC2_HOST_MODE } from "./cloud-control-aws-ec2-host-mode";
 import { artifactCredentialMode } from "./control-plane-artifact-credential-mode";
 import type { SupabaseManagedPostgresProfile } from "./control-plane-supabase-postgres-profile";
 import { readRuntimeInputFile } from "./cloud-control-runtime-input";
@@ -79,6 +80,7 @@ export function readCloudControlSetupInput(): CloudControlSetupInput {
   return {
     outDir: getFlagStr("out", "cloud-control-profile").trim(),
     mode,
+    ec2HostMode: enumFlag("ec2-host-mode", DEFAULT_EC2_HOST_MODE, EC2_HOST_MODES),
     image: imagePublication.image,
     expectedImageBuildIdentity: imagePublication.expectedImageBuildIdentity,
     imagePublication: imagePublication.imagePublication,

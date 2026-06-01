@@ -3,6 +3,8 @@ import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import * as fsp from "node:fs/promises";
 import * as path from "node:path";
+import YAML from "yaml";
+import type { Ec2HostMode } from "../../deployments/cloud-control-aws-ec2-host-mode";
 import {
   hookEvidenceRefs,
   providerCapabilityHookEvidenceRecord,
@@ -17,8 +19,10 @@ export async function validateAwsProviderCapabilityEvidence(
 ) {
   if (env.VBR_CONTROL_PLANE_LIVE_AWS_TOPOLOGY !== "1") return;
   const awsTopology = await readJsonFile(env.VBR_CONTROL_PLANE_LIVE_AWS_TOPOLOGY_EVIDENCE_FILE);
+  const expectedEc2HostMode = await expectedEc2HostModeFromLiveProfile(env);
   const driftErrors = validateProviderCapabilityEvidence(declarations, evidenceByCapability, {
     awsTopology,
+    expectedEc2HostMode,
   });
   assert.deepEqual(driftErrors, [], driftErrors.join("; "));
   const selected = declarations.find(
@@ -47,6 +51,18 @@ export async function validateAwsProviderCapabilityEvidence(
       `${selected.id} evidence must reference ${path.basename(file)} by file or digest`,
     );
   }
+}
+
+export async function expectedEc2HostModeFromLiveProfile(
+  env: Record<string, string>,
+): Promise<Ec2HostMode | undefined> {
+  if (env.VBR_CONTROL_PLANE_LIVE_AWS_TOPOLOGY !== "1") return undefined;
+  const file = env.VBR_CONTROL_PLANE_LIVE_AWS_EC2_PROFILE_FILE;
+  assert.ok(file, "VBR_CONTROL_PLANE_LIVE_AWS_EC2_PROFILE_FILE is required");
+  const profile = YAML.parse(await fsp.readFile(file, "utf8"));
+  const mode = String(profile?.ec2HostMode || "");
+  assert.match(mode, /^(external-reviewed-host|repo-owned-asg)$/);
+  return mode as Ec2HostMode;
 }
 
 async function evidenceRefs(file: string) {

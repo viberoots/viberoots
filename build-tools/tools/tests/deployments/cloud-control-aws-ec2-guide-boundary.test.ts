@@ -8,13 +8,18 @@ test("guide documents EC2 host adapter boundary and generated inputs", async () 
   assert.match(guide, /non-mutating structured EC2 host adapter/);
   assert.match(
     guide,
-    /does not create or update EC2 instances, launch templates, or Auto Scaling groups/,
+    /does not create or update EC2 instances, launch templates, or Auto\s+Scaling groups/,
   );
   assert.match(guide, /selected AWS topology evidence and generated host profile/);
   assert.match(guide, /--aws-topology-evidence/);
   assert.match(guide, /aws-topology-evidence\.json/);
   assert.match(guide, /aws-ec2-profile\.yaml/);
   assert.match(guide, /provider-capability-aws-ec2-control-plane-host\.json/);
+  assert.match(guide, /external-reviewed-host/);
+  assert.match(guide, /repo-owned-asg/);
+  assert.match(guide, /platform-team-owned EC2 remains preferable/i);
+  assert.match(guide, /launch-template version rollback/);
+  assert.match(guide, /worker drain or\s+shutdown proof/);
 });
 
 test("guide documents implemented instance-profile and reviewed-source mode credential contracts", async () => {
@@ -29,4 +34,19 @@ test("guide documents implemented instance-profile and reviewed-source mode cred
   assert.match(guide, /GitHub App mode stages `reviewed-source-github-app-id`/);
   assert.match(setup, /instance-profile mode uses the reviewed EC2 instance profile/s);
   assert.match(setup, /does not stage artifact\s+access-key or secret-key files/);
+});
+
+test("guide cutover example includes generated AWS-primary capabilities", async () => {
+  const guide = await fsp.readFile("docs/control-plane-guide.md", "utf8");
+  assert.match(guide, /generated `cutover-validate` command from\s+`commands\.json`/s);
+  for (const capability of [
+    "aws-ec2-control-plane-host",
+    "aws-network-foundation",
+    "aws-ecr-control-plane-registry",
+    "aws-s3-artifact-store",
+    "supabase-managed-postgres",
+    "supabase-privatelink-prerequisite",
+  ]) {
+    assert.match(guide, new RegExp(capability));
+  }
 });

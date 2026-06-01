@@ -176,7 +176,7 @@ If you are using private database traffic:
    `supabase-privatelink-opentofu-apply.json`, and
    `supabase-privatelink-readonly-evidence.json` at the setup bundle root.
 6. Run the generated
-   `deployment-control-plane provider-capability --provider-capability supabase-privatelink-prerequisite`
+   `deployment-control-plane provider-capability --deployment-id <deployment-id> --provider-capability supabase-privatelink-prerequisite`
    command. It fails closed when the typed evidence files are missing, stale, mismatched, or not
    rooted in the setup bundle.
 7. Use reviewed IaC to create or import a security group for the endpoint or service network that
@@ -245,7 +245,7 @@ The repo-owned profile covers these AWS resources:
   artifact credentials only for reviewed non-AWS S3-compatible backends
 - ALB or NLB listener and target group
 - ACM certificate and DNS records
-- EC2 instance or launch template for the NixOS/OCI host
+- optional EC2 launch template and Auto Scaling Group only when `repo-owned-asg` is selected
 
 For the recommended AWS registry path, use the generated
 `aws-ecr-control-plane-registry` provider-capability command rather than hand-written ECR notes.
@@ -287,15 +287,26 @@ ownership, capability id, topology identity, fresh drift proof, and non-destruct
 posture.
 
 For the EC2 host itself, prefer the generated AWS EC2 host profile from
-`deployment-control-plane setup --host-mode aws-ec2`. The current repo-owned boundary is a
-non-mutating structured EC2 host adapter: it validates the generated instance host profile against
-reviewed AWS topology evidence and emits typed preview, apply-intent, evidence, smoke, and rollback
-payloads. It does not create or update EC2 instances, launch templates, or Auto Scaling groups in
-ordinary runs. Live EC2 realization still comes from reviewed AWS foundation/IaC or an imported
-cloud-foundation process, and the adapter proves that the selected host identity, AMI, instance
-type, subnets, security groups, instance profile, bootstrap digest, container runtime, and
-credential mount wiring match the selected AWS topology evidence and generated host profile before
-protected/shared use.
+`deployment-control-plane setup --host-mode aws-ec2`. The default EC2 realization mode is
+`external-reviewed-host`: a non-mutating structured EC2 host adapter validates the generated instance host
+profile against reviewed AWS topology evidence and emits typed preview, apply-intent, evidence,
+smoke, and rollback payloads. The selected AWS topology evidence and generated host profile inputs are
+the contract for that adapter. It does not create or update EC2 instances, launch templates, or Auto Scaling groups.
+Live EC2 realization still comes from reviewed AWS foundation/IaC or an imported
+cloud-foundation process.
+
+Select `repo-owned-asg` only when the viberoots-reviewed OpenTofu stack should own the EC2 launch
+template and Auto Scaling Group lifecycle. Platform-team-owned EC2 remains preferable when the
+organization already has hardened golden AMI pipelines, endpoint-security enrollment, SSM/session
+policies, fleet patching, or replacement controls that must stay in a central cloud foundation. In
+both modes, provider evidence proves that the selected host identity, AMI, reviewed instance type,
+subnets, security groups, instance profile, bootstrap digest, worker process placement, container
+runtime, logs/alarms, and credential mount wiring match the selected AWS topology evidence and
+generated host profile before protected/shared use.
+
+Repo-owned ASG rollback is non-destructive: keep the ASG and previous launch-template version,
+roll back by selecting the previously reviewed launch-template version, drain or shut down workers
+with evidence, and retain rollback metadata before protected/shared cutover.
 
 The generated NixOS EC2 example imports the existing control-plane container module with AWS-specific
 inputs. The generated systemd/Podman artifacts are a compatibility mode for non-NixOS OCI hosts and
@@ -340,16 +351,17 @@ Operator procedure for `aws-ec2-control-plane-host`:
    selected instance or ASG identity, launch-template id/version when present, AMI pin, instance
    type, private subnet ids, service/worker security groups, instance profile, bootstrap digest,
    container runtime, and credential mount mode.
-2. Apply-intent: run the generated apply hook only after EC2 host realization has been completed by
-   the reviewed external foundation process. The hook records non-mutating structured evidence that
-   the generated profile still matches the realized EC2 identity.
+2. Apply-intent: in `external-reviewed-host`, run the generated apply hook only after EC2 host
+   realization has been completed by the reviewed external foundation process. In `repo-owned-asg`,
+   run the generated ASG OpenTofu plan/apply commands from `commands.json`, then attach typed
+   plan/apply/read-only evidence to the provider-capability command.
 3. Evidence: run the generated record command from `commands.json`; it writes
    `provider-capability-aws-ec2-control-plane-host.json` for setup-doctor and cutover collection.
 4. Smoke: after service and workers are running, run the smoke hook and keep its typed payload with
    process, readiness, worker-heartbeat, and rollback posture evidence.
-5. Rollback: keep the previous host profile, previous systemd/Podman unit set, worker shutdown
-   proof, and non-destructive replacement path. The default hook validates rollback evidence shape;
-   it does not destroy EC2 resources.
+5. Rollback: keep the previous host profile, previous systemd/Podman unit set, worker drain or
+   shutdown proof, and non-destructive replacement path. For `repo-owned-asg`, use reviewed
+   launch-template version rollback metadata rather than deleting the ASG.
 
 Operator procedure for `aws-s3-artifact-store`:
 
@@ -435,6 +447,7 @@ deployment-control-plane setup \
   --dry-run \
   --out ./cloud-control-profile \
   --host-mode aws-ec2 \
+  --ec2-host-mode external-reviewed-host \
   --image-publication-evidence ./image-publication.json \
   --public-url https://deploy.example.com \
   --auth-callback-host deploy-auth.example.com \
@@ -458,6 +471,12 @@ Then rerun without `--dry-run` after every prerequisite is resolved. The
 setup must include the generated ingress command evidence files. Literal `true`, dashboard notes,
 raw IaC state, subnet/security-group string lists, and other truthy placeholders do not satisfy AWS
 setup validation.
+
+Use `--ec2-host-mode repo-owned-asg` only after reviewing the generated ASG OpenTofu inputs and
+backend config in the bundle. That mode adds generated `ec2-asg-opentofu-plan`,
+`ec2-asg-opentofu-apply`, and `ec2-asg-readonly-evidence` commands; import/adoption of an existing
+launch template or ASG requires reviewed import metadata plus read-only evidence before
+protected/shared use.
 
 If you are using public TLS instead of Supabase PrivateLink, make the AWS topology evidence database
 mode `public`. PrivateLink mode must be `privatelink`.
@@ -697,7 +716,9 @@ database endpoint. A laptop or CI runner proof is accepted only when the profile
 non-cutover diagnostic evidence.
 
 Before this step is considered ready for cutover evidence, confirm the generated host realization
-artifacts are active on the selected EC2 host: NixOS EC2 wrapper or generated systemd units,
+artifacts are active on the selected EC2 host. In `external-reviewed-host`, this proof comes from
+reviewed external topology and host-profile evidence. In `repo-owned-asg`, it also includes
+generated OpenTofu plan/apply/read-only evidence for the launch template and ASG. Both modes require
 selected private subnet placement, reviewed instance profile, encrypted EBS/state path, registry
 pull proof for the exact image digest, worker lease/fencing evidence, and operational visibility
 for service down, readiness failure, missing worker heartbeat, queue backlog, and repeated worker
@@ -824,7 +845,10 @@ deployment-control-plane cutover-evidence \
   --out ./cloud-control-profile/cloud-cutover-evidence.json
 ```
 
-Then validate the generated report:
+Then validate the generated report by running the generated `cutover-validate` command from
+`commands.json`. It supplies the full selected capability set for the current AWS-primary profile,
+including ECR, Supabase managed Postgres, and Supabase PrivateLink when selected. A representative
+PrivateLink-enabled AWS-primary command shape is:
 
 ```bash
 deployment-control-plane cutover \
@@ -832,7 +856,7 @@ deployment-control-plane cutover \
   --expected-host-profile aws-ec2 \
   --expected-image-build-identity nix-source-<build-identity> \
   --expected-region us-east-1 \
-  --selected-capability aws-ec2-control-plane-host,aws-network-foundation,aws-s3-artifact-store \
+  --selected-capability aws-ec2-control-plane-host,aws-network-foundation,aws-ecr-control-plane-registry,aws-s3-artifact-store,supabase-managed-postgres,supabase-privatelink-prerequisite \
   --out ./cloud-control-profile/cloud-cutover-report.json
 ```
 

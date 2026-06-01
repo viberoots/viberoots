@@ -29,6 +29,7 @@ import { renderCredentialMap } from "./cloud-control-credential-map";
 import { renderResidualActionChecklist } from "./cloud-control-residual-actions";
 import { renderPrivateLinkOpenTofuFiles } from "./cloud-control-setup-privatelink-iac";
 import { renderEcrIacEvidence, renderEcrOpenTofuFiles } from "./cloud-control-setup-ecr-iac";
+import { renderEc2AsgOpenTofuFiles } from "./cloud-control-setup-ec2-asg-iac";
 import { renderPrivateLinkPsqlHelper } from "./cloud-control-setup-privatelink-psql-helper";
 
 export type CloudControlSetupBundle = {
@@ -60,6 +61,7 @@ export function renderCloudControlSetupBundle(
     ...renderEcrOpenTofuFiles(input),
     ...renderEcrIacEvidence(input),
     ...renderPrivateLinkOpenTofuFiles(input),
+    ...renderEc2AsgOpenTofuFiles(input),
     ...renderPrivateLinkPsqlHelper(input),
     "conformance-checklist.json": renderConformanceChecklist(input),
     "managed-dependencies.profile.yaml": renderManagedDependencyProfile(input),

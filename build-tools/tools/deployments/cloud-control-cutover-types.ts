@@ -10,6 +10,7 @@ export type CutoverEvidence = {
     checkedAt?: string;
   };
   hostProfile: string;
+  ec2HostMode?: string;
   region?: string;
   generatedAt: string;
   checkedAt?: string;

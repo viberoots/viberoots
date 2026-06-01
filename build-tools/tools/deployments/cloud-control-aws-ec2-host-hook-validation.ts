@@ -1,9 +1,10 @@
 import { evidenceList, evidenceObject, evidenceText } from "./cloud-control-evidence-helpers";
-
+import { validateEc2AsgIacBundle } from "./cloud-control-aws-ec2-asg-iac-evidence";
 export const AWS_EC2_HOST_HOOK_PAYLOAD_SCHEMA = "aws-ec2-host-hook-payload@1" as const;
 
 export type AwsEc2HostPayloadValidationOptions = {
   expectedAwsTopology?: unknown;
+  expectedEc2HostMode?: "external-reviewed-host" | "repo-owned-asg";
 };
 
 export function validateAwsEc2HostProviderPayload(
@@ -17,15 +18,14 @@ export function validateAwsEc2HostProviderPayload(
   const profile = evidenceObject(payload.generatedProfile);
   const operation = evidenceObject(payload.operation);
   const rollback = evidenceObject(payload.rollback);
+  const selectedMode = evidenceText(payload, "ec2HostMode") || "external-reviewed-host";
   const errors: string[] = [];
   if (payload.schemaVersion !== AWS_EC2_HOST_HOOK_PAYLOAD_SCHEMA) {
     errors.push(`${id}: missing AWS EC2 host provider payload`);
   }
-  if (payload.provisioningBoundary !== "non-mutating-structured-ec2-host-adapter") {
-    errors.push(`${id}: AWS EC2 host payload boundary is unsupported`);
-  }
-  if (operation.mutationAuthority !== false || operation.executed !== false) {
-    errors.push(`${id}: AWS EC2 host fixture hook must be non-mutating by default`);
+  errors.push(...hostModeErrors(id, payload, operation, selectedMode, opts));
+  if (operation.executed !== false) {
+    errors.push(`${id}: AWS EC2 host fixture hook must not execute custom mutations`);
   }
   for (const field of [
     "accountId",
@@ -66,6 +66,58 @@ export function validateAwsEc2HostProviderPayload(
     errors.push(`${id}: EC2 rollback evidence shape drift`);
   }
   errors.push(...validateExpectedTopology(id, identity, opts.expectedAwsTopology));
+  if (selectedMode === "repo-owned-asg") {
+    errors.push(
+      ...validateEc2AsgIacBundle({
+        iac: evidenceObject(payload.iac),
+        phase: String(value.phase || payload.phase || ""),
+        topology: opts.expectedAwsTopology as any,
+        profile,
+        expectedMode: "repo-owned-asg",
+      }).map((error) => `${id}: ${error}`),
+    );
+  }
+  return errors;
+}
+
+function hostModeErrors(
+  id: string,
+  payload: Record<string, unknown>,
+  operation: Record<string, unknown>,
+  selectedMode: string,
+  opts: AwsEc2HostPayloadValidationOptions,
+): string[] {
+  const errors: string[] = [];
+  if (opts.expectedEc2HostMode && selectedMode !== opts.expectedEc2HostMode) {
+    errors.push(`${id}: EC2 host mode does not match selected setup mode`);
+  }
+  if (selectedMode === "external-reviewed-host") {
+    if (Object.keys(evidenceObject(payload.iac)).length > 0) {
+      errors.push(`${id}: external-reviewed-host must not include repo-owned ASG IaC evidence`);
+    }
+    if (payload.mutationAuthority === "opentofu-only") {
+      errors.push(`${id}: external-reviewed-host has repo-owned ASG mutation authority`);
+    }
+    if (payload.provisioningBoundary !== "non-mutating-structured-ec2-host-adapter") {
+      errors.push(`${id}: AWS EC2 external-reviewed payload boundary is unsupported`);
+    }
+    if (operation.mutationAuthority !== false) {
+      errors.push(`${id}: external-reviewed-host must remain non-mutating`);
+    }
+    return errors;
+  }
+  if (selectedMode !== "repo-owned-asg") {
+    return [`${id}: unsupported EC2 host mode ${selectedMode || "<missing>"}`];
+  }
+  if (payload.provisioningBoundary !== "declarative-opentofu-owned-asg") {
+    errors.push(`${id}: repo-owned-asg payload must use OpenTofu ownership boundary`);
+  }
+  if (operation.mutationAuthority !== "opentofu-only") {
+    errors.push(`${id}: repo-owned-asg mutation authority must be OpenTofu-only`);
+  }
+  if (Object.keys(evidenceObject(payload.iac)).length === 0) {
+    errors.push(`${id}: repo-owned-asg requires typed OpenTofu evidence summary`);
+  }
   return errors;
 }
 

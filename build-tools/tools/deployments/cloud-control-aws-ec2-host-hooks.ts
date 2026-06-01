@@ -11,6 +11,9 @@ import type {
   HookAdapterPhaseOptions,
   HookAdapterResult,
 } from "./cloud-control-provider-capability-hooks";
+import { validateEc2AsgIacBundle } from "./cloud-control-aws-ec2-asg-iac-evidence";
+import { DEFAULT_EC2_HOST_MODE, type Ec2HostMode } from "./cloud-control-aws-ec2-host-mode";
+import { ec2BootstrapDigestForMode } from "./cloud-control-aws-ec2-asg-bootstrap";
 
 export function awsEc2HostHookAdapter(): HookAdapter {
   const phase = (selectedPhase: CloudProviderCapabilityHookPhase) => {
@@ -39,10 +42,23 @@ function ec2HostHookResult(
     throw new Error(`aws-ec2-control-plane-host: AWS topology rejected: ${errors.join("; ")}`);
   }
   const payload = ec2HostPayload(phase, opts);
+  const selectedMode = ec2HostMode(opts);
+  if (selectedMode === "repo-owned-asg") {
+    const asgErrors = validateEc2AsgIacBundle({
+      iac: opts.ec2AsgIac || {},
+      phase,
+      topology,
+      profile: opts.awsEc2Profile,
+      expectedMode: selectedMode,
+    });
+    if (asgErrors.length > 0) {
+      throw new Error(`aws-ec2-control-plane-host: ${asgErrors.join("; ")}`);
+    }
+  }
   const payloadErrors = validateAwsEc2HostProviderPayload(
     "aws-ec2-control-plane-host",
     { phase, providerPayload: payload },
-    { expectedAwsTopology: topology },
+    { expectedAwsTopology: topology, expectedEc2HostMode: selectedMode },
   );
   if (payloadErrors.length > 0) {
     throw new Error(payloadErrors.join("; "));
@@ -59,6 +75,7 @@ function ec2HostPayload(phase: CloudProviderCapabilityHookPhase, opts: HookAdapt
   const compute = evidenceObject(topology.compute);
   const userData = evidenceObject(compute.userData);
   const profile = evidenceObject(opts.awsEc2Profile);
+  const selectedMode = ec2HostMode(opts);
   const identity = {
     accountId: evidenceText(topology, "accountId"),
     region: evidenceText(topology, "region"),
@@ -73,7 +90,7 @@ function ec2HostPayload(phase: CloudProviderCapabilityHookPhase, opts: HookAdapt
     instanceProfileArn: evidenceText(compute, "instanceProfileArn"),
     privateSubnetIds: placementSubnets(compute),
     securityGroupIds: evidenceList(compute, "securityGroupIds"),
-    bootstrapDigest: evidenceText(userData, "digest"),
+    bootstrapDigest: ec2BootstrapDigestForMode(selectedMode, evidenceText(userData, "digest")),
     containerRuntime: "podman-systemd",
     credentialMountMode: evidenceText(profile.credentialMountWiring, "mode"),
   };
@@ -82,9 +99,13 @@ function ec2HostPayload(phase: CloudProviderCapabilityHookPhase, opts: HookAdapt
     capabilityId: "aws-ec2-control-plane-host",
     phase,
     deploymentLabel: opts.deploymentLabel,
-    provisioningBoundary: "non-mutating-structured-ec2-host-adapter",
+    ec2HostMode: selectedMode,
+    provisioningBoundary:
+      selectedMode === "repo-owned-asg"
+        ? "declarative-opentofu-owned-asg"
+        : "non-mutating-structured-ec2-host-adapter",
     hostProfile: "aws-ec2",
-    mutationAuthority: false,
+    mutationAuthority: selectedMode === "repo-owned-asg" ? "opentofu-only" : false,
     identity,
     generatedProfile: {
       schemaVersion: evidenceText(profile, "schemaVersion"),
@@ -95,7 +116,8 @@ function ec2HostPayload(phase: CloudProviderCapabilityHookPhase, opts: HookAdapt
       credentialMountMode: evidenceText(profile.credentialMountWiring, "mode"),
       systemdUnits: evidenceList(profile, "systemdUnits"),
     },
-    operation: operation(phase, identity),
+    operation: operation(phase, identity, selectedMode),
+    iac: selectedMode === "repo-owned-asg" ? opts.ec2AsgIac : undefined,
     smokeEvidence: phase === "smoke",
     rollback: {
       nonDestructive: true,
@@ -111,7 +133,15 @@ function placementSubnets(compute: Record<string, unknown>): string[] {
     : evidenceList(compute, "autoScalingGroupSubnetIds");
 }
 
-function operation(phase: CloudProviderCapabilityHookPhase, identity: Record<string, unknown>) {
+function ec2HostMode(opts: HookAdapterPhaseOptions): Ec2HostMode {
+  return opts.expectedEc2HostMode || DEFAULT_EC2_HOST_MODE;
+}
+
+function operation(
+  phase: CloudProviderCapabilityHookPhase,
+  identity: Record<string, unknown>,
+  selectedMode: Ec2HostMode,
+) {
   const action =
     phase === "preview"
       ? "validate-preview"
@@ -123,10 +153,13 @@ function operation(phase: CloudProviderCapabilityHookPhase, identity: Record<str
             ? "validate-smoke"
             : "collect-evidence";
   return {
-    tool: "aws-ec2-host-structured-adapter",
+    tool:
+      selectedMode === "repo-owned-asg"
+        ? "opentofu-aws-ec2-asg-adapter"
+        : "aws-ec2-host-structured-adapter",
     action,
     executed: false,
-    mutationAuthority: false,
+    mutationAuthority: selectedMode === "repo-owned-asg" ? "opentofu-only" : false,
     commandTemplates: commandTemplates(phase),
     outputDigest: digest(JSON.stringify({ phase, identity })),
   };

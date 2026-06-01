@@ -42,6 +42,7 @@ function validateCapability(
       maxAgeMinutes,
       expectedAwsTopology: evidence.awsTopology,
       expectedSupabasePostgresProfile: evidence.supabasePostgresProfile,
+      expectedEc2HostMode: evidence.ec2HostMode as any,
     }),
   );
   if (!declaration) {

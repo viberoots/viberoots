@@ -90,10 +90,10 @@ test("AWS ECR generated commands use deployment-control-plane and reviewed evide
     (entry: any) => entry.id === "provider-capability-aws-ecr-control-plane-registry",
   );
   assert.match(ecr.command, /deployment-control-plane provider-capability/);
-  assert.match(ecr.command, /--preview --provider-capability aws-ecr-control-plane-registry/);
+  assert.match(ecr.command, /--provider-capability aws-ecr-control-plane-registry --preview/);
   assert.match(
     ecr.command,
-    /--provider-capability-phase apply --provider-capability aws-ecr-control-plane-registry/,
+    /--provider-capability aws-ecr-control-plane-registry --provider-capability-phase apply/,
   );
   assert.match(ecr.command, /--registry-profile "\$PROFILE_ROOT\/registry-profile\.json"/);
   assert.match(

@@ -9,6 +9,7 @@ import {
 import { supabasePostgresEvidenceCommand } from "./cloud-control-runbook-supabase-postgres";
 import { providerCapabilityEvidenceCommands } from "./cloud-control-runbook-provider-capabilities";
 import { ecrIacCommands } from "./cloud-control-runbook-ecr-iac";
+import { ec2AsgIacCommands } from "./cloud-control-runbook-ec2-asg-iac";
 
 const CREDENTIAL_DIR = "/run/deployment-control-plane/credentials";
 
@@ -23,6 +24,7 @@ export function managedCommands(input: CloudControlSetupInput): RunbookCommand[]
   return [
     supabasePostgresEvidenceCommand(input),
     ...ecrIacCommands(input, rootPrelude(input.outDir)),
+    ...ec2AsgIacCommands(input, rootPrelude(input.outDir)),
     ...supabasePrivateLinkEvidenceCommands(input, rootPrelude(input.outDir)),
     ...supabasePrivateLinkIacCommands(input, rootPrelude(input.outDir)),
     ...providerCapabilityEvidenceCommands(input),

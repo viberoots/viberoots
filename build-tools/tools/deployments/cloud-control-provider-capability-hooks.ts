@@ -17,6 +17,8 @@ import type { ControlPlaneRegistryProfile } from "./control-plane-registry-profi
 import type { ControlPlaneImagePublicationEvidence } from "./control-plane-image-publication";
 import { supabasePrivateLinkAdapter } from "./cloud-control-supabase-privatelink-hooks";
 import type { SupabasePrivateLinkIacBundle } from "./cloud-control-supabase-privatelink-iac-evidence";
+import type { Ec2AsgIacBundle } from "./cloud-control-aws-ec2-asg-iac-evidence";
+import type { Ec2HostMode } from "./cloud-control-aws-ec2-host-mode";
 
 export const CLOUD_PROVIDER_CAPABILITY_HOOK_PHASES = [
   "preview",
@@ -29,31 +31,6 @@ export const CLOUD_PROVIDER_CAPABILITY_HOOK_PHASES = [
 
 export type CloudProviderCapabilityHookPhase =
   (typeof CLOUD_PROVIDER_CAPABILITY_HOOK_PHASES)[number];
-
-export type CloudProviderCapabilityHookEvidence = {
-  schemaVersion: typeof CLOUD_PROVIDER_CAPABILITY_HOOK_EVIDENCE_SCHEMA;
-  source: typeof CLOUD_PROVIDER_CAPABILITY_HOOK_EVIDENCE_SOURCE;
-  checkedAt: string;
-  capabilityId: string;
-  phase: CloudProviderCapabilityHookPhase;
-  declaration: ProviderCapabilityDeclaration;
-  targetIdentity: string;
-  credentialSource: string;
-  lockScope: string;
-  replaySemantics: string;
-  auditEvidence: string[];
-  auditIdentity: string;
-  rollbackProcedure: string[];
-  smokeEvidence: boolean;
-  hook: { adapter: string; automated: boolean; manualPrerequisite: boolean };
-  output: {
-    classification: string;
-    redacted: boolean;
-    summary: string;
-    fingerprint: string;
-  };
-  providerPayload?: Record<string, unknown>;
-};
 
 export type HookAdapter = {
   name: string;
@@ -78,6 +55,8 @@ export type HookAdapterPhaseOptions = {
   deploymentLabel: string;
   declaration: ProviderCapabilityDeclaration;
   awsEc2Profile?: Record<string, unknown>;
+  expectedEc2HostMode?: Ec2HostMode;
+  ec2AsgIac?: Ec2AsgIacBundle;
   awsFoundationInspection?: AwsFoundationProfile;
   awsTopologyEvidence?: AwsTopologyEvidence;
   supabasePostgresProfile?: SupabaseManagedPostgresProfile;
@@ -110,13 +89,15 @@ export async function runCloudProviderCapabilityHook(opts: {
   targetIdentity?: string;
   declaration?: ProviderCapabilityDeclaration;
   awsEc2Profile?: Record<string, unknown>;
+  expectedEc2HostMode?: Ec2HostMode;
+  ec2AsgIac?: Ec2AsgIacBundle;
   awsFoundationInspection?: AwsFoundationProfile;
   awsTopologyEvidence?: AwsTopologyEvidence;
   supabasePostgresProfile?: SupabaseManagedPostgresProfile;
   registryProfile?: ControlPlaneRegistryProfile;
   imagePublication?: ControlPlaneImagePublicationEvidence;
   supabasePrivateLinkIac?: SupabasePrivateLinkIacBundle;
-}): Promise<CloudProviderCapabilityHookEvidence> {
+}) {
   assertSupportedPhase(opts.phase);
   const declaration = opts.declaration || concreteDeclaration(opts.capabilityId);
   assertValidDeclaration(declaration);
@@ -136,6 +117,8 @@ export async function runCloudProviderCapabilityHook(opts: {
     deploymentLabel: opts.deploymentLabel,
     declaration,
     ...(opts.awsEc2Profile ? { awsEc2Profile: opts.awsEc2Profile } : {}),
+    ...(opts.expectedEc2HostMode ? { expectedEc2HostMode: opts.expectedEc2HostMode } : {}),
+    ...(opts.ec2AsgIac ? { ec2AsgIac: opts.ec2AsgIac } : {}),
     ...(opts.awsFoundationInspection
       ? { awsFoundationInspection: opts.awsFoundationInspection }
       : {}),

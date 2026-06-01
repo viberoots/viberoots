@@ -54,6 +54,7 @@ test("enabled live smoke requires staging, auth, topology, and capability eviden
     awsTopologyInputs({ VBR_CONTROL_PLANE_LIVE_AWS_TOPOLOGY: "1" } as NodeJS.ProcessEnv),
     [
       "VBR_CONTROL_PLANE_LIVE_AWS_TOPOLOGY_EVIDENCE_FILE",
+      "VBR_CONTROL_PLANE_LIVE_AWS_EC2_PROFILE_FILE",
       "VBR_CONTROL_PLANE_LIVE_AWS_SUBNET_EVIDENCE_FILE",
       "VBR_CONTROL_PLANE_LIVE_AWS_SECURITY_GROUP_EVIDENCE_FILE",
       "VBR_CONTROL_PLANE_LIVE_AWS_S3_ENDPOINT_EVIDENCE_FILE",
@@ -170,6 +171,19 @@ test("AWS runtime topology evidence is attached to provider capabilities", async
         },
       }),
     /privateSubnetIds do not match selected topology/,
+  );
+  await assert.rejects(
+    () =>
+      validateAwsProviderCapabilityEvidence(env, capabilities, {
+        "aws-ec2-control-plane-host": {
+          ...completeEvidence,
+          providerPayload: {
+            ...(completeEvidence.providerPayload as Record<string, unknown>),
+            ec2HostMode: "repo-owned-asg",
+          },
+        },
+      }),
+    /EC2 host mode does not match/,
   );
   await validateAwsProviderCapabilityEvidence(env, capabilities, {
     "aws-ec2-control-plane-host": completeEvidence,

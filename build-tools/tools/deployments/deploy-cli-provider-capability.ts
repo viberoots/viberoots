@@ -8,6 +8,11 @@ import {
   runCloudProviderCapabilityHook,
   type CloudProviderCapabilityHookPhase,
 } from "./cloud-control-provider-capability-hooks";
+import {
+  DEFAULT_EC2_HOST_MODE,
+  EC2_HOST_MODES,
+  type Ec2HostMode,
+} from "./cloud-control-aws-ec2-host-mode";
 import type { AwsTopologyEvidence } from "./cloud-control-aws-topology-types";
 import { validateSupabaseManagedPostgresProfile } from "./control-plane-supabase-postgres-validation";
 import {
@@ -58,9 +63,12 @@ async function providerInputs(capabilityId: string) {
         "aws-ec2-control-plane-host provider-capability requires --aws-topology-evidence",
       );
     }
+    const expectedEc2HostMode = ec2HostModeFlag();
     return {
       awsTopologyEvidence: topology,
       awsEc2Profile: await awsEc2ProfileInput(),
+      expectedEc2HostMode,
+      ...(expectedEc2HostMode === "repo-owned-asg" ? { ec2AsgIac: await ec2AsgIacInputs() } : {}),
     };
   }
   if (
@@ -140,6 +148,22 @@ async function privateLinkIacInputs() {
     ...(await optionalJsonFlag("supabase-privatelink-opentofu-apply", "apply")),
     ...(await optionalJsonFlag("supabase-privatelink-readonly-evidence", "readOnly")),
   };
+}
+
+async function ec2AsgIacInputs() {
+  return {
+    ...(await optionalJsonFlag("ec2-asg-opentofu-plan", "plan")),
+    ...(await optionalJsonFlag("ec2-asg-opentofu-apply", "apply")),
+    ...(await optionalJsonFlag("ec2-asg-readonly-evidence", "readOnly")),
+  };
+}
+
+function ec2HostModeFlag(): Ec2HostMode {
+  const value = getFlagStr("ec2-host-mode", DEFAULT_EC2_HOST_MODE).trim();
+  if (!EC2_HOST_MODES.includes(value as Ec2HostMode)) {
+    throw new Error(`unsupported --ec2-host-mode ${value}`);
+  }
+  return value as Ec2HostMode;
 }
 
 async function awsTopologyInput(): Promise<AwsTopologyEvidence | undefined> {

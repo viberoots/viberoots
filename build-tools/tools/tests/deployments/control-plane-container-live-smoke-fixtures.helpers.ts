@@ -21,6 +21,7 @@ export async function writeAwsRuntimeEvidence(
   const dbFile = path.join(tmp, "db.json");
   const s3File = path.join(tmp, "s3.json");
   const shutdownFile = path.join(tmp, "shutdown.json");
+  const profileFile = path.join(tmp, "aws-ec2-profile.yaml");
   const topologyFile = path.join(tmp, "aws-topology.json");
   const subnetFile = path.join(tmp, "subnets.json");
   const groupFile = path.join(tmp, "groups.json");
@@ -66,6 +67,7 @@ export async function writeAwsRuntimeEvidence(
     },
   });
   const topologyInstances = overrides.omitRuntimeTopology ? [] : [serviceProcess, workerProcess];
+  await fsp.writeFile(profileFile, "ec2HostMode: external-reviewed-host\n", "utf8");
   await writeJson(topologyFile, publicAwsTopology());
   await writeJson(subnetFile, {
     subnetIds: ["subnet-0123456789abcdef0"],
@@ -85,6 +87,7 @@ export async function writeAwsRuntimeEvidence(
     VBR_CONTROL_PLANE_LIVE_AWS_RUNTIME_DB_EVIDENCE_FILE: dbFile,
     VBR_CONTROL_PLANE_LIVE_AWS_RUNTIME_S3_EVIDENCE_FILE: s3File,
     VBR_CONTROL_PLANE_LIVE_AWS_WORKER_SHUTDOWN_EVIDENCE_FILE: shutdownFile,
+    VBR_CONTROL_PLANE_LIVE_AWS_EC2_PROFILE_FILE: profileFile,
     VBR_CONTROL_PLANE_LIVE_AWS_TOPOLOGY_EVIDENCE_FILE: topologyFile,
     VBR_CONTROL_PLANE_LIVE_AWS_SUBNET_EVIDENCE_FILE: subnetFile,
     VBR_CONTROL_PLANE_LIVE_AWS_SECURITY_GROUP_EVIDENCE_FILE: groupFile,

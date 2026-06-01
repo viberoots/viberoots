@@ -3,6 +3,7 @@ import type { AwsTopologyEvidence } from "./cloud-control-aws-topology-types";
 import type { ArtifactCredentialMode } from "./control-plane-artifact-credential-mode";
 import type { SupabaseManagedPostgresProfile } from "./control-plane-supabase-postgres-profile";
 import type { RuntimeInput } from "./cloud-control-runtime-input";
+import type { Ec2HostMode } from "./cloud-control-aws-ec2-host-mode";
 
 export const CLOUD_PROFILE_MODES = ["compose-podman", "nixos", "saas-oci", "aws-ec2"] as const;
 
@@ -22,6 +23,7 @@ export type ArtifactBackend = (typeof ARTIFACT_BACKENDS)[number];
 export type CloudControlSetupInput = {
   outDir: string;
   mode: CloudProfileMode;
+  ec2HostMode?: Ec2HostMode;
   image: string;
   expectedImageBuildIdentity: string;
   imagePublication?: ControlPlaneImagePublicationEvidence;

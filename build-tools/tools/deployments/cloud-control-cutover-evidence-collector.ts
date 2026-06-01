@@ -26,6 +26,7 @@ export async function collectCutoverEvidence(bundleDir: string): Promise<Cutover
     readJson(path.join(root, "aws-topology-evidence.json")),
   ]);
   const config = YAML.parse(configText);
+  const ec2Profile = YAML.parse(await readText(path.join(root, "aws-ec2-profile.yaml")));
   const selected = awsTopologyRequiredCapabilityIds(topology);
   const credentialStaging = await readJson(path.join(root, "credential-staging.live.json"));
   const credentialMap = await readJson(path.join(root, "credential-map.json"));
@@ -39,6 +40,7 @@ export async function collectCutoverEvidence(bundleDir: string): Promise<Cutover
     },
     checkedAt: new Date().toISOString(),
     hostProfile: "aws-ec2",
+    ec2HostMode: String(ec2Profile?.ec2HostMode || "external-reviewed-host"),
     region: String(topology?.region || topology?.awsRegion || ""),
     generatedAt: new Date().toISOString(),
     sourceHost: hostIdentity(topology),
@@ -139,5 +141,13 @@ async function readJson(file: string): Promise<any> {
     return JSON.parse(await fsp.readFile(file, "utf8"));
   } catch {
     return undefined;
+  }
+}
+
+async function readText(file: string): Promise<string> {
+  try {
+    return await fsp.readFile(file, "utf8");
+  } catch {
+    return "";
   }
 }

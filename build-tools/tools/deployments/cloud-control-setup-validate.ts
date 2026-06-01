@@ -5,6 +5,7 @@ import {
   type CloudControlSetupInput,
   type ProviderCapabilityDeclaration,
 } from "./cloud-control-setup-types";
+import { EC2_HOST_MODES, DEFAULT_EC2_HOST_MODE } from "./cloud-control-aws-ec2-host-mode";
 import { assertArtifactCredentialModeAllowed } from "./control-plane-artifact-credential-mode";
 import { setupArtifactCredentialMode } from "./cloud-control-setup-aws-topology";
 import {
@@ -31,6 +32,16 @@ export function validateCloudControlSetupInput(input: CloudControlSetupInput): s
   const errors: string[] = [];
   if (!CLOUD_PROFILE_MODES.includes(input.mode))
     errors.push(`unsupported host substrate ${input.mode}`);
+  if (
+    input.mode !== "aws-ec2" &&
+    input.ec2HostMode &&
+    input.ec2HostMode !== DEFAULT_EC2_HOST_MODE
+  ) {
+    errors.push("--ec2-host-mode is only supported with --host-mode aws-ec2");
+  }
+  if (input.ec2HostMode && !EC2_HOST_MODES.includes(input.ec2HostMode)) {
+    errors.push(`unsupported EC2 host mode ${input.ec2HostMode}`);
+  }
   if (!IMAGE_DIGEST_PATTERN.test(input.image)) {
     errors.push("control-plane image must be a registry reference pinned by @sha256 digest");
   }
@@ -196,6 +207,14 @@ function validateAwsEvidence(input: CloudControlSetupInput): string[] {
     awsTopologyDatabaseMode(input.awsTopology) !== "privatelink"
   ) {
     errors.push("--supabase-privatelink requires awsTopology.database.mode privatelink");
+  }
+  if (
+    input.ec2HostMode === "repo-owned-asg" &&
+    input.awsTopology?.compute?.mode !== "auto-scaling-group"
+  ) {
+    errors.push(
+      "--ec2-host-mode repo-owned-asg requires AWS topology compute.mode auto-scaling-group",
+    );
   }
   if (setupArtifactCredentialMode(input) === "aws-instance-profile") {
     errors.push(...validateSetupArtifactIamEvidence(input));

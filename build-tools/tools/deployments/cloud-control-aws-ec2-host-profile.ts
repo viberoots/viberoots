@@ -21,6 +21,8 @@ import {
 } from "./cloud-control-setup-aws-topology";
 import { podmanRun, systemdUnit, userDataScript } from "./cloud-control-aws-ec2-systemd";
 import { awsEc2ArtifactIamBindingField } from "./cloud-control-aws-ec2-artifact-iam-binding";
+import { DEFAULT_EC2_HOST_MODE } from "./cloud-control-aws-ec2-host-mode";
+import { ec2BootstrapDigestForMode } from "./cloud-control-aws-ec2-asg-bootstrap";
 
 export const REQUIRED_AWS_EC2_ALARMS = [
   "service-down",
@@ -59,6 +61,7 @@ function awsProfile(input: CloudControlSetupInput, processes: RenderedControlPla
       : `${input.artifactBackend} with evidence ${setupArtifactBackendEvidenceRef(input)}`;
   return YAML.stringify({
     schemaVersion: "cloud-control-aws-ec2-profile@2",
+    ec2HostMode: input.ec2HostMode || DEFAULT_EC2_HOST_MODE,
     preferredHost: "nixos-ec2",
     compatibilityHost: "systemd-podman",
     artifactBackend: {
@@ -127,7 +130,7 @@ function computeProfile(input: CloudControlSetupInput) {
     securityGroupIds: compute.securityGroupIds || [],
     instanceType: compute.instanceType,
     instanceProfileArn: compute.instanceProfileArn,
-    bootstrapDigest: compute.userData?.digest,
+    bootstrapDigest: ec2BootstrapDigestForMode(input.ec2HostMode, compute.userData?.digest),
     containerRuntime: "podman-systemd",
     recoveryMode: compute.recovery?.mode,
     accessMode: compute.access?.mode,

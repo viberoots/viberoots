@@ -22,11 +22,13 @@ export async function validateRunbookBundle(bundleDir: string) {
     ...(await validateGeneratedArtifacts(profileRoot)),
   ];
   const phases = structureErrors.length > 0 ? [] : await phaseStatuses(profileRoot, runbook);
+  const evidenceErrors = phases.flatMap((phase) => phase.evidenceErrors || []);
   return {
     schemaVersion: "cloud-control-setup-doctor@1",
     profileRoot,
-    ok: structureErrors.length === 0,
+    ok: structureErrors.length === 0 && evidenceErrors.length === 0,
     structureErrors,
+    evidenceErrors,
     phases,
   };
 }

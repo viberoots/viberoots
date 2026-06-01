@@ -16,6 +16,7 @@ const INVALID_EVIDENCE_SOURCE = /\b(dashboard-only|raw-iac-only|manual-notes?)\b
 type ProviderCapabilityEvidenceOptions = {
   awsTopology?: CloudControlSetupInput["awsTopology"];
   supabasePostgresProfile?: CloudControlSetupInput["supabasePostgres"];
+  expectedEc2HostMode?: CloudControlSetupInput["ec2HostMode"];
 };
 
 export function validateProviderCapabilityEvidence(
@@ -52,6 +53,7 @@ function hookShapeErrors(
     allowedPhases: ["evidence"],
     expectedAwsTopology: opts.awsTopology,
     expectedSupabasePostgresProfile: opts.supabasePostgresProfile,
+    expectedEc2HostMode: opts.expectedEc2HostMode,
   });
 }
 

@@ -164,10 +164,10 @@ test("generated ECR bundle carries OpenTofu evidence files and bundle-root comma
   );
   assert.equal(ecr.cwd, "profile-root");
   assert.match(ecr.command, /PROFILE_ROOT="\$\{PROFILE_ROOT:-\$\(pwd\)\}"/);
-  assert.match(ecr.command, /--preview --provider-capability aws-ecr-control-plane-registry/);
+  assert.match(ecr.command, /--provider-capability aws-ecr-control-plane-registry --preview/);
   assert.match(
     ecr.command,
-    /--provider-capability-phase apply --provider-capability aws-ecr-control-plane-registry/,
+    /--provider-capability aws-ecr-control-plane-registry --provider-capability-phase apply/,
   );
   assert.ok(managed.commands.indexOf(readOnly) < managed.commands.indexOf(ecr));
   for (const file of ["ecr-opentofu-plan", "ecr-opentofu-apply", "ecr-readonly-evidence"]) {

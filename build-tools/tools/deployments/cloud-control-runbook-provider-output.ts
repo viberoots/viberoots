@@ -1,5 +1,6 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
+import YAML from "yaml";
 import { validateProviderCapabilityHookEvidenceShape } from "./cloud-control-provider-capability-hook-contract";
 
 export async function validateProviderCapabilityRunbookOutput(
@@ -13,9 +14,13 @@ export async function validateProviderCapabilityRunbookOutput(
     readJson(localPath),
     readJson(path.join(profileRoot, "aws-topology-evidence.json")),
   ]);
+  const profile = YAML.parse(
+    (await readText(path.join(profileRoot, "aws-ec2-profile.yaml"))) || "",
+  );
   return validateProviderCapabilityHookEvidenceShape(output.capabilityId, evidence, {
     allowedPhases: [output.phase],
     expectedAwsTopology: topology,
+    expectedEc2HostMode: profile?.ec2HostMode,
   });
 }
 
@@ -39,6 +44,14 @@ async function readJson(file: string): Promise<any> {
     return JSON.parse(await fsp.readFile(file, "utf8"));
   } catch {
     return undefined;
+  }
+}
+
+async function readText(file: string): Promise<string> {
+  try {
+    return await fsp.readFile(file, "utf8");
+  } catch {
+    return "";
   }
 }
 
