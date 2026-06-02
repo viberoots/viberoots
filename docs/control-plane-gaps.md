@@ -3103,3 +3103,205 @@ follow generated dry-run commands without silently falling back to the external-
 The setup lifecycle becomes more explicit because repo-owned ASG has distinct pre-apply and
 post-apply phases, and the OpenTofu input renderer must either become whole-stack complete or split
 the ASG root cleanly from unrelated foundation resources.
+
+## PR-32: Reviewed AWS credential provenance for ASG evidence collection
+
+### 1. Problem
+
+Post-apply `repo-owned-asg` readiness depends on read-only AWS evidence for the launch template,
+Auto Scaling Group, instance inventory, and runtime posture. The generated ASG evidence command is
+read-only, but it currently permits the AWS CLI to resolve credentials ambiently from the operator
+environment. That violates the control-plane plan's fail-closed credential boundary: protected and
+shared workflows must not rely on unreviewed ambient cloud credentials, even when the command only
+reads provider state.
+
+### 2. Goals
+
+- Make ASG read-only evidence collection use an explicit reviewed credential mode.
+- Preserve the declarative IaC boundary: provider-capability commands may collect/read/validate
+  evidence and orchestrate OpenTofu, but must not mutate durable AWS resources directly.
+- Record enough credential provenance in typed ASG evidence for setup-doctor, readiness, and cutover
+  to fail closed on ambient or mismatched credentials.
+- Keep generated one-button ergonomics by producing the reviewed credential setup and evidence
+  commands as part of the runbook.
+
+### 3. Non-goals
+
+- Do not add custom AWS API mutation for EC2 launch templates, ASGs, IAM, security groups, ECR, RAM,
+  VPC Lattice, or other persistent resources.
+- Do not broaden the ASG OpenTofu module beyond the narrow optional `repo-owned-asg` host path.
+- Do not change `external-reviewed-host` behavior or require AWS credentials for external host mode.
+
+### 4. Required behavior
+
+- Generated ASG read-only evidence commands must establish an explicit reviewed AWS credential
+  boundary before invoking `aws autoscaling` or `aws ec2`.
+- Supported credential provenance must be typed and reviewable, for example an explicit AWS profile,
+  an explicit assume-role ARN/session, or a reviewed instance-profile identity. Ambient default
+  environment credentials must be rejected unless they are represented by an approved provenance
+  record.
+- ASG evidence payloads must include credential provenance for every read-only provider call batch.
+- ASG evidence validation must fail closed when:
+  - credential provenance is missing;
+  - credential provenance is ambient or unreviewed;
+  - the credential account/region does not match the reviewed OpenTofu outputs and topology;
+  - read-only ASG evidence was collected with a different credential boundary than the reviewed
+    plan/apply evidence expects.
+- Generated scripts must remain executable from the bundle root and must continue deriving ASG and
+  launch-template identity from reviewed apply outputs or refreshed topology.
+
+### 5. Required files and docs
+
+- Update ASG runbook command generation and generated script content under
+  `build-tools/tools/deployments/`.
+- Update typed ASG evidence schemas and validators so credential provenance is part of the contract.
+- Update focused ASG evidence fixtures and tests under
+  `build-tools/tools/tests/deployments/`.
+- Update `docs/control-plane-guide.md` and cutover docs to describe the reviewed AWS credential
+  boundary for ASG read-only evidence.
+
+### 6. Expected regression scope
+
+- `deployment-only` for ASG runbook generation, ASG typed evidence validation, setup-doctor,
+  readiness/cutover evidence gating, generated script proof, and docs examples.
+
+### 7. Acceptance criteria
+
+- ASG read-only evidence commands no longer rely on implicit ambient AWS credential resolution.
+- Typed ASG evidence includes reviewed credential provenance and rejects missing, ambient, wrong
+  account, wrong region, and mismatched credential-boundary cases.
+- Setup-doctor/readiness/cutover remain fail-closed until ASG read-only evidence proves both the
+  selected IaC outputs and reviewed credential provenance.
+- `external-reviewed-host` remains unchanged.
+- Documentation clearly explains that read-only AWS evidence still requires a reviewed credential
+  boundary.
+
+### 8. Risks
+
+- Making credential provenance explicit can make the generated command surface more verbose.
+- Operators may already rely on AWS CLI defaults; rejecting them can expose incomplete local setup.
+
+### 9. Mitigations
+
+- Generate the credential setup commands and evidence collection commands together so the one-button
+  flow remains ergonomic.
+- Keep the credential provenance schema small, typed, and aligned with existing ECR/AWS evidence
+  patterns instead of inventing a parallel credential system.
+
+### 10. Consequences of not implementing this PR
+
+`repo-owned-asg` remains vulnerable to passing post-apply gates with evidence collected under
+unreviewed ambient AWS credentials. That weakens the plan's protected/shared runtime boundary and
+can hide account, role, or region mismatches until cutover.
+
+### 11. Downsides for implementing this PR
+
+The ASG evidence payload and generated commands become stricter, and local operator setup must make
+the AWS credential boundary explicit before evidence collection succeeds.
+
+## PR-33: Concrete evidence validators for remaining provider capabilities
+
+### 1. Problem
+
+The provider-capability catalog still includes several capabilities that are represented by generic
+reviewed-evidence adapters:
+
+- `aws-attic-cache-service`;
+- `cloudflare-edge`;
+- `vercel-operator-ui`;
+- `remote-build-worker-fleet`.
+
+The design requires provider-capability hooks to validate capability-specific evidence, not just a
+generic reviewed audit string. AWS EC2, AWS S3/foundation, ECR, Supabase Postgres, and Supabase
+PrivateLink now have concrete fail-closed evidence paths, but these remaining entries do not yet
+prove the specific smoke/evidence contract described by the design.
+
+### 2. Goals
+
+- Replace generic reviewed-evidence stubs for the four remaining capabilities with typed,
+  capability-specific evidence validators.
+- Keep each capability read-only or IaC-orchestrated according to the declarative infrastructure
+  boundary.
+- Add explicit negative tests for every validation rule introduced.
+- Preserve existing catalog IDs and runbook ergonomics.
+
+### 3. Non-goals
+
+- Do not add direct imperative mutation for Cloudflare, Vercel, AWS Attic resources, worker fleets,
+  IAM, DNS, TLS, WAF, or persistent compute infrastructure.
+- Do not require these optional capabilities for minimal AWS/Supabase control-plane setup unless the
+  topology selects them.
+- Do not implement full production provisioning for providers that are intentionally external or
+  operator-owned; validate reviewed evidence and IaC outputs instead.
+
+### 4. Required behavior
+
+- `aws-attic-cache-service` evidence must prove attic cache endpoint identity, `atticd` health, cache
+  object conformance, selected region/account linkage, and reviewed IaC or external ownership
+  boundary.
+- `cloudflare-edge` evidence must prove selected zone, DNS record/alias posture, TLS mode/certificate
+  posture, WAF/ruleset posture when selected, and no direct mutation outside reviewed IaC or
+  provider-owned configuration.
+- `vercel-operator-ui` evidence must prove project/deployment identity, production alias or domain
+  binding, environment/config provenance, and read-only operator UI deployment posture.
+- `remote-build-worker-fleet` evidence must prove worker fleet identity, separate Buck/Nix worker
+  authority, allowed network boundary, heartbeat/smoke posture, and no reuse of protected runtime
+  credentials.
+- Each validator must fail closed on missing payloads, stale evidence, wrong provider identity,
+  wrong account/project/zone, missing smoke proof, and mutation-command evidence where only
+  read-only/IaC orchestration is allowed.
+- Runbook/setup/cutover capability selection must route selected capabilities through these concrete
+  validators rather than the generic reviewed adapter.
+
+### 5. Required files and docs
+
+- Add or update provider-capability adapters under `build-tools/tools/deployments/`.
+- Add typed evidence helpers and fixtures for the four capabilities under the existing deployment
+  test tree.
+- Update runbook generation tests and provider-capability hook tests to prove each selected
+  capability uses the concrete validator.
+- Update `docs/cloud-control-design.md` and `docs/control-plane-guide.md` to clarify the concrete
+  evidence required for the four capabilities and the declarative/IaC boundary.
+
+### 6. Expected regression scope
+
+- `deployment-only` for provider-capability hook routing, typed evidence validation, generated
+  runbook/cutover selection, stale/wrong-provider negative cases, and docs examples.
+
+### 7. Acceptance criteria
+
+- No selected provider capability from the current catalog is validated only by the generic
+  reviewed-evidence stub.
+- The four capability IDs listed above each have typed validators, fixtures, positive tests, and
+  explicit negative tests.
+- Selected runbook/setup/cutover paths fail closed when any capability-specific evidence is missing,
+  stale, wrong-provider, wrong-scope, or collected through an impermissible mutation path.
+- Documentation explains the evidence contract for each capability without implying custom
+  imperative infrastructure ownership.
+
+### 8. Risks
+
+- Four providers in one PR can become broad if the implementation adds provider SDK clients instead
+  of validating reviewed evidence payloads.
+- Optional capability validation may accidentally become mandatory for topologies that do not select
+  the capability.
+
+### 9. Mitigations
+
+- Keep the implementation to typed evidence validation, generated evidence commands, and docs; do not
+  add provider mutation clients.
+- Preserve capability selection checks so only selected capabilities require their evidence.
+- Add entrypoint-specific negative tests for setup, readiness, cutover, and imported evidence where
+  the capability can be consumed.
+
+### 10. Consequences of not implementing this PR
+
+The design remains only partially implemented for optional provider capabilities. Operators can
+select catalog entries whose evidence path proves little more than manual review text, which is below
+the fail-closed standard used for the AWS and Supabase control-plane paths.
+
+### 11. Downsides for implementing this PR
+
+The provider-capability evidence layer becomes larger, and each optional capability needs its own
+fixture and validation contract even when the provider remains operator-owned or IaC-owned outside
+the repository.
