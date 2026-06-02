@@ -487,6 +487,15 @@ apply, refresh live ASG/EC2 and runtime process evidence before setup-doctor, re
 can pass; import/adoption of an existing launch template or ASG requires reviewed import metadata
 plus read-only evidence before protected/shared use.
 
+The generated `ec2-asg-readonly-evidence` command is read-only, but it still requires a reviewed
+AWS credential boundary. Write `ec2-asg-aws-credential-provenance.json` at the bundle root before
+running it, using `file-backed-profile`, `assume-role`, or `instance-profile` provenance with the
+reviewed account id, region, reference, and boundary digest. The command emits
+`ec2-asg-readonly-caller-identity.json` and rejects ambient/default-chain credentials before it
+calls `aws autoscaling` or `aws ec2`; setup-doctor, readiness, and cutover stay blocked until the
+typed ASG read-only evidence proves both the applied IaC identity and that reviewed credential
+boundary.
+
 If you are using public TLS instead of Supabase PrivateLink, make the AWS topology evidence database
 mode `public`. PrivateLink mode must be `privatelink`.
 
@@ -828,7 +837,9 @@ For `repo-owned-asg`, collect this section only after the ASG apply completes. T
 command derives the ASG and launch-template identities from the reviewed apply output, and the
 runtime HTTP/process checks must then prove the service and workers are running on that applied
 host path. Pre-apply desired inputs are sufficient to generate and review the OpenTofu bundle, but
-they are not protected/shared readiness evidence.
+they are not protected/shared readiness evidence. Deployment-only regression coverage for this path
+must include ASG runbook generation, typed evidence validation, setup-doctor, readiness/cutover
+evidence gating, generated script proof from the bundle root, and these docs examples.
 
 Ingress evidence fails closed unless the selected public hostname resolves from a public vantage
 point to the selected ALB/NLB or a reviewed edge linked back to that AWS ingress identity. The
@@ -882,7 +893,9 @@ host in a reviewed standby mode until rollback evidence is fresh.
 For `repo-owned-asg`, the cutover report is a post-apply report. It must include typed ASG
 plan/apply/read-only evidence, refreshed provider-capability evidence, managed dependency evidence
 from the AWS runtime path, and fresh health/readiness/worker-heartbeat evidence from the applied
-host profile.
+host profile. The ASG read-only evidence must also include reviewed AWS credential provenance whose
+account, region, and boundary digest match the reviewed plan/apply evidence; cutover rejects
+ambient/default credential evidence even when the ASG inspection commands only read AWS state.
 
 Cutover rejects literal `true`, empty objects, dashboard-only notes, raw IaC state, stale
 timestamps, unsupported database modes, malformed operation evidence refs, mismatched operation

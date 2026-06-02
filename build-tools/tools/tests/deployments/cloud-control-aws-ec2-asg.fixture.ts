@@ -9,6 +9,7 @@ import { EC2_ASG_OPENTOFU_WORKING_DIR } from "../../deployments/cloud-control-aw
 const DIGEST = `sha256:${"c".repeat(64)}`;
 const APPLY = `sha256:${"d".repeat(64)}`;
 const EVIDENCE = `sha256:${"e".repeat(64)}`;
+const CREDENTIAL_BOUNDARY = `sha256:${"f".repeat(64)}`;
 
 export function asgTopology(overrides: Record<string, unknown> = {}) {
   const base = privateLinkAwsTopology();
@@ -58,6 +59,15 @@ export function asgIac(overrides: Record<string, any> = {}) {
     reviewedInstancePosture: "m7i.large reviewed for control-plane service and workers",
     rollback: { nonDestructive: true, launchTemplateVersionRollback: true, workerDrain: true },
     importAdoption: { mode: "managed", reviewedReference: "docs/control-plane-guide.md" },
+    reviewedCredentialBoundary: {
+      mode: "file-backed-profile",
+      accountId: "123456789012",
+      region: "us-east-1",
+      reviewedReference: "evidence://reviewed/aws/asg-readonly-credentials",
+      boundaryDigest: CREDENTIAL_BOUNDARY,
+      profileName: "reviewed-control-plane-readonly",
+      sharedCredentialsFile: "/run/deployment-control-plane/credentials/aws-readonly",
+    },
   };
   return {
     plan: {
@@ -81,6 +91,8 @@ export function asgIac(overrides: Record<string, any> = {}) {
       applyDigest: APPLY,
       evidenceDigest: EVIDENCE,
       evidencePath: "$PROFILE_ROOT/ec2-asg-readonly-evidence.json",
+      callerIdentityEvidencePath: "$PROFILE_ROOT/ec2-asg-readonly-caller-identity.json",
+      credentialProvenance: common.reviewedCredentialBoundary,
       ...common,
     },
     ...overrides,

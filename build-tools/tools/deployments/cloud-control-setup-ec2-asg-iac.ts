@@ -11,7 +11,10 @@ import {
   ec2AsgBootstrapDigest,
   ec2AsgBootstrapUserData,
 } from "./cloud-control-aws-ec2-asg-bootstrap";
-import { EC2_ASG_OPENTOFU_WORKING_DIR } from "./cloud-control-aws-ec2-asg-iac-types";
+import {
+  EC2_ASG_IAC_PATHS,
+  EC2_ASG_OPENTOFU_WORKING_DIR,
+} from "./cloud-control-aws-ec2-asg-iac-types";
 
 const EC2_ASG_OPENTOFU_SOURCE_DIR = "build-tools/deployments/aws-ec2-asg/opentofu";
 const EC2_ASG_OPENTOFU_BUNDLE_DIR = "opentofu/aws-ec2-asg";
@@ -101,7 +104,28 @@ function ec2AsgEvidenceTemplate() {
       "$PROFILE_ROOT/ec2-asg-opentofu-plan.json",
       "$PROFILE_ROOT/ec2-asg-opentofu-apply.json",
       "$PROFILE_ROOT/ec2-asg-readonly-evidence.json",
+      "$PROFILE_ROOT/ec2-asg-aws-credential-provenance.json",
+      "$PROFILE_ROOT/ec2-asg-readonly-caller-identity.json",
     ],
+    reviewedCredentialBoundary: credentialBoundaryTemplate(),
+    credentialProvenance: credentialBoundaryTemplate(),
     note: "Do not submit this template as evidence. Write reviewed typed evidence after running the generated ASG commands.",
+  };
+}
+
+function credentialBoundaryTemplate() {
+  return {
+    mode: "file-backed-profile | assume-role | instance-profile",
+    accountId: "<12-digit-reviewed-account-id>",
+    region: "<reviewed-aws-region>",
+    reviewedReference: "evidence://reviewed/aws/asg-readonly-credentials",
+    boundaryDigest: "sha256:<reviewed-boundary-digest>",
+    profileName: "<required for file-backed-profile>",
+    sharedCredentialsFile: "<required for file-backed-profile or assume-role>",
+    roleArn: "<required for assume-role>",
+    sessionName: "<required for assume-role>",
+    sourceProfileName: "<required for assume-role>",
+    instanceProfileArn: "<required for instance-profile>",
+    callerIdentityEvidencePath: EC2_ASG_IAC_PATHS.callerIdentity,
   };
 }

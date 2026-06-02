@@ -52,8 +52,10 @@ export function ec2AsgIacCommands(
         "$PROFILE_ROOT/aws-topology-evidence.json",
         "$PROFILE_ROOT/ec2-asg-opentofu-apply.out.json",
         EC2_ASG_IAC_PATHS.apply,
+        EC2_ASG_IAC_PATHS.credentialProvenance,
       ],
       outputs: [
+        EC2_ASG_IAC_PATHS.callerIdentity,
         "$PROFILE_ROOT/ec2-asg-readonly-autoscaling.json",
         "$PROFILE_ROOT/ec2-asg-readonly-launch-template.json",
         "$PROFILE_ROOT/ec2-asg-readonly-instances.json",
@@ -95,17 +97,120 @@ function opentofuApplyCommand(prelude: string): string {
 function readOnlyCommand(prelude: string): string {
   return [
     prelude,
+    clearAmbientAwsEnvFunction(),
     `test -f "${EC2_ASG_IAC_PATHS.apply}"`,
     `test -f "$PROFILE_ROOT/ec2-asg-opentofu-apply.out.json"`,
     `AWS_REGION="$(node -e 'const fs=require("fs"); const t=JSON.parse(fs.readFileSync(process.env.PROFILE_ROOT + "/aws-topology-evidence.json","utf8")); process.stdout.write(t.region || "")')"`,
     `ASG_NAME="$(node -e '${outputIdentity("asg")}')"`,
     `LT_ID="$(node -e '${outputIdentity("launchTemplateId")}')"`,
+    reviewedCredentialSetup(),
+    `aws sts get-caller-identity --region "$AWS_REGION" > "${EC2_ASG_IAC_PATHS.callerIdentity}"`,
+    `CALLER_ACCOUNT="$(node -e 'const fs=require("fs"); const c=JSON.parse(fs.readFileSync(process.env.PROFILE_ROOT + "/ec2-asg-readonly-caller-identity.json","utf8")); process.stdout.write(c.Account || "")')"`,
+    `CRED_ACCOUNT="$(node -e '${credentialField("accountId")}')"`,
+    `test "$CALLER_ACCOUNT" = "$CRED_ACCOUNT" || { echo "reviewed ASG credential account does not match caller identity" >&2; exit 2; }`,
     `aws autoscaling describe-auto-scaling-groups --auto-scaling-group-names "$ASG_NAME" --region "$AWS_REGION" > "$PROFILE_ROOT/ec2-asg-readonly-autoscaling.json"`,
     `aws ec2 describe-launch-template-versions --launch-template-id "$LT_ID" --versions '$Latest' --region "$AWS_REGION" > "$PROFILE_ROOT/ec2-asg-readonly-launch-template.json"`,
     `aws ec2 describe-instances --filters "Name=tag:aws:autoscaling:groupName,Values=$ASG_NAME" --region "$AWS_REGION" > "$PROFILE_ROOT/ec2-asg-readonly-instances.json"`,
     requireFile(EC2_ASG_IAC_PATHS.readOnly, "write typed EC2 ASG read-only evidence after review"),
   ].join("; ");
 }
+
+function reviewedCredentialSetup(): string {
+  return [
+    `test -f "${EC2_ASG_IAC_PATHS.credentialProvenance}"`,
+    `CRED_REGION="$(node -e '${credentialField("region")}')"`,
+    `test "$CRED_REGION" = "$AWS_REGION" || { echo "reviewed ASG credential region does not match topology" >&2; exit 2; }`,
+    `CRED_MODE="$(node -e '${credentialField("mode")}')"`,
+    `case "$CRED_MODE" in ${profileMode()} ${assumeRoleMode()} ${instanceProfileMode()} *) echo "unsupported reviewed ASG credential mode: $CRED_MODE" >&2; exit 2;; esac`,
+  ].join("; ");
+}
+
+function profileMode(): string {
+  return [
+    `"file-backed-profile") REVIEWED_PROFILE="$(node -e '${credentialField("profileName")}')"`,
+    `REVIEWED_SHARED_CREDENTIALS_FILE="$(node -e '${credentialField("sharedCredentialsFile")}')"`,
+    `test -n "$REVIEWED_PROFILE"`,
+    `test "$REVIEWED_PROFILE" != "default"`,
+    `test -n "$REVIEWED_SHARED_CREDENTIALS_FILE"`,
+    `_ec2_asg_clear_ambient_aws_env`,
+    `AWS_PROFILE="$REVIEWED_PROFILE"`,
+    `AWS_SHARED_CREDENTIALS_FILE="$REVIEWED_SHARED_CREDENTIALS_FILE"`,
+    `AWS_SDK_LOAD_CONFIG=1`,
+    `AWS_EC2_METADATA_DISABLED=true`,
+    `export AWS_PROFILE AWS_SHARED_CREDENTIALS_FILE AWS_SDK_LOAD_CONFIG AWS_EC2_METADATA_DISABLED`,
+    `;;`,
+  ].join("; ");
+}
+
+function assumeRoleMode(): string {
+  return [
+    `"assume-role") SOURCE_PROFILE="$(node -e '${credentialField("sourceProfileName")}')"`,
+    `REVIEWED_SHARED_CREDENTIALS_FILE="$(node -e '${credentialField("sharedCredentialsFile")}')"`,
+    `ROLE_ARN="$(node -e '${credentialField("roleArn")}')"`,
+    `SESSION_NAME="$(node -e '${credentialField("sessionName")}')"`,
+    `test -n "$SOURCE_PROFILE"`,
+    `test "$SOURCE_PROFILE" != "default"`,
+    `test -n "$REVIEWED_SHARED_CREDENTIALS_FILE"`,
+    `test -n "$ROLE_ARN"`,
+    `test -n "$SESSION_NAME"`,
+    `_ec2_asg_clear_ambient_aws_env`,
+    `ASSUMED="$(AWS_PROFILE="$SOURCE_PROFILE" AWS_SHARED_CREDENTIALS_FILE="$REVIEWED_SHARED_CREDENTIALS_FILE" aws sts assume-role --role-arn "$ROLE_ARN" --role-session-name "$SESSION_NAME" --region "$AWS_REGION" --output json)"`,
+    `export ASSUMED`,
+    `_ec2_asg_clear_ambient_aws_env`,
+    `AWS_ACCESS_KEY_ID="$(node -e 'const c=JSON.parse(process.env.ASSUMED).Credentials; process.stdout.write(c.AccessKeyId || "")')"`,
+    `AWS_SECRET_ACCESS_KEY="$(node -e 'const c=JSON.parse(process.env.ASSUMED).Credentials; process.stdout.write(c.SecretAccessKey || "")')"`,
+    `AWS_SESSION_TOKEN="$(node -e 'const c=JSON.parse(process.env.ASSUMED).Credentials; process.stdout.write(c.SessionToken || "")')"`,
+    `export AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_SESSION_TOKEN`,
+    `unset AWS_PROFILE SOURCE_PROFILE REVIEWED_SHARED_CREDENTIALS_FILE ASSUMED`,
+    `;;`,
+  ].join("; ");
+}
+
+function instanceProfileMode(): string {
+  return [
+    `"instance-profile") test -n "$(node -e '${credentialField("instanceProfileArn")}')"`,
+    `_ec2_asg_clear_ambient_aws_env`,
+    `export AWS_EC2_METADATA_DISABLED=false`,
+    `;;`,
+  ].join("; ");
+}
+
+function clearAmbientAwsEnvFunction(): string {
+  return `_ec2_asg_clear_ambient_aws_env() { unset ${AWS_AMBIENT_ENV_VARS.join(" ")}; AWS_SHARED_CREDENTIALS_FILE=/dev/null; AWS_CONFIG_FILE=/dev/null; AWS_EC2_METADATA_DISABLED=true; export AWS_SHARED_CREDENTIALS_FILE AWS_CONFIG_FILE AWS_EC2_METADATA_DISABLED; }`;
+}
+
+const AWS_AMBIENT_ENV_VARS = [
+  "AWS_ACCESS_KEY_ID",
+  "AWS_SECRET_ACCESS_KEY",
+  "AWS_SESSION_TOKEN",
+  "AWS_SECURITY_TOKEN",
+  "AWS_PROFILE",
+  "AWS_DEFAULT_PROFILE",
+  "AWS_SHARED_CREDENTIALS_FILE",
+  "AWS_CONFIG_FILE",
+  "AWS_SDK_LOAD_CONFIG",
+  "AWS_ENDPOINT_URL",
+  "AWS_ENDPOINT_URL_STS",
+  "AWS_ENDPOINT_URL_EC2",
+  "AWS_ENDPOINT_URL_AUTO_SCALING",
+  "AWS_DEFAULT_REGION",
+  "AWS_ROLE_ARN",
+  "AWS_ROLE_SESSION_NAME",
+  "AWS_WEB_IDENTITY_TOKEN_FILE",
+  "AWS_CONTAINER_CREDENTIALS_RELATIVE_URI",
+  "AWS_CONTAINER_CREDENTIALS_FULL_URI",
+  "AWS_CONTAINER_AUTHORIZATION_TOKEN",
+  "AWS_CONTAINER_AUTHORIZATION_TOKEN_FILE",
+  "AWS_SSO_SESSION",
+  "AWS_SSO_START_URL",
+  "AWS_SSO_REGION",
+  "AWS_SSO_ACCOUNT_ID",
+  "AWS_SSO_ROLE_NAME",
+  "AWS_EC2_METADATA_SERVICE_ENDPOINT",
+  "AWS_EC2_METADATA_SERVICE_ENDPOINT_MODE",
+  "AWS_METADATA_SERVICE_TIMEOUT",
+  "AWS_METADATA_SERVICE_NUM_ATTEMPTS",
+];
 
 function tofuInit() {
   return `TF_DATA_DIR="$PROFILE_ROOT/.tofu/ec2-asg" tofu -chdir="${EC2_ASG_OPENTOFU_DIR}" init -input=false -backend-config="${EC2_ASG_OPENTOFU_BACKEND}"`;
@@ -124,5 +229,14 @@ function outputIdentity(field: "asg" | "launchTemplateId") {
     'const fs=require("fs")',
     'const out=JSON.parse(fs.readFileSync(process.env.PROFILE_ROOT + "/ec2-asg-opentofu-apply.out.json","utf8"))',
     `process.stdout.write((((out.ec2_host||{}).value||{}).identity||{}).${field} || "")`,
+  ].join(";");
+}
+
+function credentialField(field: string) {
+  return [
+    'const fs=require("fs")',
+    'const p=process.env.PROFILE_ROOT + "/ec2-asg-aws-credential-provenance.json"',
+    "const c=JSON.parse(fs.readFileSync(p,'utf8'))",
+    `process.stdout.write(c.${field} || "")`,
   ].join(";");
 }

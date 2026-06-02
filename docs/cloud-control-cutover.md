@@ -68,6 +68,14 @@ For AWS EC2 profiles, the evidence must also include selected subnets, security 
 ALB/NLB health, database connectivity path, Supabase PrivateLink validation when selected, and AWS
 S3 VPC endpoint evidence unless a reviewed alternate artifact backend is selected.
 
+For `repo-owned-asg`, cutover is post-apply only. The report must include typed ASG plan, apply,
+and read-only evidence from the bundle root, plus `ec2-asg-readonly-caller-identity.json` from the
+generated read-only command. The ASG read-only evidence must prove the reviewed AWS credential
+boundary used for inspection: `file-backed-profile`, `assume-role`, or `instance-profile`
+provenance with the selected account id, region, reviewed reference, and boundary digest. Ambient
+AWS CLI defaults, copied environment credentials, dashboard notes, or missing provenance do not
+satisfy protected/shared cutover, even though the AWS calls are read-only.
+
 AWS cutover evidence is conditional on the selected artifact, database, and edge paths:
 
 - ALB/NLB, TLS, DNS health, public reachability, target-group health-check configuration, target

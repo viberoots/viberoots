@@ -15,6 +15,11 @@ import {
   type Ec2AsgIacBundle,
 } from "./cloud-control-aws-ec2-asg-iac-types";
 import {
+  applyCredentialBoundaryErrors,
+  planCredentialBoundaryErrors,
+  readOnlyCredentialBoundaryErrors,
+} from "./cloud-control-aws-ec2-asg-credential-provenance";
+import {
   compareEvidenceField,
   needsEc2AsgApply,
   needsEc2AsgReadOnly,
@@ -62,6 +67,7 @@ function validatePlan(value: unknown, opts: ExpectedInputs) {
   if (recordText(plan, "source") !== "reviewed-opentofu-plan") {
     errors.push("EC2 ASG IaC plan must come from reviewed OpenTofu plan");
   }
+  errors.push(...planCredentialBoundaryErrors("plan", plan, opts.topology));
   errors.push(...identityErrors("plan", plan, opts));
   errors.push(...postureErrors("plan", plan, opts));
   const adoption = recordObject(plan.importAdoption);
@@ -84,6 +90,7 @@ function validateApply(value: unknown, planValue: unknown, opts: ExpectedInputs)
   if (recordText(apply, "planDigest") !== recordText(plan, "planDigest")) {
     errors.push("EC2 ASG IaC apply planDigest does not match reviewed plan");
   }
+  errors.push(...applyCredentialBoundaryErrors(apply, plan, opts.topology));
   errors.push(...userDataTransitionErrors("apply", apply, plan, "plan"));
   errors.push(...identityErrors("apply", apply, opts));
   errors.push(...postureErrors("apply", apply, opts));
@@ -105,6 +112,7 @@ function validateReadOnly(value: unknown, applyValue: unknown, opts: ExpectedInp
   if (recordText(evidence, "applyDigest") !== recordText(apply, "applyDigest")) {
     errors.push("EC2 ASG read-only evidence applyDigest does not match reviewed apply");
   }
+  errors.push(...readOnlyCredentialBoundaryErrors(evidence, apply, opts.topology));
   errors.push(...userDataTransitionErrors("read-only evidence", evidence, apply, "apply"));
   errors.push(...identityErrors("read-only evidence", evidence, opts));
   errors.push(...postureErrors("read-only evidence", evidence, opts));

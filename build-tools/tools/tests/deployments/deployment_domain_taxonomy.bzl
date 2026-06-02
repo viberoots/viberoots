@@ -31,6 +31,7 @@ REVIEWED_DEPLOYMENT_TEST_OWNERSHIP.update({
 
 REVIEWED_DEPLOYMENT_TEST_OWNERSHIP.update({
     "build-tools/tools/tests/deployments/cloud-control-aws-ec2-asg-bootstrap.test.ts": True,
+    "build-tools/tools/tests/deployments/cloud-control-aws-ec2-asg-credentials.test.ts": True,
     "build-tools/tools/tests/deployments/cloud-control-aws-ec2-asg-greenfield.test.ts": True,
     "build-tools/tools/tests/deployments/cloud-control-aws-ec2-asg-user-data.test.ts": True,
 })
