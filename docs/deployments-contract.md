@@ -267,8 +267,8 @@ Before approving a deployment-system change, confirm:
 
 ## Companion Docs
 
-- [Deployment Design](/Users/kiltyj/Code/viberoots/docs/deployments-design.md)
-- [Deployment Schema](/Users/kiltyj/Code/viberoots/docs/deployments-schema.md)
-- [Deployment Provider Capabilities](/Users/kiltyj/Code/viberoots/docs/deployment-provider-capabilities.md)
-- [Deployment Scenarios](/Users/kiltyj/Code/viberoots/docs/deployment-scenarios.md)
-- [Deployment Implementation Plan](/Users/kiltyj/Code/viberoots/docs/deployment-plan.md)
+- [Deployment Design](deployments-design.md)
+- [Deployment Schema](deployments-schema.md)
+- [Deployment Provider Capabilities](deployment-provider-capabilities.md)
+- [Deployment Scenarios](deployment-scenarios.md)
+- [Deployment Implementation Plan](deployment-plan.md)

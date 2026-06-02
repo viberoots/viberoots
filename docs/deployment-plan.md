@@ -1,9 +1,9 @@
 # Deployment Implementation Plan - PR Breakdown
 
 This plan covers implementation of the deployment model described in
-[Deployments Design](/Users/kiltyj/Code/viberoots/docs/deployments-design.md), with the first
+[Deployments Design](deployments-design.md), with the first
 working end-to-end milestone prioritized around the `mini` shared-dev flow described in
-[Mini Shared-Dev Deployment Design](/Users/kiltyj/Code/viberoots/docs/mini-deployment.md).
+[Mini Shared-Dev Deployment Design](mini-deployment.md).
 
 Each PR includes code, tests, and documentation updates together.
 
@@ -11,9 +11,9 @@ Documentation updates are not limited to design/contract/schema docs. When a PR 
 operator, technician, setup, usage, troubleshooting, or day-to-day workflow behavior, that same PR
 must update the corresponding usage/instructions docs too. For `nixos-shared-host` and other
 operator-facing deployment flows, this explicitly includes docs such as
-[nixos-shared-host-setup.md](/Users/kiltyj/Code/viberoots/docs/nixos-shared-host-setup.md)
+[nixos-shared-host-setup.md](nixos-shared-host-setup.md)
 and
-[nixos-shared-host-technician-checklist.md](/Users/kiltyj/Code/viberoots/docs/nixos-shared-host-technician-checklist.md)
+[nixos-shared-host-technician-checklist.md](nixos-shared-host-technician-checklist.md)
 whenever the reviewed workflow, required commands, operator responsibilities, or troubleshooting
 expectations change.
 
@@ -66,7 +66,7 @@ Completion criteria:
 - the repo has a coherent implementation of deployment metadata extraction, provider capabilities,
   control-plane authority, immutable artifact handling, retry/rollback/promotion, preview cleanup,
   and authoritative records consistent with
-  [Deployments Design](/Users/kiltyj/Code/viberoots/docs/deployments-design.md)
+  [Deployments Design](deployments-design.md)
 - the protected/shared model is "Git-triggered, CI-built, Buck2-defined,
   control-plane-admitted deployments" rather than branch-backed
 - protected/shared current deployed state is read from control-plane backend state keyed by
@@ -3242,8 +3242,8 @@ and recovery-objective posture for the protected/shared control plane itself.
   records.
 - Document the authoritative control-plane backup, restore-test, and resilience posture, including
   the reviewed objective matrix implemented in this PR.
-- Align [deployments-design.md](/Users/kiltyj/Code/viberoots/docs/deployments-design.md),
-  [deployments-contract.md](/Users/kiltyj/Code/viberoots/docs/deployments-contract.md), and
+- Align [deployments-design.md](deployments-design.md),
+  [deployments-contract.md](deployments-contract.md), and
   related capability or operator docs to the same reviewed retention and resilience commitments.
 - Document the explicit failure behavior when an artifact or replay bundle is missing despite a
   supported reuse request.
@@ -5771,7 +5771,7 @@ declared fully complete while the public CLI still has known behavior gaps.
 
 I will close the remaining methodology gap identified during plan review: the deployment system is
 functionally implemented and tested, but some deployment-owned files still violate the hard file-size
-boundary from [Project Documentation Methodology](/Users/kiltyj/Code/viberoots/METHODOLOGY.XML).
+boundary from [Project Documentation Methodology](../METHODOLOGY.XML).
 This PR brings the deployment area into explicit compliance by splitting oversized deployment-owned
 modules and tests into smaller reviewed units without weakening behavior, coverage, or the deployment
 contracts already established by earlier PRs.
@@ -5958,12 +5958,12 @@ component, runtime, and rollout semantics for that promotion family.
 
 ### Docs (in this PR)
 
-- Update [Deployments Design](/Users/kiltyj/Code/viberoots/docs/deployments-design.md) to
+- Update [Deployments Design](deployments-design.md) to
   define the reviewed cross-provider promotion-compatibility model for flexible lower environments.
-- Update [Deployment Contract](/Users/kiltyj/Code/viberoots/docs/deployments-contract.md) so it
+- Update [Deployment Contract](deployments-contract.md) so it
   no longer implies unconditional provider/publisher equality when a reviewed cross-provider
   compatibility contract is declared.
-- Update [Deployment Provider Capabilities](/Users/kiltyj/Code/viberoots/docs/deployment-provider-capabilities.md)
+- Update [Deployment Provider Capabilities](deployment-provider-capabilities.md)
   to document which provider families and component/runtime contracts support cross-provider
   promotion and which still fail closed.
 - Update the Pleomino example docs so they describe the reviewed `dev` flexibility and the stricter
@@ -6087,8 +6087,8 @@ not as a second public operator input surface that can bypass authoritative Buck
 
 ### Docs (in this PR)
 
-- Update [Deployments Design](/Users/kiltyj/Code/viberoots/docs/deployments-design.md) and
-  [Deployment Contract](/Users/kiltyj/Code/viberoots/docs/deployments-contract.md) to make the
+- Update [Deployments Design](deployments-design.md) and
+  [Deployment Contract](deployments-contract.md) to make the
   public-versus-internal metadata boundary explicit:
   - `TARGETS` is the only public reviewed source of truth
   - extracted-metadata documents are internal versioned contracts, not peer operator inputs
@@ -6217,10 +6217,10 @@ protected/shared behavior onto the architecture the design says operators should
 
 ### Docs (in this PR)
 
-- Update [Deployments Design](/Users/kiltyj/Code/viberoots/docs/deployments-design.md) to mark
+- Update [Deployments Design](deployments-design.md) to mark
   the shared-control-plane API / worker / authoritative-backend architecture as the reviewed
   implemented execution model for protected/shared mutation.
-- Update [Deployment Contract](/Users/kiltyj/Code/viberoots/docs/deployments-contract.md) and
+- Update [Deployment Contract](deployments-contract.md) and
   operational docs so the repo-level CLI is documented as a client of the control-plane service,
   not an in-process peer mutator.
 - Add operator/technician docs for:
@@ -6230,9 +6230,9 @@ protected/shared behavior onto the architecture the design says operators should
   - local reviewed test/harness usage
 - Update operator setup/instructions docs to match the reviewed shared-control-plane architecture,
   including
-  [nixos-shared-host-setup.md](/Users/kiltyj/Code/viberoots/docs/nixos-shared-host-setup.md)
+  [nixos-shared-host-setup.md](nixos-shared-host-setup.md)
   and
-  [nixos-shared-host-technician-checklist.md](/Users/kiltyj/Code/viberoots/docs/nixos-shared-host-technician-checklist.md)
+  [nixos-shared-host-technician-checklist.md](nixos-shared-host-technician-checklist.md)
   wherever the install, startup, usage, or troubleshooting steps change.
 
 ### Verification Commands
@@ -6347,19 +6347,19 @@ into a complete operator workflow.
 
 ### Docs (in this PR)
 
-- Update [Deployments Design](/Users/kiltyj/Code/viberoots/docs/deployments-design.md) to
+- Update [Deployments Design](deployments-design.md) to
   document the reviewed approval-grant flow and same-run advancement behavior for
   `pending_approval`.
-- Update [Deployment Contract](/Users/kiltyj/Code/viberoots/docs/deployments-contract.md) so
+- Update [Deployment Contract](deployments-contract.md) so
   the approval lifecycle is fully described as an operator-visible, versioned control-plane
   contract rather than only an admission precondition.
 - Add operator docs for reviewing and approving pending protected/shared runs, including the
   expected failure cases when approval inputs are stale, invalid, or drifted.
 - Update operator/technician workflow docs so the reviewed approval steps, run-state expectations,
   and incident-handling instructions stay aligned with the implemented flow, including
-  [nixos-shared-host-setup.md](/Users/kiltyj/Code/viberoots/docs/nixos-shared-host-setup.md)
+  [nixos-shared-host-setup.md](nixos-shared-host-setup.md)
   and
-  [nixos-shared-host-technician-checklist.md](/Users/kiltyj/Code/viberoots/docs/nixos-shared-host-technician-checklist.md)
+  [nixos-shared-host-technician-checklist.md](nixos-shared-host-technician-checklist.md)
   when those docs describe the affected control-plane workflow.
 
 ### Verification Commands
@@ -6460,10 +6460,10 @@ results are no longer sourced from local JSON mirrors as the authority.
 
 ### Docs (in this PR)
 
-- Update [Deployments Design](/Users/kiltyj/Code/viberoots/docs/deployments-design.md) to
+- Update [Deployments Design](deployments-design.md) to
   state explicitly that the reviewed authoritative backend now backs both protected/shared deploy
   records and durable claimed-running worker ownership.
-- Update [Deployment Contract](/Users/kiltyj/Code/viberoots/docs/deployments-contract.md) so
+- Update [Deployment Contract](deployments-contract.md) so
   protected/shared status/result semantics and deploy-record authority describe Postgres as the
   authoritative record store, with JSON as operator-readable mirrors.
 - Add operator docs describing:
@@ -6471,9 +6471,9 @@ results are no longer sourced from local JSON mirrors as the authority.
   - durable worker-ownership / recovery behavior
   - what operators should trust during in-doubt recovery or restore testing
 - Update
-  [nixos-shared-host-setup.md](/Users/kiltyj/Code/viberoots/docs/nixos-shared-host-setup.md)
+  [nixos-shared-host-setup.md](nixos-shared-host-setup.md)
   and
-  [nixos-shared-host-technician-checklist.md](/Users/kiltyj/Code/viberoots/docs/nixos-shared-host-technician-checklist.md)
+  [nixos-shared-host-technician-checklist.md](nixos-shared-host-technician-checklist.md)
   wherever they describe where authoritative run state and final records live or how operators
   inspect them.
 
@@ -6595,18 +6595,18 @@ preserving backward compatibility with filesystem-based record paths.
 
 ### Docs (in this PR)
 
-- Update [Deployments Design](/Users/kiltyj/Code/viberoots/docs/deployments-design.md) to
+- Update [Deployments Design](deployments-design.md) to
   state explicitly that protected/shared control-plane state is backend-only in normal operation
   for both writes and reads.
-- Update [Deployment Contract](/Users/kiltyj/Code/viberoots/docs/deployments-contract.md) to
+- Update [Deployment Contract](deployments-contract.md) to
   remove mirror-language and path-bearing contract fields that imply a second operator-facing
   runtime record copy.
 - Update operator docs to describe the reviewed backend query, inspect, and export paths that
   replace direct filesystem inspection for control-plane state.
 - Update
-  [nixos-shared-host-setup.md](/Users/kiltyj/Code/viberoots/docs/nixos-shared-host-setup.md)
+  [nixos-shared-host-setup.md](nixos-shared-host-setup.md)
   and
-  [nixos-shared-host-technician-checklist.md](/Users/kiltyj/Code/viberoots/docs/nixos-shared-host-technician-checklist.md)
+  [nixos-shared-host-technician-checklist.md](nixos-shared-host-technician-checklist.md)
   anywhere they still instruct operators to trust routine control-plane JSON files under
   `<records-root>`.
 
@@ -6702,16 +6702,16 @@ missing.
 
 ### Docs (in this PR)
 
-- Update [Deployments Design](/Users/kiltyj/Code/viberoots/docs/deployments-design.md) and
-  [Deployment Contract](/Users/kiltyj/Code/viberoots/docs/deployments-contract.md) so
+- Update [Deployments Design](deployments-design.md) and
+  [Deployment Contract](deployments-contract.md) so
   protected/shared client paths are documented uniformly as submission clients of the central
   control plane rather than a mix of service and peer-mutator execution models.
 - Remove operator docs that describe reviewed SSH peer mutation or local in-process shared-host
   mutation as normal protected/shared workflows.
 - Update
-  [nixos-shared-host-setup.md](/Users/kiltyj/Code/viberoots/docs/nixos-shared-host-setup.md)
+  [nixos-shared-host-setup.md](nixos-shared-host-setup.md)
   and
-  [nixos-shared-host-technician-checklist.md](/Users/kiltyj/Code/viberoots/docs/nixos-shared-host-technician-checklist.md)
+  [nixos-shared-host-technician-checklist.md](nixos-shared-host-technician-checklist.md)
   to document the reviewed same-host, remote-profile, and Jenkins service-submission workflows,
   including required service endpoint / auth configuration.
 - Document the fail-closed error cases and migration guidance for callers that still expect the
@@ -6781,7 +6781,7 @@ the built-in provider capability surface and ensures the code, tests, and docs s
 
 - Expand the code-side provider-capability model so it can represent the full reviewed capability
   contract currently described in
-  [Deployment Provider Capabilities](/Users/kiltyj/Code/viberoots/docs/deployment-provider-capabilities.md),
+  [Deployment Provider Capabilities](deployment-provider-capabilities.md),
   including fields such as:
   - canonical target identity / lock-key posture
   - preview support and cleanup posture
@@ -6825,7 +6825,7 @@ the built-in provider capability surface and ensures the code, tests, and docs s
 ### Docs (in this PR)
 
 - Update
-  [Deployment Provider Capabilities](/Users/kiltyj/Code/viberoots/docs/deployment-provider-capabilities.md)
+  [Deployment Provider Capabilities](deployment-provider-capabilities.md)
   so its normative provider entries are rendered from or explicitly locked to the reviewed
   structured capability registry rather than duplicated by hand.
 - Document the reviewed DRY source-of-truth rule for built-in provider capabilities:
@@ -6940,15 +6940,15 @@ or restore-test scenarios.
 
 ### Docs (in this PR)
 
-- Update [Deployments Design](/Users/kiltyj/Code/viberoots/docs/deployments-design.md),
-  [Deployment Contract](/Users/kiltyj/Code/viberoots/docs/deployments-contract.md), and
-  [Deployment Schema](/Users/kiltyj/Code/viberoots/docs/deployments-schema.md) so the normal
+- Update [Deployments Design](deployments-design.md),
+  [Deployment Contract](deployments-contract.md), and
+  [Deployment Schema](deployments-schema.md) so the normal
   protected/shared submit / status / result / replay surfaces are documented consistently as
   backend-native and identifier-based rather than path-based.
 - Update
-  [nixos-shared-host-setup.md](/Users/kiltyj/Code/viberoots/docs/nixos-shared-host-setup.md)
+  [nixos-shared-host-setup.md](nixos-shared-host-setup.md)
   and
-  [nixos-shared-host-technician-checklist.md](/Users/kiltyj/Code/viberoots/docs/nixos-shared-host-technician-checklist.md)
+  [nixos-shared-host-technician-checklist.md](nixos-shared-host-technician-checklist.md)
   to remove guidance that treats `<records-root>/control-plane/*.json` or `<records-root>/runs/*.json`
   as the normal reviewed operator surface.
 - Document the reviewed distinction between:
@@ -7073,12 +7073,12 @@ reviewed architecture already used by the current shared-host service path.
 
 ### Docs (in this PR)
 
-- Update [Deployments Design](/Users/kiltyj/Code/viberoots/docs/deployments-design.md) and
-  [Deployment Contract](/Users/kiltyj/Code/viberoots/docs/deployments-contract.md) so reviewed
+- Update [Deployments Design](deployments-design.md) and
+  [Deployment Contract](deployments-contract.md) so reviewed
   Cloudflare Pages protected/shared flows are documented as clients of the same central control
   plane rather than as a provider-local special case.
 - Update
-  [Deployment Provider Capabilities](/Users/kiltyj/Code/viberoots/docs/deployment-provider-capabilities.md)
+  [Deployment Provider Capabilities](deployment-provider-capabilities.md)
   and any other companion docs that currently imply Cloudflare Pages protected/shared deploys use a
   different reviewed control-plane boundary.
 - Document operator-visible migration guidance and fail-closed diagnostics for callers moving from
@@ -7187,10 +7187,10 @@ technician docs describe the same service-routed client-profile contract and sam
 
 ### Docs (in this PR)
 
-- Update [NixOS Shared Host Setup](/Users/kiltyj/Code/viberoots/docs/nixos-shared-host-setup.md)
+- Update [NixOS Shared Host Setup](nixos-shared-host-setup.md)
   with the exact reviewed client-install and approval-grant workflows.
 - Update
-  [NixOS Shared Host Technician Checklist](/Users/kiltyj/Code/viberoots/docs/nixos-shared-host-technician-checklist.md)
+  [NixOS Shared Host Technician Checklist](nixos-shared-host-technician-checklist.md)
   so the short-form SOP reflects the same service endpoint, token-env, and approval-grant
   requirements as the full setup guide.
 - Update any related control-plane/operator docs that reference these flows so the repo presents one
@@ -7431,12 +7431,12 @@ the deployment design and deployment contract.
 
 ### Docs (in this PR)
 
-- Update [Deployments Design](/Users/kiltyj/Code/viberoots/docs/deployments-design.md) and
-  [Deployment Contract](/Users/kiltyj/Code/viberoots/docs/deployments-contract.md) where
+- Update [Deployments Design](deployments-design.md) and
+  [Deployment Contract](deployments-contract.md) where
   necessary so provider examples and protected/shared control-plane language explicitly include the
   now-reviewed `s3-static` and `kubernetes` service-routed execution path.
 - Update
-  [Deployment Provider Capabilities](/Users/kiltyj/Code/viberoots/docs/deployment-provider-capabilities.md)
+  [Deployment Provider Capabilities](deployment-provider-capabilities.md)
   to describe the implemented protected/shared replay / rollback / provision-only posture for these
   providers and remove any stale "initial slice only" wording that this PR supersedes.
 - Update any operator or provider-family usage docs affected by the new control-plane path so the
@@ -7551,9 +7551,9 @@ non-existent interfaces.
 
 ### Docs (in this PR)
 
-- Update [Deployments Design](/Users/kiltyj/Code/viberoots/docs/deployments-design.md) so its
+- Update [Deployments Design](deployments-design.md) so its
   operator-facing and author-facing examples match the implemented reviewed interface exactly.
-- Update [Deployment Contract](/Users/kiltyj/Code/viberoots/docs/deployments-contract.md) and
+- Update [Deployment Contract](deployments-contract.md) and
   this deployment plan wherever stale wording still implies a bare deployment-id CLI or a generic
   `deployment(...)` authoring macro.
 - Update any companion onboarding or scenario docs whose examples still reflect the older or more
@@ -7653,7 +7653,7 @@ adds the missing fail-closed tests so future drift is caught immediately.
 ### Tests (in this PR)
 
 - Add or extend parity tests that fail closed when the provider summary in
-  [Deployments Design](/Users/kiltyj/Code/viberoots/docs/deployments-design.md) drifts from
+  [Deployments Design](deployments-design.md) drifts from
   the authoritative provider-capability registry or rendered provider-capabilities doc for the
   reviewed onboarding-summary fields covered by that table.
 - Add targeted deployment-domain validation tests proving Cloudflare Pages rejects:
@@ -7666,9 +7666,9 @@ adds the missing fail-closed tests so future drift is caught immediately.
 
 ### Docs (in this PR)
 
-- Update [Deployments Design](/Users/kiltyj/Code/viberoots/docs/deployments-design.md) to make
+- Update [Deployments Design](deployments-design.md) to make
   its provider summary and related onboarding prose exact to the reviewed capability registry.
-- Update [Deployment Provider Capabilities](/Users/kiltyj/Code/viberoots/docs/deployment-provider-capabilities.md),
+- Update [Deployment Provider Capabilities](deployment-provider-capabilities.md),
   if needed, only where wording must be clarified to match the reviewed runtime and design-summary
   contract more precisely.
 - Update this plan's closeout wording if needed so the plan does not imply that the broader design
@@ -7773,7 +7773,7 @@ reviewed front door so this stale wording cannot persist or reappear silently.
 
 ### Docs (in this PR)
 
-- Update [Deployment Provider Capabilities](/Users/kiltyj/Code/viberoots/docs/deployment-provider-capabilities.md)
+- Update [Deployment Provider Capabilities](deployment-provider-capabilities.md)
   so reviewed operator examples use the same Buck-backed selector contract as the public repo-level
   deploy interface.
 - Update this deployment plan if needed so the closeout wording explicitly covers provider-capability
@@ -7886,7 +7886,7 @@ behavior cannot drift apart silently again.
 
 ### Docs (in this PR)
 
-- Update [Deployment Provider Capabilities](/Users/kiltyj/Code/viberoots/docs/deployment-provider-capabilities.md)
+- Update [Deployment Provider Capabilities](deployment-provider-capabilities.md)
   so the `s3-static` and `kubernetes` entries describe the implemented reviewed protected/shared
   rollback / immutable-reuse / provision-only posture rather than stale initial-slice wording.
 - Update any small rendered summary or contributor-facing parity guidance tied to the provider
@@ -8009,7 +8009,7 @@ coverage for both provider families.
 
 ### Docs (in this PR)
 
-- Update [Deployment Provider Capabilities](/Users/kiltyj/Code/viberoots/docs/deployment-provider-capabilities.md)
+- Update [Deployment Provider Capabilities](deployment-provider-capabilities.md)
   only as needed so the reviewed `s3-static` and `kubernetes` entries continue to describe the
   implemented protected/shared retry / rollback / provision-only posture exactly.
 - Update any small contributor-facing parity guidance associated with provider-capability rendering
@@ -8130,7 +8130,7 @@ evidence surface rather than self-consistent duplicated wording.
 
 ### Docs (in this PR)
 
-- Update [Deployment Provider Capabilities](/Users/kiltyj/Code/viberoots/docs/deployment-provider-capabilities.md)
+- Update [Deployment Provider Capabilities](deployment-provider-capabilities.md)
   only if needed so the reviewed `s3-static` and `kubernetes` entries still describe the same
   retry / rollback / provision-only posture after the parity source is unified.
 - Update any contributor-facing parity guidance so it states explicitly that reviewed
@@ -8245,7 +8245,7 @@ future approval-surface changes cannot reintroduce filesystem-path leakage throu
 
 ### Docs (in this PR)
 
-- Update [Deployment Contract](/Users/kiltyj/Code/viberoots/docs/deployments-contract.md) if
+- Update [Deployment Contract](deployments-contract.md) if
   needed so the reviewed protected/shared response-boundary language explicitly covers approval
   summary fields as part of the same no-filesystem-mirror rule.
 - Update any operator-facing or contributor-facing approval-service docs that currently imply
@@ -8356,7 +8356,7 @@ fail-closed tests so the parity layer actually catches this class of drift.
 
 ### Docs (in this PR)
 
-- Update [Deployment Provider Capabilities](/Users/kiltyj/Code/viberoots/docs/deployment-provider-capabilities.md)
+- Update [Deployment Provider Capabilities](deployment-provider-capabilities.md)
   only as needed so the reviewed Kubernetes rollback-source contract is described consistently in
   every relevant section.
 - Update any small contributor-facing parity guidance so it is explicit that provider-specific
@@ -8491,10 +8491,10 @@ path stays current without overwhelming readers with implementation detail.
 
 ### Docs (in this PR)
 
-- Update [NixOS Shared Host Setup](/Users/kiltyj/Code/viberoots/docs/nixos-shared-host-setup.md)
+- Update [NixOS Shared Host Setup](nixos-shared-host-setup.md)
   so every reviewed `mini` install, client-profile, plan, deploy, and approval example matches the
   current implemented service-routed workflow.
-- Update [NixOS Shared Host Technician Checklist](/Users/kiltyj/Code/viberoots/docs/nixos-shared-host-technician-checklist.md)
+- Update [NixOS Shared Host Technician Checklist](nixos-shared-host-technician-checklist.md)
   only as needed so it stays the short SOP version of that same reviewed workflow.
 - Add or update one explicit operator-facing deployment usage front door so the reviewed docs offer
   a clean path centered on real-world examples, capabilities, and workflows instead of forcing most
@@ -9218,7 +9218,7 @@ not copy target scopes, contract ids, policy names, role claims, or Vault paths 
   - no automatic fallback to broad claims or wildcard target scopes
 - Update the Vault bootstrap runbook so most policy, role, target-scope, and secret-template steps
   invoke the new `deploy` helpers instead of requiring manual derivation.
-- Treat [vault-production-bootstrap.md](/Users/kiltyj/Code/viberoots/docs/vault-production-bootstrap.md)
+- Treat [vault-production-bootstrap.md](vault-production-bootstrap.md)
   as an in-scope operator surface for this PR, and keep the runbook's happy path aligned with the
   generated `deploy` helper output rather than preserving parallel manual instructions.
 - Update any docs that still show hardcoded repository claims such as old repository names when the
@@ -9248,7 +9248,7 @@ not copy target scopes, contract ids, policy names, role claims, or Vault paths 
 
 ### Docs (in this PR)
 
-- Update [vault-production-bootstrap.md](/Users/kiltyj/Code/viberoots/docs/vault-production-bootstrap.md)
+- Update [vault-production-bootstrap.md](vault-production-bootstrap.md)
   so the operator path starts with `deploy --print-vault-bootstrap` and
   `deploy --print-vault-secret-templates` for deployment-derived material.
 - Document which values are derived, which values are operator-supplied, and which high-risk steps
@@ -9375,7 +9375,7 @@ consumed by the JWT-first Vault credential provider from PR-69.
     contract
 - Update the Vault bootstrap runbook to use the importable NixOS module and token-minting helper
   instead of embedding all Keycloak service config and raw `curl` token-minting commands inline.
-- Treat [vault-production-bootstrap.md](/Users/kiltyj/Code/viberoots/docs/vault-production-bootstrap.md)
+- Treat [vault-production-bootstrap.md](vault-production-bootstrap.md)
   as an in-scope operator surface for this PR, and require its `mini` IdP setup path to use the
   reviewed module/helper flow introduced here.
 
@@ -9406,9 +9406,9 @@ consumed by the JWT-first Vault credential provider from PR-69.
 
 ### Docs (in this PR)
 
-- Update [nixos-shared-host-setup.md](/Users/kiltyj/Code/viberoots/docs/nixos-shared-host-setup.md)
+- Update [nixos-shared-host-setup.md](nixos-shared-host-setup.md)
   and related `mini` usage docs to mention the reviewed identity-provider module.
-- Update [vault-production-bootstrap.md](/Users/kiltyj/Code/viberoots/docs/vault-production-bootstrap.md)
+- Update [vault-production-bootstrap.md](vault-production-bootstrap.md)
   so the Keycloak-on-`mini` path imports the module, then configures realm/client details in
   Keycloak, then uses `deploy-vault-jwt` for token minting.
 - Document the exact split between:
@@ -9539,17 +9539,17 @@ the reviewed production deployment credential path.
 
 ### Docs (in this PR)
 
-- Update [Deployment Secrets API](/Users/kiltyj/Code/viberoots/docs/deployment-secrets-api.md)
-  and [Secrets Usage](/Users/kiltyj/Code/viberoots/docs/secrets-usage.md) to include the
+- Update [Deployment Secrets API](deployment-secrets-api.md)
+  and [Secrets Usage](secrets-usage.md) to include the
   reviewed `preview_cleanup` lifecycle step and explain how provider cleanup credentials are
   declared, admitted, and consumed.
-- Update [Deployment Contract](/Users/kiltyj/Code/viberoots/docs/deployments-contract.md) if
+- Update [Deployment Contract](deployments-contract.md) if
   needed so preview cleanup is clearly inside the protected/shared admitted secret-reference
   boundary.
-- Update [NixOS Shared Host Setup](/Users/kiltyj/Code/viberoots/docs/nixos-shared-host-setup.md)
-  and [NixOS Shared Host Usage](/Users/kiltyj/Code/viberoots/docs/nixos-shared-host-usage.md)
+- Update [NixOS Shared Host Setup](nixos-shared-host-setup.md)
+  and [NixOS Shared Host Usage](nixos-shared-host-usage.md)
   so the `mini` secret workflow is JWT-first and does not direct normal operators toward AppRole.
-- Update [Vault Production Bootstrap Runbook](/Users/kiltyj/Code/viberoots/docs/vault-production-bootstrap.md)
+- Update [Vault Production Bootstrap Runbook](vault-production-bootstrap.md)
   only as needed to preserve the explicit boundary between bootstrap/debugging fallbacks and the
   normal JWT-first deployment runtime.
 
@@ -9688,15 +9688,15 @@ cleaner design because there are no current users that need compatibility.
 
 ### Docs (in this PR)
 
-- Update [Deployment Secrets API](/Users/kiltyj/Code/viberoots/docs/deployment-secrets-api.md)
+- Update [Deployment Secrets API](deployment-secrets-api.md)
   to describe the explicit deployment secret context and the in-memory Vault credential contract.
-- Update [Secrets Usage](/Users/kiltyj/Code/viberoots/docs/secrets-usage.md) so operators see
+- Update [Secrets Usage](secrets-usage.md) so operators see
   `vault_runtime` plus a reviewed credential source as the normal runtime inputs, not Vault JWT
   environment variables or JWT files.
-- Update [Deployment Contract](/Users/kiltyj/Code/viberoots/docs/deployments-contract.md) and
-  [Deployment Schema](/Users/kiltyj/Code/viberoots/docs/deployments-schema.md) if needed to
+- Update [Deployment Contract](deployments-contract.md) and
+  [Deployment Schema](deployments-schema.md) if needed to
   clarify that `vault_runtime` contains stable public routing/identity metadata only.
-- Update [Vault Production Bootstrap Runbook](/Users/kiltyj/Code/viberoots/docs/vault-production-bootstrap.md)
+- Update [Vault Production Bootstrap Runbook](vault-production-bootstrap.md)
   to remove normal-runtime instructions for `VBR_VAULT_JWT`, `VBR_VAULT_JWT_FILE`,
   `VBR_VAULT_AUTH_METHOD`, and `VAULT_TOKEN`, and to document that workload JWTs and Vault tokens
   remain in memory during deploy execution.
@@ -9881,7 +9881,7 @@ secret context and never sees ambient Vault JWT files or Vault auth environment 
 
 ### Docs (in this PR)
 
-- Update [Vault Production Bootstrap Runbook](/Users/kiltyj/Code/viberoots/docs/vault-production-bootstrap.md)
+- Update [Vault Production Bootstrap Runbook](vault-production-bootstrap.md)
   with Keycloak setup guidance for:
   - a public CLI client using Authorization Code + PKCE for human deploys
   - device authorization support for SSH/headless deploys when available
@@ -9890,11 +9890,11 @@ secret context and never sees ambient Vault JWT files or Vault auth environment 
   - Jenkins OIDC/workload-identity federation when the Jenkins installation supports it
   - separate Vault role claim bindings for human group/role tokens, service-account automation
     tokens, and Jenkins OIDC tokens
-- Update [Deployment Secrets API](/Users/kiltyj/Code/viberoots/docs/deployment-secrets-api.md)
-  and [Secrets Usage](/Users/kiltyj/Code/viberoots/docs/secrets-usage.md) to describe
+- Update [Deployment Secrets API](deployment-secrets-api.md)
+  and [Secrets Usage](secrets-usage.md) to describe
   credential sources as adapters that populate the in-memory secret context, not as provider runtime
   environment variables.
-- Update [Deployment Schema](/Users/kiltyj/Code/viberoots/docs/deployments-schema.md) to
+- Update [Deployment Schema](deployments-schema.md) to
   document any new `vault_runtime` credential-source fields and the rule that only non-secret
   routing/identity metadata may be stored in deployment metadata.
 - Add Jenkins Pipeline examples showing:
@@ -10048,17 +10048,17 @@ tests so credential-source UX stays safe as it becomes more helpful.
 
 ### Docs (in this PR)
 
-- Update [Vault Production Bootstrap Runbook](/Users/kiltyj/Code/viberoots/docs/vault-production-bootstrap.md)
+- Update [Vault Production Bootstrap Runbook](vault-production-bootstrap.md)
   with a troubleshooting section organized by the new diagnostic categories.
-- Update [Secrets Usage](/Users/kiltyj/Code/viberoots/docs/secrets-usage.md) with the operator
+- Update [Secrets Usage](secrets-usage.md) with the operator
   command flow:
   - inspect metadata with `deploy auth doctor`
   - inspect Vault role expectations with `deploy auth explain-vault-role`
   - print SSH-safe login instructions with `deploy auth print-login`
   - print Jenkins guidance with `deploy auth print-jenkins-help`
-- Update [Deployment Secrets API](/Users/kiltyj/Code/viberoots/docs/deployment-secrets-api.md)
+- Update [Deployment Secrets API](deployment-secrets-api.md)
   to document redaction rules, session/cache behavior, and diagnostic boundaries.
-- Update [Deployment Schema](/Users/kiltyj/Code/viberoots/docs/deployments-schema.md) if the
+- Update [Deployment Schema](deployments-schema.md) if the
   credential-source matrix introduces reviewed metadata fields that need schema coverage.
 - Add or update Jenkins Pipeline snippets with auth-doctor preflight examples that fail before
   provider mutation when credentials are missing or mis-scoped.
@@ -10220,20 +10220,20 @@ deployment auth: Vault at `https://secrets.apps.kilty.io:8200`, the IdP issuer a
 
 ### Docs (in this PR)
 
-- Update [Deployment Schema](/Users/kiltyj/Code/viberoots/docs/deployments-schema.md) with the
+- Update [Deployment Schema](deployments-schema.md) with the
   `vault_runtime.pkce_callback` shape, allowed modes, required fields, and precedence rules.
 - Update the checked-in `projects/deployments/**/TARGETS` deployment metadata that already points at
   `mini` Vault/IdP infrastructure so the new public callback profile is present on those deployment
   targets, not only documented as a future option.
-- Update [Deployment Secrets API](/Users/kiltyj/Code/viberoots/docs/deployment-secrets-api.md)
+- Update [Deployment Secrets API](deployment-secrets-api.md)
   with the public-host PKCE flags, environment variables, metadata fallback, and security boundary.
-- Update [Vault Production Bootstrap Runbook](/Users/kiltyj/Code/viberoots/docs/vault-production-bootstrap.md)
+- Update [Vault Production Bootstrap Runbook](vault-production-bootstrap.md)
   with Keycloak redirect URI allowlist examples for
   `https://deploy-auth.apps.kilty.io/oidc/callback`, the nginx/reverse-proxy route to the local
   bind listener, the firewall/DNS requirements for shared deploy hosts, and a single `mini` hostname
   table covering `identity.apps.kilty.io`, `secrets.apps.kilty.io`, and
   `deploy-auth.apps.kilty.io`.
-- Update [Secrets Usage](/Users/kiltyj/Code/viberoots/docs/secrets-usage.md) with operator
+- Update [Secrets Usage](secrets-usage.md) with operator
   examples showing:
   - local desktop loopback PKCE
   - shared deploy-host public callback PKCE
@@ -10377,12 +10377,12 @@ own the PKCE callback listener for shared/protected `mini` deployment workflows.
 
 ### Docs (in this PR)
 
-- Update [Deployment Secrets API](/Users/kiltyj/Code/viberoots/docs/deployment-secrets-api.md)
+- Update [Deployment Secrets API](deployment-secrets-api.md)
   with the server-owned auth session endpoints, schemas, and redaction boundary.
-- Update [Vault Production Bootstrap Runbook](/Users/kiltyj/Code/viberoots/docs/vault-production-bootstrap.md)
+- Update [Vault Production Bootstrap Runbook](vault-production-bootstrap.md)
   so Step 9 presents one normal interactive deployment story: `mini` owns the login session,
   receives the callback, and authorizes the deployment request.
-- Update [NixOS Shared Host Setup](/Users/kiltyj/Code/viberoots/docs/nixos-shared-host-setup.md)
+- Update [NixOS Shared Host Setup](nixos-shared-host-setup.md)
   so `deploy-auth.apps.kilty.io` points at the deployment service callback endpoint rather than a
   one-shot CLI listener in the reviewed server-mode path.
 
@@ -10501,9 +10501,9 @@ deployment request, and polls or streams status.
 
 ### Docs (in this PR)
 
-- Update [Deployments Usage](/Users/kiltyj/Code/viberoots/docs/deployments-usage.md) with the
+- Update [Deployments Usage](deployments-usage.md) with the
   remote/server-mode operator workflow from a laptop.
-- Update [Deployment Secrets API](/Users/kiltyj/Code/viberoots/docs/deployment-secrets-api.md)
+- Update [Deployment Secrets API](deployment-secrets-api.md)
   with the remote-client submission flow and authenticated service boundary.
 - Update `mini` setup docs so operators know they are using service-owned login and hosted
   deployment service submission for protected/shared deploys.
@@ -10627,10 +10627,10 @@ secrets, PKCE verifiers, or client secrets.
 
 ### Docs (in this PR)
 
-- Update [Vault Production Bootstrap Runbook](/Users/kiltyj/Code/viberoots/docs/vault-production-bootstrap.md)
+- Update [Vault Production Bootstrap Runbook](vault-production-bootstrap.md)
   to state that server-mode human login authorizes the request, while the `mini` worker owns Vault
   runtime credentials.
-- Update [Secrets Usage](/Users/kiltyj/Code/viberoots/docs/secrets-usage.md) with the worker-side
+- Update [Secrets Usage](secrets-usage.md) with the worker-side
   secret boundary and server-local credential configuration.
 - Update deployment service setup docs with required environment variables or secret-file references
   for worker-side credential sources.
@@ -10778,11 +10778,11 @@ control-plane authority.
 
 ### Docs (in this PR)
 
-- Update [Deployment Secrets API](/Users/kiltyj/Code/viberoots/docs/deployment-secrets-api.md)
-  and [Deployments Usage](/Users/kiltyj/Code/viberoots/docs/deployments-usage.md) with the
+- Update [Deployment Secrets API](deployment-secrets-api.md)
+  and [Deployments Usage](deployments-usage.md) with the
   artifact admission contract, including `server_build`, `client_upload`, `ci_attested`, and
   `existing_admitted_artifact` examples.
-- Update [Deployment Contract](/Users/kiltyj/Code/viberoots/docs/deployments-contract.md) with
+- Update [Deployment Contract](deployments-contract.md) with
   the distinction between artifact producer, source identity, admitted artifact identity, and replay
   artifact identity.
 - Update operator docs so production examples never submit a laptop `dist` path directly, but may
@@ -10908,13 +10908,13 @@ coherent operator experience: submit from the laptop, authenticate in the browse
 
 ### Docs (in this PR)
 
-- Update [NixOS Shared Host Setup](/Users/kiltyj/Code/viberoots/docs/nixos-shared-host-setup.md)
+- Update [NixOS Shared Host Setup](nixos-shared-host-setup.md)
   with hosted deployment service and worker bring-up.
-- Update [NixOS Shared Host Usage](/Users/kiltyj/Code/viberoots/docs/nixos-shared-host-usage.md)
+- Update [NixOS Shared Host Usage](nixos-shared-host-usage.md)
   with the laptop-as-client workflow.
-- Update [Deployment Secrets API](/Users/kiltyj/Code/viberoots/docs/deployment-secrets-api.md)
+- Update [Deployment Secrets API](deployment-secrets-api.md)
   with hosted service URL examples, upload/admission examples, and status/result shapes.
-- Update [Vault Production Bootstrap Runbook](/Users/kiltyj/Code/viberoots/docs/vault-production-bootstrap.md)
+- Update [Vault Production Bootstrap Runbook](vault-production-bootstrap.md)
   so Step 9 points operators at hosted `mini` deployment service login for normal interactive
   deploys.
 
@@ -11027,12 +11027,12 @@ performs deployment mutation.
 
 ### Docs (in this PR)
 
-- Update [Deployments Usage](/Users/kiltyj/Code/viberoots/docs/deployments-usage.md) so the
+- Update [Deployments Usage](deployments-usage.md) so the
   protected/shared production workflow is laptop client to hosted `mini` service.
-- Update [Vault Production Bootstrap Runbook](/Users/kiltyj/Code/viberoots/docs/vault-production-bootstrap.md)
+- Update [Vault Production Bootstrap Runbook](vault-production-bootstrap.md)
   so Step 9 no longer implies that an operator manually supplies a JWT, runs a laptop callback
   listener, or deploys from a laptop artifact path without upload/admission.
-- Update [Deployment Provider Capabilities](/Users/kiltyj/Code/viberoots/docs/deployment-provider-capabilities.md)
+- Update [Deployment Provider Capabilities](deployment-provider-capabilities.md)
   and generated summaries so Cloudflare Pages protected/shared capability text describes only the
   deployment-server path.
 - Add a short operator contract summary:
@@ -11284,18 +11284,18 @@ sequenceDiagram
 
 ### Docs (in this PR)
 
-- Update [Deployments Usage](/Users/kiltyj/Code/viberoots/docs/deployments-usage.md) with the
+- Update [Deployments Usage](deployments-usage.md) with the
   hardened remote upload flow: compute identity, request challenge, upload, submit, admission, and
   cleanup.
-- Update [NixOS Shared Host Usage](/Users/kiltyj/Code/viberoots/docs/nixos-shared-host-usage.md)
+- Update [NixOS Shared Host Usage](nixos-shared-host-usage.md)
   with operator-facing explanations of expected artifact identity, artifact-binding proof, admitted
   artifact identity, strict HTTPS/SSH host-key requirements, service-owned cleanup, and one-time
   challenge failures.
-- Update [Deployment Secrets API](/Users/kiltyj/Code/viberoots/docs/deployment-secrets-api.md)
+- Update [Deployment Secrets API](deployment-secrets-api.md)
   with the challenge endpoint/request/response shape, artifact-binding proof schema, supported proof
   algorithms/key ids, transport requirements, atomic consume/submit semantics, cleanup/janitor
   records, and redaction rules.
-- Update [Deployment Provider Capabilities](/Users/kiltyj/Code/viberoots/docs/deployment-provider-capabilities.md)
+- Update [Deployment Provider Capabilities](deployment-provider-capabilities.md)
   and generated summaries so protected/shared providers advertise artifact identity binding and
   replay-resistant submission challenges.
 
@@ -11461,11 +11461,11 @@ secret proof material.
 
 ### Docs (in this PR)
 
-- Update [Deployment Secrets API](/Users/kiltyj/Code/viberoots/docs/deployment-secrets-api.md)
+- Update [Deployment Secrets API](deployment-secrets-api.md)
   with the exact idempotent retry and replay behavior for challenged submissions.
-- Update [Deployments Contract](/Users/kiltyj/Code/viberoots/docs/deployments-contract.md) with
+- Update [Deployments Contract](deployments-contract.md) with
   the atomic accept semantics and provenance fields.
-- Update [NixOS Shared Host Usage](/Users/kiltyj/Code/viberoots/docs/nixos-shared-host-usage.md)
+- Update [NixOS Shared Host Usage](nixos-shared-host-usage.md)
   with the operator-facing retry behavior and redacted audit summary.
 
 ### Verification Commands
@@ -11582,11 +11582,11 @@ after canonicalization and filesystem safety checks.
 
 ### Docs (in this PR)
 
-- Update [NixOS Shared Host Setup](/Users/kiltyj/Code/viberoots/docs/nixos-shared-host-setup.md)
+- Update [NixOS Shared Host Setup](nixos-shared-host-setup.md)
   with staging-root configuration, reviewed known-hosts/pinning setup, and local-fixture exceptions.
-- Update [NixOS Shared Host Usage](/Users/kiltyj/Code/viberoots/docs/nixos-shared-host-usage.md)
+- Update [NixOS Shared Host Usage](nixos-shared-host-usage.md)
   with HTTPS and SSH host-key requirements for protected/shared deploys.
-- Update [Deployment Secrets API](/Users/kiltyj/Code/viberoots/docs/deployment-secrets-api.md)
+- Update [Deployment Secrets API](deployment-secrets-api.md)
   with staged-upload lifecycle and redacted diagnostic rules.
 
 ### Verification Commands
@@ -11704,12 +11704,12 @@ and proof key are the same ones that received the challenge.
 
 ### Docs (in this PR)
 
-- Update [Deployment Secrets API](/Users/kiltyj/Code/viberoots/docs/deployment-secrets-api.md)
+- Update [Deployment Secrets API](deployment-secrets-api.md)
   with challenge authorization requirements, proof-key registry behavior, and binding-mismatch
   responses.
-- Update [Deployments Contract](/Users/kiltyj/Code/viberoots/docs/deployments-contract.md) with
+- Update [Deployments Contract](deployments-contract.md) with
   the challenge-as-authorized-envelope contract.
-- Update [Deployment Provider Capabilities](/Users/kiltyj/Code/viberoots/docs/deployment-provider-capabilities.md)
+- Update [Deployment Provider Capabilities](deployment-provider-capabilities.md)
   and generated summaries so artifact challenge support implies authenticated and authorized
   challenge issuance, not just final-submit authorization.
 
@@ -11824,14 +11824,14 @@ contract.
 
 ### Docs (in this PR)
 
-- Update [NixOS Shared Host Usage](/Users/kiltyj/Code/viberoots/docs/nixos-shared-host-usage.md)
+- Update [NixOS Shared Host Usage](nixos-shared-host-usage.md)
   to describe service-owned cleanup, janitor records, and the limits of
   `--retain-remote-artifact` for protected/shared failures.
-- Update [NixOS Shared Host Setup](/Users/kiltyj/Code/viberoots/docs/nixos-shared-host-setup.md)
+- Update [NixOS Shared Host Setup](nixos-shared-host-setup.md)
   to document the explicit local-fixture marker required for loopback HTTP profiles.
-- Update [Deployment Secrets API](/Users/kiltyj/Code/viberoots/docs/deployment-secrets-api.md)
+- Update [Deployment Secrets API](deployment-secrets-api.md)
   with rejected-upload cleanup, janitor record, and debug-retention non-goal semantics.
-- Update [Deployments Contract](/Users/kiltyj/Code/viberoots/docs/deployments-contract.md)
+- Update [Deployments Contract](deployments-contract.md)
   with the invariant that protected/shared cleanup and fixture transport exceptions are
   service-authorized or explicitly fixture-marked, not implicit client conveniences.
 
@@ -11970,17 +11970,17 @@ service configuration or client-side best effort.
 
 ### Docs (in this PR)
 
-- Update [Deployment Secrets API](/Users/kiltyj/Code/viberoots/docs/deployment-secrets-api.md)
+- Update [Deployment Secrets API](deployment-secrets-api.md)
   with mandatory protected/shared service-token enforcement, required expected-identity fields for
   challenge issuance, and staged-reference challenge binding semantics.
-- Update [NixOS Shared Host Usage](/Users/kiltyj/Code/viberoots/docs/nixos-shared-host-usage.md)
+- Update [NixOS Shared Host Usage](nixos-shared-host-usage.md)
   so the reviewed hosted path treats the deployment-service token as required for protected/shared
   service flows and explains the fail-closed behavior for missing identity fields or early auth
   rejection.
-- Update [NixOS Shared Host Setup](/Users/kiltyj/Code/viberoots/docs/nixos-shared-host-setup.md)
+- Update [NixOS Shared Host Setup](nixos-shared-host-setup.md)
   to remove any ambiguity that an unconfigured hosted service can accept protected/shared traffic and
   to clarify which paths remain fixture-only.
-- Update [Deployments Contract](/Users/kiltyj/Code/viberoots/docs/deployments-contract.md) with
+- Update [Deployments Contract](deployments-contract.md) with
   the invariant that the authorized challenge envelope covers the finalized staged reference and that
   protected/shared rejected submissions are cleaned up or janitor-recorded by the service even on
   early auth failures.
@@ -12136,12 +12136,12 @@ without needing a new ad hoc role or claim shape for each workflow.
 
 ### Docs (in this PR)
 
-- Update [Deployments Design](/Users/kiltyj/Code/viberoots/docs/deployments-design.md) with
+- Update [Deployments Design](deployments-design.md) with
   the reviewed role model and scope semantics.
-- Update [Deployment Contract](/Users/kiltyj/Code/viberoots/docs/deployments-contract.md) to
+- Update [Deployment Contract](deployments-contract.md) to
   document the new `admission_reporter` role, the preserved meaning of `bootstrap`, and the new
   composable scope kinds.
-- Update [Deployment Scenarios](/Users/kiltyj/Code/viberoots/docs/deployment-scenarios.md) with
+- Update [Deployment Scenarios](deployment-scenarios.md) with
   example policy shapes:
   - human submitter + human approver
   - CI reporter + human submitter
@@ -12280,18 +12280,18 @@ them.
 
 ### Docs (in this PR)
 
-- Update [Vault Production Bootstrap Runbook](/Users/kiltyj/Code/viberoots/docs/vault-production-bootstrap.md)
+- Update [Vault Production Bootstrap Runbook](vault-production-bootstrap.md)
   with the reviewed Keycloak group conventions for:
   - submitters
   - approvers
   - admission reporters
   - automation principals
-- Update [NixOS Shared Host Setup](/Users/kiltyj/Code/viberoots/docs/nixos-shared-host-setup.md)
+- Update [NixOS Shared Host Setup](nixos-shared-host-setup.md)
   to document the new group families and how deploy auth sessions derive multiple grants.
-- Update [Deployments Contract](/Users/kiltyj/Code/viberoots/docs/deployments-contract.md)
+- Update [Deployments Contract](deployments-contract.md)
   with the invariant that OIDC sessions may carry multiple reviewed grants and that repository /
   environment bound claims remain mandatory.
-- Update [Deployment Scenarios](/Users/kiltyj/Code/viberoots/docs/deployment-scenarios.md)
+- Update [Deployment Scenarios](deployment-scenarios.md)
   with concrete policy examples for:
   - human-only production approval
   - CI dev auto-submit
@@ -12422,16 +12422,16 @@ adds a reviewed "report evidence now, submit later" flow.
 
 ### Docs (in this PR)
 
-- Update [NixOS Shared Host Usage](/Users/kiltyj/Code/viberoots/docs/nixos-shared-host-usage.md)
+- Update [NixOS Shared Host Usage](nixos-shared-host-usage.md)
   to explain that `--admit-and-deploy` is an authorized reporting shortcut rather than a universal
   local escape hatch.
-- Update [Deployment Scenarios](/Users/kiltyj/Code/viberoots/docs/deployment-scenarios.md)
+- Update [Deployment Scenarios](deployment-scenarios.md)
   with reviewed examples of:
   - human authorized manual check reporting
   - CI-reported evidence after real validation
   - CI submitter without approval
   - CI submitter + CI approver in lower-risk scopes
-- Update [Deployments Contract](/Users/kiltyj/Code/viberoots/docs/deployments-contract.md)
+- Update [Deployments Contract](deployments-contract.md)
   so the admission-evidence boundary explicitly requires `admission_reporter`.
 - Update operator-facing setup and troubleshooting docs with the new rejection reasons and how to
   distinguish missing submitter vs missing reporter access.
@@ -12557,13 +12557,13 @@ self-describing:
 
 ### Docs (in this PR)
 
-- Update [NixOS Shared Host Usage](/Users/kiltyj/Code/viberoots/docs/nixos-shared-host-usage.md)
+- Update [NixOS Shared Host Usage](nixos-shared-host-usage.md)
   with a concrete "how do I discover the right `--admit-and-deploy` value?" workflow.
-- Update [NixOS Shared Host Setup](/Users/kiltyj/Code/viberoots/docs/nixos-shared-host-setup.md)
+- Update [NixOS Shared Host Setup](nixos-shared-host-setup.md)
   to document the read-only requirement-inspection path before the first protected/shared submit.
-- Update [Deployments Usage](/Users/kiltyj/Code/viberoots/docs/deployments-usage.md)
+- Update [Deployments Usage](deployments-usage.md)
   so the global operator docs explain where required check names come from and how to inspect them.
-- Update [Deployments Contract](/Users/kiltyj/Code/viberoots/docs/deployments-contract.md)
+- Update [Deployments Contract](deployments-contract.md)
   to state that admission requirements remain metadata-derived and user-visible through reviewed
   inspection surfaces.
 
@@ -12693,16 +12693,16 @@ The reviewed model should become:
 
 ### Docs (in this PR)
 
-- Update [Deployments Design](/Users/kiltyj/Code/viberoots/docs/deployments-design.md) to
+- Update [Deployments Design](deployments-design.md) to
   describe the control-plane-side reviewed-ref snapshot model and why protected/shared admission is
   bound to that snapshotted commit rather than a human operator's ambient checkout.
-- Update [Mini Shared-Dev Deployment Design](/Users/kiltyj/Code/viberoots/docs/mini-deployment.md)
+- Update [Mini Shared-Dev Deployment Design](mini-deployment.md)
   with the reviewed source-ref snapshot flow for `mini`, including how concurrent
   submissions remain isolated.
-- Update [Deployments Usage](/Users/kiltyj/Code/viberoots/docs/deployments-usage.md) with
+- Update [Deployments Usage](deployments-usage.md) with
   operator guidance for diagnosing client/service source-revision mismatch and when
   `--admit-for-commit` is appropriate.
-- Update [NixOS Shared Host Usage](/Users/kiltyj/Code/viberoots/docs/nixos-shared-host-usage.md)
+- Update [NixOS Shared Host Usage](nixos-shared-host-usage.md)
   to explain that protected/shared admission is finalized against the service-owned reviewed source
   snapshot, not implicitly against the operator's local checkout.
 - Update troubleshooting/runbook docs with the new mismatch diagnostic and the safe remediation
@@ -12843,16 +12843,16 @@ The reviewed model should become:
 
 ### Docs (in this PR)
 
-- Update [Deployments Usage](/Users/kiltyj/Code/viberoots/docs/deployments-usage.md) to
+- Update [Deployments Usage](deployments-usage.md) to
   describe governance verification as a service-owned admission step for normal protected/shared
   deploys, rather than a manual evidence-construction chore.
-- Update [NixOS Shared Host Usage](/Users/kiltyj/Code/viberoots/docs/nixos-shared-host-usage.md)
+- Update [NixOS Shared Host Usage](nixos-shared-host-usage.md)
   with the simplified operator workflow and the remaining cases, if any, where explicit governance
   evidence is still needed.
-- Update [NixOS Shared Host Setup](/Users/kiltyj/Code/viberoots/docs/nixos-shared-host-setup.md)
+- Update [NixOS Shared Host Setup](nixos-shared-host-setup.md)
   so first-time operators understand which governance prerequisites the service verifies
   automatically and what credentials/config the service needs to do so.
-- Update [Deployments Design](/Users/kiltyj/Code/viberoots/docs/deployments-design.md) to
+- Update [Deployments Design](deployments-design.md) to
   state that the security value is in verification of live governance state, not in requiring
   humans to manually serialize the fact.
 - Update troubleshooting docs/runbooks with the new failure modes and remediation guidance for live
@@ -13003,23 +13003,23 @@ The reviewed model should become:
 
 ### Docs (in this PR)
 
-- Update [Vault Production Bootstrap Runbook](/Users/kiltyj/Code/viberoots/docs/vault-production-bootstrap.md)
+- Update [Vault Production Bootstrap Runbook](vault-production-bootstrap.md)
   to describe Keycloak group creation as a declarative repo-derived step rather than manual string
   assembly.
-- Update [NixOS Shared Host Setup](/Users/kiltyj/Code/viberoots/docs/nixos-shared-host-setup.md)
+- Update [NixOS Shared Host Setup](nixos-shared-host-setup.md)
   with the reviewed `mini` rebuild/switch path that provisions deploy-auth group definitions and
   mappers from deployment metadata.
-- Update [Deployments Usage](/Users/kiltyj/Code/viberoots/docs/deployments-usage.md) with the
+- Update [Deployments Usage](deployments-usage.md) with the
   new read-only helper command(s) for:
   - inspecting expected Keycloak groups for a deployment
   - understanding which groups are needed for a specific action
   - interpreting missing-grant failures without dropping into raw IdP tooling
-- Update [NixOS Shared Host Usage](/Users/kiltyj/Code/viberoots/docs/nixos-shared-host-usage.md)
+- Update [NixOS Shared Host Usage](nixos-shared-host-usage.md)
   with the operator-facing workflow for:
   - understanding which deploy-auth groups a reviewed deployment expects
   - distinguishing missing group shape from missing user membership
   - using the read-only CLI helpers before escalating to admin actions
-- Update [Deployments Schema](/Users/kiltyj/Code/viberoots/docs/deployments-schema.md) if
+- Update [Deployments Schema](deployments-schema.md) if
   needed to document any reviewed metadata or generated-artifact contract introduced by the
   derivation path.
 - Update troubleshooting docs/runbooks to distinguish:
@@ -13154,19 +13154,19 @@ The reviewed model should become:
 
 ### Docs (in this PR)
 
-- Update [Vault Production Bootstrap Runbook](/Users/kiltyj/Code/viberoots/docs/vault-production-bootstrap.md)
+- Update [Vault Production Bootstrap Runbook](vault-production-bootstrap.md)
   to present `deploy admin` as the reviewed operator surface for Keycloak identity mutations,
   replacing raw `kcadm.sh` as the primary human workflow.
-- Update [Deployments Usage](/Users/kiltyj/Code/viberoots/docs/deployments-usage.md) with the
+- Update [Deployments Usage](deployments-usage.md) with the
   split between:
   - ordinary read-only `deploy auth ...` diagnostics
   - privileged `deploy admin ...` identity changes
-- Update [NixOS Shared Host Usage](/Users/kiltyj/Code/viberoots/docs/nixos-shared-host-usage.md)
+- Update [NixOS Shared Host Usage](nixos-shared-host-usage.md)
   with the reviewed operator/admin flow for:
   - interpreting missing-grant and missing-admin-grant failures
   - choosing between read-only `deploy auth ...` helpers and privileged `deploy admin ...`
   - applying reviewed Keycloak membership or group-shape changes without dropping to raw IdP tools
-- Update [NixOS Shared Host Setup](/Users/kiltyj/Code/viberoots/docs/nixos-shared-host-setup.md)
+- Update [NixOS Shared Host Setup](nixos-shared-host-setup.md)
   with the reviewed admin-grant conventions and the expected host-side credential sources for
   `deploy admin` operations.
 - Update troubleshooting docs so missing ordinary deploy access and missing deploy-admin access are
@@ -13303,16 +13303,16 @@ The reviewed model should become:
 
 ### Docs (in this PR)
 
-- Update [Deployments Usage](/Users/kiltyj/Code/viberoots/docs/deployments-usage.md) with the
+- Update [Deployments Usage](deployments-usage.md) with the
   reviewed client-driven Keycloak admin flow, including when to use local artifact generation
   versus `--profile mini` remote application.
-- Update [NixOS Shared Host Usage](/Users/kiltyj/Code/viberoots/docs/nixos-shared-host-usage.md)
+- Update [NixOS Shared Host Usage](nixos-shared-host-usage.md)
   to document the no-manual-SSH reviewed path for applying deploy-auth membership and group-shape
   changes from a client machine.
-- Update [NixOS Shared Host Setup](/Users/kiltyj/Code/viberoots/docs/nixos-shared-host-setup.md)
+- Update [NixOS Shared Host Setup](nixos-shared-host-setup.md)
   to document the expected pure config-root layout for reviewed Keycloak realm artifacts and how
   the remote admin path updates them safely.
-- Update [Vault Production Bootstrap Runbook](/Users/kiltyj/Code/viberoots/docs/vault-production-bootstrap.md)
+- Update [Vault Production Bootstrap Runbook](vault-production-bootstrap.md)
   so the reviewed bootstrap/admin story no longer implies that operators must log into `mini` to
   apply routine reviewed Keycloak membership changes.
 - Update troubleshooting docs to distinguish:
@@ -13461,15 +13461,15 @@ The reviewed model should become:
 
 ### Docs (in this PR)
 
-- Update [Deployments Usage](/Users/kiltyj/Code/viberoots/docs/deployments-usage.md) with the
+- Update [Deployments Usage](deployments-usage.md) with the
   minimal reviewed Keycloak admin commands for self-service and cross-user grants.
-- Update [NixOS Shared Host Usage](/Users/kiltyj/Code/viberoots/docs/nixos-shared-host-usage.md)
+- Update [NixOS Shared Host Usage](nixos-shared-host-usage.md)
   to document the simplified `--profile mini` operator flow and when explicit overrides are still
   required.
-- Update [NixOS Shared Host Setup](/Users/kiltyj/Code/viberoots/docs/nixos-shared-host-setup.md)
+- Update [NixOS Shared Host Setup](nixos-shared-host-setup.md)
   so the reviewed bootstrap/runbook guidance no longer expects operators to know internal
   Keycloak-admin principal or group names for routine flows.
-- Update [Vault Production Bootstrap Runbook](/Users/kiltyj/Code/viberoots/docs/vault-production-bootstrap.md)
+- Update [Vault Production Bootstrap Runbook](vault-production-bootstrap.md)
   to show the reduced-input reviewed admin commands used during human onboarding and break-glass
   recovery.
 - Update troubleshooting docs to distinguish:
@@ -13634,15 +13634,15 @@ shape that does not emit that email claim yet. The long-term reviewed design sho
 
 ### Docs (in this PR)
 
-- Update [Deployments Usage](/Users/kiltyj/Code/viberoots/docs/deployments-usage.md) to use
+- Update [Deployments Usage](deployments-usage.md) to use
   the provider-agnostic reviewed identity-admin command family everywhere the public operator
   workflow is described.
-- Update [NixOS Shared Host Usage](/Users/kiltyj/Code/viberoots/docs/nixos-shared-host-usage.md)
+- Update [NixOS Shared Host Usage](nixos-shared-host-usage.md)
   to describe the reviewed first-install bootstrap story and the steady-state provider-agnostic
   operator commands.
-- Update [NixOS Shared Host Setup](/Users/kiltyj/Code/viberoots/docs/nixos-shared-host-setup.md)
+- Update [NixOS Shared Host Setup](nixos-shared-host-setup.md)
   so a new installation can follow one reviewed bootstrap path without console-only IdP repair.
-- Update [Vault Production Bootstrap Runbook](/Users/kiltyj/Code/viberoots/docs/vault-production-bootstrap.md)
+- Update [Vault Production Bootstrap Runbook](vault-production-bootstrap.md)
   to replace implementation-branded admin commands with provider-agnostic ones and to document the
   host-local first-operator bootstrap contract.
 - Update troubleshooting docs to distinguish:
@@ -13798,16 +13798,16 @@ operator performs out-of-band vendor-console surgery. The reviewed design should
 
 ### Docs (in this PR)
 
-- Update [NixOS Shared Host Setup](/Users/kiltyj/Code/viberoots/docs/nixos-shared-host-setup.md)
+- Update [NixOS Shared Host Setup](nixos-shared-host-setup.md)
   to describe one declarative path that covers both fresh installs and upgrades of existing
   reviewed identity-provider realms.
-- Update [NixOS Shared Host Usage](/Users/kiltyj/Code/viberoots/docs/nixos-shared-host-usage.md)
+- Update [NixOS Shared Host Usage](nixos-shared-host-usage.md)
   to clarify that provider bootstrap migration happens during host reconciliation and that
   `deploy admin identity ...` remains the steady-state human operator path after login is aligned.
-- Update [Vault Production Bootstrap Runbook](/Users/kiltyj/Code/viberoots/docs/vault-production-bootstrap.md)
+- Update [Vault Production Bootstrap Runbook](vault-production-bootstrap.md)
   to remove any remaining manual admin-console upgrade steps from the normal reviewed recovery
   story.
-- Update [Deployments Usage](/Users/kiltyj/Code/viberoots/docs/deployments-usage.md) and any
+- Update [Deployments Usage](deployments-usage.md) and any
   related troubleshooting docs so upgrade guidance clearly separates:
   - declarative bootstrap migration during host reconciliation
   - steady-state reviewed identity sync
@@ -13945,10 +13945,10 @@ The reviewed design should be:
 
 ### Docs (in this PR)
 
-- Update [NixOS Shared Host Setup](/Users/kiltyj/Code/viberoots/docs/nixos-shared-host-setup.md)
+- Update [NixOS Shared Host Setup](nixos-shared-host-setup.md)
   to document the reviewed host-secret contract for the identity-provider database password without
   requiring manual permission relaxation.
-- Update [Vault Production Bootstrap Runbook](/Users/kiltyj/Code/viberoots/docs/vault-production-bootstrap.md)
+- Update [Vault Production Bootstrap Runbook](vault-production-bootstrap.md)
   so the reviewed bootstrap path is compatible with host-managed secrets, Vault-backed operator
   expectations, and restricted secret-file permissions.
 - Update any related secret/runtime docs to clarify that:
@@ -14020,10 +14020,10 @@ manually repaired local setups.
 
 ## Companion Docs
 
-- [Deployments Design](/Users/kiltyj/Code/viberoots/docs/deployments-design.md)
-- [Deployment Contract](/Users/kiltyj/Code/viberoots/docs/deployments-contract.md)
-- [Deployment Schema](/Users/kiltyj/Code/viberoots/docs/deployments-schema.md)
-- [Deployment Provider Capabilities](/Users/kiltyj/Code/viberoots/docs/deployment-provider-capabilities.md)
-- [Deployment Scenarios](/Users/kiltyj/Code/viberoots/docs/deployment-scenarios.md)
-- [Mini Shared-Dev Deployment Design](/Users/kiltyj/Code/viberoots/docs/mini-deployment.md)
-- [Vault Production Bootstrap Runbook](/Users/kiltyj/Code/viberoots/docs/vault-production-bootstrap.md)
+- [Deployments Design](deployments-design.md)
+- [Deployment Contract](deployments-contract.md)
+- [Deployment Schema](deployments-schema.md)
+- [Deployment Provider Capabilities](deployment-provider-capabilities.md)
+- [Deployment Scenarios](deployment-scenarios.md)
+- [Mini Shared-Dev Deployment Design](mini-deployment.md)
+- [Vault Production Bootstrap Runbook](vault-production-bootstrap.md)

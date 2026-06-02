@@ -4,9 +4,9 @@ This document defines a concrete design for using `mini` as the shared developme
 destination for application environments served under `*.apps.kilty.io`.
 
 Do not start here when you are trying to set up `mini`.
-Start with [NixOS Shared Host Usage](/Users/kiltyj/Code/viberoots/docs/nixos-shared-host-usage.md)
+Start with [NixOS Shared Host Usage](nixos-shared-host-usage.md)
 for the reviewed operator-facing entrypoint, then open
-[NixOS Shared Host Setup](/Users/kiltyj/Code/viberoots/docs/nixos-shared-host-setup.md)
+[NixOS Shared Host Setup](nixos-shared-host-setup.md)
 for the install and maintenance reference.
 
 The reviewed provider family is `nixos-shared-host`. In this document, `mini` is the current
@@ -22,13 +22,13 @@ shared deployment design for one provider family:
 
 It should be read together with:
 
-- [NixOS Shared Host Usage](/Users/kiltyj/Code/viberoots/docs/nixos-shared-host-usage.md)
+- [NixOS Shared Host Usage](nixos-shared-host-usage.md)
   for the reviewed operator-facing usage path and day-to-day workflows
-- [NixOS Shared Host Setup](/Users/kiltyj/Code/viberoots/docs/nixos-shared-host-setup.md)
+- [NixOS Shared Host Setup](nixos-shared-host-setup.md)
   for the canonical server/client install workflow and lifecycle reference
-- [Deployments Design](/Users/kiltyj/Code/viberoots/docs/deployments-design.md)
-- [Deployment Contract](/Users/kiltyj/Code/viberoots/docs/deployments-contract.md)
-- [Deployment Provider Capabilities](/Users/kiltyj/Code/viberoots/docs/deployment-provider-capabilities.md)
+- [Deployments Design](deployments-design.md)
+- [Deployment Contract](deployments-contract.md)
+- [Deployment Provider Capabilities](deployment-provider-capabilities.md)
 
 If this document ever drifts from the cross-cutting contract or provider-capability rules, those
 documents remain authoritative.
@@ -79,7 +79,7 @@ Cloud cutover standby scope:
   elsewhere
 - `processMode: fully-disabled` preserves config and credentials while preventing accidental service
   or worker startup
-- run [Cloud Control Cutover](/Users/kiltyj/Code/viberoots/docs/cloud-control-cutover.md)
+- run [Cloud Control Cutover](cloud-control-cutover.md)
   validation before re-enabling workers or returning traffic to mini
 
 Provider scope:

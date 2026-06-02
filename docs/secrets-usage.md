@@ -21,17 +21,17 @@ Use this guide when you want the shortest path to:
 ## Reviewed Front Door
 
 The main public surface is the `SprinkleRef` layer described in
-[Deployment And Secrets API](/Users/kiltyj/Code/viberoots/docs/deployment-secrets-api.md).
+[Deployment And Secrets API](deployment-secrets-api.md).
 
 For day-to-day operator deployment flows, start with
-[Deployments Usage](/Users/kiltyj/Code/viberoots/docs/deployments-usage.md).
+[Deployments Usage](deployments-usage.md).
 
 For secret-runtime integration and public helper signatures, open
-[Deployment And Secrets API](/Users/kiltyj/Code/viberoots/docs/deployment-secrets-api.md).
+[Deployment And Secrets API](deployment-secrets-api.md).
 
 For production Vault bring-up and the optional local/test export bridge into
 `VBR_DEPLOYMENT_SECRET_FIXTURE_PATH`, open
-[Vault Production Bootstrap Runbook](/Users/kiltyj/Code/viberoots/docs/vault-production-bootstrap.md).
+[Vault Production Bootstrap Runbook](vault-production-bootstrap.md).
 
 ## Plain-Language Glossary
 
@@ -105,7 +105,7 @@ export VBR_DEPLOYMENT_SECRET_FIXTURE_PATH="$PWD/secret-fixture.json"
 ```
 
 Then use the runtime helper described in
-[Deployment And Secrets API](/Users/kiltyj/Code/viberoots/docs/deployment-secrets-api.md):
+[Deployment And Secrets API](deployment-secrets-api.md):
 
 ```ts
 const runtime = createDeploymentSecretRuntimeForAdmittedContext({
@@ -429,7 +429,7 @@ For local development, isolated tests, or explicit bootstrap-oriented
 workflows, use the fixture override shown below.
 
 For production secret storage and optional fixture export, use
-[Vault Production Bootstrap Runbook](/Users/kiltyj/Code/viberoots/docs/vault-production-bootstrap.md)
+[Vault Production Bootstrap Runbook](vault-production-bootstrap.md)
 to bootstrap Vault as the source of truth and then export the secret fixture
 when one of those non-production workflows needs it.
 
@@ -717,7 +717,7 @@ the actual secret value into durable records or replay snapshots.
 This repo now documents two distinct layers:
 
 - Vault as the long-lived production source of truth in
-  [Vault Production Bootstrap Runbook](/Users/kiltyj/Code/viberoots/docs/vault-production-bootstrap.md)
+  [Vault Production Bootstrap Runbook](vault-production-bootstrap.md)
 - JWT-first runtime Vault reads for the reviewed production path through
   deployment `vault_runtime` metadata and deployment-derived workload JWTs
 - Infisical runtime reads through Universal Auth and reviewed non-secret
@@ -841,18 +841,18 @@ secret keeps the check out of sync.
 
 ## When To Open Which Doc
 
-Open [Deployment And Secrets API](/Users/kiltyj/Code/viberoots/docs/deployment-secrets-api.md)
+Open [Deployment And Secrets API](deployment-secrets-api.md)
 when you need the exact CLI flags, HTTP endpoints, schema names, or helper
 signatures.
 
-Open [Vault Production Bootstrap Runbook](/Users/kiltyj/Code/viberoots/docs/vault-production-bootstrap.md)
+Open [Vault Production Bootstrap Runbook](vault-production-bootstrap.md)
 when you are setting up Vault itself, configuring JWT auth roles, writing secrets,
 or generating the optional local/test runtime export from Vault.
 
-Open [Deployments Design](/Users/kiltyj/Code/viberoots/docs/deployments-design.md)
+Open [Deployments Design](deployments-design.md)
 when you need the architectural rationale behind `SprinkleRef`, replay
 snapshots, and Vault-backed resolution.
 
-Open [Deployment Contract](/Users/kiltyj/Code/viberoots/docs/deployments-contract.md)
+Open [Deployment Contract](deployments-contract.md)
 when you need the fail-closed rules for secret references, approval binding, and
 replay behavior.

@@ -14,8 +14,8 @@ Normative-source note:
 - those structured capability entries are the authoritative source for normative provider values
 - this document may add explanatory prose outside the rendered registry block, but must not redefine
   reviewed provider values independently
-- [Deployment Design](/Users/kiltyj/Code/viberoots/docs/deployments-design.md) may summarize provider support for onboarding, but this document owns the normative provider-capability contract
-- [Deployments Usage](/Users/kiltyj/Code/viberoots/docs/deployments-usage.md) is the reviewed
+- [Deployment Design](deployments-design.md) may summarize provider support for onboarding, but this document owns the normative provider-capability contract
+- [Deployments Usage](deployments-usage.md) is the reviewed
   operator-facing front door for the day-to-day command surface that sits above
   these provider-specific capability details
 
@@ -1033,8 +1033,8 @@ Change-control rule:
 
 ## Companion Docs
 
-- [Deployment Design](/Users/kiltyj/Code/viberoots/docs/deployments-design.md)
-- [Deployment Contract](/Users/kiltyj/Code/viberoots/docs/deployments-contract.md)
-- [Deployment Schema](/Users/kiltyj/Code/viberoots/docs/deployments-schema.md)
-- [Deployment Scenarios](/Users/kiltyj/Code/viberoots/docs/deployment-scenarios.md)
-- [Deployment Implementation Plan](/Users/kiltyj/Code/viberoots/docs/deployment-plan.md)
+- [Deployment Design](deployments-design.md)
+- [Deployment Contract](deployments-contract.md)
+- [Deployment Schema](deployments-schema.md)
+- [Deployment Scenarios](deployment-scenarios.md)
+- [Deployment Implementation Plan](deployment-plan.md)

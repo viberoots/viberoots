@@ -16,7 +16,8 @@ import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 
-const [urlFile, outFile] = process.argv.slice(2);
+const args = process.argv;
+const [urlFile, outFile] = args.slice(2);
 if (!urlFile || !outFile) {
   console.error("usage: supabase-privatelink-psql-proof <database-url-file> <out-file>");
   process.exit(2);

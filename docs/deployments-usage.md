@@ -15,23 +15,23 @@ Use this guide when you want the shortest path to the day-to-day workflows:
 
 Use the deeper docs when needed:
 
-- [Deployments Design](/Users/kiltyj/Code/viberoots/docs/deployments-design.md)
+- [Deployments Design](deployments-design.md)
   for model rationale, authoring structure, and policy intent
-- [Deployment Contract](/Users/kiltyj/Code/viberoots/docs/deployments-contract.md)
+- [Deployment Contract](deployments-contract.md)
   for fail-closed shared operator and implementation guarantees
-- [Deployment And Secrets API](/Users/kiltyj/Code/viberoots/docs/deployment-secrets-api.md)
+- [Deployment And Secrets API](deployment-secrets-api.md)
   for the public CLI, control-plane, and `SprinkleRef` helper surface
-- [Secrets Usage](/Users/kiltyj/Code/viberoots/docs/secrets-usage.md)
+- [Secrets Usage](secrets-usage.md)
   for declaring deployment secret requirements and choosing the Vault or
   Infisical workflow per deployment
-- [Deployment Provider Capabilities](/Users/kiltyj/Code/viberoots/docs/deployment-provider-capabilities.md)
+- [Deployment Provider Capabilities](deployment-provider-capabilities.md)
   for reviewed provider-specific support and constraints
-- [Deployment Scenarios](/Users/kiltyj/Code/viberoots/docs/deployment-scenarios.md)
+- [Deployment Scenarios](deployment-scenarios.md)
   for canonical scenario-by-scenario expectations
-- [NixOS Shared Host Usage](/Users/kiltyj/Code/viberoots/docs/nixos-shared-host-usage.md)
+- [NixOS Shared Host Usage](nixos-shared-host-usage.md)
   for the reviewed `mini` host workflow and the start-here path for first-time
   `mini` setup
-- [Runtime Prefix Migration](/Users/kiltyj/Code/viberoots/docs/runtime-prefix-migration.md)
+- [Runtime Prefix Migration](runtime-prefix-migration.md)
   for updating old runtime environment variables to `VBR_*`
 
 ## Main Command
@@ -513,7 +513,7 @@ step instead of editing Keycloak by hand.
   path
 - includes host setup, client setup, remote plan, remote deploy, Jenkins deploy,
   and approval on a waiting run
-- start with [NixOS Shared Host Usage](/Users/kiltyj/Code/viberoots/docs/nixos-shared-host-usage.md)
+- start with [NixOS Shared Host Usage](nixos-shared-host-usage.md)
 
 `cloudflare-pages`
 
@@ -526,7 +526,7 @@ step instead of editing Keycloak by hand.
 - keep account, project, domains, lane policy, admission policy, preview, smoke,
   and secret requirements in `TARGETS`; keep `wrangler.jsonc` limited to
   provider-native Wrangler settings such as `$schema` and `compatibility_date`
-- use this guide plus [Deployment Provider Capabilities](/Users/kiltyj/Code/viberoots/docs/deployment-provider-capabilities.md)
+- use this guide plus [Deployment Provider Capabilities](deployment-provider-capabilities.md)
   for the exact supported behavior
 
 `cloudflare-containers`
@@ -557,7 +557,7 @@ step instead of editing Keycloak by hand.
 - protected/shared worker execution uses a frozen admitted snapshot with the
   shared admission-engine result and admitted static artifact reference; queued
   snapshots do not carry laptop-local artifact directories
-- use this guide plus [Deployment Provider Capabilities](/Users/kiltyj/Code/viberoots/docs/deployment-provider-capabilities.md)
+- use this guide plus [Deployment Provider Capabilities](deployment-provider-capabilities.md)
   for the exact supported behavior
 
 `kubernetes`
@@ -678,7 +678,7 @@ repeating the same check for production.
   contexts: old Vault-admitted runs continue replaying with Vault references,
   and any already-recorded Infisical runs continue replaying with their exact
   Infisical references.
-- use this guide plus [Deployment Provider Capabilities](/Users/kiltyj/Code/viberoots/docs/deployment-provider-capabilities.md)
+- use this guide plus [Deployment Provider Capabilities](deployment-provider-capabilities.md)
 
 Scaffold-first examples:
 
@@ -821,35 +821,35 @@ prebuilt artifacts and never rebuild from current branch state. The
 control-plane service persists the admitted prebuilt artifact reference,
 source-run selector, secret-contract references, and shared admission
 evaluation in one frozen execution snapshot before worker mutation.
-See [Vercel Troubleshooting](/Users/kiltyj/Code/viberoots/docs/handbook/troubleshooting.md#vercel-control-plane-deployments)
+See [Vercel Troubleshooting](handbook/troubleshooting.md#vercel-control-plane-deployments)
 for service submission, admission, replay, and provider API failure modes.
 
 `app-store-connect`
 
 - good fit for iOS apps
-- use this guide plus [Deployment Provider Capabilities](/Users/kiltyj/Code/viberoots/docs/deployment-provider-capabilities.md)
+- use this guide plus [Deployment Provider Capabilities](deployment-provider-capabilities.md)
   for staged rollout and promotion rules
 
 `google-play`
 
 - good fit for Android apps
-- use this guide plus [Deployment Provider Capabilities](/Users/kiltyj/Code/viberoots/docs/deployment-provider-capabilities.md)
+- use this guide plus [Deployment Provider Capabilities](deployment-provider-capabilities.md)
   for staged rollout, promotion, and replay rules
 
 ## When To Open Which Doc
 
 Open this guide first when you want the right command quickly.
 
-Open [Deployment Provider Capabilities](/Users/kiltyj/Code/viberoots/docs/deployment-provider-capabilities.md)
+Open [Deployment Provider Capabilities](deployment-provider-capabilities.md)
 when you need the exact support or restriction for one backend.
 
-Open [Deployment And Secrets API](/Users/kiltyj/Code/viberoots/docs/deployment-secrets-api.md)
+Open [Deployment And Secrets API](deployment-secrets-api.md)
 when you need the exact `deploy` flags, HTTP API shapes, or secrets examples.
 
-Open [Deployment Scenarios](/Users/kiltyj/Code/viberoots/docs/deployment-scenarios.md)
+Open [Deployment Scenarios](deployment-scenarios.md)
 when you need canonical expected behavior for a concrete operation such as
 preview, retry, rollback, promotion, or provision-only.
 
-Open [Deployments Design](/Users/kiltyj/Code/viberoots/docs/deployments-design.md)
+Open [Deployments Design](deployments-design.md)
 when you are creating a new deployment definition or need architecture
 background.

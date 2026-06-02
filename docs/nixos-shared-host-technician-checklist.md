@@ -96,31 +96,23 @@ Completion criteria:
 Run on `mini` from `/srv/viberoots`:
 
 ```bash
-export VBR_DEPLOY_CONTROL_PLANE_DATABASE_URL='postgres://deployctl:REDACTED@127.0.0.1:5432/deployctl'
-export VBR_DEPLOY_CONTROL_PLANE_TOKEN='replace-me'
-set -a
-. /etc/deployment-host/reviewed-source-ssh.env
-set +a
-direnv exec . zx-wrapper build-tools/tools/deployments/nixos-shared-host-control-plane-service.ts \
-  --host-root /var/lib/deployment-host/runtime \
-  --state /etc/nixos/deployment-host/platform-state.json \
-  --records-root /var/lib/deployment-host/records \
-  --host 127.0.0.1 \
-  --port 7780
+deployment-control-plane service \
+  --config /etc/deployment-control-plane/config.yaml
 ```
 
 ```bash
-direnv exec . zx-wrapper build-tools/tools/deployments/nixos-shared-host-control-plane-worker.ts \
-  --records-root /var/lib/deployment-host/records
+deployment-control-plane worker \
+  --config /etc/deployment-control-plane/config.yaml
 ```
 
 What success looks like:
 
 - the service binds successfully
 - the worker stays running
-- both processes use the same Postgres URL
-- both processes load `/etc/deployment-host/reviewed-source-ssh.env`, which
-  points at the host-managed GitHub SSH deploy key for the private reviewed repo
+- both processes load the same reviewed runtime config
+- both processes validate mounted database, artifact-store, and reviewed-source credential files
+- the reviewed-source credential files point at the host-managed GitHub SSH deploy key for the
+  private reviewed repo
 - worker-side Vault credential variables are present only on `mini`, and
   fixture paths or laptop Vault token/JWT variables are not exported into the
   service submission path

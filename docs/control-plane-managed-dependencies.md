@@ -58,7 +58,8 @@ zx-wrapper build-tools/tools/deployments/control-plane-managed-dependencies.ts \
   --host-profile aws-ec2 \
   --aws-region us-east-1 \
   --source-host-identity i-0abc1234 \
-  --source-host-kind aws-ec2
+  --source-host-kind aws-ec2 \
+  > ./managed-dependency-evidence.json
 ```
 
 The validator checks managed Postgres features used by the control plane, including JSONB, temporary
@@ -66,12 +67,14 @@ tables, `FOR UPDATE SKIP LOCKED`, `INSERT ON CONFLICT`, and `RETURNING`. It chec
 through the same S3-compatible artifact-store implementation workers use: `PUT`, `GET`, `HEAD`,
 metadata, content type, digest verification, and signing region.
 
-Evidence is written as JSON when `compatibilityEvidenceFile` is set. Evidence records provider
-labels, observed runtime host profile, observed AWS region, selected database connectivity mode,
-source host identity and kind, Supabase project and region labels when supplied, resolved database
-host, TLS status, non-secret bucket/region/endpoint host, checked operations, digest, object key,
-S3 VPC endpoint proof for AWS S3, and Postgres feature results. It must not contain database URLs,
-access keys, secret keys, or credential file contents.
+Evidence is printed as JSON on stdout; capture it as `managed-dependency-evidence.json` in the
+profile bundle because cutover evidence collection reads that file. `compatibilityEvidenceFile`
+documents the intended evidence path but the CLI does not write it by itself. Evidence records
+provider labels, observed runtime host profile, observed AWS region, selected database connectivity
+mode, source host identity and kind, Supabase project and region labels when supplied, resolved
+database host, TLS status, non-secret bucket/region/endpoint host, checked operations, digest,
+object key, S3 VPC endpoint proof for AWS S3, and Postgres feature results. It must not contain
+database URLs, access keys, secret keys, or credential file contents.
 
 For Supabase Postgres, evidence also includes a `supabase-managed-postgres-evidence@1` lifecycle
 record. The envelope contains the selected profile identity, evidence source, `checkedAt`,

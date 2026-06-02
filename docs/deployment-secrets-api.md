@@ -18,9 +18,9 @@ Use this document when you need:
 
 Open the usage guides first when you want the shortest operator path:
 
-- [Deployments Usage](/Users/kiltyj/Code/viberoots/docs/deployments-usage.md)
-- [Secrets Usage](/Users/kiltyj/Code/viberoots/docs/secrets-usage.md)
-- [Vault Production Bootstrap Runbook](/Users/kiltyj/Code/viberoots/docs/vault-production-bootstrap.md)
+- [Deployments Usage](deployments-usage.md)
+- [Secrets Usage](secrets-usage.md)
+- [Vault Production Bootstrap Runbook](vault-production-bootstrap.md)
 
 ## Plain-Language Glossary
 
@@ -37,21 +37,21 @@ Open the usage guides first when you want the shortest operator path:
 These are the public surfaces you can rely on:
 
 1. the repo-level `deploy` CLI in
-   [build-tools/tools/bin/deploy](/Users/kiltyj/Code/viberoots/build-tools/tools/bin/deploy)
+   [build-tools/tools/bin/deploy](../build-tools/tools/bin/deploy)
 2. the shared deployment service endpoints implemented by
-   [nixos-shared-host-control-plane-server.ts](/Users/kiltyj/Code/viberoots/build-tools/tools/deployments/nixos-shared-host-control-plane-server.ts)
+   [nixos-shared-host-control-plane-server.ts](../build-tools/tools/deployments/nixos-shared-host-control-plane-server.ts)
 3. the shared request and response contracts in
-   [deployment-control-plane-contract.ts](/Users/kiltyj/Code/viberoots/build-tools/tools/deployments/deployment-control-plane-contract.ts)
+   [deployment-control-plane-contract.ts](../build-tools/tools/deployments/deployment-control-plane-contract.ts)
 4. the provider submit-request contracts in
-   [nixos-shared-host-control-plane-api-contract.ts](/Users/kiltyj/Code/viberoots/build-tools/tools/deployments/nixos-shared-host-control-plane-api-contract.ts)
+   [nixos-shared-host-control-plane-api-contract.ts](../build-tools/tools/deployments/nixos-shared-host-control-plane-api-contract.ts)
    and
-   [cloudflare-pages-control-plane-api-contract.ts](/Users/kiltyj/Code/viberoots/build-tools/tools/deployments/cloudflare-pages-control-plane-api-contract.ts)
+   [cloudflare-pages-control-plane-api-contract.ts](../build-tools/tools/deployments/cloudflare-pages-control-plane-api-contract.ts)
 5. the `SprinkleRef` helpers in
-   [deployment-sprinkle-ref.ts](/Users/kiltyj/Code/viberoots/build-tools/tools/deployments/deployment-sprinkle-ref.ts),
-   [deployment-secret-runtime.ts](/Users/kiltyj/Code/viberoots/build-tools/tools/deployments/deployment-secret-runtime.ts),
-   [deployment-secret-runtime-helpers.ts](/Users/kiltyj/Code/viberoots/build-tools/tools/deployments/deployment-secret-runtime-helpers.ts),
+   [deployment-sprinkle-ref.ts](../build-tools/tools/deployments/deployment-sprinkle-ref.ts),
+   [deployment-secret-runtime.ts](../build-tools/tools/deployments/deployment-secret-runtime.ts),
+   [deployment-secret-runtime-helpers.ts](../build-tools/tools/deployments/deployment-secret-runtime-helpers.ts),
    and
-   [deployment-secret-vault.ts](/Users/kiltyj/Code/viberoots/build-tools/tools/deployments/deployment-secret-vault.ts)
+   [deployment-secret-vault.ts](../build-tools/tools/deployments/deployment-secret-vault.ts)
 
 ## `deploy` CLI
 
@@ -366,12 +366,8 @@ deploy --from-changes
 The current service is started with:
 
 ```bash
-export VBR_DEPLOY_CONTROL_PLANE_DATABASE_URL='postgres://deployctl:REDACTED@127.0.0.1:5432/deployctl'
-export VBR_DEPLOY_CONTROL_PLANE_TOKEN='replace-me'
-
-zx-wrapper build-tools/tools/deployments/nixos-shared-host-control-plane-service.ts \
-  --host 127.0.0.1 \
-  --port 7780
+deployment-control-plane service \
+  --config /etc/deployment-control-plane/config.yaml
 ```
 
 The service returns JSON on all endpoints.
@@ -417,7 +413,7 @@ The service returns JSON on all endpoints.
 ### Schema Names
 
 The shared schema constants are exported from
-[deployment-control-plane-contract.ts](/Users/kiltyj/Code/viberoots/build-tools/tools/deployments/deployment-control-plane-contract.ts):
+[deployment-control-plane-contract.ts](../build-tools/tools/deployments/deployment-control-plane-contract.ts):
 
 - `deployment-control-plane-submit-request@1`
 - `deployment-control-plane-submit-response@1`
@@ -709,7 +705,7 @@ backend behind that surface.
 ### Public Types And Helpers
 
 The public `SprinkleRef` helpers are exported from
-[deployment-sprinkle-ref.ts](/Users/kiltyj/Code/viberoots/build-tools/tools/deployments/deployment-sprinkle-ref.ts):
+[deployment-sprinkle-ref.ts](../build-tools/tools/deployments/deployment-sprinkle-ref.ts):
 
 - `DeploymentSecretBackendKind`
 - `DeploymentSecretContractBinding`
@@ -717,7 +713,7 @@ The public `SprinkleRef` helpers are exported from
 - `deploymentSecretBindingsForStep()`
 
 The runtime helpers are exported from
-[deployment-secret-runtime.ts](/Users/kiltyj/Code/viberoots/build-tools/tools/deployments/deployment-secret-runtime.ts):
+[deployment-secret-runtime.ts](../build-tools/tools/deployments/deployment-secret-runtime.ts):
 
 - `DeploymentSecretMaterial`
 - `DeploymentSecretBackend`
@@ -726,18 +722,18 @@ The runtime helpers are exported from
 The backend and admitted-context helpers are exported from:
 
 - `createDeploymentVaultSecretBackend()` in
-  [deployment-secret-vault.ts](/Users/kiltyj/Code/viberoots/build-tools/tools/deployments/deployment-secret-vault.ts)
+  [deployment-secret-vault.ts](../build-tools/tools/deployments/deployment-secret-vault.ts)
 - `resolveDeploymentInfisicalAdmittedReferences()` and
   `createDeploymentInfisicalSecretBackend()` in
-  [deployment-secret-infisical.ts](/Users/kiltyj/Code/viberoots/build-tools/tools/deployments/deployment-secret-infisical.ts)
+  [deployment-secret-infisical.ts](../build-tools/tools/deployments/deployment-secret-infisical.ts)
 - `createDeploymentSecretRuntimeForAdmittedContext()` in
-  [deployment-secret-runtime-helpers.ts](/Users/kiltyj/Code/viberoots/build-tools/tools/deployments/deployment-secret-runtime-helpers.ts)
+  [deployment-secret-runtime-helpers.ts](../build-tools/tools/deployments/deployment-secret-runtime-helpers.ts)
 - `createVaultDeploymentSecretRuntime()` in
-  [deployment-secret-runtime-helpers.ts](/Users/kiltyj/Code/viberoots/build-tools/tools/deployments/deployment-secret-runtime-helpers.ts)
+  [deployment-secret-runtime-helpers.ts](../build-tools/tools/deployments/deployment-secret-runtime-helpers.ts)
   remains a Vault compatibility helper for intentionally Vault-specific callers
 
 The Infisical credential helpers are exported from
-[deployment-secret-infisical-credentials.ts](/Users/kiltyj/Code/viberoots/build-tools/tools/deployments/deployment-secret-infisical-credentials.ts):
+[deployment-secret-infisical-credentials.ts](../build-tools/tools/deployments/deployment-secret-infisical-credentials.ts):
 
 - `InfisicalCredentialConfig`
 - `infisicalCredentialFromRuntime()`
@@ -1020,7 +1016,7 @@ export VBR_DEPLOYMENT_SECRET_FIXTURE_PATH="$PWD/secret-fixture.json"
 ```
 
 Production operators should also read
-[Vault Production Bootstrap Runbook](/Users/kiltyj/Code/viberoots/docs/vault-production-bootstrap.md).
+[Vault Production Bootstrap Runbook](vault-production-bootstrap.md).
 That runbook bootstraps Vault as the source of truth for the JWT-first runtime
 path and also shows how to export this fixture format for local/test workflows.
 
@@ -1309,18 +1305,18 @@ is still no repo-local `deploy auth status` or `deploy auth logout` command.
 
 ## When To Open Which Doc
 
-Open [Deployments Usage](/Users/kiltyj/Code/viberoots/docs/deployments-usage.md)
+Open [Deployments Usage](deployments-usage.md)
 when you want the fastest operator command path.
 
-Open [Secrets Usage](/Users/kiltyj/Code/viberoots/docs/secrets-usage.md)
+Open [Secrets Usage](secrets-usage.md)
 when you need the shortest explanation of the `SprinkleRef` and Vault model.
 
-Open [Vault Production Bootstrap Runbook](/Users/kiltyj/Code/viberoots/docs/vault-production-bootstrap.md)
+Open [Vault Production Bootstrap Runbook](vault-production-bootstrap.md)
 when you need the operator workflow for initializing Vault, enabling KV/JWT auth,
 writing policies, storing secrets, and exporting the current secret fixture.
 
-Open [Deployments Design](/Users/kiltyj/Code/viberoots/docs/deployments-design.md)
+Open [Deployments Design](deployments-design.md)
 when you need the architectural rationale behind the API surface.
 
-Open [Deployment Contract](/Users/kiltyj/Code/viberoots/docs/deployments-contract.md)
+Open [Deployment Contract](deployments-contract.md)
 when you need the fail-closed behavioral rules that the public APIs must obey.

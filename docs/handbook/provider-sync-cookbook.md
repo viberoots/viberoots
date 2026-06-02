@@ -7,10 +7,13 @@ Provider sync writes deterministic Buck provider glue from lockfiles and patch i
     - `@scope__pkg@1.2.3.patch` → `@scope/pkg@1.2.3`
     - `lodash___core@4.17.21.patch` → `lodash/_core@4.17.21`
 - **Unified sync command (orchestrator)**: `node build-tools/tools/buck/sync-providers.ts` writes all language-specific provider files deterministically:
-  - Go: `third_party/providers/TARGETS.auto`
   - Node (PNPM): `third_party/providers/TARGETS.node.auto` (when lockfiles present)
-  - Mapping file: `third_party/providers/nix_attr_map.bzl` (canonical nixpkgs attr map)
-- C++: provider sync is a **no-op** by design (see `docs/handbook/cpp-provider-sync-migration.md`).
+  - Python (uv): generated provider files when Python lockfiles/importers are present
+  - Optional provider index: `third_party/providers/provider_index.bzl` when invoked with
+    `--emit-index`
+- Go and C++ provider sync are **no-ops/removed** by design. Go and C++ macros use labels,
+  package-local patch inputs, and provider-edge helpers rather than generated language-specific
+  provider files (see `docs/handbook/cpp-provider-sync-migration.md`).
 - **Idempotency**: re-running should not change output when inputs are unchanged.
 - **Tests**: create a single patch using fixtures and assert stable provider name and paths.
 
@@ -49,8 +52,9 @@ Rule: do not hand-roll global patch scanning or effective-set patch selection in
 
 Canonical naming and helpers:
 
-- **Source of truth (TS helpers)**: `build-tools/tools/lib/providers.ts` defines provider naming. Use `providerNameForModuleKey(importPath, version)` for Go module providers and `providerNameForImporter(lockfilePath, importer)` for Node importer‑scoped providers.
-- **Go nixpkgs providers (CGO)**: Go macros do not inject direct provider deps for `nixpkg_deps`. Instead, they attach `nixpkg:<attr>` labels and rely on `MODULE_PROVIDERS` loaded via `//build-tools/lang:auto_map.bzl` (re-export of `third_party/providers/auto_map.bzl`) to map targets to providers (format: `//third_party/providers:nix_<normalized_attr>`; example: `pkgs.openssl` → `nix_pkgs_openssl`). Do not handcraft names.
+- **Source of truth (TS helpers)**: `build-tools/tools/lib/providers.ts` defines provider naming. Use `providerNameForImporter(lockfilePath, importer)` for importer‑scoped providers.
+- **Go nixpkgs providers (CGO)**: Go macros attach `nixpkg:<attr>` labels and package-local patch
+  files to target inputs. They do not rely on generated Go provider files for patch invalidation.
 - **Stamp‑time normalization (Go)**: Go macros stamp `nixpkg:` labels using the shared helper at stamp‑time (via `append_nixpkg_labels`). This only changes where normalization occurs; behavior and mappings are unchanged because the mapper already normalizes.
 - **nixpkgs attr map**: The unified orchestrator generates `third_party/providers/nix_attr_map.bzl` deterministically; Starlark macros should load from this mapping instead of deriving attrs heuristically.
 - **Patch fixtures**: `build-tools/tools/tests/lib/fixtures/go.ts: ensurePatch()` creates a correctly named patch file for tests.

@@ -7,6 +7,11 @@
 **Date:** 2026-05-25
 **Summary:** Assess whether Buck2 remote execution is worth pursuing at current repo scale, evaluate at least two RE providers against the pinned Buck2 commit, and either configure a trial or produce a documented decision record for deferral.
 
+**Current status note:** This task is a planning record. The current setup and local conformance
+commands live in [`../../build-tools/docs/remote-build-setup.md`](../../build-tools/docs/remote-build-setup.md).
+The repo now has dormant named remote-execution profiles and platform wiring, but no default live
+Buck2 RE client config is selected.
+
 ## What
 
 Evaluate whether Buck2 remote execution (RE) is worth enabling for this repo, and if the answer is
@@ -139,19 +144,15 @@ alternative.
 
 ## Considerations
 
-**The RE toolchain declaration is already present but unconfigured.** `toolchains//:remote_test_execution`
-is declared with an empty `profiles = {}` dict and `default_profile = None`. This is the correct
-stub state: it satisfies the prelude's requirement that the toolchain be declared, but it does not
-activate RE. Activating RE requires adding at minimum one named profile entry with a `use_case`
-and the appropriate `capabilities` dict for the target workers, and setting `default_profile` to
-that profile name.
+**The RE toolchain declaration is present but unselected by default.**
+`toolchains//:remote_test_execution` has dormant named profiles and `default_profile = None`.
+Activating RE requires selecting a reviewed profile and generated Buck2 client config for the target
+workers; developer defaults must remain local unless explicitly opted in.
 
-**`.buckconfig` RE client section is absent.** The root `.buckconfig` has no `[buck2_re_client]`
-section. This section is where the RE endpoint URL, TLS configuration, and authentication token are
-declared. Adding it must happen in a way that keeps the configuration inert (no-op) when no RE
-backend is reachable, so developer builds are not broken if they have not configured RE credentials.
-Buck2 supports `[buck2_re_client] enabled = false` as a local override; document this pattern in
-the developer handbook before enabling RE in CI.
+**Committed `.buckconfig` RE client config must stay absent by default.** A generated or
+CI-selected Buck2 RE client config is where endpoint URLs, TLS configuration, and HTTP headers are
+declared. Do not add unsupported local enablement keys; use the renderer and default-local policy
+checks documented in the remote-build setup guide.
 
 **Hermetic inputs must not include volatile host paths.** The `flake.nix` `allowed-impure-env-vars`
 list already contains a documented set of env vars that are allowed to pass into derivations.
@@ -171,7 +172,5 @@ parallelism levels, and a recommendation (proceed / defer / drop). If the recomm
 "defer" or "drop," close this task with that document as the artifact and record the decision in
 `docs/adrs/` so future scale changes have a reference point.
 
-**`build-tools/docs/remote-build-setup.md` is Nix-layer only.** The existing remote build setup
-guide covers Nix remote builders and binary caches. It does not address Buck2 REAPI. If this task
-proceeds to parts 2 and 3, extend the guide with a Buck2 RE section, or create a separate
-`build-tools/docs/buck2-remote-execution.md` to avoid conflating the two distribution mechanisms.
+**`build-tools/docs/remote-build-setup.md` now covers both layers.** The guide separates Nix remote
+builders/binary caches from dormant Buck2 REAPI configuration and local conformance evidence.

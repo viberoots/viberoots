@@ -5,7 +5,9 @@ This document describes the current remote-build state of this repository and th
 The short version:
 
 - Nix remote builders and binary caches are usable today for many `nix build` calls, but the repo has a few intentional paths that disable builders.
-- Buck2 remote execution is not enabled today. The repo has a placeholder `toolchains//:remote_test_execution` target, but no Buck2 RE client config or remote execution profiles.
+- Buck2 remote execution is not enabled by default today. The repo has dormant
+  `toolchains//:remote_test_execution` profiles and platform wiring, but no committed Buck2 RE
+  client config is selected as the default profile.
 - The target architecture is Buck2-native remote execution for build and test actions, backed by Nix-native binary caches and remote builders. Custom code should handle orchestration around Buck/Nix, not reimplement their execution engines.
 - Spot workers should be stateless, preemptible RE workers backed by CAS, immutable logs/artifacts, a Nix binary cache, and narrowly scoped credentials.
 
@@ -956,14 +958,24 @@ Do not conflate their caches. A Nix binary cache stores Nix closures. A Buck/RE 
 
 The repository should keep developer defaults local and make RE activation explicit through CI or an opt-in include.
 
-Example shape, intentionally incomplete until validated against the pinned Buck2 commit. Use `grpc://` or omit the scheme; TLS is controlled by Buck2 RE client config, not by a `grpcs://` scheme. Use provider-specific RE client keys validated against the pinned Buck2 commit: local insecure BuildBarn-style setups may require `tls = false`; mTLS providers should use `tls_client_cert` and optionally `tls_ca_certs`; token-based providers should use `http_headers`. Source secret values from explicit CI-owned files or workload identity rather than ambient env, and do not treat `tls = true` as a complete authentication configuration:
+Example shape, intentionally incomplete until validated against the pinned Buck2 commit. Use
+`grpc://` or omit the scheme; TLS is controlled by Buck2 RE client config, not by a `grpcs://`
+scheme. Use provider-specific RE client keys validated against the pinned Buck2 commit. mTLS
+providers should use the nested TLS client-certificate keys, and token-based providers should use
+`http_headers`. Source secret values from explicit CI-owned files or workload identity rather than
+ambient env:
 
 ```ini
 [buck2_re_client]
 engine_address = grpc://re.example.com:443
 cas_address = grpc://cas.example.com:443
 action_cache_address = grpc://ac.example.com:443
-tls = true
+http_headers = authorization=Bearer <redacted>
+
+[buck2_re_client.tls]
+tls_client_cert = /run/re-client/client.crt
+tls_client_key = /run/re-client/client.key
+tls_ca_certs = /run/re-client/ca.crt
 ```
 
 The concrete keys must match the pinned Buck2 commit's supported config. Current Buck2 documentation describes `[buck2_re_client]` endpoint, TLS, and HTTP-header settings; do not invent local enablement keys unless the pinned Buck2 commit supports them. The design requirement is that CI can generate or include RE config without forcing every developer to hold RE credentials.
@@ -1054,7 +1066,7 @@ The expected fix is not to disable remote execution broadly. The expected fix is
 Local/dry-run conformance uses fixture or generated Buck config only:
 
 1. Render a redacted config into `buck-out/tmp`:
-   `build-tools/tools/remote-exec/render-buckconfig.ts --config build-tools/tools/remote-exec/remote-buckconfig.example.json`.
+   `build-tools/tools/remote-exec/render-buckconfig.ts --input build-tools/tools/remote-exec/remote-buckconfig.example.json --out buck-out/tmp/remote.buckconfig`.
 2. Run the Nix remote-builder smoke tool in dry-run mode for the selected builder policy.
 3. Run the cache manifest publisher in dry-run mode and keep the manifest digest in the run summary.
 4. Confirm committed defaults remain local-only with `build-tools/tools/remote-exec/default-local-policy.ts`.

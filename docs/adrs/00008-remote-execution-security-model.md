@@ -4,6 +4,10 @@
 **Date:** 2026-05-25
 **Authors:** viberoots team
 
+**Scope note:** This ADR covers protected/shared deployment execution through the deployment
+control plane. Buck2 remote build/test execution and Nix remote-builder setup are documented in
+[`../../build-tools/docs/remote-build-setup.md`](../../build-tools/docs/remote-build-setup.md).
+
 ## Context
 
 viberoots deploys to protected and shared environments (`shared_nonprod`, `production_facing`) through a shared deployment control plane. Without an explicit security model, the following risks arise:

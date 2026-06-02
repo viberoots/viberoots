@@ -652,11 +652,8 @@ deploy admin infisical plan --deployment <label>
 deploy admin infisical check --deployment <label>
 ```
 
-Optional later:
-
-```bash
-deploy admin infisical sync --deployment <label>
-```
+There is no current `deploy admin infisical sync` command. Infisical admin commands are limited to
+read-only planning and checking unless a future design explicitly adds reviewed mutation support.
 
 `plan` should be local and read-only. `check` should read live Infisical state
 and verify:

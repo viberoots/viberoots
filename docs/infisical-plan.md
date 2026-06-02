@@ -1,7 +1,7 @@
 # Infisical Deployment Secrets Plan
 
 This plan implements the Infisical deployment secrets model described in
-[Infisical Deployment Secrets Design](/Users/kiltyj/Code/viberoots/docs/infisical-design.md).
+[Infisical Deployment Secrets Design](infisical-design.md).
 
 Reviewed context:
 
@@ -37,7 +37,7 @@ Verify-scope organization:
 
 - The PR sequence is intentionally organized so ordinary implementation work stays under the
   reviewed deployment-owned paths from
-  [Deployment Verify Scope](/Users/kiltyj/Code/viberoots/docs/deployment-verify-scope.md):
+  [Deployment Verify Scope](deployment-verify-scope.md):
   - `build-tools/deployments/**`
   - `build-tools/tools/deployments/**`
   - `build-tools/tools/tests/deployments/**`
@@ -539,7 +539,7 @@ generic runtime surface.
 - Update deployment secrets API docs to state that provider code consumes secrets only through the
   neutral runtime helper.
 - Update protected/shared worker docs with the server-local Infisical credential boundary.
-- Update [NixOS Shared Host Usage](/Users/kiltyj/Code/viberoots/docs/nixos-shared-host-usage.md)
+- Update [NixOS Shared Host Usage](nixos-shared-host-usage.md)
   and the relevant `mini` setup/migration instructions so operators can migrate a `mini` host from
   the pre-`viberoots`-rename control plane to the current control plane and then run
   Infisical-backed deployments through `--profile mini`.

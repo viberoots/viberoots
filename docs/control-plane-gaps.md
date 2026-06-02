@@ -1,8 +1,13 @@
 # AWS Control Plane Gaps Plan
 
+**Status:** Completed planning and follow-up ledger. Use
+[`control-plane-guide.md`](control-plane-guide.md), [`cloud-control-setup.md`](cloud-control-setup.md),
+and [`cloud-control-cutover.md`](cloud-control-cutover.md) for current operator commands and
+supported AWS EC2 runtime modes.
+
 This plan closes the gap between the operator flow described in
-[AWS Control Plane Setup Guide](/Users/kiltyj/Code/viberoots/docs/control-plane-guide.md) and the
-current deployment control-plane implementation.
+[AWS Control Plane Setup Guide](control-plane-guide.md) and the current deployment control-plane
+implementation.
 
 Reviewed context:
 
@@ -73,7 +78,7 @@ Verify-scope organization:
 
 - The PR sequence is intentionally organized so ordinary implementation work stays under the
   reviewed deployment-owned paths from
-  [Deployment Verify Scope](/Users/kiltyj/Code/viberoots/docs/deployment-verify-scope.md):
+  [Deployment Verify Scope](deployment-verify-scope.md):
   - `build-tools/deployments/**`
   - `build-tools/tools/deployments/**`
   - `build-tools/tools/tests/deployments/**`

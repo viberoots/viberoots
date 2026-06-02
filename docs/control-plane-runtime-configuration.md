@@ -190,7 +190,7 @@ that prefix before routing UI assets and `/api/v1/read/*` requests.
 
 `mcp.basePath` controls the read-only HTTP MCP endpoint. The endpoint is enabled by default at
 `/mcp` and can be disabled with `mcp.enabled: false` when a host should not expose agent
-inspection. See [Deployment Control Plane MCP](/Users/kiltyj/Code/viberoots/docs/control-plane-mcp.md)
+inspection. See [Deployment Control Plane MCP](control-plane-mcp.md)
 for the v1 tool list, authentication requirements, audit behavior, and fixture-only unauthenticated
 mode.
 

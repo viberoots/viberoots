@@ -330,7 +330,7 @@ Useful defaults:
 The v1 web UI should be deliberately small. It should prove the control-plane service can serve a
 browser app and that the app can call read-only control-plane APIs through the same authenticated
 origin. The implemented v1 read-only surface is documented in
-[Deployment Control Plane Web UI](/Users/kiltyj/Code/viberoots/docs/control-plane-web-ui.md).
+[Deployment Control Plane Web UI](control-plane-web-ui.md).
 
 Required v1 screens:
 
@@ -435,10 +435,10 @@ service-side authorization, query, redaction, idempotency, and audit primitives 
 Avoid a separate agent-only control path.
 
 The implemented v1 endpoint and examples are documented in
-[Deployment Control Plane MCP](/Users/kiltyj/Code/viberoots/docs/control-plane-mcp.md).
+[Deployment Control Plane MCP](control-plane-mcp.md).
 
 The non-NixOS Compose and Podman host profile is documented in
-[Deployment Control Plane Non-NixOS Host Profile](/Users/kiltyj/Code/viberoots/docs/control-plane-non-nixos-host-profile.md).
+[Deployment Control Plane Non-NixOS Host Profile](control-plane-non-nixos-host-profile.md).
 
 ## Volumes And State
 

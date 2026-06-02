@@ -4,6 +4,13 @@
 **Date:** 2026-05-25  
 **Authors:** viberoots team
 
+**Implementation note:** Current tooling supports Vault bootstrap/admin/runtime flows and gated
+Infisical live credential staging. The original non-goal wording below is historical for the
+initial scope; use [`../secrets-usage.md`](../secrets-usage.md),
+[`../control-plane-credential-staging.md`](../control-plane-credential-staging.md), and
+[`../control-plane-runtime-configuration.md`](../control-plane-runtime-configuration.md) for
+current operator commands.
+
 ## Context
 
 Deployments in viberoots require access to secrets (API keys, credentials, tokens) at runtime. Several concerns shaped the design:

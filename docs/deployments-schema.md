@@ -1313,9 +1313,9 @@ Protected/shared observability and durable-record redaction rules:
 
 ## Companion Docs
 
-- [Deployment Contract](/Users/kiltyj/Code/viberoots/docs/deployments-contract.md)
-- [Deployment Design](/Users/kiltyj/Code/viberoots/docs/deployments-design.md)
-- [Deployment Control-Plane Observability](/Users/kiltyj/Code/viberoots/docs/deployment-control-plane-observability.md)
-- [Deployment Provider Capabilities](/Users/kiltyj/Code/viberoots/docs/deployment-provider-capabilities.md)
-- [Deployment Scenarios](/Users/kiltyj/Code/viberoots/docs/deployment-scenarios.md)
-- [Deployment Implementation Plan](/Users/kiltyj/Code/viberoots/docs/deployment-plan.md)
+- [Deployment Contract](deployments-contract.md)
+- [Deployment Design](deployments-design.md)
+- [Deployment Control-Plane Observability](deployment-control-plane-observability.md)
+- [Deployment Provider Capabilities](deployment-provider-capabilities.md)
+- [Deployment Scenarios](deployment-scenarios.md)
+- [Deployment Implementation Plan](deployment-plan.md)

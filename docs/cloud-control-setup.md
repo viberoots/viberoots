@@ -7,12 +7,9 @@ control plane on a cloud substrate:
 deployment-control-plane setup \
   --out ./cloud-control-profile \
   --host-mode aws-ec2 \
-  --image registry.example.com/platform/deployment-control-plane@sha256:<64-hex-digest> \
-  --expected-image-build-identity nix-source-<64-hex-build-identity> \
-  --image-source-revision source-<reviewed-revision> \
-  --image-build-identity nix-source-<64-hex-build-identity> \
-  --image-publication-digest sha256:<64-hex-digest> \
-  --image-inspected-digest sha256:<64-hex-digest> \
+  --image-publication-evidence ./image-publication.json \
+  --runtime-input ./runtime-input.json \
+  --supabase-postgres-profile ./supabase-postgres.profile.json \
   --public-url https://deploy.example.test \
   --deployment-id pleomino-staging \
   --auth-callback-host deploy-auth.example.test \
@@ -65,10 +62,9 @@ under `/run/deployment-control-plane/credentials`.
    `/run/deployment-control-plane/credentials/control-plane-database-url`.
 2. Provision an S3-compatible artifact store and write endpoint, access key id, and secret access
    key to the filenames in `credential-manifest.json`.
-3. Publish the reviewed Nix-built image, inspect the registry manifest, and keep the resulting
-   `image-publication.json` fields together. Setup rejects build-only image identity, placeholder
-   digest values, mismatched build identity, and mismatched inspection evidence for production
-   profiles.
+3. Publish the reviewed Nix-built image, inspect the registry manifest, and keep the generated
+   `image-publication.json` evidence together. Production AWS setup consumes this reviewed evidence
+   with `--image-publication-evidence`; direct image/digest flags are not the production path.
 4. Generate the bundle with `deployment-control-plane setup --dry-run`, resolve every reported
    prerequisite, then rerun without `--dry-run`.
 5. Stage `config.yaml`, `managed-dependencies.profile.yaml`, provider-capability evidence, the
@@ -82,12 +78,16 @@ under `/run/deployment-control-plane/credentials`.
 7. Run
    `deployment-control-plane credential-preflight --bundle-dir ./cloud-control-profile --out ./cloud-control-profile/credential-preflight.json`
    before starting service and worker processes.
-8. Run the `managed-dependencies` phase in `commands.json`. Both database and artifact-store checks
-   must pass against temporary schema/data or temporary object prefixes.
-9. Start one service process and at least two worker processes from the `process-start` phase.
-10. Run the `http-validation` phase for health, readiness, and authenticated worker-heartbeat
+8. Run live credential staging for protected/shared cutover and keep
+   `credential-staging.live.json` in the bundle. Cutover evidence collection requires this live
+   staging proof in addition to local preflight.
+9. Run the `managed-dependencies` phase in `commands.json` and capture stdout as
+   `managed-dependency-evidence.json`. Both database and artifact-store checks must pass against
+   temporary schema/data or temporary object prefixes.
+10. Start one service process and at least two worker processes from the `process-start` phase.
+11. Run the `http-validation` phase for health, readiness, and authenticated worker-heartbeat
     checks.
-11. Treat the host as protected/shared-ready only after every entry in
+12. Treat the host as protected/shared-ready only after every entry in
     `conformance-checklist.json` passes and the evidence is attached to the selected provider
     capabilities.
 
@@ -257,7 +257,7 @@ evidence. The default `aws-s3` backend still requires S3 gateway or interface en
    digest-pinned service/worker image and runtime config use the selected public or PrivateLink
    Postgres path and selected S3 endpoint path before any staging deploy smoke is accepted.
 8. Before moving traffic, run the cutover validator described in
-   [Cloud Control Cutover](/Users/kiltyj/Code/viberoots/docs/cloud-control-cutover.md). The
+   [Cloud Control Cutover](cloud-control-cutover.md). The
    validator must see fresh host-matched evidence, selected provider-capability audit evidence,
    standby controls, restore checks, and rollback checks. Keep live staging smoke explicitly gated
    and non-production until this report passes.

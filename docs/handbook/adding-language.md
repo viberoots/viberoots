@@ -205,7 +205,10 @@ Importer-local patch attachment uses `native.glob(...)`, which cannot reach acro
 
 ## Path invariants (must-follow)
 
-- Patches live under `patches/<lang>/` (flat directory).
+- Patch scope is part of the language contract. Package-local ecosystems such as Go, C++, and Rust
+  attach patches from the owning Buck package. Importer-scoped ecosystems such as Node and Python
+  attach importer-local patches from `<importer>/patches/<lang>/`; languages may additionally opt
+  into an effective-set-gated repo-root `patches/<lang>/` directory when the contract supports it.
 - Nix templates live under `build-tools/tools/nix/templates/<lang>.nix` and are imported by `build-tools/tools/nix/lang-templates.nix`.
 - Language macros live under `<lang>/defs.bzl` and load provider mappings via the stable `//build-tools/lang:auto_map.bzl` re-export.
 - Provider rules live under `//third_party/providers/**` and are generated, not hand-edited.

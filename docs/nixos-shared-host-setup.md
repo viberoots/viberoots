@@ -597,27 +597,21 @@ Common example values:
   flag based loopback HTTP is rejected unless that fixture marker is present.
 
 ```bash
-export VBR_DEPLOY_CONTROL_PLANE_DATABASE_URL='postgres://deployctl:REDACTED@127.0.0.1:5432/deployctl'
-export VBR_DEPLOY_CONTROL_PLANE_TOKEN='replace-me'
-export VBR_DEPLOY_GITHUB_TOKEN='replace-me'
-set -a
-. /etc/deployment-host/reviewed-source-ssh.env
-set +a
-direnv exec . zx-wrapper build-tools/tools/deployments/nixos-shared-host-control-plane-service.ts \
-  --host-root /var/lib/deployment-host/runtime \
-  --state /etc/nixos/deployment-host/platform-state.json \
-  --records-root /var/lib/deployment-host/records \
-  --artifact-staging-root /var/lib/deployment-host/runtime/.deploy-artifacts \
-  --host 127.0.0.1 \
-  --port 7780
+deployment-control-plane service \
+  --config /etc/deployment-control-plane/config.yaml
 ```
 
 ```bash
-direnv exec . zx-wrapper build-tools/tools/deployments/nixos-shared-host-control-plane-worker.ts \
-  --records-root /var/lib/deployment-host/records
+deployment-control-plane worker \
+  --config /etc/deployment-control-plane/config.yaml
 ```
 
-Required worker-side secret-source prep after PR-79 and later:
+Before either process starts, create or mount the runtime config and credential directory described
+in [`control-plane-runtime-configuration.md`](control-plane-runtime-configuration.md). Production
+startup validates mounted config, database URL files, artifact-store credentials, reviewed-source
+credentials, and worker credential directories before accepting protected/shared work.
+
+Required worker-side secret-source prep:
 
 - set `VBR_DEPLOY_CONTROL_PLANE_DATABASE_URL` for both service and worker
 - set `VBR_DEPLOY_CONTROL_PLANE_TOKEN` or pass `--token` for the reviewed

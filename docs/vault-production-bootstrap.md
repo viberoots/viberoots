@@ -1749,9 +1749,9 @@ Jenkins-bound secret values.
 
 ## Related Docs
 
-- [Secrets Usage](/Users/kiltyj/Code/viberoots/docs/secrets-usage.md)
-- [Deployment And Secrets API](/Users/kiltyj/Code/viberoots/docs/deployment-secrets-api.md)
-- [Deployments Usage](/Users/kiltyj/Code/viberoots/docs/deployments-usage.md)
+- [Secrets Usage](secrets-usage.md)
+- [Deployment And Secrets API](deployment-secrets-api.md)
+- [Deployments Usage](deployments-usage.md)
 
 ## External References
 

@@ -1,7 +1,7 @@
 # Deployment Control Plane Containerization Plan
 
 This plan implements the containerized deployment control plane described in
-[Deployment Control Plane Containerization](/Users/kiltyj/Code/viberoots/docs/control-plane-containerization.md).
+[Deployment Control Plane Containerization](control-plane-containerization.md).
 
 Reviewed context:
 
@@ -70,7 +70,7 @@ Build-system scope minimization:
 Sequencing with the Pleomino Infisical cutover:
 
 - Implement this containerization plan before PR-12 in
-  [Infisical Deployment Secrets Plan](/Users/kiltyj/Code/viberoots/docs/infisical-plan.md). The
+  [Infisical Deployment Secrets Plan](infisical-plan.md). The
   first Pleomino staging and production Infisical rollout should use the containerized,
   horizontally scalable control plane rather than the current shared-host runtime.
 - PR-1 owns the portable credential-directory abstraction that PR-12 needs for Infisical Universal

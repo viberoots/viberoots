@@ -1,7 +1,7 @@
 # Cloud Control Plane Implementation Plan
 
 This plan implements the cloud-portable control-plane target described in
-[Cloud Control Plane Design](/Users/kiltyj/Code/viberoots/docs/cloud-control-design.md).
+[Cloud Control Plane Design](cloud-control-design.md).
 
 Reviewed context:
 

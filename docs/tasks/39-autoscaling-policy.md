@@ -7,6 +7,10 @@
 **Date:** 2026-05-25
 **Summary:** Define the HPA policy for control plane workers (min 2 replicas, scale on `queue_depth` via KEDA or Prometheus Adapter), implement it as OpenTofu resources in the k8s stack, and set `terminationGracePeriodSeconds` conservatively to avoid mid-execution scale-down.
 
+**Scope note:** This task covers deployment control-plane worker autoscaling. It is not the remote
+build/Buck2 RE worker-fleet autoscaling plan; remote build fleet concepts live in
+[`../../build-tools/docs/remote-build-setup.md`](../../build-tools/docs/remote-build-setup.md).
+
 ## What
 
 Define and implement autoscaling policy for the deployment control plane worker replicas running on
