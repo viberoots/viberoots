@@ -19,6 +19,7 @@ import {
   awsTopologyDatabaseMode,
   validateAwsTopologyEvidence,
 } from "./cloud-control-aws-topology-validate";
+import { validateAwsTopologyPreApplyEvidence } from "./cloud-control-aws-topology-preapply";
 import { validateIngressCommandEvidenceBundle } from "./cloud-control-aws-ingress-command-evidence";
 import { validateSetupArtifactIamEvidence } from "./cloud-control-setup-artifact-iam-evidence";
 import { validateSupabaseManagedPostgresProfile } from "./control-plane-supabase-postgres-validation";
@@ -182,14 +183,7 @@ function validateAwsEvidence(input: CloudControlSetupInput): string[] {
   const errors = [
     ...evidenceSourceErrors(input.awsTopology, "cloudControlSetup.awsTopology"),
     ...evidenceSecretErrors(input.awsTopology, "cloudControlSetup.awsTopology"),
-    ...validateAwsTopologyEvidence(input.awsTopology, {
-      maxAgeMinutes: 60,
-      expectedImage: input.image,
-      expectedImageDigest: input.imagePublication?.digest,
-      expectedPublicUrl: input.publicUrl,
-      expectedAuthCallbackHost: input.authCallbackHost,
-      expectedAuthCallbackPath: input.authCallbackPath,
-    }),
+    ...validateSetupAwsTopology(input),
     ...validateIngressCommandEvidenceBundle(input.awsTopology, input.ingressCommandEvidence, {
       maxAgeMinutes: 60,
       required:
@@ -220,4 +214,19 @@ function validateAwsEvidence(input: CloudControlSetupInput): string[] {
     errors.push(...validateSetupArtifactIamEvidence(input));
   }
   return errors;
+}
+
+function validateSetupAwsTopology(input: CloudControlSetupInput): string[] {
+  const opts = {
+    maxAgeMinutes: 60,
+    expectedImage: input.image,
+    expectedImageDigest: input.imagePublication?.digest,
+    expectedPublicUrl: input.publicUrl,
+    expectedAuthCallbackHost: input.authCallbackHost,
+    expectedAuthCallbackPath: input.authCallbackPath,
+  };
+  if (input.ec2HostMode === "repo-owned-asg" && input.ec2AsgEvidenceMode !== "post-apply") {
+    return validateAwsTopologyPreApplyEvidence(input.awsTopology, opts);
+  }
+  return validateAwsTopologyEvidence(input.awsTopology, opts);
 }

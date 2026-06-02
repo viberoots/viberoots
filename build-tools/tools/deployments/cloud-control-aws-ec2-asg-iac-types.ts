@@ -8,6 +8,8 @@ export const EC2_ASG_IAC_PATHS = {
   readOnly: "$PROFILE_ROOT/ec2-asg-readonly-evidence.json",
 } as const;
 
+export const EC2_ASG_OPENTOFU_WORKING_DIR = "$PROFILE_ROOT/opentofu/aws-ec2-asg";
+
 export type Ec2AsgIacBundle = {
   plan?: Ec2AsgIacRecord;
   apply?: Ec2AsgIacRecord;

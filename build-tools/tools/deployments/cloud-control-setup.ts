@@ -13,11 +13,12 @@ import {
   assertProductionImagePublicationEvidence,
   readSetupImagePublicationFlags,
 } from "./cloud-control-setup-image-publication";
-import type {
-  ArtifactBackend,
-  CloudControlSetupInput,
-  CloudProfileMode,
-  ReviewedSourceMode,
+import {
+  EC2_ASG_EVIDENCE_MODES,
+  type ArtifactBackend,
+  type CloudControlSetupInput,
+  type CloudProfileMode,
+  type ReviewedSourceMode,
 } from "./cloud-control-setup-types";
 import { EC2_HOST_MODES, DEFAULT_EC2_HOST_MODE } from "./cloud-control-aws-ec2-host-mode";
 import { artifactCredentialMode } from "./control-plane-artifact-credential-mode";
@@ -107,6 +108,7 @@ export function readCloudControlSetupInput(): CloudControlSetupInput {
     serviceReplicas: numberFlag("service-replicas", 1),
     workerReplicas: numberFlag("worker-replicas", 2),
     dryRun: getFlagBool("dry-run"),
+    ec2AsgEvidenceMode: enumFlag("ec2-asg-evidence-mode", "pre-apply", EC2_ASG_EVIDENCE_MODES),
     awsTopology,
     supabasePostgres: supabasePostgresFromFlags(),
     runtimeInput: runtimeInputFromFlags(),

@@ -18,6 +18,11 @@ test("guide documents EC2 host adapter boundary and generated inputs", async () 
   assert.match(guide, /external-reviewed-host/);
   assert.match(guide, /repo-owned-asg/);
   assert.match(guide, /platform-team-owned EC2 remains preferable/i);
+  assert.match(guide, /pre-apply setup renders the ASG OpenTofu\s+bundle/s);
+  assert.match(
+    guide,
+    /post-apply setup-doctor, readiness, and cutover require live read-only\s+ASG\/EC2 evidence/s,
+  );
   assert.match(guide, /launch-template version rollback/);
   assert.match(guide, /worker drain or\s+shutdown proof/);
 });
@@ -48,5 +53,16 @@ test("guide cutover example includes generated AWS-primary capabilities", async 
     "supabase-privatelink-prerequisite",
   ]) {
     assert.match(guide, new RegExp(capability));
+  }
+});
+
+test("cutover docs do not show a short AWS-primary capability list", async () => {
+  const cutover = await fsp.readFile("docs/cloud-control-cutover.md", "utf8");
+  assert.doesNotMatch(
+    cutover,
+    /--selected-capability aws-ec2-control-plane-host,aws-s3-artifact-store\b/,
+  );
+  for (const capability of ["aws-network-foundation", "aws-ecr-control-plane-registry"]) {
+    assert.match(cutover, new RegExp(capability));
   }
 });

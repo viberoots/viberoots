@@ -4,6 +4,7 @@ import {
   ec2AsgBootstrapBase64,
   ec2AsgBootstrapDigest,
 } from "../../deployments/cloud-control-aws-ec2-asg-bootstrap";
+import { EC2_ASG_OPENTOFU_WORKING_DIR } from "../../deployments/cloud-control-aws-ec2-asg-iac-types";
 
 const DIGEST = `sha256:${"c".repeat(64)}`;
 const APPLY = `sha256:${"d".repeat(64)}`;
@@ -30,7 +31,7 @@ export function asgTopology(overrides: Record<string, unknown> = {}) {
 
 export function asgIac(overrides: Record<string, any> = {}) {
   const common = {
-    workingDirectory: "$PROFILE_ROOT/opentofu/aws-control-plane-foundation",
+    workingDirectory: EC2_ASG_OPENTOFU_WORKING_DIR,
     ec2HostMode: "repo-owned-asg",
     expected: {
       accountId: "123456789012",

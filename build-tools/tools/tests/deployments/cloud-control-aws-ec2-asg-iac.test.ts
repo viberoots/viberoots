@@ -27,10 +27,7 @@ test("repo-owned ASG resources and runbook commands are explicit opt-in", () => 
   const plan = managed.commands.find((entry: any) => entry.id === "ec2-asg-opentofu-plan");
   const apply = managed.commands.find((entry: any) => entry.id === "ec2-asg-opentofu-apply");
   const readonly = managed.commands.find((entry: any) => entry.id === "ec2-asg-readonly-evidence");
-  assert.match(
-    plan.command,
-    /tofu -chdir="\$PROFILE_ROOT\/opentofu\/aws-control-plane-foundation" plan/,
-  );
+  assert.match(plan.command, /tofu -chdir="\$PROFILE_ROOT\/opentofu\/aws-ec2-asg" plan/);
   assert.match(plan.command, /-backend-config="\$PROFILE_ROOT\/ec2-asg-backend\.hcl"/);
   assert.match(plan.command, /-var-file="\$PROFILE_ROOT\/ec2-asg-opentofu\.tfvars\.json"/);
   assert.doesNotMatch(JSON.stringify([plan, apply, readonly]), /-backend=false/);

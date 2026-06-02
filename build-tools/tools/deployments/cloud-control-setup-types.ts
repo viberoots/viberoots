@@ -16,9 +16,12 @@ export const ARTIFACT_BACKENDS = [
   "s3-compatible",
 ] as const;
 
+export const EC2_ASG_EVIDENCE_MODES = ["pre-apply", "post-apply"] as const;
+
 export type CloudProfileMode = (typeof CLOUD_PROFILE_MODES)[number];
 export type ReviewedSourceMode = (typeof REVIEWED_SOURCE_MODES)[number];
 export type ArtifactBackend = (typeof ARTIFACT_BACKENDS)[number];
+export type Ec2AsgEvidenceMode = (typeof EC2_ASG_EVIDENCE_MODES)[number];
 
 export type CloudControlSetupInput = {
   outDir: string;
@@ -44,6 +47,7 @@ export type CloudControlSetupInput = {
   serviceReplicas: number;
   workerReplicas: number;
   dryRun: boolean;
+  ec2AsgEvidenceMode?: Ec2AsgEvidenceMode;
   awsTopology?: AwsTopologyEvidence;
   supabasePostgres?: SupabaseManagedPostgresProfile;
   runtimeInput?: RuntimeInput;

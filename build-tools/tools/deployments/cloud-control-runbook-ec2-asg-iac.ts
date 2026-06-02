@@ -48,7 +48,11 @@ export function ec2AsgIacCommands(
       actionType: "read-only-evidence",
       evidenceGuidance:
         "collect ASG, launch-template, instance, and security posture with read-only AWS commands",
-      inputs: ["$PROFILE_ROOT/aws-topology-evidence.json", EC2_ASG_IAC_PATHS.apply],
+      inputs: [
+        "$PROFILE_ROOT/aws-topology-evidence.json",
+        "$PROFILE_ROOT/ec2-asg-opentofu-apply.out.json",
+        EC2_ASG_IAC_PATHS.apply,
+      ],
       outputs: [
         "$PROFILE_ROOT/ec2-asg-readonly-autoscaling.json",
         "$PROFILE_ROOT/ec2-asg-readonly-launch-template.json",
@@ -92,9 +96,10 @@ function readOnlyCommand(prelude: string): string {
   return [
     prelude,
     `test -f "${EC2_ASG_IAC_PATHS.apply}"`,
+    `test -f "$PROFILE_ROOT/ec2-asg-opentofu-apply.out.json"`,
     `AWS_REGION="$(node -e 'const fs=require("fs"); const t=JSON.parse(fs.readFileSync(process.env.PROFILE_ROOT + "/aws-topology-evidence.json","utf8")); process.stdout.write(t.region || "")')"`,
-    `ASG_NAME="$(node -e 'const fs=require("fs"); const c=JSON.parse(fs.readFileSync(process.env.PROFILE_ROOT + "/aws-topology-evidence.json","utf8")).compute||{}; process.stdout.write(c.autoScalingGroupName || "")')"`,
-    `LT_ID="$(node -e 'const fs=require("fs"); const c=JSON.parse(fs.readFileSync(process.env.PROFILE_ROOT + "/aws-topology-evidence.json","utf8")).compute||{}; process.stdout.write(c.launchTemplateId || "")')"`,
+    `ASG_NAME="$(node -e '${outputIdentity("asg")}')"`,
+    `LT_ID="$(node -e '${outputIdentity("launchTemplateId")}')"`,
     `aws autoscaling describe-auto-scaling-groups --auto-scaling-group-names "$ASG_NAME" --region "$AWS_REGION" > "$PROFILE_ROOT/ec2-asg-readonly-autoscaling.json"`,
     `aws ec2 describe-launch-template-versions --launch-template-id "$LT_ID" --versions '$Latest' --region "$AWS_REGION" > "$PROFILE_ROOT/ec2-asg-readonly-launch-template.json"`,
     `aws ec2 describe-instances --filters "Name=tag:aws:autoscaling:groupName,Values=$ASG_NAME" --region "$AWS_REGION" > "$PROFILE_ROOT/ec2-asg-readonly-instances.json"`,
@@ -112,4 +117,12 @@ function workspaceCommand() {
 
 function requireFile(file: string, message: string) {
   return `test -f "${file}" || { echo ${JSON.stringify(message)} >&2; exit 2; }`;
+}
+
+function outputIdentity(field: "asg" | "launchTemplateId") {
+  return [
+    'const fs=require("fs")',
+    'const out=JSON.parse(fs.readFileSync(process.env.PROFILE_ROOT + "/ec2-asg-opentofu-apply.out.json","utf8"))',
+    `process.stdout.write((((out.ec2_host||{}).value||{}).identity||{}).${field} || "")`,
+  ].join(";");
 }

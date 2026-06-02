@@ -298,8 +298,12 @@ cloud-foundation process.
 Select `repo-owned-asg` only when the viberoots-reviewed OpenTofu stack should own the EC2 launch
 template and Auto Scaling Group lifecycle. Platform-team-owned EC2 remains preferable when the
 organization already has hardened golden AMI pipelines, endpoint-security enrollment, SSM/session
-policies, fleet patching, or replacement controls that must stay in a central cloud foundation. In
-both modes, provider evidence proves that the selected host identity, AMI, reviewed instance type,
+policies, fleet patching, or replacement controls that must stay in a central cloud foundation. The
+greenfield `repo-owned-asg` path has two evidence modes: pre-apply setup renders the ASG OpenTofu
+bundle from reviewed desired inputs before launch-template, ASG, instance, process, or worker
+heartbeat evidence exists; post-apply setup-doctor, readiness, and cutover require live read-only
+ASG/EC2 evidence plus runtime process evidence that matches the applied OpenTofu outputs. In both
+modes, provider evidence proves that the selected host identity, AMI, reviewed instance type,
 subnets, security groups, instance profile, bootstrap digest, worker process placement, container
 runtime, logs/alarms, and credential mount wiring match the selected AWS topology evidence and
 generated host profile before protected/shared use.
@@ -352,9 +356,11 @@ Operator procedure for `aws-ec2-control-plane-host`:
    type, private subnet ids, service/worker security groups, instance profile, bootstrap digest,
    container runtime, and credential mount mode.
 2. Apply-intent: in `external-reviewed-host`, run the generated apply hook only after EC2 host
-   realization has been completed by the reviewed external foundation process. In `repo-owned-asg`,
-   run the generated ASG OpenTofu plan/apply commands from `commands.json`, then attach typed
-   plan/apply/read-only evidence to the provider-capability command.
+   realization has been completed by the reviewed external foundation process. In greenfield
+   `repo-owned-asg`, first generate the bundle with `--ec2-asg-evidence-mode pre-apply`, review the
+   ASG-specific OpenTofu root and backend config, run the generated ASG OpenTofu plan/apply commands
+   from `commands.json`, then collect read-only AWS evidence from the reviewed apply outputs before
+   attaching typed plan/apply/read-only evidence to the provider-capability command.
 3. Evidence: run the generated record command from `commands.json`; it writes
    `provider-capability-aws-ec2-control-plane-host.json` for setup-doctor and cutover collection.
 4. Smoke: after service and workers are running, run the smoke hook and keep its typed payload with
@@ -472,11 +478,14 @@ setup must include the generated ingress command evidence files. Literal `true`,
 raw IaC state, subnet/security-group string lists, and other truthy placeholders do not satisfy AWS
 setup validation.
 
-Use `--ec2-host-mode repo-owned-asg` only after reviewing the generated ASG OpenTofu inputs and
-backend config in the bundle. That mode adds generated `ec2-asg-opentofu-plan`,
-`ec2-asg-opentofu-apply`, and `ec2-asg-readonly-evidence` commands; import/adoption of an existing
-launch template or ASG requires reviewed import metadata plus read-only evidence before
-protected/shared use.
+Use `--ec2-host-mode repo-owned-asg --ec2-asg-evidence-mode pre-apply` only after reviewing the
+desired ASG inputs: AMI id/build/pin evidence, instance type, instance profile, private subnets,
+service and worker security groups, user-data digest, capacity, log/alarm posture, and
+non-destructive rollback metadata. That mode adds an ASG-specific OpenTofu root plus generated
+`ec2-asg-opentofu-plan`, `ec2-asg-opentofu-apply`, and `ec2-asg-readonly-evidence` commands. After
+apply, refresh live ASG/EC2 and runtime process evidence before setup-doctor, readiness, or cutover
+can pass; import/adoption of an existing launch template or ASG requires reviewed import metadata
+plus read-only evidence before protected/shared use.
 
 If you are using public TLS instead of Supabase PrivateLink, make the AWS topology evidence database
 mode `public`. PrivateLink mode must be `privatelink`.
@@ -717,12 +726,13 @@ non-cutover diagnostic evidence.
 
 Before this step is considered ready for cutover evidence, confirm the generated host realization
 artifacts are active on the selected EC2 host. In `external-reviewed-host`, this proof comes from
-reviewed external topology and host-profile evidence. In `repo-owned-asg`, it also includes
-generated OpenTofu plan/apply/read-only evidence for the launch template and ASG. Both modes require
-selected private subnet placement, reviewed instance profile, encrypted EBS/state path, registry
-pull proof for the exact image digest, worker lease/fencing evidence, and operational visibility
-for service down, readiness failure, missing worker heartbeat, queue backlog, and repeated worker
-crash.
+reviewed external topology and host-profile evidence. In `repo-owned-asg`, this is a post-apply
+gate: generated OpenTofu plan/apply/read-only evidence must prove the launch template and ASG, and
+runtime process evidence must prove the service and at least two workers are active on the applied
+host path. Both modes require selected private subnet placement, reviewed instance profile,
+encrypted EBS/state path, registry pull proof for the exact image digest, worker lease/fencing
+evidence, and operational visibility for service down, readiness failure, missing worker heartbeat,
+queue backlog, and repeated worker crash.
 
 ## Step 9: Start Service And Workers
 
@@ -814,6 +824,12 @@ For AWS EC2 readiness, also attach evidence for:
 - image digest and runtime config digest
 - graceful worker shutdown evidence
 
+For `repo-owned-asg`, collect this section only after the ASG apply completes. The read-only ASG
+command derives the ASG and launch-template identities from the reviewed apply output, and the
+runtime HTTP/process checks must then prove the service and workers are running on that applied
+host path. Pre-apply desired inputs are sufficient to generate and review the OpenTofu bundle, but
+they are not protected/shared readiness evidence.
+
 Ingress evidence fails closed unless the selected public hostname resolves from a public vantage
 point to the selected ALB/NLB or a reviewed edge linked back to that AWS ingress identity. The
 service host must not have direct public ingress; LB/client sources may reach only the selected
@@ -862,6 +878,11 @@ deployment-control-plane cutover \
 
 The report must pass before the AWS host becomes protected/shared-ready. Keep mini or the previous
 host in a reviewed standby mode until rollback evidence is fresh.
+
+For `repo-owned-asg`, the cutover report is a post-apply report. It must include typed ASG
+plan/apply/read-only evidence, refreshed provider-capability evidence, managed dependency evidence
+from the AWS runtime path, and fresh health/readiness/worker-heartbeat evidence from the applied
+host profile.
 
 Cutover rejects literal `true`, empty objects, dashboard-only notes, raw IaC state, stale
 timestamps, unsupported database modes, malformed operation evidence refs, mismatched operation

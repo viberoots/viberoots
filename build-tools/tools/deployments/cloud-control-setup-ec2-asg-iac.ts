@@ -1,7 +1,7 @@
 import { setupAwsTopology } from "./cloud-control-setup-aws-topology";
 import {
-  opentofuStackInputs,
-  renderOpenTofuStackFiles,
+  opentofuSourceInputs,
+  renderOpenTofuSourceFiles,
 } from "./cloud-control-setup-opentofu-stack";
 import type { CloudControlSetupInput } from "./cloud-control-setup-types";
 import {
@@ -11,8 +11,12 @@ import {
   ec2AsgBootstrapDigest,
   ec2AsgBootstrapUserData,
 } from "./cloud-control-aws-ec2-asg-bootstrap";
+import { EC2_ASG_OPENTOFU_WORKING_DIR } from "./cloud-control-aws-ec2-asg-iac-types";
 
-export const EC2_ASG_OPENTOFU_DIR = "$PROFILE_ROOT/opentofu/aws-control-plane-foundation";
+const EC2_ASG_OPENTOFU_SOURCE_DIR = "build-tools/deployments/aws-ec2-asg/opentofu";
+const EC2_ASG_OPENTOFU_BUNDLE_DIR = "opentofu/aws-ec2-asg";
+
+export const EC2_ASG_OPENTOFU_DIR = EC2_ASG_OPENTOFU_WORKING_DIR;
 export const EC2_ASG_OPENTOFU_TFVARS = "$PROFILE_ROOT/ec2-asg-opentofu.tfvars.json";
 export const EC2_ASG_OPENTOFU_BACKEND = "$PROFILE_ROOT/ec2-asg-backend.hcl";
 export { EC2_ASG_BOOTSTRAP_BUNDLE_PATH };
@@ -20,7 +24,7 @@ export { EC2_ASG_BOOTSTRAP_BUNDLE_PATH };
 export function renderEc2AsgOpenTofuFiles(input: CloudControlSetupInput) {
   if (input.ec2HostMode !== "repo-owned-asg") return {};
   return {
-    ...renderOpenTofuStackFiles(),
+    ...renderOpenTofuSourceFiles(EC2_ASG_OPENTOFU_SOURCE_DIR, EC2_ASG_OPENTOFU_BUNDLE_DIR),
     [EC2_ASG_BOOTSTRAP_FILE]: ec2AsgBootstrapUserData(),
     "ec2-asg-opentofu.tfvars.json": `${JSON.stringify(ec2AsgTfvars(input), null, 2)}\n`,
     "ec2-asg-backend.hcl": ec2AsgBackendConfig(input),
@@ -33,7 +37,7 @@ export function ec2AsgStackInputs() {
     EC2_ASG_OPENTOFU_BACKEND,
     EC2_ASG_OPENTOFU_TFVARS,
     EC2_ASG_BOOTSTRAP_BUNDLE_PATH,
-    ...opentofuStackInputs(),
+    ...opentofuSourceInputs(EC2_ASG_OPENTOFU_SOURCE_DIR, EC2_ASG_OPENTOFU_BUNDLE_DIR),
   ];
 }
 
@@ -64,9 +68,6 @@ function ec2AsgTfvars(input: CloudControlSetupInput) {
       hostMode: "repo-owned-asg",
       rollback: "non-destructive",
     },
-    artifact_bucket_name: input.artifactBucket,
-    state_bucket_name: `${input.instanceId}-tofu-state`,
-    state_lock_table_name: `${input.instanceId}-tofu-state-lock`,
     ec2_host_mode: "repo-owned-asg",
     ec2_asg_name: compute.autoScalingGroupName || `${input.instanceId}-control-plane`,
     ec2_ami_id: compute.amiId,

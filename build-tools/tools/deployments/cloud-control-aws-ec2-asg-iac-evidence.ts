@@ -8,6 +8,7 @@ import {
 import {
   EC2_ASG_APPLY_SCHEMA,
   EC2_ASG_IAC_PATHS,
+  EC2_ASG_OPENTOFU_WORKING_DIR,
   EC2_ASG_PLAN_SCHEMA,
   EC2_ASG_READONLY_SCHEMA,
   EC2_ASG_SHA256,
@@ -119,10 +120,8 @@ type ExpectedInputs = {
 function common(label: string, record: Record<string, unknown>, schema: string, path: string) {
   const errors: string[] = [];
   if (record.schemaVersion !== schema) errors.push(`EC2 ASG ${label} missing ${schema}`);
-  if (
-    recordText(record, "workingDirectory") !== "$PROFILE_ROOT/opentofu/aws-control-plane-foundation"
-  ) {
-    errors.push(`EC2 ASG ${label} must use bundle-root OpenTofu working directory`);
+  if (recordText(record, "workingDirectory") !== EC2_ASG_OPENTOFU_WORKING_DIR) {
+    errors.push(`EC2 ASG ${label} must use ASG-specific bundle-root OpenTofu working directory`);
   }
   const digest =
     recordText(record, "planDigest") ||

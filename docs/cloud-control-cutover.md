@@ -22,7 +22,7 @@ deployment-control-plane cutover \
   --expected-host-profile aws-ec2 \
   --expected-image-build-identity nix-source-<64-hex-build-identity> \
   --expected-region us-east-1 \
-  --selected-capability aws-ec2-control-plane-host,aws-s3-artifact-store \
+  --selected-capability aws-ec2-control-plane-host,aws-network-foundation,aws-ecr-control-plane-registry,aws-s3-artifact-store,supabase-managed-postgres,supabase-privatelink-prerequisite \
   --out ./cloud-control-profile/cloud-cutover-report.json
 ```
 
