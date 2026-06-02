@@ -81,21 +81,19 @@ and fail closed against IaC outputs. Provider-capability commands must not becom
 imperative infrastructure engine for persistent ECR, RAM, VPC Lattice, IAM, security-group, EC2,
 load-balancer, DNS, or TLS resources.
 
-The current repo does not yet own full AWS infrastructure provisioning for:
+The repo now provides reviewed declarative/IaC paths for the AWS foundation surfaces used by the
+control-plane setup bundle: network and S3 foundation evidence, ECR registry evidence, AWS-side
+Supabase PrivateLink evidence, ingress evidence, and the optional `repo-owned-asg` EC2 launch
+template/Auto Scaling Group host mode. Operators may still choose `external-reviewed-host` for EC2
+host ownership, and support-mediated provider steps such as the Supabase-side PrivateLink share must
+still be represented as structured evidence instead of inferred from dashboards or notes.
 
-- VPC, subnets, route tables, NAT, security groups, and VPC endpoints
-- EC2 instance profile, launch template, AMI selection, and systemd/Podman host realization
-- ALB/NLB, ACM certificate, listeners, target groups, DNS, and TLS policy
-
-Use reviewed IaC outside this repo or a manually reviewed cloud-foundation process for those gaps
-today. Supabase PrivateLink remains support-mediated until Supabase shares the resource, and
-AWS-side RAM acceptance, VPC Lattice association, private DNS, and security-group posture should be
-realized by reviewed IaC. The generated provider-capability command consumes reviewed
-`aws-topology-evidence.json`, IaC plan/apply outputs, and read-only AWS/`psql` evidence once those
-AWS-side artifacts exist. Capture every non-secret output as evidence and feed it into the setup and
-cutover commands. The code/design work needed to bring the remaining pieces under repo-owned IaC is
-listed in
-[Control Plane Gaps](./control-plane-gaps.md).
+Generated provider-capability commands consume reviewed `aws-topology-evidence.json`, IaC plan/apply
+outputs, selected provider evidence, and read-only AWS/`psql` evidence once the reviewed artifacts
+exist. Capture every non-secret output as evidence and feed it into setup-doctor, readiness, and
+cutover commands. When an organization owns additional cloud-foundation resources outside this repo,
+keep those resources declarative/IaC-owned and import their reviewed outputs through the same typed
+evidence gates.
 
 ## Prerequisites
 
