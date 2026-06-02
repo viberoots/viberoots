@@ -83,6 +83,36 @@ async function providerInputs(capabilityId: string) {
       supabasePrivateLinkIac: await privateLinkIacInputs(),
     };
   }
+  if (capabilityId === "aws-attic-cache-service") {
+    return {
+      ...(topology ? { awsTopologyEvidence: topology } : {}),
+      awsAtticCacheEvidence: await requiredJsonFlag(
+        "aws-attic-cache-evidence",
+        "aws-attic-cache-service",
+      ),
+    };
+  }
+  if (capabilityId === "cloudflare-edge") {
+    return {
+      ...(topology ? { awsTopologyEvidence: topology } : {}),
+      cloudflareEdgeEvidence: await requiredJsonFlag("cloudflare-edge-evidence", capabilityId),
+    };
+  }
+  if (capabilityId === "vercel-operator-ui") {
+    return {
+      ...(topology ? { awsTopologyEvidence: topology } : {}),
+      vercelOperatorUiEvidence: await requiredJsonFlag("vercel-operator-ui-evidence", capabilityId),
+    };
+  }
+  if (capabilityId === "remote-build-worker-fleet") {
+    return {
+      ...(topology ? { awsTopologyEvidence: topology } : {}),
+      remoteBuildWorkerFleetEvidence: await requiredJsonFlag(
+        "remote-build-worker-fleet-evidence",
+        capabilityId,
+      ),
+    };
+  }
   if (capabilityId !== "supabase-managed-postgres") return {};
   const profilePath = getFlagStr("supabase-postgres-profile", "").trim();
   if (!profilePath) {
@@ -187,6 +217,12 @@ async function readJson(filePath: string): Promise<unknown> {
 async function optionalJsonFlag(flag: string, key: string) {
   const filePath = getFlagStr(flag, "").trim();
   return filePath ? { [key]: await readJson(filePath) } : {};
+}
+
+async function requiredJsonFlag(flag: string, capabilityId: string) {
+  const filePath = getFlagStr(flag, "").trim();
+  if (!filePath) throw new Error(`${capabilityId} provider-capability requires --${flag}`);
+  return readJson(filePath) as Promise<Record<string, unknown>>;
 }
 
 export function selectedProviderCapabilityPhase(): CloudProviderCapabilityHookPhase {

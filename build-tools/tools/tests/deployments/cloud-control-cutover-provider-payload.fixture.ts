@@ -1,6 +1,6 @@
 import { buildSupabaseManagedPostgresEvidence } from "../../deployments/control-plane-supabase-postgres-evidence";
 import { reviewedSupabaseManagedPostgresProfile } from "../../deployments/control-plane-supabase-postgres-profile";
-import { IMAGE_DIGEST, IMAGE_REF } from "./cloud-control-aws-topology.fixture";
+import { freshCheckedAt, IMAGE_DIGEST, IMAGE_REF } from "./cloud-control-aws-topology.fixture";
 import { privateLinkIacEvidence } from "./cloud-control-supabase-privatelink.fixture";
 import { ecrRegistryProfileForImage } from "./control-plane-registry-profile.fixture";
 
@@ -22,17 +22,11 @@ export function providerPayloadFor(id: string) {
   }
   if (id === "supabase-privatelink-prerequisite") return supabasePrivateLinkPayload();
   if (id === "supabase-managed-postgres") return supabasePayload();
-  if (id !== "cloudflare-edge" && id !== "vercel-operator-ui") return {};
-  return {
-    providerPayload: {
-      schemaVersion: "edge-ingress-provider-payload@1",
-      hostname: "deploy.example.test",
-      callbackHost: "deploy-auth.example.test",
-      callbackPath: "/oidc/callback",
-      originLoadBalancerArn:
-        "arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/cp/1",
-    },
-  };
+  if (id === "aws-attic-cache-service") return atticPayload();
+  if (id === "cloudflare-edge") return cloudflarePayload();
+  if (id === "vercel-operator-ui") return vercelPayload();
+  if (id === "remote-build-worker-fleet") return fleetPayload();
+  return {};
 }
 
 function awsEcrPayload() {
@@ -144,5 +138,96 @@ function supabasePayload() {
         }),
       ),
     },
+  };
+}
+
+function cloudflarePayload() {
+  return {
+    providerPayload: {
+      ...remainingCommon("cloudflare-edge", "cloudflare-edge-evidence@1"),
+      ownership: {
+        boundary: "provider-owned-reviewed",
+        reviewedReference: "iac://cloudflare-edge",
+        allowsDirectMutation: false,
+        mutationCommands: [],
+      },
+      cloudflare: { accountId: "cf-account", zoneId: "zone-1", zoneName: "example.test" },
+      dns: { recordName: "deploy.example.test", target: "alb.example.test", proxied: true },
+      tls: { mode: "full-strict", certificateStatus: "active" },
+      waf: { selected: true, rulesetStatus: "active", rateLimitStatus: "active" },
+      binding: edgeBinding(),
+    },
+  };
+}
+
+function vercelPayload() {
+  return {
+    providerPayload: {
+      ...remainingCommon("vercel-operator-ui", "vercel-operator-ui-evidence@1"),
+      vercel: {
+        teamId: "team-1",
+        projectId: "operator-ui",
+        deploymentId: "dpl_1",
+        environment: "production",
+      },
+      domain: { productionAlias: "deploy.example.test", bound: true },
+      config: { provenance: "reviewed-env-digest", digest: "sha256:config" },
+      posture: { readOnly: true, uiApiOnly: true },
+      binding: edgeBinding(),
+    },
+  };
+}
+
+function atticPayload() {
+  return {
+    providerPayload: {
+      ...remainingCommon("aws-attic-cache-service", "aws-attic-cache-service-evidence@1"),
+      aws: { accountId: "123456789012", region: "us-east-1" },
+      endpoint: { identity: "attic-prod-cache", url: "https://attic.example.test" },
+      health: { atticdReady: true },
+      cacheObject: { put: true, get: true, metadata: true, digestVerified: true },
+      tokenScope: { cacheScoped: true, leastPrivilege: true },
+    },
+  };
+}
+
+function fleetPayload() {
+  return {
+    providerPayload: {
+      ...remainingCommon("remote-build-worker-fleet", "remote-build-worker-fleet-evidence@1"),
+      aws: { accountId: "123456789012", region: "us-east-1" },
+      fleet: { fleetId: "linux-spot-builders" },
+      authority: { buckSeparate: true, nixSeparate: true, notDeploymentScheduler: true },
+      network: { allowedBoundary: "build-vpc-private-subnets" },
+      scaling: { registrationProven: true, autoscalingPolicyReviewed: true },
+      credentials: { protectedRuntimeCredentialsReused: false },
+    },
+  };
+}
+
+function remainingCommon(capabilityId: string, schemaVersion: string) {
+  return {
+    schemaVersion,
+    capabilityId,
+    checkedAt: freshCheckedAt(),
+    ownership: {
+      boundary: "reviewed-iac",
+      reviewedReference: `iac://${capabilityId}`,
+      allowsDirectMutation: false,
+      mutationCommands: [],
+    },
+    smoke: { passed: true, heartbeat: true },
+    rollback: { nonDestructive: true, previousTarget: "previous-reviewed-target" },
+  };
+}
+
+function edgeBinding() {
+  return {
+    schemaVersion: "edge-ingress-provider-payload@1",
+    hostname: "deploy.example.test",
+    callbackHost: "deploy-auth.example.test",
+    callbackPath: "/oidc/callback",
+    originLoadBalancerArn:
+      "arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/cp/1",
   };
 }

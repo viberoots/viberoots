@@ -18,8 +18,10 @@ const DEPLOY_POSITIONAL_PRECEDING_VALUE_FLAGS = [
   "admit-only",
   "artifact-dir",
   "aws-ec2-profile",
+  "aws-attic-cache-evidence",
   "aws-topology-evidence",
   "cleanup-reason",
+  "cloudflare-edge-evidence",
   "component-artifacts",
   "control-plane-token",
   "control-plane-url",
@@ -45,7 +47,9 @@ const DEPLOY_POSITIONAL_PRECEDING_VALUE_FLAGS = [
   "supabase-postgres-profile",
   "provider-capability",
   "provider-capability-phase",
+  "remote-build-worker-fleet-evidence",
   "target-exception",
+  "vercel-operator-ui-evidence",
 ];
 
 function isDeploymentSelector(value: string): boolean {

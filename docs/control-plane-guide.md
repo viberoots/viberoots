@@ -277,6 +277,29 @@ account/region, or shared publish/runtime principals. Rollback is non-destructiv
 retain the repository and immutable image digests, restore reviewed policy/lifecycle settings
 through IaC, and do not delete production image digests.
 
+Optional adjacent capabilities use the same bundle-root evidence rule: generated
+provider-capability commands validate typed evidence files and must not call provider SDKs or CLIs to
+mutate resources directly. When selected, keep these files at the setup bundle root:
+
+- `aws-attic-cache-evidence.json`: proves the Attic endpoint identity, `atticd` health, cache
+  object conformance, AWS account and region linkage, reviewed IaC or external ownership boundary,
+  token/cache scope, smoke proof, and non-destructive rollback posture.
+- `cloudflare-edge-evidence.json`: proves the selected Cloudflare account and zone, DNS
+  record/alias/proxy posture, TLS/certificate posture, selected WAF/ruleset/rate-limit posture,
+  callback and origin binding, provider-owned or reviewed-IaC boundary, and no direct mutation
+  commands.
+- `vercel-operator-ui-evidence.json`: proves Vercel team, project, deployment, production alias or
+  domain binding, environment/config provenance, read-only UI/API posture, callback/domain binding,
+  and that Vercel is not deployment worker or provider authority.
+- `remote-build-worker-fleet-evidence.json`: proves the fleet identity, selected AWS account and
+  region, separate Buck/Nix worker authority, allowed network boundary, heartbeat/smoke posture,
+  scaling/registration posture, no protected runtime credential reuse, and no replacement of
+  deployment worker scheduling.
+
+These optional validators run only when the topology selects the corresponding capability. Minimal
+AWS/Supabase setup does not require Cloudflare, Vercel, Attic, or remote build fleet evidence unless
+those capabilities are selected in the generated provider-capability list.
+
 For ingress, this implementation uses repo-owned OpenTofu resources rather than provider-hook-only
 evidence. The AWS foundation module owns the default ALB/NLB, HTTPS/TLS listener, target group,
 target registration inputs, target-group readiness health check, Route53 record, ACM attachment,

@@ -10,6 +10,7 @@ import {
   registryProfile,
   withAwsCredentialFile,
 } from "./cloud-control-aws-ecr-registry.fixture";
+import { providerInputs as pr33ProviderInputs } from "./cloud-control-remaining-capabilities.fixture";
 
 test("provider-capability hook dispatch covers every concrete capability", async () => {
   for (const capabilityId of CLOUD_CAPABILITY_IDS) {
@@ -36,9 +37,21 @@ async function runHook(capabilityId: string) {
             imagePublication: imagePublication(),
           }
         : {}),
+      ...(pr33Inputs(capabilityId) as any),
       ...awsFoundationInspection(capabilityId),
     });
   return capabilityId === "aws-ecr-control-plane-registry" ? withAwsCredentialFile(run) : run();
+}
+
+function pr33Inputs(capabilityId: string) {
+  return [
+    "aws-attic-cache-service",
+    "cloudflare-edge",
+    "vercel-operator-ui",
+    "remote-build-worker-fleet",
+  ].includes(capabilityId)
+    ? pr33ProviderInputs(capabilityId)
+    : {};
 }
 
 function awsFoundationInspection(capabilityId: string) {

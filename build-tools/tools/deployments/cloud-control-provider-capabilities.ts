@@ -199,6 +199,18 @@ function iacCommands(id: CloudCapabilityId): ProviderCapabilityDeclaration["iac"
 function providerBundleFlags(id: CloudCapabilityId): string {
   if (id === "aws-ecr-control-plane-registry") return ecrBundleFlags();
   if (id === "supabase-privatelink-prerequisite") return supabasePrivateLinkBundleFlags();
+  if (id === "aws-attic-cache-service") {
+    return ' --aws-topology-evidence "$PROFILE_ROOT/aws-topology-evidence.json" --aws-attic-cache-evidence "$PROFILE_ROOT/aws-attic-cache-evidence.json"';
+  }
+  if (id === "cloudflare-edge") {
+    return ' --aws-topology-evidence "$PROFILE_ROOT/aws-topology-evidence.json" --cloudflare-edge-evidence "$PROFILE_ROOT/cloudflare-edge-evidence.json"';
+  }
+  if (id === "vercel-operator-ui") {
+    return ' --aws-topology-evidence "$PROFILE_ROOT/aws-topology-evidence.json" --vercel-operator-ui-evidence "$PROFILE_ROOT/vercel-operator-ui-evidence.json"';
+  }
+  if (id === "remote-build-worker-fleet") {
+    return ' --aws-topology-evidence "$PROFILE_ROOT/aws-topology-evidence.json" --remote-build-worker-fleet-evidence "$PROFILE_ROOT/remote-build-worker-fleet-evidence.json"';
+  }
   return "";
 }
 

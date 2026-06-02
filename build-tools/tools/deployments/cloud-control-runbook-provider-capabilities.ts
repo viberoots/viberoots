@@ -67,6 +67,18 @@ function inputFlags(input: CloudControlSetupInput, capabilityId: string): string
   if (capabilityId === "supabase-privatelink-prerequisite") {
     return `${topology} --supabase-privatelink-opentofu-plan "$PROFILE_ROOT/supabase-privatelink-opentofu-plan.json" --supabase-privatelink-opentofu-apply "$PROFILE_ROOT/supabase-privatelink-opentofu-apply.json" --supabase-privatelink-readonly-evidence "$PROFILE_ROOT/supabase-privatelink-readonly-evidence.json"`;
   }
+  if (capabilityId === "aws-attic-cache-service") {
+    return `${topology} --aws-attic-cache-evidence "$PROFILE_ROOT/aws-attic-cache-evidence.json"`;
+  }
+  if (capabilityId === "cloudflare-edge") {
+    return `${topology} --cloudflare-edge-evidence "$PROFILE_ROOT/cloudflare-edge-evidence.json"`;
+  }
+  if (capabilityId === "vercel-operator-ui") {
+    return `${topology} --vercel-operator-ui-evidence "$PROFILE_ROOT/vercel-operator-ui-evidence.json"`;
+  }
+  if (capabilityId === "remote-build-worker-fleet") {
+    return `${topology} --remote-build-worker-fleet-evidence "$PROFILE_ROOT/remote-build-worker-fleet-evidence.json"`;
+  }
   if (capabilityId !== "aws-ec2-control-plane-host") return topology;
   const asg =
     input.ec2HostMode === "repo-owned-asg"
@@ -97,6 +109,18 @@ function inputs(input: CloudControlSetupInput, capabilityId: string): string[] {
       "$PROFILE_ROOT/supabase-privatelink-opentofu-apply.json",
       "$PROFILE_ROOT/supabase-privatelink-readonly-evidence.json",
     ];
+  }
+  if (capabilityId === "aws-attic-cache-service") {
+    return [...values, "$PROFILE_ROOT/aws-attic-cache-evidence.json"];
+  }
+  if (capabilityId === "cloudflare-edge") {
+    return [...values, "$PROFILE_ROOT/cloudflare-edge-evidence.json"];
+  }
+  if (capabilityId === "vercel-operator-ui") {
+    return [...values, "$PROFILE_ROOT/vercel-operator-ui-evidence.json"];
+  }
+  if (capabilityId === "remote-build-worker-fleet") {
+    return [...values, "$PROFILE_ROOT/remote-build-worker-fleet-evidence.json"];
   }
   if (capabilityId !== "aws-ec2-control-plane-host") return values;
   const ec2 = [...values, "$PROFILE_ROOT/aws-ec2-profile.yaml"];

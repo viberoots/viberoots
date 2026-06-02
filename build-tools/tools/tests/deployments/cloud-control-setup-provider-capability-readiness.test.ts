@@ -15,6 +15,11 @@ import {
   withAwsCredentialFile,
 } from "./cloud-control-aws-ecr-registry.fixture";
 import { privateLinkIacEvidence } from "./cloud-control-supabase-privatelink.fixture";
+import { pr33Evidence } from "./cloud-control-remaining-capabilities.fixture";
+import {
+  completeCloudflareEdge,
+  completeVercelEdge,
+} from "./cloud-control-cutover-aws-edge.fixture";
 
 const DIGEST_REF =
   "registry.example.com/platform/deployment-control-plane@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
@@ -37,7 +42,7 @@ test("provider-capability hook evidence is required before protected readiness",
   const completeEvidence = await hookEvidenceFor(capabilities);
   assert.deepEqual(
     validateProviderCapabilityEvidence(capabilities, completeEvidence, {
-      awsTopology: privateLinkAwsTopology(),
+      awsTopology: readinessTopology(),
       supabasePostgresProfile: supabaseProfile(),
     }),
     [],
@@ -52,7 +57,7 @@ test("provider-capability hook evidence is required before protected readiness",
     validateProviderCapabilityEvidence(
       capabilities,
       { ...completeEvidence, "supabase-managed-postgres": wrongSupabase },
-      { awsTopology: privateLinkAwsTopology(), supabasePostgresProfile: supabaseProfile() },
+      { awsTopology: readinessTopology(), supabasePostgresProfile: supabaseProfile() },
     ).join("\n"),
     /does not match selected setup profile/,
   );
@@ -100,7 +105,7 @@ test("placeholder declarations and raw evidence cannot mark readiness", () => {
 });
 
 async function hookEvidenceFor(capabilities: Array<{ id: string }>) {
-  const foundation = privateLinkAwsTopology().foundation;
+  const foundation = readinessTopology().foundation;
   return Object.fromEntries(
     await Promise.all(
       capabilities.map(async (capability) => [
@@ -118,11 +123,11 @@ async function runEvidenceHook(capabilityId: string, foundation: unknown) {
       phase: "evidence",
       deploymentLabel: "//deployments:staging",
       ...(capabilityId === "aws-ec2-control-plane-host"
-        ? { awsTopologyEvidence: privateLinkAwsTopology(), awsEc2Profile: awsEc2HookProfile() }
+        ? { awsTopologyEvidence: readinessTopology(), awsEc2Profile: awsEc2HookProfile() }
         : {}),
       ...(capabilityId === "aws-ecr-control-plane-registry"
         ? {
-            awsTopologyEvidence: privateLinkAwsTopology(),
+            awsTopologyEvidence: readinessTopology(),
             registryProfile: registryProfile(),
             imagePublication: imagePublication(),
           }
@@ -135,8 +140,32 @@ async function runEvidenceHook(capabilityId: string, foundation: unknown) {
         : {}),
       ...(capabilityId === "supabase-privatelink-prerequisite"
         ? {
-            awsTopologyEvidence: privateLinkAwsTopology(),
+            awsTopologyEvidence: readinessTopology(),
             supabasePrivateLinkIac: privateLinkIacEvidence(),
+          }
+        : {}),
+      ...(capabilityId === "aws-attic-cache-service"
+        ? {
+            awsTopologyEvidence: readinessTopology(),
+            awsAtticCacheEvidence: pr33Evidence(capabilityId),
+          }
+        : {}),
+      ...(capabilityId === "cloudflare-edge"
+        ? {
+            awsTopologyEvidence: readinessTopology(),
+            cloudflareEdgeEvidence: pr33Evidence(capabilityId),
+          }
+        : {}),
+      ...(capabilityId === "vercel-operator-ui"
+        ? {
+            awsTopologyEvidence: readinessTopology(),
+            vercelOperatorUiEvidence: pr33Evidence(capabilityId),
+          }
+        : {}),
+      ...(capabilityId === "remote-build-worker-fleet"
+        ? {
+            awsTopologyEvidence: readinessTopology(),
+            remoteBuildWorkerFleetEvidence: pr33Evidence(capabilityId),
           }
         : {}),
     });
@@ -190,8 +219,14 @@ function baseInput(): CloudControlSetupInput {
     serviceReplicas: 1,
     workerReplicas: 2,
     dryRun: false,
-    awsTopology: privateLinkAwsTopology(),
+    awsTopology: readinessTopology(),
     supabasePostgres: supabaseProfile(),
     runtimeInput: reviewedRuntimeInput(),
   };
+}
+
+function readinessTopology() {
+  return privateLinkAwsTopology({
+    selectedEdges: { cloudflare: completeCloudflareEdge(), vercel: completeVercelEdge() },
+  });
 }

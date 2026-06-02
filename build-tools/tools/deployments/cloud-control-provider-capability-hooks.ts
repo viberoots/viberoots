@@ -19,6 +19,7 @@ import { supabasePrivateLinkAdapter } from "./cloud-control-supabase-privatelink
 import type { SupabasePrivateLinkIacBundle } from "./cloud-control-supabase-privatelink-iac-evidence";
 import type { Ec2AsgIacBundle } from "./cloud-control-aws-ec2-asg-iac-evidence";
 import type { Ec2HostMode } from "./cloud-control-aws-ec2-host-mode";
+import { remainingCapabilityHookAdapter } from "./cloud-control-remaining-capability-hooks";
 
 export const CLOUD_PROVIDER_CAPABILITY_HOOK_PHASES = [
   "preview",
@@ -63,11 +64,15 @@ export type HookAdapterPhaseOptions = {
   registryProfile?: ControlPlaneRegistryProfile;
   imagePublication?: ControlPlaneImagePublicationEvidence;
   supabasePrivateLinkIac?: SupabasePrivateLinkIacBundle;
+  awsAtticCacheEvidence?: Record<string, unknown>;
+  cloudflareEdgeEvidence?: Record<string, unknown>;
+  vercelOperatorUiEvidence?: Record<string, unknown>;
+  remoteBuildWorkerFleetEvidence?: Record<string, unknown>;
 };
 
 const HOOK_ADAPTERS: Record<string, HookAdapter> = {
   "aws-ec2-control-plane-host": awsEc2HostHookAdapter(),
-  "aws-attic-cache-service": reviewedAdapter("aws-attic-cache-service"),
+  "aws-attic-cache-service": remainingCapabilityHookAdapter("aws-attic-cache-service"),
   "aws-ecr-control-plane-registry": awsEcrRegistryHookAdapter(),
   "aws-s3-artifact-store": awsFoundationHookAdapter("aws-s3-artifact-store"),
   "aws-network-foundation": awsFoundationHookAdapter("aws-network-foundation"),
@@ -77,9 +82,9 @@ const HOOK_ADAPTERS: Record<string, HookAdapter> = {
   "supabase-privatelink-prerequisite": supabasePrivateLinkAdapter(
     reviewedAdapter("supabase-privatelink-evidence-gate", false, true),
   ),
-  "cloudflare-edge": reviewedAdapter("cloudflare-edge"),
-  "vercel-operator-ui": reviewedAdapter("vercel-operator-ui"),
-  "remote-build-worker-fleet": reviewedAdapter("remote-build-worker-fleet"),
+  "cloudflare-edge": remainingCapabilityHookAdapter("cloudflare-edge"),
+  "vercel-operator-ui": remainingCapabilityHookAdapter("vercel-operator-ui"),
+  "remote-build-worker-fleet": remainingCapabilityHookAdapter("remote-build-worker-fleet"),
 };
 
 export async function runCloudProviderCapabilityHook(opts: {
@@ -97,6 +102,10 @@ export async function runCloudProviderCapabilityHook(opts: {
   registryProfile?: ControlPlaneRegistryProfile;
   imagePublication?: ControlPlaneImagePublicationEvidence;
   supabasePrivateLinkIac?: SupabasePrivateLinkIacBundle;
+  awsAtticCacheEvidence?: Record<string, unknown>;
+  cloudflareEdgeEvidence?: Record<string, unknown>;
+  vercelOperatorUiEvidence?: Record<string, unknown>;
+  remoteBuildWorkerFleetEvidence?: Record<string, unknown>;
 }) {
   assertSupportedPhase(opts.phase);
   const declaration = opts.declaration || concreteDeclaration(opts.capabilityId);
@@ -129,6 +138,14 @@ export async function runCloudProviderCapabilityHook(opts: {
     ...(opts.registryProfile ? { registryProfile: opts.registryProfile } : {}),
     ...(opts.imagePublication ? { imagePublication: opts.imagePublication } : {}),
     ...(opts.supabasePrivateLinkIac ? { supabasePrivateLinkIac: opts.supabasePrivateLinkIac } : {}),
+    ...(opts.awsAtticCacheEvidence ? { awsAtticCacheEvidence: opts.awsAtticCacheEvidence } : {}),
+    ...(opts.cloudflareEdgeEvidence ? { cloudflareEdgeEvidence: opts.cloudflareEdgeEvidence } : {}),
+    ...(opts.vercelOperatorUiEvidence
+      ? { vercelOperatorUiEvidence: opts.vercelOperatorUiEvidence }
+      : {}),
+    ...(opts.remoteBuildWorkerFleetEvidence
+      ? { remoteBuildWorkerFleetEvidence: opts.remoteBuildWorkerFleetEvidence }
+      : {}),
   });
   const output = redactOperatorText(result.rawOutput);
   if (!output) throw new Error(`${opts.capabilityId}: hook produced no audit output`);

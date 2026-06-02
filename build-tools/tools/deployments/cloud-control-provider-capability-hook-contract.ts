@@ -6,6 +6,7 @@ import { validateAwsEc2HostProviderPayload } from "./cloud-control-aws-ec2-host-
 import { validateSupabasePrivateLinkPayload } from "./cloud-control-supabase-privatelink-hook-validation";
 import { validateAwsEcrProviderPayload } from "./cloud-control-aws-ecr-iac-evidence";
 import { directAwsMutationErrors } from "./cloud-control-aws-mutation-scan";
+import { validateRemainingProviderCapabilityPayload } from "./cloud-control-remaining-capability-validation";
 
 export const CLOUD_PROVIDER_CAPABILITY_HOOK_EVIDENCE_SCHEMA =
   "cloud-provider-capability-hook-evidence@1";
@@ -78,6 +79,12 @@ export function validateProviderCapabilityHookEvidenceShape(
   );
   errors.push(...validateSupabaseManagedPostgresPayload(id, value, opts));
   errors.push(...validateSupabasePrivateLinkPayload(id, value, opts));
+  errors.push(
+    ...validateRemainingProviderCapabilityPayload(id, value.providerPayload, {
+      maxAgeMinutes: opts.maxAgeMinutes,
+      awsTopology: opts.expectedAwsTopology,
+    }),
+  );
   errors.push(...validateNoDashboardOnlyEvidence(id, value));
   errors.push(...validateNoUnsafeEvidenceContent(id, value));
   return errors;

@@ -65,9 +65,10 @@ test("provider-capability hook dispatch rejects invalid contract bindings", asyn
 
 test("provider-capability hook output is redacted before evidence persistence", async () => {
   const hook = await runCloudProviderCapabilityHook({
-    capabilityId: "cloudflare-edge",
+    capabilityId: "aws-s3-artifact-store",
     phase: "preview",
     deploymentLabel: "//deployments:staging",
+    awsFoundationInspection: publicAwsTopology().foundation,
   });
   assert.equal(hook.output.redacted, true);
   assert.equal(hook.output.classification, "redact_before_display");
@@ -236,7 +237,6 @@ function hookEvidence(capabilityId: string, phase: any) {
       : {}),
   });
 }
-
 function badDeclarations(capability: ReturnType<typeof capabilityDeclaration>) {
   return [
     { ...capability, credentialSource: "" },

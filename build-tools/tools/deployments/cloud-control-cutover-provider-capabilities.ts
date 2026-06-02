@@ -1,5 +1,6 @@
 import type { CutoverEvidence } from "./cloud-control-cutover-types";
 import { evidenceObject, evidenceText } from "./cloud-control-evidence-helpers";
+import { validateEdgeIngressProviderPayload } from "./cloud-control-edge-provider-payload";
 import type { ProviderCapabilityDeclaration } from "./cloud-control-setup-types";
 import { validateProviderCapabilityDeclaration } from "./cloud-control-setup-validate";
 import {
@@ -98,7 +99,10 @@ function validateIngressProviderPayload(
   if (Object.keys(payload).length === 0)
     return [`${id}: missing reviewed ingress provider payload`];
   if (id === "aws-network-foundation") return validateAwsNetworkPayload(id, payload);
-  return validateEdgePayload(id, payload, evidence);
+  return validateEdgeIngressProviderPayload(id, payload, {
+    awsTopology: evidence.awsTopology,
+    runtimeConfig: evidence.runtimeConfig,
+  });
 }
 
 function validateAwsNetworkPayload(id: string, payload: Record<string, unknown>): string[] {
@@ -113,42 +117,4 @@ function validateAwsNetworkPayload(id: string, payload: Record<string, unknown>)
     errors.push(`${id}: missing structured AWS ingress inspection payload`);
   }
   return errors;
-}
-
-function validateEdgePayload(
-  id: string,
-  payload: Record<string, unknown>,
-  evidence: CutoverEvidence,
-): string[] {
-  const errors: string[] = [];
-  const ingress = evidenceObject(evidence.awsTopology?.ingress);
-  const expectedHost = hostFromUrl(String(evidence.runtimeConfig?.publicUrl || ""));
-  const callback = (evidence.runtimeConfig?.authProvider as any)?.callback || {};
-  if (evidenceText(payload, "schemaVersion") !== "edge-ingress-provider-payload@1") {
-    errors.push(`${id}: missing structured edge ingress provider payload`);
-  }
-  if (evidenceText(payload, "hostname") !== expectedHost) {
-    errors.push(`${id}: edge provider payload hostname does not match runtime publicUrl`);
-  }
-  if (evidenceText(payload, "callbackHost") !== String(callback.externalHost || "")) {
-    errors.push(`${id}: edge provider payload callback host does not match runtime config`);
-  }
-  if (evidenceText(payload, "callbackPath") !== String(callback.externalPath || "")) {
-    errors.push(`${id}: edge provider payload callback path does not match runtime config`);
-  }
-  if (
-    evidenceText(payload, "originLoadBalancerArn") !==
-    evidenceText(evidenceObject(ingress.loadBalancer), "arn")
-  ) {
-    errors.push(`${id}: edge provider payload origin does not match selected AWS ingress`);
-  }
-  return errors;
-}
-
-function hostFromUrl(value: string): string {
-  try {
-    return new URL(value).hostname;
-  } catch {
-    return "";
-  }
 }

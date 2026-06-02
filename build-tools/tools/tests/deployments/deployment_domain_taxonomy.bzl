@@ -35,3 +35,10 @@ REVIEWED_DEPLOYMENT_TEST_OWNERSHIP.update({
     "build-tools/tools/tests/deployments/cloud-control-aws-ec2-asg-greenfield.test.ts": True,
     "build-tools/tools/tests/deployments/cloud-control-aws-ec2-asg-user-data.test.ts": True,
 })
+
+REVIEWED_DEPLOYMENT_TEST_OWNERSHIP.update({
+    "build-tools/tools/tests/deployments/cloud-control-remaining-capabilities.fixture.ts": False,
+    "build-tools/tools/tests/deployments/cloud-control-remaining-capabilities.test.ts": True,
+    "build-tools/tools/tests/deployments/cloud-control-remaining-provider-identity.test.ts": True,
+    "build-tools/tools/tests/deployments/deployment-control-plane-command-flags.test.ts": True,
+})

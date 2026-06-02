@@ -692,6 +692,30 @@ The current catalog is:
 - `remote-build-worker-fleet`: adjacent build-system capacity capability; it must prove separate
   Buck/Nix worker authority and must not replace deployment worker scheduling.
 
+The optional Attic, Cloudflare, Vercel, and remote-build-fleet entries use concrete typed evidence
+validators, not generic reviewed-note adapters. Their provider-capability hooks consume reviewed
+evidence payloads from the setup bundle and reject missing, stale, wrong-scope, wrong-provider,
+smoke-less, rollback-less, raw/manual-only, or mutation-command evidence. The contracts are:
+
+- `aws-attic-cache-service`: endpoint identity, `atticd` health, cache object conformance, selected
+  AWS account and region, reviewed IaC or external ownership boundary, token/cache scope, smoke
+  proof, and non-destructive rollback posture.
+- `cloudflare-edge`: selected account and zone, DNS record/alias/proxy posture, TLS/certificate
+  posture, selected WAF/ruleset/rate-limit posture, callback/origin binding, reviewed ownership
+  boundary, and no direct mutation outside reviewed IaC or provider-owned configuration.
+- `vercel-operator-ui`: team/project/deployment identity, production alias or domain binding,
+  environment/config provenance, read-only UI/API posture, callback/domain binding, and explicit
+  proof that Vercel is not deployment worker or provider authority. Hook validation compares the
+  team, project, domain, and environment against selected topology identity; deployment ID remains a
+  provider-observed presence check because it may not exist until Vercel evidence is collected.
+- `remote-build-worker-fleet`: fleet identity, separate Buck/Nix worker authority, allowed network
+  boundary, heartbeat/smoke posture, scaling/registration posture, no protected runtime credential
+  reuse, and no replacement of deployment worker scheduling.
+
+These validators are selected-capability gates. They must not make optional Cloudflare, Vercel,
+Attic, or remote-build-fleet evidence mandatory for a minimal AWS/Supabase topology that does not
+select those capabilities.
+
 Provider entries may be implemented directly or by invoking reviewed infrastructure tooling such as
 OpenTofu, Terraform, CloudFormation, or provider CLIs. In all cases, the deployment control plane owns
 admission, locks, credential scoping, audit, smoke evidence, and rollback evidence. Raw IaC state or
