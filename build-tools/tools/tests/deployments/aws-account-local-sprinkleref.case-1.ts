@@ -22,10 +22,10 @@ test("aws-account resolves structured stack refs from hierarchical local values"
   await runInTemp("aws-account-local-values", async (tmp) => {
     await writeStack(tmp, {
       domain: { value: "example.com" },
-      awsAccountId: { ref: "secret://control-plane/aws/account-id" },
-      awsOrganizationId: { ref: "secret://control-plane/aws/organization-id" },
-      supabaseOrgId: { ref: "secret://control-plane/supabase/org-id" },
-      supabaseProjectRef: { ref: "secret://control-plane/supabase/project-ref" },
+      awsAccountId: { ref: "config://control-plane/aws/account-id" },
+      awsOrganizationId: { ref: "config://control-plane/aws/organization-id" },
+      supabaseOrgId: { ref: "config://control-plane/supabase/org-id" },
+      supabaseProjectRef: { ref: "config://control-plane/supabase/project-ref" },
       supabaseAccessToken: { ref: "secret://control-plane/supabase/management-api-token" },
     });
     await writeLocalValues(tmp, {
@@ -150,7 +150,7 @@ test("aws-account parser rejects invalid stack value and ref forms", () => {
   );
   assert.throws(
     () => parseStackField({ awsAccountId: { ref: "infisical://x/y" } }, "awsAccountId"),
-    /secret:\/\//,
+    /config:\/\/ or runtime:\/\//,
   );
   assert.throws(
     () => parseStackField({ awsAccountId: { ref: "" } }, "awsAccountId", { required: true }),
@@ -159,7 +159,7 @@ test("aws-account parser rejects invalid stack value and ref forms", () => {
   assert.throws(
     () =>
       parseStackField(
-        { awsAccountId: { ref: "secret://github/deployments/token" } },
+        { awsAccountId: { ref: "config://github/deployments/token" } },
         "awsAccountId",
       ),
     /backend-neutral/,
@@ -175,7 +175,7 @@ test("aws-account parser rejects invalid stack value and ref forms", () => {
 
 test("aws-account local values fail closed on malformed JSON and value objects", async () => {
   await runInTemp("aws-account-local-values-negative", async (tmp) => {
-    const ref = "secret://control-plane/aws/account-id";
+    const ref = "config://control-plane/aws/account-id";
     await fsp.mkdir(path.join(tmp, "config/sprinkleref/local"), { recursive: true });
     await fsp.writeFile(path.join(tmp, "config/sprinkleref/local/values.json"), "{", "utf8");
     await assert.rejects(() => resolveStackRef(tmp, ref), /invalid local SprinkleRef values JSON/);
@@ -188,8 +188,8 @@ test("aws-account local values fail closed on malformed JSON and value objects",
 
 test("aws-account local redirects detect cycles through redirect chains", async () => {
   await runInTemp("aws-account-local-redirect-cycle", async (tmp) => {
-    const accountRef = "secret://control-plane/aws/account-id";
-    const orgRef = "secret://control-plane/aws/organization-id";
+    const accountRef = "config://control-plane/aws/account-id";
+    const orgRef = "config://control-plane/aws/organization-id";
     await writeLocalValues(tmp, {
       "control-plane": {
         aws: {

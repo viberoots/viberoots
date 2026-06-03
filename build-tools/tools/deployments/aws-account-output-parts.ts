@@ -51,6 +51,7 @@ export function formatMissingDestinations(fields: MissingConfigField[]): string[
 function formatMissingField(field: MissingConfigField, action?: string): string[] {
   const lines = [`    ${field.field}:`];
   if (field.ref) lines.push(...wrapText(field.ref, 6, "ref: "));
+  if (field.category) lines.push(`      category: ${field.category}`);
   if (action) lines.push(...wrapText(action, 6, "action: "));
   const hint = field.valueHint.trim().startsWith("{") ? field.valueHint : field.valueHint;
   if (hint && (!field.ref || !hint.includes(field.ref))) {

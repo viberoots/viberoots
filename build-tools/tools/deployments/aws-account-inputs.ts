@@ -1,29 +1,13 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import { assertBackendNeutralSecretRef, resolveSprinkleRefBackend } from "./sprinkleref-config";
+import { assertStackRef, logicalRefPath, type StackRefOptions } from "./aws-account-ref-schemes";
+import type { StackInputResolution, StackInputSource } from "./aws-account-input-types";
+import { resolveSprinkleRefBackend } from "./sprinkleref-config";
 import { readSelectedSprinkleRefConfig } from "./sprinkleref-config-select";
 import { createSprinkleRefStore } from "./sprinkleref-store";
 
 export const LOCAL_VALUES_PATH = "config/sprinkleref/local/values.json";
-
-export type StackInputSource = {
-  source: "cli" | "inline" | "default" | "local-values" | "sprinkleref" | "env" | "missing";
-  ref?: string;
-  category?: string;
-  env?: string;
-  localValuesPath?: string;
-  backend?: string;
-  categoryExplicit?: boolean;
-  valuePrinted: boolean;
-};
-
-export type StackInputResolution = {
-  value?: string;
-  ref?: string;
-  category?: string;
-  source: StackInputSource;
-  error?: string;
-};
+export type { StackInputResolution, StackInputSource } from "./aws-account-input-types";
 
 export function parseStackField(
   file: Record<string, unknown>,
@@ -39,7 +23,7 @@ export function parseStackField(
       : missingSource(key, opts);
   }
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
-    throw new Error(`${key} must be a scalar, { "value": ... }, or { "ref": "secret://..." }`);
+    throw new Error(`${key} must be a scalar, { "value": ... }, or { "ref": "<scheme>://..." }`);
   }
   const obj = raw as Record<string, unknown>;
   if (Object.hasOwn(obj, "value") && Object.hasOwn(obj, "ref")) {
@@ -53,28 +37,27 @@ export function parseStackField(
   }
   if (!Object.hasOwn(obj, "ref")) throw new Error(`${key} object must contain value or ref`);
   const ref = stringMember(obj, "ref");
-  const category = stringMember(obj, "category");
+  const category = optionalStringMember(obj, "category", `${key} category`);
   if (!ref) return missingSource(key, opts);
-  assertSecretRef(key, ref);
+  assertStackRef(key, ref, Boolean(opts.secret));
   return { ref, category, source: { source: "missing", ref, category, valuePrinted: false } };
 }
 
 export async function resolveStackRef(
   cwd: string,
   ref: string,
-  opts: { category?: string; secret?: boolean; env?: NodeJS.ProcessEnv } = {},
+  opts: StackRefOptions = {},
 ): Promise<StackInputResolution> {
-  assertSecretRef("stack ref", ref);
+  assertStackRef("stack ref", ref, Boolean(opts.secret));
   return await resolveRef(cwd, ref, { ...opts, cwd }, new Set());
 }
 
-export function cliSource(secret = false): StackInputSource {
-  return { source: "cli", valuePrinted: !secret };
-}
+export const cliSource = (secret = false): StackInputSource => ({
+  source: "cli",
+  valuePrinted: !secret,
+});
 
-export function defaultSource(): StackInputSource {
-  return { source: "default", valuePrinted: true };
-}
+export const defaultSource = (): StackInputSource => ({ source: "default", valuePrinted: true });
 
 function inlineSource(secret = false): StackInputSource {
   return { source: "inline", valuePrinted: !secret };
@@ -88,10 +71,10 @@ function missingSource(key: string, opts: { secret?: boolean; required?: boolean
 async function resolveRef(
   cwd: string,
   ref: string,
-  opts: { category?: string; secret?: boolean; env?: NodeJS.ProcessEnv; cwd: string },
+  opts: RefResolutionOpts,
   seen: Set<string>,
 ): Promise<StackInputResolution> {
-  const cycleKey = `${opts.category || ""}:${ref}`;
+  const cycleKey = `${opts.category || ""}:${opts.categoryExplicit ? "explicit" : ""}:${ref}`;
   if (seen.has(cycleKey)) throw new Error(`local SprinkleRef redirect cycle for ${ref}`);
   seen.add(cycleKey);
   const local = await readLocalValue(cwd, ref);
@@ -103,7 +86,7 @@ async function resolveLocalValue(
   cwd: string,
   ref: string,
   raw: unknown,
-  opts: { category?: string; secret?: boolean; env?: NodeJS.ProcessEnv; cwd: string },
+  opts: RefResolutionOpts,
   seen: Set<string>,
 ): Promise<StackInputResolution> {
   if (typeof raw === "string") {
@@ -128,22 +111,24 @@ async function resolveLocalValue(
   }
   const targetRef = stringMember(obj, "ref");
   if (!targetRef) throw new Error(`${ref} local redirect requires ref`);
-  assertSecretRef("local redirect", targetRef);
-  const category = stringMember(obj, "category");
-  if (category) {
+  assertStackRef("local redirect", targetRef, Boolean(opts.secret));
+  const category = optionalStringMember(obj, "category", `${ref} local redirect category`);
+  if (category && !opts.categoryExplicit) {
     return localRedirectSource(
       cwd,
       targetRef,
-      await resolveRemoteRef(targetRef, { ...opts, category }),
+      await resolveRemoteRef(targetRef, { ...opts, category, categoryExplicit: true }),
     );
   }
   if (targetRef !== ref) return await resolveRef(cwd, targetRef, opts, seen);
   return localRedirectSource(cwd, targetRef, await resolveRemoteRef(targetRef, opts));
 }
 
+type RefResolutionOpts = StackRefOptions & { cwd: string };
+
 async function resolveRemoteRef(
   ref: string,
-  opts: { category?: string; secret?: boolean; env?: NodeJS.ProcessEnv; cwd: string },
+  opts: RefResolutionOpts,
 ): Promise<StackInputResolution> {
   try {
     const config = await readSelectedSprinkleRefConfig(await selectedConfigPath(opts), opts.env);
@@ -163,7 +148,7 @@ async function resolveRemoteRef(
         ref,
         category: resolved.category,
         backend: store.describe(),
-        categoryExplicit: Boolean(opts.category),
+        categoryExplicit: Boolean(opts.categoryExplicit),
         valuePrinted: !opts.secret,
       },
       error: value ? undefined : `${ref} is missing in SprinkleRef category ${resolved.category}`,
@@ -176,7 +161,7 @@ async function resolveRemoteRef(
         source: "missing",
         ref,
         category: opts.category,
-        categoryExplicit: Boolean(opts.category),
+        categoryExplicit: Boolean(opts.categoryExplicit),
         valuePrinted: false,
       },
       error: String(error instanceof Error ? error.message : error),
@@ -209,7 +194,7 @@ async function readLocalValue(cwd: string, ref: string) {
   }
   const root = parsed && typeof parsed === "object" ? (parsed as Record<string, unknown>) : {};
   let current: unknown = root.values;
-  for (const part of ref.slice("secret://".length).split("/").filter(Boolean)) {
+  for (const part of logicalRefPath(ref).split("/").filter(Boolean)) {
     if (!current || typeof current !== "object" || Array.isArray(current)) return { found: false };
     const obj = current as Record<string, unknown>;
     if (!Object.hasOwn(obj, part)) return { found: false };
@@ -244,7 +229,9 @@ function stringMember(obj: Record<string, unknown>, key: string): string | undef
   return typeof value === "string" && value.trim() ? value.trim() : undefined;
 }
 
-function assertSecretRef(key: string, ref: string): void {
-  if (!ref.startsWith("secret://")) throw new Error(`${key} ref must use secret://`);
-  assertBackendNeutralSecretRef(ref);
+function optionalStringMember(obj: Record<string, unknown>, key: string, label: string) {
+  if (!Object.hasOwn(obj, key)) return undefined;
+  const value = obj[key];
+  if (typeof value !== "string" || !value.trim()) throw new Error(`${label} must be a string`);
+  return value.trim();
 }

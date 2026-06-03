@@ -1,5 +1,6 @@
 import path from "node:path";
 import { ensureNixStoreToolPathSync } from "../lib/tool-paths";
+import { CONTROL_PLANE_CONFIG_REFS } from "./aws-account-ref-schemes";
 import type { AwsAccountConfig, PhaseRecord, RunDeps } from "./aws-account-types";
 import { defaultCommandRunner, writeEvidence } from "./aws-account-utils";
 
@@ -50,7 +51,8 @@ export async function checkAwsLogin(
           field: "awsAccountId",
           valueHint: "<new-account-id>",
           destination: "local-values-or-shared-resolver",
-          ref: "secret://control-plane/aws/account-id",
+          ref: CONTROL_PLANE_CONFIG_REFS.awsAccountId,
+          category: config.inputSources.awsAccountId?.category,
           note: "same account returned by aws sts get-caller-identity",
         },
       ],

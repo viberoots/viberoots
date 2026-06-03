@@ -45,7 +45,7 @@ export function sprinkleRefStarterConfigs(platform = process.platform) {
     "selected.json": {
       version: 1,
       extends: "./base.json",
-      defaultCategory: "main",
+      defaultCategory: "control",
       categories: {
         bootstrap,
         main: { profile: "infisical-default" },
@@ -55,7 +55,7 @@ export function sprinkleRefStarterConfigs(platform = process.platform) {
     "selected.local.json": {
       version: 1,
       extends: "./selected.json",
-      defaultCategory: "main",
+      defaultCategory: "control",
       categories: {},
     },
   };

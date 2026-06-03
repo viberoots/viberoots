@@ -1,4 +1,5 @@
 import { hasFlag } from "../lib/cli";
+import { CONTROL_PLANE_CONFIG_REFS } from "./aws-account-ref-schemes";
 import {
   AWS_ACCOUNT_STACK_CONFIG_FIELDS_WITHOUT_DEFAULTS,
   type RunDeps,
@@ -216,21 +217,22 @@ function initStructuredField(
   fromFile: Record<string, unknown>,
   key: string,
   flags: string[],
-): string | { ref: string } {
+): string | { ref: string; category?: string } {
   for (const flag of flags) {
     const value = strFlag(flag, "");
-    if (value) return flag === "supabase-access-token-ref" ? { ref: value } : value;
+    if (value) {
+      return flag === "supabase-access-token-ref"
+        ? { ref: value, category: strFlag("supabase-access-token-ref-category", "control") }
+        : value;
+    }
   }
   if (Object.hasOwn(fromFile, key)) return fromFile[key] as string | { ref: string };
-  return { ref: defaultStackRef(key) };
+  return { ref: defaultStackRef(key), category: "control" };
 }
 
 function defaultStackRef(key: string): string {
   const refs: Record<string, string> = {
-    awsAccountId: "secret://control-plane/aws/account-id",
-    awsOrganizationId: "secret://control-plane/aws/organization-id",
-    supabaseOrgId: "secret://control-plane/supabase/org-id",
-    supabaseProjectRef: "secret://control-plane/supabase/project-ref",
+    ...CONTROL_PLANE_CONFIG_REFS,
     supabaseAccessToken: "secret://control-plane/supabase/management-api-token",
   };
   return refs[key] || "";

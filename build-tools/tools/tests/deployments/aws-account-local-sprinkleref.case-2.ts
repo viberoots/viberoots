@@ -21,8 +21,8 @@ import {
 
 test("aws-account resolver handles remote fallback and unknown redirect categories", async () => {
   await runInTemp("aws-account-remote-fallback", async (tmp) => {
-    const ref = "secret://control-plane/aws/account-id";
-    const orgRef = "secret://control-plane/aws/organization-id";
+    const ref = "config://control-plane/aws/account-id";
+    const orgRef = "config://control-plane/aws/organization-id";
     await writeRemote(tmp, "control", { [ref]: "remote-id" });
     await writeStack(tmp, { domain: "example.com", awsAccountId: { ref } });
     let config = await readAwsAccountConfig(tmp);
@@ -162,7 +162,7 @@ test("aws-account check ignores default bootstrap category for token guidance", 
 test("aws-account source precedence favors cli and inline over resolvers", async () => {
   await runInTemp("aws-account-source-precedence", async (tmp) => {
     const ref = "secret://control-plane/supabase/management-api-token";
-    const accountRef = "secret://control-plane/aws/account-id";
+    const accountRef = "config://control-plane/aws/account-id";
     await writeRemote(tmp, "control", { [ref]: "remote-token", [accountRef]: "remote-id" });
     await writeLocalValues(tmp, {
       "control-plane": {

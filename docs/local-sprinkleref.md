@@ -5,7 +5,8 @@ developer-specific account coordinates or plaintext secrets into the repository.
 
 The goal is good developer experience without weakening the existing SprinkleRef model:
 
-- `secret://...` remains the backend-neutral logical reference.
+- `secret://...` remains the backend-neutral logical reference for true secrets.
+- `config://...` and `runtime://...` identify non-secret configuration/runtime values.
 - Resolver config chooses where refs are stored.
 - `bootstrap` remains a SprinkleRef category/lane for root credentials needed to access a primary
   secret manager such as Infisical or Vault.
@@ -43,6 +44,7 @@ refs and each clone can resolve those refs locally or through shared remote back
 Use the repo's current SprinkleRef terminology precisely:
 
 - **Ref:** backend-neutral logical identity, such as
+  `config://control-plane/aws/account-id` or
   `secret://control-plane/supabase/management-api-token`.
 - **Category:** usage lane selected by resolver config, such as `main`, `control`, or `bootstrap`.
 - **Backend kind:** storage implementation, such as `infisical`, `vault`, `local-file`, or
@@ -65,7 +67,7 @@ Control-plane stack config fields should accept three forms:
 ```
 
 ```json
-"awsAccountId": { "ref": "secret://control-plane/aws/account-id" }
+"awsAccountId": { "ref": "config://control-plane/aws/account-id" }
 ```
 
 Rules:
@@ -73,7 +75,8 @@ Rules:
 - Plain scalar means inline value.
 - `{ "value": ... }` means explicit inline value. This form exists so future fields can hold object
   or array values without changing the field model.
-- `{ "ref": "secret://..." }` means resolve through SprinkleRef.
+- `{ "ref": "config://..." }`, `{ "ref": "runtime://..." }`, or `{ "ref": "secret://..." }`
+  means resolve through SprinkleRef.
 - `{ "value": ..., "ref": ... }` is invalid.
 - Empty string, `{ "value": "" }`, and `{ "ref": "" }` are missing for required fields.
 - True secret fields must reject inline scalar and `{ "value": ... }`.
@@ -96,11 +99,20 @@ Recommended generated shape:
 {
   "schemaVersion": "aws-account-stack-config@1",
   "domain": "",
-  "awsAccountId": { "ref": "secret://control-plane/aws/account-id" },
-  "awsOrganizationId": { "ref": "secret://control-plane/aws/organization-id" },
-  "supabaseOrgId": { "ref": "secret://control-plane/supabase/org-id" },
-  "supabaseProjectRef": { "ref": "secret://control-plane/supabase/project-ref" },
-  "supabaseAccessToken": { "ref": "secret://control-plane/supabase/management-api-token" }
+  "awsAccountId": { "ref": "config://control-plane/aws/account-id", "category": "control" },
+  "awsOrganizationId": {
+    "ref": "config://control-plane/aws/organization-id",
+    "category": "control"
+  },
+  "supabaseOrgId": { "ref": "config://control-plane/supabase/org-id", "category": "control" },
+  "supabaseProjectRef": {
+    "ref": "config://control-plane/supabase/project-ref",
+    "category": "control"
+  },
+  "supabaseAccessToken": {
+    "ref": "secret://control-plane/supabase/management-api-token",
+    "category": "control"
+  }
 }
 ```
 
@@ -113,7 +125,7 @@ Do not generate these by default:
 - evidence directory
 - state backend names
 - Supabase API base URL
-- token env/category
+- token env
 - `expectedAwsRoleArn`
 
 Those fields remain supported as explicit overrides. `expectedAwsRoleArn` is optional hardening: if
@@ -157,7 +169,7 @@ The file is hierarchical so one file can hold all clone-local values:
 A ref like:
 
 ```text
-secret://control-plane/aws/account-id
+config://control-plane/aws/account-id
 ```
 
 maps to:
@@ -208,7 +220,8 @@ Redirect rules:
   category.
 - `{ "ref": "secret://..." }` resolves the referenced ref through the current/default category
   chain.
-- `category` must name a configured SprinkleRef category.
+- `category`, when present, must be a non-empty string naming a configured SprinkleRef category.
+  Malformed category values fail closed instead of being treated as absent.
 - Cycle detection is required.
 - For secret-class fields, local scalar values and `{ "value": ... }` are invalid, but redirect
   objects are allowed.
@@ -270,15 +283,15 @@ For a stack field with an inline value:
 3. Default, when the field has one.
 4. Missing/blocking.
 
-For a stack field with `{ "ref": "secret://..." }`:
+For a stack field with `{ "ref": "<scheme>://..." }`:
 
 1. CLI flag, when supplied.
 2. Conventional local values file at `config/sprinkleref/local/values.json`.
 3. If the local entry is scalar or `{ "value": ... }`, use it only when the requested field is not
    secret-class.
-4. If the local entry is `{ "ref": "secret://...", "category": "<category>" }`, resolve the target
+4. If the local entry is `{ "ref": "<scheme>://...", "category": "<category>" }`, resolve the target
    ref through that category.
-5. If the local entry is `{ "ref": "secret://..." }`, resolve the target ref through the current
+5. If the local entry is `{ "ref": "<scheme>://..." }`, resolve the target ref through the current
    category chain.
 6. If no local entry resolves, use the configured category/backend resolver, such as Infisical or
    Vault.
@@ -288,8 +301,9 @@ For a stack field with `{ "ref": "secret://..." }`:
 For `supabaseAccessToken`:
 
 1. Explicit setup-shell env var, when supplied.
-2. Stack config `{ "ref": "secret://control-plane/supabase/management-api-token" }`; if it
-   includes `category: "bootstrap"`, resolve through bootstrap.
+2. Stack config `{ "ref": "secret://control-plane/supabase/management-api-token",
+"category": "control" }`; if it includes another category such as `bootstrap`, resolve through
+   that explicit category.
 3. Local values redirect without a category, resolved through the selected/default category chain,
    when present.
 4. Local values redirect to `category: "bootstrap"`, only when explicitly chosen.
@@ -299,9 +313,10 @@ For `supabaseAccessToken`:
 The token value must never be printed or written into stack config, local values, inputs, or
 evidence.
 
-The default category for control-plane setup refs should be `control`. A local redirect to
+Generated control-plane setup refs should declare `category: "control"` explicitly. Resolver code
+must not infer `control` from a `control-plane` ref prefix. A local redirect to
 `category: "bootstrap"` is an explicit clone-local decision to use the bootstrap lane for that one
-value.
+value only when the stack ref has no explicit category.
 
 ## Developer Experience
 
@@ -373,16 +388,20 @@ print bootstrap token guidance unless a future command mode explicitly initializ
 Stack Config
   Missing:
     awsAccountId
-      ref: secret://control-plane/aws/account-id
+      ref: config://control-plane/aws/account-id
+      category: control
       action: fill config/sprinkleref/local/values.json or write the ref in SprinkleRef
     supabaseOrgId
-      ref: secret://control-plane/supabase/org-id
+      ref: config://control-plane/supabase/org-id
+      category: control
       action: fill config/sprinkleref/local/values.json or write the ref in SprinkleRef
     supabaseProjectRef
-      ref: secret://control-plane/supabase/project-ref
+      ref: config://control-plane/supabase/project-ref
+      category: control
       action: fill config/sprinkleref/local/values.json or write the ref in SprinkleRef
     supabaseAccessToken
       ref: secret://control-plane/supabase/management-api-token
+      category: control
       action: fill config/sprinkleref/local/values.json or write the ref in SprinkleRef
 
 Resolved:

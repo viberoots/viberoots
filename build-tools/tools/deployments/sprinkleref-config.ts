@@ -24,13 +24,17 @@ const BACKEND_NAMES = new Set([...BACKENDS, "github", "gitlab", "bitbucket"]);
 
 export function assertBackendNeutralSecretRef(ref: string) {
   if (!ref.startsWith("secret://")) throw new Error(`secret ref must start with secret://: ${ref}`);
+  assertBackendNeutralRef(ref);
+}
+
+export function assertBackendNeutralRef(ref: string) {
   const backendName = ref
-    .slice("secret://".length)
+    .slice(ref.indexOf("://") + "://".length)
     .split("/")
     .map((part) => part.trim())
     .find((part) => BACKEND_NAMES.has(part));
   if (backendName) {
-    throw new Error(`secret ref must be backend-neutral; move ${backendName} to resolver config`);
+    throw new Error(`ref must be backend-neutral; move ${backendName} to resolver config`);
   }
 }
 

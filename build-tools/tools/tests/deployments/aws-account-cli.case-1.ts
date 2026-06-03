@@ -102,16 +102,25 @@ test("aws-account config-init writes canonical stack config with empty unknowns"
     assert.ok(out[0]?.includes("config/control-plane/stack.json"));
     assert.equal(config.schemaVersion, "aws-account-stack-config@1");
     assert.equal(config.domain, "");
-    assert.deepEqual(config.awsAccountId, { ref: "secret://control-plane/aws/account-id" });
-    assert.deepEqual(config.awsOrganizationId, {
-      ref: "secret://control-plane/aws/organization-id",
+    assert.deepEqual(config.awsAccountId, {
+      ref: "config://control-plane/aws/account-id",
+      category: "control",
     });
-    assert.deepEqual(config.supabaseOrgId, { ref: "secret://control-plane/supabase/org-id" });
+    assert.deepEqual(config.awsOrganizationId, {
+      ref: "config://control-plane/aws/organization-id",
+      category: "control",
+    });
+    assert.deepEqual(config.supabaseOrgId, {
+      ref: "config://control-plane/supabase/org-id",
+      category: "control",
+    });
     assert.deepEqual(config.supabaseProjectRef, {
-      ref: "secret://control-plane/supabase/project-ref",
+      ref: "config://control-plane/supabase/project-ref",
+      category: "control",
     });
     assert.deepEqual(config.supabaseAccessToken, {
       ref: "secret://control-plane/supabase/management-api-token",
+      category: "control",
     });
     assert.equal(Object.hasOwn(config, "stackName"), false);
     assert.equal(Object.hasOwn(config, "region"), false);

@@ -63,29 +63,29 @@ different stack config.
 
 Multi-stack parameter model:
 
-| Parameter                   | First-stack default                                              | Must be overridable? | Notes                                                                                              |
-| --------------------------- | ---------------------------------------------------------------- | -------------------- | -------------------------------------------------------------------------------------------------- |
-| `stackName` / `environment` | `control`                                                        | Yes                  | Logical control-plane stack name. Use a different value for a second independent control plane.    |
-| `awsOrganizationId`         | unset until account is known                                     | Yes                  | Recorded as evidence; used to distinguish accounts in different AWS orgs.                          |
-| `awsAccountId`              | unset until account is known                                     | Yes                  | Required before AWS login checks can pass.                                                         |
-| `region`                    | `us-east-1`                                                      | Yes                  | Must match the Supabase project region for PrivateLink.                                            |
-| `domain`                    | required; no default                                             | Yes                  | Every stack must supply its own domain.                                                            |
-| `service`                   | `deploy`                                                         | Yes                  | Derives the public service hostname unless `serviceHost` is supplied.                              |
-| `authService`               | `auth`                                                           | Yes                  | Derives the public auth callback hostname unless `authHost` is supplied.                           |
-| `privateDbService`          | `db`                                                             | Yes                  | Derives the private database alias unless `privateDbHost` is supplied.                             |
-| `serviceHost`               | `<service>.<stackName>.<domain>`                                 | Yes                  | Public DNS name.                                                                                   |
-| `authHost`                  | `<authService>.<stackName>.<domain>`                             | Yes                  | Public DNS name.                                                                                   |
-| `privateDbHost`             | `<privateDbService>.<stackName>.<domain>`                        | Yes                  | Private hosted zone only.                                                                          |
-| `evidenceDir`               | `buck-out/aws-account/<stackName>-<domain>`                      | Yes                  | Must be unique per stack and account.                                                              |
-| `stateBucketName`           | `deployment-control-plane-<stack>-<domain-sanitized>-tofu-state` | Yes                  | Must be globally unique if S3-backed. Override if AWS bucket naming policy requires it.            |
-| `stateLockTableName`        | `deployment-control-plane-<stack>-<domain-sanitized>-tofu-locks` | Yes                  | Account-local DynamoDB table.                                                                      |
-| `backendStateKey`           | `aws-foundation/deployment-control-plane.tfstate`                | Yes                  | S3 key for the main foundation remote backend state.                                               |
-| `supabaseOrgId`             | unset until selected                                             | Yes                  | Required evidence for PrivateLink setup.                                                           |
-| `supabaseProjectRef`        | unset until selected                                             | Yes                  | Required evidence for PrivateLink setup.                                                           |
-| `supabaseRegion`            | selected AWS region                                              | Yes                  | Must match the AWS region used for the VPC and PrivateLink endpoint.                               |
-| `supabaseAccessTokenEnv`    | `SUPABASE_ACCESS_TOKEN`                                          | Yes                  | Fallback environment variable name only; the token value must never be written to config/evidence. |
-| `supabaseAccessToken`       | `secret://control-plane/supabase/management-api-token`           | Yes                  | Structured SprinkleRef ref for the Supabase Management API token; plaintext values are rejected.   |
-| `supabaseApiBaseUrl`        | `https://api.supabase.com`                                       | Yes                  | Override only for a reviewed Supabase API endpoint change or test harness.                         |
+| Parameter                   | First-stack default                                              | Must be overridable? | Notes                                                                                                                       |
+| --------------------------- | ---------------------------------------------------------------- | -------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| `stackName` / `environment` | `control`                                                        | Yes                  | Logical control-plane stack name. Use a different value for a second independent control plane.                             |
+| `awsOrganizationId`         | unset until account is known                                     | Yes                  | Recorded as evidence; used to distinguish accounts in different AWS orgs.                                                   |
+| `awsAccountId`              | unset until account is known                                     | Yes                  | Required before AWS login checks can pass.                                                                                  |
+| `region`                    | `us-east-1`                                                      | Yes                  | Must match the Supabase project region for PrivateLink.                                                                     |
+| `domain`                    | required; no default                                             | Yes                  | Every stack must supply its own domain.                                                                                     |
+| `service`                   | `deploy`                                                         | Yes                  | Derives the public service hostname unless `serviceHost` is supplied.                                                       |
+| `authService`               | `auth`                                                           | Yes                  | Derives the public auth callback hostname unless `authHost` is supplied.                                                    |
+| `privateDbService`          | `db`                                                             | Yes                  | Derives the private database alias unless `privateDbHost` is supplied.                                                      |
+| `serviceHost`               | `<service>.<stackName>.<domain>`                                 | Yes                  | Public DNS name.                                                                                                            |
+| `authHost`                  | `<authService>.<stackName>.<domain>`                             | Yes                  | Public DNS name.                                                                                                            |
+| `privateDbHost`             | `<privateDbService>.<stackName>.<domain>`                        | Yes                  | Private hosted zone only.                                                                                                   |
+| `evidenceDir`               | `buck-out/aws-account/<stackName>-<domain>`                      | Yes                  | Must be unique per stack and account.                                                                                       |
+| `stateBucketName`           | `deployment-control-plane-<stack>-<domain-sanitized>-tofu-state` | Yes                  | Must be globally unique if S3-backed. Override if AWS bucket naming policy requires it.                                     |
+| `stateLockTableName`        | `deployment-control-plane-<stack>-<domain-sanitized>-tofu-locks` | Yes                  | Account-local DynamoDB table.                                                                                               |
+| `backendStateKey`           | `aws-foundation/deployment-control-plane.tfstate`                | Yes                  | S3 key for the main foundation remote backend state.                                                                        |
+| `supabaseOrgId`             | unset until selected                                             | Yes                  | Required evidence for PrivateLink setup.                                                                                    |
+| `supabaseProjectRef`        | unset until selected                                             | Yes                  | Required evidence for PrivateLink setup.                                                                                    |
+| `supabaseRegion`            | selected AWS region                                              | Yes                  | Must match the AWS region used for the VPC and PrivateLink endpoint.                                                        |
+| `supabaseAccessTokenEnv`    | `SUPABASE_ACCESS_TOKEN`                                          | Yes                  | Fallback environment variable name only; the token value must never be written to config/evidence.                          |
+| `supabaseAccessToken`       | `secret://control-plane/supabase/management-api-token`           | Yes                  | Structured SprinkleRef ref with `category: "control"` for the Supabase Management API token; plaintext values are rejected. |
+| `supabaseApiBaseUrl`        | `https://api.supabase.com`                                       | Yes                  | Override only for a reviewed Supabase API endpoint change or test harness.                                                  |
 
 The guided command accepts flags, a generated canonical JSON stack config file, or an explicit JSON
 config file. Generate the canonical first-stack config with:
@@ -110,8 +110,10 @@ single setup run.
 
 `stack.json` is JSON-only. The aws-account command does not support TOML or YAML stack config
 files. When `config-init` runs without flags, `domain` is written as an empty scalar and private
-coordinates are written as structured refs: `awsAccountId`, `awsOrganizationId`, `supabaseOrgId`,
-`supabaseProjectRef`, and `supabaseAccessToken`. Optional
+coordinates are written as structured refs with explicit `category: "control"`: `awsAccountId`,
+`awsOrganizationId`, `supabaseOrgId`, `supabaseProjectRef`, and `supabaseAccessToken`. Non-secret
+account and Supabase coordinates use `config://...` refs; the Supabase Management API token remains
+a `secret://...` ref. Optional
 hardening fields, such as `expectedAwsRoleArn`, and fields with sensible defaults, such as
 `stackName`, `region`, service names, derived hostnames, evidence paths, state backend names,
 Supabase token env, and Supabase API base URL, are omitted unless an operator explicitly supplies a

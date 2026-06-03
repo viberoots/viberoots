@@ -142,10 +142,12 @@ test("starter configs are deterministic and contain no secret values", async () 
   assert.ok(written.some((file) => file.endsWith("ci.github.json")));
   assert.match(await fs.readFile(path.join(dir, "selected.json"), "utf8"), /local-file/);
   const selected = await readSprinkleRefConfig(path.join(dir, "selected.json"));
+  assert.equal(selected.defaultCategory, "control");
   const control = resolveSprinkleRefBackend(selected, "control");
   assert.equal(control.profile, "infisical-control");
   assert.equal(control.backend.backend, "infisical");
   assert.equal(control.backend.defaultEnvironment, "control");
+  assert.equal(resolveSprinkleRefBackend(selected).profile, "infisical-control");
 });
 
 test("CI resolver templates parse each bootstrap mapping without remote writes", async () => {

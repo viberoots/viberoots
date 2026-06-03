@@ -61,6 +61,7 @@ export async function resolveSupabaseAccessToken(
   try {
     const resolved = await resolveStackRef(deps.cwd || process.cwd(), tokenInput.ref, {
       category: tokenInput.category,
+      categoryExplicit: Boolean(tokenInput.category),
       secret: true,
       env,
     });

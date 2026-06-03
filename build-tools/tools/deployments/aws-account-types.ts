@@ -82,6 +82,7 @@ export type MissingConfigField = {
   valueHint: string;
   destination?: "stack-config" | "local-values-or-shared-resolver" | "bootstrap-category";
   ref?: string;
+  category?: string;
   note?: string;
 };
 

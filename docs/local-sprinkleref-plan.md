@@ -5,8 +5,9 @@ This plan implements the local and clone-specific resolution model described in
 
 Reviewed context:
 
-- `secret://...` remains the backend-neutral logical reference. Backend names and storage details
-  stay in SprinkleRef resolver config, not in logical refs.
+- `secret://...` remains the backend-neutral logical reference for true secrets. Non-secret
+  setup coordinates use `config://...`, and runtime-derived values may use `runtime://...`.
+  Backend names and storage details stay in SprinkleRef resolver config, not in logical refs.
 - `bootstrap` is an existing SprinkleRef category/lane for root credentials needed to access a
   primary secret manager such as Infisical or Vault. It is not a URI scheme and not a backend kind.
 - `macos-keychain`, `local-file`, `infisical`, and `vault` are backend kinds.
@@ -60,7 +61,7 @@ secret material out of plaintext local JSON and preserving the compact setup UX.
   - plain scalar inline values, such as `"domain": "example.com"`
   - explicit inline values, such as `"domain": { "value": "example.com" }`
   - SprinkleRef-backed values, such as
-    `"awsAccountId": { "ref": "secret://control-plane/aws/account-id" }`
+    `"awsAccountId": { "ref": "config://control-plane/aws/account-id" }`
 - Reject invalid stack field shapes:
   - objects containing both `value` and `ref`
   - empty refs for required values
@@ -80,9 +81,9 @@ secret material out of plaintext local JSON and preserving the compact setup UX.
 - Add one conventional gitignored local values file path:
   - `config/sprinkleref/local/values.json`
 - Add hierarchical local values lookup:
-  - `secret://control-plane/aws/account-id` maps to
+  - `config://control-plane/aws/account-id` maps to
     `values.control-plane.aws.account-id`
-  - `secret://control-plane/supabase/project-ref` maps to
+  - `config://control-plane/supabase/project-ref` maps to
     `values.control-plane.supabase.project-ref`
 - Treat the local values file as an implicit local-first resolver for stack refs so developers can
   share the same tracked selector config.
@@ -389,3 +390,133 @@ resolved coordinates while omitting the token write command for the selected/def
 
 It adds a small amount of metadata and CLI-output coupling that must stay aligned across check
 diagnostics, evidence JSON, docs, and tests.
+
+## PR-3: Control-plane category defaults and explicit category precedence
+
+### 1. Intent
+
+Close the remaining local SprinkleRef design-assessment gaps around control-plane setup ref category
+selection and ref schemes, so generated control-plane refs explicitly show the `control` category,
+non-secret values are not mislabeled as secrets, and explicit stack categories cannot be weakened by
+clone-local redirects.
+
+### 2. Scope of changes
+
+- Emit generated control-plane setup refs with explicit `category: "control"` instead of inferring
+  category from `control-plane` ref prefixes or resolver defaults.
+- Update `control-plane aws-account config-init` output, starter configs, missing-value guidance,
+  and setup docs so control-plane setup refs visibly use the `control` category.
+- Use `config://...` for non-secret configuration coordinates such as AWS account id, AWS
+  organization id, Supabase organization id, and Supabase project ref.
+- Reserve `secret://...` for true secrets such as `supabaseAccessToken`; use `runtime://...` for
+  runtime/environment-derived values if they are introduced in this setup path.
+- Keep explicit category overrides supported for generated control-plane setup refs:
+  - a stack value with `category: "bootstrap"` continues to resolve through `bootstrap`
+  - a stack value with another configured category resolves through that configured category
+  - missing or unknown categories still fail clearly
+- Harden stack-ref resolution so an explicit stack config category wins before local values
+  resolution where required, including `supabaseAccessToken` resolution.
+- Prevent a local values redirect object from overriding an explicit category declared on the stack
+  config value for the same ref.
+- Preserve local values redirects for stack refs that do not declare an explicit category; those
+  redirects may still provide their own `category` according to the PR-1 model.
+- Keep setup-shell environment fallback behavior unchanged for the Supabase Management API token.
+- Do not infer category from any `secret://...`, `config://...`, or `runtime://...` scheme/path
+  prefix, add a `bootstrap://` URI scheme, or remove existing `selected.local.json`
+  compatibility.
+
+### 3. External prerequisites
+
+- A configured `control` SprinkleRef category is required for generated control-plane setup refs
+  that are resolved remotely.
+- A configured `bootstrap` category is required only when the stack config explicitly selects
+  `category: "bootstrap"` or an allowed local redirect selects bootstrap for a ref without an
+  explicit stack category.
+
+### 4. Tests to be added
+
+- Add `config-init` tests proving generated control-plane setup refs include explicit
+  `category: "control"` and non-secret setup coordinates use `config://...`.
+- Add starter config or fixture tests proving docs/templates no longer hide generated
+  control-plane setup ref category selection behind `main` or prefix inference.
+- Add remote resolution tests proving a bare `config://control-plane/...` or
+  `secret://control-plane/...` stack ref does not infer `control` from its prefix, while generated
+  explicit `category: "control"` refs use the control lane.
+- Add override tests proving an explicit stack category such as `bootstrap` or another configured
+  category still wins over the `control` default.
+- Add hardening tests for `resolveSupabaseAccessToken` proving a stack config ref with
+  `category: "bootstrap"` resolves through bootstrap before local redirects can affect category
+  selection.
+- Add local values precedence tests proving a local redirect with its own category cannot override
+  an explicit stack category, while the same local redirect can still provide a category when the
+  stack ref has no explicit category.
+- Add negative tests proving unknown categories and malformed local redirect category overrides
+  still fail closed.
+
+### 5. Docs to be added or updated
+
+- Update [Local SprinkleRef Design](local-sprinkleref.md) if the final implementation needs sharper
+  wording for default category selection or explicit category hardening.
+- Update [SprinkleRef Resolver](sprinkleref.md) to document that generated control-plane setup refs
+  declare `category: "control"` explicitly unless a stack config value selects another category.
+- Update [AWS Account Control Plane And Remote Builds](aws-account-control-plane-and-remote-builds.md)
+  with corrected starter config examples, setup guidance, and category precedence examples for
+  `supabaseAccessToken`.
+- Update relevant `control-plane aws-account config-init`, `check`, and `sprinkleref` help text if
+  command output mentions default categories or local redirect precedence.
+
+### 5.5. Expected regression scope
+
+- `deployment-only`
+- Expected implementation paths:
+  - `build-tools/tools/deployments/aws-account.ts`
+  - `build-tools/tools/deployments/sprinkleref*.ts`
+  - `build-tools/tools/tests/deployments/aws-account-cli.test.ts`
+  - `build-tools/tools/tests/deployments/sprinkleref*.test.ts`
+  - `docs/**`
+  - reviewed starter config examples under `config/**`, if present
+- Keep changes narrowly focused on category defaults and precedence hardening.
+
+### 6. Acceptance criteria
+
+- Generated control-plane setup refs include explicit `category: "control"` and resolve through
+  that category unless the stack config explicitly selects another configured category.
+- Starter configs, docs, command help, and tests no longer teach hidden prefix-based or `main`
+  category selection for generated control-plane setup refs.
+- Missing-value output no longer labels non-secret setup coordinates as `secret://...`; it uses
+  `config://...` and shows the relevant category when known.
+- An explicit stack config category for `supabaseAccessToken` or another control-plane setup ref
+  cannot be overridden by `config/sprinkleref/local/values.json`.
+- Local redirect category selection still works for stack refs that have no explicit category.
+- Tests cover explicit generated category selection, absence of prefix-based category inference,
+  explicit category overrides, local redirect precedence, and failure cases for unknown or
+  malformed categories.
+
+### 7. Risks
+
+- Making generated stack config explicitly select `control` could surprise existing local setups
+  that implicitly relied on `main`.
+- Category precedence can be hard to diagnose if human output and evidence do not show the winning
+  category clearly.
+- Hardening explicit stack categories could make some existing local redirect shortcuts stop
+  working when they were masking a mismatched stack config.
+
+### 8. Mitigations
+
+- Keep the change scoped to generated control-plane setup refs and document the migration from
+  `main` to `control` in the setup docs.
+- Reuse the same resolved ref/category metadata in diagnostics and evidence so the winning category
+  is visible without printing secret values.
+- Add contrast tests that preserve local redirect category behavior when no explicit stack category
+  is present.
+
+### 9. Consequences of not implementing this PR
+
+Generated control-plane setup refs will continue resolving through the selected resolver default or
+starter-config `main` defaults instead of the design-specified `control` category, and explicit token
+stack categories can still be weakened by clone-local redirects.
+
+### 10. Downsides for implementing this PR
+
+It tightens category precedence in a way that may require local setup docs and diagnostics to be more
+explicit about which category is used for each control-plane setup ref.

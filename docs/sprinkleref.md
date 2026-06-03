@@ -1,7 +1,8 @@
 # SprinkleRef Resolver
 
-SprinkleRef stable refs stay backend-neutral. Use `secret://deployments/...` for the logical secret
-identity, then select the storage backend through a resolver config and optional category.
+SprinkleRef stable refs stay backend-neutral. Use `secret://deployments/...` for true secrets and
+`config://...` or `runtime://...` for non-secret declarations, then select the storage backend
+through a resolver config and optional category.
 
 Resolver configs live outside deployment metadata:
 
@@ -59,6 +60,9 @@ sprinkleref --update secret://control-plane/supabase/management-api-token --crea
 
 Add `--category bootstrap` only when the stack field or local value explicitly opts into the
 bootstrap category. It never writes a plaintext token placeholder.
+
+Generated AWS account setup refs declare `category: "control"` in stack config. Resolver code does
+not infer a category from `control-plane` ref prefixes.
 
 Resolver configs may define named backend profiles separately from categories. Profiles name backend
 instances/accounts, while categories name usage lanes:

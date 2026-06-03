@@ -2,18 +2,23 @@
   "schemaVersion": "aws-account-stack-config@1",
   "domain": "unfair.ly",
   "awsAccountId": {
-    "ref": "secret://control-plane/aws/account-id"
+    "ref": "config://control-plane/aws/account-id",
+    "category": "control"
   },
   "awsOrganizationId": {
-    "ref": "secret://control-plane/aws/organization-id"
+    "ref": "config://control-plane/aws/organization-id",
+    "category": "control"
   },
   "supabaseOrgId": {
-    "ref": "secret://control-plane/supabase/org-id"
+    "ref": "config://control-plane/supabase/org-id",
+    "category": "control"
   },
   "supabaseProjectRef": {
-    "ref": "secret://control-plane/supabase/project-ref"
+    "ref": "config://control-plane/supabase/project-ref",
+    "category": "control"
   },
   "supabaseAccessToken": {
-    "ref": "secret://control-plane/supabase/management-api-token"
+    "ref": "secret://control-plane/supabase/management-api-token",
+    "category": "control"
   }
 }

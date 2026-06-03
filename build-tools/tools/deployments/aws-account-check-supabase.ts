@@ -1,4 +1,5 @@
 import path from "node:path";
+import { CONTROL_PLANE_CONFIG_REFS } from "./aws-account-ref-schemes";
 import type { AwsAccountConfig, PhaseRecord, RunDeps } from "./aws-account-types";
 import {
   defaultHttpFetch,
@@ -28,7 +29,8 @@ export async function checkSupabase(
       field: "supabaseOrgId",
       valueHint: "<supabase-org-id>",
       destination: "local-values-or-shared-resolver",
-      ref: "secret://control-plane/supabase/org-id",
+      ref: CONTROL_PLANE_CONFIG_REFS.supabaseOrgId,
+      category: config.inputSources.supabaseOrgId?.category,
     });
   }
   if (!config.supabaseProjectRef) {
@@ -37,7 +39,8 @@ export async function checkSupabase(
       field: "supabaseProjectRef",
       valueHint: "<project-ref>",
       destination: "local-values-or-shared-resolver",
-      ref: "secret://control-plane/supabase/project-ref",
+      ref: CONTROL_PLANE_CONFIG_REFS.supabaseProjectRef,
+      category: config.inputSources.supabaseProjectRef?.category,
     });
   }
   if (config.supabaseRegion !== config.region) {
@@ -56,6 +59,10 @@ export async function checkSupabase(
       valueHint: '{ "ref": "secret://control-plane/supabase/management-api-token" }',
       destination: supabaseAccessTokenDestination(tokenResolution.metadata),
       ref: "secret://control-plane/supabase/management-api-token",
+      category:
+        typeof tokenResolution.metadata.category === "string"
+          ? tokenResolution.metadata.category
+          : undefined,
       note: `or export ${config.supabaseAccessTokenEnv}=<token> for this run; do not put token values in stack config, inputs.json, or evidence`,
     });
   }

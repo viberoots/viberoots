@@ -177,7 +177,10 @@ async function resolveConfigInput(
     if (!parsed.value && opts.fallback) return { value: opts.fallback, source: defaultSource() };
     return parsed;
   }
-  return await resolveStackRef(cwd, parsed.ref, { category: parsed.category });
+  return await resolveStackRef(cwd, parsed.ref, {
+    category: parsed.category,
+    categoryExplicit: Boolean(parsed.category),
+  });
 }
 
 async function resolveSecretInput(
