@@ -65,7 +65,9 @@ Add `--category bootstrap` only when the stack field or local value explicitly o
 bootstrap category. It never writes a plaintext token placeholder.
 
 Generated AWS account setup refs declare `category: "control"` in stack config. Resolver code does
-not infer a category from `control-plane` ref prefixes.
+not infer a category from `control-plane` ref prefixes. When a stack ref declares a category
+explicitly, that category wins over matching local scalar, `{ "value": ... }`, and redirect entries.
+Stack refs without an explicit category continue to use local values first.
 
 Resolver configs may define named backend profiles separately from categories. Profiles name backend
 instances/accounts, while categories name usage lanes:

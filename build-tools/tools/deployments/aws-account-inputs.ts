@@ -92,6 +92,7 @@ async function resolveLocalValue(
 ): Promise<StackInputResolution> {
   if (typeof raw === "string") {
     if (opts.secret) throw new Error(`${ref} must not be plaintext in ${LOCAL_VALUES_PATH}`);
+    if (opts.categoryExplicit) return await resolveRemoteRef(ref, opts);
     return {
       value: raw.trim() || undefined,
       source: localSource(cwd, ref, opts.secret),
@@ -106,6 +107,7 @@ async function resolveLocalValue(
   }
   if (Object.hasOwn(obj, "value")) {
     if (opts.secret) throw new Error(`${ref} must not be plaintext in ${LOCAL_VALUES_PATH}`);
+    if (opts.categoryExplicit) return await resolveRemoteRef(ref, opts);
     const value = obj.value;
     if (typeof value !== "string") throw new Error(`${ref} local value.value must be a string`);
     return { value: value.trim() || undefined, source: localSource(cwd, ref, opts.secret) };

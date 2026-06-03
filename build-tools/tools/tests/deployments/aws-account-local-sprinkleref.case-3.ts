@@ -98,6 +98,54 @@ test("aws-account arbitrary explicit stack categories override local redirects",
   });
 });
 
+test("aws-account explicit stack categories override local scalar and value entries", async () => {
+  await runInTemp("aws-account-explicit-category-over-local-values", async (tmp) => {
+    await writeStack(tmp, {
+      domain: "example.com",
+      awsAccountId: { ref: ACCOUNT_REF, category: "ops" },
+    });
+    await writeResolver(tmp, "main", {
+      main: {},
+      ops: { [ACCOUNT_REF]: "ops-id" },
+    });
+    await writeLocalValues(tmp, {
+      "control-plane": { aws: { "account-id": "local-id" } },
+    });
+    let config = await readAwsAccountConfig(tmp);
+    assert.equal(config.awsAccountId, "ops-id");
+    assert.equal(config.inputSources.awsAccountId.source, "sprinkleref");
+    await writeLocalValues(tmp, {
+      "control-plane": { aws: { "account-id": { value: "local-id" } } },
+    });
+    config = await readAwsAccountConfig(tmp);
+    assert.equal(config.awsAccountId, "ops-id");
+    assert.equal(config.inputSources.awsAccountId.category, "ops");
+  });
+});
+
+test("aws-account uncategorized stack refs remain local first for scalar and value entries", async () => {
+  await runInTemp("aws-account-uncategorized-local-values", async (tmp) => {
+    await writeStack(tmp, {
+      domain: "example.com",
+      awsAccountId: { ref: ACCOUNT_REF },
+    });
+    await writeResolver(tmp, "main", {
+      main: { [ACCOUNT_REF]: "remote-id" },
+    });
+    await writeLocalValues(tmp, {
+      "control-plane": { aws: { "account-id": "scalar-id" } },
+    });
+    let config = await readAwsAccountConfig(tmp);
+    assert.equal(config.awsAccountId, "scalar-id");
+    await writeLocalValues(tmp, {
+      "control-plane": { aws: { "account-id": { value: "object-id" } } },
+    });
+    config = await readAwsAccountConfig(tmp);
+    assert.equal(config.awsAccountId, "object-id");
+    assert.equal(config.inputSources.awsAccountId.source, "local-values");
+  });
+});
+
 test("aws-account local redirects cannot override explicit token category", async () => {
   await runInTemp("aws-account-explicit-token-category-hardening", async (tmp) => {
     await writeStack(tmp, {

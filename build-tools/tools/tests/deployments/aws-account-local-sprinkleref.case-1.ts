@@ -73,6 +73,20 @@ test("aws-account rejects plaintext secret-class stack and local values", async 
     await assert.rejects(
       () =>
         resolveStackRef(tmp, "secret://control-plane/supabase/management-api-token", {
+          category: "control",
+          categoryExplicit: true,
+          secret: true,
+        }),
+      /must not be plaintext/,
+    );
+    await writeLocalValues(tmp, {
+      "control-plane": { supabase: { "management-api-token": { value: "plain-token" } } },
+    });
+    await assert.rejects(
+      () =>
+        resolveStackRef(tmp, "secret://control-plane/supabase/management-api-token", {
+          category: "control",
+          categoryExplicit: true,
           secret: true,
         }),
       /must not be plaintext/,

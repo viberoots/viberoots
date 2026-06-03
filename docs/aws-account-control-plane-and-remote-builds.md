@@ -128,6 +128,10 @@ per-clone resolver changes. Ordinary clone-local coordinates belong in the gitig
 sprinkleref --init-local
 ```
 
+When a stack ref declares `category` explicitly, resolver category selection stays explicit:
+matching local scalar, `{ "value": ... }`, and redirect entries do not override that category.
+Local values remain local-first for stack refs that omit `category`.
+
 A local value can redirect a true secret to the configured bootstrap category:
 
 ```json

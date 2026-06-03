@@ -651,3 +651,108 @@ state that lacks the required AWS organization id.
 It adds another required missing-coordinate diagnostic and tightens bootstrap resolution in AWS
 account setup, which may require existing local fixtures and docs to become more explicit about
 their intended resolver category and organization id source.
+
+## PR-5: Explicit category precedence over local value entries
+
+### 1. Intent
+
+Close the remaining explicit-category precedence gap in local SprinkleRef resolution so an explicit
+stack category wins over every local value form, not only local redirect objects.
+
+### 2. Scope of changes
+
+- Update stack ref resolution so `categoryExplicit` prevents `config/sprinkleref/local/values.json`
+  scalar entries from satisfying the ref before the explicit category is resolved.
+- Apply the same explicit-category precedence to local `{ "value": ... }` entries, so local
+  non-secret values cannot bypass a stack config category such as `control`, `bootstrap`, or another
+  configured category.
+- Preserve the PR-3 behavior where local redirect objects cannot override an explicit stack
+  category for the same ref.
+- Preserve PR-1 local-first resolution for stack refs that do not declare an explicit category,
+  including scalar entries, `{ "value": ... }` entries, and redirect objects.
+- Keep true secret plaintext rejection unchanged for local scalar values and local `{ "value": ... }`
+  entries.
+- Do not change category defaults, generated stack config shape, bootstrap guard behavior, or
+  `selected.local.json` compatibility.
+
+### 3. External prerequisites
+
+- The explicit category named in stack config must already be configured in the selected
+  SprinkleRef resolver config.
+- Local value files remain clone-local and gitignored; this PR only changes when they are allowed
+  to satisfy an explicitly categorized stack ref.
+
+### 4. Tests to be added
+
+- Add regression tests proving an explicit stack category wins when
+  `config/sprinkleref/local/values.json` contains a matching non-secret scalar value.
+- Add regression tests proving an explicit stack category wins when the local file contains a
+  matching `{ "value": ... }` object.
+- Keep or extend existing local redirect precedence tests proving redirect objects cannot override
+  an explicit stack category.
+- Add contrast tests proving local scalar values and local `{ "value": ... }` entries still satisfy
+  stack refs that do not declare an explicit category.
+- Add secret-class contrast coverage proving plaintext local scalar and `{ "value": ... }` entries
+  are still rejected for true secrets rather than resolving locally or through the explicit category
+  path.
+
+### 5. Docs to be added or updated
+
+- Update [Local SprinkleRef Design](local-sprinkleref.md) if the explicit-category precedence rules
+  need clearer wording for scalar and `{ "value": ... }` local entries.
+- Update [SprinkleRef Resolver](sprinkleref.md) to state that explicit stack categories bypass all
+  local value forms for category selection, while uncategorized refs still use local-first
+  resolution.
+- Update [AWS Account Control Plane And Remote Builds](aws-account-control-plane-and-remote-builds.md)
+  if setup examples or troubleshooting text describe local values as overriding explicitly
+  categorized stack refs.
+
+### 5.5. Expected regression scope
+
+- `deployment-only`
+- Expected implementation paths:
+  - `build-tools/tools/deployments/aws-account.ts`
+  - `build-tools/tools/deployments/sprinkleref*.ts`
+  - `build-tools/tools/tests/deployments/aws-account-cli.test.ts`
+  - `build-tools/tools/tests/deployments/sprinkleref*.test.ts`
+  - `docs/**`
+- Keep changes narrowly focused on explicit category precedence over local scalar and value-object
+  entries.
+
+### 6. Acceptance criteria
+
+- A stack ref with an explicit category resolves through that category even when a matching local
+  scalar value exists.
+- A stack ref with an explicit category resolves through that category even when a matching local
+  `{ "value": ... }` entry exists.
+- Local redirect objects, local scalar values, and local `{ "value": ... }` entries cannot weaken or
+  bypass an explicit stack category.
+- Stack refs without an explicit category continue to use local-first resolution for all valid local
+  value forms.
+- Tests and docs cover scalar, `{ "value": ... }`, and redirect local value forms under explicit
+  and implicit category selection.
+
+### 7. Risks
+
+- Tightening explicit-category precedence could surprise local setups that expected local non-secret
+  values to override a generated explicit category.
+- The resolver could accidentally skip local values for uncategorized refs if the explicit-category
+  branch is applied too broadly.
+
+### 8. Mitigations
+
+- Gate the behavior only on the existing `categoryExplicit` signal passed into stack ref resolution.
+- Add contrast tests for uncategorized refs to preserve PR-1 local-first behavior.
+- Keep diagnostics and docs clear that local values are local-first only when the stack ref does not
+  select a category explicitly.
+
+### 9. Consequences of not implementing this PR
+
+Explicit stack categories can still be bypassed by matching non-secret local scalar values or local
+`{ "value": ... }` entries, leaving PR-3 category precedence incomplete and under-tested.
+
+### 10. Downsides for implementing this PR
+
+It slightly reduces local override convenience for explicitly categorized stack refs, requiring
+developers to change the stack category or resolver value instead of relying on a local scalar/value
+entry for those refs.

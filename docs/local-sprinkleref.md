@@ -288,17 +288,19 @@ For a stack field with an inline value:
 For a stack field with `{ "ref": "<scheme>://..." }`:
 
 1. CLI flag, when supplied.
-2. Conventional local values file at `config/sprinkleref/local/values.json`.
-3. If the local entry is scalar or `{ "value": ... }`, use it only when the requested field is not
+2. If the stack ref declares `category`, resolve through that category; local values do not satisfy
+   scalar, `{ "value": ... }`, or redirect entries for that ref.
+3. Conventional local values file at `config/sprinkleref/local/values.json`.
+4. If the local entry is scalar or `{ "value": ... }`, use it only when the requested field is not
    secret-class.
-4. If the local entry is `{ "ref": "<scheme>://...", "category": "<category>" }`, resolve the target
+5. If the local entry is `{ "ref": "<scheme>://...", "category": "<category>" }`, resolve the target
    ref through that category.
-5. If the local entry is `{ "ref": "<scheme>://..." }`, resolve the target ref through the current
+6. If the local entry is `{ "ref": "<scheme>://..." }`, resolve the target ref through the current
    category chain.
-6. If no local entry resolves, use the configured category/backend resolver, such as Infisical or
+7. If no local entry resolves, use the configured category/backend resolver, such as Infisical or
    Vault.
-7. Default, when the field has one.
-8. Missing/blocking.
+8. Default, when the field has one.
+9. Missing/blocking.
 
 For `supabaseAccessToken`:
 
@@ -318,7 +320,8 @@ evidence.
 Generated control-plane setup refs should declare `category: "control"` explicitly. Resolver code
 must not infer `control` from a `control-plane` ref prefix. A local redirect to
 `category: "bootstrap"` is an explicit clone-local decision to use the bootstrap lane for that one
-value only when the stack ref has no explicit category.
+value only when the stack ref has no explicit category. Local scalar and `{ "value": ... }` entries
+are also local-first only for stack refs without an explicit category.
 
 ## Developer Experience
 
