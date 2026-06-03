@@ -13,6 +13,7 @@ export type StackInputSource = {
   env?: string;
   localValuesPath?: string;
   backend?: string;
+  categoryExplicit?: boolean;
   valuePrinted: boolean;
 };
 
@@ -79,10 +80,7 @@ function inlineSource(secret = false): StackInputSource {
   return { source: "inline", valuePrinted: !secret };
 }
 
-function missingSource(
-  key: string,
-  opts: { secret?: boolean; required?: boolean },
-): StackInputResolution {
+function missingSource(key: string, opts: { secret?: boolean; required?: boolean }) {
   if (opts.required) throw new Error(`${key} is required`);
   return { source: { source: "missing", valuePrinted: !opts.secret } };
 }
@@ -132,9 +130,15 @@ async function resolveLocalValue(
   if (!targetRef) throw new Error(`${ref} local redirect requires ref`);
   assertSecretRef("local redirect", targetRef);
   const category = stringMember(obj, "category");
-  if (category) return await resolveRemoteRef(targetRef, { ...opts, category });
+  if (category) {
+    return localRedirectSource(
+      cwd,
+      targetRef,
+      await resolveRemoteRef(targetRef, { ...opts, category }),
+    );
+  }
   if (targetRef !== ref) return await resolveRef(cwd, targetRef, opts, seen);
-  return await resolveRemoteRef(targetRef, opts);
+  return localRedirectSource(cwd, targetRef, await resolveRemoteRef(targetRef, opts));
 }
 
 async function resolveRemoteRef(
@@ -159,6 +163,7 @@ async function resolveRemoteRef(
         ref,
         category: resolved.category,
         backend: store.describe(),
+        categoryExplicit: Boolean(opts.category),
         valuePrinted: !opts.secret,
       },
       error: value ? undefined : `${ref} is missing in SprinkleRef category ${resolved.category}`,
@@ -167,7 +172,13 @@ async function resolveRemoteRef(
     return {
       ref,
       category: opts.category,
-      source: { source: "missing", ref, category: opts.category, valuePrinted: false },
+      source: {
+        source: "missing",
+        ref,
+        category: opts.category,
+        categoryExplicit: Boolean(opts.category),
+        valuePrinted: false,
+      },
       error: String(error instanceof Error ? error.message : error),
     };
   }
@@ -185,10 +196,7 @@ async function selectedConfigPath(opts: { cwd: string; env?: NodeJS.ProcessEnv }
   return "";
 }
 
-async function readLocalValue(
-  cwd: string,
-  ref: string,
-): Promise<{ found: boolean; value?: unknown }> {
+async function readLocalValue(cwd: string, ref: string) {
   const file = path.resolve(cwd, LOCAL_VALUES_PATH);
   let parsed: unknown;
   try {
@@ -201,7 +209,7 @@ async function readLocalValue(
   }
   const root = parsed && typeof parsed === "object" ? (parsed as Record<string, unknown>) : {};
   let current: unknown = root.values;
-  for (const part of refPathParts(ref)) {
+  for (const part of ref.slice("secret://".length).split("/").filter(Boolean)) {
     if (!current || typeof current !== "object" || Array.isArray(current)) return { found: false };
     const obj = current as Record<string, unknown>;
     if (!Object.hasOwn(obj, part)) return { found: false };
@@ -210,16 +218,24 @@ async function readLocalValue(
   return { found: true, value: current };
 }
 
-function refPathParts(ref: string): string[] {
-  return ref.slice("secret://".length).split("/").filter(Boolean);
-}
-
 function localSource(cwd: string, ref: string, secret = false): StackInputSource {
   return {
     source: "local-values",
     ref,
     localValuesPath: path.resolve(cwd, LOCAL_VALUES_PATH),
     valuePrinted: !secret,
+  };
+}
+
+function localRedirectSource(cwd: string, ref: string, resolved: StackInputResolution) {
+  return {
+    ...resolved,
+    ref,
+    source: {
+      ...resolved.source,
+      ref,
+      localValuesPath: path.resolve(cwd, LOCAL_VALUES_PATH),
+    },
   };
 }
 

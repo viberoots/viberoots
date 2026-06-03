@@ -64,3 +64,30 @@ export async function fakeSupabaseFetch(url: string) {
     : { ref: "project-ref", region: "us-east-1", organization_id: "supabase-org" };
   return { ok: true, status: 200, text: async () => JSON.stringify(body) };
 }
+
+export async function runCheckForMissingToken(tmp: string): Promise<string> {
+  const out: string[] = [];
+  const previousExitCode = process.exitCode;
+  process.exitCode = undefined;
+  try {
+    await withControlPlaneArgv(
+      ["aws-account", "check", "--evidence-dir", path.join(tmp, "evidence-missing-token")],
+      () =>
+        runAwsAccountCommand({
+          cwd: tmp,
+          env: {},
+          now: () => new Date("2026-06-02T12:00:00.000Z"),
+          stdout: (text) => out.push(text),
+          toolResolver: (tool) => `/nix/store/fake-${tool}/bin/${tool}`,
+          commandRunner: async () => ({
+            stdout: JSON.stringify({ Account: "123456789012" }),
+            stderr: "",
+          }),
+        }),
+    );
+    assert.equal(process.exitCode, 2);
+    return out.join("\n");
+  } finally {
+    process.exitCode = previousExitCode;
+  }
+}

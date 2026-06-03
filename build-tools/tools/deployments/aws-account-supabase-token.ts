@@ -89,6 +89,7 @@ export async function resolveSupabaseAccessToken(
         source: "sprinkleref",
         ref: tokenInput.ref,
         category: tokenInput.category,
+        categoryExplicit: Boolean(tokenInput.category),
         secretValuePrinted: false,
         valuePrinted: false,
       },

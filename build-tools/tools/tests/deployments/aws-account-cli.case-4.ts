@@ -90,7 +90,8 @@ test("aws-account check explains where missing Supabase values belong", async ()
     }
     assert.ok(out[0]?.includes("  BLOCKED check-supabase"));
     assert.ok(out[0]?.includes("Missing Values"));
-    assert.ok(out[0]?.includes("Local values or shared resolver:"));
+    assert.ok(out[0]?.includes("Local values or shared resolver refs:"));
+    assert.ok(out[0]?.includes("action: fill local values or write the ref in SprinkleRef"));
     assert.ok(out[0]?.includes("ref: secret://control-plane/supabase/org-id"));
     assert.equal(out[0]?.includes("passed with --config"), false);
     assert.ok(out[0]?.includes("ref: secret://control-plane/supabase/project-ref"));

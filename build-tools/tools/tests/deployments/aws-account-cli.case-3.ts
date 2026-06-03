@@ -40,9 +40,10 @@ test("aws-account check canonical config guidance points back to stack.json", as
         process.exitCode = previousExitCode;
       }
       assert.ok(out[0]?.includes("Missing Values"));
-      assert.ok(out[0]?.includes("Local values or shared resolver:"));
-      assert.ok(out[0]?.includes("Shared resolver:\n      selected SprinkleRef"));
+      assert.ok(out[0]?.includes("Local values or shared resolver refs:"));
+      assert.equal(out[0]?.includes("selected SprinkleRef default/category chain"), false);
       assert.ok(out[0]?.includes("ref: secret://control-plane/aws/account-id"));
+      assert.ok(out[0]?.includes("action: fill local values or write the ref in SprinkleRef"));
       assert.ok(out[0]?.includes("ref: secret://control-plane/supabase/org-id"));
       assert.ok(out[0]?.includes("ref: secret://control-plane/supabase/project-ref"));
       assert.equal(out[0]?.includes("Bootstrap category:"), false);

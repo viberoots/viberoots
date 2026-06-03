@@ -48,9 +48,17 @@ default so managed deployment bootstrap outputs can be created after repo setup.
 `deployment --target <buck-target>`.
 
 `config/sprinkleref/local/values.json` is the conventional gitignored clone-local values file.
-`sprinkleref --init-local` creates or updates it with placeholders for private coordinates and a
-bootstrap redirect object for `secret://control-plane/supabase/management-api-token`. It never writes
-a plaintext token placeholder.
+`sprinkleref --init-local` creates or updates it with empty placeholders for private coordinates and
+a non-plaintext ref object for `secret://control-plane/supabase/management-api-token`. Empty
+coordinate placeholders remain unresolved until filled. The command also prints the normal token
+write command for the selected/default resolver:
+
+```bash
+sprinkleref --update secret://control-plane/supabase/management-api-token --create-missing
+```
+
+Add `--category bootstrap` only when the stack field or local value explicitly opts into the
+bootstrap category. It never writes a plaintext token placeholder.
 
 Resolver configs may define named backend profiles separately from categories. Profiles name backend
 instances/accounts, while categories name usage lanes:

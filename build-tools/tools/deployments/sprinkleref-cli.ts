@@ -77,7 +77,17 @@ export async function runSprinkleRefCli(deps: SprinkleRefCliDeps) {
   if (readFlagBoolFromTokens("help", deps.argv)) return out(sprinklerefUsage());
   if (readFlagBoolFromTokens("init-local", deps.argv)) {
     const written = await initLocalSprinkleRefValues(process.cwd());
-    return out(JSON.stringify({ written }, null, 2));
+    return out(
+      JSON.stringify(
+        {
+          written,
+          nextCommand:
+            "sprinkleref --update secret://control-plane/supabase/management-api-token --create-missing",
+        },
+        null,
+        2,
+      ),
+    );
   }
   if (readFlagBoolFromTokens("check", deps.argv) || readFlagBoolFromTokens("all", deps.argv)) {
     const exitCode = await runSprinkleRefCheck(deps);

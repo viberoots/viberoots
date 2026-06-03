@@ -109,13 +109,12 @@ function mergeLocalValueDefaults(existing: Record<string, unknown>) {
   const control = objectChild(values, "control-plane");
   const aws = objectChild(control, "aws");
   const supabase = objectChild(control, "supabase");
-  aws["account-id"] ??= "<aws-account-id>";
-  aws["organization-id"] ??= "<aws-organization-id>";
-  supabase["org-id"] ??= "<supabase-org-id>";
-  supabase["project-ref"] ??= "<supabase-project-ref>";
+  aws["account-id"] ??= "";
+  aws["organization-id"] ??= "";
+  supabase["org-id"] ??= "";
+  supabase["project-ref"] ??= "";
   supabase["management-api-token"] ??= {
     ref: "secret://control-plane/supabase/management-api-token",
-    category: "bootstrap",
   };
   return root;
 }

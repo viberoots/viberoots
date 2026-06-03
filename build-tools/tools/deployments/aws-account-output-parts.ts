@@ -16,19 +16,17 @@ export function formatMissingDestinations(fields: MissingConfigField[]): string[
     (field) => (field.destination || "stack-config") === "local-values-or-shared-resolver",
   );
   if (localOrShared.length > 0) {
-    lines.push(
-      "  Local values or shared resolver:",
-      "    Local file:",
-      `      ${LOCAL_VALUES_PATH}`,
-      "    Shared resolver:",
-      "      selected SprinkleRef default/category chain",
-    );
-    for (const field of localOrShared) lines.push(...formatMissingField(field));
+    lines.push("  Local values or shared resolver refs:", `    Local file: ${LOCAL_VALUES_PATH}`);
+    for (const field of localOrShared) {
+      lines.push(...formatMissingField(field, "fill local values or write the ref in SprinkleRef"));
+    }
   }
   const bootstrap = fields.filter((field) => field.destination === "bootstrap-category");
   if (bootstrap.length > 0) {
     lines.push("  Bootstrap category:");
-    for (const field of bootstrap) lines.push(...formatMissingField(field));
+    for (const field of bootstrap) {
+      lines.push(...formatMissingField(field, "write the ref in the bootstrap category"));
+    }
   }
   const stackConfig = fields.filter(
     (field) => !field.destination || field.destination === "stack-config",
@@ -50,9 +48,10 @@ export function formatMissingDestinations(fields: MissingConfigField[]): string[
   return lines;
 }
 
-function formatMissingField(field: MissingConfigField): string[] {
+function formatMissingField(field: MissingConfigField, action?: string): string[] {
   const lines = [`    ${field.field}:`];
   if (field.ref) lines.push(...wrapText(field.ref, 6, "ref: "));
+  if (action) lines.push(...wrapText(action, 6, "action: "));
   const hint = field.valueHint.trim().startsWith("{") ? field.valueHint : field.valueHint;
   if (hint && (!field.ref || !hint.includes(field.ref))) {
     lines.push(...wrapText(hint, 6, "value: "));

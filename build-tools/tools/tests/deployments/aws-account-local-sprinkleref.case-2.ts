@@ -8,6 +8,7 @@ import {
   readSupabaseEvidence,
   resolveStackRef,
   runAwsAccountCommand,
+  runCheckForMissingToken,
   runInTemp,
   runSprinkleRefCli,
   test,
@@ -48,6 +49,113 @@ test("aws-account resolver handles remote fallback and unknown redirect categori
     const chained = await resolveStackRef(tmp, ref);
     assert.equal(chained.value, "local-org");
     assert.equal(chained.source.source, "local-values");
+  });
+});
+
+test("aws-account check points missing bootstrap token refs at bootstrap category", async () => {
+  await runInTemp("aws-account-missing-bootstrap-token", async (tmp) => {
+    const ref = "secret://control-plane/supabase/management-api-token";
+    await writeStack(tmp, {
+      domain: "example.com",
+      awsAccountId: "123456789012",
+      supabaseOrgId: "supabase-org",
+      supabaseProjectRef: "project-ref",
+      supabaseAccessToken: { ref, category: "bootstrap" },
+    });
+    await writeJson(path.join(tmp, "config/sprinkleref/selected.json"), {
+      version: 1,
+      defaultCategory: "control",
+      categories: {
+        control: { backend: "local-file", file: path.join(tmp, ".local/control.json") },
+        bootstrap: { backend: "local-file", file: path.join(tmp, ".local/bootstrap.json") },
+      },
+    });
+    const out = await runCheckForMissingToken(tmp);
+    assert.match(out, /BLOCKED check-supabase/);
+    assert.match(out, /Missing Values\n  Bootstrap category:/);
+    assert.doesNotMatch(out, /Local values or shared resolver refs:[\s\S]*supabaseAccessToken/);
+  });
+});
+
+test("aws-account check points missing local bootstrap redirects at bootstrap category", async () => {
+  await runInTemp("aws-account-missing-bootstrap-token-redirect", async (tmp) => {
+    const ref = "secret://control-plane/supabase/management-api-token";
+    await writeStack(tmp, {
+      domain: "example.com",
+      awsAccountId: "123456789012",
+      supabaseOrgId: "supabase-org",
+      supabaseProjectRef: "project-ref",
+      supabaseAccessToken: { ref },
+    });
+    await writeJson(path.join(tmp, "config/sprinkleref/selected.json"), {
+      version: 1,
+      defaultCategory: "control",
+      categories: {
+        control: { backend: "local-file", file: path.join(tmp, ".local/control.json") },
+        bootstrap: { backend: "local-file", file: path.join(tmp, ".local/bootstrap.json") },
+      },
+    });
+    await writeLocalValues(tmp, {
+      "control-plane": { supabase: { "management-api-token": { ref, category: "bootstrap" } } },
+    });
+    const out = await runCheckForMissingToken(tmp);
+    assert.match(out, /Missing Values\n  Bootstrap category:/);
+    const evidence = await readSupabaseEvidence(path.join(tmp, "evidence-missing-token"));
+    assert.equal(evidence.supabaseAccessToken.source, "missing");
+    assert.equal(evidence.supabaseAccessToken.ref, ref);
+    assert.equal(evidence.supabaseAccessToken.category, "bootstrap");
+    assert.match(
+      evidence.supabaseAccessToken.localValuesPath,
+      /config\/sprinkleref\/local\/values\.json$/,
+    );
+    assert.match(evidence.supabaseAccessToken.backend, /local-file/);
+    assert.equal(evidence.supabaseAccessToken.valuePrinted, false);
+  });
+});
+
+test("aws-account check keeps non-bootstrap missing token refs on resolver guidance", async () => {
+  await runInTemp("aws-account-missing-control-token", async (tmp) => {
+    const ref = "secret://control-plane/supabase/management-api-token";
+    await writeStack(tmp, {
+      domain: "example.com",
+      awsAccountId: "123456789012",
+      supabaseOrgId: "supabase-org",
+      supabaseProjectRef: "project-ref",
+      supabaseAccessToken: { ref },
+    });
+    await writeRemote(tmp, "control", {});
+    await writeLocalValues(tmp, {
+      "control-plane": { supabase: { "management-api-token": { ref } } },
+    });
+    const out = await runCheckForMissingToken(tmp);
+    assert.match(out, /Local values or shared resolver refs:[\s\S]*supabaseAccessToken/);
+    assert.doesNotMatch(out, /Bootstrap category:[\s\S]*supabaseAccessToken/);
+    const evidence = await readSupabaseEvidence(path.join(tmp, "evidence-missing-token"));
+    assert.equal(evidence.supabaseAccessToken.category, "control");
+    assert.match(
+      evidence.supabaseAccessToken.localValuesPath,
+      /config\/sprinkleref\/local\/values\.json$/,
+    );
+  });
+});
+
+test("aws-account check ignores default bootstrap category for token guidance", async () => {
+  await runInTemp("aws-account-default-bootstrap-token-guidance", async (tmp) => {
+    const ref = "secret://control-plane/supabase/management-api-token";
+    await writeStack(tmp, {
+      domain: "example.com",
+      awsAccountId: "123456789012",
+      supabaseOrgId: "supabase-org",
+      supabaseProjectRef: "project-ref",
+      supabaseAccessToken: { ref },
+    });
+    await writeRemote(tmp, "bootstrap", {});
+    const out = await runCheckForMissingToken(tmp);
+    assert.match(out, /Local values or shared resolver refs:[\s\S]*supabaseAccessToken/);
+    assert.doesNotMatch(out, /Bootstrap category:[\s\S]*supabaseAccessToken/);
+    const evidence = await readSupabaseEvidence(path.join(tmp, "evidence-missing-token"));
+    assert.equal(evidence.supabaseAccessToken.category, "bootstrap");
+    assert.equal(evidence.supabaseAccessToken.categoryExplicit, false);
   });
 });
 
@@ -118,10 +226,17 @@ test("sprinkleref --init-local preserves values and writes no plaintext token", 
       );
       assert.match(out[0] || "", /config\/sprinkleref\/local\/values\.json/);
       assert.equal(values.values["control-plane"].aws["account-id"], "kept");
-      assert.equal(
-        values.values["control-plane"].supabase["management-api-token"].category,
-        "bootstrap",
+      assert.equal(values.values["control-plane"].aws["organization-id"], "");
+      assert.equal(values.values["control-plane"].supabase["org-id"], "");
+      assert.equal(values.values["control-plane"].supabase["project-ref"], "");
+      assert.deepEqual(values.values["control-plane"].supabase["management-api-token"], {
+        ref: "secret://control-plane/supabase/management-api-token",
+      });
+      assert.match(
+        out.join("\n"),
+        /"nextCommand": "sprinkleref --update secret:\/\/control-plane\/supabase\/management-api-token --create-missing"/,
       );
+      assert.doesNotMatch(out.join("\n"), /optionalBootstrapCommand|--category bootstrap/);
       assert.doesNotMatch(JSON.stringify(values), /token-value|plain-token/);
     } finally {
       process.chdir(cwd);

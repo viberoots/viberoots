@@ -116,13 +116,15 @@ secret material out of plaintext local JSON and preserving the compact setup UX.
   ownership and flag-oriented CLI style, so it writes or updates
   `config/sprinkleref/local/values.json` with:
   - placeholders for private coordinates
-  - redirect objects for secret-class refs that should use `category: "bootstrap"`
+  - non-plaintext ref objects for secret-class refs, with `category: "bootstrap"` only when a
+    clone explicitly opts into bootstrap
   - no plaintext secret placeholders that encourage token values in JSON
 - Do not add a parallel `control-plane sprinkleref` command. `control-plane aws-account config-init`
   owns AWS account stack config generation; `sprinkleref` owns resolver config, local values, and
   secret add/update/remove operations.
-- Keep bootstrap secret writes on existing SprinkleRef add/update semantics, for example
-  `sprinkleref --update secret://control-plane/supabase/management-api-token --category bootstrap --create-missing`,
+- Keep secret writes on existing SprinkleRef add/update semantics, for example
+  `sprinkleref --update secret://control-plane/supabase/management-api-token --create-missing`;
+  add `--category bootstrap` only for explicit bootstrap opt-in,
   instead of inventing a new `set` verb.
 - Ensure `.gitignore` or the repo-local ignore policy excludes `config/sprinkleref/local/`.
 - Update `control-plane aws-account check` output to remain compact and source-aware:
@@ -265,3 +267,125 @@ private deployment values in the wrong place.
 
 It adds a richer config value grammar, local values resolution, and redirect semantics that must be
 kept consistent across docs, command output, and evidence.
+
+## PR-2: Local bootstrap redirect classification and init-local follow-ups
+
+### 1. Intent
+
+Close the remaining local SprinkleRef implementation gaps found by the completed end-of-range plan
+and design assessments, so bootstrap token guidance, local redirect source metadata, and
+`sprinkleref --init-local` behavior match the reviewed design.
+
+### 2. Scope of changes
+
+- Update `control-plane aws-account check` missing-value classification so a missing
+  `supabaseAccessToken` is reported as a bootstrap-category action when the token stack field or
+  local redirect resolves through `category: "bootstrap"`, instead of always reporting
+  `local-values-or-shared-resolver`.
+- Preserve local redirect origin metadata for `{ "ref": "...", "category": "..." }` entries loaded
+  from `config/sprinkleref/local/values.json`:
+  - retain the local values file path as the source path
+  - report the redirected ref
+  - report the redirect category
+  - report the backend used by the redirected resolution when available
+  - keep `valuePrinted: false` for true secrets
+- Update `sprinkleref --init-local` so generated local coordinate placeholders are empty values, not
+  non-empty placeholder strings that count as resolved values.
+- Update `sprinkleref --init-local` output to print the next command required to write the
+  Supabase Management API token to the selected/default resolver, using the existing update
+  semantics:
+  `sprinkleref --update secret://control-plane/supabase/management-api-token --create-missing`.
+  The default init-local output must not print bootstrap token guidance.
+- Keep true secret handling unchanged: `sprinkleref --init-local` must not write plaintext secret
+  values into `config/sprinkleref/local/values.json`.
+- Do not start broader resolver migration work, remove `selected.local.json` compatibility, or add a
+  new `bootstrap://` URI scheme.
+
+### 3. External prerequisites
+
+- A configured `bootstrap` SprinkleRef category is required only when the operator explicitly opts
+  the token ref into `category: "bootstrap"`.
+- The selected bootstrap backend requirements, such as macOS Keychain availability on macOS, remain
+  unchanged from PR-1.
+
+### 4. Tests to be added
+
+- Add `check` tests proving a missing `supabaseAccessToken` is classified as bootstrap when its
+  structured ref or local redirect includes `category: "bootstrap"`.
+- Add negative or contrast coverage proving non-bootstrap missing refs still use the local-values or
+  shared resolver guidance.
+- Add JSON evidence tests proving local redirects preserve the
+  `config/sprinkleref/local/values.json` source path while also reporting ref, category, backend,
+  and `valuePrinted: false` for secret-class values.
+- Add `sprinkleref --init-local` tests proving generated local coordinate placeholders are empty and
+  therefore still treated as unresolved until the developer fills them.
+- Add `sprinkleref --init-local` CLI-output tests proving the default token update command is
+  printed without a category and bootstrap command guidance is absent by default.
+- Keep existing redaction tests passing for true secrets and add focused regression coverage if the
+  metadata changes alter evidence output.
+
+### 5. Docs to be added or updated
+
+- Update [Local SprinkleRef Design](local-sprinkleref.md) if any command text or placeholder wording
+  needs to be clarified after implementation.
+- Update [SprinkleRef Resolver](sprinkleref.md) to show empty local coordinate placeholders and the
+  default token update command emitted by `sprinkleref --init-local`.
+- Update [AWS Account Control Plane And Remote Builds](aws-account-control-plane-and-remote-builds.md)
+  if check guidance or evidence metadata examples include the stale
+  `local-values-or-shared-resolver` classification for bootstrap token refs.
+- Update relevant `sprinkleref --help` or `control-plane aws-account check` help text if the
+  user-facing command output changes.
+
+### 5.5. Expected regression scope
+
+- `deployment-only`
+- Expected implementation paths:
+  - `build-tools/tools/deployments/aws-account.ts`
+  - `build-tools/tools/deployments/sprinkleref*.ts`
+  - `build-tools/tools/tests/deployments/aws-account-cli.test.ts`
+  - `build-tools/tools/tests/deployments/sprinkleref*.test.ts`
+  - `docs/**`
+- Keep changes narrowly focused on assessment follow-ups and avoid unrelated resolver or AWS account
+  setup refactors.
+
+### 6. Acceptance criteria
+
+- Missing bootstrap Supabase Management API token guidance points developers to the bootstrap
+  category whenever the unresolved token ref resolves through `category: "bootstrap"`.
+- JSON evidence for local redirects preserves both the local values source path and redirected
+  SprinkleRef metadata without printing true secret values.
+- `sprinkleref --init-local` writes empty coordinate placeholders that remain visibly unresolved
+  until filled by the developer.
+- `sprinkleref --init-local` prints the default token write command using
+  `sprinkleref --update ... --create-missing` and does not print bootstrap command guidance by
+  default.
+- Tests and docs cover the four assessment findings without expanding the PR into unrelated
+  implementation work.
+
+### 7. Risks
+
+- Bootstrap classification could become inconsistent between human check output and JSON evidence.
+- Empty placeholders could be mistaken for intentionally blank coordinates if diagnostics are not
+  clear.
+- Preserving both local source and redirected backend metadata could make evidence shape more complex
+  than callers expect.
+
+### 8. Mitigations
+
+- Drive bootstrap classification from the same resolved ref/category metadata used for source
+  evidence.
+- Keep empty placeholders paired with check output that treats them as missing required values.
+- Add focused evidence-shape regression tests for local redirects that include source path, ref,
+  category, backend, and redaction fields together.
+
+### 9. Consequences of not implementing this PR
+
+Fresh local setup will continue to produce misleading bootstrap-token guidance, local redirect
+evidence will obscure that values originated in `config/sprinkleref/local/values.json`, and
+`sprinkleref --init-local` will continue generating placeholders that can be mistaken for real
+resolved coordinates while omitting the token write command for the selected/default resolver.
+
+### 10. Downsides for implementing this PR
+
+It adds a small amount of metadata and CLI-output coupling that must stay aligned across check
+diagnostics, evidence JSON, docs, and tests.

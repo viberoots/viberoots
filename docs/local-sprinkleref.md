@@ -288,10 +288,13 @@ For a stack field with `{ "ref": "secret://..." }`:
 For `supabaseAccessToken`:
 
 1. Explicit setup-shell env var, when supplied.
-2. Stack config `{ "ref": "secret://control-plane/supabase/management-api-token" }`.
-3. Local values redirect to `category: "bootstrap"`, when present.
-4. Configured remote resolver, when present.
-5. Missing/blocking.
+2. Stack config `{ "ref": "secret://control-plane/supabase/management-api-token" }`; if it
+   includes `category: "bootstrap"`, resolve through bootstrap.
+3. Local values redirect without a category, resolved through the selected/default category chain,
+   when present.
+4. Local values redirect to `category: "bootstrap"`, only when explicitly chosen.
+5. Configured remote resolver, when present.
+6. Missing/blocking.
 
 The token value must never be printed or written into stack config, local values, inputs, or
 evidence.
@@ -320,10 +323,12 @@ control-plane aws-account config-init
 sprinkleref --init-local
 sprinkleref \
   --update secret://control-plane/supabase/management-api-token \
-  --category bootstrap \
   --create-missing
 control-plane aws-account check
 ```
+
+Add `--category bootstrap` only when the stack config or clone-local value explicitly chooses
+`category: "bootstrap"` for the token ref.
 
 `sprinkleref --init-local` should write or update:
 
@@ -346,8 +351,7 @@ with placeholders for non-secret/private coordinates and redirect objects for se
         "org-id": "",
         "project-ref": "",
         "management-api-token": {
-          "ref": "secret://control-plane/supabase/management-api-token",
-          "category": "bootstrap"
+          "ref": "secret://control-plane/supabase/management-api-token"
         }
       }
     }
@@ -355,8 +359,11 @@ with placeholders for non-secret/private coordinates and redirect objects for se
 }
 ```
 
-The command should print the `sprinkleref --update ... --category bootstrap --create-missing`
-command for the secret instead of asking the developer to put the token into JSON.
+The command should print the
+`sprinkleref --update secret://control-plane/supabase/management-api-token --create-missing`
+command for the secret instead of asking the developer to put the token into JSON. It should not
+print bootstrap token guidance unless a future command mode explicitly initializes a
+`category: "bootstrap"` local token redirect.
 
 ## Check Output
 
@@ -365,10 +372,18 @@ command for the secret instead of asking the developer to put the token into JSO
 ```text
 Stack Config
   Missing:
-    awsAccountId                  config/sprinkleref/local/values.json or control resolver
-    supabaseOrgId                 config/sprinkleref/local/values.json or control resolver
-    supabaseProjectRef            config/sprinkleref/local/values.json or control resolver
-    supabaseAccessToken           bootstrap category or control resolver
+    awsAccountId
+      ref: secret://control-plane/aws/account-id
+      action: fill config/sprinkleref/local/values.json or write the ref in SprinkleRef
+    supabaseOrgId
+      ref: secret://control-plane/supabase/org-id
+      action: fill config/sprinkleref/local/values.json or write the ref in SprinkleRef
+    supabaseProjectRef
+      ref: secret://control-plane/supabase/project-ref
+      action: fill config/sprinkleref/local/values.json or write the ref in SprinkleRef
+    supabaseAccessToken
+      ref: secret://control-plane/supabase/management-api-token
+      action: fill config/sprinkleref/local/values.json or write the ref in SprinkleRef
 
 Resolved:
     domain                        inline
@@ -395,6 +410,14 @@ Example:
     },
     "supabaseAccessToken": {
       "source": "sprinkleref",
+      "ref": "secret://control-plane/supabase/management-api-token",
+      "category": "control",
+      "backend": "infisical",
+      "valuePrinted": false
+    },
+    "supabaseAccessTokenBootstrapRedirect": {
+      "source": "sprinkleref",
+      "localValuesPath": "config/sprinkleref/local/values.json",
       "ref": "secret://control-plane/supabase/management-api-token",
       "category": "bootstrap",
       "backend": "macos-keychain",

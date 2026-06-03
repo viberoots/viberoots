@@ -130,7 +130,14 @@ test("aws-account resolves secret local redirect through bootstrap category", as
       /supabaseAccessToken: SprinkleRef \(redacted\)\n(?:.*\n)*    category: bootstrap/,
     );
     const evidence = await readSupabaseEvidence(evidenceDir);
+    assert.equal(evidence.supabaseAccessToken.source, "sprinkleref");
+    assert.equal(evidence.supabaseAccessToken.ref, ref);
     assert.equal(evidence.supabaseAccessToken.category, "bootstrap");
+    assert.match(
+      evidence.supabaseAccessToken.localValuesPath,
+      /config\/sprinkleref\/local\/values\.json$/,
+    );
+    assert.match(evidence.supabaseAccessToken.backend, /local-file/);
     assert.equal(evidence.supabaseAccessToken.valuePrinted, false);
     assert.doesNotMatch(JSON.stringify(evidence), /test-token/);
   });

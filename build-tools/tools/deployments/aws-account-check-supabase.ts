@@ -54,7 +54,7 @@ export async function checkSupabase(
     missingConfigFields.push({
       field: "supabaseAccessToken",
       valueHint: '{ "ref": "secret://control-plane/supabase/management-api-token" }',
-      destination: "local-values-or-shared-resolver",
+      destination: supabaseAccessTokenDestination(tokenResolution.metadata),
       ref: "secret://control-plane/supabase/management-api-token",
       note: `or export ${config.supabaseAccessTokenEnv}=<token> for this run; do not put token values in stack config, inputs.json, or evidence`,
     });
@@ -184,4 +184,12 @@ export async function checkSupabase(
     checkedAt: now,
     resolvedInputSources: { supabaseAccessToken: tokenSource(tokenResolution.metadata) },
   };
+}
+
+function supabaseAccessTokenDestination(
+  metadata: Record<string, unknown>,
+): "bootstrap-category" | "local-values-or-shared-resolver" {
+  return metadata.category === "bootstrap" && metadata.categoryExplicit === true
+    ? "bootstrap-category"
+    : "local-values-or-shared-resolver";
 }
