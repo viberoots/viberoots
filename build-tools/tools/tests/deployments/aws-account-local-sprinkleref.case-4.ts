@@ -54,7 +54,9 @@ test("aws-account uncategorized stack refs allow different-ref local redirects",
     });
     const config = await readAwsAccountConfig(tmp);
     assert.equal(config.awsAccountId, "main-org-id");
-    assert.equal(config.inputSources.awsAccountId.ref, ORG_REF);
+    assert.equal(config.inputSources.awsAccountId.ref, ACCOUNT_REF);
+    assert.equal(config.inputSources.awsAccountId.redirectRef, ORG_REF);
+    assert.equal(config.inputSources.awsAccountId.redirectSource?.ref, ORG_REF);
     assert.equal(config.inputSources.awsAccountId.category, "main");
     assert.equal(config.inputSources.awsAccountId.categoryExplicit, false);
   });

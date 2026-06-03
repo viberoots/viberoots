@@ -964,3 +964,108 @@ missing local values.
 It further limits local redirect convenience for explicitly categorized stack refs and turns some
 previously tolerated malformed local files into resolver errors, but keeps both changes aligned with
 the documented explicit-category and init-local validation contracts.
+
+## PR-8: Source-specific local values evidence paths
+
+### 1. Intent
+
+Close the remaining local values evidence gap by recording and exposing the resolved hierarchical
+local values path used for each local value, so evidence can distinguish the local file source from
+the exact `values.*` entry that resolved the stack input.
+
+### 2. Scope of changes
+
+- Extend local values resolution metadata so evidence includes the resolved local hierarchical path,
+  such as `values.control-plane.aws.account-id`, when a stack input is resolved from
+  `config/sprinkleref/local/values.json`.
+- Preserve existing evidence fields including `source`, `ref`, `localValuesPath`, and
+  `valuePrinted`.
+- Keep redaction behavior unchanged for secrets and preserve existing source metadata for inline,
+  default, local-values, and shared SprinkleRef resolver sources.
+- Record the resolved local hierarchical path for scalar local entries.
+- Record the resolved local hierarchical path for local `{ "value": ... }` entries.
+- Record the applicable local hierarchical path for redirect entries, preserving both local-source
+  metadata and redirected backend metadata where evidence already exposes redirect resolution.
+- Do not change local values file shape, stack config shape, redirect semantics, category
+  precedence, generated AWS account setup config, or selected resolver compatibility.
+
+### 3. External prerequisites
+
+- Local values continue to live in `config/sprinkleref/local/values.json` and remain clone-local and
+  gitignored.
+- Existing redaction classification for stack inputs must already identify whether the resolved value
+  is safe to print.
+
+### 4. Tests to be added
+
+- Add JSON evidence tests proving scalar local values include the resolved hierarchical local values
+  path while preserving `source`, `ref`, `localValuesPath`, and `valuePrinted`.
+- Add JSON evidence tests proving local `{ "value": ... }` entries include the resolved
+  hierarchical local values path with unchanged redaction behavior.
+- Add JSON evidence tests proving local redirect entries expose the applicable local hierarchical
+  path and continue to preserve redirected ref/backend metadata.
+- Add secret-value regression coverage proving the new local path metadata does not print or
+  otherwise expose redacted values.
+- Keep existing local resolution source assertions passing while extending them to assert the
+  source-specific hierarchical path.
+
+### 5. Docs to be added or updated
+
+- Update [Local SprinkleRef Design](local-sprinkleref.md) to document that local-values evidence
+  records both the local values file path and the resolved hierarchical `values.*` path.
+- Update [SprinkleRef Resolver](sprinkleref.md) if its evidence metadata examples omit the resolved
+  local hierarchical path for scalar, `{ "value": ... }`, or redirect entries.
+- Update AWS account setup docs only if their evidence examples include local-values source metadata
+  that would otherwise omit the resolved hierarchical path.
+
+### 5.5. Expected regression scope
+
+- `deployment-only`
+- Expected implementation paths:
+  - `build-tools/tools/deployments/sprinkleref*.ts`
+  - `build-tools/tools/tests/deployments/sprinkleref*.test.ts`
+  - `docs/**`
+- Keep changes narrowly focused on local-values evidence metadata and matching docs/tests.
+
+### 6. Acceptance criteria
+
+- Evidence for scalar local values records the resolved hierarchical local values path such as
+  `values.control-plane.aws.account-id`.
+- Evidence for local `{ "value": ... }` entries records the same resolved hierarchical path while
+  preserving redaction.
+- Evidence for local redirect entries records the applicable local hierarchical path and still
+  preserves redirected source metadata.
+- Existing evidence fields `source`, `ref`, `localValuesPath`, and `valuePrinted` remain present and
+  semantically unchanged.
+- Tests assert the new source-specific local values path for scalar, `{ "value": ... }`, and redirect
+  local resolution paths.
+- Docs describe the distinction between the local values file path and the resolved hierarchical
+  `values.*` path.
+
+### 7. Risks
+
+- Adding another evidence field could make local-values metadata harder to read if its name overlaps
+  with the existing local file path field.
+- Redirect evidence could become ambiguous if the local path and redirected backend metadata are not
+  clearly separated.
+
+### 8. Mitigations
+
+- Use a field name and docs wording that distinguish the local values file path from the resolved
+  hierarchical `values.*` path.
+- Add redirect-specific evidence tests that assert both the local hierarchical path and redirected
+  metadata remain visible and distinct.
+- Keep redaction assertions paired with the new metadata so source-specific evidence does not leak
+  secret values.
+
+### 9. Consequences of not implementing this PR
+
+Local-values evidence will continue to identify the source file and logical ref but not the exact
+hierarchical local entry that resolved the value, leaving the design's source-specific evidence
+requirement only partially implemented.
+
+### 10. Downsides for implementing this PR
+
+It adds one more evidence metadata field and corresponding regression assertions, but keeps the
+behavior limited to source-specific local-values observability without changing resolution
+semantics.

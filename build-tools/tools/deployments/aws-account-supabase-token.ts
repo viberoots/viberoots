@@ -118,6 +118,13 @@ export function tokenSource(metadata: Record<string, unknown>): StackInputSource
     env: typeof metadata.env === "string" ? metadata.env : undefined,
     localValuesPath:
       typeof metadata.localValuesPath === "string" ? metadata.localValuesPath : undefined,
+    localValuesEntryPath:
+      typeof metadata.localValuesEntryPath === "string" ? metadata.localValuesEntryPath : undefined,
+    redirectRef: typeof metadata.redirectRef === "string" ? metadata.redirectRef : undefined,
+    redirectSource:
+      metadata.redirectSource && typeof metadata.redirectSource === "object"
+        ? tokenSource(metadata.redirectSource as Record<string, unknown>)
+        : undefined,
     backend: typeof metadata.backend === "string" ? metadata.backend : undefined,
     valuePrinted: metadata.valuePrinted === true,
   };

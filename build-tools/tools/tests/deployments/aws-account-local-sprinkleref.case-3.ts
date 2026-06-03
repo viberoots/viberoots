@@ -137,12 +137,20 @@ test("aws-account uncategorized stack refs remain local first for scalar and val
     });
     let config = await readAwsAccountConfig(tmp);
     assert.equal(config.awsAccountId, "scalar-id");
+    assert.equal(
+      config.inputSources.awsAccountId.localValuesEntryPath,
+      "values.control-plane.aws.account-id",
+    );
     await writeLocalValues(tmp, {
       "control-plane": { aws: { "account-id": { value: "object-id" } } },
     });
     config = await readAwsAccountConfig(tmp);
     assert.equal(config.awsAccountId, "object-id");
     assert.equal(config.inputSources.awsAccountId.source, "local-values");
+    assert.equal(
+      config.inputSources.awsAccountId.localValuesEntryPath,
+      "values.control-plane.aws.account-id",
+    );
   });
 });
 
@@ -174,6 +182,10 @@ test("aws-account local redirects cannot override explicit token category", asyn
     assert.match(
       evidence.supabaseAccessToken.localValuesPath,
       /config\/sprinkleref\/local\/values\.json$/,
+    );
+    assert.equal(
+      evidence.supabaseAccessToken.localValuesEntryPath,
+      "values.control-plane.supabase.management-api-token",
     );
     assert.doesNotMatch(JSON.stringify(evidence), /bootstrap-token/);
   });

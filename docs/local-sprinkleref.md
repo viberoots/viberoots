@@ -432,7 +432,8 @@ Example:
   "resolvedInputs": {
     "awsAccountId": {
       "source": "local-values",
-      "path": "values.control-plane.aws.account-id",
+      "localValuesPath": "config/sprinkleref/local/values.json",
+      "localValuesEntryPath": "values.control-plane.aws.account-id",
       "valuePrinted": true
     },
     "supabaseAccessToken": {
@@ -445,7 +446,9 @@ Example:
     "supabaseAccessTokenBootstrapRedirect": {
       "source": "sprinkleref",
       "localValuesPath": "config/sprinkleref/local/values.json",
+      "localValuesEntryPath": "values.control-plane.supabase.management-api-token",
       "ref": "secret://control-plane/supabase/management-api-token",
+      "redirectRef": "secret://control-plane/supabase/management-api-token",
       "category": "bootstrap",
       "backend": "macos-keychain",
       "valuePrinted": false

@@ -4,6 +4,9 @@ export type StackInputSource = {
   category?: string;
   env?: string;
   localValuesPath?: string;
+  localValuesEntryPath?: string;
+  redirectRef?: string;
+  redirectSource?: StackInputSource;
   backend?: string;
   categoryExplicit?: boolean;
   valuePrinted: boolean;

@@ -56,8 +56,11 @@ default so managed deployment bootstrap outputs can be created after repo setup.
 a non-plaintext ref object for `secret://control-plane/supabase/management-api-token`. Empty
 coordinate placeholders remain unresolved until filled. A present local values file must parse to an
 object root; scalar or array roots fail as malformed local values rather than being treated as a
-missing file. The command also prints the normal token write command for the selected/default
-resolver:
+missing file. Evidence records `localValuesPath` for the JSON file and `localValuesEntryPath` for
+the resolved hierarchical entry, for example `values.control-plane.aws.account-id`. Local redirect
+evidence keeps the local ref in `ref` and records the redirected target as `redirectRef` with
+`redirectSource` details. The command also prints the normal token write command for the
+selected/default resolver:
 
 ```bash
 sprinkleref --update secret://control-plane/supabase/management-api-token --create-missing

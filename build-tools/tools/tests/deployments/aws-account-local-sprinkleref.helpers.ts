@@ -78,6 +78,40 @@ export async function readSupabaseEvidence(evidenceDir: string) {
   );
 }
 
+export async function readInputsEvidence(evidenceDir: string) {
+  return JSON.parse(await fsp.readFile(path.join(evidenceDir, "inputs.json"), "utf8"));
+}
+
+export function assertAccountLocalValuesSource(source: Record<string, unknown>) {
+  assert.equal(source.source, "local-values");
+  assert.equal(source.ref, "config://control-plane/aws/account-id");
+  assert.equal(source.localValuesEntryPath, "values.control-plane.aws.account-id");
+  assert.equal(source.valuePrinted, true);
+}
+
+export async function runAwsAccountCheckForEvidence(tmp: string, evidenceDir: string) {
+  const previousExitCode = process.exitCode;
+  process.exitCode = undefined;
+  try {
+    await withControlPlaneArgv(["aws-account", "check", "--evidence-dir", evidenceDir], async () =>
+      runAwsAccountCommand({
+        cwd: tmp,
+        env: { SUPABASE_ACCESS_TOKEN: "test-token" },
+        now: () => new Date("2026-06-02T12:00:00.000Z"),
+        httpFetch: fakeSupabaseFetch,
+        stdout: () => undefined,
+        toolResolver: (tool) => `/nix/store/fake-${tool}/bin/${tool}`,
+        commandRunner: async () => ({
+          stdout: JSON.stringify({ Account: "123456789012" }),
+          stderr: "",
+        }),
+      }),
+    );
+  } finally {
+    process.exitCode = previousExitCode;
+  }
+}
+
 export async function fakeSupabaseFetch(url: string) {
   const body = url.includes("/organizations/")
     ? { id: "supabase-org", plan: "Team" }

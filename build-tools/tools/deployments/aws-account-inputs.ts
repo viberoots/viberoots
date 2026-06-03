@@ -1,13 +1,19 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import { assertStackRef, logicalRefPath, type StackRefOptions } from "./aws-account-ref-schemes";
+import { assertStackRef, type StackRefOptions } from "./aws-account-ref-schemes";
 import type { StackInputResolution, StackInputSource } from "./aws-account-input-types";
+import {
+  LOCAL_VALUES_PATH,
+  localRedirectSource,
+  localSource,
+  readLocalValue,
+} from "./aws-account-local-values";
 import { assertBootstrapCategoryCanWrite } from "./sprinkleref-bootstrap-guard";
 import { resolveSprinkleRefBackend } from "./sprinkleref-config";
 import { readSelectedSprinkleRefConfig } from "./sprinkleref-config-select";
 import { createSprinkleRefStore } from "./sprinkleref-store";
 
-export const LOCAL_VALUES_PATH = "config/sprinkleref/local/values.json";
+export { LOCAL_VALUES_PATH };
 export type { StackInputResolution, StackInputSource } from "./aws-account-input-types";
 
 export function parseStackField(
@@ -110,7 +116,10 @@ async function resolveLocalValue(
     if (opts.categoryExplicit) return await resolveRemoteRef(ref, opts);
     const value = obj.value;
     if (typeof value !== "string") throw new Error(`${ref} local value.value must be a string`);
-    return { value: value.trim() || undefined, source: localSource(cwd, ref, opts.secret) };
+    return {
+      value: value.trim() || undefined,
+      source: localSource(cwd, ref, opts.secret),
+    };
   }
   const targetRef = stringMember(obj, "ref");
   if (!targetRef) throw new Error(`${ref} local redirect requires ref`);
@@ -119,16 +128,16 @@ async function resolveLocalValue(
   if (category && !opts.categoryExplicit) {
     return localRedirectSource(
       cwd,
-      targetRef,
+      ref,
       await resolveRemoteRef(targetRef, { ...opts, category, categoryExplicit: true }),
     );
   }
   if (targetRef !== ref) {
     if (opts.categoryExplicit)
       return localRedirectSource(cwd, ref, await resolveRemoteRef(ref, opts));
-    return await resolveRef(cwd, targetRef, opts, seen);
+    return localRedirectSource(cwd, ref, await resolveRef(cwd, targetRef, opts, seen));
   }
-  return localRedirectSource(cwd, targetRef, await resolveRemoteRef(targetRef, opts));
+  return localRedirectSource(cwd, ref, await resolveRemoteRef(targetRef, opts));
 }
 
 type RefResolutionOpts = StackRefOptions & { cwd: string };
@@ -187,54 +196,6 @@ async function selectedConfigPath(opts: { cwd: string; env?: NodeJS.ProcessEnv }
     if ((await fsp.stat(candidate).catch(() => undefined))?.isFile()) return candidate;
   }
   return "";
-}
-
-async function readLocalValue(cwd: string, ref: string) {
-  const file = path.resolve(cwd, LOCAL_VALUES_PATH);
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(await fsp.readFile(file, "utf8"));
-  } catch (error) {
-    if (error && typeof error === "object" && "code" in error && error.code === "ENOENT") {
-      return { found: false };
-    }
-    throw new Error(`invalid local SprinkleRef values JSON: ${LOCAL_VALUES_PATH}`);
-  }
-  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-    throw new Error(
-      `malformed local SprinkleRef values: ${LOCAL_VALUES_PATH} root must be an object`,
-    );
-  }
-  const root = parsed as Record<string, unknown>;
-  let current: unknown = root.values;
-  for (const part of logicalRefPath(ref).split("/").filter(Boolean)) {
-    if (!current || typeof current !== "object" || Array.isArray(current)) return { found: false };
-    const obj = current as Record<string, unknown>;
-    if (!Object.hasOwn(obj, part)) return { found: false };
-    current = obj[part];
-  }
-  return { found: true, value: current };
-}
-
-function localSource(cwd: string, ref: string, secret = false): StackInputSource {
-  return {
-    source: "local-values",
-    ref,
-    localValuesPath: path.resolve(cwd, LOCAL_VALUES_PATH),
-    valuePrinted: !secret,
-  };
-}
-
-function localRedirectSource(cwd: string, ref: string, resolved: StackInputResolution) {
-  return {
-    ...resolved,
-    ref,
-    source: {
-      ...resolved.source,
-      ref,
-      localValuesPath: path.resolve(cwd, LOCAL_VALUES_PATH),
-    },
-  };
 }
 
 function stringMember(obj: Record<string, unknown>, key: string): string | undefined {

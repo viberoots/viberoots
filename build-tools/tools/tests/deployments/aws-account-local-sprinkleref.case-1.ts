@@ -1,13 +1,16 @@
 import {
   assert,
+  assertAccountLocalValuesSource,
   fakeSupabaseFetch,
   fsp,
   path,
   parseStackField,
   readAwsAccountConfig,
+  readInputsEvidence,
+  runAwsAccountCheckForEvidence,
+  runAwsAccountCommand,
   readSupabaseEvidence,
   resolveStackRef,
-  runAwsAccountCommand,
   runInTemp,
   runSprinkleRefCli,
   test,
@@ -35,18 +38,17 @@ test("aws-account resolves structured stack refs from hierarchical local values"
       },
     });
     const evidenceDir = path.join(tmp, "evidence-plaintext");
-    await withControlPlaneArgv(
-      ["aws-account", "check", "--evidence-dir", evidenceDir],
-      async () => {
-        const config = await readAwsAccountConfig(tmp);
-        assert.equal(config.domain, "example.com");
-        assert.equal(config.awsAccountId, "123456789012");
-        assert.equal(config.awsOrganizationId, "o-example");
-        assert.equal(config.supabaseOrgId, "org");
-        assert.equal(config.supabaseProjectRef, "project-ref");
-        assert.equal(config.inputSources.awsAccountId.source, "local-values");
-      },
-    );
+    await runAwsAccountCheckForEvidence(tmp, evidenceDir);
+    const accountSource = (await readInputsEvidence(evidenceDir)).inputSources.awsAccountId;
+    assertAccountLocalValuesSource(accountSource);
+    assert.match(accountSource.localValuesPath, /config\/sprinkleref\/local\/values\.json$/);
+    await writeLocalValues(tmp, {
+      "control-plane": { aws: { "account-id": { value: "object-account-id" } } },
+    });
+    const objectEvidenceDir = path.join(tmp, "evidence-value-object");
+    await runAwsAccountCheckForEvidence(tmp, objectEvidenceDir);
+    const objectSource = (await readInputsEvidence(objectEvidenceDir)).inputSources.awsAccountId;
+    assertAccountLocalValuesSource(objectSource);
   });
 });
 
@@ -147,12 +149,19 @@ test("aws-account resolves secret local redirect through bootstrap category", as
     const evidence = await readSupabaseEvidence(evidenceDir);
     assert.equal(evidence.supabaseAccessToken.source, "sprinkleref");
     assert.equal(evidence.supabaseAccessToken.ref, ref);
+    assert.equal(evidence.supabaseAccessToken.redirectRef, ref);
     assert.equal(evidence.supabaseAccessToken.category, "bootstrap");
     assert.match(
       evidence.supabaseAccessToken.localValuesPath,
       /config\/sprinkleref\/local\/values\.json$/,
     );
+    assert.equal(
+      evidence.supabaseAccessToken.localValuesEntryPath,
+      "values.control-plane.supabase.management-api-token",
+    );
     assert.match(evidence.supabaseAccessToken.backend, /local-file/);
+    assert.equal(evidence.supabaseAccessToken.redirectSource.ref, ref);
+    assert.equal(evidence.supabaseAccessToken.redirectSource.category, "bootstrap");
     assert.equal(evidence.supabaseAccessToken.valuePrinted, false);
     assert.doesNotMatch(JSON.stringify(evidence), /test-token/);
   });
