@@ -16,6 +16,7 @@ export async function writeStatusAndInputs(config: AwsAccountConfig, status: Aws
     schemaVersion: AWS_ACCOUNT_INPUTS_SCHEMA,
     ...stackConfigCompatibleInputs(config),
     inputSources: config.inputSources,
+    inputErrors: config.inputErrors,
   });
   await writeEvidence(path.join(config.evidenceDir, "status.json"), status);
 }

@@ -73,7 +73,9 @@ export async function resolveSupabaseAccessToken(
           secretValuePrinted: false,
           valuePrinted: false,
         },
-        error: `Supabase Management API token ref is configured but missing. Add ${tokenInput.ref} to SprinkleRef, or export ${config.supabaseAccessTokenEnv}=<token> for this setup run.`,
+        error:
+          resolved.error ||
+          `Supabase Management API token ref is configured but missing. Add ${tokenInput.ref} to SprinkleRef, or export ${config.supabaseAccessTokenEnv}=<token> for this setup run.`,
       };
     }
     return {

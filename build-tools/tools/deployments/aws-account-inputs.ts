@@ -2,6 +2,7 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { assertStackRef, logicalRefPath, type StackRefOptions } from "./aws-account-ref-schemes";
 import type { StackInputResolution, StackInputSource } from "./aws-account-input-types";
+import { assertBootstrapCategoryCanWrite } from "./sprinkleref-bootstrap-guard";
 import { resolveSprinkleRefBackend } from "./sprinkleref-config";
 import { readSelectedSprinkleRefConfig } from "./sprinkleref-config-select";
 import { createSprinkleRefStore } from "./sprinkleref-store";
@@ -133,6 +134,7 @@ async function resolveRemoteRef(
   try {
     const config = await readSelectedSprinkleRefConfig(await selectedConfigPath(opts), opts.env);
     const resolved = resolveSprinkleRefBackend(config, opts.category);
+    assertBootstrapCategoryCanWrite(resolved);
     const store = createSprinkleRefStore(resolved.backend, {
       env: opts.env,
       resolverConfig: config,
@@ -162,7 +164,7 @@ async function resolveRemoteRef(
         ref,
         category: opts.category,
         categoryExplicit: Boolean(opts.categoryExplicit),
-        valuePrinted: false,
+        valuePrinted: !opts.secret,
       },
       error: String(error instanceof Error ? error.message : error),
     };

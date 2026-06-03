@@ -499,9 +499,9 @@ Defaults:
 - `--supabase-api-base-url https://api.supabase.com`
 
 The operator should normally provide only `--domain`, the expected AWS account id, Supabase project
-identifiers, and either the structured `supabaseAccessToken` ref or a setup-shell
-`SUPABASE_ACCESS_TOKEN` for the first stack. Prefer writing non-secret clone-local values to
-`config/sprinkleref/local/values.json` and keeping the shared refs in
+identifiers, the AWS organization id, and either the structured `supabaseAccessToken` ref or a
+setup-shell `SUPABASE_ACCESS_TOKEN` for the first stack. Prefer writing non-secret clone-local
+values to `config/sprinkleref/local/values.json` and keeping the shared refs in
 `config/control-plane/stack.json`. `config-init` writes the small checklist by default and records
 non-default overrides only when they are explicitly supplied. Use `--config <path>` only for
 exception cases, such as a second control-plane stack in the same clone. Override hostnames or
@@ -516,6 +516,7 @@ selected/default resolver when needed:
 control-plane aws-account config-init \
   --domain example.com \
   --expected-aws-account-id <new-account-id> \
+  --aws-organization-id <aws-organization-id> \
   --supabase-org-id <supabase-org-id> \
   --supabase-project-ref <supabase-project-ref>
 
@@ -529,12 +530,16 @@ control-plane aws-account check
 Add `--category bootstrap` only when the stack config or clone-local value explicitly chooses
 `category: "bootstrap"` for the token ref. If SprinkleRef is not ready yet, export
 `SUPABASE_ACCESS_TOKEN=<token>` in the setup shell for that run. The env var wins when both the env
-var and ref are present.
+var and ref are present. AWS account stack resolution enforces the same bootstrap guard as
+standalone SprinkleRef commands, so an Infisical-backed `bootstrap` category cannot satisfy
+bootstrap-selected access credentials.
 
 `check` prints a human-readable summary by default: a compact stack header, a phase result list, a
 stack-config checklist for missing setup values, a short problem or evidence section, the next
-command to run, and the machine-readable status file path. Use `--json` when a CI job or script needs
-the raw `aws-account-status@1` payload on stdout:
+command to run, and the machine-readable status file path. Missing `awsOrganizationId` is a blocking
+non-secret coordinate: fill it in stack config, `config/sprinkleref/local/values.json`, or the
+shared resolver according to the source shown in the summary. Use `--json` when a CI job or script
+needs the raw `aws-account-status@1` payload on stdout:
 
 ```bash
 control-plane aws-account check \

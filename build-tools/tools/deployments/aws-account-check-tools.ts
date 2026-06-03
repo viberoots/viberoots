@@ -1,7 +1,12 @@
 import path from "node:path";
 import { ensureNixStoreToolPathSync } from "../lib/tool-paths";
 import { CONTROL_PLANE_CONFIG_REFS } from "./aws-account-ref-schemes";
-import type { AwsAccountConfig, PhaseRecord, RunDeps } from "./aws-account-types";
+import type {
+  AwsAccountConfig,
+  MissingConfigField,
+  PhaseRecord,
+  RunDeps,
+} from "./aws-account-types";
 import { defaultCommandRunner, writeEvidence } from "./aws-account-utils";
 
 export async function checkTools(
@@ -42,20 +47,21 @@ export async function checkAwsLogin(
   deps: RunDeps,
   now: string,
 ): Promise<PhaseRecord> {
-  if (!config.awsAccountId) {
+  const missingConfigFields = missingAwsIdentityFields(config);
+  if (missingConfigFields.length > 0) {
+    const errors = missingConfigFields
+      .map((field) => config.inputErrors[field.field])
+      .filter(Boolean);
     return {
       state: "blocked",
-      message: "Expected AWS account id is missing.",
-      missingConfigFields: [
-        {
-          field: "awsAccountId",
-          valueHint: "<new-account-id>",
-          destination: "local-values-or-shared-resolver",
-          ref: CONTROL_PLANE_CONFIG_REFS.awsAccountId,
-          category: config.inputSources.awsAccountId?.category,
-          note: "same account returned by aws sts get-caller-identity",
-        },
-      ],
+      message: `AWS identity coordinates are missing: ${missingConfigFields
+        .map((field) => field.field)
+        .join(", ")}.${errors.length > 0 ? ` ${errors.join(" ")}` : ""}`,
+      missingConfigFields,
+      resolvedInputSources: {
+        awsAccountId: config.inputSources.awsAccountId,
+        awsOrganizationId: config.inputSources.awsOrganizationId,
+      },
       checkedAt: now,
     };
   }
@@ -100,4 +106,50 @@ export async function checkAwsLogin(
       checkedAt: now,
     };
   }
+}
+
+function missingAwsIdentityFields(config: AwsAccountConfig): MissingConfigField[] {
+  const fields: MissingConfigField[] = [];
+  if (!config.awsAccountId) {
+    const source = config.inputSources.awsAccountId;
+    fields.push({
+      field: "awsAccountId",
+      valueHint: "<new-account-id>",
+      destination: missingDestination(source),
+      ref: source?.ref || CONTROL_PLANE_CONFIG_REFS.awsAccountId,
+      category: source?.category,
+      note: missingNote(
+        "same account returned by aws sts get-caller-identity",
+        config.inputErrors.awsAccountId,
+      ),
+    });
+  }
+  if (!config.awsOrganizationId) {
+    const source = config.inputSources.awsOrganizationId;
+    fields.push({
+      field: "awsOrganizationId",
+      valueHint: "<aws-organization-id>",
+      destination: missingDestination(source),
+      ref: source?.ref || CONTROL_PLANE_CONFIG_REFS.awsOrganizationId,
+      category: source?.category,
+      note: missingNote(
+        "AWS Organizations id for the account, for example o-xxxxxxxxxx",
+        config.inputErrors.awsOrganizationId,
+      ),
+    });
+  }
+  return fields;
+}
+
+function missingDestination(
+  source: AwsAccountConfig["inputSources"][string],
+): MissingConfigField["destination"] {
+  if (!source?.ref) return "stack-config";
+  return source.category === "bootstrap" && source.categoryExplicit
+    ? "bootstrap-category"
+    : "local-values-or-shared-resolver";
+}
+
+function missingNote(base: string, error?: string) {
+  return error ? `${base}; resolution error: ${error}` : base;
 }

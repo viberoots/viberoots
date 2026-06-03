@@ -60,6 +60,7 @@ export type AwsAccountConfig = {
   supabaseAccessToken?: StackInputResolution;
   supabaseApiBaseUrl: string;
   inputSources: Record<string, StackInputSource>;
+  inputErrors: Record<string, string>;
 };
 
 export type SupabaseTokenResolution = {

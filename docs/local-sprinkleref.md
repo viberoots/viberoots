@@ -222,6 +222,8 @@ Redirect rules:
   chain.
 - `category`, when present, must be a non-empty string naming a configured SprinkleRef category.
   Malformed category values fail closed instead of being treated as absent.
+- AWS account stack resolution applies the same bootstrap guard as standalone SprinkleRef commands,
+  so a redirect to `category: "bootstrap"` cannot use an Infisical-backed bootstrap category.
 - Cycle detection is required.
 - For secret-class fields, local scalar values and `{ "value": ... }` are invalid, but redirect
   objects are allowed.

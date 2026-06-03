@@ -21,6 +21,9 @@ config/sprinkleref/selected.json
 deployment and application secrets. `--category bootstrap` is reserved for root credentials needed
 to access Infisical or Vault, so it must resolve to a non-Infisical backend such as macOS Keychain
 or restrictive local files.
+That bootstrap safety guard applies both to standalone `sprinkleref` commands and to higher-level
+AWS account stack ref resolution when stack config or local values explicitly choose
+`category: "bootstrap"`.
 
 Initialize starter configs:
 

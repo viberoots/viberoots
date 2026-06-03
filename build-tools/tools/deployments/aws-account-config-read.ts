@@ -44,6 +44,7 @@ export async function readAwsAccountConfig(cwd: string): Promise<AwsAccountConfi
   );
   const region = strFlag("region", stringValue(fromFile, "region", "us-east-1"));
   const inputSources: Record<string, StackInputSource> = {};
+  const inputErrors: Record<string, string> = {};
   const domainInput = await resolveConfigInput(cwd, fromFile, "domain", {
     flag: "domain",
     fallback: "",
@@ -134,6 +135,11 @@ export async function readAwsAccountConfig(cwd: string): Promise<AwsAccountConfi
   inputSources.supabaseOrgId = supabaseOrg.source;
   inputSources.supabaseProjectRef = supabaseProject.source;
   inputSources.supabaseAccessToken = supabaseToken.source;
+  recordInputError(inputErrors, "awsAccountId", awsAccount);
+  recordInputError(inputErrors, "awsOrganizationId", awsOrg);
+  recordInputError(inputErrors, "supabaseOrgId", supabaseOrg);
+  recordInputError(inputErrors, "supabaseProjectRef", supabaseProject);
+  recordInputError(inputErrors, "supabaseAccessToken", supabaseToken);
   return {
     stackName,
     region,
@@ -160,7 +166,16 @@ export async function readAwsAccountConfig(cwd: string): Promise<AwsAccountConfi
     supabaseAccessToken: supabaseToken,
     supabaseApiBaseUrl,
     inputSources,
+    inputErrors,
   };
+}
+
+function recordInputError(
+  inputErrors: Record<string, string>,
+  key: string,
+  input: StackInputResolution,
+) {
+  if (input.error) inputErrors[key] = input.error;
 }
 
 async function resolveConfigInput(

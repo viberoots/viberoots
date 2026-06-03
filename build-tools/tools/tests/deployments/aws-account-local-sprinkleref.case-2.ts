@@ -173,6 +173,7 @@ test("aws-account source precedence favors cli and inline over resolvers", async
     await writeStack(tmp, {
       domain: "example.com",
       awsAccountId: "stack-id",
+      awsOrganizationId: "o-example",
       supabaseOrgId: "supabase-org",
       supabaseProjectRef: "project-ref",
       supabaseAccessToken: { ref },

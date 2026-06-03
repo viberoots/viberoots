@@ -520,3 +520,134 @@ stack categories can still be weakened by clone-local redirects.
 
 It tightens category precedence in a way that may require local setup docs and diagnostics to be more
 explicit about which category is used for each control-plane setup ref.
+
+## PR-4: AWS account check guardrails and required organization coordinate
+
+### 1. Intent
+
+Close the latest end-of-range design-assessment findings in AWS account setup by applying the
+existing bootstrap-category safety guard to AWS account stack ref resolution and by making
+`awsOrganizationId` a blocking required setup coordinate in `control-plane aws-account check`.
+
+### 2. Scope of changes
+
+- Harden AWS account stack ref resolution so explicit stack refs and local-value redirects that
+  select `category: "bootstrap"` go through the same bootstrap-category guard used by generic
+  SprinkleRef paths.
+- Prevent AWS account setup from resolving Infisical access credentials through an Infisical-backed
+  `bootstrap` category when the ref is reached through AWS account-specific resolution helpers.
+- Keep valid bootstrap-category usage working when the configured bootstrap backend satisfies the
+  existing guardrail, such as `macos-keychain`, `local-file`, or another allowed non-Infisical
+  bootstrap backend.
+- Reuse the existing bootstrap guard implementation or a narrow shared wrapper instead of adding a
+  second AWS account-only guard with different behavior.
+- Update `control-plane aws-account check` required-coordinate handling so missing
+  `awsOrganizationId` is reported as a blocking missing value, matching generated config and design
+  expectations.
+- Ensure missing `awsOrganizationId` guidance points to the correct source based on the configured
+  stack value:
+  - local values when the generated or selected ref is meant to be clone-local
+  - shared resolver/category guidance when remote resolution is expected
+  - config guidance when the stack field is absent or malformed
+- Keep `awsOrganizationId` non-secret: use `config://...` examples, do not redact it as a true
+  secret, and do not suggest secret-token write commands for it.
+- Do not broaden this PR into resolver migration work, Supabase plan handling, direct AWS
+  provisioning, or removal of `selected.local.json` compatibility.
+
+### 3. External prerequisites
+
+- Existing resolver category configuration remains the source of truth for whether `bootstrap`
+  uses Infisical or an allowed bootstrap backend.
+- AWS Organizations access is still required only for real account checks that validate the
+  coordinate against AWS; this PR only makes the configured `awsOrganizationId` presence check
+  consistent with setup requirements.
+
+### 4. Tests to be added
+
+- Add AWS account stack ref tests proving a structured stack ref with `category: "bootstrap"` fails
+  closed when the configured bootstrap category is Infisical-backed for Infisical access
+  credentials.
+- Add AWS account local redirect tests proving a local value redirect with `category: "bootstrap"`
+  also triggers the same bootstrap guard before resolving through an Infisical-backed bootstrap
+  category.
+- Add contrast tests proving allowed bootstrap backends still resolve through AWS account stack ref
+  resolution and preserve category/source metadata.
+- Add regression coverage proving AWS account-specific ref resolution cannot bypass
+  `sprinkleref-bootstrap-guard.ts` by calling lower-level backend/store helpers directly.
+- Add `control-plane aws-account check` human-output tests proving a missing `awsOrganizationId` is
+  listed as a blocking missing coordinate alongside other required account setup values.
+- Add check guidance tests for `awsOrganizationId` covering absent stack config, unresolved local
+  values, and unresolved shared resolver/category paths.
+- Add JSON evidence or status tests proving unresolved `awsOrganizationId` is represented as a
+  missing required non-secret coordinate without secret redaction fields or token guidance.
+
+### 5. Docs to be added or updated
+
+- Update [Local SprinkleRef Design](local-sprinkleref.md) if the AWS account resolver wrapper or
+  guard flow needs clearer wording after implementation.
+- Update [SprinkleRef Resolver](sprinkleref.md) to clarify that the bootstrap guard applies to
+  higher-level AWS account stack ref resolution, not only standalone `sprinkleref` commands.
+- Update [AWS Account Control Plane And Remote Builds](aws-account-control-plane-and-remote-builds.md)
+  with `awsOrganizationId` as a required setup coordinate in `check` output examples and setup
+  troubleshooting guidance.
+- Update relevant `control-plane aws-account check` help text or diagnostics if they list required
+  coordinates or source-specific remediation commands.
+
+### 5.5. Expected regression scope
+
+- `deployment-only`
+- Expected implementation paths:
+  - `build-tools/tools/deployments/aws-account.ts`
+  - `build-tools/tools/deployments/sprinkleref-bootstrap-guard.ts`
+  - `build-tools/tools/deployments/sprinkleref*.ts`
+  - `build-tools/tools/tests/deployments/aws-account-cli.test.ts`
+  - `build-tools/tools/tests/deployments/sprinkleref*.test.ts`
+  - `docs/**`
+- Keep changes narrowly focused on AWS account setup ref guardrails and missing-coordinate
+  diagnostics.
+
+### 6. Acceptance criteria
+
+- AWS account stack ref resolution cannot resolve Infisical access credentials through an
+  Infisical-backed `bootstrap` category, whether `bootstrap` is selected directly in stack config or
+  through `config/sprinkleref/local/values.json`.
+- AWS account ref resolution and generic SprinkleRef resolution share the same bootstrap guard
+  behavior and test coverage.
+- Allowed bootstrap backends still work for explicit bootstrap opt-in and retain useful
+  source/category metadata.
+- `control-plane aws-account check` treats missing `awsOrganizationId` as a blocking required
+  coordinate.
+- Human output, JSON/status evidence, docs, and help text guide developers to fill
+  `awsOrganizationId` through config, local values, or the shared resolver as appropriate.
+- `awsOrganizationId` remains modeled as a non-secret `config://...` coordinate and is not confused
+  with Supabase token guidance.
+
+### 7. Risks
+
+- Wiring the bootstrap guard too low in the resolver stack could accidentally block unrelated
+  bootstrap-category reads that are not Infisical access credentials.
+- Adding `awsOrganizationId` to blocking check output could expose stale local setup fixtures that
+  never populated the generated coordinate.
+- Source-specific missing-value guidance could drift from the actual resolution path if it is
+  implemented separately from ref metadata.
+
+### 8. Mitigations
+
+- Reuse the existing bootstrap guard at the AWS account ref-resolution boundary where the credential
+  purpose is known.
+- Update fixtures and tests that represent valid generated setup config to include the required
+  organization id ref or an explicit missing-value expectation.
+- Drive `awsOrganizationId` guidance from the same resolution metadata used for other required
+  coordinates.
+
+### 9. Consequences of not implementing this PR
+
+AWS account setup can still bypass the design's bootstrap safety guard when resolving account stack
+refs, and `control-plane aws-account check` can continue passing or under-guiding incomplete setup
+state that lacks the required AWS organization id.
+
+### 10. Downsides for implementing this PR
+
+It adds another required missing-coordinate diagnostic and tightens bootstrap resolution in AWS
+account setup, which may require existing local fixtures and docs to become more explicit about
+their intended resolver category and organization id source.

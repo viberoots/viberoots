@@ -86,6 +86,7 @@ test("aws-account resolves secret local redirect through bootstrap category", as
     await writeStack(tmp, {
       domain: "example.com",
       awsAccountId: "123456789012",
+      awsOrganizationId: "o-example",
       supabaseOrgId: "supabase-org",
       supabaseProjectRef: "project-ref",
       supabaseAccessToken: { ref },

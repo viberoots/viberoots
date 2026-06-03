@@ -4,3 +4,5 @@ import "./aws-account-cli.case-3";
 import "./aws-account-cli.case-4";
 import "./aws-account-cli.case-5";
 import "./aws-account-cli.case-6";
+import "./aws-account-cli.case-7";
+import "./aws-account-cli.case-8";
