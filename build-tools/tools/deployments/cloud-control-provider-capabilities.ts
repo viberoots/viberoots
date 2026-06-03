@@ -131,7 +131,7 @@ export function capabilityDeclaration(
   const copy = structuredClone(declaration);
   const label = opts.deploymentLabel?.trim();
   if (!label) return copy;
-  const run = `deployment-control-plane provider-capability --deployment-id ${shellQuote(label)}`;
+  const run = `control-plane provider-capability --deployment-id ${shellQuote(label)}`;
   for (const field of [
     "previewCommand",
     "applyCommand",
@@ -140,7 +140,7 @@ export function capabilityDeclaration(
     "rollbackCommand",
   ] as const) {
     copy.iac[field] = copy.iac[field].replace(
-      "deployment-control-plane provider-capability --deployment-id <label>",
+      "control-plane provider-capability --deployment-id <label>",
       run,
     );
   }
@@ -184,7 +184,7 @@ function cap(
 }
 
 function iacCommands(id: CloudCapabilityId): ProviderCapabilityDeclaration["iac"] {
-  const base = `deployment-control-plane provider-capability --deployment-id <label> --provider-capability ${id}`;
+  const base = `control-plane provider-capability --deployment-id <label> --provider-capability ${id}`;
   const flags = providerBundleFlags(id);
   return {
     reviewedReference: "docs/cloud-control-setup.md",

@@ -2,6 +2,9 @@
 import * as fs from "node:fs/promises";
 import { readSprinkleRefConfig } from "./sprinkleref-config";
 
+export const DEFAULT_SPRINKLEREF_CONFIG_PATH = "config/sprinkleref/selected.json";
+const LEGACY_SPRINKLEREF_CONFIG_PATH = "config/sprinkleref/selected.local.json";
+
 export async function readSelectedSprinkleRefConfig(
   configPath: string,
   env: NodeJS.ProcessEnv = process.env,
@@ -17,8 +20,10 @@ export async function readSelectedSprinkleRefConfig(
 }
 
 async function existingDefaultConfigPath() {
-  const configPath = "sprinkleref/selected.local.json";
-  return (await fs.stat(configPath).catch(() => undefined))?.isFile() ? configPath : "";
+  for (const configPath of [DEFAULT_SPRINKLEREF_CONFIG_PATH, LEGACY_SPRINKLEREF_CONFIG_PATH]) {
+    if ((await fs.stat(configPath).catch(() => undefined))?.isFile()) return configPath;
+  }
+  return "";
 }
 
 function configReadErrorMessage(selected: string, error: unknown): string {
@@ -27,7 +32,7 @@ function configReadErrorMessage(selected: string, error: unknown): string {
     (error && typeof error === "object" && "code" in error && error.code === "ENOENT") ||
     /ENOENT/.test(message)
   ) {
-    return `SprinkleRef resolver config not found: ${selected}. Run build-tools/tools/deployments/infisical-bootstrap.ts repo --dry-run, then build-tools/tools/deployments/infisical-bootstrap.ts repo (or add --yes to skip the prompt), or run sprinkleref --init sprinkleref and edit the generated config for this environment. Then retry with --config ${selected}.`;
+    return `SprinkleRef resolver config not found: ${selected}. Run build-tools/tools/deployments/infisical-bootstrap.ts repo --dry-run, then build-tools/tools/deployments/infisical-bootstrap.ts repo (or add --yes to skip the prompt), or run sprinkleref --init config/sprinkleref and edit the generated config for this environment. Then retry with --config ${selected}.`;
   }
   return message;
 }

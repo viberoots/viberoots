@@ -1,5 +1,7 @@
 RESOURCE_LIMITED_DEPLOYMENT_TESTS = {
     "build-tools/tools/tests/deployments/app-store-connect.e2e.test.ts": True,
+    "build-tools/tools/tests/deployments/aws-account-cli.test.ts": True,
+    "build-tools/tools/tests/deployments/aws-account-local-sprinkleref.test.ts": True,
     "build-tools/tools/tests/deployments/cloudflare-pages-artifact-object-input.test.ts": True,
     "build-tools/tools/tests/deployments/cloudflare-pages.artifact-input.service.test.ts": True,
     "build-tools/tools/tests/deployments/cloudflare-pages.backend-recovery.test.ts": True,

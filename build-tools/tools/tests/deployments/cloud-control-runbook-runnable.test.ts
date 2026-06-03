@@ -96,8 +96,8 @@ test("guide command flow stays in generated runbook phase order", async () => {
     ]!,
   );
   const guideAnchors: Record<string, string> = {
-    "local-review": "deployment-control-plane setup-doctor \\",
-    "credential-preflight": "deployment-control-plane credential-preflight \\",
+    "local-review": "control-plane setup-doctor \\",
+    "credential-preflight": "control-plane credential-preflight \\",
     "managed-dependencies": "## Step 8: Run Managed Dependency Validation",
     "process-start": "## Step 9: Start Service And Workers",
     "http-validation": "## Step 10: Run Runtime And AWS Evidence Checks",

@@ -17,7 +17,7 @@ dependency ecosystems that are currently in use:
   importer level including `wrangler@4.17.0`, `pg@^8.20.0`, `@anthropic-ai/claude-code@2.1.128`,
   `@openai/codex@0.128.0`, and `zx@^8.0.0`, plus their transitive closure.
 - **Nix closure** — `grype` or `trivy` run against the Nix store paths for the
-  `deployment-control-plane` OCI image produced by
+  `control-plane` OCI image produced by
   `build-tools/tools/nix/flake/packages/deployment-control-plane-image.nix`. The image bundles
   `pkgs.nodejs_22`, `pkgs.git`, `pkgs.openssh`, `pkgs.opentofu`, `pkgs.awscli2`, `pkgs.kubectl`,
   `pkgs.kubernetes-helm`, `pkgs.bashInteractive`, `pkgs.coreutils`, and `pkgs.cacert`, all sourced

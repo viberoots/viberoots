@@ -6,13 +6,14 @@ identity, then select the storage backend through a resolver config and optional
 Resolver configs live outside deployment metadata:
 
 ```text
-sprinkleref/base.json
-sprinkleref/local.macos.json
-sprinkleref/local.file.json
-sprinkleref/ci.github.json
-sprinkleref/ci.jenkins.json
-sprinkleref/ci.gitlab.json
-sprinkleref/ci.bitbucket.json
+config/sprinkleref/base.json
+config/sprinkleref/local.macos.json
+config/sprinkleref/local.file.json
+config/sprinkleref/ci.github.json
+config/sprinkleref/ci.jenkins.json
+config/sprinkleref/ci.gitlab.json
+config/sprinkleref/ci.bitbucket.json
+config/sprinkleref/selected.json
 ```
 
 `defaultCategory` is normally `main`. Omitted `--category` uses that category for ordinary
@@ -23,7 +24,8 @@ or restrictive local files.
 Initialize starter configs:
 
 ```bash
-sprinkleref --init sprinkleref
+sprinkleref --init config/sprinkleref
+sprinkleref --init-local
 ```
 
 Repo-wide bootstrap also uses this resolver shape:
@@ -31,18 +33,24 @@ Repo-wide bootstrap also uses this resolver shape:
 ```bash
 build-tools/tools/deployments/infisical-bootstrap.ts repo --dry-run
 build-tools/tools/deployments/infisical-bootstrap.ts repo
-sprinkleref --check --config sprinkleref/selected.local.json
+sprinkleref --check --config config/sprinkleref/selected.json
 ```
 
 With `--credential-sink auto`, it uses `SPRINKLEREF_CONFIG` when set, then an existing
-`sprinkleref/selected.local.json`. If neither exists and `--yes` has already passed bootstrap
-preflight, it creates the starter config set and uses `selected.local.json` so the `bootstrap`
-backend choice is visible in config instead of hidden inside bootstrap code. Dry-run bootstrap
+`config/sprinkleref/selected.json`, then the legacy `config/sprinkleref/selected.local.json`. If
+neither exists and `--yes` has already passed bootstrap preflight, it creates the starter config set
+and uses `selected.json` so the `bootstrap` backend choice is visible in config instead of hidden
+inside bootstrap code. Dry-run bootstrap
 reports the starter backend without creating the config files. Existing resolver configs are
 treated as authoritative. Confirmed repo bootstrap offers a second deployment fan-out prompt by
 default so managed deployment bootstrap outputs can be created after repo setup. Use
 `repo --without-deployments` to stop after resolver/profile setup, or retry one scope directly with
 `deployment --target <buck-target>`.
+
+`config/sprinkleref/local/values.json` is the conventional gitignored clone-local values file.
+`sprinkleref --init-local` creates or updates it with placeholders for private coordinates and a
+bootstrap redirect object for `secret://control-plane/supabase/management-api-token`. It never writes
+a plaintext token placeholder.
 
 Resolver configs may define named backend profiles separately from categories. Profiles name backend
 instances/accounts, while categories name usage lanes:
@@ -97,27 +105,27 @@ Add, update, or remove ordinary secrets:
 
 ```bash
 sprinkleref \
-  --config sprinkleref/local.macos.json \
+  --config config/sprinkleref/local.macos.json \
   --add secret://deployments/pleomino/staging/cloudflare_api_token
 
 sprinkleref \
-  --config sprinkleref/local.macos.json \
+  --config config/sprinkleref/local.macos.json \
   --add secret://deployments/pleomino/staging/cloudflare_api_token \
   --overwrite-existing
 
 sprinkleref \
-  --config sprinkleref/local.macos.json \
+  --config config/sprinkleref/local.macos.json \
   --update secret://deployments/pleomino/prod/cloudflare_api_token \
   --value-file .local/secrets/cloudflare-prod-token
 
 sprinkleref \
-  --config sprinkleref/local.macos.json \
+  --config config/sprinkleref/local.macos.json \
   --update secret://deployments/pleomino/prod/new_runtime_secret \
   --create-missing \
   --value-file .local/secrets/new-runtime-secret
 
 sprinkleref \
-  --config sprinkleref/local.macos.json \
+  --config config/sprinkleref/local.macos.json \
   --remove secret://deployments/pleomino/staging/cloudflare_api_token
 ```
 
@@ -141,7 +149,7 @@ For bootstrap credentials:
 
 ```bash
 sprinkleref \
-  --config sprinkleref/local.file.json \
+  --config config/sprinkleref/local.file.json \
   --add secret://deployments/pleomino/staging/infisical-client-secret \
   --category bootstrap
 ```
@@ -154,7 +162,7 @@ validation:
 
 ```bash
 sprinkleref --check
-sprinkleref --check --scheme secret --config sprinkleref/local.file.json
+sprinkleref --check --scheme secret --config config/sprinkleref/local.file.json
 sprinkleref --check --target //projects/deployments/pleomino/staging:deploy
 sprinkleref --check --target //projects/deployments/pleomino/staging:deploy --no-deps
 sprinkleref --check --format json

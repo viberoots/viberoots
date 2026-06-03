@@ -29,7 +29,7 @@ export async function buildImageContract() {
 
 export async function buildControlPlaneRuntime(): Promise<ControlPlaneRuntime> {
   const outPath = await nixBuildOutput(".#deployment-control-plane-runtime");
-  return { outPath, commandPath: path.join(outPath, "bin", "deployment-control-plane") };
+  return { outPath, commandPath: path.join(outPath, "bin", "control-plane") };
 }
 
 export async function buildImageTarball(): Promise<ControlPlaneImageTarball> {

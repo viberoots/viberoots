@@ -46,7 +46,7 @@ FILES = [
     ("25-document-simple-sdlc.md",                8764, "PROD-60", "Task spec: Document Simple SDLC"),
     ("26-multi-tenant-isolation-design.md",      16479, "PROD-61", "Task spec: Multi-Tenant Isolation Invariants / Design"),
     ("27-migration-versioning-conventions.md",   16582, "PROD-62", "Task spec: Migration/Versioning Conventions for Infra + DB"),
-    ("28-forking-strategy.md",                   10052, "PROD-63", "Task spec: Decide Forking Strategy for unfairly / viberoots"),
+    ("28-forking-strategy.md",                   10052, "PROD-63", "Task spec: Decide Forking Strategy for downstream products / viberoots"),
     ("29-internal-pki-service-auth.md",          14458, "PROD-64", "Task spec: Internal PKI / Service Auth Strategy"),
     ("30-secret-rotation-policy.md",             14428, "PROD-65", "Task spec: Secret Rotation Policy & Workflows"),
     ("31-webhook-signature-verification.md",     10785, "PROD-66", "Task spec: Webhook Signature Verification Framework"),

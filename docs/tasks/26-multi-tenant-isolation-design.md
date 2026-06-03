@@ -35,10 +35,10 @@ The output of this task is a written design, not implementation code. The design
    - a tenant column on every row with Postgres row-level security (RLS) enforcing the boundary;
    - a separate schema per tenant within one database;
    - a separate Postgres database (or Supabase project) per tenant.
-   The design must justify the choice for the control-plane database specifically, separate from any
-   application-layer database decisions made in task #13. ADR-00004 already asserts "there is no
-   cross-tenant state sharing in the database schema"; the design must make that assertion
-   structurally enforceable, not just policy.
+     The design must justify the choice for the control-plane database specifically, separate from any
+     application-layer database decisions made in task #13. ADR-00004 already asserts "there is no
+     cross-tenant state sharing in the database schema"; the design must make that assertion
+     structurally enforceable, not just policy.
 
 3. **API authorization scoping.** Every read and write API endpoint must either scope its results
    by tenant id or explicitly declare why it does not (e.g., the `/healthz` and `/readyz` endpoints

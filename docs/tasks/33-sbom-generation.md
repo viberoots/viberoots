@@ -9,7 +9,7 @@
 
 ## What
 
-Generate a Software Bill of Materials (SBOM) for the `deployment-control-plane` OCI image at Nix
+Generate a Software Bill of Materials (SBOM) for the `control-plane` OCI image at Nix
 build time and attach it to the admitted artifact record in the control plane.
 
 Concretely this means:

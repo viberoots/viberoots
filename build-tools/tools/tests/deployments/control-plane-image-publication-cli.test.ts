@@ -135,7 +135,7 @@ test("production AWS setup consumes generated image publication evidence path", 
     );
     assert.deepEqual(publication.reviewedBuildCommands, REVIEWED_BUILD_COMMANDS);
     const commands = JSON.parse(await fsp.readFile(path.join(out, "commands.json"), "utf8"));
-    assert.match(JSON.stringify(commands), /deployment-control-plane image-publication/);
+    assert.match(JSON.stringify(commands), /control-plane image-publication/);
   });
 });
 

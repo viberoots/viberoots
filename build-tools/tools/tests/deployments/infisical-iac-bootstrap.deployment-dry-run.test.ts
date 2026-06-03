@@ -45,7 +45,7 @@ test("deployment bootstrap dry-run with auto sink remains read-only", async () =
     );
     assert.match(output, /"mode": "deployment"/);
     assert.deepEqual(requests, []);
-    await assertMissing(path.join(dir, "sprinkleref/selected.local.json"));
+    await assertMissing(path.join(dir, "config/sprinkleref/selected.local.json"));
     await assertMissing(path.join(dir, "side-effects/credentials.json"));
     await assertMissing(path.join(dir, "side-effects/plan.tfplan"));
     await assertMissing(tofuMarker);

@@ -130,7 +130,7 @@ test("repo dry-run reports non-empty deployment fan-out targets read-only", asyn
     };
     assert.equal(report.deploymentFanOut?.readOnly, true);
     assert.deepEqual(report.deploymentFanOut?.offeredTargets, [staging]);
-    await assert.rejects(() => fs.stat("sprinkleref/selected.local.json"), /ENOENT/);
+    await assert.rejects(() => fs.stat("config/sprinkleref/selected.local.json"), /ENOENT/);
   } finally {
     process.chdir(cwd);
   }
@@ -161,9 +161,9 @@ function fanOutOnlyNode(name: string) {
 }
 
 async function writeRepoOnlyResolver(dir: string) {
-  await fs.mkdir(path.join(dir, "sprinkleref"), { recursive: true });
+  await fs.mkdir(path.join(dir, "config/sprinkleref"), { recursive: true });
   await fs.writeFile(
-    path.join(dir, "sprinkleref/selected.local.json"),
+    path.join(dir, "config/sprinkleref/selected.local.json"),
     `${JSON.stringify(
       {
         version: 1,

@@ -153,7 +153,7 @@ made here directly shapes what #41 (autoscaling) must provide in terms of metric
 
 - Protected/shared multi-component deployments must declare `rollout_policy` explicitly even when
   the intended behavior matches the provider default. This is already enforced for `nixos-shared-
-  host` and `kubernetes` multi-component shapes. Any deployment that is promoted from
+host` and `kubernetes` multi-component shapes. Any deployment that is promoted from
   single-component to multi-component must add an explicit `rollout_policy` at the same time.
 
 - The `cloudflare-containers` capability entry explicitly defers advanced rollout to "a later

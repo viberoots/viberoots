@@ -10,20 +10,13 @@ import {
   createCredentialSink,
   resolveCredentialSinkSelection,
 } from "../../deployments/infisical-iac-bootstrap-sink";
+import { assertMissing, VAULT_PROFILE } from "./infisical-iac-bootstrap.resolver-profiles.helpers";
 import { fakeRepoBootstrapFetch } from "./sprinkleref-test-helpers";
-
-const VAULT_PROFILE = {
-  backend: "vault",
-  addressEnv: "VBR_VAULT_ADDR",
-  tokenEnv: "VBR_VAULT_TOKEN",
-  mount: "secret",
-  defaultPath: "/deployments",
-};
 
 test("auto credential sink reuses existing SprinkleRef resolver config", async () => {
   const dir = await tmp();
   await withCwdAndEnv(dir, async () => {
-    await writeJson("sprinkleref/selected.local.json", {
+    await writeJson("config/sprinkleref/selected.local.json", {
       version: 1,
       defaultCategory: "bootstrap",
       categories: { bootstrap: { backend: "local-file", file: "kept-bootstrap.json" } },
@@ -34,7 +27,7 @@ test("auto credential sink reuses existing SprinkleRef resolver config", async (
     });
     assert.equal(selection.kind, "sprinkleref");
     assert.equal(selection.backend, "local-file");
-    assert.equal(selection.configPath, "sprinkleref/selected.local.json");
+    assert.equal(selection.configPath, "config/sprinkleref/selected.local.json");
     await assert.rejects(() => fs.stat("sprinkleref/base.json"), /ENOENT/);
   });
 });
@@ -47,7 +40,10 @@ test("repo bootstrap auto credential sink creates starter resolver config only w
       { platform: "linux", env: {} },
     );
     assert.match(sink.describe(), /SprinkleRef bootstrap local-file/);
-    const selected = await fs.readFile("sprinkleref/selected.local.json", "utf8");
+    const selectedLocal = await fs.readFile("config/sprinkleref/selected.local.json", "utf8");
+    assert.match(selectedLocal, /"extends": "\.\/selected\.json"/);
+    assert.doesNotMatch(selectedLocal, /clientSecret":/);
+    const selected = await fs.readFile("config/sprinkleref/selected.json", "utf8");
     assert.match(selected, /"backend": "local-file"/);
     assert.doesNotMatch(selected, /clientSecret":/);
   });
@@ -56,8 +52,8 @@ test("repo bootstrap auto credential sink creates starter resolver config only w
 test("repo bootstrap auto credential sink uses explicit create mode for starter resolver config", async () => {
   const dir = await tmp();
   await withCwdAndEnv(dir, async () => {
-    await fs.mkdir("sprinkleref", { recursive: true });
-    await fs.writeFile("sprinkleref/base.json", "operator-owned\n");
+    await fs.mkdir("config/sprinkleref", { recursive: true });
+    await fs.writeFile("config/sprinkleref/base.json", "operator-owned\n");
     await assert.rejects(
       () =>
         createCredentialSink(
@@ -66,8 +62,8 @@ test("repo bootstrap auto credential sink uses explicit create mode for starter 
         ),
       /EEXIST/,
     );
-    assert.equal(await fs.readFile("sprinkleref/base.json", "utf8"), "operator-owned\n");
-    await assertMissing("sprinkleref/selected.local.json");
+    assert.equal(await fs.readFile("config/sprinkleref/base.json", "utf8"), "operator-owned\n");
+    await assertMissing("config/sprinkleref/selected.local.json");
   });
 });
 
@@ -86,23 +82,31 @@ test("repo bootstrap creates and validates resolver profiles independent of cred
       }),
     );
     assert.doesNotMatch(output.stdout, /nextCommands/);
-    assert.match(output.stderr, /sprinkleref --check --config sprinkleref\/selected\.local\.json/);
+    assert.match(
+      output.stderr,
+      /sprinkleref --check --config config\/sprinkleref\/selected\.local\.json/,
+    );
     const report = JSON.parse(output.stdout);
     assert.equal(report.nextCommands, undefined);
-    assert.equal(report.bootstrapCredentialSinks.length, 1);
-    assert.equal(report.bootstrapCredentialSinks[0]?.profile, "infisical-default");
+    assert.equal(report.bootstrapCredentialSinks.length, 2);
+    assert.equal(report.bootstrapCredentialSinks[0]?.profile, "infisical-control");
     assert.equal(report.bootstrapCredentialSinks[0]?.credentialSinkBackend, "local-file");
-    assert.deepEqual(report.profileMaterialization?.materializedProfiles, ["infisical-default"]);
+    assert.deepEqual(report.profileMaterialization?.materializedProfiles, [
+      "infisical-control",
+      "infisical-default",
+    ]);
     assert.deepEqual(report.profileMaterialization?.validatedExistingProfiles, []);
-    const selected = await fs.readFile("sprinkleref/selected.local.json", "utf8");
-    assert.match(selected, /"profile": "infisical-default"/);
+    const selected = await fs.readFile("config/sprinkleref/selected.json", "utf8");
+    assert.match(selected, /"infisical-default"/);
+    const base = await fs.readFile("config/sprinkleref/base.json", "utf8");
+    assert.match(base, /"backend": "infisical"/);
   });
 });
 
 test("repo bootstrap materializes missing non-default Infisical profiles", async () => {
   const dir = await tmp();
   await withCwdAndEnv(dir, async () => {
-    await writeJson("sprinkleref/selected.local.json", {
+    await writeJson("config/sprinkleref/selected.local.json", {
       version: 1,
       defaultCategory: "main",
       profiles: {
@@ -136,7 +140,7 @@ test("repo bootstrap materializes missing non-default Infisical profiles", async
       "infisical-default",
     ]);
     assert.match(
-      await fs.readFile("sprinkleref/selected.local.json", "utf8"),
+      await fs.readFile("config/sprinkleref/selected.local.json", "utf8"),
       /"infisical-regulated"/,
     );
   });
@@ -145,7 +149,7 @@ test("repo bootstrap materializes missing non-default Infisical profiles", async
 test("repo bootstrap validates bootstrap category even with explicit credential sinks", async () => {
   const dir = await tmp();
   await withCwdAndEnv(dir, async () => {
-    await writeJson("sprinkleref/selected.local.json", {
+    await writeJson("config/sprinkleref/selected.local.json", {
       version: 1,
       defaultCategory: "main",
       profiles: {
@@ -225,10 +229,6 @@ async function writeJson(file: string, value: unknown) {
 
 async function writeGraph(nodes: unknown[]) {
   await writeJson(path.join("build-tools", "tools", "buck", "graph.json"), { nodes });
-}
-
-async function assertMissing(file: string) {
-  await assert.rejects(() => fs.stat(file), /ENOENT/);
 }
 
 async function captureConsole(run: () => Promise<void>) {

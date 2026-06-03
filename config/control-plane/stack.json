@@ -1,0 +1,19 @@
+{
+  "schemaVersion": "aws-account-stack-config@1",
+  "domain": "unfair.ly",
+  "awsAccountId": {
+    "ref": "secret://control-plane/aws/account-id"
+  },
+  "awsOrganizationId": {
+    "ref": "secret://control-plane/aws/organization-id"
+  },
+  "supabaseOrgId": {
+    "ref": "secret://control-plane/supabase/org-id"
+  },
+  "supabaseProjectRef": {
+    "ref": "secret://control-plane/supabase/project-ref"
+  },
+  "supabaseAccessToken": {
+    "ref": "secret://control-plane/supabase/management-api-token"
+  }
+}

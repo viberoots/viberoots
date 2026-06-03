@@ -69,6 +69,7 @@ is out of policy except under documented break-glass procedures.
 ### 5. Protected deployments declare lane policy sourced from reviewed main metadata
 
 Any deployment classified `shared_nonprod` or `production_facing` must declare:
+
 - `lane_policy`
 - `environment_stage`
 - `admission_policy`

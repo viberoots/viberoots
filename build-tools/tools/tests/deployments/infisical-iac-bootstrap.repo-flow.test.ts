@@ -45,13 +45,13 @@ test("repo bootstrap applies first-bootstrap metadata, resumes fan-out, and runs
   assert.deepEqual(seenTargets, [staging, staging]);
   assert.deepEqual(credentialSetups, ["viberoots-iac-bootstrap"]);
   assert.deepEqual(finalChecks, [
-    ["--check", "--config", "sprinkleref/selected.local.json"],
-    ["--check", "--category", "bootstrap", "--config", "sprinkleref/selected.local.json"],
+    ["--check", "--config", "config/sprinkleref/selected.local.json"],
+    ["--check", "--category", "bootstrap", "--config", "config/sprinkleref/selected.local.json"],
   ]);
   assert.match(await fs.readFile(path.join(dir, patch.path), "utf8"), /proj_live/);
   assert.equal(await fs.readFile(path.join(dir, ".local/bootstrap.json"), "utf8"), "{}\n");
   assert.match(
-    await fs.readFile(path.join(dir, "sprinkleref/selected.local.json"), "utf8"),
+    await fs.readFile(path.join(dir, "config/sprinkleref/selected.local.json"), "utf8"),
     /infisical-default/,
   );
 });

@@ -42,7 +42,7 @@ test("setup doctor classifies local runbook phases without cloud credentials", a
     await writeBundle(tmp, bundle.files);
     const commands = JSON.parse(bundle.files["commands.json"]!);
     const managedCommand = runbookCommand(commands, "database").command;
-    assert.match(managedCommand, /deployment-control-plane managed-dependencies/);
+    assert.match(managedCommand, /control-plane managed-dependencies/);
     assert.ok(commands.phases.every((entry: any) => entry.evidenceInputs.length > 0));
     assert.match(JSON.stringify(commands.phases), /supabase-managed-postgres/);
 

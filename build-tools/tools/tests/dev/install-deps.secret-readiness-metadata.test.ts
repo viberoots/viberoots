@@ -93,9 +93,9 @@ async function writeResolver(repoRoot: string) {
       bootstrap: { backend: "local-file", file: path.join(repoRoot, ".local/bootstrap.json") },
     },
   };
-  await fsp.mkdir(path.join(repoRoot, "sprinkleref"), { recursive: true });
+  await fsp.mkdir(path.join(repoRoot, "config/sprinkleref"), { recursive: true });
   await fsp.writeFile(
-    path.join(repoRoot, "sprinkleref/selected.local.json"),
+    path.join(repoRoot, "config/sprinkleref/selected.local.json"),
     `${JSON.stringify(config, null, 2)}\n`,
   );
 }

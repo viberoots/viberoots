@@ -155,8 +155,8 @@ test("direct Podman example preserves the same runtime contract", async () => {
   assert.doesNotMatch(text, /IMAGE_DIGEST:-unknown/);
   assert.match(text, /podman pod create/);
   assert.match(text, /--publish 127\.0\.0\.1:7780:7780/);
-  assert.equal((text.match(/deployment-control-plane service --config/g) || []).length, 1);
-  assert.equal((text.match(/deployment-control-plane worker --config/g) || []).length, 2);
+  assert.equal((text.match(/control-plane service --config/g) || []).length, 1);
+  assert.equal((text.match(/control-plane worker --config/g) || []).length, 2);
   for (const mount of REQUIRED_MOUNTS) assert.match(text, new RegExp(escapeRegExp(mount)));
   assert.doesNotMatch(text, /env-file|POSTGRES|DATABASE_URL|SECRET_ACCESS_KEY|PRIVATE KEY/i);
 });

@@ -82,6 +82,7 @@ a clear incompatibility error. The design spec states this rule explicitly:
 
 The `readVersionedJson` helper in `deployment-schema-compat.ts` implements the read-time
 migration pattern. Concrete examples already in production:
+
 - `nixos-shared-host-record-compat.ts` registers `deploy-record@2026-04-04` and
   `deploy-record@2026-04-08` → current `deploy-record@2026-04-10`
 - `vercel-records.ts` registers `vercel-deploy-record@2026-05-02` → current

@@ -48,9 +48,9 @@ async function withRepo(fn: (repoRoot: string) => Promise<void>) {
 }
 
 async function writeResolver(repoRoot: string) {
-  await fsp.mkdir(path.join(repoRoot, "sprinkleref"), { recursive: true });
+  await fsp.mkdir(path.join(repoRoot, "config/sprinkleref"), { recursive: true });
   await fsp.writeFile(
-    path.join(repoRoot, "sprinkleref/selected.local.json"),
+    path.join(repoRoot, "config/sprinkleref/selected.local.json"),
     `${JSON.stringify({
       defaultCategory: "main",
       profiles: {},

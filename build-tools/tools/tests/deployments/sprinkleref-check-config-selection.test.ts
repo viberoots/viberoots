@@ -25,7 +25,7 @@ test("check uses injected SPRINKLEREF_CONFIG env for resolver selection", async 
 
 test("check auto-selects sprinkleref selected local resolver config", async () => {
   const dir = await gitRepo();
-  const { secretRef } = await writeResolverFixture(dir, "sprinkleref/selected.local.json");
+  const { secretRef } = await writeResolverFixture(dir, "config/sprinkleref/selected.local.json");
   const output = await runInDir(dir, async () => {
     let output = "";
     const exitCode = await runSprinkleRefCheck({

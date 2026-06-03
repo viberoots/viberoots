@@ -11,14 +11,14 @@ export function cutoverCommands(input: CloudControlSetupInput): RunbookCommand[]
   return [
     command(
       "cutover-evidence",
-      `${rootPrelude(input.outDir)}; deployment-control-plane cutover-evidence --bundle-dir "$PROFILE_ROOT" --out "$PROFILE_ROOT/cloud-cutover-evidence.json"`,
+      `${rootPrelude(input.outDir)}; control-plane cutover-evidence --bundle-dir "$PROFILE_ROOT" --out "$PROFILE_ROOT/cloud-cutover-evidence.json"`,
       evidenceInputs(input, capabilities),
       ["$PROFILE_ROOT/cloud-cutover-evidence.json"],
       "cutover evidence is collected from setup outputs and provider evidence",
     ),
     command(
       "cutover-validate",
-      `${rootPrelude(input.outDir)}; deployment-control-plane cutover --evidence "$PROFILE_ROOT/cloud-cutover-evidence.json" --expected-host-profile ${input.mode} --expected-image-build-identity ${input.expectedImageBuildIdentity} --expected-region ${expectedRegion} --selected-capability ${selected} --out "$PROFILE_ROOT/cloud-cutover-report.json"`,
+      `${rootPrelude(input.outDir)}; control-plane cutover --evidence "$PROFILE_ROOT/cloud-cutover-evidence.json" --expected-host-profile ${input.mode} --expected-image-build-identity ${input.expectedImageBuildIdentity} --expected-region ${expectedRegion} --selected-capability ${selected} --out "$PROFILE_ROOT/cloud-cutover-report.json"`,
       ["$PROFILE_ROOT/cloud-cutover-evidence.json"],
       ["$PROFILE_ROOT/cloud-cutover-report.json"],
       "protected/shared cutover validation passes",

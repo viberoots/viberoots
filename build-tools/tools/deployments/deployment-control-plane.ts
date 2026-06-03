@@ -1,6 +1,6 @@
 #!/usr/bin/env zx-wrapper
 import { pathToFileURL } from "node:url";
-import { getFlagBool, getFlagStr } from "../lib/cli";
+import { getFlagBool, getFlagStr, getPositionals } from "../lib/cli";
 import { findRepoRoot } from "../lib/repo";
 import { loadControlPlaneRuntimeConfig } from "./control-plane-runtime-config";
 import type {
@@ -25,12 +25,24 @@ import {
 import { runControlPlaneManagedDependenciesCli } from "./control-plane-managed-dependencies";
 import { runControlPlaneImagePublicationCommand } from "./control-plane-image-publication-cli";
 import { runControlPlaneProviderCapabilityCommand } from "./control-plane-provider-capability-command";
-import { selectedControlPlaneCommand } from "./deployment-control-plane-command";
+import {
+  CONTROL_PLANE_USAGE,
+  selectedControlPlaneCommand,
+} from "./deployment-control-plane-command";
+import { runAwsAccountCommand } from "./aws-account";
 
 export async function runDeploymentControlPlaneCommand() {
+  if (getFlagBool("help") && getPositionals().length === 0) {
+    console.log(CONTROL_PLANE_USAGE);
+    return undefined;
+  }
   const mode = selectedControlPlaneCommand();
   if (getFlagBool("help")) {
-    console.log(`usage: deployment-control-plane ${mode} --config <path>`);
+    if (mode === "aws-account") {
+      await runAwsAccountCommand();
+      return undefined;
+    }
+    console.log(`usage: control-plane ${mode} --config <path>`);
     return undefined;
   }
   if (mode === "setup") {
@@ -71,6 +83,10 @@ export async function runDeploymentControlPlaneCommand() {
   }
   if (mode === "provider-capability") {
     await runControlPlaneProviderCapabilityCommand();
+    return undefined;
+  }
+  if (mode === "aws-account") {
+    await runAwsAccountCommand();
     return undefined;
   }
   const correlationId = createControlPlaneCorrelationId(mode);
@@ -153,8 +169,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
           process.exit(0);
         });
       }
-      if (selectedControlPlaneCommand() === "worker" && !getFlagBool("help"))
-        await new Promise(() => {});
+      if (getPositionals()[0] === "worker" && !getFlagBool("help")) await new Promise(() => {});
     })
     .catch((error) => {
       console.error(error);

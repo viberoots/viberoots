@@ -1066,7 +1066,9 @@ The expected fix is not to disable remote execution broadly. The expected fix is
 Local/dry-run conformance uses fixture or generated Buck config only:
 
 1. Render a redacted config into `buck-out/tmp`:
-   `build-tools/tools/remote-exec/render-buckconfig.ts --input build-tools/tools/remote-exec/remote-buckconfig.example.json --out buck-out/tmp/remote.buckconfig`.
+   `build-tools/tools/remote-exec/render-buckconfig.ts --input build-tools/tools/remote-exec/remote-buckconfig.example.json`.
+   The rendered config path comes from the input JSON's `artifactDir`; the checked-in example writes
+   under `buck-out/tmp/remote-exec/example-run`.
 2. Run the Nix remote-builder smoke tool in dry-run mode for the selected builder policy.
 3. Run the cache manifest publisher in dry-run mode and keep the manifest digest in the run summary.
 4. Confirm committed defaults remain local-only with `build-tools/tools/remote-exec/default-local-policy.ts`.

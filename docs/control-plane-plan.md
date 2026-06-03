@@ -354,8 +354,8 @@ control-plane behavior.
 
 ### 2. Scope of changes
 
-- Add `deployment-control-plane service --config ...`.
-- Add `deployment-control-plane worker --config ...`.
+- Add `control-plane service --config ...`.
+- Add `control-plane worker --config ...`.
 - Ensure both modes validate config and credentials before starting.
 - Start the service as a stateless HTTP/API process bound to configured host and port.
 - Start the worker as a queue consumer using the hardened database claim, lease, lock, and artifact
@@ -390,7 +390,7 @@ control-plane behavior.
 
 ### 5. Docs to be added or updated
 
-- Document the `deployment-control-plane service` and `deployment-control-plane worker` commands.
+- Document the `control-plane service` and `control-plane worker` commands.
 - Update operator runbooks with health, readiness, worker heartbeat, and graceful shutdown behavior.
 - Document the intended one-service/two-worker minimum production topology for the containerized
   runtime.
@@ -611,7 +611,7 @@ image with no embedded secrets or host-specific state.
   deployment records, local cache contents, and host-specific config.
 - Run as a non-root service user where the runtime allows it.
 - Add image labels or metadata for version, source revision, and digest reporting.
-- Support both `deployment-control-plane service` and `deployment-control-plane worker` commands from
+- Support both `control-plane service` and `control-plane worker` commands from
   the same image.
 - Keep registry and repository location parameterized; do not hardcode GitHub Container Registry.
 

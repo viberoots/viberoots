@@ -31,7 +31,7 @@ automatic companion step when generating a service deployment package.
 The task is to close that gap:
 
 - Wire the shared governance template as an automatic companion when `scaf new deployment
-  cloudflare-containers` (or `deployment/service`) is invoked without an existing shared package,
+cloudflare-containers` (or `deployment/service`) is invoked without an existing shared package,
   or document and test the two-step invocation order explicitly.
 - Extend (or introduce) a per-environment directory layout so that a single `scaf` invocation
   stamps `dev/TARGETS`, `staging/TARGETS`, `prod/TARGETS`, and `shared/TARGETS` for the chosen

@@ -108,9 +108,9 @@ living process document that will be amended rather than superseded. The recomme
 
 **Format rigidity vs. flexibility.** Locking the three required sections (`Context`, `Decision`,
 `Consequences`) and the three `Consequences` subsections prevents format drift. The cost is that
-unusual decisions — for example, a decision to *not* adopt a pattern — are slightly awkward to
+unusual decisions — for example, a decision to _not_ adopt a pattern — are slightly awkward to
 express. The existing ADRs demonstrate that the format handles this: ADR-00004 (tenant isolation)
-and ADR-00005 (control-plane/data-plane boundary) both define what is *out of scope* in the
+and ADR-00005 (control-plane/data-plane boundary) both define what is _out of scope_ in the
 `Decision` section. Document this technique explicitly rather than adding a fourth optional section.
 
 **Named status values vs. free-form.** The four statuses (`Proposed`, `Accepted`, `Superseded`,

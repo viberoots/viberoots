@@ -109,7 +109,13 @@ export async function waitForConsecutive(
 }
 
 export async function writeAndBumpMtime(filePath: string, contents: string): Promise<void> {
-  await fsp.writeFile(filePath, contents, "utf8");
+  const tmpPath = `${filePath}.tmp-${process.pid}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  try {
+    await fsp.writeFile(tmpPath, contents, "utf8");
+    await fsp.rename(tmpPath, filePath);
+  } finally {
+    await fsp.rm(tmpPath, { force: true }).catch(() => {});
+  }
   const nextStep = (perFileTouchStep.get(filePath) || 0) + 1;
   perFileTouchStep.set(filePath, nextStep);
   const stamp = new Date(Date.now() + nextStep * 1100);

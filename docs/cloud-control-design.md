@@ -44,8 +44,8 @@ is intentional.
 The current image shape is:
 
 - one reviewed OCI image
-- service mode: `deployment-control-plane service --config /etc/deployment-control-plane/config.yaml`
-- worker mode: `deployment-control-plane worker --config /etc/deployment-control-plane/config.yaml`
+- service mode: `control-plane service --config /etc/deployment-control-plane/config.yaml`
+- worker mode: `control-plane worker --config /etc/deployment-control-plane/config.yaml`
 - non-root runtime user
 - file-backed runtime credentials
 - external Postgres-compatible database URL
@@ -196,7 +196,7 @@ secret values.
 
 Cloud host-profile setup starts with
 [`docs/cloud-control-setup.md`](cloud-control-setup.md) and the reviewed
-`deployment-control-plane setup` command. The generator writes runtime config, credential
+`control-plane setup` command. The generator writes runtime config, credential
 manifest, service and worker commands, validation commands, and provider-capability declarations
 without embedding secret values.
 
@@ -284,8 +284,8 @@ artifact-store-secret-access-key
 The same reviewed image exposes long-running service and worker process modes:
 
 ```bash
-deployment-control-plane service --config /etc/deployment-control-plane/config.yaml
-deployment-control-plane worker --config /etc/deployment-control-plane/config.yaml
+control-plane service --config /etc/deployment-control-plane/config.yaml
+control-plane worker --config /etc/deployment-control-plane/config.yaml
 ```
 
 - `/healthz`
@@ -661,7 +661,7 @@ when those provider-capability entries exist. The minimum required entries are:
 - `remote-build-worker-fleet` for build/test worker capacity registration and autoscaling policy
 
 Concrete capability declarations for this topology are generated from the reviewed catalog used by
-`deployment-control-plane setup`. Each declaration defines a non-placeholder target identity shape,
+`control-plane setup`. Each declaration defines a non-placeholder target identity shape,
 file-backed or support-mediated credential source, lock scope, redacted preview command, apply and
 smoke hooks, rollback evidence, replay semantics, audit evidence, and protected/shared eligibility.
 The hook commands are executable dispatch contracts, not placeholder shell snippets: `deploy

@@ -227,7 +227,7 @@ async function ensureResolverConfigPath(
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
     if (!createMissingResolverConfig) return undefined;
-    await initSprinkleRefConfigs({ dir: "sprinkleref", platform, mode: "create" });
+    await initSprinkleRefConfigs({ dir: path.dirname(selected), platform, mode: "create" });
   }
   return selected;
 }

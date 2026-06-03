@@ -10,7 +10,7 @@ The short version:
 2. Provision AWS networking, S3, ingress, and a NixOS or OCI host by infrastructure-as-code as much
    as the current repo allows.
 3. Publish the Nix-built control-plane image by immutable digest.
-4. Generate a runtime bundle with `deployment-control-plane setup --host-mode aws-ec2`.
+4. Generate a runtime bundle with `control-plane setup --host-mode aws-ec2`.
 5. Stage file-backed credentials, start one service and at least two workers, then run the generated
    validation commands.
 6. Cut over only after the cutover evidence report passes.
@@ -68,7 +68,7 @@ The current repo can already define or generate these pieces:
 
 - Nix-built OCI image: `nix build .#deployment-control-plane-image`
 - image publication evidence shape
-- runtime config bundle: `deployment-control-plane setup`
+- runtime config bundle: `control-plane setup`
 - credential manifest
 - managed dependency conformance profile
 - provider-capability declarations and evidence expectations
@@ -174,7 +174,7 @@ If you are using private database traffic:
    `supabase-privatelink-opentofu-apply.json`, and
    `supabase-privatelink-readonly-evidence.json` at the setup bundle root.
 6. Run the generated
-   `deployment-control-plane provider-capability --deployment-id <deployment-id> --provider-capability supabase-privatelink-prerequisite`
+   `control-plane provider-capability --deployment-id <deployment-id> --provider-capability supabase-privatelink-prerequisite`
    command. It fails closed when the typed evidence files are missing, stale, mismatched, or not
    rooted in the setup bundle.
 7. Use reviewed IaC to create or import a security group for the endpoint or service network that
@@ -308,7 +308,7 @@ ownership, capability id, topology identity, fresh drift proof, and non-destruct
 posture.
 
 For the EC2 host itself, prefer the generated AWS EC2 host profile from
-`deployment-control-plane setup --host-mode aws-ec2`. The default EC2 realization mode is
+`control-plane setup --host-mode aws-ec2`. The default EC2 realization mode is
 `external-reviewed-host`: a non-mutating structured EC2 host adapter validates the generated instance host
 profile against reviewed AWS topology evidence and emits typed preview, apply-intent, evidence,
 smoke, and rollback payloads. The selected AWS topology evidence and generated host profile inputs are
@@ -444,7 +444,7 @@ Publish it to your registry and inspect the immutable digest through the reviewe
 command rejects production AWS profiles without generated registry inspection evidence:
 
 ```bash
-deployment-control-plane image-publication \
+control-plane image-publication \
   --registry-profile ./registry-profile.json \
   --image registry.example.com/platform/deployment-control-plane@sha256:<digest> \
   --source-revision source-<reviewed-revision> \
@@ -470,7 +470,7 @@ Do not deploy `latest` or any mutable tag as the runtime identity.
 Run a dry run first:
 
 ```bash
-deployment-control-plane setup \
+control-plane setup \
   --dry-run \
   --out ./cloud-control-profile \
   --host-mode aws-ec2 \
@@ -493,7 +493,7 @@ deployment-control-plane setup \
 ```
 
 Then rerun without `--dry-run` after every prerequisite is resolved. The
-`image-publication.json` file must come from `deployment-control-plane image-publication`, and the
+`image-publication.json` file must come from `control-plane image-publication`, and the
 `aws-topology-evidence.json` file must use schema `aws-topology-evidence@1`, and non-dry-run AWS
 setup must include the generated ingress command evidence files. Literal `true`, dashboard notes,
 raw IaC state, subnet/security-group string lists, and other truthy placeholders do not satisfy AWS
@@ -647,16 +647,16 @@ generated host profile explicitly emits and tests that mode.
 Run the local setup checks and staging executor. From the repo root, use:
 
 ```bash
-deployment-control-plane setup-doctor \
+control-plane setup-doctor \
   --bundle-dir ./cloud-control-profile \
   --out ./cloud-control-profile/setup-doctor.json
-deployment-control-plane credential-preflight \
+control-plane credential-preflight \
   --bundle-dir ./cloud-control-profile \
   --out ./cloud-control-profile/credential-preflight.json
-deployment-control-plane credential-staging \
+control-plane credential-staging \
   --bundle-dir ./cloud-control-profile \
   --out ./cloud-control-profile/credential-staging.json
-deployment-control-plane credential-rotation \
+control-plane credential-rotation \
   --bundle-dir ./cloud-control-profile \
   --apply-rotation \
   --out ./cloud-control-profile/credential-rotation.json \
@@ -666,10 +666,10 @@ deployment-control-plane credential-rotation \
 From inside the generated bundle directory, use:
 
 ```bash
-deployment-control-plane setup-doctor --bundle-dir . --out ./setup-doctor.json
-deployment-control-plane credential-preflight --bundle-dir . --out ./credential-preflight.json
-deployment-control-plane credential-staging --bundle-dir . --out ./credential-staging.json
-deployment-control-plane credential-rotation \
+control-plane setup-doctor --bundle-dir . --out ./setup-doctor.json
+control-plane credential-preflight --bundle-dir . --out ./credential-preflight.json
+control-plane credential-staging --bundle-dir . --out ./credential-staging.json
+control-plane credential-rotation \
   --bundle-dir . \
   --apply-rotation \
   --out ./credential-rotation.json \
@@ -696,7 +696,7 @@ Local live host verification must inspect the actual
 when the command runs on that host:
 
 ```bash
-VBR_CONTROL_PLANE_LIVE_CREDENTIAL_STAGING=1 deployment-control-plane credential-staging \
+VBR_CONTROL_PLANE_LIVE_CREDENTIAL_STAGING=1 control-plane credential-staging \
   --live \
   --bundle-dir . \
   --live-backend-profile ./live-infisical-backend.profile.json \
@@ -712,7 +712,7 @@ source host, target credential directory, credential filename set, and AWS bind-
 The trust root itself is a separate reviewed input; do not embed it in the verifier result.
 
 ```bash
-VBR_CONTROL_PLANE_LIVE_CREDENTIAL_STAGING=1 deployment-control-plane credential-staging \
+VBR_CONTROL_PLANE_LIVE_CREDENTIAL_STAGING=1 control-plane credential-staging \
   --live \
   --bundle-dir . \
   --live-backend-profile ./live-infisical-backend.profile.json \
@@ -731,7 +731,7 @@ They must not coexist with `deploymentOwnedLiveBackendWrite` in persisted stagin
 Use the generated profile and the same credential directory the service uses:
 
 ```bash
-deployment-control-plane managed-dependencies \
+control-plane managed-dependencies \
   --profile ./cloud-control-profile/managed-dependencies.profile.yaml \
   --credential-directory /run/deployment-control-plane/credentials \
   --host-profile aws-ec2 \
@@ -776,9 +776,9 @@ plan capability, migration/schema metadata, backup/restore posture, and user sep
 Use the generated AWS profile or equivalent host configuration to start:
 
 ```bash
-deployment-control-plane service --config /etc/deployment-control-plane/config.yaml
-deployment-control-plane worker --config /etc/deployment-control-plane/config.yaml --worker-id worker-1
-deployment-control-plane worker --config /etc/deployment-control-plane/config.yaml --worker-id worker-2
+control-plane service --config /etc/deployment-control-plane/config.yaml
+control-plane worker --config /etc/deployment-control-plane/config.yaml --worker-id worker-1
+control-plane worker --config /etc/deployment-control-plane/config.yaml --worker-id worker-2
 ```
 
 The recommended production minimum is one service and two workers. Workers coordinate through
@@ -888,7 +888,7 @@ It also requires `latest-non-production-deployment.json` from a real protected/s
 deployment through the AWS-primary path; staging success is not inferred by the collector.
 
 ```bash
-deployment-control-plane cutover-evidence \
+control-plane cutover-evidence \
   --bundle-dir ./cloud-control-profile \
   --out ./cloud-control-profile/cloud-cutover-evidence.json
 ```
@@ -899,7 +899,7 @@ including ECR, Supabase managed Postgres, and Supabase PrivateLink when selected
 PrivateLink-enabled AWS-primary command shape is:
 
 ```bash
-deployment-control-plane cutover \
+control-plane cutover \
   --evidence ./cloud-control-profile/cloud-cutover-evidence.json \
   --expected-host-profile aws-ec2 \
   --expected-image-build-identity nix-source-<build-identity> \
@@ -949,8 +949,8 @@ do not satisfy protected/shared readiness by themselves.
   and key prefix.
 - Missing credential failure: compare host files against `credential-manifest.json`. Do not repair
   by switching to environment variables.
-- Stale credential failure: rerun `deployment-control-plane credential-staging` and, when stale
-  entries remain active, run `deployment-control-plane credential-rotation --apply-rotation
+- Stale credential failure: rerun `control-plane credential-staging` and, when stale
+  entries remain active, run `control-plane credential-rotation --apply-rotation
 --rotated-map-out ./credential-map.rotated.json` after refreshing the reviewed backend or
   encrypted host source.
 - Backend write failure: confirm the selected backend profile, least-privilege scope evidence,
@@ -992,7 +992,7 @@ do not satisfy protected/shared readiness by themselves.
 - [ ] AWS VPC, subnets, security groups, ingress, S3, and endpoints are provisioned by reviewed IaC
       or captured as a documented current-code gap.
 - [ ] Control-plane image is Nix-built and deployed by immutable registry digest.
-- [ ] `deployment-control-plane setup --host-mode aws-ec2` bundle is generated without secrets.
+- [ ] `control-plane setup --host-mode aws-ec2` bundle is generated without secrets.
 - [ ] `config.yaml` auth-provider and Infisical metadata are generated from reviewed runtime input
       and provider evidence.
 - [ ] Credential files match `credential-manifest.json`.

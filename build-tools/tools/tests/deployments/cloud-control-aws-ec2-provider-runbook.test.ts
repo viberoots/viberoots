@@ -90,7 +90,7 @@ test("AWS runbook produces provider capability evidence before cutover", () => {
   assert.ok(readOnly.outputs.includes("$PROFILE_ROOT/supabase-privatelink-readonly-evidence.json"));
   assert.ok(readOnly.outputs.includes("$PROFILE_ROOT/supabase-privatelink-readonly-psql.json"));
   assert.ok(managed.commands.indexOf(readOnly) < managed.commands.indexOf(privatelink));
-  assert.match(privatelink.command, /deployment-control-plane provider-capability/);
+  assert.match(privatelink.command, /control-plane provider-capability/);
   assert.match(privatelink.command, /--provider-capability supabase-privatelink-prerequisite/);
   assert.match(
     privatelink.command,

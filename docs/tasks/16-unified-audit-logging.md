@@ -23,7 +23,7 @@ The repo already has two audit tables and several write paths:
   `writeBackendControlPlaneMcpAuditEvent`, `writeBackendControlPlaneReadAuditEvent`).
 
 - `stage_state_audit_events` — append-only hash-chained rows per `(deployment_id,
-  environment_stage)`, with `content_hash`, `event_hash`, `previous_event_hash`, and
+environment_stage)`, with `content_hash`, `event_hash`, `previous_event_hash`, and
   `audit_sequence` forming a tamper-evident chain. Written by `deployment-stage-state-audit.ts`
   for successful stage-state mutations (deploy, promotion, retry, rollback, cancellation,
   recovery). Event types are the closed set: `stage_state_updated`, `promotion_lineage_recorded`,

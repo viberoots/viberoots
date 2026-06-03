@@ -9,7 +9,11 @@ import YAML from "yaml";
 import { cutoverCommands } from "../../deployments/cloud-control-runbook-cutover";
 import { renderCloudControlSetupBundle } from "../../deployments/cloud-control-setup-render";
 import { serviceNetworkAssociationEvidence } from "./cloud-control-supabase-privatelink.fixture";
-import { setupInput } from "./control-plane-managed-dependencies-runtime-path.fixture";
+import { pathEnv } from "./control-plane-managed-dependencies-runtime-path-runbook.helpers";
+import {
+  evidence as managedDependencyEvidence,
+  setupInput,
+} from "./control-plane-managed-dependencies-runtime-path.fixture";
 import { runInScratchTemp } from "../lib/test-helpers";
 
 const execFileAsync = promisify(execFile);
@@ -72,17 +76,30 @@ test("AWS setup runbook fails closed when IMDSv2 token acquisition fails", async
 
 test("AWS setup runbook executes IMDSv2 metadata fetches before managed validation", async () => {
   await runInScratchTemp("cloud-control-imdsv2-exec", async (tmp) => {
-    const command = runbookCommand(
-      JSON.parse(renderCloudControlSetupBundle(setupInput()).files["commands.json"]!),
-      "database",
-    ).command;
+    const bundle = renderCloudControlSetupBundle(setupInput());
+    const command = runbookCommand(JSON.parse(bundle.files["commands.json"]!), "database").command;
     const bin = path.join(tmp, "bin");
     const seen = path.join(tmp, "seen.log");
     await fsp.mkdir(bin);
     await fsp.writeFile(path.join(tmp, "commands.json"), "{}");
+    await fsp.writeFile(
+      path.join(tmp, "managed-dependencies.profile.yaml"),
+      bundle.files["managed-dependencies.profile.yaml"]!,
+    );
+    const evidence = managedDependencyEvidence();
+    await fsp.writeFile(
+      path.join(tmp, "managed-dependency-evidence.json"),
+      `${JSON.stringify(evidence, null, 2)}\n`,
+    );
+    await fsp.writeFile(
+      path.join(tmp, "supabase-managed-postgres-evidence.json"),
+      `${JSON.stringify(evidence.supabasePostgres, null, 2)}\n`,
+    );
     await fsp.writeFile(path.join(bin, "curl"), fakeCurlScript(seen));
+    await fsp.writeFile(path.join(bin, "control-plane"), fakeControlPlaneScript(seen));
     await fsp.writeFile(path.join(bin, "deployment-control-plane"), fakeControlPlaneScript(seen));
     await fsp.chmod(path.join(bin, "curl"), 0o755);
+    await fsp.chmod(path.join(bin, "control-plane"), 0o755);
     await fsp.chmod(path.join(bin, "deployment-control-plane"), 0o755);
     await execFileAsync("bash", ["-c", command], { cwd: tmp, env: pathEnv(bin) });
     const log = await fsp.readFile(seen, "utf8");
@@ -196,10 +213,6 @@ function runbookCommand(commands: any, id: string) {
     .find((command: any) => command.id === id);
   if (!found) throw new Error(`missing runbook command ${id}`);
   return found;
-}
-
-function pathEnv(bin: string): NodeJS.ProcessEnv {
-  return { ...process.env, PATH: `${bin}:${process.env.PATH || ""}` };
 }
 
 function fakeCurlScript(seen: string): string {

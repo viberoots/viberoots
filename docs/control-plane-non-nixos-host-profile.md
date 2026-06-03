@@ -65,8 +65,8 @@ Deployment-scoped Infisical credentials keep the same defaults as the NixOS prof
 Compose, Docker, and Podman are only runtime substrates. They must preserve:
 
 - the same reviewed image pinned by digest, never a tag-only image such as `:latest`
-- `deployment-control-plane service --config /etc/deployment-control-plane/config.yaml`
-- `deployment-control-plane worker --config /etc/deployment-control-plane/config.yaml`
+- `control-plane service --config /etc/deployment-control-plane/config.yaml`
+- `control-plane worker --config /etc/deployment-control-plane/config.yaml`
 - the mounted config, credential directory, records root, artifact scratch root, and runtime root
 - loopback host binding for the service
 - file-backed credentials without secret values in image layers, command arguments, or env files

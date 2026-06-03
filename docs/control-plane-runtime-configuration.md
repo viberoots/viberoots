@@ -14,8 +14,8 @@ Tests and local fixtures may pass an explicit config path to the loader.
 The container image exposes one long-running command surface:
 
 ```bash
-deployment-control-plane service --config /etc/deployment-control-plane/config.yaml
-deployment-control-plane worker --config /etc/deployment-control-plane/config.yaml
+control-plane service --config /etc/deployment-control-plane/config.yaml
+control-plane worker --config /etc/deployment-control-plane/config.yaml
 ```
 
 Both modes validate the mounted config, required credential files, database URL credential, and
@@ -26,13 +26,13 @@ Before starting either long-running process from a generated setup bundle, run t
 preflight against that bundle:
 
 ```bash
-deployment-control-plane credential-preflight \
+control-plane credential-preflight \
   --bundle-dir ./cloud-control-profile \
   --out ./cloud-control-profile/credential-preflight.json
 ```
 
 If your current working directory is the generated bundle, use
-`deployment-control-plane credential-preflight --bundle-dir . --out ./credential-preflight.json`.
+`control-plane credential-preflight --bundle-dir . --out ./credential-preflight.json`.
 The preflight reads `credential-manifest.json` and `config.yaml`, verifies the exact file-backed
 credential contract, checks `credential-map.json` for explicit reviewed backend or host credential
 sources, checks safe URL-shaped credential files, rejects ambient/env-var-only credential sources,
@@ -261,7 +261,7 @@ unreadable, empty, or filename-mismatched files fail before the service or worke
 Credential staging evidence is generated with:
 
 ```bash
-deployment-control-plane credential-staging \
+control-plane credential-staging \
   --bundle-dir ./cloud-control-profile \
   --out ./cloud-control-profile/credential-staging.json
 ```
@@ -276,7 +276,7 @@ bind-mounted credential directory; it does not assume systemd `LoadCredential=`.
 Credential rotation evidence is generated separately:
 
 ```bash
-deployment-control-plane credential-rotation \
+control-plane credential-rotation \
   --bundle-dir ./cloud-control-profile \
   --apply-rotation \
   --out ./cloud-control-profile/credential-rotation.json \

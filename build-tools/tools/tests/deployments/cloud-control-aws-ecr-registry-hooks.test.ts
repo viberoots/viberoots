@@ -81,7 +81,7 @@ test("AWS ECR provider hook rejects ambient AWS credential discovery", async () 
   }
 });
 
-test("AWS ECR generated commands use deployment-control-plane and reviewed evidence inputs", () => {
+test("AWS ECR generated commands use control-plane and reviewed evidence inputs", () => {
   const commands = JSON.parse(
     renderCloudControlSetupBundle(ec2HostProfileInput()).files["commands.json"]!,
   );
@@ -89,7 +89,7 @@ test("AWS ECR generated commands use deployment-control-plane and reviewed evide
   const ecr = managed.commands.find(
     (entry: any) => entry.id === "provider-capability-aws-ecr-control-plane-registry",
   );
-  assert.match(ecr.command, /deployment-control-plane provider-capability/);
+  assert.match(ecr.command, /control-plane provider-capability/);
   assert.match(ecr.command, /--provider-capability aws-ecr-control-plane-registry --preview/);
   assert.match(
     ecr.command,
@@ -121,7 +121,7 @@ test("AWS ECR generated commands use deployment-control-plane and reviewed evide
   );
 });
 
-test("deployment-control-plane provider-capability emits ECR hook evidence", async () => {
+test("control-plane provider-capability emits ECR hook evidence", async () => {
   const tmp = await fsp.mkdtemp(path.join(os.tmpdir(), "ecr-provider-cli-"));
   await withAwsCredentialFile(async () => {
     const profile = path.join(tmp, "registry-profile.json");
@@ -158,7 +158,7 @@ test("deployment-control-plane provider-capability emits ECR hook evidence", asy
   });
 });
 
-test("deployment-control-plane ECR provider-capability requires image publication evidence", async () => {
+test("control-plane ECR provider-capability requires image publication evidence", async () => {
   const tmp = await fsp.mkdtemp(path.join(os.tmpdir(), "ecr-provider-cli-missing-"));
   await withAwsCredentialFile(async () => {
     const profile = path.join(tmp, "registry-profile.json");

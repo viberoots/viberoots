@@ -2,6 +2,7 @@ import * as path from "node:path";
 import * as readline from "node:readline/promises";
 import { withDeploymentBootstrapDefaults } from "./infisical-iac-bootstrap-config";
 import type { BootstrapArgs } from "./infisical-iac-bootstrap-types";
+import { DEFAULT_SPRINKLEREF_CONFIG_PATH } from "./sprinkleref-config-select";
 
 type PreflightIo = {
   stdin?: NodeJS.ReadStream;
@@ -98,6 +99,6 @@ function quoteShell(value: string) {
   return `'${value.replaceAll("'", "'\\''")}'`;
 }
 
-export function resolverConfigPath(dir = "sprinkleref") {
+export function resolverConfigPath(dir = path.dirname(DEFAULT_SPRINKLEREF_CONFIG_PATH)) {
   return path.join(dir, "selected.local.json");
 }

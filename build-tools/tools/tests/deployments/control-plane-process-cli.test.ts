@@ -21,7 +21,7 @@ const SETUP_IMAGE =
 const SETUP_DIGEST = `sha256:${"a".repeat(64)}`;
 const SETUP_BUILD_IDENTITY = `nix-source-${"b".repeat(64)}`;
 
-test("deployment-control-plane command validates mode config overrides and credentials", async () => {
+test("control-plane command validates mode config overrides and credentials", async () => {
   await runInTemp("control-plane-cli-config", async (tmp) => {
     await assert.rejects(
       () => withControlPlaneArgv(["status"], runDeploymentControlPlaneCommand),
@@ -80,7 +80,7 @@ test("deployment-control-plane command validates mode config overrides and crede
   });
 });
 
-test("deployment-control-plane setup writes a cloud host profile bundle", async () => {
+test("control-plane setup writes a cloud host profile bundle", async () => {
   await runInTemp("control-plane-cli-setup", async (tmp) => {
     const out = path.join(tmp, "profile");
     const topologyFile = path.join(tmp, "aws-topology-evidence.json");
@@ -115,7 +115,7 @@ test("deployment-control-plane setup writes a cloud host profile bundle", async 
   });
 });
 
-test("deployment-control-plane standby process modes gate service and workers", async () => {
+test("control-plane standby process modes gate service and workers", async () => {
   await runInTemp("control-plane-cli-standby", async (tmp) => {
     const serviceOnly = await writeRuntimeConfig(path.join(tmp, "service-only"), {
       processMode: "service-only",

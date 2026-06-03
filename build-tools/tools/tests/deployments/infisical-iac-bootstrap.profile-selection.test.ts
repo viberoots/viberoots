@@ -31,9 +31,9 @@ test("repo bootstrap skips unused starter backend profiles", async () => {
       }),
     );
     const report = JSON.parse(output.stdout) as { profiles: string[] };
-    const config = await fs.readFile("sprinkleref/selected.local.json", "utf8");
+    const config = await fs.readFile("config/sprinkleref/selected.local.json", "utf8");
     const credentials = await fs.readFile(".local/infisical-bootstrap-credentials.json", "utf8");
-    assert.deepEqual(report.profiles, ["infisical-default"]);
+    assert.deepEqual(report.profiles, ["infisical-control", "infisical-default"]);
     assert.match(config, /secret:\/\/viberoots\/bootstrap\/viberoots-iac-bootstrap\/client-id/);
     assert.doesNotMatch(config, /secret:\/\/deployments\/pleomino/);
     assert.match(credentials, /secret:\/\/viberoots\/bootstrap\/viberoots-iac-bootstrap/);
@@ -47,13 +47,13 @@ test("repo dry-run reports active category profile outside graph requirements", 
     await writeResolverConfig(inlineInfisicalProfile());
     await writeGraph([{ name: "//deployments/vault:deploy", secret_backend: "vault/default" }]);
     const plan = await buildRepoDryRunMaterializationPlan({
-      configPath: "sprinkleref/selected.local.json",
+      configPath: "config/sprinkleref/selected.local.json",
       graphPath: path.join("build-tools", "tools", "buck", "graph.json"),
       sink: { kind: "local-file", backend: "local-file", description: "local" },
     });
     const resolver = await ensureRepoResolverConfig({
       dryRun: false,
-      configPath: "sprinkleref/selected.local.json",
+      configPath: "config/sprinkleref/selected.local.json",
       graphPath: path.join("build-tools", "tools", "buck", "graph.json"),
     });
     assert.deepEqual(
@@ -75,14 +75,14 @@ test("category projectIdEnv blockers appear in dry-run and fail confirmed materi
     delete process.env.OPERATOR_INFISICAL_PROJECT_ID;
     await writeResolverConfig(projectIdEnvInfisicalProfile());
     await writeGraph([{ name: "//deployments/vault:deploy", secret_backend: "vault/default" }]);
-    const before = await fs.readFile("sprinkleref/selected.local.json", "utf8");
+    const before = await fs.readFile("config/sprinkleref/selected.local.json", "utf8");
     const resolver = await ensureRepoResolverConfig({
       dryRun: false,
-      configPath: "sprinkleref/selected.local.json",
+      configPath: "config/sprinkleref/selected.local.json",
       graphPath: path.join("build-tools", "tools", "buck", "graph.json"),
     });
     const plan = await buildRepoDryRunMaterializationPlan({
-      configPath: "sprinkleref/selected.local.json",
+      configPath: "config/sprinkleref/selected.local.json",
       graphPath: path.join("build-tools", "tools", "buck", "graph.json"),
       env: {},
       sink: { kind: "local-file", backend: "local-file", description: "local" },
@@ -94,7 +94,7 @@ test("category projectIdEnv blockers appear in dry-run and fail confirmed materi
       () =>
         materializeRepoBackendProfiles({
           args: DEFAULT_BOOTSTRAP_ARGS,
-          configPath: "sprinkleref/selected.local.json",
+          configPath: "config/sprinkleref/selected.local.json",
           requiredProfiles: resolver.profiles,
           api: fakeProjectApi() as never,
           organizationId: "org_1",
@@ -102,7 +102,7 @@ test("category projectIdEnv blockers appear in dry-run and fail confirmed materi
         }),
       /projectIdEnv OPERATOR_INFISICAL_PROJECT_ID[\s\S]*unset/,
     );
-    assert.equal(await fs.readFile("sprinkleref/selected.local.json", "utf8"), before);
+    assert.equal(await fs.readFile("config/sprinkleref/selected.local.json", "utf8"), before);
   });
 });
 
@@ -138,7 +138,7 @@ async function writeGraph(nodes: unknown[]) {
 }
 
 async function writeResolverConfig(infisicalProfile: unknown) {
-  await writeJson("sprinkleref/selected.local.json", {
+  await writeJson("config/sprinkleref/selected.local.json", {
     version: 1,
     defaultCategory: "main",
     profiles: {

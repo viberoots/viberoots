@@ -29,12 +29,6 @@ in {
           dev_root="$search_root"
         fi
       fi
-      # Guard against recursive shell hook invocation only when this root is already wired.
-      if [ -n "''${_VIBEROOTS_DEVSHELL_ACTIVE:-}" ] && [ "''${_VIBEROOTS_DEVSHELL_ROOT:-}" = "$dev_root" ]; then
-        if command -v i >/dev/null 2>&1; then
-          return 0
-        fi
-      fi
       export _VIBEROOTS_DEVSHELL_ACTIVE=1
       export _VIBEROOTS_DEVSHELL_ROOT="$dev_root"
       is_interactive=0
@@ -43,6 +37,29 @@ in {
       esac
 
       cd "$dev_root"
+
+      _vbr_filter_host_path() {
+        local old_ifs="$IFS"
+        local entry
+        local out=""
+        IFS=':'
+        for entry in $1; do
+          case "$entry" in
+            ""|/opt/homebrew/bin|/opt/homebrew/sbin|/usr/local/Homebrew/*|/usr/local/Cellar/*) ;;
+            *) out="''${out:+$out:}$entry" ;;
+          esac
+        done
+        IFS="$old_ifs"
+        printf '%s\n' "$out"
+      }
+
+      _vbr_apply_dev_path() {
+        local repo_prefix="$PWD/build-tools/tools/bin:$PWD/.direnv/bin:$PWD/node_modules/.bin"
+        local nix_prefix="''${HOST_PATH:-}"
+        local host_tail
+        host_tail="$(_vbr_filter_host_path "$PATH")"
+        export PATH="$repo_prefix''${nix_prefix:+:$nix_prefix}''${host_tail:+:$host_tail}"
+      }
 
       link_script="$PWD/build-tools/tools/dev/devshell-link-node-modules.ts"
       if [ -f "$link_script" ]; then
@@ -110,7 +127,7 @@ EOF
             clang -Wall -Wextra -O2 -o "$PWD/.direnv/bin/apfs-clone-checker" "$PWD/.direnv/bin/apfs-clone-checker.c" >/dev/null 2>&1 || rm -f "$PWD/.direnv/bin/apfs-clone-checker"
           fi
         fi
-        export PATH="$PWD/build-tools/tools/bin:$PWD/.direnv/bin:$PWD/node_modules/.bin:$PATH"
+        _vbr_apply_dev_path
       fi
       # Ensure wrapper scripts on PATH are used even if stale aliases linger
       # from an older shellHook revision.
@@ -150,6 +167,7 @@ EOF
           fi
         fi
       fi
+      _vbr_apply_dev_path
 
       # Prepare zsh/bash env for completions and aliases
       mkdir -p .nix-zsh
@@ -170,10 +188,18 @@ _vbr_update_path() {
   local d="$PWD"
   while [[ "$d" != "/" ]]; do
     if [[ -f "$d/flake.nix" && -d "$d/build-tools/tools/bin" ]]; then
-      case ":$PATH:" in
-        *":$d/build-tools/tools/bin:"*) ;;
-        *) export PATH="$d/build-tools/tools/bin:$d/node_modules/.bin:$PATH" ;;
-      esac
+      local old_ifs="$IFS"
+      local entry
+      local out=""
+      IFS=':'
+      for entry in $PATH; do
+        case "$entry" in
+          ""|/opt/homebrew/bin|/opt/homebrew/sbin|/usr/local/Homebrew/*|/usr/local/Cellar/*|"$d/build-tools/tools/bin"|"$d/.direnv/bin"|"$d/node_modules/.bin") ;;
+          *) out="''${out:+$out:}$entry" ;;
+        esac
+      done
+      IFS="$old_ifs"
+      export PATH="$d/build-tools/tools/bin:$d/.direnv/bin:$d/node_modules/.bin''${HOST_PATH:+:$HOST_PATH}''${out:+:$out}"
       return
     fi
     d="$(dirname "$d")"
@@ -240,7 +266,8 @@ EOF
     '';
     buildInputs = [
       pkgs.git pkgs.buck2 pkgs.go pkgs.pnpm pkgs.nodejs_22 zx-wrapper pkgs.jq pkgs.rsync pkgs.copier pkgs.yq
-      pkgs.jc pkgs.coreutils pkgs.gomod2nix pkgs.opentofu pkgs.infisical
+      pkgs.jc pkgs.coreutils pkgs.gomod2nix pkgs.opentofu pkgs.infisical pkgs.awscli2 pkgs.dnsutils
+      pkgs.openssl pkgs.postgresql_16
     ] ++ (if pkgs.stdenv.isDarwin then [ agent-safehouse ] else [])
       ++ (if pkgs.stdenv.isLinux then [ pkgs.fuse-overlayfs pkgs.xdg-utils ] else []);
   };

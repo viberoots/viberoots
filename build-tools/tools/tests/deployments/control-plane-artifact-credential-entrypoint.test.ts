@@ -6,7 +6,7 @@ import { readCloudControlSetupInput } from "../../deployments/cloud-control-setu
 import { validateCloudControlSetupInput } from "../../deployments/cloud-control-setup-validate";
 import { withControlPlaneArgv } from "./control-plane-process-entrypoints.helpers";
 
-test("deployment-control-plane setup dispatcher treats artifact credential mode as value flag", async () => {
+test("control-plane setup dispatcher treats artifact credential mode as value flag", async () => {
   await withControlPlaneArgv(
     ["setup", "--artifact-credential-mode", "aws-instance-profile", "--help"],
     runDeploymentControlPlaneCommand,

@@ -9,6 +9,8 @@ current references for implementation work.
 - [`scaffolding.md`](scaffolding.md): scaffolding behavior and supported generators.
 - [`remote-build-setup.md`](remote-build-setup.md): remote-builder, cache, and Buck2 remote
   execution readiness guide.
+- [`../../docs/aws-account-control-plane-and-remote-builds.md`](../../docs/aws-account-control-plane-and-remote-builds.md):
+  fresh AWS account setup path that combines control-plane bootstrap with remote-build readiness.
 - [`cpp-linking.md`](cpp-linking.md) and [`cpp-linking.examples.md`](cpp-linking.examples.md):
   C++ linking behavior.
 - [`go-linking.md`](go-linking.md): Go linking behavior.

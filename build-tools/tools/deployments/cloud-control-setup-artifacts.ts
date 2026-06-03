@@ -146,7 +146,7 @@ export function renderIngressChecklist(input: CloudControlSetupInput): string {
       schemaVersion: "cloud-control-ingress-checklist@1",
       serviceIngress: {
         publicUrl: input.publicUrl,
-        requiredBoundary: "HTTPS to deployment-control-plane service only",
+        requiredBoundary: "HTTPS to control-plane service only",
         health: "/healthz",
         readiness: "/readyz",
         workerHeartbeats: "/api/v1/worker-heartbeats",

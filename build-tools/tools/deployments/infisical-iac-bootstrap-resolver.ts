@@ -1,5 +1,6 @@
 #!/usr/bin/env zx-wrapper
 import * as fs from "node:fs/promises";
+import * as path from "node:path";
 import { DEFAULT_GRAPH_PATH } from "../lib/graph-const";
 import { readGraph, type GraphNode } from "../lib/graph";
 import {
@@ -36,7 +37,7 @@ export async function ensureRepoResolverConfig(opts: {
       };
     }
     await initSprinkleRefConfigs({
-      dir: "sprinkleref",
+      dir: path.dirname(configPath),
       platform: opts.platform || process.platform,
       mode: "create",
     });

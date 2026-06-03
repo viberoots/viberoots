@@ -26,9 +26,9 @@ Concretely:
    - **`conventional-changelog-cli`** — a Node.js tool installable via pnpm, already in-ecosystem
      given the repo's heavy use of zx/TypeScript build tooling. Less configurable than git-cliff
      for monorepo scoping.
-   `git-cliff` is the preferred choice: it is a hermetic binary with no runtime dependency chain,
-   its configuration lives in a single `cliff.toml`, and it is available in `nixpkgs-unstable` (the
-   locked flake input already in use).
+     `git-cliff` is the preferred choice: it is a hermetic binary with no runtime dependency chain,
+     its configuration lives in a single `cliff.toml`, and it is available in `nixpkgs-unstable` (the
+     locked flake input already in use).
 
 2. **Configure scoping for the monorepo.** The commit scope field (e.g. `infisical`, `deployments`,
    `verify`, `install`, `dev`) maps naturally to subsystem sections in the changelog. The `cliff.toml`

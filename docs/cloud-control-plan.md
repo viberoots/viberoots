@@ -290,8 +290,8 @@ Make the long-running service and worker entrypoints reliable under container or
 
 ### 2. Scope of changes
 
-- Harden `deployment-control-plane service --config ...`.
-- Harden `deployment-control-plane worker --config ...`.
+- Harden `control-plane service --config ...`.
+- Harden `control-plane worker --config ...`.
 - Validate `/healthz` and `/readyz` semantics for service startup, database connectivity, and
   required runtime dependencies.
 - Make worker shutdown stop lease renewal and allow replacement workers to claim after expiry.
@@ -505,7 +505,7 @@ digest.
 ### 4. Tests to be added
 
 - Add Nix build tests for the runtime derivation and image contract derivation.
-- Add image smoke tests for `deployment-control-plane service --help` and `worker --help`, or the
+- Add image smoke tests for `control-plane service --help` and `worker --help`, or the
   closest non-mutating command available.
 - Add layer inspection tests for prohibited paths and secret-looking strings.
 - Add live-gated push/pull/digest tests for the selected registry.
@@ -860,7 +860,7 @@ cloud control-plane host profile without embedding secrets.
 
 ### 2. Scope of changes
 
-- Add a `deployment-control-plane` or `deploy-control-plane-operator` setup subcommand for cloud
+- Add a `control-plane` or `deploy-control-plane-operator` setup subcommand for cloud
   host profile generation.
 - Generate a profile bundle containing:
   - runtime config template

@@ -366,7 +366,7 @@ deploy --from-changes
 The current service is started with:
 
 ```bash
-deployment-control-plane service \
+control-plane service \
   --config /etc/deployment-control-plane/config.yaml
 ```
 

@@ -11,10 +11,10 @@ printf '%s\n' "${VBR_CONTROL_PLANE_IMAGE_BUILD_IDENTITY:?set reviewed nix-source
 VBR_CONTROL_PLANE_IMAGE_REF="${VBR_CONTROL_PLANE_IMAGE_REGISTRY:?set image registry}/${VBR_CONTROL_PLANE_IMAGE_REPOSITORY:?set image repository}@${VBR_CONTROL_PLANE_IMAGE_DIGEST}"
 
 podman pod create \
-  --name deployment-control-plane \
+  --name control-plane \
   --publish 127.0.0.1:7780:7780
 
-podman run -d --pod deployment-control-plane \
+podman run -d --pod control-plane \
   --name deployment-control-plane-service \
   --user 10001:10001 \
   --mount type=bind,source="${VBR_CONTROL_PLANE_CONFIG:-./config.example.yaml}",target=/etc/deployment-control-plane/config.yaml,readonly \
@@ -30,9 +30,9 @@ podman run -d --pod deployment-control-plane \
   --env VBR_CONTROL_PLANE_IMAGE_TAG="${VBR_CONTROL_PLANE_IMAGE_TAG:?set reviewed publication tag}" \
   --env VBR_CONTROL_PLANE_IMAGE_DIGEST_STATUS="verified-registry-publication" \
   "${VBR_CONTROL_PLANE_IMAGE_REF}" \
-  deployment-control-plane service --config /etc/deployment-control-plane/config.yaml
+  control-plane service --config /etc/deployment-control-plane/config.yaml
 
-podman run -d --pod deployment-control-plane \
+podman run -d --pod control-plane \
   --name deployment-control-plane-worker-1 \
   --user 10001:10001 \
   --mount type=bind,source="${VBR_CONTROL_PLANE_CONFIG:-./config.example.yaml}",target=/etc/deployment-control-plane/config.yaml,readonly \
@@ -48,9 +48,9 @@ podman run -d --pod deployment-control-plane \
   --env VBR_CONTROL_PLANE_IMAGE_TAG="${VBR_CONTROL_PLANE_IMAGE_TAG:?set reviewed publication tag}" \
   --env VBR_CONTROL_PLANE_IMAGE_DIGEST_STATUS="verified-registry-publication" \
   "${VBR_CONTROL_PLANE_IMAGE_REF}" \
-  deployment-control-plane worker --config /etc/deployment-control-plane/config.yaml
+  control-plane worker --config /etc/deployment-control-plane/config.yaml
 
-podman run -d --pod deployment-control-plane \
+podman run -d --pod control-plane \
   --name deployment-control-plane-worker-2 \
   --user 10001:10001 \
   --mount type=bind,source="${VBR_CONTROL_PLANE_CONFIG:-./config.example.yaml}",target=/etc/deployment-control-plane/config.yaml,readonly \
@@ -66,4 +66,4 @@ podman run -d --pod deployment-control-plane \
   --env VBR_CONTROL_PLANE_IMAGE_TAG="${VBR_CONTROL_PLANE_IMAGE_TAG:?set reviewed publication tag}" \
   --env VBR_CONTROL_PLANE_IMAGE_DIGEST_STATUS="verified-registry-publication" \
   "${VBR_CONTROL_PLANE_IMAGE_REF}" \
-  deployment-control-plane worker --config /etc/deployment-control-plane/config.yaml
+  control-plane worker --config /etc/deployment-control-plane/config.yaml

@@ -1,15 +1,15 @@
-# 31. Decide Forking Strategy for unfairly / viberoots
+# 31. Decide Forking Strategy for downstream products / viberoots
 
 **Tier:** Process & Governance
 **Priority:** 31 of 44
 **Depends on:** #23 Get Bob Set Up with viberoots-Based Monorepo, #24 Dry Run Deployment Flow with Bob
 **Estimated effort:** S
 **Date:** 2026-05-25
-**Summary:** Evaluate and decide the repository relationship between viberoots (platform) and unfairly (product) — single monorepo, separate repos, or GitHub template — and document the chosen model and its implications for CI, secrets, and deployment identity.
+**Summary:** Evaluate and decide the repository relationship between viberoots (platform) and downstream product (product) — single monorepo, separate repos, or GitHub template — and document the chosen model and its implications for CI, secrets, and deployment identity.
 
 ## What
 
-Decide and document the canonical mechanism by which a downstream product repo — such as unfairly —
+Decide and document the canonical mechanism by which a downstream product repo — such as downstream product —
 is created from and related to viberoots. The decision must cover:
 
 1. How the downstream repo gets its initial scaffold (build system, flake, Starlark helpers,
@@ -20,9 +20,9 @@ is created from and related to viberoots. The decision must cover:
 
 The concrete candidate strategies to evaluate:
 
-- **Single shared monorepo** — unfairly lives inside viberoots under `projects/apps/` and
+- **Single shared monorepo** — downstream product lives inside viberoots under `projects/apps/` and
   `projects/deployments/`. No forking; one repo, one Buck graph, one flake.
-- **Separate repo with manual scaffold** — unfairly is an independent repo whose initial
+- **Separate repo with manual scaffold** — downstream product is an independent repo whose initial
   `build-tools/`, `toolchains/`, and `flake.nix` are copied from viberoots by hand. Upstream
   updates are adopted manually, with no automated sync path.
 - **GitHub template repo** — viberoots (or a stripped derivative) is marked as a GitHub template.
@@ -38,7 +38,7 @@ The output of this task is a written decision recorded in this document or a lin
 the chosen strategy, the rationale, the explicit trade-offs accepted, and the operational steps
 required to set up a new downstream repo once the strategy is in effect. If the decision is
 "single monorepo", that is also the answer and should state what the boundary between
-viberoots-platform code and unfairly product code is.
+viberoots-platform code and downstream product code is.
 
 ## Why Now
 
@@ -65,9 +65,9 @@ strategy is tracked as task #31" — is acceptable as a private interim but not 
 This is why the task depends on both. Do not resolve #31 before those tasks have produced a working
 downstream repo with at least one real deployment.
 
-**Single monorepo is the path of least resistance but may not scale.** Putting unfairly inside
+**Single monorepo is the path of least resistance but may not scale.** Putting downstream product inside
 viberoots eliminates the upstream-tracking problem entirely but collapses the separation between
-the platform layer and the product layer. It means unfairly is subject to viberoots's full
+the platform layer and the product layer. It means downstream product is subject to viberoots's full
 methodology — `METHODOLOGY.XML`, stale-names lint, the six-stage CI pipeline, the 250-line file
 limit, all of it. If viberoots is intended to become a publicly maintained platform for multiple
 downstream products, the monorepo model creates a governance question: who controls the repo, and
@@ -95,15 +95,15 @@ known consideration from #23 and must be factored into whatever scaffold process
 
 ## Trade-offs
 
-| Strategy | Upstream updates | Governance boundary | Setup complexity | CI/build fidelity |
-|---|---|---|---|---|
-| Single monorepo | Not needed | None — same repo | Lowest | Identical |
-| Manual scaffold | Manual, ad hoc | Implicit, by copy | Low | Depends on discipline |
-| GitHub template | None after creation | None | Low | Identical at fork time |
-| Git subtree | `git subtree pull` | Weak — all files shared | Medium | Identical if subtree is self-contained |
-| Git submodule | Explicit SHA bump | Stronger — pinned ref | Higher | Depends on module boundary |
+| Strategy        | Upstream updates    | Governance boundary     | Setup complexity | CI/build fidelity                      |
+| --------------- | ------------------- | ----------------------- | ---------------- | -------------------------------------- |
+| Single monorepo | Not needed          | None — same repo        | Lowest           | Identical                              |
+| Manual scaffold | Manual, ad hoc      | Implicit, by copy       | Low              | Depends on discipline                  |
+| GitHub template | None after creation | None                    | Low              | Identical at fork time                 |
+| Git subtree     | `git subtree pull`  | Weak — all files shared | Medium           | Identical if subtree is self-contained |
+| Git submodule   | Explicit SHA bump   | Stronger — pinned ref   | Higher           | Depends on module boundary             |
 
-The decision should also consider unfairly's intended lifecycle: is it a single team working
+The decision should also consider downstream product's intended lifecycle: is it a single team working
 closely with the viberoots author, or is it intended to operate at arm's length? Close collaboration
 favors the monorepo. Independent roadmap favors separate repo with explicit versioning.
 
@@ -137,10 +137,9 @@ current state of the tooling. The forking strategy decision should distinguish b
 canonical answer" and "the tooling that automates it"; the decision can be made before the tooling
 is built, and the tooling can be a follow-on.
 
-**unfairly has no existing presence in the viberoots repo.** As of this writing, the name
-"unfairly" does not appear in any viberoots source file, docs, or task. The relationship between
-the two projects is informal context, not a committed design. This task is the appropriate place
-to formalize it.
+**A concrete downstream product should not be named in the viberoots repo.** Downstream product
+names should be treated as external context, not committed platform design. This task is the
+appropriate place to formalize the generic relationship between viberoots and downstream repos.
 
 **Record the decision as an ADR if the answer is non-obvious.** If the strategy is "single
 monorepo", that is simple enough to state in this document. If the strategy involves a separate

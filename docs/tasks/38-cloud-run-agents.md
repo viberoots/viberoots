@@ -22,7 +22,7 @@ The spike has three deliverables:
 
 2. **Authorization design.** Define how cloud-run agents acquire and prove identity. The current
    MCP endpoint requires the reviewed service bearer token (`Authorization: Bearer <reviewed service
-   token>`). Agents need a separate, non-shared, revocable identity. The spike should determine
+token>`). Agents need a separate, non-shared, revocable identity. The spike should determine
    whether service-principal grants via #6's auth-provider abstraction are sufficient, whether a
    dedicated agent identity type is needed, and how agent tokens are provisioned without a human
    login flow.
@@ -127,7 +127,7 @@ category.
 **Agent runs as a long-lived service vs. a short-lived job.** A long-lived agent service
 (persistent process, always-on) requires hosting, health monitoring, and credential rotation
 management. A short-lived job (invoked by a cron, webhook, or CI trigger; runs to completion;
-exits) is simpler, easier to audit, and matches the existing `deployment-control-plane worker`
+exits) is simpler, easier to audit, and matches the existing `control-plane worker`
 model. The spike should prototype a short-lived job shape first.
 
 ## Considerations

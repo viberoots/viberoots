@@ -143,13 +143,14 @@ async function writeProfileOverrides(
   profiles: Record<string, SprinkleRefBackendConfig>,
 ) {
   const raw = await readConfigFile(configPath);
+  const resolved = await readSprinkleRefConfig(configPath);
   raw.profiles = { ...(raw.profiles || {}), ...profiles };
   validateConfig(
     {
       path: configPath,
       defaultCategory: raw.defaultCategory || "main",
-      profiles: raw.profiles,
-      categories: raw.categories || {},
+      profiles: { ...resolved.profiles, ...raw.profiles },
+      categories: { ...resolved.categories, ...(raw.categories || {}) },
     },
     configPath,
   );

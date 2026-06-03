@@ -13,7 +13,7 @@ Reviewed context:
 
 - The control plane remains the deployment authority. AWS, Supabase, S3, PrivateLink, DNS, TLS, and
   provider CLIs are runtime dependencies, provider-capability targets, or evidence sources.
-- `deployment-control-plane setup --host-mode aws-ec2` already emits a runtime bundle with
+- `control-plane setup --host-mode aws-ec2` already emits a runtime bundle with
   `config.yaml`, `credential-manifest.json`, `commands.json`, image publication evidence, managed
   dependency profiles, provider-capability declarations, and AWS profile fragments.
 - The generated AWS profile is not yet a complete infrastructure-as-code realization. VPC, subnet,
@@ -152,7 +152,7 @@ guessing service URLs, current working directories, authentication headers, or m
 - Add a setup doctor command that reads the generated bundle, validates the runbook structure, and
   reports which setup phases are ready, blocked, or complete without needing cloud credentials for
   purely local checks.
-- Add a credential preflight command under `deployment-control-plane` or a deployment-owned
+- Add a credential preflight command under `control-plane` or a deployment-owned
   companion command that validates:
   - exact filenames from `credential-manifest.json`
   - selected reviewed-source mode
@@ -334,7 +334,7 @@ flags.
   - region/account/repository identity evidence
 - Add deployment-owned IaC or provider-capability hook support for ECR repository creation, policy
   preview, apply, evidence, smoke, and rollback/import where practical.
-- Add `deployment-control-plane image-publication` or an equivalent setup subcommand that:
+- Add `control-plane image-publication` or an equivalent setup subcommand that:
   - optionally runs or records the reviewed `nix build .#deployment-control-plane-image` and
     `.#deployment-control-plane-image-contract` commands
   - accepts the reviewed image reference, source revision, build identity, and human tag
@@ -343,7 +343,7 @@ flags.
     helper pattern
   - verifies the inspected digest matches the published digest and image reference digest
   - writes `image-publication.json` using the existing evidence schema
-- Make `deployment-control-plane setup` accept `--image-publication-evidence <path>` for production
+- Make `control-plane setup` accept `--image-publication-evidence <path>` for production
   profile generation.
 - Preserve direct digest flags only for dry-run fixtures and tests, or clearly mark them as
   non-production escape hatches.
@@ -1153,7 +1153,7 @@ workflow.
 
 ### 2. Scope of changes
 
-- Add a typed runtime input file consumed by `deployment-control-plane setup` for non-secret values:
+- Add a typed runtime input file consumed by `control-plane setup` for non-secret values:
   - auth issuer, audience, JWKS URL, role/group claim mappings, service principals, callback host,
     and callback path
   - Infisical site URL, project id, environment, and deployment id mappings

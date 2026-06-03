@@ -47,7 +47,7 @@ function providerCapabilityEvidenceCommand(
 }
 
 function providerCommand(input: CloudControlSetupInput, capabilityId: string): string {
-  return `deployment-control-plane provider-capability --deployment-id ${shellQuote(
+  return `control-plane provider-capability --deployment-id ${shellQuote(
     input.deploymentIds[0] || "<missing-deployment>",
   )} --provider-capability ${capabilityId}${modeFlag(input, capabilityId)}`;
 }

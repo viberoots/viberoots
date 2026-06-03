@@ -21,8 +21,8 @@ The system is split into a **control plane** and a **data plane** at a hard auth
 
 The control plane is the sole deployment authority for all protected and shared deployment targets. It consists of:
 
-- **deployment-control-plane service** — stateless HTTP service that accepts submissions, runs admission validation, and answers status and record queries. Listens on HTTPS. Exposes: `POST /api/v1/submit`, `GET /api/v1/submit`, `GET /api/v1/status`, `GET /api/v1/records`, `GET /api/v1/current-stage-state`, `GET /api/v1/stage-history`.
-- **deployment-control-plane worker** — stateless background worker that pulls work from the Postgres queue and executes provider-specific publish operations.
+- **control-plane service** — stateless HTTP service that accepts submissions, runs admission validation, and answers status and record queries. Listens on HTTPS. Exposes: `POST /api/v1/submit`, `GET /api/v1/submit`, `GET /api/v1/status`, `GET /api/v1/records`, `GET /api/v1/current-stage-state`, `GET /api/v1/stage-history`.
+- **control-plane worker** — stateless background worker that pulls work from the Postgres queue and executes provider-specific publish operations.
 - **Postgres** — authoritative runtime state: submissions, work queue, distributed locks, worker ownership, deploy records, stage state, and stage history.
 - **S3-compatible artifact store** — immutable artifact storage for artifacts that have been admitted by the service.
 

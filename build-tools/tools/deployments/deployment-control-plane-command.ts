@@ -12,7 +12,11 @@ export type ControlPlaneCommand =
   | "credential-rotation"
   | "image-publication"
   | "managed-dependencies"
-  | "provider-capability";
+  | "provider-capability"
+  | "aws-account";
+
+export const CONTROL_PLANE_USAGE =
+  "usage: control-plane <service|worker|setup|image-publication|provider-capability|setup-doctor|credential-preflight|credential-staging|credential-rotation|managed-dependencies|cutover-evidence|cutover|aws-account>";
 
 export function selectedControlPlaneCommand(): ControlPlaneCommand {
   const [mode] = getPositionalsWithValueFlags([
@@ -86,11 +90,33 @@ export function selectedControlPlaneCommand(): ControlPlaneCommand {
     "worker-id",
     "worker-replicas",
     "vercel-operator-ui-evidence",
+    "auth-host",
+    "auth-service",
+    "aws-account-id",
+    "aws-organization-id",
+    "backend-state-key",
+    "domain",
+    "environment",
+    "evidence-dir",
+    "expected-aws-account-id",
+    "expected-aws-role-arn",
+    "private-db-host",
+    "private-db-service",
+    "service",
+    "service-host",
+    "stack",
+    "state-bucket-name",
+    "state-lock-table-name",
+    "supabase-access-token-env",
+    "supabase-access-token-ref",
+    "supabase-access-token-ref-category",
+    "supabase-api-base-url",
+    "supabase-org-id",
+    "supabase-project-ref",
+    "supabase-region",
   ]);
   if (isControlPlaneCommand(mode)) return mode;
-  throw new Error(
-    "usage: deployment-control-plane <service|worker|setup|image-publication|provider-capability|setup-doctor|credential-preflight|credential-staging|credential-rotation|managed-dependencies|cutover-evidence|cutover>",
-  );
+  throw new Error(CONTROL_PLANE_USAGE);
 }
 
 function isControlPlaneCommand(mode: string): mode is ControlPlaneCommand {
@@ -106,6 +132,7 @@ function isControlPlaneCommand(mode: string): mode is ControlPlaneCommand {
     mode === "credential-rotation" ||
     mode === "image-publication" ||
     mode === "managed-dependencies" ||
-    mode === "provider-capability"
+    mode === "provider-capability" ||
+    mode === "aws-account"
   );
 }

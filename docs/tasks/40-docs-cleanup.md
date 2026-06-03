@@ -20,7 +20,6 @@ distinct documentation types that are not cleanly separated, and has no index or
 **Concrete sub-tasks, in order:**
 
 1. **Identify and archive or delete stale documents.** The following categories are candidates:
-
    - `docs/build-history/` — 78 files of alignment notes (`quad-alignment-1.md` through
      `quad-alignment-40.md`, `trio-alignment-*.md`, `hmr-phase-*.md`, `cpp-patches-final.md`, etc.)
      representing incremental session notes from active development. These are not reference material;

@@ -11,7 +11,7 @@ import { resolveCredentialSinkSelection } from "../../deployments/infisical-iac-
 test("bootstrap credentials cannot resolve through an Infisical backend or profile", async () => {
   const dir = await tmp();
   await withCwdAndEnv(dir, async () => {
-    await writeJson("sprinkleref/selected.local.json", unsafeInfisicalBootstrapConfig());
+    await writeJson("config/sprinkleref/selected.local.json", unsafeInfisicalBootstrapConfig());
     await assert.rejects(
       () =>
         resolveCredentialSinkSelection(

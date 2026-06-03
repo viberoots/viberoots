@@ -31,12 +31,12 @@ Concrete activities:
 - Confirm the control plane is reachable: `the deployment control plane endpoint` for the hosted service, or
   the containerized successor from #4.
 - Confirm Bob has a client profile installed via `nixos-shared-host-install client install
-  --profile the current personal server --control-plane-url https://the deployment control plane endpoint` (or equivalent for the chosen
+--profile the current personal server --control-plane-url https://the deployment control plane endpoint` (or equivalent for the chosen
   provider).
 - Confirm Bob holds `submitter` and `admission_reporter` grants for the target deployment scope.
   Use `deploy auth explain-groups --deployment <label> --action submit` to verify the expected
   group shape before the run, then use `deploy admin identity grant-user --profile the current personal server --action
-  submit --user-email <bob@example.com> --apply-host` if the grant is absent.
+submit --user-email <bob@example.com> --apply-host` if the grant is absent.
 - Confirm the Infisical project for Bob's deployment family is bootstrapped (per the one-command
   flow: `build-tools/tools/deployments/infisical-bootstrap.ts deployment --target <label>`) and
   that the required secret values are populated outside the bootstrap command.

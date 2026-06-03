@@ -14,7 +14,7 @@ Stand up a Kubernetes cluster that task #7 (Simple Kubernetes / OpenTofu Deploym
 Concrete steps:
 
 - Select a cloud provider and cluster topology (see Trade-offs) and provision the cluster via OpenTofu or the provider's CLI.
-- Create a dedicated namespace for the control plane (`deployment-control-plane` or equivalent).
+- Create a dedicated namespace for the control plane (`control-plane` or equivalent).
 - Configure RBAC: a service account for the control plane deployment, roles scoped to that namespace, and a kubeconfig that CI and the deploy tooling can use.
 - Install required cluster add-ons: an ingress controller (nginx or cloud-native), a storage class for PersistentVolumeClaims if the control plane needs persistent volumes, and cert-manager if TLS certificate provisioning is managed in-cluster.
 - Verify that the deploy tooling (`kubectl`, `helm`) can reach the cluster from both a developer workstation and a CI context.

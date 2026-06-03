@@ -227,8 +227,8 @@ test("provider capabilities wire preview, apply, and evidence through reviewed a
     renderCloudControlSetupBundle(input()).files["provider-capabilities.json"]!,
   );
   for (const declaration of declarations) {
-    assert.match(declaration.iac.previewCommand, /^deployment-control-plane provider-capability/);
-    assert.match(declaration.iac.applyCommand, /^deployment-control-plane provider-capability/);
-    assert.match(declaration.iac.evidenceCommand, /^deployment-control-plane provider-capability/);
+    assert.match(declaration.iac.previewCommand, /^control-plane provider-capability/);
+    assert.match(declaration.iac.applyCommand, /^control-plane provider-capability/);
+    assert.match(declaration.iac.evidenceCommand, /^control-plane provider-capability/);
   }
 });

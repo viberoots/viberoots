@@ -28,6 +28,7 @@ import {
   readPleominoReviewedMetadataSource,
 } from "./infisical-iac-bootstrap-reviewed-metadata";
 import { errorMessage } from "./infisical-iac-bootstrap-redaction";
+import { DEFAULT_SPRINKLEREF_CONFIG_PATH } from "./sprinkleref-config-select";
 import type { BootstrapArgs } from "./infisical-iac-bootstrap-types";
 
 const PLEOMINO_DEPLOYMENT_BOOTSTRAP_TARGETS = new Set([
@@ -129,7 +130,7 @@ async function dryRun(args: BootstrapArgs) {
   console.log(JSON.stringify(await buildDryRunReport(args), null, 2));
   for (const line of await buildDryRunGuidance(args)) console.error(line);
   if (args.mode === "repo") {
-    printRepoFollowUpCommands("sprinkleref/selected.local.json");
+    printRepoFollowUpCommands(DEFAULT_SPRINKLEREF_CONFIG_PATH);
   }
 }
 

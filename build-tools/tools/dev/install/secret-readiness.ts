@@ -29,7 +29,10 @@ type SecretReadinessProbe = {
 
 const deploymentMetadataRoot = path.join("projects", "deployments");
 const familyMetadataSuffix = path.join("shared", "family.bzl");
-const resolverConfigRelativePath = path.join("sprinkleref", "selected.local.json");
+const resolverConfigRelativePaths = [
+  path.join("config", "sprinkleref", "selected.local.json"),
+  path.join("sprinkleref", "selected.local.json"),
+];
 
 export async function ensureInstallSecretReadiness(opts: {
   repoRoot: string;
@@ -88,8 +91,7 @@ export async function probeLocalSecretReadiness(repoRoot = process.cwd()) {
     resolveBootstrapAccessCredentialSinkBackend,
     resolveCredentialSinkSelection,
   } = await loadDeploymentReadinessModules();
-  const configPath =
-    process.env.SPRINKLEREF_CONFIG || path.join(repoRoot, resolverConfigRelativePath);
+  const configPath = process.env.SPRINKLEREF_CONFIG || (await selectedResolverConfigPath(repoRoot));
   const metadataPaths = await discoverDeploymentFamilyMetadataPaths(repoRoot);
   try {
     await readSprinkleRefConfig(configPath);
@@ -129,6 +131,19 @@ export async function probeLocalSecretReadiness(repoRoot = process.cwd()) {
 
 export async function isInstallSecretReadinessApplicable(repoRoot = process.cwd()) {
   return (await discoverDeploymentFamilyMetadataPaths(repoRoot)).length > 0;
+}
+
+async function selectedResolverConfigPath(repoRoot: string) {
+  for (const relativePath of resolverConfigRelativePaths) {
+    const candidate = path.join(repoRoot, relativePath);
+    try {
+      await fsp.access(candidate);
+      return candidate;
+    } catch (error) {
+      if (!isFileAbsenceError(error)) throw error;
+    }
+  }
+  return path.join(repoRoot, resolverConfigRelativePaths[0]);
 }
 
 async function discoverDeploymentFamilyMetadataPaths(repoRoot: string) {

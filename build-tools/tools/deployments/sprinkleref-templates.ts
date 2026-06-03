@@ -4,6 +4,7 @@ import * as os from "node:os";
 import * as path from "node:path";
 import { starterInfisicalProfile } from "./infisical-iac-bootstrap-profile-kind";
 import type { SprinkleRefConfigFile } from "./sprinkleref-types";
+import { LOCAL_VALUES_PATH } from "./aws-account-inputs";
 
 const VAULT_DEFAULT = {
   backend: "vault" as const,
@@ -24,8 +25,12 @@ export function sprinkleRefStarterConfigs(platform = process.platform) {
     profiles: {
       "vault-default": VAULT_DEFAULT,
       "infisical-default": starterInfisicalProfile(),
+      "infisical-control": { ...starterInfisicalProfile(), defaultEnvironment: "control" },
     },
-    categories: { main: { profile: "infisical-default" } },
+    categories: {
+      main: { profile: "infisical-default" },
+      control: { profile: "infisical-control" },
+    },
   };
   return {
     "base.json": base,
@@ -37,11 +42,21 @@ export function sprinkleRefStarterConfigs(platform = process.platform) {
     "ci.jenkins.json": ciConfig("jenkins", "VIBEROOTS_"),
     "ci.gitlab.json": ciConfig("gitlab-ci", "VIBEROOTS_"),
     "ci.bitbucket.json": ciConfig("bitbucket-pipelines", "VIBEROOTS_"),
-    "selected.local.json": {
+    "selected.json": {
       version: 1,
       extends: "./base.json",
       defaultCategory: "main",
-      categories: { bootstrap, main: { profile: "infisical-default" } },
+      categories: {
+        bootstrap,
+        main: { profile: "infisical-default" },
+        control: { profile: "infisical-control" },
+      },
+    },
+    "selected.local.json": {
+      version: 1,
+      extends: "./selected.json",
+      defaultCategory: "main",
+      categories: {},
     },
   };
 }
@@ -62,6 +77,57 @@ export async function initSprinkleRefConfigs(opts: {
     written.push(file);
   }
   return written;
+}
+
+export async function initLocalSprinkleRefValues(cwd: string) {
+  const file = path.resolve(cwd, LOCAL_VALUES_PATH);
+  const existing = await readExistingLocalValues(file);
+  const next = mergeLocalValueDefaults(existing);
+  await fs.mkdir(path.dirname(file), { recursive: true });
+  await fs.writeFile(file, `${JSON.stringify(next, null, 2)}\n`, "utf8");
+  return file;
+}
+
+async function readExistingLocalValues(file: string): Promise<Record<string, unknown>> {
+  try {
+    const parsed = JSON.parse(await fs.readFile(file, "utf8"));
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      throw new Error("local values root must be an object");
+    }
+    return parsed as Record<string, unknown>;
+  } catch (error) {
+    if (error && typeof error === "object" && "code" in error && error.code === "ENOENT") {
+      return {};
+    }
+    throw new Error(`invalid local SprinkleRef values JSON: ${LOCAL_VALUES_PATH}`);
+  }
+}
+
+function mergeLocalValueDefaults(existing: Record<string, unknown>) {
+  const root = { ...existing, schemaVersion: "sprinkleref-values@1" };
+  const values = objectChild(root, "values");
+  const control = objectChild(values, "control-plane");
+  const aws = objectChild(control, "aws");
+  const supabase = objectChild(control, "supabase");
+  aws["account-id"] ??= "<aws-account-id>";
+  aws["organization-id"] ??= "<aws-organization-id>";
+  supabase["org-id"] ??= "<supabase-org-id>";
+  supabase["project-ref"] ??= "<supabase-project-ref>";
+  supabase["management-api-token"] ??= {
+    ref: "secret://control-plane/supabase/management-api-token",
+    category: "bootstrap",
+  };
+  return root;
+}
+
+function objectChild(parent: Record<string, unknown>, key: string): Record<string, unknown> {
+  const current = parent[key];
+  if (current && typeof current === "object" && !Array.isArray(current)) {
+    return current as Record<string, unknown>;
+  }
+  const child: Record<string, unknown> = {};
+  parent[key] = child;
+  return child;
 }
 
 function localConfig(backend: "local-file" | "macos-keychain", fields: Record<string, string>) {

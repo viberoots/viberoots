@@ -23,7 +23,7 @@ What is missing is an end-to-end answer to "what do I do when a credential needs
    local file. These are the root credentials to reach a secret backend. They are currently issued
    with `clientSecretTtl: 0` (no expiry) and `accessTokenTtl: 3600` (1-hour derived access
    tokens). The bootstrap tool already has `--rotate-bootstrap-credentials
-   --force-overwrite-local-credentials` to issue a new Infisical client secret for this machine and
+--force-overwrite-local-credentials` to issue a new Infisical client secret for this machine and
    overwrite the local sink. There is no policy for when or how often operators should use this,
    what to do when a machine is decommissioned, or how to revoke a leaked credential promptly.
 
@@ -98,6 +98,7 @@ This task adds the policy and guidance layer so operators know when and how to u
 safely.
 
 The task is also gated on #1 (Infisical provider) being fully wired because:
+
 - the dual-backend model means rotation procedures must exist for both Infisical-backed and
   Infisical-backed deployments, and the Infisical runtime worker credential path is still being
   hardened

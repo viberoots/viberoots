@@ -67,7 +67,7 @@ EOF
 exec ${pkgs.nodejs_22}/bin/node "$resolved_wrangler_cli" "\$@"
 EOF
       chmod 0755 "$out/bin/wrangler"
-      cat > "$out/bin/deployment-control-plane" <<EOF
+      cat > "$out/bin/control-plane" <<EOF
 #!${pkgs.runtimeShell}
 export VBR_CONTROL_PLANE_VERSION="${version}"
 export VBR_CONTROL_PLANE_SOURCE_REVISION="\''${VBR_CONTROL_PLANE_SOURCE_REVISION:-${sourceRevision}}"
@@ -76,7 +76,7 @@ export VBR_CONTROL_PLANE_IMAGE_DIGEST_STATUS="\''${VBR_CONTROL_PLANE_IMAGE_DIGES
 export VBR_CONTROL_PLANE_IMAGE_DIGEST="\''${VBR_CONTROL_PLANE_IMAGE_DIGEST:-build-only}"
 exec ${pkgs.nodejs_22}/bin/node "$out/share/deployment-control-plane/deployment-control-plane-wrapper.cjs" "\$@"
 EOF
-      chmod 0755 "$out/bin/deployment-control-plane"
+      chmod 0755 "$out/bin/control-plane"
     '';
   };
   digestContract = {
@@ -95,10 +95,10 @@ EOF
     inherit version sourceRevision imageBuildIdentity;
     inherit digestContract;
     user = "10001:10001";
-    entrypoint = [ "/bin/deployment-control-plane" ];
+    entrypoint = [ "/bin/control-plane" ];
     commands = [
-      "deployment-control-plane service --config /etc/deployment-control-plane/config.yaml"
-      "deployment-control-plane worker --config /etc/deployment-control-plane/config.yaml"
+      "control-plane service --config /etc/deployment-control-plane/config.yaml"
+      "control-plane worker --config /etc/deployment-control-plane/config.yaml"
     ];
     includedTools = [
       "node"

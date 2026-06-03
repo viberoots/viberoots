@@ -24,6 +24,7 @@ produces no structured output at all. Request correlation works through the `X-R
 **TypeScript logging library** (`build-tools/tools/lib/logger.ts`)
 
 A single module, under 250 lines, that:
+
 - Exports a `createLogger(service: string, context?: Record<string, unknown>)` factory that
   returns a logger bound to a fixed `service` field.
 - Writes NDJSON lines to stdout for `info` and `debug` levels; writes to stderr for `warn` and
@@ -41,6 +42,7 @@ A single module, under 250 lines, that:
 
 Replace all `console.log` / `console.error` calls inside long-running service and worker entry
 points with structured logger calls. Concretely:
+
 - `nixos-shared-host-control-plane-service.ts` — emit a structured `info` line on bind (fields:
   `url`, `instance_id`, `mode`) instead of `JSON.stringify({ url })`.
 - `nixos-shared-host-control-plane-worker.ts` — emit `info` on start and `error` on fatal exit.
@@ -103,6 +105,7 @@ The dependency on #11 (Backend Service Build Templates) matters for any Go servi
 template: they need the same NDJSON contract from the start rather than retrofitting it.
 
 This task directly unblocks:
+
 - **#18 Monitoring** — alerting rules need log-derived signals (error rate, specific error codes)
   that do not exist yet as metrics.
 - **#17 Audit Logging** — audit events share the same transport; the log library's redaction

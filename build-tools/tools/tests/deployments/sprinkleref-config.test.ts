@@ -140,7 +140,12 @@ test("starter configs are deterministic and contain no secret values", async () 
   const dir = await tmp();
   const written = await initSprinkleRefConfigs({ dir, platform: "linux" });
   assert.ok(written.some((file) => file.endsWith("ci.github.json")));
-  assert.match(await fs.readFile(path.join(dir, "selected.local.json"), "utf8"), /local-file/);
+  assert.match(await fs.readFile(path.join(dir, "selected.json"), "utf8"), /local-file/);
+  const selected = await readSprinkleRefConfig(path.join(dir, "selected.json"));
+  const control = resolveSprinkleRefBackend(selected, "control");
+  assert.equal(control.profile, "infisical-control");
+  assert.equal(control.backend.backend, "infisical");
+  assert.equal(control.backend.defaultEnvironment, "control");
 });
 
 test("CI resolver templates parse each bootstrap mapping without remote writes", async () => {
@@ -165,7 +170,7 @@ test("sprinkleref --init defaults to the sprinkleref directory", async () => {
   try {
     await runSprinkleRefCli({ argv: ["--init"], stdout: () => undefined, platform: "linux" });
     assert.match(
-      await fs.readFile(path.join(dir, "sprinkleref", "selected.local.json"), "utf8"),
+      await fs.readFile(path.join(dir, "config/sprinkleref", "selected.json"), "utf8"),
       /local-file/,
     );
   } finally {

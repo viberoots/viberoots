@@ -26,7 +26,7 @@ export function readSetupImagePublicationFlags(): SetupImagePublicationFlags {
 export function assertProductionImagePublicationEvidence(flags: SetupImagePublicationFlags): void {
   if (!flags.imagePublicationEvidencePath) {
     throw new Error(
-      "production AWS setup requires --image-publication-evidence from deployment-control-plane image-publication",
+      "production AWS setup requires --image-publication-evidence from control-plane image-publication",
     );
   }
   if (flags.imagePublication?.evidenceSource !== "generated-command") {

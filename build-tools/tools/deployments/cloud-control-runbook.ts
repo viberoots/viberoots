@@ -166,7 +166,7 @@ function processCommands(input: CloudControlSetupInput): RunbookCommand[] {
   if (input.mode === "aws-ec2") return awsEc2ProcessCommands(input);
   const service = command(
     "service",
-    "deployment-control-plane service --config /etc/deployment-control-plane/config.yaml",
+    "control-plane service --config /etc/deployment-control-plane/config.yaml",
     ["$PROFILE_ROOT/credential-preflight.json"],
     ["$PROFILE_ROOT/process-service.json"],
     "service process starts",
@@ -174,7 +174,7 @@ function processCommands(input: CloudControlSetupInput): RunbookCommand[] {
   const workers = Array.from({ length: input.workerReplicas }, (_, index) =>
     command(
       `worker-${index + 1}`,
-      `deployment-control-plane worker --config /etc/deployment-control-plane/config.yaml --worker-id worker-${index + 1}`,
+      `control-plane worker --config /etc/deployment-control-plane/config.yaml --worker-id worker-${index + 1}`,
       ["$PROFILE_ROOT/credential-preflight.json"],
       [`$PROFILE_ROOT/process-worker-${index + 1}.json`],
       "worker process starts",
@@ -214,4 +214,4 @@ function awsEc2ProcessCommands(input: CloudControlSetupInput): RunbookCommand[] 
 }
 
 const doctor = (input: CloudControlSetupInput) =>
-  `${rootPrelude(input.outDir)}; deployment-control-plane setup-doctor --bundle-dir "$PROFILE_ROOT" --out "$PROFILE_ROOT/setup-doctor.json"`;
+  `${rootPrelude(input.outDir)}; control-plane setup-doctor --bundle-dir "$PROFILE_ROOT" --out "$PROFILE_ROOT/setup-doctor.json"`;

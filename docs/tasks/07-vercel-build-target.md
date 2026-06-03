@@ -17,6 +17,7 @@ The work spans several layers that must land together:
 
 **Starlark macro — `node_vercel_next_artifact`** (`build-tools/node/defs_vercel.bzl`)
 A new genrule-backed macro, analogous in shape to the existing `node_service_artifact`, that:
+
 - Accepts a `vercel_config` pointing to the package-local `vercel.project.json` (schema
   `vercel-next-artifact@1`).
 - Calls Nix via the shared `nix_calling_genrule_bootstrap` / `nix_calling_env_export_buck_graph_json`
@@ -31,6 +32,7 @@ A new genrule-backed macro, analogous in shape to the existing `node_service_art
 
 **Nix derivation — `node-vercel-next`** (`build-tools/tools/nix/flake/packages/node-vercel-next.nix`)
 A per-importer `stdenvNoCC.mkDerivation` that:
+
 - Receives the hermetic `nodeWebapp` dist output from the existing `node-webapp` derivation family.
 - Runs `build-tools/tools/vercel/next-artifact.ts` (a `#!/usr/bin/env zx-wrapper` script) to
   assemble the Vercel Build Output API v3 directory layout under `.vercel/output/`.
@@ -39,6 +41,7 @@ A per-importer `stdenvNoCC.mkDerivation` that:
 
 **Artifact identity script — `build-tools/tools/vercel/next-artifact.ts`**
 A zx-wrapper TypeScript script that:
+
 - Reads and validates `vercel.project.json` (schema version, `framework: "nextjs"`,
   `runtime.nodeVersion`, declared `buildEnv`/`runtimeEnv` names).
 - Enforces the closed-world invariant: fails on any ambient `.vercel` directory, fails on any
@@ -54,6 +57,7 @@ A zx-wrapper TypeScript script that:
 - Rejects symlinks and hardlinks in the output tree.
 
 **Scaffold template — `ts/webapp-ssr-next`** (`build-tools/tools/scaffolding/templates/ts/webapp-ssr-next/`)
+
 - `TARGETS.jinja` includes `node_vercel_next_artifact(name = "vercel_artifact")` alongside the
   existing `:app` / `:app_raw` targets.
 - `vercel.project.json.jinja` emits a declared-input config (schema version, project name,
@@ -62,6 +66,7 @@ A zx-wrapper TypeScript script that:
   runtime contract.
 
 **Deployment scaffold template — `deployment/vercel-next`** (`build-tools/tools/scaffolding/templates/deployment/vercel-next/`)
+
 - `TARGETS.jinja` emits `vercel_next_webapp_deployment(...)` pointing at
   `//projects/apps/<name>:vercel_artifact`, with Vercel team/project, environment, lane policy,
   admission policy, `vercel-api-token` secret requirement scoped to the `publish` step, runtime
@@ -70,6 +75,7 @@ A zx-wrapper TypeScript script that:
   any of these are absent.
 
 **Tests to add or verify present**
+
 - Artifact identity stability: identical `dist/` bytes must produce identical `identity` values
   across two separate invocations.
 - Fail-closed: ambient `.vercel/` directory must reject; undeclared `VERCEL_*` env must reject.
@@ -81,6 +87,7 @@ A zx-wrapper TypeScript script that:
   labeled artifact target.
 
 **Docs to update**
+
 - `build-tools/docs/scaffolding.md` — Vercel artifact mode section for `ts/webapp-ssr-next`.
 - Node/webapp build docs — `.vercel/output` contract, difference between `pnpm run dev` and the
   Buck artifact path.
@@ -163,6 +170,7 @@ override path (for local non-sandboxed runs) follows the same pattern used by `n
 
 **Template anti-drift contracts.** Adding `ts/webapp-ssr-next` and `deployment/vercel-next` as
 scaffold templates requires:
+
 1. Template root directories and `meta.json` files to be present.
 2. `gen-template-manifest-artifacts.ts` to be re-run to refresh generated taxonomy surfaces.
 3. Parity/runtime contract tests (`template-taxonomy.parity-contract.test.ts`,

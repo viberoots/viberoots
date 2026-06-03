@@ -597,12 +597,12 @@ Common example values:
   flag based loopback HTTP is rejected unless that fixture marker is present.
 
 ```bash
-deployment-control-plane service \
+control-plane service \
   --config /etc/deployment-control-plane/config.yaml
 ```
 
 ```bash
-deployment-control-plane worker \
+control-plane worker \
   --config /etc/deployment-control-plane/config.yaml
 ```
 

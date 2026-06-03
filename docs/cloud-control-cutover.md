@@ -1,6 +1,6 @@
 # Cloud Control Cutover, Rollback, Restore, and Break Glass
 
-Use `deployment-control-plane cutover` before moving protected/shared traffic to a cloud-primary
+Use `control-plane cutover` before moving protected/shared traffic to a cloud-primary
 host, returning traffic to mini, validating a restore, or using break-glass controls.
 
 Generate the evidence file from the setup bundle first. The collector reads the generated profile,
@@ -8,7 +8,7 @@ provider-capability hook outputs, managed dependency evidence, HTTP checks, the 
 `latest-non-production-deployment.json` staging report, and standby evidence:
 
 ```bash
-deployment-control-plane cutover-evidence \
+control-plane cutover-evidence \
   --bundle-dir ./cloud-control-profile \
   --out ./cloud-control-profile/cloud-cutover-evidence.json
 ```
@@ -17,7 +17,7 @@ The validation command consumes that JSON evidence file and refuses missing, sta
 host-mismatched, boolean-placeholder, or dashboard-only evidence:
 
 ```bash
-deployment-control-plane cutover \
+control-plane cutover \
   --evidence ./cloud-control-profile/cloud-cutover-evidence.json \
   --expected-host-profile aws-ec2 \
   --expected-image-build-identity nix-source-<64-hex-build-identity> \

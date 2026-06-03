@@ -187,9 +187,9 @@ function renderReadme(input: CloudControlSetupInput): string {
     "are evidence inputs; they are not hidden deployment authority. Protected/shared readiness is",
     "blocked until every selected provider capability has validation evidence.",
     "",
-    "Run `deployment-control-plane setup-doctor --bundle-dir <bundle> --out <bundle>/setup-doctor.json`",
-    "`deployment-control-plane credential-preflight --bundle-dir <bundle> --out <bundle>/credential-preflight.json`,",
-    "and `deployment-control-plane credential-staging --bundle-dir <bundle> --out <bundle>/credential-staging.json`",
+    "Run `control-plane setup-doctor --bundle-dir <bundle> --out <bundle>/setup-doctor.json`",
+    "`control-plane credential-preflight --bundle-dir <bundle> --out <bundle>/credential-preflight.json`,",
+    "and `control-plane credential-staging --bundle-dir <bundle> --out <bundle>/credential-staging.json`",
     "before starting the service and workers. `commands.json` is the ordered runbook for the",
     "remaining checks.",
   ].join("\n");

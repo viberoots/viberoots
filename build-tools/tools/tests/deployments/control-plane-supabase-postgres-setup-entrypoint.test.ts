@@ -34,10 +34,10 @@ test("setup renders Supabase profile as a managed dependency consumer input", ()
   const evidenceCommand = commands.phases
     .find((phase: any) => phase.id === "managed-dependencies")
     .commands.find((entry: any) => entry.id === "supabase-managed-postgres-evidence");
-  assert.match(managedCommand, /deployment-control-plane managed-dependencies/);
+  assert.match(managedCommand, /control-plane managed-dependencies/);
   assert.match(managedCommand, /PROFILE_ROOT="\$\{PROFILE_ROOT:-\$\(pwd\)\}"/);
   assert.match(managedCommand, /commands\.json not found; run from repo root or bundle directory/);
-  assert.match(evidenceCommand.command, /deployment-control-plane provider-capability/);
+  assert.match(evidenceCommand.command, /control-plane provider-capability/);
   assert.match(evidenceCommand.command, /--provider-capability supabase-managed-postgres/);
   assert.match(
     evidenceCommand.command,

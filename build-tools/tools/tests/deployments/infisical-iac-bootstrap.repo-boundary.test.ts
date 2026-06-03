@@ -77,10 +77,10 @@ test("repo bootstrap dry-run reports resolver profiles without Pleomino provisio
     assert.equal(report.deterministic, undefined);
     assert.equal(report.browserAutomation, undefined);
     assert.match(output.stderr, /Credential sink: .*starter config not created during dry-run/);
-    assert.match(output.stderr, /sprinkleref --check --config sprinkleref\/selected\.local\.json/);
+    assert.match(output.stderr, /sprinkleref --check --config config\/sprinkleref\/selected\.json/);
     assert.doesNotMatch(output.stdout, /pleomino|opentofu|cloudflare_api_token/);
     assert.doesNotMatch(output.stderr, /pleomino|opentofu|--tofu-dir|cloudflare_api_token/i);
-    await assertMissing("sprinkleref/selected.local.json");
+    await assertMissing("config/sprinkleref/selected.json");
   });
 });
 
@@ -99,14 +99,14 @@ test("deployment bootstrap auto credential sink does not create starter resolver
       },
     );
     assert.match(selection.description, /starter config not created/);
-    await assertMissing("sprinkleref/selected.local.json");
+    await assertMissing("config/sprinkleref/selected.local.json");
   });
 });
 
 test("repo bootstrap dry-run reports preserved operator profiles separately", async () => {
   const dir = await tmp();
   await withCwdAndEnv(dir, async () => {
-    await writeJson("sprinkleref/selected.local.json", {
+    await writeJson("config/sprinkleref/selected.local.json", {
       version: 1,
       defaultCategory: "main",
       profiles: {
@@ -128,10 +128,10 @@ test("repo bootstrap dry-run reports preserved operator profiles separately", as
       nodes: [{ name: "//deployments/infisical:deploy", secret_backend: "infisical/default" }],
     });
     const plan = await buildRepoDryRunMaterializationPlan({
-      configPath: "sprinkleref/selected.local.json",
+      configPath: "config/sprinkleref/selected.local.json",
       graphPath: "graph.json",
       sink: {
-        kind: "sprinkleref",
+        kind: "config/sprinkleref",
         backend: "local-file",
         category: "bootstrap",
         description: "test sink",

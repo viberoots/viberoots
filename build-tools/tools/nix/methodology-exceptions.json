@@ -1,6 +1,10 @@
 {
   "sourceFileSizeExceptions": [
     {
+      "path": "devshell.nix",
+      "justification": "Existing dev shell package and environment wiring is slightly over the limit after deployment tooling additions; pending extraction of deployment-specific packages."
+    },
+    {
       "path": "flake/packages/node-webapp.nix",
       "justification": "Legacy node-webapp package wiring remains coupled pending decomposition."
     },

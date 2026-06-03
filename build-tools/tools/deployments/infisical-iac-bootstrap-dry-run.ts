@@ -3,6 +3,7 @@ import { withDeploymentBootstrapDefaults } from "./infisical-iac-bootstrap-confi
 import { buildDeploymentFanOutDryRunReport } from "./infisical-iac-bootstrap-deployments";
 import { buildRepoDryRunMaterializationPlan } from "./infisical-iac-bootstrap-dry-run-plan";
 import { resolveCredentialSinkSelection } from "./infisical-iac-bootstrap-sink";
+import { DEFAULT_SPRINKLEREF_CONFIG_PATH } from "./sprinkleref-config-select";
 
 export async function buildDryRunReport(args: BootstrapArgs) {
   const sink = await resolveCredentialSinkSelection(args);
@@ -12,7 +13,7 @@ export async function buildDryRunReport(args: BootstrapArgs) {
       schemaVersion: "infisical-repo-bootstrap-operations@1",
       mode: "repo",
       resolverConfig: {
-        directory: "sprinkleref",
+        directory: DEFAULT_SPRINKLEREF_CONFIG_PATH.replace(/\/selected\.local\.json$/, ""),
         profiles: materializationPlan.profiles.map((profile) => profile.name),
         categories: ["main", "bootstrap"],
       },

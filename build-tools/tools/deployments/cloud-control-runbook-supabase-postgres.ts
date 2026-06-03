@@ -5,7 +5,7 @@ import type { CloudControlSetupInput } from "./cloud-control-setup-types";
 export function supabasePostgresEvidenceCommand(input: CloudControlSetupInput): RunbookCommand {
   return {
     id: "supabase-managed-postgres-evidence",
-    command: `${rootPrelude(input.outDir)}; deployment-control-plane provider-capability --deployment-id ${shellQuote(
+    command: `${rootPrelude(input.outDir)}; control-plane provider-capability --deployment-id ${shellQuote(
       input.deploymentIds[0] || "<missing-deployment>",
     )} --record --provider-capability supabase-managed-postgres --supabase-postgres-profile "$PROFILE_ROOT/supabase-postgres.profile.json" > "$PROFILE_ROOT/supabase-managed-postgres-evidence.json"`,
     cwd: "profile-root",

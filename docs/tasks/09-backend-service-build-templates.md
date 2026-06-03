@@ -22,7 +22,7 @@ The template family has two connected pieces:
 - `cmd/<name>/main.go` — server entrypoint that reads `PORT` from the environment
   and starts an HTTP listener.
 - `internal/health/health.go` — `/healthz` handler returning `{"ok":true,
-  "service":"<name>"}`, exercised by an auto-wired `_test.go` alongside it.
+"service":"<name>"}`, exercised by an auto-wired `_test.go` alongside it.
 - `TARGETS` — loads `//build-tools/go:defs.bzl` and declares a `nix_go_binary`
   target labeled `lang:go`, `kind:bin`, and `deployment-component:service`, plus a
   `service.runtime.json` source input that carries the runtime contract to
@@ -58,7 +58,7 @@ template-only test selection works when `go/service` template files change.
 
 - A smoke test in `build-tools/tools/tests/scaffolding/` (zx, single test per
   file) that RSyncs the repo to a temp directory, runs `scaf new go service
-  demo-svc`, runs glue steps, builds `//projects/apps/demo-svc:demo-svc` with
+demo-svc`, runs glue steps, builds `//projects/apps/demo-svc:demo-svc` with
   Buck2, and runs auto-wired tests — mirroring the existing
   `go-lib.scaffold-and-build.test.ts` pattern.
 - A runtime contract test asserting `service.runtime.json` is present, parses
@@ -113,7 +113,7 @@ authors to start from `go/cli` and add service plumbing by hand.
 - **gomod2nix drift on first build.** The `go/service` scaffold produces a
   `go.mod` with no external dependencies; the `gomod2nix.toml` at the repo
   root must still be regenerated after scaffold creation (`node
-  build-tools/tools/dev/install-deps.ts --glue-only`). If the scaffold test
+build-tools/tools/dev/install-deps.ts --glue-only`). If the scaffold test
   skips this step the Nix build will fail on a stale lockfile. The smoke test
   must include the install-deps step.
 

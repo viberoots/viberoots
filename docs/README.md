@@ -10,6 +10,8 @@ manuals for day-to-day setup and operations; use plans and history as implementa
   evidence, readiness, and cutover.
 - [`cloud-control-setup.md`](cloud-control-setup.md): reviewed cloud-control host-profile bundle
   generation.
+- [`aws-account-control-plane-and-remote-builds.md`](aws-account-control-plane-and-remote-builds.md):
+  end-to-end fresh AWS account setup for the control plane, remote builds, and remote-test readiness.
 - [`cloud-control-cutover.md`](cloud-control-cutover.md): protected/shared cutover evidence and
   readiness gates.
 - [`secrets-usage.md`](secrets-usage.md): Vault, Infisical, fixture, and bootstrap secret flows.

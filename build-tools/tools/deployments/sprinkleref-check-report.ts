@@ -202,6 +202,6 @@ function parseInfisicalBackend(backend?: string) {
 function renderUncheckedHint(lines: string[], count: number): void {
   if (count === 0) return;
   lines.push(
-    `Unchecked secrets: ${count} (pass --config, set SPRINKLEREF_CONFIG, or run repo bootstrap to create sprinkleref/selected.local.json before checking backend presence).`,
+    `Unchecked secrets: ${count} (pass --config, set SPRINKLEREF_CONFIG, or run repo bootstrap to create config/sprinkleref/selected.local.json before checking backend presence).`,
   );
 }

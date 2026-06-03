@@ -1,16 +1,21 @@
 #!/usr/bin/env zx-wrapper
+import * as path from "node:path";
 import { readFlagBoolFromTokens, readFlagFromTokens, readFlagStrFromTokens } from "../lib/argv";
 import { assertBackendNeutralSecretRef, resolveSprinkleRefBackend } from "./sprinkleref-config";
-import { readSelectedSprinkleRefConfig } from "./sprinkleref-config-select";
+import {
+  DEFAULT_SPRINKLEREF_CONFIG_PATH,
+  readSelectedSprinkleRefConfig,
+} from "./sprinkleref-config-select";
 import { editResolverEntry, resolverBackendFromArgs } from "./sprinkleref-config-edit";
 import { assertBootstrapCategoryCanWrite } from "./sprinkleref-bootstrap-guard";
 import { createSprinkleRefStore } from "./sprinkleref-store";
 import { runSprinkleRefCheck } from "./sprinkleref-check";
 import { collectCheckRefs } from "./sprinkleref-check-refs";
 import { backendForEntry } from "./sprinkleref-check-classify";
-import { initSprinkleRefConfigs } from "./sprinkleref-templates";
+import { initLocalSprinkleRefValues, initSprinkleRefConfigs } from "./sprinkleref-templates";
 import { renderSprinkleRefFingerprint } from "./sprinkleref-fingerprint";
 import { confirmRemoval, readSecretValue } from "./sprinkleref-secret-input";
+import { sprinklerefUsage } from "./sprinkleref-usage";
 import type { SprinkleRefBackendConfig, SprinkleRefOperation } from "./sprinkleref-types";
 
 const VALUE_FLAGS = [
@@ -53,6 +58,7 @@ const BOOL_FLAGS = [
   "check",
   "all",
   "no-deps",
+  "init-local",
 ];
 
 export type SprinkleRefCliDeps = {
@@ -65,33 +71,14 @@ export type SprinkleRefCliDeps = {
   stdout?: (text: string) => void;
 };
 
-export function sprinklerefUsage() {
-  return `Usage:
-  sprinkleref --init <dir>
-  sprinkleref --resolver-entry --add <category> --backend <kind> [backend options]
-  sprinkleref --resolver-entry --update <category> --backend <kind> [backend options]
-  sprinkleref --check [--scheme secret|config|runtime] [--format json]
-  sprinkleref --get <secret://...> --fingerprint [--category <name>] [--format json]
-  sprinkleref --add <secret://...> [--category <name>] [--value-env <name>|--value-file <path>]
-  sprinkleref --update <secret://...> [--category <name>] [--value-env <name>|--value-file <path>]
-  sprinkleref --remove <secret://...> [--category <name>] [--yes]
-
-Options:
-  --config <path>              Resolver config path
-  --category <name>            Resolver category, defaults from config
-  --overwrite-existing         Allow --add to replace an existing ref or resolver category
-  --create-missing             Allow --update to create a missing ref or resolver category
-  --check                      Inventory and validate deployment contract refs
-  --fingerprint                Print only a digest for --get; secret values are never printed
-  --target <buck-target>       Limit --check to structured refs required by a Buck target
-  --dry-run                    Describe the selected backend without reading or writing values
-`;
-}
-
 export async function runSprinkleRefCli(deps: SprinkleRefCliDeps) {
   validateKnownFlags(deps.argv, readFlagBoolFromTokens("check", deps.argv));
   const out = deps.stdout || console.log;
   if (readFlagBoolFromTokens("help", deps.argv)) return out(sprinklerefUsage());
+  if (readFlagBoolFromTokens("init-local", deps.argv)) {
+    const written = await initLocalSprinkleRefValues(process.cwd());
+    return out(JSON.stringify({ written }, null, 2));
+  }
   if (readFlagBoolFromTokens("check", deps.argv) || readFlagBoolFromTokens("all", deps.argv)) {
     const exitCode = await runSprinkleRefCheck(deps);
     process.exitCode = exitCode;
@@ -99,7 +86,7 @@ export async function runSprinkleRefCli(deps: SprinkleRefCliDeps) {
   }
   const initFlag = readFlagFromTokens("init", deps.argv);
   if (initFlag.provided) {
-    const initDir = initFlag.value.trim() || "sprinkleref";
+    const initDir = initFlag.value.trim() || path.dirname(DEFAULT_SPRINKLEREF_CONFIG_PATH);
     const written = await initSprinkleRefConfigs({ dir: initDir, platform: deps.platform });
     return out(JSON.stringify({ written }, null, 2));
   }

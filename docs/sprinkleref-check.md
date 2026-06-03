@@ -32,7 +32,7 @@ sprinkleref --check --scheme config
 sprinkleref --check --scheme runtime
 sprinkleref --check --all
 sprinkleref --check --format json
-sprinkleref --check --config sprinkleref/local.macos.json
+sprinkleref --check --config config/sprinkleref/local.macos.json
 sprinkleref --check --category bootstrap
 sprinkleref --check --target //projects/deployments/pleomino/staging:deploy
 sprinkleref --check --target //projects/deployments/pleomino/staging:deploy --no-deps
@@ -45,7 +45,7 @@ configured secret presence:
 ```bash
 build-tools/tools/deployments/infisical-bootstrap.ts repo --dry-run
 build-tools/tools/deployments/infisical-bootstrap.ts repo
-sprinkleref --check --config sprinkleref/selected.local.json
+sprinkleref --check --config config/sprinkleref/selected.local.json
 ```
 
 The repo-wide path sets up resolver profiles and categories first, then offers a second prompt to

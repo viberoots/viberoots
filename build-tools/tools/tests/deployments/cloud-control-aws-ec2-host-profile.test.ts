@@ -30,7 +30,7 @@ test("AWS EC2 setup renders realizable units podman script and NixOS module reus
   assert.match(serviceUnit, /--publish 0\.0\.0\.0:7780:7780/);
   assert.match(serviceUnit, /\/healthz.*\/readyz/);
   assert.match(serviceUnit, new RegExp(`${escapeRegExp(IMAGE_REF)} service --config`));
-  assert.doesNotMatch(serviceUnit, /deployment-control-plane service --config/);
+  assert.doesNotMatch(serviceUnit, /control-plane service --config/);
   for (const name of ["worker-1", "worker-2"]) {
     const unit = bundle.files[`systemd/deployment-control-plane-${name}.service`]!;
     assert.doesNotMatch(unit, /--publish/);
@@ -177,8 +177,8 @@ test("AWS EC2 runbook process start uses generated host activation artifacts", (
   const phase = commands.phases.find((entry: any) => entry.id === "process-start");
   assert.equal(phase.commands.length, 3);
   assert.match(phase.commands[0].command, /bash "\$PROFILE_ROOT\/aws-ec2-podman-run\.sh"/);
-  assert.doesNotMatch(JSON.stringify(phase.commands), /deployment-control-plane service --config/);
-  assert.doesNotMatch(JSON.stringify(phase.commands), /deployment-control-plane worker --config/);
+  assert.doesNotMatch(JSON.stringify(phase.commands), /control-plane service --config/);
+  assert.doesNotMatch(JSON.stringify(phase.commands), /control-plane worker --config/);
   assert.ok(
     phase.commands[0].inputs.includes(
       "$PROFILE_ROOT/systemd/deployment-control-plane-service.service",

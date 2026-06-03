@@ -67,7 +67,7 @@ test("deployment bootstrap creates missing auto resolver before remote mutation"
   const server = http.createServer((request, response) => {
     requests.push(request.url || "");
     resolverExistedAtFirstRequest = fsSync.existsSync(
-      path.join(dir, "sprinkleref", "selected.local.json"),
+      path.join(dir, "config/sprinkleref", "selected.local.json"),
     );
     response.writeHead(500, { "Content-Type": "application/json" });
     response.end("{}");
@@ -99,7 +99,7 @@ test("deployment bootstrap creates missing auto resolver before remote mutation"
       );
       assert.ok(requests.length > 0);
       assert.equal(resolverExistedAtFirstRequest, true);
-      await fs.stat("sprinkleref/selected.local.json");
+      await fs.stat("config/sprinkleref/selected.local.json");
       await assertMissing("side-effects/credentials.json");
       await assertMissing("side-effects/plan.tfplan");
       await assertMissing(tofuMarker);

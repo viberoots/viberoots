@@ -182,8 +182,8 @@
     },
     {
       "num": 31,
-      "title": "Decide Forking Strategy for unfairly / viberoots",
-      "summary": "Evaluate and decide the repository relationship between viberoots (platform) and unfairly (product) \u2014 single monorepo, separate repos, or GitHub template \u2014 and document the chosen model and its implications for CI, secrets, and deployment identity.",
+      "title": "Decide Forking Strategy for downstream products / viberoots",
+      "summary": "Evaluate and decide the repository relationship between viberoots (platform) and downstream product (product) \u2014 single monorepo, separate repos, or GitHub template \u2014 and document the chosen model and its implications for CI, secrets, and deployment identity.",
       "depends_on": [23, 24]
     },
     {

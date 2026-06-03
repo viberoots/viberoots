@@ -18,8 +18,8 @@ test("concrete cloud provider capabilities validate structurally", () => {
     const capability = capabilityDeclaration(id);
     assert.equal(capability.id, id);
     assert.deepEqual(validateProviderCapabilityDeclaration(capability), []);
-    assert.match(capability.iac.previewCommand, /^deployment-control-plane provider-capability/);
-    assert.match(capability.iac.smokeCommand, /^deployment-control-plane provider-capability/);
+    assert.match(capability.iac.previewCommand, /^control-plane provider-capability/);
+    assert.match(capability.iac.smokeCommand, /^control-plane provider-capability/);
     assert.doesNotMatch(JSON.stringify(capability), /<reviewed|placeholder provider/i);
   }
 });
@@ -61,7 +61,7 @@ test("generated provider-capabilities.json carries executable ECR bundle-root co
   const ecr = capabilities.find((entry: any) => entry.id === "aws-ecr-control-plane-registry");
   assert.ok(ecr);
   for (const command of Object.values(ecr.iac) as string[]) {
-    if (!command.startsWith("deployment-control-plane provider-capability")) continue;
+    if (!command.startsWith("control-plane provider-capability")) continue;
     assert.match(command, /--registry-profile "\$PROFILE_ROOT\/registry-profile\.json"/);
     assert.match(command, /--image-publication-evidence "\$PROFILE_ROOT\/image-publication\.json"/);
     assert.match(command, /--ecr-opentofu-plan "\$PROFILE_ROOT\/ecr-opentofu-plan\.json"/);

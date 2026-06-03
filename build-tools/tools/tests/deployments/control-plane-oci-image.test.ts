@@ -38,7 +38,7 @@ test("control-plane image contract exposes service and worker entrypoints withou
   const second = await buildImageContract();
   const image = await buildImageTarball();
   assert.equal(first.outPath, second.outPath);
-  assert.deepEqual(image.config.config.Entrypoint, ["/bin/deployment-control-plane"]);
+  assert.deepEqual(image.config.config.Entrypoint, ["/bin/control-plane"]);
   assert.equal(image.config.config.User, "10001:10001");
   assert.equal(
     image.config.config.Labels["org.opencontainers.image.title"],
@@ -65,8 +65,8 @@ test("control-plane image contract exposes service and worker entrypoints withou
   assert.doesNotMatch(JSON.stringify(image.config.config.Labels), /unpublished|null|unknown/i);
   assert.match(first.contract.sourceRevision, /^source-[a-z0-9]{12}$/);
   assert.deepEqual(first.contract.commands, [
-    "deployment-control-plane service --config /etc/deployment-control-plane/config.yaml",
-    "deployment-control-plane worker --config /etc/deployment-control-plane/config.yaml",
+    "control-plane service --config /etc/deployment-control-plane/config.yaml",
+    "control-plane worker --config /etc/deployment-control-plane/config.yaml",
   ]);
   assert.equal(first.contract.user, "10001:10001");
   for (const tool of ["node", "git", "ssh", "tofu", "aws", "kubectl", "helm"]) {
@@ -106,7 +106,7 @@ test("control-plane Nix runtime exposes non-mutating service and worker help", a
       timeout: 30_000,
       maxBuffer: 1024 * 1024,
     });
-    assert.match(stdout, new RegExp(`deployment-control-plane ${mode} --config <path>`));
+    assert.match(stdout, new RegExp(`control-plane ${mode} --config <path>`));
   }
 });
 

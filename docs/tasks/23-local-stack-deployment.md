@@ -14,7 +14,7 @@ stack — Postgres, S3-compatible object storage, control-plane service, and one
 their own machine without touching the shared control plane or any cloud resource.
 
 The stack runs the same reviewed OCI image produced by control-plane-plan PR-7. It uses the same
-`deployment-control-plane service --config ...` and `deployment-control-plane worker --config ...`
+`control-plane service --config ...` and `control-plane worker --config ...`
 process modes as the NixOS module and Compose/Podman profile. The local stack is not a separate
 code path; it is the PR-9 non-NixOS Compose/Podman profile wired with local fixture services
 instead of external production ones.
@@ -147,6 +147,7 @@ the local stack is a developer sandbox, not a pre-production verification enviro
 **Starting point is the E2E fixture pattern.** The E2E test helpers in
 `build-tools/tools/tests/deployments/control-plane-container-e2e.helpers.ts` and
 `control-plane-container-e2e-flow.helpers.ts` already encode:
+
 - `postgres:16-alpine` with `POSTGRES_PASSWORD: "postgres"`
 - a `fake-s3.mjs` Node server via `writeFakeS3Server`
 - `runFixtureContainer` for both Postgres and the S3 server

@@ -30,8 +30,8 @@ is what remains.
   implementation; payload bytes by immutable object key; metadata, digests, and provenance in
   Postgres; digest and provenance verification before worker execution; retry-safe idempotent object
   writes; credential resolution through the PR-1 file-backed contract.
-- **PR-4** — Service and worker process entrypoints. `deployment-control-plane service --config ...`
-  and `deployment-control-plane worker --config ...` long-running process modes; health and readiness
+- **PR-4** — Service and worker process entrypoints. `control-plane service --config ...`
+  and `control-plane worker --config ...` long-running process modes; health and readiness
   endpoints; graceful shutdown with lease release; child process environment scrubbing.
 - **PR-5** — Same-origin read APIs and minimal web UI. Read-only APIs for control-plane status,
   queue state, worker heartbeats, and deployment detail; static UI pages for status, queue, and

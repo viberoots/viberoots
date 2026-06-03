@@ -45,8 +45,8 @@ Build a reproducible OCI image for the deployment control plane. The same image 
 least two process modes:
 
 ```bash
-deployment-control-plane service --config /etc/deployment-control-plane/config.yaml
-deployment-control-plane worker --config /etc/deployment-control-plane/config.yaml
+control-plane service --config /etc/deployment-control-plane/config.yaml
+control-plane worker --config /etc/deployment-control-plane/config.yaml
 ```
 
 Optional administrative modes may share the image when they run under the same credential and
@@ -124,7 +124,7 @@ runtime pull proof.
 Generate production publication evidence with:
 
 ```bash
-deployment-control-plane image-publication \
+control-plane image-publication \
   --registry-profile ./registry-profile.json \
   --image registry.example.com/platform/deployment-control-plane@sha256:<digest> \
   --source-revision source-<reviewed-revision> \
@@ -207,8 +207,8 @@ behavior.
 
 The service and worker should run as two containers from one reviewed image:
 
-- service container: `deployment-control-plane service`
-- worker container: `deployment-control-plane worker`
+- service container: `control-plane service`
+- worker container: `control-plane worker`
 
 Administrative operations should run either through the service API or as tightly scoped one-shot
 containers from the same image. They should not require a third long-lived admin daemon.
@@ -900,7 +900,7 @@ Rationale:
    and stage-state compare-and-swap behavior for multiple service and worker replicas.
 3. Add S3-compatible artifact storage for admitted artifacts and execution payloads, with digest
    verification before worker execution.
-4. Add stable `deployment-control-plane service` and `worker` entrypoints.
+4. Add stable `control-plane service` and `worker` entrypoints.
 5. Add the minimal same-origin web UI and read-only API endpoints needed by the UI.
 6. Add the minimal read-only MCP server over the same read APIs, authorization checks, redaction,
    and audit/correlation path.

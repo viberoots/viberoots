@@ -14,6 +14,7 @@ result
 .tmp/
 .local/
 sprinkleref/
+config/sprinkleref/local/
 projects/deployments/*/infisical/opentofu/.terraform*/
 projects/deployments/*/infisical/opentofu/.terraform.lock.hcl
 projects/deployments/*/infisical/opentofu/terraform.tfstate*

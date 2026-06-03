@@ -79,6 +79,7 @@ establish the infrastructure against which backup jobs, S3 replication policy, a
 actually be configured and verified. Running drills against ephemeral local state is not equivalent.
 
 This task blocks #43 (make viberoots public) because:
+
 - A publicly visible deployment authority with no validated recovery posture is an operational
   liability.
 - Any public consumer of the deploy CLI or control plane API needs assurance that the run record

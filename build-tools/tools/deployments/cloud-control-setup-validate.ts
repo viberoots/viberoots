@@ -167,15 +167,15 @@ function matchesConcreteCapability(
 }
 
 function usesReviewedDeployAdmission(command: string): boolean {
-  return /^deployment-control-plane provider-capability --deployment-id (?:<label>|'[^']+'|[^\s]+)/.test(
+  return /^control-plane provider-capability --deployment-id (?:<label>|'[^']+'|[^\s]+)/.test(
     command,
   );
 }
 
 function normalizeProviderCommand(command: string): string {
   return command.replace(
-    /^deployment-control-plane provider-capability --deployment-id (?:<label>|'[^']+'|[^\s]+)/,
-    "deployment-control-plane provider-capability --deployment-id <label>",
+    /^control-plane provider-capability --deployment-id (?:<label>|'[^']+'|[^\s]+)/,
+    "control-plane provider-capability --deployment-id <label>",
   );
 }
 

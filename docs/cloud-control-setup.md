@@ -4,7 +4,7 @@ Use the setup command to generate a reviewed host-profile bundle before placing 
 control plane on a cloud substrate:
 
 ```bash
-deployment-control-plane setup \
+control-plane setup \
   --out ./cloud-control-profile \
   --host-mode aws-ec2 \
   --image-publication-evidence ./image-publication.json \
@@ -65,7 +65,7 @@ under `/run/deployment-control-plane/credentials`.
 3. Publish the reviewed Nix-built image, inspect the registry manifest, and keep the generated
    `image-publication.json` evidence together. Production AWS setup consumes this reviewed evidence
    with `--image-publication-evidence`; direct image/digest flags are not the production path.
-4. Generate the bundle with `deployment-control-plane setup --dry-run`, resolve every reported
+4. Generate the bundle with `control-plane setup --dry-run`, resolve every reported
    prerequisite, then rerun without `--dry-run`.
 5. Stage `config.yaml`, `managed-dependencies.profile.yaml`, provider-capability evidence, the
    reviewed-source credential files, and deployment-scoped Infisical credential files on the host.
@@ -73,10 +73,10 @@ under `/run/deployment-control-plane/credentials`.
    workers, config and credential mounts, digest-pinned image references, and scratch/state/cache
    paths owned by the runtime uid/gid.
 6. Run
-   `deployment-control-plane setup-doctor --bundle-dir ./cloud-control-profile --out ./cloud-control-profile/setup-doctor.json`
+   `control-plane setup-doctor --bundle-dir ./cloud-control-profile --out ./cloud-control-profile/setup-doctor.json`
    from the repo root, or run the generated setup-doctor command from the bundle directory.
 7. Run
-   `deployment-control-plane credential-preflight --bundle-dir ./cloud-control-profile --out ./cloud-control-profile/credential-preflight.json`
+   `control-plane credential-preflight --bundle-dir ./cloud-control-profile --out ./cloud-control-profile/credential-preflight.json`
    before starting service and worker processes.
 8. Run live credential staging for protected/shared cutover and keep
    `credential-staging.live.json` in the bundle. Cutover evidence collection requires this live
