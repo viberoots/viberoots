@@ -14,6 +14,32 @@ import {
 
 const TOKEN_REF = "secret://control-plane/supabase/management-api-token";
 
+test("aws-account help describes local SprinkleRef first-run setup", async () => {
+  const out: string[] = [];
+  await withControlPlaneArgv(["aws-account", "--help"], () =>
+    runAwsAccountCommand({ stdout: (text) => out.push(text) }),
+  );
+  const help = out.join("\n");
+  assert.match(help, /normal first run:[\s\S]*control-plane aws-account config-init/);
+  assert.match(help, /normal first run:[\s\S]*sprinkleref --init-local/);
+  assert.match(help, /normal first run:[\s\S]*control-plane aws-account check/);
+  assert.match(help, /required coordinates:.*awsOrganizationId/);
+  assert.match(help, /structured refs:.*config:\/\/.*secret:\/\//);
+  assert.match(help, /fill local non-secret coordinates.*local\/values\.json/);
+  assert.match(help, /fill local non-secret coordinates.*selected\/default resolver/);
+  assert.match(help, /sources:.*stack config.*local\/values\.json.*selected\/default resolver/);
+  assert.match(
+    help,
+    /sprinkleref --update secret:\/\/control-plane\/supabase\/management-api-token --create-missing/,
+  );
+  assert.match(help, /token:.*write the Supabase Management API token with sprinkleref --update/);
+  assert.match(help, /do not use token write commands for awsOrganizationId/);
+  assert.doesNotMatch(
+    help,
+    /aws-account bootstrap --domain <domain> --expected-aws-account-id <id>/,
+  );
+});
+
 test("aws-account bootstrap token ref rejects Infisical-backed bootstrap category", async () => {
   await runInTemp("aws-account-bootstrap-infisical-token", async (tmp) => {
     await writeInfisicalBootstrapConfig(tmp);

@@ -756,3 +756,101 @@ Explicit stack categories can still be bypassed by matching non-secret local sca
 It slightly reduces local override convenience for explicitly categorized stack refs, requiring
 developers to change the stack category or resolver value instead of relying on a local scalar/value
 entry for those refs.
+
+## PR-6: AWS account help output for local SprinkleRef setup
+
+### 1. Intent
+
+Update `control-plane aws-account --help` so its first-run guidance reflects the implemented local
+SprinkleRef setup flow instead of the older direct `bootstrap --domain ... --expected-aws-account-id
+...` command shape.
+
+### 2. Scope of changes
+
+- Replace the stale `normal first run: control-plane aws-account bootstrap --domain <domain>
+--expected-aws-account-id <id>` help example with the canonical PR-1 through PR-5 setup sequence.
+- Ensure the help output points developers to `control-plane aws-account config-init` and
+  `sprinkleref --init-local` as the expected local setup entry points.
+- Include required `awsOrganizationId` guidance in the help text alongside the existing required AWS
+  account setup coordinates.
+- Describe structured refs and the intended config/local/shared value sources at help level without
+  duplicating the full resolver documentation.
+- Keep token handling guidance accurate: local token setup belongs in local SprinkleRef bootstrap
+  configuration, while non-secret coordinates such as `awsOrganizationId` use config or resolver
+  values rather than secret-token write commands.
+- Do not change command behavior, resolver behavior, bootstrap guard behavior, or setup file formats.
+
+### 3. External prerequisites
+
+- The PR-1 through PR-5 local SprinkleRef setup flow remains the canonical AWS account first-run
+  model.
+- Generated setup config continues to require `awsOrganizationId` as a non-secret AWS account
+  coordinate.
+
+### 4. Tests to be added
+
+- Add focused CLI help coverage for `control-plane aws-account --help` proving the first-run
+  guidance names `config-init` and `sprinkleref --init-local`.
+- Assert the help output no longer advertises the stale `aws-account bootstrap --domain <domain>
+--expected-aws-account-id <id>` normal-first-run example.
+- Add help assertions for required `awsOrganizationId` guidance and structured ref/source language
+  that distinguishes config, local, and shared resolver setup paths.
+- Add help assertions proving token guidance remains scoped to local SprinkleRef bootstrap setup and
+  does not suggest secret-token write commands for `awsOrganizationId`.
+
+### 5. Docs to be added or updated
+
+- Update [AWS Account Control Plane And Remote Builds](aws-account-control-plane-and-remote-builds.md)
+  if its command-help examples or first-run wording still mirror the older bootstrap-only flow.
+- Update [Local SprinkleRef Design](local-sprinkleref.md) only if the concise help wording exposes an
+  unclear or missing first-run term that should also be documented.
+- Keep docs aligned with command help so `config-init`, `sprinkleref --init-local`,
+  `awsOrganizationId`, structured refs, config/local/shared sources, and token handling are described
+  consistently.
+
+### 5.5. Expected regression scope
+
+- `deployment-only`
+- Expected implementation paths:
+  - `build-tools/tools/deployments/aws-account.ts`
+  - `build-tools/tools/tests/deployments/aws-account-cli.test.ts`
+  - `docs/**`
+- Keep changes narrowly focused on AWS account command help and matching docs/tests.
+
+### 6. Acceptance criteria
+
+- `control-plane aws-account --help` presents `config-init` and `sprinkleref --init-local` as the
+  normal local SprinkleRef first-run setup flow.
+- The old `aws-account bootstrap --domain <domain> --expected-aws-account-id <id>` normal-first-run
+  guidance is removed from help output.
+- Help output identifies `awsOrganizationId` as a required non-secret coordinate.
+- Help output gives concise structured ref and config/local/shared source guidance that matches the
+  local SprinkleRef docs and generated setup expectations.
+- Help output keeps token handling tied to local SprinkleRef bootstrap setup and does not confuse
+  `awsOrganizationId` with secret-token commands.
+- Focused tests cover the help output regressions and docs are aligned where they reference the same
+  setup flow.
+
+### 7. Risks
+
+- Overloading command help with resolver details could make the output harder to scan.
+- Help wording could drift from the generated setup config or resolver docs if it hardcodes too many
+  examples.
+
+### 8. Mitigations
+
+- Keep command help as concise first-run guidance and link or point to detailed docs for resolver
+  mechanics.
+- Assert only stable setup terms and required coordinates in tests, while leaving detailed examples
+  to docs.
+
+### 9. Consequences of not implementing this PR
+
+Developers can still be directed toward an obsolete first-run command shape, missing the required
+local SprinkleRef setup path, `awsOrganizationId`, structured refs, source guidance, and current
+token handling expectations.
+
+### 10. Downsides for implementing this PR
+
+It adds focused help-output assertions that may need small updates when the first-run command wording
+changes, but keeps those updates isolated to AWS account setup guidance.

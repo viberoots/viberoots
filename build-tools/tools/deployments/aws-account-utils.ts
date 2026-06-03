@@ -149,8 +149,16 @@ export function printUsage(stdout = console.log) {
       "",
       "defaults: --stack control --region us-east-1 --service deploy --auth-service auth --private-db-service db",
       "canonical config: config/control-plane/stack.json",
-      "config generation: control-plane aws-account config-init [--domain <domain>]",
-      "normal first run: control-plane aws-account bootstrap --domain <domain> --expected-aws-account-id <id>",
+      "normal first run:",
+      "  control-plane aws-account config-init [--domain <domain>]",
+      "  sprinkleref --init-local",
+      "  fill local non-secret coordinates in config/sprinkleref/local/values.json or store them in the selected/default resolver",
+      "  sprinkleref --update secret://control-plane/supabase/management-api-token --create-missing",
+      "  control-plane aws-account check",
+      "required coordinates: domain, awsAccountId, awsOrganizationId, supabaseOrgId, supabaseProjectRef",
+      "structured refs: stack config can point to config:// or secret:// refs",
+      "sources: stack config, config/sprinkleref/local/values.json, or the selected/default resolver",
+      "token: write the Supabase Management API token with sprinkleref --update; do not use token write commands for awsOrganizationId",
     ].join("\n"),
   );
 }

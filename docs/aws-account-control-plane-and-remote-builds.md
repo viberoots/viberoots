@@ -440,18 +440,30 @@ The practical goal is one guided bootstrap command or checklist that:
 4. runs the main OpenTofu plan/apply only after the prerequisite checks pass
 5. captures all evidence files into the account setup record
 
-### Top-Level Guided Bootstrap Command
+### Top-Level Local Setup Flow
 
-The setup has one top-level guided command:
+The normal first run starts by generating the small stack config checklist and local SprinkleRef
+placeholder file:
 
 ```bash
-control-plane aws-account bootstrap --domain example.com
+control-plane aws-account config-init
+sprinkleref --init-local
+sprinkleref --update secret://control-plane/supabase/management-api-token --create-missing
+control-plane aws-account check
 ```
 
-`bootstrap` is the normal guided entrypoint. The current implementation covers prerequisite checks
-and the remote-state bootstrap plan/apply path. Later foundation, DNS, profile, cutover, and remote
-build phases are represented in status/evidence as the intended sequence, but are still completed
-with the documented commands in the later sections of this guide.
+Use structured `config://...` and `secret://...` refs in stack config, then fill non-secret
+coordinates in stack config, `config/sprinkleref/local/values.json`, or the selected/default
+resolver. Required coordinates include `domain`, `awsAccountId`, `awsOrganizationId`,
+`supabaseOrgId`, and `supabaseProjectRef`. Write the Supabase Management API token with
+`sprinkleref --update secret://control-plane/supabase/management-api-token --create-missing`, or
+use the setup-shell fallback environment variable for a single run; do not put it in config/local
+JSON as plaintext.
+
+`bootstrap` is the guided entrypoint after local setup values exist. The current implementation
+covers prerequisite checks and the remote-state bootstrap plan/apply path. Later foundation, DNS,
+profile, cutover, and remote build phases are represented in status/evidence as the intended
+sequence, but are still completed with the documented commands in the later sections of this guide.
 
 The `aws-account` namespace also has small subcommands for resuming, checking, and inspecting
 the setup without rerunning every phase:
@@ -701,6 +713,7 @@ created yet. Use the reviewed state-bootstrap module first:
 control-plane aws-account bootstrap \
   --domain example.com \
   --expected-aws-account-id <new-account-id> \
+  --aws-organization-id <aws-organization-id> \
   --supabase-org-id <supabase-org-id> \
   --supabase-project-ref <supabase-project-ref>
 ```
