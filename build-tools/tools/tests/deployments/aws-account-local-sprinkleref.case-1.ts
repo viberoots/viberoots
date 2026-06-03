@@ -201,6 +201,24 @@ test("aws-account local values fail closed on malformed JSON and value objects",
   });
 });
 
+test("aws-account local values fail closed on malformed JSON roots", async () => {
+  await runInTemp("aws-account-local-values-malformed-root", async (tmp) => {
+    const ref = "config://control-plane/aws/account-id";
+    const valuesPath = path.join(tmp, "config/sprinkleref/local/values.json");
+    await fsp.mkdir(path.dirname(valuesPath), { recursive: true });
+    await fsp.writeFile(valuesPath, '"not-an-object"\n', "utf8");
+    await assert.rejects(
+      () => resolveStackRef(tmp, ref),
+      /malformed local SprinkleRef values: config\/sprinkleref\/local\/values\.json root must be an object/,
+    );
+    await fsp.writeFile(valuesPath, "[]\n", "utf8");
+    await assert.rejects(
+      () => resolveStackRef(tmp, ref),
+      /malformed local SprinkleRef values: config\/sprinkleref\/local\/values\.json root must be an object/,
+    );
+  });
+});
+
 test("aws-account local redirects detect cycles through redirect chains", async () => {
   await runInTemp("aws-account-local-redirect-cycle", async (tmp) => {
     const accountRef = "config://control-plane/aws/account-id";

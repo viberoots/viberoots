@@ -8,8 +8,8 @@ import {
   runInTemp,
   test,
   withControlPlaneArgv,
-  writeJson,
   writeLocalValues,
+  writeResolver,
   writeStack,
 } from "./aws-account-local-sprinkleref.helpers";
 
@@ -215,23 +215,3 @@ test("aws-account explicit unknown categories fail closed", async () => {
     assert.match(config.inputSources.awsAccountId.source, /missing/);
   });
 });
-
-async function writeResolver(
-  tmp: string,
-  defaultCategory: string,
-  stores: Record<string, Record<string, string>>,
-) {
-  const categories: Record<string, { backend: "local-file"; file: string }> = {};
-  for (const [category, values] of Object.entries(stores)) {
-    categories[category] = {
-      backend: "local-file",
-      file: path.join(tmp, `.local/${category}.json`),
-    };
-    await writeJson(path.join(tmp, `.local/${category}.json`), values);
-  }
-  await writeJson(path.join(tmp, "config/sprinkleref/selected.json"), {
-    version: 1,
-    defaultCategory,
-    categories,
-  });
-}

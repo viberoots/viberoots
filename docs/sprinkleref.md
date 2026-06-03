@@ -54,8 +54,10 @@ default so managed deployment bootstrap outputs can be created after repo setup.
 `config/sprinkleref/local/values.json` is the conventional gitignored clone-local values file.
 `sprinkleref --init-local` creates or updates it with empty placeholders for private coordinates and
 a non-plaintext ref object for `secret://control-plane/supabase/management-api-token`. Empty
-coordinate placeholders remain unresolved until filled. The command also prints the normal token
-write command for the selected/default resolver:
+coordinate placeholders remain unresolved until filled. A present local values file must parse to an
+object root; scalar or array roots fail as malformed local values rather than being treated as a
+missing file. The command also prints the normal token write command for the selected/default
+resolver:
 
 ```bash
 sprinkleref --update secret://control-plane/supabase/management-api-token --create-missing
@@ -66,8 +68,9 @@ bootstrap category. It never writes a plaintext token placeholder.
 
 Generated AWS account setup refs declare `category: "control"` in stack config. Resolver code does
 not infer a category from `control-plane` ref prefixes. When a stack ref declares a category
-explicitly, that category wins over matching local scalar, `{ "value": ... }`, and redirect entries.
-Stack refs without an explicit category continue to use local values first.
+explicitly, that category resolves the original logical ref and wins over matching local scalar,
+`{ "value": ... }`, and redirect entries, including redirects to a different target ref. Stack refs
+without an explicit category continue to use local values first.
 
 Resolver configs may define named backend profiles separately from categories. Profiles name backend
 instances/accounts, while categories name usage lanes:

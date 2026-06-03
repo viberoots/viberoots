@@ -123,7 +123,11 @@ async function resolveLocalValue(
       await resolveRemoteRef(targetRef, { ...opts, category, categoryExplicit: true }),
     );
   }
-  if (targetRef !== ref) return await resolveRef(cwd, targetRef, opts, seen);
+  if (targetRef !== ref) {
+    if (opts.categoryExplicit)
+      return localRedirectSource(cwd, ref, await resolveRemoteRef(ref, opts));
+    return await resolveRef(cwd, targetRef, opts, seen);
+  }
   return localRedirectSource(cwd, targetRef, await resolveRemoteRef(targetRef, opts));
 }
 
@@ -196,7 +200,12 @@ async function readLocalValue(cwd: string, ref: string) {
     }
     throw new Error(`invalid local SprinkleRef values JSON: ${LOCAL_VALUES_PATH}`);
   }
-  const root = parsed && typeof parsed === "object" ? (parsed as Record<string, unknown>) : {};
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    throw new Error(
+      `malformed local SprinkleRef values: ${LOCAL_VALUES_PATH} root must be an object`,
+    );
+  }
+  const root = parsed as Record<string, unknown>;
   let current: unknown = root.values;
   for (const part of logicalRefPath(ref).split("/").filter(Boolean)) {
     if (!current || typeof current !== "object" || Array.isArray(current)) return { found: false };

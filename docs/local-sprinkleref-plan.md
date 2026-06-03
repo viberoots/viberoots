@@ -854,3 +854,113 @@ token handling expectations.
 
 It adds focused help-output assertions that may need small updates when the first-run command wording
 changes, but keeps those updates isolated to AWS account setup guidance.
+
+## PR-7: Local values resolver hardening for explicit categories and malformed roots
+
+### 1. Intent
+
+Close the remaining local values resolver hardening gaps so explicit stack categories cannot be
+bypassed by redirecting to a different logical ref, and malformed local values roots fail clearly
+instead of being treated as missing local values.
+
+### 2. Scope of changes
+
+- Update stack ref resolution so `categoryExplicit` also prevents local redirect objects from
+  changing the logical target ref before category resolution.
+- Ensure a stack config such as `{ "ref": "config://control-plane/aws/account-id", "category":
+"ops" }` cannot be redirected by `config/sprinkleref/local/values.json` to another ref and then
+  resolved through the explicit `ops` category.
+- Preserve local redirect behavior for stack refs that do not declare an explicit category.
+- Keep same-ref explicit category precedence from PR-3 and PR-5 unchanged for local redirect,
+  scalar, and `{ "value": ... }` entries.
+- Update resolver local values loading so a parsed scalar, array, or other non-object root in
+  `config/sprinkleref/local/values.json` fails with a clear malformed-local-values diagnostic.
+- Keep JSON parse errors as clear failures and keep missing local values files as non-errors.
+- Align resolver behavior with `sprinkleref --init-local`, which already validates the local values
+  root as an object.
+- Do not change local values path conventions, stack config shape, category defaults, generated AWS
+  account setup config, or `selected.local.json` compatibility.
+
+### 3. External prerequisites
+
+- The explicit category named in stack config must already be configured in the selected
+  SprinkleRef resolver config.
+- Local value files remain clone-local and gitignored; this PR only changes malformed-file handling
+  and redirect eligibility under explicit category selection.
+
+### 4. Tests to be added
+
+- Add regression tests proving an explicit stack category wins when the local values file contains a
+  redirect object for the same logical ref that points to a different target ref.
+- Add contrast tests proving the same different-ref local redirect still works for a stack ref that
+  does not declare an explicit category.
+- Keep or extend same-ref local redirect coverage proving explicit category precedence remains
+  intact for redirect objects that do not change the logical ref.
+- Add malformed local values root tests for parsed scalar and array roots, asserting clear failure
+  diagnostics rather than missing-value fallthrough.
+- Add at least one non-object root contrast case that is not a JSON parse error, so resolver tests
+  cover the gap separately from existing invalid JSON coverage.
+- Keep missing-file and valid object-root tests passing to prove only malformed present files now
+  fail.
+
+### 5. Docs to be added or updated
+
+- Update [Local SprinkleRef Design](local-sprinkleref.md) to state that explicit stack categories
+  prevent local redirect target-ref changes, not just local category or value overrides.
+- Update [SprinkleRef Resolver](sprinkleref.md) to document that
+  `config/sprinkleref/local/values.json` must parse to an object root and that scalar, array, or
+  other non-object roots fail clearly.
+- Update AWS account setup docs only if their troubleshooting text describes local redirect behavior
+  or malformed local values files in a way that conflicts with this hardened resolver behavior.
+
+### 5.5. Expected regression scope
+
+- `deployment-only`
+- Expected implementation paths:
+  - `build-tools/tools/deployments/sprinkleref*.ts`
+  - `build-tools/tools/tests/deployments/sprinkleref*.test.ts`
+  - `docs/**`
+- Keep changes narrowly focused on explicit-category redirect target-ref protection and malformed
+  local values root diagnostics.
+
+### 6. Acceptance criteria
+
+- A stack ref with an explicit category resolves through its original logical ref and explicit
+  category even when local values contain a redirect to a different ref.
+- Local redirect objects cannot weaken or bypass an explicit stack category by changing the logical
+  target ref.
+- Stack refs without an explicit category continue to support local redirect objects, including
+  redirects to a different logical ref.
+- A present `config/sprinkleref/local/values.json` whose parsed root is a scalar, array, or other
+  non-object fails clearly.
+- Missing local values files remain optional and valid object-root local values files continue to
+  resolve as before.
+- Tests and docs cover different-ref redirects under explicit category selection and malformed
+  local values root handling.
+
+### 7. Risks
+
+- Tightening redirect handling could accidentally disable valid local redirects for uncategorized
+  refs.
+- Failing on malformed local values roots can surface previously hidden corrupt local files in
+  developer clones.
+
+### 8. Mitigations
+
+- Gate redirect target-ref protection only on the existing `categoryExplicit` signal.
+- Add contrast tests for uncategorized different-ref redirects so local-first resolution remains
+  available where no explicit category was selected.
+- Keep the malformed-root diagnostic specific to `config/sprinkleref/local/values.json` and the
+  expected object root shape so corrupt local files are easy to repair.
+
+### 9. Consequences of not implementing this PR
+
+Explicit stack categories can still be bypassed by local redirects that change the logical ref, and
+corrupt local values files that parse to scalar or array roots can still be silently treated as
+missing local values.
+
+### 10. Downsides for implementing this PR
+
+It further limits local redirect convenience for explicitly categorized stack refs and turns some
+previously tolerated malformed local files into resolver errors, but keeps both changes aligned with
+the documented explicit-category and init-local validation contracts.

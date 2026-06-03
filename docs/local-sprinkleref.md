@@ -288,8 +288,9 @@ For a stack field with an inline value:
 For a stack field with `{ "ref": "<scheme>://..." }`:
 
 1. CLI flag, when supplied.
-2. If the stack ref declares `category`, resolve through that category; local values do not satisfy
-   scalar, `{ "value": ... }`, or redirect entries for that ref.
+2. If the stack ref declares `category`, resolve the original logical ref through that category;
+   local values do not satisfy scalar, `{ "value": ... }`, or redirect target-ref changes for that
+   ref.
 3. Conventional local values file at `config/sprinkleref/local/values.json`.
 4. If the local entry is scalar or `{ "value": ... }`, use it only when the requested field is not
    secret-class.
@@ -320,8 +321,10 @@ evidence.
 Generated control-plane setup refs should declare `category: "control"` explicitly. Resolver code
 must not infer `control` from a `control-plane` ref prefix. A local redirect to
 `category: "bootstrap"` is an explicit clone-local decision to use the bootstrap lane for that one
-value only when the stack ref has no explicit category. Local scalar and `{ "value": ... }` entries
-are also local-first only for stack refs without an explicit category.
+value only when the stack ref has no explicit category. Redirects that change the target ref are
+also ignored when the stack ref declares a category, so an explicit category always applies to the
+original logical ref. Local scalar and `{ "value": ... }` entries are also local-first only for stack
+refs without an explicit category.
 
 ## Developer Experience
 

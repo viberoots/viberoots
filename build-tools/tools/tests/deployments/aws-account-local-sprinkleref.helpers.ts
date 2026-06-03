@@ -47,6 +47,26 @@ export async function writeRemote(tmp: string, category: string, values: Record<
   await writeJson(path.join(tmp, `.local/${category}.json`), values);
 }
 
+export async function writeResolver(
+  tmp: string,
+  defaultCategory: string,
+  stores: Record<string, Record<string, string>>,
+) {
+  const categories: Record<string, { backend: "local-file"; file: string }> = {};
+  for (const [category, values] of Object.entries(stores)) {
+    categories[category] = {
+      backend: "local-file",
+      file: path.join(tmp, `.local/${category}.json`),
+    };
+    await writeJson(path.join(tmp, `.local/${category}.json`), values);
+  }
+  await writeJson(path.join(tmp, "config/sprinkleref/selected.json"), {
+    version: 1,
+    defaultCategory,
+    categories,
+  });
+}
+
 export async function writeJson(file: string, value: unknown) {
   await fsp.mkdir(path.dirname(file), { recursive: true });
   await fsp.writeFile(file, `${JSON.stringify(value, null, 2)}\n`, "utf8");
