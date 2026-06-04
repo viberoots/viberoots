@@ -68,6 +68,28 @@ test("Infisical SprinkleRef storage avoids collisions for matching final segment
   }
 });
 
+test("Infisical SprinkleRef storage strips config and runtime schemes", async () => {
+  const server = await startFakeInfisicalServer(auth);
+  try {
+    const store = storeFor(server.siteUrl);
+    await store.add("config://control-plane/aws/account-id", "123456789012");
+    await store.add("runtime://control-plane/deploy/run-id", "run-123");
+    assert.deepEqual(
+      server.secrets.map((secret) => [secret.secretPath, secret.secretName, secret.secretValue]),
+      [
+        ["/control-plane/aws", "account-id", "123456789012"],
+        ["/control-plane/deploy", "run-id", "run-123"],
+      ],
+    );
+    assert.ok(
+      server.secretCalls.every((call) => !call.includes("://")),
+      server.secretCalls.join("\n"),
+    );
+  } finally {
+    await server.close();
+  }
+});
+
 test("non-Infisical SprinkleRef stores keep logical refs as their storage key", async () => {
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), "sprinkleref-local-storage-"));
   const file = path.join(dir, "values.json");
@@ -85,6 +107,28 @@ test("tracked control SprinkleRef profile uses prod Infisical environment", asyn
     const config = JSON.parse(await fs.readFile(relPath, "utf8"));
     assert.equal(config.categories.control.profile, "infisical-control");
     assert.equal(config.profiles["infisical-control"].defaultEnvironment, "prod");
+  }
+});
+
+test("Infisical docs keep UI keys scheme-free and document cleanup only", async () => {
+  const docs = await Promise.all(
+    ["docs/sprinkleref.md", "docs/local-sprinkleref.md"].map(async (name) => ({
+      name,
+      text: await fs.readFile(name, "utf8"),
+    })),
+  );
+  const joined = docs.map((doc) => doc.text).join("\n");
+  assert.match(joined, /one-time Infisical cleanup/i);
+  assert.match(joined, /root-level key `management-api-token`/);
+  assert.match(joined, /folder `\/control-plane\/supabase`[\s\S]*key `management-api-token`/);
+  assert.match(joined, /does not search the old root-level location/);
+  assert.match(joined, /UI key `management-api-token`/);
+  for (const doc of docs) {
+    assert.doesNotMatch(
+      doc.text,
+      /(?:Infisical UI key|UI key|key)\s+`(?:secret|config|runtime):\/\//i,
+      `${doc.name} must not present full logical URIs as Infisical UI keys`,
+    );
   }
 });
 

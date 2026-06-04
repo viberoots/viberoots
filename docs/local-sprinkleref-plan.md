@@ -1323,3 +1323,100 @@ Infisical environment that is not expected to work for the current setup.
 The change may require moving existing manually created Infisical secrets into derived folders, but
 it aligns the backend adapter with Infisical's native model and keeps SprinkleRef logical refs
 backend-neutral and collision-resistant.
+
+## PR-11: Infisical cleanup note and scheme regression coverage
+
+### 1. Intent
+
+Close the latest end-of-range plan-assessment gaps for PR-10 by documenting the one-time operator
+cleanup for root-level, last-segment-only Infisical test keys from earlier experiments, and by
+extending focused regression coverage so Infisical storage coordinates are proven for `secret://`,
+`config://`, and `runtime://` logical refs.
+
+### 2. Scope of changes
+
+- Add a clear operator cleanup note for existing Infisical test secrets that were manually created
+  under the previous root-level, last-segment-only mapping.
+- Explain that existing root-level keys such as `management-api-token` may need to be moved into the
+  derived folder path, for example `/control-plane/supabase` with key `management-api-token`.
+- State that SprinkleRef does not search both the old root-level location and the new derived
+  coordinates.
+- Keep the cleanup note limited to existing Infisical test data; do not imply that logical
+  SprinkleRef refs, runtime behavior, or non-Infisical backends should change.
+- Extend Infisical adapter regression tests so non-`secret://` schemes strip their URI scheme before
+  deriving `secretPath` and `secretName`.
+- Add docs/config fixture regression coverage proving docs do not imply that Infisical UI keys
+  contain full `secret://`, `config://`, or `runtime://` URIs.
+- Do not add new storage mapping behavior beyond what PR-10 already specified.
+
+### 3. External prerequisites
+
+- Operators with old root-level Infisical test secrets from earlier experiments need access to move
+  or recreate those records under the derived folder paths.
+- No new Infisical project, environment, or credential requirements are introduced.
+
+### 4. Tests to be added
+
+- Add Infisical adapter tests proving `config://control-plane/aws/account-id` calls the API with
+  `secretPath=/control-plane/aws` and `secretName=account-id`.
+- Add Infisical adapter tests proving a representative `runtime://...` ref calls the API with the
+  URI scheme stripped and only the final path segment used as `secretName`.
+- Ensure the scheme coverage applies to the same Infisical operations covered by PR-10, or to a
+  shared derivation helper used by all those operations.
+- Add docs or config fixture tests proving examples do not instruct operators to create Infisical UI
+  keys containing full logical URI schemes such as `secret://`, `config://`, or `runtime://`.
+
+### 5. Docs to be added or updated
+
+- Update [Local SprinkleRef Design](local-sprinkleref.md), [SprinkleRef Resolver](sprinkleref.md),
+  or the AWS account setup docs with a one-time cleanup note for root-level Infisical test keys
+  created under the previous last-segment-only mapping.
+- Include an example that shows the old root key and the new derived Infisical folder plus key.
+- Keep docs clear that the full logical ref remains the SprinkleRef identifier and metadata value,
+  while the Infisical UI `Key` is only the final stripped path segment.
+
+### 5.5. Expected regression scope
+
+- `deployment-only`
+- Expected implementation paths:
+  - `build-tools/tools/tests/deployments/sprinkleref-infisical.test.ts`
+  - `build-tools/tools/tests/deployments/infisical.test-server.ts`
+  - `docs/**`
+- Keep changes narrowly focused on cleanup documentation and regression tests for Infisical
+  scheme stripping.
+
+### 6. Acceptance criteria
+
+- Docs include a one-time operator cleanup note for moving root-level, last-segment-only Infisical
+  test secrets into derived folder paths, and they state the tool does not search the old location.
+- Infisical API calls never use a full `secret://`, `config://`, or `runtime://` URI as
+  `secretName`, with focused tests covering all three schemes.
+- Docs or config fixture tests prove current docs do not imply that Infisical UI keys should contain
+  full logical URI schemes.
+- No non-Infisical backend behavior changes.
+
+### 7. Risks
+
+- Cleanup docs could be too broad and make operators think every backend or every new secret needs
+  manual movement.
+- Docs fixture tests could become brittle if they scan broad prose without anchoring on Infisical UI
+  key examples.
+
+### 8. Mitigations
+
+- Frame the cleanup note as a one-time Infisical-only step for root-level test secrets created before
+  the PR-10 mapping change.
+- Anchor docs regression tests to the specific Infisical UI key examples and setup fixtures that
+  operators use.
+
+### 9. Consequences of not implementing this PR
+
+Operators with existing root-level Infisical test keys may not understand why the new folder/key
+mapping cannot find those old records, and regression tests may still miss accidental use of full
+`config://` or `runtime://` URIs as Infisical `secretName` values.
+
+### 10. Downsides for implementing this PR
+
+The added docs and fixture tests introduce a small amount of maintenance around examples, but keep
+the PR focused on closing PR-10 documentation and acceptance-test gaps without changing storage
+behavior.

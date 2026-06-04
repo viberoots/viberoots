@@ -122,6 +122,13 @@ all use that same mapping. The full logical ref is preserved as Infisical metada
 `sprinkleref` when the backend API accepts metadata; do not create Infisical keys containing
 `secret://`, `config://`, or `runtime://`.
 
+One-time Infisical cleanup note: if an operator-authored root-level test secret exists from earlier
+experiments, move or recreate only that Infisical record under its derived coordinates. For example,
+an old root-level key `management-api-token` should move to folder `/control-plane/supabase` with key
+`management-api-token`. SprinkleRef does not search the old root-level location. The logical
+SprinkleRef identifier stays `secret://control-plane/supabase/management-api-token`, and
+non-Infisical backends do not need this cleanup.
+
 Generated starter configs use generic env-name based profile metadata. Confirmed
 `infisical-bootstrap repo` validates those profiles and writes or preserves real non-secret
 backend metadata, such as an Infisical `projectId`, before deployment bootstrap consumes them.
