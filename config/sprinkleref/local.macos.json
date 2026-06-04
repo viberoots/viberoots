@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "extends": "./base.json",
+  "defaultCategory": "main",
+  "categories": {
+    "bootstrap": {
+      "backend": "macos-keychain",
+      "service": "viberoots-bootstrap"
+    }
+  }
+}

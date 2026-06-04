@@ -168,8 +168,8 @@ test("control-plane dispatcher recognizes aws-account subcommands", () => {
       "example.com",
       "--state-bucket-name",
       "custom-state-bucket",
-      "--supabase-access-token-ref",
-      "secret://control-plane/supabase/management-api-token",
+      "--supabase-access-token-env",
+      "CONTROL_SUPABASE_TOKEN",
     ];
     assert.equal(selectedControlPlaneCommand(), "aws-account");
   } finally {

@@ -2,7 +2,7 @@ import { execFile } from "node:child_process";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { promisify } from "node:util";
-import { getFlagStr, getPositionals } from "../lib/cli";
+import { getFlagStr, getPositionals, hasFlag } from "../lib/cli";
 import type { RunDeps, Subcommand } from "./aws-account-types";
 
 const execFileAsync = promisify(execFile);
@@ -46,6 +46,14 @@ export function assertNoOperatorSupabasePlanInput(fromFile: Record<string, unkno
   if (getFlagStr("supabase-plan", "").trim() || Object.hasOwn(fromFile, "supabasePlan")) {
     throw new Error(
       "supabasePlan is not a stack config input. The aws-account command reads the Supabase plan from the Supabase Management API and records it as evidence.",
+    );
+  }
+}
+
+export function assertNoSupabaseAccessTokenRefCliInputs(): void {
+  if (hasFlag("supabase-access-token-ref") || hasFlag("supabase-access-token-ref-category")) {
+    throw new Error(
+      "supabaseAccessTokenRef CLI inputs are no longer supported. Use supabaseAccessToken in stack config with a structured secret ref, or use SUPABASE_ACCESS_TOKEN as a setup-shell fallback.",
     );
   }
 }

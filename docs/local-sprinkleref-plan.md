@@ -1069,3 +1069,120 @@ requirement only partially implemented.
 It adds one more evidence metadata field and corresponding regression assertions, but keeps the
 behavior limited to source-specific local-values observability without changing resolution
 semantics.
+
+## PR-9: Track shared resolver config and remove stale token-ref CLI inputs
+
+### 1. Intent
+
+Close the latest end-of-range design-assessment findings by making shared SprinkleRef resolver
+config trackable while keeping clone-local values ignored, and by removing the stale
+`supabaseAccessTokenRef` public CLI naming from AWS account setup unless a focused migration test
+proves an intentional compatibility path is still required.
+
+### 2. Scope of changes
+
+- Replace or anchor the broad `.gitignore` rule that ignores every directory named `sprinkleref/`
+  so shared resolver config under `config/sprinkleref/` can be tracked.
+- Keep only clone-local SprinkleRef values ignored, especially `config/sprinkleref/local/`.
+- Ensure shared resolver policy files such as `config/sprinkleref/base.json` and
+  `config/sprinkleref/selected.json` are not ignored by the repo ignore policy.
+- Preserve `config/sprinkleref/selected.local.json` compatibility as an escape hatch or migration
+  artifact, but do not let the ignore policy hide the shared `selected.json` default.
+- Remove or rename the stale AWS account CLI flags:
+  - `--supabase-access-token-ref`
+  - `--supabase-access-token-ref-category`
+- Prefer the current `supabaseAccessToken` structured value model for CLI/help/config surfaces.
+- If removal would break a documented compatibility requirement, keep the old flags only as
+  explicitly documented compatibility aliases with focused migration coverage proving their
+  behavior is intentional and does not reintroduce `supabaseAccessTokenRef` into generated config.
+- Keep true secret handling unchanged: no plaintext Supabase Management API token values in stack
+  config, local values, generated config, command output, or evidence.
+- Do not broaden this PR into resolver semantics, local values precedence, category defaults, or
+  `selected.local.json` removal.
+
+### 3. External prerequisites
+
+- None beyond the existing local SprinkleRef setup flow and repo-local gitignore hygiene.
+- Any compatibility decision for old token-ref flags must be justified by an existing documented
+  user or migration requirement.
+
+### 4. Tests to be added
+
+- Add repository hygiene or gitignore tests proving `config/sprinkleref/base.json` and
+  `config/sprinkleref/selected.json` are not ignored.
+- Add gitignore coverage proving `config/sprinkleref/local/` remains ignored for clone-local values.
+- Add CLI tests proving `--supabase-access-token-ref` and
+  `--supabase-access-token-ref-category` are removed or rejected if no compatibility requirement
+  exists.
+- Add command help tests proving stale `supabaseAccessTokenRef` naming no longer appears in public
+  AWS account setup help.
+- If compatibility aliases are retained, add focused migration tests proving the old flags map to
+  the new `supabaseAccessToken` structured model, produce deprecation guidance, and do not appear in
+  generated config or normal docs.
+- Keep existing secret-class tests passing for `supabaseAccessToken` redaction and plaintext
+  rejection.
+
+### 5. Docs to be added or updated
+
+- Update `.gitignore` comments or local setup docs to explain that shared resolver config under
+  `config/sprinkleref/` is tracked while `config/sprinkleref/local/` is ignored.
+- Update [SprinkleRef Resolver](sprinkleref.md) to clarify that `config/sprinkleref/selected.json`
+  is the tracked shared selector and `selected.local.json` is only an escape hatch or migration
+  artifact.
+- Update [AWS Account Control Plane And Remote Builds](aws-account-control-plane-and-remote-builds.md)
+  and relevant command help so token setup uses `supabaseAccessToken` terminology and does not
+  advertise stale `supabaseAccessTokenRef` inputs.
+- If old token-ref CLI flags are intentionally retained as compatibility aliases, document their
+  deprecated status narrowly and point users to the `supabaseAccessToken` structured value model.
+
+### 5.5. Expected regression scope
+
+- `deployment-only`
+- Expected implementation paths:
+  - `.gitignore`
+  - `build-tools/tools/deployments/aws-account.ts`
+  - `build-tools/tools/tests/deployments/aws-account-cli.test.ts`
+  - `build-tools/tools/tests/deployments/sprinkleref*.test.ts`
+  - `docs/**`
+  - tracked shared resolver config examples under `config/sprinkleref/**`, if present
+- Keep changes narrowly focused on ignore policy hygiene and stale token-ref CLI surface cleanup.
+
+### 6. Acceptance criteria
+
+- `config/sprinkleref/base.json` and `config/sprinkleref/selected.json` can be tracked by git.
+- `config/sprinkleref/local/` remains ignored for clone-local values.
+- Public AWS account setup CLI/help/config surfaces no longer use stale
+  `supabaseAccessTokenRef` naming unless explicitly retained as a documented deprecated migration
+  alias.
+- Generated stack config and normal docs continue to use the `supabaseAccessToken` structured value
+  model.
+- Tests cover tracked shared resolver config, ignored local values, and either removal/rejection of
+  old token-ref flags or their intentional compatibility mapping.
+
+### 7. Risks
+
+- Narrowing the ignore rule could accidentally allow clone-local secret or private values outside
+  `config/sprinkleref/local/` to become visible to git.
+- Removing old token-ref flags could break local scripts that used an obsolete public CLI surface.
+- Keeping compatibility aliases without clear tests could prolong stale naming and confuse setup
+  docs.
+
+### 8. Mitigations
+
+- Anchor the ignore policy to the intended clone-local path and add hygiene tests for both tracked
+  shared files and ignored local values.
+- Prefer removal or rename of old token-ref flags when no compatibility requirement is documented.
+- If aliases are retained, make them deprecated, tested, and absent from generated config and normal
+  docs.
+
+### 9. Consequences of not implementing this PR
+
+Shared resolver policy such as `config/sprinkleref/selected.json` can remain silently ignored by
+git, forcing per-clone selector drift, while public AWS account setup continues exposing stale
+token-ref CLI names that conflict with the planned `supabaseAccessToken` structured config model.
+
+### 10. Downsides for implementing this PR
+
+It tightens repository ignore hygiene and CLI naming in ways that may require small updates to local
+setup scripts or fixtures, but keeps the change limited to tracked shared config policy and stale
+public token-ref inputs.

@@ -34,6 +34,7 @@ test("aws-account help describes local SprinkleRef first-run setup", async () =>
   );
   assert.match(help, /token:.*write the Supabase Management API token with sprinkleref --update/);
   assert.match(help, /do not use token write commands for awsOrganizationId/);
+  assert.doesNotMatch(help, /supabaseAccessTokenRef|supabase-access-token-ref/);
   assert.doesNotMatch(
     help,
     /aws-account bootstrap --domain <domain> --expected-aws-account-id <id>/,

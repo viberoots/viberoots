@@ -1,5 +1,6 @@
 #!/usr/bin/env zx-wrapper
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
@@ -180,6 +181,12 @@ test("sprinkleref --init defaults to the sprinkleref directory", async () => {
   }
 });
 
+test("repo ignore policy tracks shared resolver config and ignores local values", () => {
+  assert.equal(isGitIgnored("config/sprinkleref/base.json"), false);
+  assert.equal(isGitIgnored("config/sprinkleref/selected.json"), false);
+  assert.equal(isGitIgnored("config/sprinkleref/local/values.json"), true);
+});
+
 async function tmp() {
   return await fs.mkdtemp(path.join(os.tmpdir(), "sprinkleref-config-"));
 }
@@ -196,4 +203,18 @@ function vaultProfile() {
     mount: "secret",
     defaultPath: "/deployments",
   };
+}
+
+function isGitIgnored(relativePath: string): boolean {
+  try {
+    execFileSync("git", ["check-ignore", "--quiet", relativePath], {
+      cwd: process.cwd(),
+      stdio: "ignore",
+    });
+    return true;
+  } catch (error) {
+    const status = (error as { status?: number }).status;
+    if (status === 1) return false;
+    throw error;
+  }
 }

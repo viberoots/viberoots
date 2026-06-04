@@ -51,6 +51,10 @@ default so managed deployment bootstrap outputs can be created after repo setup.
 `repo --without-deployments` to stop after resolver/profile setup, or retry one scope directly with
 `deployment --target <buck-target>`.
 
+`config/sprinkleref/selected.json` is tracked shared resolver policy. Keep clone-local coordinate
+values under `config/sprinkleref/local/`; `selected.local.json` is reserved for migration or an
+exceptional per-clone resolver override.
+
 `config/sprinkleref/local/values.json` is the conventional gitignored clone-local values file.
 `sprinkleref --init-local` creates or updates it with empty placeholders for private coordinates and
 a non-plaintext ref object for `secret://control-plane/supabase/management-api-token`. Empty

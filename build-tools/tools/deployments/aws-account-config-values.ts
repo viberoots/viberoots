@@ -48,9 +48,7 @@ export function buildStackConfigValues(
   values.supabaseProjectRef = initStructuredField(fromFile, "supabaseProjectRef", [
     "supabase-project-ref",
   ]);
-  values.supabaseAccessToken = initStructuredField(fromFile, "supabaseAccessToken", [
-    "supabase-access-token-ref",
-  ]);
+  values.supabaseAccessToken = initStructuredField(fromFile, "supabaseAccessToken", []);
 
   addNonDefaultStackConfigValue(values, fromFile, "stackName", stackName, "control", [
     "stack",
@@ -221,9 +219,7 @@ function initStructuredField(
   for (const flag of flags) {
     const value = strFlag(flag, "");
     if (value) {
-      return flag === "supabase-access-token-ref"
-        ? { ref: value, category: strFlag("supabase-access-token-ref-category", "control") }
-        : value;
+      return value;
     }
   }
   if (Object.hasOwn(fromFile, key)) return fromFile[key] as string | { ref: string };

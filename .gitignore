@@ -13,7 +13,10 @@ result
 # Local temp artifacts
 .tmp/
 .local/
-sprinkleref/
+# Ignore only the legacy repo-root local SprinkleRef workdir. Shared resolver
+# policy under config/sprinkleref/ is tracked; clone-local values stay below
+# config/sprinkleref/local/.
+/sprinkleref/
 config/sprinkleref/local/
 projects/deployments/*/infisical/opentofu/.terraform*/
 projects/deployments/*/infisical/opentofu/.terraform.lock.hcl

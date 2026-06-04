@@ -171,8 +171,6 @@ test("aws-account check resolves Supabase token from SprinkleRef ref", async () 
           "supabase-org",
           "--supabase-project-ref",
           "project-ref",
-          "--supabase-access-token-ref",
-          secretRef,
         ],
         () => runAwsAccountCommand({ cwd: tmp, stdout: () => undefined }),
       );

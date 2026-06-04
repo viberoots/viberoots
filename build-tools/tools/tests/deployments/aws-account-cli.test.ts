@@ -6,3 +6,4 @@ import "./aws-account-cli.case-5";
 import "./aws-account-cli.case-6";
 import "./aws-account-cli.case-7";
 import "./aws-account-cli.case-8";
+import "./aws-account-cli.case-9";

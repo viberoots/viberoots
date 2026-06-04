@@ -108,8 +108,6 @@ export function selectedControlPlaneCommand(): ControlPlaneCommand {
     "state-bucket-name",
     "state-lock-table-name",
     "supabase-access-token-env",
-    "supabase-access-token-ref",
-    "supabase-access-token-ref-category",
     "supabase-api-base-url",
     "supabase-org-id",
     "supabase-project-ref",

@@ -11,6 +11,7 @@ import {
 import type { AwsAccountConfig } from "./aws-account-types";
 import {
   assertNoOperatorSupabasePlanInput,
+  assertNoSupabaseAccessTokenRefCliInputs,
   defaultStackConfigPath,
   pathExists,
   readConfigFile,
@@ -38,6 +39,7 @@ export async function readAwsAccountConfig(cwd: string): Promise<AwsAccountConfi
     fromFile = await readConfigFile(canonicalConfigPath);
   }
   assertNoOperatorSupabasePlanInput(fromFile);
+  assertNoSupabaseAccessTokenRefCliInputs();
   const stackName = strFlag(
     "stack",
     strFlag("environment", stringValue(fromFile, "stackName", "control")),
@@ -129,7 +131,7 @@ export async function readAwsAccountConfig(cwd: string): Promise<AwsAccountConfi
   const supabaseProject = await resolveConfigInput(cwd, fromFile, "supabaseProjectRef", {
     flag: "supabase-project-ref",
   });
-  const supabaseToken = await resolveSecretInput(fromFile, "supabaseAccessToken");
+  const supabaseToken = parseStackField(fromFile, "supabaseAccessToken", { secret: true });
   inputSources.awsAccountId = awsAccount.source;
   inputSources.awsOrganizationId = awsOrg.source;
   inputSources.supabaseOrgId = supabaseOrg.source;
@@ -196,25 +198,4 @@ async function resolveConfigInput(
     category: parsed.category,
     categoryExplicit: Boolean(parsed.category),
   });
-}
-
-async function resolveSecretInput(
-  fromFile: Record<string, unknown>,
-  key: string,
-): Promise<StackInputResolution> {
-  const flagRef = strFlag("supabase-access-token-ref", "");
-  const flagCategory = strFlag("supabase-access-token-ref-category", "");
-  if (flagRef) {
-    return {
-      ref: flagRef,
-      category: flagCategory || undefined,
-      source: {
-        source: "cli",
-        ref: flagRef,
-        category: flagCategory || undefined,
-        valuePrinted: false,
-      },
-    };
-  }
-  return parseStackField(fromFile, key, { secret: true });
 }

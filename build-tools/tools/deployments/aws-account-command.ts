@@ -21,6 +21,7 @@ import { printCheckResult } from "./aws-account-output";
 import { freshStatus, nextPhase, readStatus, writeStatusAndInputs } from "./aws-account-status";
 import {
   assertNoOperatorSupabasePlanInput,
+  assertNoSupabaseAccessTokenRefCliInputs,
   isoNow,
   printJson,
   printUsage,
@@ -34,6 +35,7 @@ export async function runAwsAccountCommand(deps: RunDeps = {}): Promise<void> {
     return;
   }
   assertNoOperatorSupabasePlanInput({});
+  assertNoSupabaseAccessTokenRefCliInputs();
   if (subcommand === "config-init") return initStackConfig(deps.cwd || process.cwd(), deps);
   const cwd = deps.cwd || process.cwd();
   const config = await readAwsAccountConfigForCommand(cwd, deps, subcommand);
