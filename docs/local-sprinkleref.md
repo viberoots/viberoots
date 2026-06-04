@@ -292,6 +292,13 @@ Local values are an implicit local-first resolution surface. They do not need to
 `projects/config/shared.json`, which lets shared config remain the same for every clone. Resolution
 should still report when a value came from `projects/config/local.json`.
 
+Older `config/sprinkleref/*` resolver files should be deleted after their useful values are moved.
+Move shared resolver settings and prior `local.*.json` / `ci.*.json` runtime variants into
+`projects/config/shared.json`, move entries from `config/sprinkleref/local/values.json` and
+clone-only selections from `config/sprinkleref/selected.local.json` into
+`projects/config/local.json`, and keep true secret values in the selected secret backend rather than
+in either JSON file. See [sprinkleref.md](sprinkleref.md) for concrete examples.
+
 ## Resolution Strategy
 
 For a stack field with an inline value:

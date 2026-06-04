@@ -3,12 +3,36 @@ import assert from "node:assert/strict";
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
+import { fileURLToPath } from "node:url";
 import { test } from "node:test";
 import {
   readSprinkleRefConfig,
   resolveSprinkleRefBackend,
 } from "../../deployments/sprinkleref-config";
 import { initSprinkleRefConfigs } from "../../deployments/sprinkleref-templates";
+
+const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../../..");
+
+test("SprinkleRef docs explain the old local resolver file move", async () => {
+  const docs = await Promise.all([
+    fs.readFile(path.join(repoRoot, "docs/sprinkleref.md"), "utf8"),
+    fs.readFile(path.join(repoRoot, "docs/local-sprinkleref.md"), "utf8"),
+  ]);
+  for (const fragment of [
+    "config/sprinkleref/local/values.json",
+    "config/sprinkleref/selected.local.json",
+    "config/sprinkleref/local.*.json",
+    "config/sprinkleref/ci.*.json",
+    "projects/config/shared.json",
+    "projects/config/local.json",
+    "runtimeHosts",
+  ]) {
+    assert.ok(
+      docs.some((doc) => doc.includes(fragment)),
+      `SprinkleRef migration docs must mention ${fragment}`,
+    );
+  }
+});
 
 test("project config selects multiple runtime hosts from the shared profile set", async () => {
   const dir = await tmp();

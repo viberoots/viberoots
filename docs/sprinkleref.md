@@ -131,6 +131,63 @@ all use that same mapping. The full logical ref is preserved as Infisical metada
 `sprinkleref` when the backend API accepts metadata; do not create Infisical keys containing
 `secret://`, `config://`, or `runtime://`.
 
+## Moving from older local files
+
+The canonical project config replaced the earlier `config/sprinkleref/*` resolver files. Those
+paths are not compatibility inputs. Move any still-useful values into the new files and delete the
+old files.
+
+- Move repo-wide resolver policy, shared backend coordinates, named environments, runtime host
+  profiles, and shared non-secret values into `projects/config/shared.json`.
+- Move individual operator values, active runtime host selection, and local-only backend file paths
+  into `projects/config/local.json`.
+- Move entries from `config/sprinkleref/local/values.json` into the `values` object in
+  `projects/config/local.json`.
+- Replace `config/sprinkleref/selected.local.json` with either local overrides in
+  `projects/config/local.json` or shared category/profile selection in `projects/config/shared.json`.
+- Fold prior `config/sprinkleref/local.*.json` and `config/sprinkleref/ci.*.json` resolver variants
+  into `runtimeHosts` entries in the shared file, with the clone-specific active selection in the
+  local file when needed.
+
+Example local values move:
+
+```json
+{
+  "schemaVersion": "viberoots-project-local-config@1",
+  "values": {
+    "control-plane": {
+      "aws": {
+        "account-id": "123456789012",
+        "organization-id": "o-example"
+      },
+      "supabase": {
+        "org-id": "org-example",
+        "project-ref": "abcd1234"
+      }
+    }
+  }
+}
+```
+
+Example runtime host move:
+
+```json
+{
+  "schemaVersion": "viberoots-project-config@1",
+  "runtimeHosts": {
+    "github-actions": {
+      "backend": "github-actions",
+      "scope": "repository",
+      "namePrefix": "VIBEROOTS_"
+    },
+    "local-macos": {
+      "backend": "macos-keychain",
+      "service": "viberoots-bootstrap"
+    }
+  }
+}
+```
+
 One-time Infisical cleanup note: if an operator-authored root-level test secret exists from earlier
 experiments, move or recreate only that Infisical record under its derived coordinates. For example,
 an old root-level key `management-api-token` should move to folder `/control-plane/supabase` with key
