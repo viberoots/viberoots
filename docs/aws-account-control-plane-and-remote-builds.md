@@ -543,6 +543,10 @@ sprinkleref --update secret://control-plane/supabase/management-api-token --crea
 control-plane aws-account check
 ```
 
+With the tracked `control` resolver profile, the token is currently stored in the Infisical `prod`
+environment, folder `/control-plane/supabase`, key `management-api-token`. The `control` category
+remains a distinct resolver lane even while it targets the existing `prod` Infisical environment.
+
 Add `--category bootstrap` only when the stack config or clone-local value explicitly chooses
 `category: "bootstrap"` for the token ref. If SprinkleRef is not ready yet, export
 `SUPABASE_ACCESS_TOKEN=<token>` in the setup shell for that run. The env var wins when both the env

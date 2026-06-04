@@ -147,7 +147,7 @@ test("starter configs are deterministic and contain no secret values", async () 
   const control = resolveSprinkleRefBackend(selected, "control");
   assert.equal(control.profile, "infisical-control");
   assert.equal(control.backend.backend, "infisical");
-  assert.equal(control.backend.defaultEnvironment, "control");
+  assert.equal(control.backend.defaultEnvironment, "prod");
   assert.equal(resolveSprinkleRefBackend(selected).profile, "infisical-control");
 });
 

@@ -81,7 +81,8 @@ export class SprinkleRefInfisicalStore implements SprinkleRefStore {
     const token = await resolveInfisicalAccessToken(await this.credential(), {
       fetchImpl: this.fetchImpl,
     });
-    const url = this.url(ref, value);
+    const storage = infisicalStorage(ref);
+    const url = this.url(storage, value);
     return await this.fetchImpl(url, {
       method,
       headers: {
@@ -95,19 +96,23 @@ export class SprinkleRefInfisicalStore implements SprinkleRefStore {
             body: JSON.stringify({
               projectId: this.projectId(),
               environment: this.config.defaultEnvironment || "",
-              secretPath: this.config.defaultPath || "/",
+              secretPath: storage.secretPath,
               type: "shared",
               secretValue,
+              secretMetadata: { sprinkleref: ref },
             }),
           }),
     });
   }
 
-  private url(ref: string, viewSecretValue: boolean) {
-    const url = new URL(`/api/v4/secrets/${encodeURIComponent(secretName(ref))}`, this.config.host);
+  private url(storage: InfisicalStorage, viewSecretValue: boolean) {
+    const url = new URL(
+      `/api/v4/secrets/${encodeURIComponent(storage.secretName)}`,
+      this.config.host,
+    );
     url.searchParams.set("projectId", this.projectId());
     url.searchParams.set("environment", this.config.defaultEnvironment || "");
-    url.searchParams.set("secretPath", this.config.defaultPath || "/");
+    url.searchParams.set("secretPath", storage.secretPath);
     url.searchParams.set("type", "shared");
     url.searchParams.set("viewSecretValue", viewSecretValue ? "true" : "false");
     url.searchParams.set("expandSecretReferences", "false");
@@ -162,8 +167,19 @@ function bootstrapCredentialStore(backend: SprinkleRefBackendConfig, platform?: 
   );
 }
 
-function secretName(ref: string) {
-  return ref.split("/").filter(Boolean).pop() || ref;
+type InfisicalStorage = {
+  secretPath: string;
+  secretName: string;
+};
+
+export function infisicalStorage(ref: string): InfisicalStorage {
+  const stripped = ref.replace(/^[a-z][a-z0-9+.-]*:\/\//i, "");
+  const segments = stripped.split("/").filter(Boolean);
+  const secretName = segments.pop() || ref;
+  return {
+    secretPath: segments.length ? `/${segments.join("/")}` : "/",
+    secretName,
+  };
 }
 
 async function throwInfisicalError(action: string, response: Response): Promise<never> {

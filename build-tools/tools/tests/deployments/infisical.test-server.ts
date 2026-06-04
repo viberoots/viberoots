@@ -23,6 +23,7 @@ export type FakeInfisicalSecret = {
   secretName: string;
   version?: string;
   secretValue?: string;
+  secretMetadata?: unknown;
   deleted?: boolean;
   revoked?: boolean;
   unavailable?: boolean;
@@ -177,10 +178,12 @@ export async function startFakeInfisicalServer(
             secretPath: url.searchParams.get("secretPath") || "",
             secretName,
             secretValue: String(body.secretValue || ""),
+            secretMetadata: body.secretMetadata,
             version: "v-written",
           });
         } else {
           found.secretValue = String(body.secretValue || "");
+          found.secretMetadata = body.secretMetadata;
           found.version = "v-updated";
         }
         json(response, 200, { secret: { secretName, version: found ? "v-updated" : "v-written" } });

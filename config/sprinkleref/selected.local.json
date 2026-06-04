@@ -30,7 +30,7 @@
       "backend": "infisical",
       "generatedBy": "viberoots-repo-bootstrap",
       "host": "https://app.infisical.com",
-      "defaultEnvironment": "control",
+      "defaultEnvironment": "prod",
       "defaultPath": "/",
       "projectId": "55d756b1-7523-4025-b144-cc23c20ff156",
       "projectName": "viberoots-deployments",

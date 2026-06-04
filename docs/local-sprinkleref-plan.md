@@ -1186,3 +1186,140 @@ token-ref CLI names that conflict with the planned `supabaseAccessToken` structu
 It tightens repository ignore hygiene and CLI naming in ways that may require small updates to local
 setup scripts or fixtures, but keeps the change limited to tracked shared config policy and stale
 public token-ref inputs.
+
+## PR-10: Infisical storage mapping and production control profile
+
+### 1. Intent
+
+Close the newly identified Infisical backend mismatch by keeping SprinkleRef refs backend-neutral
+while mapping them onto Infisical's native folder/key model, and simplify the tracked control-plane
+resolver profile so the `control` category uses the existing `prod` Infisical environment instead
+of a separate `control` environment.
+
+### 2. Scope of changes
+
+- Keep logical SprinkleRef refs unchanged, such as
+  `secret://control-plane/supabase/management-api-token`, `config://control-plane/aws/account-id`,
+  and `runtime://...`.
+- Do not write the full logical URI into Infisical's `Key` / `secretName` field.
+- Derive Infisical storage coordinates from the logical ref by stripping the URI scheme:
+  - `secret://control-plane/supabase/management-api-token`
+  - backend storage key `/control-plane/supabase/management-api-token`
+  - Infisical `secretPath` `/control-plane/supabase`
+  - Infisical `secretName` / UI `Key` `management-api-token`
+- Preserve the full logical ref in Infisical metadata when the API supports metadata, for example
+  `sprinkleref=secret://control-plane/supabase/management-api-token`, so reverse lookup and audit
+  evidence can recover the original backend-neutral ref.
+- Apply the same path/name derivation to Infisical read, presence check, add, update, and remove
+  paths.
+- Avoid the current last-segment-only mapping that writes every logical ref into the backend
+  default path and risks collisions between refs with the same final segment.
+- Keep non-Infisical backends unchanged unless their docs need to clarify that only the Infisical
+  adapter splits logical refs into `secretPath` and `secretName`.
+- Update tracked SprinkleRef config so the `control` category/profile uses the `prod` Infisical
+  environment for now instead of `control`.
+- Update docs that currently describe or show `defaultEnvironment: "control"` so they explain that
+  the `control` category is a resolver lane backed by the `prod` Infisical environment until a
+  separate control environment is introduced deliberately.
+- Do not remove the `control` category itself; keep it as an explicit, reviewable resolver lane for
+  control-plane setup refs.
+- Do not infer backend paths from UI folder state outside the deterministic logical-ref mapping.
+
+### 3. External prerequisites
+
+- Infisical projects must allow secrets to be created under folder paths such as
+  `/control-plane/supabase`.
+- Operators may need to move existing manually created root-level Infisical secrets into the derived
+  folder path if they were created with the previous last-segment-only mapping.
+- The tracked resolver config can continue to use the existing Infisical project and machine
+  identity credentials.
+
+### 4. Tests to be added
+
+- Add Infisical adapter tests proving a ref such as
+  `secret://control-plane/supabase/management-api-token` calls the API with
+  `secretName=management-api-token` and `secretPath=/control-plane/supabase`.
+- Add tests proving two refs with the same final segment but different logical paths do not collide
+  because they use different Infisical `secretPath` values.
+- Add read, add/update, has, and remove coverage so all Infisical operations use the same derived
+  `secretPath`/`secretName` mapping.
+- Add metadata tests proving the full logical SprinkleRef ref is included in Infisical
+  `secretMetadata` or the closest supported metadata/comment field without printing secret values.
+- Add regression tests proving non-Infisical backends keep their existing storage behavior.
+- Add config tests proving the tracked `control` resolver profile points to the `prod` Infisical
+  environment and that generated control-plane refs still explicitly select `category: "control"`.
+- Add docs or config fixture tests proving no current docs imply that the Infisical UI `Key` should
+  contain a `secret://` URI.
+
+### 5. Docs to be added or updated
+
+- Update [Local SprinkleRef Design](local-sprinkleref.md) to describe the Infisical-specific
+  backend mapping from logical refs to folder path plus key.
+- Update [SprinkleRef Resolver](sprinkleref.md) to document that Infisical's UI `Key` is the final
+  logical-ref segment and the folder breadcrumb is the rest of the stripped logical ref path.
+- Update AWS account setup docs if they show the Supabase Management API token location, using the
+  example:
+  - environment `prod`
+  - folder `/control-plane/supabase`
+  - key `management-api-token`
+- Update tracked config examples under `config/sprinkleref/**` so the `control` profile uses
+  `defaultEnvironment: "prod"` until a separate control environment is intentionally introduced.
+- Document that the `control` category remains distinct from `main` as resolver policy, even when
+  both categories currently target the same Infisical environment.
+
+### 5.5. Expected regression scope
+
+- `deployment-only`
+- Expected implementation paths:
+  - `build-tools/tools/deployments/sprinkleref-infisical.ts`
+  - `build-tools/tools/tests/deployments/sprinkleref-infisical.test.ts`
+  - `build-tools/tools/tests/deployments/infisical.test-server.ts`
+  - `config/sprinkleref/**`
+  - `docs/**`
+- Keep changes narrowly focused on Infisical storage coordinate mapping and the tracked control
+  profile environment.
+
+### 6. Acceptance criteria
+
+- Infisical API calls never use a full `secret://`, `config://`, or `runtime://` URI as
+  `secretName`.
+- `secret://control-plane/supabase/management-api-token` maps to Infisical folder
+  `/control-plane/supabase` and key `management-api-token`.
+- The full logical SprinkleRef ref is preserved in Infisical metadata or documented equivalent
+  metadata/comment field when creating or updating secrets.
+- Existing Infisical read, write, update, check, and remove flows use the same mapping and pass
+  focused tests.
+- Refs with the same final segment but different logical paths do not collide in Infisical.
+- The tracked `control` profile uses Infisical environment `prod`, and docs explain that `control`
+  remains a resolver lane rather than an Infisical environment name.
+- Existing local-file, macOS Keychain, and CI backend behavior is unchanged.
+
+### 7. Risks
+
+- Existing Infisical secrets created under the previous root-path, last-segment-only mapping may not
+  be found after the mapping changes.
+- Infisical metadata support could differ between API versions or deployments.
+- Pointing both `main` and `control` resolver lanes at `prod` could blur operational separation if
+  docs are not clear that the lane is still intentional resolver policy.
+
+### 8. Mitigations
+
+- Document the migration clearly and include a one-time operator note for moving existing secrets
+  from root-level keys to derived folder paths.
+- If metadata writes are unavailable, fail clearly or use an explicitly documented fallback such as
+  `secretComment` while keeping the logical ref out of the secret value and key.
+- Keep the `control` category explicit in generated stack config and resolver config, even while it
+  targets the `prod` Infisical environment.
+
+### 9. Consequences of not implementing this PR
+
+Infisical storage will continue using only the final logical-ref segment as the secret key in a
+single default path, which can collide and does not match the folder/key model operators see in the
+Infisical UI. The tracked resolver config will also continue pointing the `control` lane at an
+Infisical environment that is not expected to work for the current setup.
+
+### 10. Downsides for implementing this PR
+
+The change may require moving existing manually created Infisical secrets into derived folders, but
+it aligns the backend adapter with Infisical's native model and keeps SprinkleRef logical refs
+backend-neutral and collision-resistant.

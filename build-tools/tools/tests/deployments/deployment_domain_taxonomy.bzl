@@ -42,3 +42,7 @@ REVIEWED_DEPLOYMENT_TEST_OWNERSHIP.update({
     "build-tools/tools/tests/deployments/cloud-control-remaining-provider-identity.test.ts": True,
     "build-tools/tools/tests/deployments/deployment-control-plane-command-flags.test.ts": True,
 })
+
+REVIEWED_DEPLOYMENT_TEST_OWNERSHIP.update({
+    "build-tools/tools/tests/deployments/sprinkleref-infisical-storage.test.ts": True,
+})

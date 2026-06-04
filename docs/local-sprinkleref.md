@@ -210,6 +210,9 @@ Meaning:
 - This clone chooses to resolve that value through the `bootstrap` category.
 - The resolver config decides whether `bootstrap` uses `macos-keychain`, `local-file`, or another
   allowed non-Infisical backend.
+- If the selected category is Infisical, the backend stores this ref under folder
+  `/control-plane/supabase` with UI key `management-api-token`; the UI key is not the full
+  `secret://...` URI.
 
 This avoids global automatic keychain fallback. A keychain/bootstrap value is used only by clones
 whose local values file explicitly redirects to the `bootstrap` category.
@@ -247,7 +250,7 @@ Example:
       "backend": "infisical",
       "host": "https://app.infisical.com",
       "projectId": "<project-id>",
-      "defaultEnvironment": "control",
+      "defaultEnvironment": "prod",
       "clientIdEnv": "INFISICAL_MACHINE_IDENTITY_CLIENT_ID",
       "clientSecretEnv": "INFISICAL_MACHINE_IDENTITY_CLIENT_SECRET"
     },
@@ -266,6 +269,10 @@ Example:
 Developers should not need a per-clone selector for ordinary local overrides. The conventional local
 values file is enough. A per-clone selector can still exist for exceptional cases, but it should not
 be the default path.
+
+The `control` category is a resolver lane for control-plane setup refs. It can currently target the
+same Infisical `prod` environment as other production-ready refs; introduce a separate Infisical
+environment only as a deliberate resolver-profile change.
 
 The conventional local values file is an implicit local-first resolver. It does not need to be
 listed in `config/sprinkleref/selected.json`, which lets the shared selector remain the same for

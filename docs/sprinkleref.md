@@ -114,6 +114,14 @@ Infisical profiles use Universal Auth env names only: `clientIdEnv` and `clientS
 `tokenEnv` remains valid for Vault profiles, but Infisical resolver profiles reject raw token env
 credentials.
 
+Infisical storage is the only backend that splits logical refs into native UI coordinates.
+SprinkleRef keeps refs backend-neutral, then strips the URI scheme for Infisical: for example
+`secret://control-plane/supabase/management-api-token` is stored in environment `prod`, folder
+`/control-plane/supabase`, and UI key `management-api-token`. Add, update, read, check, and remove
+all use that same mapping. The full logical ref is preserved as Infisical metadata named
+`sprinkleref` when the backend API accepts metadata; do not create Infisical keys containing
+`secret://`, `config://`, or `runtime://`.
+
 Generated starter configs use generic env-name based profile metadata. Confirmed
 `infisical-bootstrap repo` validates those profiles and writes or preserves real non-secret
 backend metadata, such as an Infisical `projectId`, before deployment bootstrap consumes them.

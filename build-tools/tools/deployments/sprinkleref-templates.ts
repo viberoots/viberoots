@@ -25,7 +25,7 @@ export function sprinkleRefStarterConfigs(platform = process.platform) {
     profiles: {
       "vault-default": VAULT_DEFAULT,
       "infisical-default": starterInfisicalProfile(),
-      "infisical-control": { ...starterInfisicalProfile(), defaultEnvironment: "control" },
+      "infisical-control": { ...starterInfisicalProfile(), defaultEnvironment: "prod" },
     },
     categories: {
       main: { profile: "infisical-default" },
