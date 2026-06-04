@@ -41,7 +41,7 @@ test("aws-account resolves structured stack refs from hierarchical local values"
     await runAwsAccountCheckForEvidence(tmp, evidenceDir);
     const accountSource = (await readInputsEvidence(evidenceDir)).inputSources.awsAccountId;
     assertAccountLocalValuesSource(accountSource);
-    assert.match(accountSource.localValuesPath, /config\/sprinkleref\/local\/values\.json$/);
+    assert.match(accountSource.localValuesPath, /projects\/config\/local\.json$/);
     await writeLocalValues(tmp, {
       "control-plane": { aws: { "account-id": { value: "object-account-id" } } },
     });
@@ -107,14 +107,16 @@ test("aws-account resolves secret local redirect through bootstrap category", as
       supabaseProjectRef: "project-ref",
       supabaseAccessToken: { ref },
     });
-    await fsp.mkdir(path.join(tmp, "config/sprinkleref"), { recursive: true });
     await fsp.mkdir(path.join(tmp, ".local"), { recursive: true });
-    await writeJson(path.join(tmp, "config/sprinkleref", "selected.json"), {
-      version: 1,
-      defaultCategory: "control",
-      categories: {
-        control: { backend: "local-file", file: path.join(tmp, ".local/control.json") },
-        bootstrap: { backend: "local-file", file: path.join(tmp, ".local/bootstrap.json") },
+    await writeJson(path.join(tmp, "projects/config/shared.json"), {
+      schemaVersion: "viberoots-project-config@1",
+      sprinkleref: {
+        version: 1,
+        defaultCategory: "control",
+        categories: {
+          control: { backend: "local-file", file: path.join(tmp, ".local/control.json") },
+          bootstrap: { backend: "local-file", file: path.join(tmp, ".local/bootstrap.json") },
+        },
       },
     });
     await writeJson(path.join(tmp, ".local", "bootstrap.json"), { [ref]: "test-token" });
@@ -151,10 +153,7 @@ test("aws-account resolves secret local redirect through bootstrap category", as
     assert.equal(evidence.supabaseAccessToken.ref, ref);
     assert.equal(evidence.supabaseAccessToken.redirectRef, ref);
     assert.equal(evidence.supabaseAccessToken.category, "bootstrap");
-    assert.match(
-      evidence.supabaseAccessToken.localValuesPath,
-      /config\/sprinkleref\/local\/values\.json$/,
-    );
+    assert.match(evidence.supabaseAccessToken.localValuesPath, /projects\/config\/local\.json$/);
     assert.equal(
       evidence.supabaseAccessToken.localValuesEntryPath,
       "values.control-plane.supabase.management-api-token",
@@ -200,9 +199,9 @@ test("aws-account parser rejects invalid stack value and ref forms", () => {
 test("aws-account local values fail closed on malformed JSON and value objects", async () => {
   await runInTemp("aws-account-local-values-negative", async (tmp) => {
     const ref = "config://control-plane/aws/account-id";
-    await fsp.mkdir(path.join(tmp, "config/sprinkleref/local"), { recursive: true });
-    await fsp.writeFile(path.join(tmp, "config/sprinkleref/local/values.json"), "{", "utf8");
-    await assert.rejects(() => resolveStackRef(tmp, ref), /invalid local SprinkleRef values JSON/);
+    await fsp.mkdir(path.join(tmp, "projects/config"), { recursive: true });
+    await fsp.writeFile(path.join(tmp, "projects/config/local.json"), "{", "utf8");
+    await assert.rejects(() => resolveStackRef(tmp, ref), /invalid project config JSON/);
     await writeLocalValues(tmp, {
       "control-plane": { aws: { "account-id": { value: "1", ref: "secret://x/y" } } },
     });
@@ -213,17 +212,17 @@ test("aws-account local values fail closed on malformed JSON and value objects",
 test("aws-account local values fail closed on malformed JSON roots", async () => {
   await runInTemp("aws-account-local-values-malformed-root", async (tmp) => {
     const ref = "config://control-plane/aws/account-id";
-    const valuesPath = path.join(tmp, "config/sprinkleref/local/values.json");
+    const valuesPath = path.join(tmp, "projects/config/local.json");
     await fsp.mkdir(path.dirname(valuesPath), { recursive: true });
     await fsp.writeFile(valuesPath, '"not-an-object"\n', "utf8");
     await assert.rejects(
       () => resolveStackRef(tmp, ref),
-      /malformed local SprinkleRef values: config\/sprinkleref\/local\/values\.json root must be an object/,
+      /projects\/config\/local\.json root must be an object/,
     );
     await fsp.writeFile(valuesPath, "[]\n", "utf8");
     await assert.rejects(
       () => resolveStackRef(tmp, ref),
-      /malformed local SprinkleRef values: config\/sprinkleref\/local\/values\.json root must be an object/,
+      /projects\/config\/local\.json root must be an object/,
     );
   });
 });

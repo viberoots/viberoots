@@ -60,8 +60,30 @@ test("human check output points unchecked secrets at interactive repo bootstrap"
   });
   assert.match(text, /Unchecked secrets: 1/);
   assert.match(text, /pass --config, set SPRINKLEREF_CONFIG/);
-  assert.match(text, /config\/sprinkleref\/selected\.local\.json/);
+  assert.match(text, /projects\/config\/shared\.json/);
   assert.doesNotMatch(text, /infisical-bootstrap\.ts repo --yes/);
+});
+
+test("human check output reports active local overrides with redacted secret-like values", () => {
+  const text = renderReport({
+    scannedFiles: 1,
+    refs: [],
+    summary: summarize([]),
+    localOverrides: [
+      { path: "activeRuntimeHost", sharedValue: "github-actions", localValue: "local-macos" },
+      {
+        path: "values.control-plane.supabase.management-api-token",
+        sharedValue: "<redacted>",
+        localValue: "<redacted>",
+      },
+    ],
+  });
+  assert.match(text, /Active local overrides:/);
+  assert.match(text, /activeRuntimeHost: shared=github-actions local=local-macos/);
+  assert.match(
+    text,
+    /values\.control-plane\.supabase\.management-api-token: shared=<redacted> local=<redacted>/,
+  );
 });
 
 test("check report shows inferred deployment family for missing target refs", async () => {

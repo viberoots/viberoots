@@ -1,5 +1,6 @@
 #!/usr/bin/env zx-wrapper
 import type { SprinkleRefCheckEntry, SprinkleRefCheckReport } from "./sprinkleref-check-types";
+import { formatProjectConfigOverride } from "./project-config";
 
 const ORDER = ["present", "declared", "managed", "missing", "unmapped", "invalid", "unchecked"];
 const ACTIONABLE = new Set(["missing", "unmapped"]);
@@ -22,11 +23,22 @@ export function renderReport(report: SprinkleRefCheckReport): string {
     `Summary: ${ORDER.map((status) => `${status} ${report.summary[status] || 0}`).join(", ")}`,
     "",
   ];
+  renderLocalOverrides(lines, report.localOverrides || []);
   if (report.target) return renderTargetReport(report, lines);
   renderActionableGroup(lines, report.refs);
   renderManagedGroup(lines, report.refs);
   renderUncheckedHint(lines, report.summary.unchecked || 0);
   return lines.join("\n").trimEnd();
+}
+
+function renderLocalOverrides(
+  lines: string[],
+  overrides: NonNullable<SprinkleRefCheckReport["localOverrides"]>,
+): void {
+  if (overrides.length === 0) return;
+  lines.push("Active local overrides:");
+  for (const override of overrides) lines.push(`  ${formatProjectConfigOverride(override)}`);
+  lines.push("");
 }
 
 function renderTargetReport(report: SprinkleRefCheckReport, lines: string[]): string {
@@ -202,6 +214,6 @@ function parseInfisicalBackend(backend?: string) {
 function renderUncheckedHint(lines: string[], count: number): void {
   if (count === 0) return;
   lines.push(
-    `Unchecked secrets: ${count} (pass --config, set SPRINKLEREF_CONFIG, or run repo bootstrap to create config/sprinkleref/selected.local.json before checking backend presence).`,
+    `Unchecked secrets: ${count} (pass --config, set SPRINKLEREF_CONFIG, or run repo bootstrap to create projects/config/shared.json before checking backend presence).`,
   );
 }

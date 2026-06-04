@@ -23,9 +23,9 @@ test("check uses injected SPRINKLEREF_CONFIG env for resolver selection", async 
   assertPresentWithoutSecret(output, secretRef);
 });
 
-test("check auto-selects sprinkleref selected local resolver config", async () => {
+test("check uses canonical project config by default", async () => {
   const dir = await gitRepo();
-  const { secretRef } = await writeResolverFixture(dir, "config/sprinkleref/selected.local.json");
+  const { secretRef } = await writeResolverFixture(dir, "projects/config/shared.json");
   const output = await runInDir(dir, async () => {
     let output = "";
     const exitCode = await runSprinkleRefCheck({
@@ -46,14 +46,14 @@ async function writeResolverFixture(dir: string, configRelative: string) {
   await writeTracked(dir, "contracts.txt", `${secretRef}\n`);
   await fs.mkdir(path.dirname(config), { recursive: true });
   await fs.writeFile(store, `${JSON.stringify({ [secretRef]: "hidden" })}\n`);
-  await fs.writeFile(
-    config,
-    `${JSON.stringify({
-      version: 1,
-      defaultCategory: "main",
-      categories: { main: { backend: "local-file", file: store } },
-    })}\n`,
-  );
+  const resolver = {
+    version: 1,
+    defaultCategory: "main",
+    categories: { main: { backend: "local-file", file: store } },
+  };
+  const value =
+    configRelative === "projects/config/shared.json" ? { sprinkleref: resolver } : resolver;
+  await fs.writeFile(config, `${JSON.stringify(value)}\n`);
   return { config, secretRef };
 }
 

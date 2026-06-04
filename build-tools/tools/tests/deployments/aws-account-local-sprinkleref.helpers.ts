@@ -30,18 +30,21 @@ export async function writeStack(tmp: string, fields: Record<string, unknown>) {
 }
 
 export async function writeLocalValues(tmp: string, values: Record<string, unknown>) {
-  await writeJson(path.join(tmp, "config/sprinkleref/local/values.json"), {
-    schemaVersion: "sprinkleref-values@1",
+  await writeJson(path.join(tmp, "projects/config/local.json"), {
+    schemaVersion: "viberoots-project-local-config@1",
     values,
   });
 }
 
 export async function writeRemote(tmp: string, category: string, values: Record<string, string>) {
-  await writeJson(path.join(tmp, "config/sprinkleref/selected.json"), {
-    version: 1,
-    defaultCategory: category,
-    categories: {
-      [category]: { backend: "local-file", file: path.join(tmp, `.local/${category}.json`) },
+  await writeJson(path.join(tmp, "projects/config/shared.json"), {
+    schemaVersion: "viberoots-project-config@1",
+    sprinkleref: {
+      version: 1,
+      defaultCategory: category,
+      categories: {
+        [category]: { backend: "local-file", file: path.join(tmp, `.local/${category}.json`) },
+      },
     },
   });
   await writeJson(path.join(tmp, `.local/${category}.json`), values);
@@ -60,10 +63,13 @@ export async function writeResolver(
     };
     await writeJson(path.join(tmp, `.local/${category}.json`), values);
   }
-  await writeJson(path.join(tmp, "config/sprinkleref/selected.json"), {
-    version: 1,
-    defaultCategory,
-    categories,
+  await writeJson(path.join(tmp, "projects/config/shared.json"), {
+    schemaVersion: "viberoots-project-config@1",
+    sprinkleref: {
+      version: 1,
+      defaultCategory,
+      categories,
+    },
   });
 }
 

@@ -1,0 +1,78 @@
+{
+  "schemaVersion": "viberoots-project-config@1",
+  "environments": {
+    "staging": {
+      "infisicalEnvironment": "staging"
+    },
+    "prod": {
+      "infisicalEnvironment": "prod"
+    }
+  },
+  "runtimeHosts": {
+    "local-macos": {
+      "backend": "macos-keychain",
+      "service": "viberoots-bootstrap"
+    },
+    "local-file": {
+      "backend": "local-file"
+    },
+    "github-actions": {
+      "backend": "github-actions",
+      "scope": "repository",
+      "namePrefix": "VIBEROOTS_"
+    },
+    "jenkins": {
+      "backend": "jenkins",
+      "scope": "repository",
+      "namePrefix": "VIBEROOTS_"
+    },
+    "gitlab-ci": {
+      "backend": "gitlab-ci",
+      "scope": "repository",
+      "namePrefix": "VIBEROOTS_"
+    },
+    "bitbucket-pipelines": {
+      "backend": "bitbucket-pipelines",
+      "scope": "repository",
+      "namePrefix": "VIBEROOTS_"
+    }
+  },
+  "sprinkleref": {
+    "version": 1,
+    "defaultCategory": "control",
+    "categories": {
+      "main": {
+        "profile": "infisical-default",
+        "environment": "staging"
+      },
+      "control": {
+        "profile": "infisical-control",
+        "environment": "prod"
+      }
+    },
+    "profiles": {
+      "infisical-default": {
+        "backend": "infisical",
+        "generatedBy": "viberoots-repo-bootstrap",
+        "host": "https://app.infisical.com",
+        "defaultEnvironment": "staging",
+        "defaultPath": "/",
+        "projectId": "55d756b1-7523-4025-b144-cc23c20ff156",
+        "projectName": "viberoots-deployments",
+        "clientIdRef": "secret://viberoots/bootstrap/viberoots-iac-bootstrap/client-id",
+        "clientSecretRef": "secret://viberoots/bootstrap/viberoots-iac-bootstrap/client-secret"
+      },
+      "infisical-control": {
+        "backend": "infisical",
+        "generatedBy": "viberoots-repo-bootstrap",
+        "host": "https://app.infisical.com",
+        "defaultEnvironment": "staging",
+        "defaultPath": "/",
+        "projectId": "55d756b1-7523-4025-b144-cc23c20ff156",
+        "projectName": "viberoots-deployments",
+        "clientIdRef": "secret://viberoots/bootstrap/viberoots-iac-bootstrap/client-id",
+        "clientSecretRef": "secret://viberoots/bootstrap/viberoots-iac-bootstrap/client-secret"
+      }
+    }
+  }
+}

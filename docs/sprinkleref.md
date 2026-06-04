@@ -4,18 +4,21 @@ SprinkleRef stable refs stay backend-neutral. Use `secret://deployments/...` for
 `config://...` or `runtime://...` for non-secret declarations, then select the storage backend
 through a resolver config and optional category.
 
-Resolver configs live outside deployment metadata:
+Project config lives outside deployment metadata:
 
 ```text
-config/sprinkleref/base.json
-config/sprinkleref/local.macos.json
-config/sprinkleref/local.file.json
-config/sprinkleref/ci.github.json
-config/sprinkleref/ci.jenkins.json
-config/sprinkleref/ci.gitlab.json
-config/sprinkleref/ci.bitbucket.json
-config/sprinkleref/selected.json
+projects/config/shared.json
+projects/config/local.json
 ```
+
+`projects/config/shared.json` is checked in and contains repo-wide non-secret routing metadata such
+as Infisical project coordinates, environments, runtime host profiles, resolver categories, and
+logical refs. `projects/config/local.json` is gitignored and contains individual operator values,
+such as local bootstrap sink selection, local file paths, and local AWS/Supabase sandbox
+coordinates. The tool loads shared config first, then deep-merges local config over it. When local
+config changes a shared value, commands report an `Active local overrides` section with redacted
+secret-like values. Set `VBR_DISALLOW_LOCAL_OVERRIDES=1` when a strict run should fail if any local
+override is active.
 
 `defaultCategory` is normally `main`. Omitted `--category` uses that category for ordinary
 deployment and application secrets. `--category bootstrap` is reserved for root credentials needed
@@ -28,7 +31,7 @@ AWS account stack ref resolution when stack config or local values explicitly ch
 Initialize starter configs:
 
 ```bash
-sprinkleref --init config/sprinkleref
+sprinkleref --init
 sprinkleref --init-local
 ```
 
@@ -37,34 +40,26 @@ Repo-wide bootstrap also uses this resolver shape:
 ```bash
 build-tools/tools/deployments/infisical-bootstrap.ts repo --dry-run
 build-tools/tools/deployments/infisical-bootstrap.ts repo
-sprinkleref --check --config config/sprinkleref/selected.json
+sprinkleref --check
 ```
 
-With `--credential-sink auto`, it uses `SPRINKLEREF_CONFIG` when set, then an existing
-`config/sprinkleref/selected.json`, then the legacy `config/sprinkleref/selected.local.json`. If
-neither exists and `--yes` has already passed bootstrap preflight, it creates the starter config set
-and uses `selected.json` so the `bootstrap` backend choice is visible in config instead of hidden
-inside bootstrap code. Dry-run bootstrap
-reports the starter backend without creating the config files. Existing resolver configs are
-treated as authoritative. Confirmed repo bootstrap offers a second deployment fan-out prompt by
-default so managed deployment bootstrap outputs can be created after repo setup. Use
+With `--credential-sink auto`, repo bootstrap uses the canonical project config path. If
+`projects/config/shared.json` does not exist and `--yes` has already passed bootstrap preflight, it
+creates the starter shared config. Dry-run bootstrap reports the starter backend without creating
+config files. Confirmed repo bootstrap offers a second deployment fan-out prompt by default so
+managed deployment bootstrap outputs can be created after repo setup. Use
 `repo --without-deployments` to stop after resolver/profile setup, or retry one scope directly with
 `deployment --target <buck-target>`.
 
-`config/sprinkleref/selected.json` is tracked shared resolver policy. Keep clone-local coordinate
-values under `config/sprinkleref/local/`; `selected.local.json` is reserved for migration or an
-exceptional per-clone resolver override.
-
-`config/sprinkleref/local/values.json` is the conventional gitignored clone-local values file.
-`sprinkleref --init-local` creates or updates it with empty placeholders for private coordinates and
-a non-plaintext ref object for `secret://control-plane/supabase/management-api-token`. Empty
-coordinate placeholders remain unresolved until filled. A present local values file must parse to an
-object root; scalar or array roots fail as malformed local values rather than being treated as a
-missing file. Evidence records `localValuesPath` for the JSON file and `localValuesEntryPath` for
-the resolved hierarchical entry, for example `values.control-plane.aws.account-id`. Local redirect
-evidence keeps the local ref in `ref` and records the redirected target as `redirectRef` with
-`redirectSource` details. The command also prints the normal token write command for the
-selected/default resolver:
+`sprinkleref --init-local` creates or updates `projects/config/local.json` with empty placeholders
+for private coordinates and a non-plaintext ref object for
+`secret://control-plane/supabase/management-api-token`. Empty coordinate placeholders remain
+unresolved until filled. A present local config file must parse to an object root; scalar or array
+roots fail as malformed project config rather than being treated as a missing file. Evidence records
+`localValuesPath` for the JSON file and `localValuesEntryPath` for the resolved hierarchical entry,
+for example `values.control-plane.aws.account-id`. Local redirect evidence keeps the local ref in
+`ref` and records the redirected target as `redirectRef` with `redirectSource` details. The command
+also prints the normal token write command for the canonical project config:
 
 ```bash
 sprinkleref --update secret://control-plane/supabase/management-api-token --create-missing
@@ -79,36 +74,50 @@ explicitly, that category resolves the original logical ref and wins over matchi
 `{ "value": ... }`, and redirect entries, including redirects to a different target ref. Stack refs
 without an explicit category continue to use local values first.
 
-Resolver configs may define named backend profiles separately from categories. Profiles name backend
+Project config may define named backend profiles separately from categories. Profiles name backend
 instances/accounts, while categories name usage lanes:
 
 ```json
 {
-  "version": 1,
-  "defaultCategory": "main",
-  "profiles": {
-    "vault-default": {
-      "backend": "vault",
-      "addressEnv": "VBR_VAULT_ADDR",
-      "tokenEnv": "VBR_VAULT_TOKEN",
-      "mount": "secret",
-      "defaultPath": "/deployments"
+  "schemaVersion": "viberoots-project-config@1",
+  "environments": {
+    "staging": { "infisicalEnvironment": "staging" },
+    "prod": { "infisicalEnvironment": "prod" }
+  },
+  "runtimeHosts": {
+    "local-macos": {
+      "backend": "macos-keychain",
+      "service": "viberoots-bootstrap"
     },
-    "infisical-default": {
-      "backend": "infisical",
-      "host": "https://app.infisical.com",
-      "projectId": "<repo-infisical-project-id>",
-      "defaultEnvironment": "staging",
-      "clientIdEnv": "INFISICAL_MACHINE_IDENTITY_CLIENT_ID",
-      "clientSecretEnv": "INFISICAL_MACHINE_IDENTITY_CLIENT_SECRET"
+    "github-actions": {
+      "backend": "github-actions",
+      "scope": "repository",
+      "namePrefix": "VIBEROOTS_"
     }
   },
-  "categories": {
-    "main": { "profile": "infisical-default" },
-    "bootstrap": { "backend": "local-file", "file": ".local/infisical/bootstrap/credentials.json" }
+  "sprinkleref": {
+    "version": 1,
+    "defaultCategory": "main",
+    "profiles": {
+      "infisical-default": {
+        "backend": "infisical",
+        "host": "https://app.infisical.com",
+        "projectId": "<repo-infisical-project-id>",
+        "defaultEnvironment": "staging",
+        "clientIdEnv": "INFISICAL_MACHINE_IDENTITY_CLIENT_ID",
+        "clientSecretEnv": "INFISICAL_MACHINE_IDENTITY_CLIENT_SECRET"
+      }
+    },
+    "categories": {
+      "main": { "profile": "infisical-default" }
+    }
   }
 }
 ```
+
+Runtime hosts choose the `bootstrap` category for the current execution context. Local config can
+set `activeRuntimeHost`, CI environments are detected for GitHub Actions, Jenkins, GitLab CI, and
+Bitbucket Pipelines, and `VBR_SPRINKLEREF_RUNTIME_HOST` can force a host explicitly.
 
 Infisical profiles use Universal Auth env names only: `clientIdEnv` and `clientSecretEnv`.
 `tokenEnv` remains valid for Vault profiles, but Infisical resolver profiles reject raw token env
@@ -147,27 +156,22 @@ Add, update, or remove ordinary secrets:
 
 ```bash
 sprinkleref \
-  --config config/sprinkleref/local.macos.json \
   --add secret://deployments/pleomino/staging/cloudflare_api_token
 
 sprinkleref \
-  --config config/sprinkleref/local.macos.json \
   --add secret://deployments/pleomino/staging/cloudflare_api_token \
   --overwrite-existing
 
 sprinkleref \
-  --config config/sprinkleref/local.macos.json \
   --update secret://deployments/pleomino/prod/cloudflare_api_token \
   --value-file .local/secrets/cloudflare-prod-token
 
 sprinkleref \
-  --config config/sprinkleref/local.macos.json \
   --update secret://deployments/pleomino/prod/new_runtime_secret \
   --create-missing \
   --value-file .local/secrets/new-runtime-secret
 
 sprinkleref \
-  --config config/sprinkleref/local.macos.json \
   --remove secret://deployments/pleomino/staging/cloudflare_api_token
 ```
 
@@ -191,20 +195,19 @@ For bootstrap credentials:
 
 ```bash
 sprinkleref \
-  --config config/sprinkleref/local.file.json \
   --add secret://deployments/pleomino/staging/infisical-client-secret \
   --category bootstrap
 ```
 
-CI resolver templates are generated and parsed as read-only mappings for GitHub Actions, Jenkins,
-GitLab CI/CD, and Bitbucket Pipelines. This command does not perform remote CI provider writes.
+Runtime host profiles are shared project config entries for GitHub Actions, Jenkins, GitLab CI/CD,
+Bitbucket Pipelines, and local execution. This command does not perform remote CI provider writes.
 
 Check repository deployment contract references before bootstrap, admission, deployment, or CI
 validation:
 
 ```bash
 sprinkleref --check
-sprinkleref --check --scheme secret --config config/sprinkleref/local.file.json
+sprinkleref --check --scheme secret
 sprinkleref --check --target //projects/deployments/pleomino/staging:deploy
 sprinkleref --check --target //projects/deployments/pleomino/staging:deploy --no-deps
 sprinkleref --check --format json
@@ -212,9 +215,9 @@ sprinkleref --check --format json
 
 `--check` scans tracked repository files for `secret://`, `config://`, and `runtime://` references
 while skipping generated output and dependency directories. `secret://` refs are presence-checked
-through the selected resolver config when one is supplied; without a config they are reported as
-unchecked rather than reading a backend implicitly. `config://` and `runtime://` refs are non-secret
-contract declarations and are not looked up in secret stores.
+through the canonical project config by default, or through an explicit config when one is supplied.
+`config://` and `runtime://` refs are non-secret contract declarations and are not looked up in
+secret stores.
 
 Target checks use Buck metadata and default to transitive dependencies. Use `--deps none`,
 `--deps direct`, `--deps transitive`, or `--no-deps` to adjust the target closure. Target output

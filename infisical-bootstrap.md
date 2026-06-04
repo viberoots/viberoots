@@ -29,10 +29,10 @@ i --machine-label <label>
 ```
 
 `i` is the normal first-run and daily-run entrypoint. After dependency setup, it performs a narrow
-local readiness check for `sprinkleref/selected.local.json`, the repo bootstrap Universal Auth
-credential, and the Pleomino deployment Universal Auth credentials for this machine. It does not run
-full `sprinkleref --check` and does not require application secrets such as Cloudflare tokens to
-exist.
+local readiness check for the canonical project config in `projects/config/`, the repo bootstrap
+Universal Auth credential, and the Pleomino deployment Universal Auth credentials for this machine.
+It does not run full `sprinkleref --check` and does not require application secrets such as
+Cloudflare tokens to exist.
 
 The readiness phase is capability-gated by checked-out deployment metadata. Partial clones or
 minimized workspaces that do not include `projects/deployments/pleomino/shared/family.bzl` skip
@@ -58,11 +58,12 @@ build-tools/tools/deployments/infisical-bootstrap.ts deployment --target <buck-t
 ```
 
 `repo` first initializes and validates the repo-wide SprinkleRef resolver/profile boundary. It
-creates or checks `sprinkleref/`, named backend profiles such as `vault-default` and
-`infisical-default`, and category lanes such as `main` and `bootstrap`. Confirmed repo bootstrap
-also materializes shared backend profile metadata and the selected bootstrap credential sink. It
-writes only non-secret resolver metadata such as Infisical project ids, Vault address env names,
-mounts, default paths, and credential env names.
+creates or checks `projects/config/shared.json`, named backend profiles such as `vault-default` and
+`infisical-default`, category lanes such as `main` and `bootstrap`, and shared runtime host profiles
+for local and CI execution. Confirmed repo bootstrap also materializes shared backend profile
+metadata and the selected bootstrap credential sink. It writes only non-secret resolver metadata
+such as Infisical project ids, Vault address env names, mounts, default paths, and credential env
+names.
 
 After the repo-wide phase succeeds, confirmed `repo` runs a second `Y/n` prompt to fan out to
 reviewed deployment bootstrap targets discovered from deployment metadata. `--yes` pre-confirms
@@ -88,9 +89,9 @@ reconciliation and the final SprinkleRef checks can use the reviewed values.
 If live OpenTofu output differs from already-reviewed non-placeholder metadata, bootstrap still
 fails closed. Stop and inspect the Infisical resources instead of applying a generated patch.
 
-Generated local bootstrap artifacts stay local: `sprinkleref/`, `.terraform/`,
-`terraform.tfstate*`, and the OpenTofu `.terraform.lock.hcl` are ignored for this repo. Do not
-commit local resolver config, OpenTofu state, or credential material.
+Generated local bootstrap artifacts stay local: `projects/config/local.json`, `.local/`,
+`.terraform/`, `terraform.tfstate*`, and the OpenTofu `.terraform.lock.hcl` are ignored for this
+repo. Do not commit individual-user config, OpenTofu state, or credential material.
 
 To intentionally reset only local bootstrap state before starting fresh, use:
 
@@ -320,7 +321,7 @@ Rotation:
 ## Infisical Runtime Metadata
 
 Deployment targets select Infisical with the unified backend selector, for example
-`secret_backend = "infisical/default"`. Non-default resolver profiles use the same local alias
+`secret_backend = "infisical/default"`. Non-default project config profiles use the same local alias
 shape, such as `secret_backend = "infisical/regulated"`, which normalizes to the
 `infisical-regulated` SprinkleRef profile. Bare backend values and separate
 `secret_backend_profile` metadata are not accepted.
@@ -404,94 +405,92 @@ Recommended categories:
 - `main`: ordinary deployment/application secrets. For this deployment, `main` resolves to Infisical after bootstrap.
 - `bootstrap`: root credentials needed to access Infisical or Vault. This category must not resolve to Infisical for Infisical access credentials.
 
-The bootstrap command resolves `auto` through the SprinkleRef resolver config. It uses an existing
-selected resolver config when present and creates starter resolver configs only for confirmed,
-non-dry-run bootstrap.
+The bootstrap command resolves `auto` through the canonical project config. `projects/config/shared.json`
+defines shared resolver categories, backend profiles, environments, and runtime host profiles.
+`projects/config/local.json` is the single ignored individual-user config file and may select
+`activeRuntimeHost` or provide local non-secret values.
 
-Resolver configs should be separate per execution context, with a shared base where useful:
+Runtime host selection no longer requires separate resolver files. The default loader deep-merges
+`projects/config/shared.json` plus `projects/config/local.json` when present, then chooses a runtime
+host from an explicit environment override, CI detection, local `activeRuntimeHost`, or the platform
+fallback.
 
 ```text
-sprinkleref/
-  base.json
-  local.macos.json
-  local.file.json
-  ci.github.json
-  ci.jenkins.json
-  ci.gitlab.json
-  ci.bitbucket.json
+projects/config/
+  shared.json     # committed shared project config
+  local.json      # gitignored individual-user config
 ```
 
 Selection:
 
 ```bash
-SPRINKLEREF_CONFIG=sprinkleref/local.macos.json sprinkleref --add secret://...
-sprinkleref --config sprinkleref/local.macos.json --add secret://...
+VBR_SPRINKLEREF_RUNTIME_HOST=local-file sprinkleref --add secret://...
+sprinkleref --config projects/config/shared.json --add secret://...
 ```
 
-`base.json` should define stable category names, naming conventions, and defaults that are independent of a concrete secret store. Context-specific files bind categories to concrete backends.
+`shared.json` should define stable category names, naming conventions, shared Infisical coordinates,
+and the available runtime host backends. `local.json` contains only individual-user selections or
+local non-secret values.
 
-Example macOS local config:
+Example shared project config:
 
 ```json
 {
-  "version": 1,
-  "extends": "./base.json",
-  "defaultCategory": "main",
-  "categories": {
-    "bootstrap": {
+  "schemaVersion": "viberoots-project-config@1",
+  "runtimeHosts": {
+    "local-macos": {
       "backend": "macos-keychain",
       "service": "viberoots-bootstrap"
     },
-    "main": {
-      "backend": "infisical",
-      "host": "https://app.infisical.com",
-      "projectId": "<repo-infisical-project-id>",
-      "defaultEnvironment": "staging",
-      "defaultPath": "/",
-      "clientIdEnv": "VBR_INFISICAL_CLIENT_ID",
-      "clientSecretEnv": "VBR_INFISICAL_CLIENT_SECRET"
+    "github-actions": {
+      "backend": "github-actions",
+      "scope": "repository",
+      "namePrefix": "VIBEROOTS_"
+    }
+  },
+  "sprinkleref": {
+    "version": 1,
+    "defaultCategory": "control",
+    "categories": {
+      "main": { "profile": "infisical-default" },
+      "control": { "profile": "infisical-control" }
+    },
+    "profiles": {
+      "infisical-default": {
+        "backend": "infisical",
+        "host": "https://app.infisical.com",
+        "projectId": "<repo-infisical-project-id>",
+        "defaultEnvironment": "staging",
+        "defaultPath": "/",
+        "clientIdRef": "secret://viberoots/bootstrap/viberoots-iac-bootstrap/client-id",
+        "clientSecretRef": "secret://viberoots/bootstrap/viberoots-iac-bootstrap/client-secret"
+      }
     }
   }
 }
 ```
 
-In the macOS Keychain backend, `service` is the Keychain generic-password service/group name. The logical `secret://...` ref can be used as the Keychain account/name. For example:
+Example individual local config:
+
+```json
+{
+  "schemaVersion": "viberoots-project-local-config@1",
+  "activeRuntimeHost": "local-macos"
+}
+```
+
+In the macOS Keychain runtime host, `service` is the Keychain generic-password service/group name.
+The logical `secret://...` ref can be used as the Keychain account/name. For example:
 
 ```text
 service: viberoots-bootstrap
 account: secret://viberoots/bootstrap/viberoots-iac-bootstrap/client-secret
 ```
 
-Example GitHub Actions CI config:
-
-```json
-{
-  "version": 1,
-  "extends": "./base.json",
-  "defaultCategory": "main",
-  "categories": {
-    "bootstrap": {
-      "backend": "github-actions",
-      "scope": "repository",
-      "namePrefix": "VIBEROOTS_"
-    },
-    "main": {
-      "backend": "infisical",
-      "host": "https://app.infisical.com",
-      "projectId": "<repo-infisical-project-id>",
-      "defaultEnvironment": "staging",
-      "defaultPath": "/",
-      "clientIdEnv": "VBR_INFISICAL_CLIENT_ID",
-      "clientSecretEnv": "VBR_INFISICAL_CLIENT_SECRET"
-    }
-  }
-}
-```
-
 The bootstrap command should:
 
-- read the selected SprinkleRef resolver config if it exists;
-- create starter resolver configs if none exist;
+- read the canonical project config overlay, or an explicit `SPRINKLEREF_CONFIG` path when set;
+- create `projects/config/shared.json` during confirmed repo bootstrap if shared config is missing;
 - validate or materialize repo-wide `infisical-*` and `vault-*` backend profiles;
 - materialize Infisical profile credentials under repo-scoped
   `secret://viberoots/bootstrap/...` refs, not a deployment family namespace;
@@ -501,16 +500,8 @@ The bootstrap command should:
   and path fields;
 - preserve operator-authored profiles that use `projectIdEnv`; validate the resolved value when the
   environment variable is present, and fail closed without rewriting when it is unset;
-- rewrite only missing Infisical profiles, profiles marked
-  `generatedBy: "viberoots-repo-bootstrap"`, or untouched legacy starter profiles that exactly match
-  the old `VBR_INFISICAL_PROJECT_ID`, `VBR_INFISICAL_CLIENT_ID`, and
-  `VBR_INFISICAL_CLIENT_SECRET` starter shape;
-- classify that legacy shape as exactly `backend: "infisical"`,
-  `host: "https://app.infisical.com"`, `projectIdEnv: "VBR_INFISICAL_PROJECT_ID"`,
-  `defaultEnvironment: "staging"`, `defaultPath: "/"`,
-  `clientIdEnv: "VBR_INFISICAL_CLIENT_ID"`, and
-  `clientSecretEnv: "VBR_INFISICAL_CLIENT_SECRET"` with no additional keys; `namespace`, custom
-  refs, or other resolver metadata make the profile operator-authored;
+- rewrite only missing Infisical profiles or profiles marked
+  `generatedBy: "viberoots-repo-bootstrap"`;
 - validate Vault profile address/token/mount metadata against Vault when configured env values are
   available, otherwise fail with remediation naming the missing bootstrap env;
 - materialize the configured local bootstrap sink path, or validate the macOS Keychain service name;
@@ -519,15 +510,16 @@ The bootstrap command should:
 - default `main` to Infisical once OpenTofu has created the project;
 - never hide backend selection in code when a resolver config can make it explicit.
 
-With `--credential-sink auto`, bootstrap first uses `SPRINKLEREF_CONFIG` when set, then
-`sprinkleref/selected.local.json` when present. If neither exists, it creates the starter
-`sprinkleref/` config set and uses `selected.local.json`, whose `bootstrap` category explicitly
-selects macOS Keychain on macOS and local `0600` files elsewhere. Existing resolver configs are
-authoritative and are not overwritten unless a profile is missing or generated by the rule above. In
+With `--credential-sink auto`, bootstrap first uses `SPRINKLEREF_CONFIG` when explicitly set;
+otherwise it uses `projects/config/shared.json` plus the ignored `projects/config/local.json` overlay.
+If shared project config is missing during confirmed repo bootstrap, it creates the starter
+`projects/config/shared.json`; `sprinkleref --init-local` creates or updates
+`projects/config/local.json` for individual-user selections. Existing shared resolver metadata is
+authoritative and is not overwritten unless a profile is missing or generated by the rule above. In
 `--dry-run`, bootstrap reports the starter backend it would use plus a `materializationPlan` for
 backend login, Infisical project validation/creation, Vault mount/profile validation, resolver
 profile creation, `validatedExistingProfiles`, `materializedProfiles`, and bootstrap sink setup, but
-does not create resolver config files or call backends. Operator-authored profiles whose
+does not create project config files or call backends. Operator-authored profiles whose
 `projectIdEnv` is unset appear in `unresolvedExistingProfiles`, not `validatedExistingProfiles`, so
 dry-run does not claim confirmed bootstrap would preserve a profile it cannot validate. To
 intentionally regenerate an

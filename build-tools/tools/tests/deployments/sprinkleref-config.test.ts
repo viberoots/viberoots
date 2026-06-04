@@ -16,9 +16,10 @@ import {
   sprinkleRefStarterConfigs,
 } from "../../deployments/sprinkleref-templates";
 
-test("resolver config applies default category and extends base categories", async () => {
+test("resolver config applies default category and rejects retired config forms", async () => {
   const dir = await tmp();
-  await writeJson(path.join(dir, "base.json"), {
+  const configPath = path.join(dir, "resolver.json");
+  await writeJson(configPath, {
     version: 1,
     defaultCategory: "main",
     categories: {
@@ -32,15 +33,22 @@ test("resolver config applies default category and extends base categories", asy
       },
     },
   });
-  const configPath = path.join(dir, "local.json");
-  await writeJson(configPath, {
-    version: 1,
-    extends: "./base.json",
-    categories: { bootstrap: { backend: "local-file", file: path.join(dir, "secrets.json") } },
-  });
   const config = await readSprinkleRefConfig(configPath);
   assert.equal(resolveSprinkleRefBackend(config).backend.backend, "infisical");
-  assert.equal(resolveSprinkleRefBackend(config, "bootstrap").backend.backend, "local-file");
+  await writeJson(path.join(dir, "extends.json"), {
+    version: 1,
+    extends: "./resolver.json",
+    defaultCategory: "main",
+    categories: { main: { backend: "local-file", file: "main.json" } },
+  });
+  await assert.rejects(
+    () => readSprinkleRefConfig(path.join(dir, "extends.json")),
+    /extends is no longer supported/,
+  );
+  await assert.rejects(
+    () => readSprinkleRefConfig(path.join(dir, "config/sprinkleref/selected.local.json")),
+    /retired SprinkleRef resolver config path/,
+  );
 });
 
 test("resolver config resolves categories through named backend profiles", async () => {
@@ -135,45 +143,45 @@ test("starter configs are deterministic and contain no secret values", async () 
   const configs = sprinkleRefStarterConfigs("darwin");
   const serialized = JSON.stringify(configs);
   assert.match(serialized, /macos-keychain/);
+  assert.match(serialized, /github-actions/);
+  assert.match(serialized, /bitbucket-pipelines/);
   assert.doesNotMatch(serialized, /clientSecret":/);
   assert.doesNotMatch(serialized, /pleomino-project-id|vault-default-placeholder/);
   assert.deepEqual(configs, sprinkleRefStarterConfigs("darwin"));
   const dir = await tmp();
   const written = await initSprinkleRefConfigs({ dir, platform: "linux" });
-  assert.ok(written.some((file) => file.endsWith("ci.github.json")));
-  assert.match(await fs.readFile(path.join(dir, "selected.json"), "utf8"), /local-file/);
-  const selected = await readSprinkleRefConfig(path.join(dir, "selected.json"));
+  assert.deepEqual(
+    written.map((file) => path.basename(file)),
+    ["shared.json"],
+  );
+  assert.match(await fs.readFile(path.join(dir, "shared.json"), "utf8"), /local-file/);
+  const selected = await readSprinkleRefConfig(path.join(dir, "shared.json"));
   assert.equal(selected.defaultCategory, "control");
   const control = resolveSprinkleRefBackend(selected, "control");
   assert.equal(control.profile, "infisical-control");
   assert.equal(control.backend.backend, "infisical");
   assert.equal(control.backend.defaultEnvironment, "prod");
+  assert.equal(selected.profiles["infisical-control"]?.defaultEnvironment, "staging");
   assert.equal(resolveSprinkleRefBackend(selected).profile, "infisical-control");
+  const sharedPath = path.join(dir, "shared.json");
+  const shared = JSON.parse(await fs.readFile(sharedPath, "utf8"));
+  shared.environments.prod.infisicalEnvironment = "prod-alt";
+  await writeJson(sharedPath, shared);
+  assert.equal(
+    resolveSprinkleRefBackend(await readSprinkleRefConfig(sharedPath), "control").backend
+      .defaultEnvironment,
+    "prod-alt",
+  );
 });
 
-test("CI resolver templates parse each bootstrap mapping without remote writes", async () => {
-  const dir = await tmp();
-  await initSprinkleRefConfigs({ dir, platform: "linux" });
-  const expected = {
-    "ci.github.json": "github-actions",
-    "ci.jenkins.json": "jenkins",
-    "ci.gitlab.json": "gitlab-ci",
-    "ci.bitbucket.json": "bitbucket-pipelines",
-  };
-  for (const [file, backend] of Object.entries(expected)) {
-    const config = await readSprinkleRefConfig(path.join(dir, file));
-    assert.equal(resolveSprinkleRefBackend(config, "bootstrap").backend.backend, backend);
-  }
-});
-
-test("sprinkleref --init defaults to the sprinkleref directory", async () => {
+test("sprinkleref --init defaults to projects/config", async () => {
   const dir = await tmp();
   const cwd = process.cwd();
   process.chdir(dir);
   try {
     await runSprinkleRefCli({ argv: ["--init"], stdout: () => undefined, platform: "linux" });
     assert.match(
-      await fs.readFile(path.join(dir, "config/sprinkleref", "selected.json"), "utf8"),
+      await fs.readFile(path.join(dir, "projects/config", "shared.json"), "utf8"),
       /local-file/,
     );
   } finally {
@@ -181,10 +189,9 @@ test("sprinkleref --init defaults to the sprinkleref directory", async () => {
   }
 });
 
-test("repo ignore policy tracks shared resolver config and ignores local values", () => {
-  assert.equal(isGitIgnored("config/sprinkleref/base.json"), false);
-  assert.equal(isGitIgnored("config/sprinkleref/selected.json"), false);
-  assert.equal(isGitIgnored("config/sprinkleref/local/values.json"), true);
+test("repo ignore policy tracks shared project config and ignores local project config", () => {
+  assert.equal(isGitIgnored("projects/config/shared.json"), false);
+  assert.equal(isGitIgnored("projects/config/local.json"), true);
 });
 
 async function tmp() {
@@ -207,7 +214,7 @@ function vaultProfile() {
 
 function isGitIgnored(relativePath: string): boolean {
   try {
-    execFileSync("git", ["check-ignore", "--quiet", relativePath], {
+    execFileSync("git", ["check-ignore", "--no-index", "--quiet", relativePath], {
       cwd: process.cwd(),
       stdio: "ignore",
     });

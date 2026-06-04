@@ -19,6 +19,6 @@ Options:
   --fingerprint                Print only a digest for --get; secret values are never printed
   --target <buck-target>       Limit --check to structured refs required by a Buck target
   --dry-run                    Describe the selected backend without reading or writing values
-  --init-local                 Create or update config/sprinkleref/local/values.json
+  --init-local                 Create or update projects/config/local.json
 `;
 }

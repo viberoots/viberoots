@@ -13,7 +13,7 @@ export async function buildDryRunReport(args: BootstrapArgs) {
       schemaVersion: "infisical-repo-bootstrap-operations@1",
       mode: "repo",
       resolverConfig: {
-        directory: DEFAULT_SPRINKLEREF_CONFIG_PATH.replace(/\/selected\.local\.json$/, ""),
+        directory: DEFAULT_SPRINKLEREF_CONFIG_PATH.replace(/\/shared\.json$/, ""),
         profiles: materializationPlan.profiles.map((profile) => profile.name),
         categories: ["main", "bootstrap"],
       },

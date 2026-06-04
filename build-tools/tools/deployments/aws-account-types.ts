@@ -1,4 +1,5 @@
 import type { StackInputResolution, StackInputSource } from "./aws-account-inputs";
+import type { RedactedProjectConfigOverride } from "./project-config";
 
 export const AWS_ACCOUNT_STATUS_SCHEMA = "aws-account-status@1";
 export const AWS_ACCOUNT_INPUTS_SCHEMA = "aws-account-inputs@1";
@@ -61,6 +62,7 @@ export type AwsAccountConfig = {
   supabaseApiBaseUrl: string;
   inputSources: Record<string, StackInputSource>;
   inputErrors: Record<string, string>;
+  localOverrides: RedactedProjectConfigOverride[];
 };
 
 export type SupabaseTokenResolution = {
@@ -81,7 +83,12 @@ export type PhaseRecord = {
 export type MissingConfigField = {
   field: string;
   valueHint: string;
-  destination?: "stack-config" | "local-values-or-shared-resolver" | "bootstrap-category";
+  destination?:
+    | "stack-config"
+    | "project-shared-config"
+    | "project-local-config"
+    | "secret-backend"
+    | "bootstrap-category";
   ref?: string;
   category?: string;
   note?: string;
@@ -93,6 +100,7 @@ export type AwsAccountStatus = {
   stackName: string;
   domain: string;
   evidenceDir: string;
+  localOverrides: RedactedProjectConfigOverride[];
   phases: Record<Phase, PhaseRecord>;
   nextPhase?: Phase;
 };

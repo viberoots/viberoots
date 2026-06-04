@@ -18,6 +18,7 @@ export type SprinkleRefBackendConfig = {
   projectName?: string;
   projectRef?: string;
   generatedBy?: string;
+  environment?: string;
   defaultEnvironment?: string;
   defaultPath?: string;
   clientIdEnv?: string;
@@ -38,11 +39,17 @@ export type SprinkleRefCategoryConfig =
   | SprinkleRefBackendConfig
   | {
       profile: string;
+      environment?: string;
     };
+
+export type SprinkleRefEnvironmentConfig = {
+  infisicalEnvironment?: string;
+};
 
 export type SprinkleRefConfigFile = {
   version: 1;
   extends?: string;
+  environments?: Record<string, SprinkleRefEnvironmentConfig>;
   defaultCategory?: string;
   profiles?: Record<string, SprinkleRefBackendConfig>;
   categories?: Record<string, SprinkleRefCategoryConfig>;
@@ -51,8 +58,10 @@ export type SprinkleRefConfigFile = {
 export type SprinkleRefConfig = {
   path?: string;
   defaultCategory: string;
+  environments?: Record<string, SprinkleRefEnvironmentConfig>;
   profiles: Record<string, SprinkleRefBackendConfig>;
   categories: Record<string, SprinkleRefCategoryConfig>;
+  overrides?: { path: string; sharedValue: unknown; localValue: unknown }[];
 };
 
 export type SprinkleRefOperation = "add" | "update" | "remove";

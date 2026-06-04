@@ -1,5 +1,6 @@
 import {
   assert,
+  fsp,
   path,
   readAwsAccountConfig,
   readSupabaseEvidence,
@@ -39,6 +40,7 @@ test("aws-account config-init refs resolve through explicit control category", a
       main: { [ACCOUNT_REF]: "main-id" },
       control: { [ACCOUNT_REF]: "control-id" },
     });
+    await fsp.rm(path.join(tmp, "config/control-plane/stack.json"), { force: true });
     await withControlPlaneArgv(["aws-account", "config-init", "--domain", "example.com"], () =>
       runAwsAccountCommand({ cwd: tmp, stdout: () => undefined }),
     );
@@ -93,7 +95,7 @@ test("aws-account arbitrary explicit stack categories override local redirects",
     assert.equal(config.inputSources.awsAccountId.categoryExplicit, true);
     assert.match(
       config.inputSources.awsAccountId.localValuesPath || "",
-      /config\/sprinkleref\/local\/values\.json$/,
+      /projects\/config\/local\.json$/,
     );
   });
 });
@@ -173,16 +175,13 @@ test("aws-account local redirects cannot override explicit token category", asyn
       },
     });
     const out = await runCheckForMissingToken(tmp);
-    assert.match(out, /Local values or shared resolver refs:[\s\S]*supabaseAccessToken/);
+    assert.match(out, /Secret backend:[\s\S]*supabaseAccessToken/);
     assert.doesNotMatch(out, /Bootstrap category:[\s\S]*supabaseAccessToken/);
     const evidence = await readSupabaseEvidence(path.join(tmp, "evidence-missing-token"));
     assert.equal(evidence.supabaseAccessToken.source, "missing");
     assert.equal(evidence.supabaseAccessToken.category, "control");
     assert.equal(evidence.supabaseAccessToken.categoryExplicit, true);
-    assert.match(
-      evidence.supabaseAccessToken.localValuesPath,
-      /config\/sprinkleref\/local\/values\.json$/,
-    );
+    assert.match(evidence.supabaseAccessToken.localValuesPath, /projects\/config\/local\.json$/);
     assert.equal(
       evidence.supabaseAccessToken.localValuesEntryPath,
       "values.control-plane.supabase.management-api-token",

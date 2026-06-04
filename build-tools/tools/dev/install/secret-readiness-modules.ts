@@ -1,4 +1,5 @@
 import path from "node:path";
+import { PROJECT_SHARED_CONFIG_PATH } from "../../deployments/project-config";
 
 export type BootstrapArgs = Record<string, unknown> & {
   identityName: string;
@@ -27,7 +28,7 @@ export type CredentialSinkSelection = {
 type ReadinessModules = {
   LocalFileCredentialSink: new (file: string) => CredentialSink;
   createSprinkleRefStore: (backend: { backend: string; file?: string }) => MutableCredentialStore;
-  readSprinkleRefConfig: (configPath: string) => Promise<unknown>;
+  readSprinkleRefConfig: (configPath: string, cwd?: string) => Promise<unknown>;
   resolveBootstrapAccessCredentialSinkBackend: (
     config: unknown,
     category: string,
@@ -74,7 +75,12 @@ export async function sinkFromSelection(
   if (selection.kind === "local-file") {
     return new modules.LocalFileCredentialSink(args.localCredentialFile);
   }
-  const config = await modules.readSprinkleRefConfig(selection.configPath);
+  const config = await modules.readSprinkleRefConfig(
+    canonicalProjectConfigSelected(selection.configPath, repoRoot)
+      ? ""
+      : selection.configPath || "",
+    repoRoot,
+  );
   const resolved = modules.resolveBootstrapAccessCredentialSinkBackend(
     config,
     selection.category || args.sprinkleCategory || "bootstrap",
@@ -91,6 +97,12 @@ export async function sinkFromSelection(
       await store.add(ref, value);
     },
   };
+}
+
+function canonicalProjectConfigSelected(configPath: string | undefined, repoRoot: string) {
+  return Boolean(
+    configPath && path.resolve(configPath) === path.resolve(repoRoot, PROJECT_SHARED_CONFIG_PATH),
+  );
 }
 
 function absolutizeLocalFileBackend<T extends { backend: string; file?: string }>(

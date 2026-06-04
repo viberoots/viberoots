@@ -133,8 +133,8 @@ test("Infisical resolver docs show Universal Auth profile fields", async () => {
       if (!block.includes('"backend": "infisical"') || !block.includes('"defaultEnvironment"')) {
         continue;
       }
-      assert.match(block, /"clientIdEnv"\s*:/, relPath);
-      assert.match(block, /"clientSecretEnv"\s*:/, relPath);
+      assert.match(block, /"clientIdRef"\s*:/, relPath);
+      assert.match(block, /"clientSecretRef"\s*:/, relPath);
       assert.doesNotMatch(block, /"tokenEnv"\s*:/, relPath);
     }
   }

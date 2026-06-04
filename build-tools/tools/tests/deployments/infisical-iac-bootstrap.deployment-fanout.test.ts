@@ -130,7 +130,7 @@ test("repo dry-run reports non-empty deployment fan-out targets read-only", asyn
     };
     assert.equal(report.deploymentFanOut?.readOnly, true);
     assert.deepEqual(report.deploymentFanOut?.offeredTargets, [staging]);
-    await assert.rejects(() => fs.stat("config/sprinkleref/selected.local.json"), /ENOENT/);
+    await assert.rejects(() => fs.stat(sharedConfigPath()), /ENOENT/);
   } finally {
     process.chdir(cwd);
   }
@@ -141,6 +141,10 @@ async function graph(nodes: unknown[]) {
   const graphPath = path.join(dir, "graph.json");
   await fs.writeFile(graphPath, `${JSON.stringify({ nodes }, null, 2)}\n`);
   return graphPath;
+}
+
+function sharedConfigPath() {
+  return path.join("projects", "config", "shared.json");
 }
 
 function deploymentNode(name: string, family: string) {
@@ -161,16 +165,19 @@ function fanOutOnlyNode(name: string) {
 }
 
 async function writeRepoOnlyResolver(dir: string) {
-  await fs.mkdir(path.join(dir, "config/sprinkleref"), { recursive: true });
+  await fs.mkdir(path.join(dir, "projects/config"), { recursive: true });
   await fs.writeFile(
-    path.join(dir, "config/sprinkleref/selected.local.json"),
+    path.join(dir, "projects/config/shared.json"),
     `${JSON.stringify(
       {
-        version: 1,
-        defaultCategory: "main",
-        categories: {
-          main: { backend: "local-file", file: ".local/main.json" },
-          bootstrap: { backend: "local-file", file: ".local/bootstrap.json" },
+        schemaVersion: "viberoots-project-config@1",
+        sprinkleref: {
+          version: 1,
+          defaultCategory: "main",
+          categories: {
+            main: { backend: "local-file", file: ".local/main.json" },
+            bootstrap: { backend: "local-file", file: ".local/bootstrap.json" },
+          },
         },
       },
       null,

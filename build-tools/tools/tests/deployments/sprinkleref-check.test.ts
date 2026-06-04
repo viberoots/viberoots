@@ -139,9 +139,9 @@ test("check exposes stable usage and resolver access exit codes", async () => {
       assert.equal(error.exitCode, 2);
       assert.match(
         error.message,
-        /resolver config not found[\s\S]*infisical-bootstrap\.ts repo --dry-run[\s\S]*infisical-bootstrap\.ts repo \(or add --yes to skip the prompt\)[\s\S]*sprinkleref --init config\/sprinkleref/,
+        /Project config not found[\s\S]*sprinkleref --init projects\/config[\s\S]*projects\/config\/shared\.json[\s\S]*projects\/config\/local\.json/,
       );
-      assert.doesNotMatch(error.message, /infisical-bootstrap\.ts repo --yes/);
+      assert.doesNotMatch(error.message, /config\/sprinkleref/);
       return true;
     },
   );

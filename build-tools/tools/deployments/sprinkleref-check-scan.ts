@@ -87,7 +87,11 @@ async function trackedFiles(root: string): Promise<string[]> {
 }
 
 async function readText(file: string): Promise<string | undefined> {
-  const stat = await fs.stat(file);
+  const stat = await fs.stat(file).catch((error: NodeJS.ErrnoException) => {
+    if (error.code === "ENOENT") return undefined;
+    throw error;
+  });
+  if (!stat) return undefined;
   if (!stat.isFile()) return undefined;
   const data = await fs.readFile(file);
   if (data.includes(0)) return undefined;

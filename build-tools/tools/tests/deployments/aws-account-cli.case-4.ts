@@ -92,15 +92,75 @@ test("aws-account check explains where missing Supabase values belong", async ()
     }
     assert.ok(out[0]?.includes("  BLOCKED check-supabase"));
     assert.ok(out[0]?.includes("Missing Values"));
-    assert.ok(out[0]?.includes("Local values or shared resolver refs:"));
-    assert.ok(out[0]?.includes("action: fill local values or write the ref in SprinkleRef"));
+    assert.ok(out[0]?.includes("Shared project config:"));
+    assert.ok(out[0]?.includes("action: add the shared value or ref to project config"));
     assert.ok(out[0]?.includes("ref: config://control-plane/supabase/org-id"));
     assert.equal(out[0]?.includes("passed with --config"), false);
     assert.ok(out[0]?.includes("ref: config://control-plane/supabase/project-ref"));
     assert.equal(out[0]?.includes("Bootstrap category:"), false);
     assert.ok(out[0]?.includes("ref: secret://control-plane/supabase/management-api-token"));
     assert.ok(out[0]?.includes("SUPABASE_ACCESS_TOKEN"));
-    assert.ok(out[0]?.includes("config/sprinkleref/local/values.json"));
+    assert.ok(out[0]?.includes("projects/config/local.json"));
+  });
+});
+
+test("aws-account check classifies empty local Supabase values as local setup gaps", async () => {
+  await runInTemp("aws-account-check-local-supabase-guidance", async (tmp) => {
+    await removeCanonicalStackConfig(tmp);
+    await fsp.mkdir(path.join(tmp, "projects/config"), { recursive: true });
+    await fsp.mkdir(path.join(tmp, "config/control-plane"), { recursive: true });
+    await fsp.writeFile(
+      path.join(tmp, "config/control-plane/stack.json"),
+      JSON.stringify(
+        {
+          domain: "example.com",
+          evidenceDir: path.join(tmp, "evidence"),
+          awsAccountId: "123456789012",
+          awsOrganizationId: "o-example",
+          supabaseOrgId: { ref: "config://control-plane/supabase/org-id" },
+          supabaseProjectRef: { ref: "config://control-plane/supabase/project-ref" },
+        },
+        null,
+        2,
+      ),
+    );
+    await fsp.writeFile(
+      path.join(tmp, "projects/config/local.json"),
+      JSON.stringify(
+        {
+          values: {
+            "control-plane": {
+              supabase: { "org-id": "", "project-ref": "" },
+            },
+          },
+        },
+        null,
+        2,
+      ),
+    );
+    const out: string[] = [];
+    const previousExitCode = process.exitCode;
+    process.exitCode = undefined;
+    try {
+      await withControlPlaneArgv(["aws-account", "check"], () =>
+        runAwsAccountCommand({
+          cwd: tmp,
+          now: () => NOW,
+          stdout: (text) => out.push(text),
+          toolResolver: (tool) => `/nix/store/fake-${tool}/bin/${tool}`,
+          commandRunner: async () => ({
+            stdout: JSON.stringify({ Account: "123456789012" }),
+            stderr: "",
+          }),
+          env: {},
+        }),
+      );
+    } finally {
+      process.exitCode = previousExitCode;
+    }
+    assert.match(out[0] || "", /Local operator config:[\s\S]*supabaseOrgId/);
+    assert.match(out[0] || "", /Local operator config:[\s\S]*supabaseProjectRef/);
+    assert.doesNotMatch(out[0] || "", /Shared project config:[\s\S]*supabaseOrgId/);
   });
 });
 

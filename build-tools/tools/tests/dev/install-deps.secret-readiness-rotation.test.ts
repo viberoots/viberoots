@@ -48,15 +48,18 @@ async function withRepo(fn: (repoRoot: string) => Promise<void>) {
 }
 
 async function writeResolver(repoRoot: string) {
-  await fsp.mkdir(path.join(repoRoot, "config/sprinkleref"), { recursive: true });
+  await fsp.mkdir(path.join(repoRoot, "projects/config"), { recursive: true });
   await fsp.writeFile(
-    path.join(repoRoot, "config/sprinkleref/selected.local.json"),
+    path.join(repoRoot, "projects/config/shared.json"),
     `${JSON.stringify({
-      defaultCategory: "main",
-      profiles: {},
-      categories: {
-        main: { backend: "local-file", file: ".local/main.json" },
-        bootstrap: { backend: "local-file", file: path.join(repoRoot, ".local/bootstrap.json") },
+      schemaVersion: "viberoots-project-config@1",
+      sprinkleref: {
+        defaultCategory: "main",
+        profiles: {},
+        categories: {
+          main: { backend: "local-file", file: ".local/main.json" },
+          bootstrap: { backend: "local-file", file: path.join(repoRoot, ".local/bootstrap.json") },
+        },
       },
     })}\n`,
   );

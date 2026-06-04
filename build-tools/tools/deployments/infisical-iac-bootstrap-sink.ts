@@ -5,7 +5,7 @@ import { resolverConfigPath } from "./infisical-iac-bootstrap-preflight";
 import { readSprinkleRefConfig } from "./sprinkleref-config";
 import * as bootstrapGuard from "./sprinkleref-bootstrap-guard";
 import { createSprinkleRefStore } from "./sprinkleref-store";
-import { initSprinkleRefConfigs } from "./sprinkleref-templates";
+import { initLocalSprinkleRefValues, initSprinkleRefConfigs } from "./sprinkleref-templates";
 import type { SprinkleRefBackendConfig } from "./sprinkleref-types";
 
 type Store = Record<string, string>;
@@ -228,6 +228,7 @@ async function ensureResolverConfigPath(
     if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
     if (!createMissingResolverConfig) return undefined;
     await initSprinkleRefConfigs({ dir: path.dirname(selected), platform, mode: "create" });
+    await initLocalSprinkleRefValues(process.cwd());
   }
   return selected;
 }

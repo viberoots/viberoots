@@ -33,7 +33,7 @@ test("aws-account explicit stack categories prevent different-ref local redirect
     assert.equal(config.inputSources.awsAccountId.categoryExplicit, true);
     assert.match(
       config.inputSources.awsAccountId.localValuesPath || "",
-      /config\/sprinkleref\/local\/values\.json$/,
+      /projects\/config\/local\.json$/,
     );
   });
 });

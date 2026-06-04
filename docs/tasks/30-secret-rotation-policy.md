@@ -78,8 +78,9 @@ What is missing is an end-to-end answer to "what do I do when a credential needs
   the live Infisical secret does not invalidate in-flight retries unless the old version is
   explicitly deleted from Infisical version history.
 - A decommission checklist for removing an operator machine from the bootstrap identity: revoke
-  the machine's labeled client-secret record in Infisical, confirm the `sprinkleref/selected.local.json`
-  profile on that machine no longer resolves, and verify active deployment runs were not
+  the machine's labeled client-secret record in Infisical, confirm that `projects/config/local.json`
+  on that machine no longer selects credentials for the revoked identity, and verify active deployment
+  runs were not
   mid-execution on that machine's credential.
 
 ## Why Now

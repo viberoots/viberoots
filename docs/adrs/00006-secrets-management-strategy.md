@@ -28,7 +28,12 @@ Deployments in viberoots require access to secrets (API keys, credentials, token
 
 All secret dependencies are declared via `secret_requirements` in TARGETS metadata using stable `secret://deployments/...` URIs. These URIs are logical names that never change even if the backend or path changes. SprinkleRef resolves them through an environment-specific resolver config selected at deployment time, not baked into TARGETS.
 
-Resolver configs (`sprinkleref/base.json`, `sprinkleref/local.macos.json`, `sprinkleref/local.file.json`, `sprinkleref/ci.github.json`, `sprinkleref/ci.jenkins.json`, etc.) live outside deployment metadata. The active local config is `selected.local.json`. This separation makes the contract layer backend-neutral: the same URI resolves via Vault, Infisical, macOS Keychain, or a local fixture file depending on the resolver.
+Project config lives outside deployment metadata in `projects/config/shared.json` plus gitignored
+`projects/config/local.json`. Shared config defines resolver categories, Infisical coordinates,
+environments, and runtime host profiles; local config supplies individual operator values and can
+select the active local runtime host. This separation makes the contract layer backend-neutral: the
+same URI resolves via Vault, Infisical, macOS Keychain, local fixture files, or CI backends depending
+on the selected runtime host and resolver category.
 
 `sprinkleref --check` validates that resolver config and secret references are consistent before any deployment proceeds.
 

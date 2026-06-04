@@ -46,3 +46,7 @@ REVIEWED_DEPLOYMENT_TEST_OWNERSHIP.update({
 REVIEWED_DEPLOYMENT_TEST_OWNERSHIP.update({
     "build-tools/tools/tests/deployments/sprinkleref-infisical-storage.test.ts": True,
 })
+
+REVIEWED_DEPLOYMENT_TEST_OWNERSHIP.update({
+    "build-tools/tools/tests/deployments/sprinkleref-project-config.test.ts": True,
+})

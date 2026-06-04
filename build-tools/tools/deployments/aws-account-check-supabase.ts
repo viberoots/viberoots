@@ -1,6 +1,11 @@
 import path from "node:path";
 import { CONTROL_PLANE_CONFIG_REFS } from "./aws-account-ref-schemes";
-import type { AwsAccountConfig, PhaseRecord, RunDeps } from "./aws-account-types";
+import type {
+  AwsAccountConfig,
+  MissingConfigField,
+  PhaseRecord,
+  RunDeps,
+} from "./aws-account-types";
 import {
   defaultHttpFetch,
   getSupabaseJson,
@@ -28,7 +33,7 @@ export async function checkSupabase(
     missingConfigFields.push({
       field: "supabaseOrgId",
       valueHint: "<supabase-org-id>",
-      destination: "local-values-or-shared-resolver",
+      destination: missingDestination(config.inputSources.supabaseOrgId),
       ref: CONTROL_PLANE_CONFIG_REFS.supabaseOrgId,
       category: config.inputSources.supabaseOrgId?.category,
     });
@@ -38,7 +43,7 @@ export async function checkSupabase(
     missingConfigFields.push({
       field: "supabaseProjectRef",
       valueHint: "<project-ref>",
-      destination: "local-values-or-shared-resolver",
+      destination: missingDestination(config.inputSources.supabaseProjectRef),
       ref: CONTROL_PLANE_CONFIG_REFS.supabaseProjectRef,
       category: config.inputSources.supabaseProjectRef?.category,
     });
@@ -195,8 +200,14 @@ export async function checkSupabase(
 
 function supabaseAccessTokenDestination(
   metadata: Record<string, unknown>,
-): "bootstrap-category" | "local-values-or-shared-resolver" {
+): "bootstrap-category" | "secret-backend" {
   return metadata.category === "bootstrap" && metadata.categoryExplicit === true
     ? "bootstrap-category"
-    : "local-values-or-shared-resolver";
+    : "secret-backend";
+}
+
+function missingDestination(
+  source: AwsAccountConfig["inputSources"][string],
+): "project-shared-config" | "project-local-config" {
+  return source?.source === "local-values" ? "project-local-config" : "project-shared-config";
 }

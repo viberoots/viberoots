@@ -167,7 +167,7 @@ function profileValidationStates(
 
 async function writeProfileConfig(profile: unknown) {
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), "infisical-profile-env-"));
-  const configPath = path.join(dir, "selected.local.json");
+  const configPath = path.join(dir, "operator-config.json");
   await writeJson(configPath, {
     version: 1,
     defaultCategory: "main",

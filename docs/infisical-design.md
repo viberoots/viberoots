@@ -260,7 +260,7 @@ Repo bootstrap should:
 - materialize or validate local bootstrap credential sinks such as macOS
   Keychain services or restrictive local files, while keeping root/bootstrap
   access credentials out of Infisical-backed categories;
-- keep generated `base.json` and starter resolver templates free of
+- keep generated starter resolver templates free of
   deployment-specific names, project ids, paths, and Pleomino examples.
 
 Infisical SprinkleRef profiles expose only Universal Auth workload credentials. They must use

@@ -73,12 +73,7 @@ test("resolver entry overwrite preserves following entries and comments", async 
 test("resolver entry update creates missing entries only with explicit mode", async () => {
   const dir = await tmp();
   const configPath = await writeConfig(dir);
-  const argv = entryArgs(configPath, "update", [
-    "--backend",
-    "local-file",
-    "--file",
-    "bootstrap.json",
-  ]);
+  const argv = entryArgs(configPath, "update", localFileArgs("bootstrap.json"));
   await assert.rejects(() => runSprinkleRefCli({ argv, stdout: () => undefined }), /is missing/);
   await runSprinkleRefCli({ argv: [...argv, "--create-missing"], stdout: () => undefined });
   assert.equal(
@@ -87,41 +82,25 @@ test("resolver entry update creates missing entries only with explicit mode", as
   );
 });
 
-test("resolver entry update preserves inherited base config", async () => {
-  const dir = await tmp();
-  const configPath = await writeExtendingConfig(dir);
-  await runSprinkleRefCli({
-    argv: entryArgs(
-      configPath,
-      "update",
-      ["--backend", "local-file", "--file", "rotated-main.json"],
-      "main",
-    ),
-    stdout: () => undefined,
-  });
-  const text = await fs.readFile(configPath, "utf8");
-  assert.match(text, /"bootstrap"/);
-  const config = await readSprinkleRefConfig(configPath);
-  assert.equal(config.categories.main.file, "rotated-main.json");
-  assert.equal(config.categories.bootstrap.service, "viberoots-bootstrap");
-});
-
 test("resolver entry update accepts generated profile-backed resolver config", async () => {
   const dir = await tmp();
   await initSprinkleRefConfigs({ dir, platform: "darwin" });
-  const configPath = path.join(dir, "selected.local.json");
+  const generated = JSON.parse(await fs.readFile(path.join(dir, "shared.json"), "utf8"));
+  const configPath = path.join(dir, "operator-config.json");
+  await fs.writeFile(
+    configPath,
+    `${JSON.stringify({ environments: generated.environments, ...generated.sprinkleref }, null, 2)}\n`,
+  );
   await runSprinkleRefCli({
-    argv: entryArgs(configPath, "update", [
-      "--backend",
-      "local-file",
-      "--file",
-      "rotated-bootstrap.json",
-    ]),
+    argv: entryArgs(configPath, "update", localFileArgs("rotated-control.json"), "control"),
     stdout: () => undefined,
   });
   const config = await readSprinkleRefConfig(configPath);
-  assert.equal(config.categories.bootstrap.file, "rotated-bootstrap.json");
-  assert.deepEqual(config.categories.main, { profile: "infisical-default" });
+  assert.equal(config.categories.control.file, "rotated-control.json");
+  assert.deepEqual(config.categories.main, {
+    profile: "infisical-default",
+    environment: "staging",
+  });
   assert.equal(config.profiles["infisical-default"]?.backend, "infisical");
 });
 
@@ -132,7 +111,7 @@ test("resolver entry edits reject secret value inputs", async () => {
     () =>
       runSprinkleRefCli({
         argv: [
-          ...entryArgs(configPath, "add", ["--backend", "local-file", "--file", "bootstrap.json"]),
+          ...entryArgs(configPath, "add", localFileArgs("bootstrap.json")),
           "--value-env",
           "SECRET",
         ],
@@ -151,6 +130,10 @@ function entryArgs(
   category = "bootstrap",
 ) {
   return ["--config", configPath, "--resolver-entry", `--${mode}`, category, ...rest];
+}
+
+function localFileArgs(file: string) {
+  return ["--backend", "local-file", "--file", file];
 }
 
 async function writeCommentedConfig(dir: string) {
@@ -212,30 +195,6 @@ async function writeMultiBackendConfig(dir: string) {
   }
 }
 `,
-  );
-  return configPath;
-}
-
-async function writeExtendingConfig(dir: string) {
-  await fs.writeFile(
-    path.join(dir, "base.json"),
-    `${JSON.stringify({
-      version: 1,
-      defaultCategory: "main",
-      categories: { main: { backend: "local-file", file: "main.json" } },
-    })}\n`,
-  );
-  const configPath = path.join(dir, "selected.local.json");
-  await fs.writeFile(
-    configPath,
-    `${JSON.stringify({
-      version: 1,
-      extends: "./base.json",
-      defaultCategory: "main",
-      categories: {
-        bootstrap: { backend: "macos-keychain", service: "viberoots-bootstrap" },
-      },
-    })}\n`,
   );
   return configPath;
 }

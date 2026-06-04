@@ -11,7 +11,7 @@ import { resolveCredentialSinkSelection } from "../../deployments/infisical-iac-
 test("bootstrap credentials cannot resolve through an Infisical backend or profile", async () => {
   const dir = await tmp();
   await withCwdAndEnv(dir, async () => {
-    await writeJson("config/sprinkleref/selected.local.json", unsafeInfisicalBootstrapConfig());
+    await writeJson("projects/config/shared.json", unsafeInfisicalBootstrapConfig());
     await assert.rejects(
       () =>
         resolveCredentialSinkSelection(
@@ -116,21 +116,24 @@ test("repo bootstrap reports Keychain remediation when service is unusable", asy
 
 function unsafeInfisicalBootstrapConfig() {
   return {
-    version: 1,
-    defaultCategory: "main",
-    profiles: {
-      "infisical-default": {
-        backend: "infisical",
-        host: "https://app.infisical.com",
-        projectId: "project",
-        defaultEnvironment: "staging",
-        clientIdEnv: "INFISICAL_CLIENT_ID",
-        clientSecretEnv: "INFISICAL_CLIENT_SECRET",
+    schemaVersion: "viberoots-project-config@1",
+    sprinkleref: {
+      version: 1,
+      defaultCategory: "main",
+      profiles: {
+        "infisical-default": {
+          backend: "infisical",
+          host: "https://app.infisical.com",
+          projectId: "project",
+          defaultEnvironment: "staging",
+          clientIdEnv: "INFISICAL_CLIENT_ID",
+          clientSecretEnv: "INFISICAL_CLIENT_SECRET",
+        },
       },
-    },
-    categories: {
-      main: { profile: "infisical-default" },
-      bootstrap: { profile: "infisical-default" },
+      categories: {
+        main: { profile: "infisical-default" },
+        bootstrap: { profile: "infisical-default" },
+      },
     },
   };
 }

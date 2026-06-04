@@ -9,7 +9,7 @@ import { materializeRepoBackendProfiles } from "../../deployments/infisical-iac-
 
 test("repo profile materialization writes Infisical project id without secret values", async () => {
   const dir = await tmp();
-  const configPath = path.join(dir, "selected.local.json");
+  const configPath = path.join(dir, "operator-config.json");
   await writeJson(configPath, starterConfig());
   const api = fakeProjectApi();
   const result = await materializeRepoBackendProfiles({
@@ -40,7 +40,7 @@ test("repo profile materialization writes Infisical project id without secret va
 
 test("operator-authored Infisical profile is validated and preserved", async () => {
   const dir = await tmp();
-  const configPath = path.join(dir, "selected.local.json");
+  const configPath = path.join(dir, "operator-config.json");
   const config = starterConfig();
   config.profiles["infisical-default"] = {
     backend: "infisical",
@@ -77,7 +77,7 @@ test("operator-authored Infisical profile is validated and preserved", async () 
 
 test("generated Infisical starter profile with project id is rewritten with repo refs", async () => {
   const dir = await tmp();
-  const configPath = path.join(dir, "selected.local.json");
+  const configPath = path.join(dir, "operator-config.json");
   const config = starterConfig();
   config.profiles["infisical-default"] = {
     ...config.profiles["infisical-default"],
@@ -103,7 +103,7 @@ test("generated Infisical starter profile with project id is rewritten with repo
 
 test("operator-authored Infisical project mismatch fails without rewriting", async () => {
   const dir = await tmp();
-  const configPath = path.join(dir, "selected.local.json");
+  const configPath = path.join(dir, "operator-config.json");
   const config = starterConfig();
   config.profiles["infisical-default"] = {
     backend: "infisical",
@@ -132,7 +132,7 @@ test("operator-authored Infisical project mismatch fails without rewriting", asy
 
 test("repo profile validation rejects placeholder Vault metadata", async () => {
   const dir = await tmp();
-  const configPath = path.join(dir, "selected.local.json");
+  const configPath = path.join(dir, "operator-config.json");
   await writeJson(configPath, {
     ...starterConfig(),
     profiles: {
@@ -159,7 +159,7 @@ test("repo profile validation rejects placeholder Vault metadata", async () => {
 
 test("Vault profile validation checks the configured mount", async () => {
   const dir = await tmp();
-  const configPath = path.join(dir, "selected.local.json");
+  const configPath = path.join(dir, "operator-config.json");
   await writeJson(configPath, starterConfig());
   await assert.rejects(
     () =>

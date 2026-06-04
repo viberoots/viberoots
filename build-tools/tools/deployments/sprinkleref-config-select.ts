@@ -1,29 +1,20 @@
 #!/usr/bin/env zx-wrapper
-import * as fs from "node:fs/promises";
 import { readSprinkleRefConfig } from "./sprinkleref-config";
+import { PROJECT_SHARED_CONFIG_PATH } from "./project-config";
 
-export const DEFAULT_SPRINKLEREF_CONFIG_PATH = "config/sprinkleref/selected.json";
-const LEGACY_SPRINKLEREF_CONFIG_PATH = "config/sprinkleref/selected.local.json";
+export const DEFAULT_SPRINKLEREF_CONFIG_PATH = PROJECT_SHARED_CONFIG_PATH;
 
 export async function readSelectedSprinkleRefConfig(
   configPath: string,
   env: NodeJS.ProcessEnv = process.env,
+  cwd = process.cwd(),
 ) {
-  const selected =
-    configPath || env.SPRINKLEREF_CONFIG || (await existingDefaultConfigPath()) || "";
-  if (!selected) throw new Error("missing SprinkleRef config; pass --config or SPRINKLEREF_CONFIG");
+  const selected = configPath || env.SPRINKLEREF_CONFIG || "";
   try {
-    return await readSprinkleRefConfig(selected);
+    return await readSprinkleRefConfig(selected, cwd);
   } catch (error) {
-    throw new Error(configReadErrorMessage(selected, error));
+    throw new Error(configReadErrorMessage(selected || DEFAULT_SPRINKLEREF_CONFIG_PATH, error));
   }
-}
-
-async function existingDefaultConfigPath() {
-  for (const configPath of [DEFAULT_SPRINKLEREF_CONFIG_PATH, LEGACY_SPRINKLEREF_CONFIG_PATH]) {
-    if ((await fs.stat(configPath).catch(() => undefined))?.isFile()) return configPath;
-  }
-  return "";
 }
 
 function configReadErrorMessage(selected: string, error: unknown): string {
@@ -32,7 +23,7 @@ function configReadErrorMessage(selected: string, error: unknown): string {
     (error && typeof error === "object" && "code" in error && error.code === "ENOENT") ||
     /ENOENT/.test(message)
   ) {
-    return `SprinkleRef resolver config not found: ${selected}. Run build-tools/tools/deployments/infisical-bootstrap.ts repo --dry-run, then build-tools/tools/deployments/infisical-bootstrap.ts repo (or add --yes to skip the prompt), or run sprinkleref --init config/sprinkleref and edit the generated config for this environment. Then retry with --config ${selected}.`;
+    return `Project config not found: ${selected}. Run sprinkleref --init projects/config and edit projects/config/shared.json plus gitignored projects/config/local.json for this environment.`;
   }
   return message;
 }

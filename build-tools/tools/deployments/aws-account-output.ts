@@ -50,6 +50,9 @@ export function formatCheckSummary(status: AwsAccountStatus, config: AwsAccountC
     lines.push(`  ${phaseStateLabel(record.state).padEnd(7)} ${phase}`);
   }
   lines.push("", "Sources", ...formatInputSources(status, config));
+  if (config.localOverrides.length > 0) {
+    lines.push("", "Active local overrides", ...formatLocalOverrides(config.localOverrides));
+  }
   const missingConfigFields = collectMissingConfigFields(problemPhases, status);
   if (missingConfigFields.length > 0) {
     lines.push("", ...formatMissingDestinations(missingConfigFields));
@@ -101,4 +104,17 @@ export function formatCheckSummary(status: AwsAccountStatus, config: AwsAccountC
     `  ${awsAccountCheckCommand(status, true)}`,
   );
   return lines.join("\n");
+}
+
+function formatLocalOverrides(overrides: AwsAccountConfig["localOverrides"]): string[] {
+  return overrides.map(
+    (entry) =>
+      `  ${entry.path}: shared=${formatDiagnosticValue(entry.sharedValue)} local=${formatDiagnosticValue(entry.localValue)}`,
+  );
+}
+
+function formatDiagnosticValue(value: unknown): string {
+  if (value === undefined) return "<unset>";
+  if (typeof value === "string") return value || "<empty>";
+  return JSON.stringify(value);
 }

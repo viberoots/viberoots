@@ -77,10 +77,10 @@ test("repo bootstrap dry-run reports resolver profiles without Pleomino provisio
     assert.equal(report.deterministic, undefined);
     assert.equal(report.browserAutomation, undefined);
     assert.match(output.stderr, /Credential sink: .*starter config not created during dry-run/);
-    assert.match(output.stderr, /sprinkleref --check --config config\/sprinkleref\/selected\.json/);
+    assert.match(output.stderr, /sprinkleref --check --config projects\/config\/shared\.json/);
     assert.doesNotMatch(output.stdout, /pleomino|opentofu|cloudflare_api_token/);
     assert.doesNotMatch(output.stderr, /pleomino|opentofu|--tofu-dir|cloudflare_api_token/i);
-    await assertMissing("config/sprinkleref/selected.json");
+    await assertMissing("projects/config/shared.json");
   });
 });
 
@@ -99,39 +99,42 @@ test("deployment bootstrap auto credential sink does not create starter resolver
       },
     );
     assert.match(selection.description, /starter config not created/);
-    await assertMissing("config/sprinkleref/selected.local.json");
+    await assertMissing("projects/config/shared.json");
   });
 });
 
 test("repo bootstrap dry-run reports preserved operator profiles separately", async () => {
   const dir = await tmp();
   await withCwdAndEnv(dir, async () => {
-    await writeJson("config/sprinkleref/selected.local.json", {
-      version: 1,
-      defaultCategory: "main",
-      profiles: {
-        "infisical-default": {
-          backend: "infisical",
-          host: "https://app.infisical.com",
-          projectId: "proj_operator",
-          defaultEnvironment: "staging",
-          clientIdRef: "secret://operator/client-id",
-          clientSecretRef: "secret://operator/client-secret",
+    await writeJson("projects/config/shared.json", {
+      schemaVersion: "viberoots-project-config@1",
+      sprinkleref: {
+        version: 1,
+        defaultCategory: "main",
+        profiles: {
+          "infisical-default": {
+            backend: "infisical",
+            host: "https://app.infisical.com",
+            projectId: "proj_operator",
+            defaultEnvironment: "staging",
+            clientIdRef: "secret://operator/client-id",
+            clientSecretRef: "secret://operator/client-secret",
+          },
         },
-      },
-      categories: {
-        main: { profile: "infisical-default" },
-        bootstrap: { backend: "local-file", file: ".local/bootstrap.json" },
+        categories: {
+          main: { profile: "infisical-default" },
+          bootstrap: { backend: "local-file", file: ".local/bootstrap.json" },
+        },
       },
     });
     await writeJson("graph.json", {
       nodes: [{ name: "//deployments/infisical:deploy", secret_backend: "infisical/default" }],
     });
     const plan = await buildRepoDryRunMaterializationPlan({
-      configPath: "config/sprinkleref/selected.local.json",
+      configPath: "projects/config/shared.json",
       graphPath: "graph.json",
       sink: {
-        kind: "config/sprinkleref",
+        kind: "projects/config",
         backend: "local-file",
         category: "bootstrap",
         description: "test sink",

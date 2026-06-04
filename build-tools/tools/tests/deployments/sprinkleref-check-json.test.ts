@@ -53,10 +53,21 @@ test("repo JSON includes stable status, scheme, sensitivity, location, category,
 test("target JSON includes stable requiredBy and direct or dependency scope", async () => {
   await runInTemp("sprinkleref-check-json-target", async (tmp) => {
     await writeDeploymentTargets(tmp);
+    const config = path.join(tmp, "resolver.json");
+    await fs.writeFile(
+      config,
+      `${JSON.stringify({
+        version: 1,
+        defaultCategory: "main",
+        categories: { main: { backend: "local-file", file: path.join(tmp, "store.json") } },
+      })}\n`,
+    );
     const report = await jsonInDir(tmp, [
       "--check",
       "--target",
       "//projects/deployments/json-demo:deploy",
+      "--config",
+      config,
       "--format",
       "json",
     ]);
@@ -72,7 +83,7 @@ test("target JSON includes stable requiredBy and direct or dependency scope", as
       {
         scheme: "secret",
         sensitive: true,
-        status: "unchecked",
+        status: "missing",
         scope: "direct",
         requiredBy: ["//projects/deployments/json-demo:deploy"],
       },
@@ -95,6 +106,41 @@ test("target JSON includes stable requiredBy and direct or dependency scope", as
     );
     assert.match(byRef.get("config://deployments/json-demo/public_url").locations[0], /TARGETS:/);
   });
+});
+
+test("repo JSON reports active local overrides with secret-like values redacted", async () => {
+  const dir = await gitRepo("sprinkleref-json-overrides-");
+  await fs.mkdir(path.join(dir, "projects/config"), { recursive: true });
+  await fs.writeFile(path.join(dir, "contracts.txt"), "");
+  await fs.writeFile(
+    path.join(dir, "projects/config/shared.json"),
+    `${JSON.stringify({
+      schemaVersion: "viberoots-project-config@1",
+      sprinkleref: {
+        version: 1,
+        defaultCategory: "main",
+        categories: { main: { backend: "local-file", file: path.join(dir, "shared.json") } },
+      },
+      values: { control: { token: "shared-secret", region: "us-east-1" } },
+    })}\n`,
+  );
+  await fs.writeFile(
+    path.join(dir, "projects/config/local.json"),
+    `${JSON.stringify({
+      activeRuntimeHost: "local-file",
+      values: { control: { token: "local-secret", region: "us-west-2" } },
+    })}\n`,
+  );
+  await $({ cwd: dir })`git add contracts.txt`.quiet();
+  const report = await jsonInDir(dir, ["--check", "--format", "json"]);
+  assert.deepEqual(report.localOverrides, [
+    { path: "values.control.region", sharedValue: "us-east-1", localValue: "us-west-2" },
+    {
+      path: "values.control.token",
+      sharedValue: "<redacted>",
+      localValue: "<redacted>",
+    },
+  ]);
 });
 
 function pick(value: any, keys: string[]): Record<string, unknown> {

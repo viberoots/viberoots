@@ -10,16 +10,22 @@ import {
   createCredentialSink,
   resolveCredentialSinkSelection,
 } from "../../deployments/infisical-iac-bootstrap-sink";
-import { assertMissing, VAULT_PROFILE } from "./infisical-iac-bootstrap.resolver-profiles.helpers";
+import {
+  assertMissing,
+  captureConsole,
+  VAULT_PROFILE,
+} from "./infisical-iac-bootstrap.resolver-profiles.helpers";
 import { fakeRepoBootstrapFetch } from "./sprinkleref-test-helpers";
 
 test("auto credential sink reuses existing SprinkleRef resolver config", async () => {
   const dir = await tmp();
   await withCwdAndEnv(dir, async () => {
-    await writeJson("config/sprinkleref/selected.local.json", {
-      version: 1,
-      defaultCategory: "bootstrap",
-      categories: { bootstrap: { backend: "local-file", file: "kept-bootstrap.json" } },
+    await writeJson("projects/config/shared.json", {
+      sprinkleref: {
+        version: 1,
+        defaultCategory: "bootstrap",
+        categories: { bootstrap: { backend: "local-file", file: "kept-bootstrap.json" } },
+      },
     });
     const selection = await resolveCredentialSinkSelection(DEFAULT_BOOTSTRAP_ARGS, {
       platform: "linux",
@@ -27,8 +33,8 @@ test("auto credential sink reuses existing SprinkleRef resolver config", async (
     });
     assert.equal(selection.kind, "sprinkleref");
     assert.equal(selection.backend, "local-file");
-    assert.equal(selection.configPath, "config/sprinkleref/selected.local.json");
-    await assert.rejects(() => fs.stat("sprinkleref/base.json"), /ENOENT/);
+    assert.equal(selection.configPath, "projects/config/shared.json");
+    await assertMissing("projects/config/local.json");
   });
 });
 
@@ -40,30 +46,30 @@ test("repo bootstrap auto credential sink creates starter resolver config only w
       { platform: "linux", env: {} },
     );
     assert.match(sink.describe(), /SprinkleRef bootstrap local-file/);
-    const selectedLocal = await fs.readFile("config/sprinkleref/selected.local.json", "utf8");
-    assert.match(selectedLocal, /"extends": "\.\/selected\.json"/);
-    assert.doesNotMatch(selectedLocal, /clientSecret":/);
-    const selected = await fs.readFile("config/sprinkleref/selected.json", "utf8");
-    assert.match(selected, /"backend": "local-file"/);
-    assert.doesNotMatch(selected, /clientSecret":/);
+    const shared = await fs.readFile(sharedConfigPath(), "utf8");
+    assert.match(shared, /"runtimeHosts"/);
+    assert.match(shared, /"backend": "local-file"/);
+    assert.doesNotMatch(shared, /"file": ".local\/infisical\/bootstrap\/credentials.json"/);
+    assert.doesNotMatch(shared, /clientSecret":/);
+    const local = await fs.readFile(localConfigPath(), "utf8");
+    assert.match(local, /"file": ".local\/infisical\/bootstrap\/credentials.json"/);
   });
 });
 
-test("repo bootstrap auto credential sink uses explicit create mode for starter resolver config", async () => {
+test("repo bootstrap auto credential sink rejects invalid existing shared project config", async () => {
   const dir = await tmp();
   await withCwdAndEnv(dir, async () => {
-    await fs.mkdir("config/sprinkleref", { recursive: true });
-    await fs.writeFile("config/sprinkleref/base.json", "operator-owned\n");
+    await fs.mkdir(projectConfigDir(), { recursive: true });
+    await fs.writeFile(sharedConfigPath(), "operator-owned\n");
     await assert.rejects(
       () =>
         createCredentialSink(
           { ...DEFAULT_BOOTSTRAP_ARGS, mode: "repo" },
           { platform: "linux", env: {} },
         ),
-      /EEXIST/,
+      /invalid project config JSON/,
     );
-    assert.equal(await fs.readFile("config/sprinkleref/base.json", "utf8"), "operator-owned\n");
-    await assertMissing("config/sprinkleref/selected.local.json");
+    assert.equal(await fs.readFile(sharedConfigPath(), "utf8"), "operator-owned\n");
   });
 });
 
@@ -82,10 +88,7 @@ test("repo bootstrap creates and validates resolver profiles independent of cred
       }),
     );
     assert.doesNotMatch(output.stdout, /nextCommands/);
-    assert.match(
-      output.stderr,
-      /sprinkleref --check --config config\/sprinkleref\/selected\.local\.json/,
-    );
+    assert.match(output.stderr, /sprinkleref --check --config projects\/config\/shared\.json/);
     const report = JSON.parse(output.stdout);
     assert.equal(report.nextCommands, undefined);
     assert.equal(report.bootstrapCredentialSinks.length, 2);
@@ -96,33 +99,34 @@ test("repo bootstrap creates and validates resolver profiles independent of cred
       "infisical-default",
     ]);
     assert.deepEqual(report.profileMaterialization?.validatedExistingProfiles, []);
-    const selected = await fs.readFile("config/sprinkleref/selected.json", "utf8");
+    const selected = await fs.readFile(sharedConfigPath(), "utf8");
     assert.match(selected, /"infisical-default"/);
-    const base = await fs.readFile("config/sprinkleref/base.json", "utf8");
-    assert.match(base, /"backend": "infisical"/);
+    assert.match(selected, /"backend": "infisical"/);
   });
 });
 
 test("repo bootstrap materializes missing non-default Infisical profiles", async () => {
   const dir = await tmp();
   await withCwdAndEnv(dir, async () => {
-    await writeJson("config/sprinkleref/selected.local.json", {
-      version: 1,
-      defaultCategory: "main",
-      profiles: {
-        "vault-default": VAULT_PROFILE,
-        "infisical-default": {
-          backend: "infisical",
-          host: "https://app.infisical.com",
-          projectId: "proj_repo_test",
-          defaultEnvironment: "staging",
-          clientIdEnv: "INFISICAL_CLIENT_ID",
-          clientSecretEnv: "INFISICAL_CLIENT_SECRET",
+    await writeJson("projects/config/shared.json", {
+      sprinkleref: {
+        version: 1,
+        defaultCategory: "main",
+        profiles: {
+          "vault-default": VAULT_PROFILE,
+          "infisical-default": {
+            backend: "infisical",
+            host: "https://app.infisical.com",
+            projectId: "proj_repo_test",
+            defaultEnvironment: "staging",
+            clientIdEnv: "INFISICAL_CLIENT_ID",
+            clientSecretEnv: "INFISICAL_CLIENT_SECRET",
+          },
         },
-      },
-      categories: {
-        main: { profile: "infisical-default" },
-        bootstrap: { backend: "local-file", file: ".local/bootstrap.json" },
+        categories: {
+          main: { profile: "infisical-default" },
+          bootstrap: { backend: "local-file", file: ".local/bootstrap.json" },
+        },
       },
     });
     await writeGraph([
@@ -139,33 +143,32 @@ test("repo bootstrap materializes missing non-default Infisical profiles", async
     assert.deepEqual(report.profileMaterialization?.validatedExistingProfiles, [
       "infisical-default",
     ]);
-    assert.match(
-      await fs.readFile("config/sprinkleref/selected.local.json", "utf8"),
-      /"infisical-regulated"/,
-    );
+    assert.match(await fs.readFile(sharedConfigPath(), "utf8"), /"infisical-regulated"/);
   });
 });
 
 test("repo bootstrap validates bootstrap category even with explicit credential sinks", async () => {
   const dir = await tmp();
   await withCwdAndEnv(dir, async () => {
-    await writeJson("config/sprinkleref/selected.local.json", {
-      version: 1,
-      defaultCategory: "main",
-      profiles: {
-        "vault-default": VAULT_PROFILE,
-        "infisical-default": {
-          backend: "infisical",
-          host: "https://app.infisical.com",
-          projectId: "project",
-          defaultEnvironment: "staging",
-          clientIdEnv: "INFISICAL_CLIENT_ID",
-          clientSecretEnv: "INFISICAL_CLIENT_SECRET",
+    await writeJson("projects/config/shared.json", {
+      sprinkleref: {
+        version: 1,
+        defaultCategory: "main",
+        profiles: {
+          "vault-default": VAULT_PROFILE,
+          "infisical-default": {
+            backend: "infisical",
+            host: "https://app.infisical.com",
+            projectId: "project",
+            defaultEnvironment: "staging",
+            clientIdEnv: "INFISICAL_CLIENT_ID",
+            clientSecretEnv: "INFISICAL_CLIENT_SECRET",
+          },
         },
-      },
-      categories: {
-        main: { profile: "infisical-default" },
-        bootstrap: { profile: "infisical-default" },
+        categories: {
+          main: { profile: "infisical-default" },
+          bootstrap: { profile: "infisical-default" },
+        },
       },
     });
     await writeGraph([
@@ -189,6 +192,10 @@ async function tmp() {
   return await fs.mkdtemp(path.join(os.tmpdir(), "infisical-bootstrap-resolver-"));
 }
 
+const projectConfigDir = () => path.join("projects", "config");
+const sharedConfigPath = () => path.join(projectConfigDir(), "shared.json");
+const localConfigPath = () => path.join(projectConfigDir(), "local.json");
+
 async function withCwdAndEnv(dir: string, run: () => Promise<void>) {
   const cwd = process.cwd();
   const oldConfig = process.env.SPRINKLEREF_CONFIG;
@@ -196,8 +203,10 @@ async function withCwdAndEnv(dir: string, run: () => Promise<void>) {
   const oldToken = process.env.INFISICAL_ACCESS_TOKEN;
   const oldVaultAddr = process.env.VBR_VAULT_ADDR;
   const oldVaultToken = process.env.VBR_VAULT_TOKEN;
+  const oldRuntimeHost = process.env.VBR_RUNTIME_HOST;
   const oldFetch = globalThis.fetch;
   delete process.env.SPRINKLEREF_CONFIG;
+  process.env.VBR_RUNTIME_HOST = "local-file";
   process.env.VBR_INFISICAL_PROJECT_ID = "proj_repo_test";
   process.env.INFISICAL_ACCESS_TOKEN = "admin-token";
   process.env.VBR_VAULT_ADDR = "https://vault.test";
@@ -218,6 +227,8 @@ async function withCwdAndEnv(dir: string, run: () => Promise<void>) {
     else process.env.VBR_VAULT_ADDR = oldVaultAddr;
     if (oldVaultToken === undefined) delete process.env.VBR_VAULT_TOKEN;
     else process.env.VBR_VAULT_TOKEN = oldVaultToken;
+    if (oldRuntimeHost === undefined) delete process.env.VBR_RUNTIME_HOST;
+    else process.env.VBR_RUNTIME_HOST = oldRuntimeHost;
     globalThis.fetch = oldFetch;
   }
 }
@@ -229,20 +240,4 @@ async function writeJson(file: string, value: unknown) {
 
 async function writeGraph(nodes: unknown[]) {
   await writeJson(path.join("build-tools", "tools", "buck", "graph.json"), { nodes });
-}
-
-async function captureConsole(run: () => Promise<void>) {
-  const originalLog = console.log;
-  const originalError = console.error;
-  const stdout: string[] = [];
-  const stderr: string[] = [];
-  console.log = (value?: unknown) => stdout.push(String(value));
-  console.error = (value?: unknown) => stderr.push(String(value));
-  try {
-    await run();
-  } finally {
-    console.log = originalLog;
-    console.error = originalError;
-  }
-  return { stdout: stdout.join("\n"), stderr: stderr.join("\n") };
 }

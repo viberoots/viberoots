@@ -17,8 +17,12 @@ export async function writeStatusAndInputs(config: AwsAccountConfig, status: Aws
     ...stackConfigCompatibleInputs(config),
     inputSources: config.inputSources,
     inputErrors: config.inputErrors,
+    localOverrides: config.localOverrides,
   });
-  await writeEvidence(path.join(config.evidenceDir, "status.json"), status);
+  await writeEvidence(path.join(config.evidenceDir, "status.json"), {
+    ...status,
+    localOverrides: config.localOverrides,
+  });
 }
 
 function stackConfigCompatibleInputs(config: AwsAccountConfig): Record<string, unknown> {
@@ -71,6 +75,7 @@ export function freshStatus(config: AwsAccountConfig, now: string): AwsAccountSt
     stackName: config.stackName,
     domain: config.domain,
     evidenceDir: config.evidenceDir,
+    localOverrides: config.localOverrides,
     phases,
   };
 }

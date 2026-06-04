@@ -12,13 +12,22 @@ import { relativePath } from "./aws-account-utils";
 
 export function formatMissingDestinations(fields: MissingConfigField[]): string[] {
   const lines = ["Missing Values"];
-  const localOrShared = fields.filter(
-    (field) => (field.destination || "stack-config") === "local-values-or-shared-resolver",
-  );
-  if (localOrShared.length > 0) {
-    lines.push("  Local values or shared resolver refs:", `    Local file: ${LOCAL_VALUES_PATH}`);
-    for (const field of localOrShared) {
-      lines.push(...formatMissingField(field, "fill local values or write the ref in SprinkleRef"));
+  const sharedProject = fields.filter((field) => field.destination === "project-shared-config");
+  if (sharedProject.length > 0) {
+    lines.push(
+      "  Shared project config:",
+      "    Shared file: projects/config/shared.json",
+      `    Local override file: ${LOCAL_VALUES_PATH}`,
+    );
+    for (const field of sharedProject) {
+      lines.push(...formatMissingField(field, "add the shared value or ref to project config"));
+    }
+  }
+  const localProject = fields.filter((field) => field.destination === "project-local-config");
+  if (localProject.length > 0) {
+    lines.push("  Local operator config:", `    Local file: ${LOCAL_VALUES_PATH}`);
+    for (const field of localProject) {
+      lines.push(...formatMissingField(field, "fill the individual value in local project config"));
     }
   }
   const bootstrap = fields.filter((field) => field.destination === "bootstrap-category");
@@ -26,6 +35,13 @@ export function formatMissingDestinations(fields: MissingConfigField[]): string[
     lines.push("  Bootstrap category:");
     for (const field of bootstrap) {
       lines.push(...formatMissingField(field, "write the ref in the bootstrap category"));
+    }
+  }
+  const secretBackend = fields.filter((field) => field.destination === "secret-backend");
+  if (secretBackend.length > 0) {
+    lines.push("  Secret backend:");
+    for (const field of secretBackend) {
+      lines.push(...formatMissingField(field, "write the ref in the selected secret backend"));
     }
   }
   const stackConfig = fields.filter(

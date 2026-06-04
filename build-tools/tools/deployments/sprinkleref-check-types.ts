@@ -1,4 +1,6 @@
 #!/usr/bin/env zx-wrapper
+import type { RedactedProjectConfigOverride } from "./project-config";
+
 export type SprinkleRefScheme = "secret" | "config" | "runtime";
 export type SprinkleRefStatus =
   | "present"
@@ -44,4 +46,5 @@ export type SprinkleRefCheckReport = {
   scannedFiles: number;
   refs: SprinkleRefCheckEntry[];
   summary: Record<string, number>;
+  localOverrides?: RedactedProjectConfigOverride[];
 };

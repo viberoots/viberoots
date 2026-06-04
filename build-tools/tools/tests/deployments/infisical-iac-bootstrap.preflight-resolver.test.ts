@@ -123,7 +123,7 @@ test("bootstrap path rejects non-interactive execution before Infisical, OpenTof
         /needs confirmation/,
       );
       assert.deepEqual(requests, []);
-      await assertMissing("config/sprinkleref/selected.local.json");
+      await assertMissing("projects/config/shared.json");
       await assertMissing("side-effects/credentials.json");
       await assertMissing("side-effects/plan.tfplan");
       await assertMissing(tofuMarker);
@@ -160,13 +160,13 @@ test("bootstrap dry-run path does not create resolver config without --yes", asy
     const report = JSON.parse(output.stdout) as { credentialSinkDescription?: unknown };
     assert.equal(report.credentialSinkDescription, undefined);
     assert.match(output.stderr, /starter config not created during dry-run/);
-    await assert.rejects(() => fs.stat("config/sprinkleref/selected.local.json"), /ENOENT/);
+    await assert.rejects(() => fs.stat(sharedConfigPath()), /ENOENT/);
   });
 });
 
-async function tmp() {
-  return await fs.mkdtemp(path.join(os.tmpdir(), "infisical-bootstrap-preflight-"));
-}
+const tmp = () => fs.mkdtemp(path.join(os.tmpdir(), "infisical-bootstrap-preflight-"));
+
+const sharedConfigPath = () => path.join("projects", "config", "shared.json");
 
 async function withCwdAndEnv(dir: string, run: () => Promise<void>) {
   const cwd = process.cwd();

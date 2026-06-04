@@ -100,14 +100,11 @@ test("non-Infisical SprinkleRef stores keep logical refs as their storage key", 
 });
 
 test("tracked control SprinkleRef profile uses prod Infisical environment", async () => {
-  for (const relPath of [
-    "config/sprinkleref/selected.json",
-    "config/sprinkleref/selected.local.json",
-  ]) {
-    const config = JSON.parse(await fs.readFile(relPath, "utf8"));
-    assert.equal(config.categories.control.profile, "infisical-control");
-    assert.equal(config.profiles["infisical-control"].defaultEnvironment, "prod");
-  }
+  const config = JSON.parse(
+    await fs.readFile(path.join("projects", "config", "shared.json"), "utf8"),
+  );
+  assert.equal(config.sprinkleref.categories.control.profile, "infisical-control");
+  assert.equal(config.sprinkleref.categories.control.environment, "prod");
 });
 
 test("Infisical docs keep UI keys scheme-free and document cleanup only", async () => {

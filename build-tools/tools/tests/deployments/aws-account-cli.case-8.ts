@@ -13,22 +13,7 @@ import {
 const ACCOUNT_REF = "config://control-plane/aws/account-id";
 const ORG_REF = "config://control-plane/aws/organization-id";
 
-type StatusLike = {
-  phases: {
-    "check-aws-login": {
-      missingConfigFields: MissingField[];
-      resolvedInputSources: Record<string, { source: string; valuePrinted: boolean }>;
-    };
-  };
-};
-
-type MissingField = {
-  field: string;
-  destination: string;
-  ref: string;
-  category?: string;
-  note?: string;
-};
+type StatusLike = { phases: Record<string, any> };
 test("aws-account identity refs surface direct bootstrap guard failures", async () => {
   await runInTemp("aws-account-identity-bootstrap-guard", async (tmp) => {
     await writeInfisicalBootstrapConfig(tmp);
@@ -87,7 +72,7 @@ test("aws-account organization id reports unresolved local values as non-secret"
     const { status } = await runBlockedCheck(tmp);
     assertMissingField(status, "awsOrganizationId", {
       ref: ORG_REF,
-      destination: "local-values-or-shared-resolver",
+      destination: "project-local-config",
       note: /AWS Organizations id/,
       source: "local-values",
     });
@@ -95,7 +80,7 @@ test("aws-account organization id reports unresolved local values as non-secret"
   });
 });
 
-test("aws-account organization id reports unresolved shared resolver paths as non-secret", async () => {
+test("aws-account organization id reports unresolved shared project config refs as non-secret", async () => {
   await runInTemp("aws-account-org-shared-missing", async (tmp) => {
     await writeControlLocalFileConfig(tmp, {});
     await writeStackConfig(tmp, { awsOrganizationId: { ref: ORG_REF, category: "control" } });
@@ -103,7 +88,7 @@ test("aws-account organization id reports unresolved shared resolver paths as no
     assertMissingField(status, "awsOrganizationId", {
       ref: ORG_REF,
       category: "control",
-      destination: "local-values-or-shared-resolver",
+      destination: "project-shared-config",
       note: /is missing in SprinkleRef category control/,
       source: "missing",
     });
@@ -200,17 +185,21 @@ async function writeControlLocalFileConfig(tmp: string, values: Record<string, s
 }
 
 async function writeResolverConfig(tmp: string, config: Record<string, unknown>) {
-  await fsp.mkdir(path.join(tmp, "config", "sprinkleref"), { recursive: true });
+  await fsp.mkdir(path.join(tmp, "projects", "config"), { recursive: true });
   await fsp.writeFile(
-    path.join(tmp, "config", "sprinkleref", "selected.json"),
-    `${JSON.stringify(config, null, 2)}\n`,
+    path.join(tmp, "projects", "config", "shared.json"),
+    `${JSON.stringify(
+      { schemaVersion: "viberoots-project-config@1", sprinkleref: config },
+      null,
+      2,
+    )}\n`,
   );
 }
 
 async function writeLocalValues(tmp: string, leaf: string, value: unknown) {
-  await fsp.mkdir(path.join(tmp, "config", "sprinkleref", "local"), { recursive: true });
+  await fsp.mkdir(path.join(tmp, "projects", "config"), { recursive: true });
   await fsp.writeFile(
-    path.join(tmp, "config", "sprinkleref", "local", "values.json"),
+    path.join(tmp, "projects", "config", "local.json"),
     `${JSON.stringify({ values: { "control-plane": { aws: { [leaf]: value } } } }, null, 2)}\n`,
   );
 }

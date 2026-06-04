@@ -54,8 +54,8 @@ should be introduced only through an explicit product-approved plan PR.
 Repo bootstrap materializes backend profile credentials under repo-scoped refs such as
 `secret://viberoots/bootstrap/viberoots-iac-bootstrap/client-id`. Pleomino deployment bootstrap
 continues to report only stage-specific managed workload refs under
-`secret://deployments/pleomino/<stage>/...`. If local `sprinkleref/selected.local.json` still
-points profile auth at the old Pleomino bootstrap namespace, rerun
+`secret://deployments/pleomino/<stage>/...`. If `projects/config/local.json` overrides profile auth
+to an old Pleomino bootstrap namespace, remove that local override and rerun
 `build-tools/tools/deployments/infisical-bootstrap.ts repo`.
 Universal Auth client-secret records are per operator machine. Existing local credentials are reused
 by default; a fresh machine creates its own labeled client-secret record and stores it only in the
@@ -86,8 +86,9 @@ Token-based `--no-login` bootstrap flows must pass exactly one of `--org-name` o
 `--organization-id`; login-based operator flows may still use interactive or `--yes` single-org
 discovery.
 
-Expected local bootstrap artifacts are ignored and should not be committed: `sprinkleref/`, the
-OpenTofu `.terraform/` directory, `terraform.tfstate*`, and `.terraform.lock.hcl`.
+Expected local bootstrap artifacts are ignored and should not be committed:
+`projects/config/local.json`, `.local/`, the OpenTofu `.terraform/` directory,
+`terraform.tfstate*`, and `.terraform.lock.hcl`.
 To intentionally return to a clean local bootstrap state without deleting Infisical cloud
 resources, run:
 

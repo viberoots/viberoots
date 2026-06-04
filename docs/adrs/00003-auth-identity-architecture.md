@@ -24,7 +24,7 @@ The deployment control plane uses Infisical Universal Auth (client ID + client s
 
 ### 2. SprinkleRef as the stable secret reference layer
 
-All secret references in the repository use `secret://deployments/...` URIs (SprinkleRef). These URIs are logical names that remain backend-neutral. Resolution is driven by resolver config files (`sprinkleref/base.json`, `sprinkleref/local.macos.json`, etc.) that map secret categories to backends. This isolates application and deployment code from backend-specific paths.
+All secret references in the repository use `secret://deployments/...` URIs (SprinkleRef). These URIs are logical names that remain backend-neutral. Resolution is driven by canonical project config in `projects/config/shared.json` plus gitignored `projects/config/local.json`; shared config maps categories, environments, and runtime hosts to backends while local config supplies individual operator values. This isolates application and deployment code from backend-specific paths.
 
 SprinkleRef defines two categories:
 

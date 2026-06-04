@@ -137,20 +137,20 @@ ARN. If absent, account-id validation is enough.
 Use one conventional gitignored clone-local values file:
 
 ```text
-config/sprinkleref/local/values.json
+projects/config/local.json
 ```
 
-Ignore the whole local directory:
+Ignore only the individual-user file:
 
 ```text
-config/sprinkleref/local/
+projects/config/local.json
 ```
 
 The file is hierarchical so one file can hold all clone-local values:
 
 ```json
 {
-  "schemaVersion": "sprinkleref-values@1",
+  "schemaVersion": "viberoots-project-local-config@1",
   "values": {
     "control-plane": {
       "aws": {
@@ -190,7 +190,7 @@ Example:
 
 ```json
 {
-  "schemaVersion": "sprinkleref-values@1",
+  "schemaVersion": "viberoots-project-local-config@1",
   "values": {
     "control-plane": {
       "supabase": {
@@ -231,57 +231,66 @@ Redirect rules:
 - For secret-class fields, local scalar values and `{ "value": ... }` are invalid, but redirect
   objects are allowed.
 
-## Resolver Config
+## Project Config
 
-Keep shared resolver policy in tracked config when possible:
+Keep shared resolver policy and repo-wide non-secret coordinates in tracked project config:
 
 ```text
-config/sprinkleref/selected.json
+projects/config/shared.json
 ```
 
 Example:
 
 ```json
 {
-  "version": 1,
-  "defaultCategory": "control",
-  "profiles": {
-    "control-infisical": {
-      "backend": "infisical",
-      "host": "https://app.infisical.com",
-      "projectId": "<project-id>",
-      "defaultEnvironment": "prod",
-      "clientIdEnv": "INFISICAL_MACHINE_IDENTITY_CLIENT_ID",
-      "clientSecretEnv": "INFISICAL_MACHINE_IDENTITY_CLIENT_SECRET"
-    },
-    "bootstrap-keychain": {
+  "schemaVersion": "viberoots-project-config@1",
+  "environments": {
+    "staging": { "infisicalEnvironment": "staging" },
+    "prod": { "infisicalEnvironment": "prod" }
+  },
+  "runtimeHosts": {
+    "local-macos": {
       "backend": "macos-keychain",
-      "service": "viberoots.sprinkleref"
+      "service": "viberoots-bootstrap"
+    },
+    "github-actions": {
+      "backend": "github-actions",
+      "scope": "repository",
+      "namePrefix": "VIBEROOTS_"
     }
   },
-  "categories": {
-    "control": { "profile": "control-infisical" },
-    "bootstrap": { "profile": "bootstrap-keychain" }
+  "sprinkleref": {
+    "version": 1,
+    "defaultCategory": "control",
+    "profiles": {
+      "control-infisical": {
+        "backend": "infisical",
+        "host": "https://app.infisical.com",
+        "projectId": "<project-id>",
+        "clientIdEnv": "INFISICAL_MACHINE_IDENTITY_CLIENT_ID",
+        "clientSecretEnv": "INFISICAL_MACHINE_IDENTITY_CLIENT_SECRET"
+      }
+    },
+    "categories": {
+      "control": { "profile": "control-infisical", "environment": "prod" }
+    }
   }
 }
 ```
 
-Developers should not need a per-clone selector for ordinary local overrides. The conventional local
-values file is enough. A per-clone selector can still exist for exceptional cases, but it should not
-be the default path.
+Developers should not need a per-clone selector for ordinary local overrides. The canonical local
+file is `projects/config/local.json`. The tool loads `shared.json`, then deep-merges `local.json`
+over it. Every changed overlap path is reported as an active local override with secret-like values
+redacted. Use the coarse no-local-overrides guard for strict runs that should prove shared config is
+not being locally changed.
 
 The `control` category is a resolver lane for control-plane setup refs. It can currently target the
 same Infisical `prod` environment as other production-ready refs; introduce a separate Infisical
 environment only as a deliberate resolver-profile change.
 
-The conventional local values file is an implicit local-first resolver. It does not need to be
-listed in `config/sprinkleref/selected.json`, which lets the shared selector remain the same for
-every clone. Resolution should still report when a value came from the implicit local file.
-
-The repo currently has flows that use `config/sprinkleref/selected.local.json`. This design moves
-toward tracked shared resolver policy in `config/sprinkleref/selected.json` plus gitignored
-clone-local values in `config/sprinkleref/local/values.json`. Existing `selected.local.json` usage
-should be migrated or retained only as an escape hatch for unusual local backend selection.
+Local values are an implicit local-first resolution surface. They do not need to be listed in
+`projects/config/shared.json`, which lets shared config remain the same for every clone. Resolution
+should still report when a value came from `projects/config/local.json`.
 
 ## Resolution Strategy
 
@@ -298,7 +307,7 @@ For a stack field with `{ "ref": "<scheme>://..." }`:
 2. If the stack ref declares `category`, resolve the original logical ref through that category;
    local values do not satisfy scalar, `{ "value": ... }`, or redirect target-ref changes for that
    ref.
-3. Conventional local values file at `config/sprinkleref/local/values.json`.
+3. Conventional local values file at `projects/config/local.json`.
 4. If the local entry is scalar or `{ "value": ... }`, use it only when the requested field is not
    secret-class.
 5. If the local entry is `{ "ref": "<scheme>://...", "category": "<category>" }`, resolve the target
@@ -316,7 +325,7 @@ For `supabaseAccessToken`:
 2. Stack config `{ "ref": "secret://control-plane/supabase/management-api-token",
 "category": "control" }`; if it includes another category such as `bootstrap`, resolve through
    that explicit category.
-3. Local values redirect without a category, resolved through the selected/default category chain,
+3. Local values redirect without a category, resolved through the configured default category,
    when present.
 4. Local values redirect to `category: "bootstrap"`, only when explicitly chosen.
 5. Configured remote resolver, when present.
@@ -340,7 +349,7 @@ Command ownership:
 - `control-plane aws-account config-init` owns AWS account stack config generation because that file
   is specific to the control-plane fresh-account workflow.
 - `sprinkleref --init-local` should own local SprinkleRef values initialization because
-  `config/sprinkleref/local/values.json` is a generic SprinkleRef local resolution surface, not a
+  `projects/config/local.json` is a generic SprinkleRef local resolution surface, not a
   control-plane-only command.
 - Secret writes should continue to use the existing `sprinkleref --add` / `sprinkleref --update`
   operation model. Do not add a parallel `control-plane sprinkleref` command unless the
@@ -363,14 +372,14 @@ Add `--category bootstrap` only when the stack config or clone-local value expli
 `sprinkleref --init-local` should write or update:
 
 ```text
-config/sprinkleref/local/values.json
+projects/config/local.json
 ```
 
 with placeholders for non-secret/private coordinates and redirect objects for secret-class refs:
 
 ```json
 {
-  "schemaVersion": "sprinkleref-values@1",
+  "schemaVersion": "viberoots-project-local-config@1",
   "values": {
     "control-plane": {
       "aws": {
@@ -405,19 +414,19 @@ Stack Config
     awsAccountId
       ref: config://control-plane/aws/account-id
       category: control
-      action: fill config/sprinkleref/local/values.json or write the ref in SprinkleRef
+      action: fill projects/config/local.json or write the ref in SprinkleRef
     supabaseOrgId
       ref: config://control-plane/supabase/org-id
       category: control
-      action: fill config/sprinkleref/local/values.json or write the ref in SprinkleRef
+      action: fill projects/config/local.json or write the ref in SprinkleRef
     supabaseProjectRef
       ref: config://control-plane/supabase/project-ref
       category: control
-      action: fill config/sprinkleref/local/values.json or write the ref in SprinkleRef
+      action: fill projects/config/local.json or write the ref in SprinkleRef
     supabaseAccessToken
       ref: secret://control-plane/supabase/management-api-token
       category: control
-      action: fill config/sprinkleref/local/values.json or write the ref in SprinkleRef
+      action: fill projects/config/local.json or write the ref in SprinkleRef
 
 Resolved:
     domain                        inline
@@ -439,7 +448,7 @@ Example:
   "resolvedInputs": {
     "awsAccountId": {
       "source": "local-values",
-      "localValuesPath": "config/sprinkleref/local/values.json",
+      "localValuesPath": "projects/config/local.json",
       "localValuesEntryPath": "values.control-plane.aws.account-id",
       "valuePrinted": true
     },
@@ -452,7 +461,7 @@ Example:
     },
     "supabaseAccessTokenBootstrapRedirect": {
       "source": "sprinkleref",
-      "localValuesPath": "config/sprinkleref/local/values.json",
+      "localValuesPath": "projects/config/local.json",
       "localValuesEntryPath": "values.control-plane.supabase.management-api-token",
       "ref": "secret://control-plane/supabase/management-api-token",
       "redirectRef": "secret://control-plane/supabase/management-api-token",
@@ -497,7 +506,7 @@ managers or the bootstrap category backed by macOS Keychain or another reviewed 
 ## Implementation Notes
 
 - Add parser support for scalar, `{ "value": ... }`, and `{ "ref": ... }` stack config fields.
-- Add local hierarchical values lookup at `config/sprinkleref/local/values.json`.
+- Add local hierarchical values lookup at `projects/config/local.json`.
 - Add redirect support for local values entries with `{ "ref": "secret://...", "category": "..." }`.
 - Enforce secret-class restrictions so `supabaseAccessToken` cannot be inline or plaintext local.
 - Preserve existing `bootstrap` guardrails: the `bootstrap` category must not use Infisical when it

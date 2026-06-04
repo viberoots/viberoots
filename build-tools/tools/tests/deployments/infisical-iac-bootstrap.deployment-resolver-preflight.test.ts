@@ -67,7 +67,7 @@ test("deployment bootstrap creates missing auto resolver before remote mutation"
   const server = http.createServer((request, response) => {
     requests.push(request.url || "");
     resolverExistedAtFirstRequest = fsSync.existsSync(
-      path.join(dir, "config/sprinkleref", "selected.local.json"),
+      path.join(dir, "projects/config", "shared.json"),
     );
     response.writeHead(500, { "Content-Type": "application/json" });
     response.end("{}");
@@ -99,7 +99,7 @@ test("deployment bootstrap creates missing auto resolver before remote mutation"
       );
       assert.ok(requests.length > 0);
       assert.equal(resolverExistedAtFirstRequest, true);
-      await fs.stat("config/sprinkleref/selected.local.json");
+      await fs.stat(sharedConfigPath());
       await assertMissing("side-effects/credentials.json");
       await assertMissing("side-effects/plan.tfplan");
       await assertMissing(tofuMarker);
@@ -113,7 +113,7 @@ test("deployment bootstrap creates missing auto resolver before remote mutation"
   }
 });
 
-test("deployment bootstrap remediates missing selected resolver before remote mutation", async () => {
+test("deployment bootstrap remediates missing project config before remote mutation", async () => {
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), "infisical-bootstrap-resolver-"));
   await writeReviewedMetadata(dir);
   const binDir = path.join(dir, "bin");
@@ -166,6 +166,8 @@ function unsafeInfisicalBootstrapConfig() {
     '{"version":1,"defaultCategory":"bootstrap","categories":{"bootstrap":{"backend":"infisical","host":"https://app.infisical.com","projectId":"proj_123","defaultEnvironment":"prod","clientIdEnv":"INFISICAL_CLIENT_ID","clientSecretEnv":"INFISICAL_CLIENT_SECRET"}}}',
   );
 }
+
+const sharedConfigPath = () => path.join("projects", "config", "shared.json");
 
 function missingBootstrapConfig() {
   return JSON.parse(

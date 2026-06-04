@@ -147,7 +147,9 @@ function missingDestination(
   if (!source?.ref) return "stack-config";
   return source.category === "bootstrap" && source.categoryExplicit
     ? "bootstrap-category"
-    : "local-values-or-shared-resolver";
+    : source.source === "local-values"
+      ? "project-local-config"
+      : "project-shared-config";
 }
 
 function missingNote(base: string, error?: string) {

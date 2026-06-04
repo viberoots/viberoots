@@ -9,6 +9,7 @@ import {
   type StackInputSource,
 } from "./aws-account-inputs";
 import type { AwsAccountConfig } from "./aws-account-types";
+import { readProjectConfig, redactedProjectConfigOverrides } from "./project-config";
 import {
   assertNoOperatorSupabasePlanInput,
   assertNoSupabaseAccessTokenRefCliInputs,
@@ -142,6 +143,14 @@ export async function readAwsAccountConfig(cwd: string): Promise<AwsAccountConfi
   recordInputError(inputErrors, "supabaseOrgId", supabaseOrg);
   recordInputError(inputErrors, "supabaseProjectRef", supabaseProject);
   recordInputError(inputErrors, "supabaseAccessToken", supabaseToken);
+  const localOverrides = redactedProjectConfigOverrides(
+    (await readProjectConfig(cwd)).overrides,
+  ).sort((a, b) => a.path.localeCompare(b.path));
+  if (process.env.VBR_DISALLOW_LOCAL_OVERRIDES === "1" && localOverrides.length > 0) {
+    throw new Error(
+      `local project config overrides are disabled: ${localOverrides.map((entry) => entry.path).join(", ")}`,
+    );
+  }
   return {
     stackName,
     region,
@@ -169,6 +178,7 @@ export async function readAwsAccountConfig(cwd: string): Promise<AwsAccountConfi
     supabaseApiBaseUrl,
     inputSources,
     inputErrors,
+    localOverrides,
   };
 }
 

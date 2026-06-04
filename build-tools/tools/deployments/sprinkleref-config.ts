@@ -9,6 +9,13 @@ import type {
   SprinkleRefConfigFile,
 } from "./sprinkleref-types";
 import { stripJsonComments } from "./json-comments";
+import { PROJECT_SHARED_CONFIG_PATH, readProjectConfig } from "./project-config";
+import {
+  materializeRuntimeHost,
+  readProjectEnvironments,
+  rejectRetiredConfigPath,
+  withNamedEnvironment,
+} from "./sprinkleref-config-environments";
 
 const BACKENDS = new Set<SprinkleRefBackendKind>([
   "infisical",
@@ -38,40 +45,83 @@ export function assertBackendNeutralRef(ref: string) {
   }
 }
 
-export async function readSprinkleRefConfig(configPath?: string): Promise<SprinkleRefConfig> {
+export async function readSprinkleRefConfig(
+  configPath?: string,
+  cwd = process.cwd(),
+): Promise<SprinkleRefConfig> {
   const selected = configPath || process.env.SPRINKLEREF_CONFIG || "";
-  if (!selected) throw new Error("missing SprinkleRef config; pass --config or SPRINKLEREF_CONFIG");
-  return loadConfig(path.resolve(selected), new Set());
+  if (!selected) return await readProjectSprinkleRefConfig(cwd);
+  const selectedPath = path.isAbsolute(selected) ? selected : path.resolve(cwd, selected);
+  if (selectedPath === path.resolve(cwd, PROJECT_SHARED_CONFIG_PATH)) {
+    return await readProjectSprinkleRefConfig(cwd);
+  }
+  rejectRetiredConfigPath(selected);
+  return loadConfig(selectedPath);
 }
 
-async function loadConfig(file: string, seen: Set<string>): Promise<SprinkleRefConfig> {
-  if (seen.has(file)) throw new Error(`circular SprinkleRef config extends: ${file}`);
-  seen.add(file);
-  const raw = parseConfig(await fs.readFile(file, "utf8"), file);
-  const base = raw.extends
-    ? await loadConfig(path.resolve(path.dirname(file), raw.extends), seen)
-    : emptyConfig();
+async function readProjectSprinkleRefConfig(cwd: string): Promise<SprinkleRefConfig> {
+  const loaded = await readProjectConfig(cwd);
+  const raw = loaded.config.sprinkleref;
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+    throw new Error("missing projects/config/shared.json sprinkleref config");
+  }
+  const config = raw as SprinkleRefConfigFile;
+  const materialized = materializeRuntimeHost(config, loaded.config, process.env);
+  if (process.env.VBR_DISALLOW_LOCAL_OVERRIDES === "1" && loaded.overrides.length) {
+    throw new Error(
+      `local project config overrides are disabled: ${loaded.overrides.map((entry) => entry.path).join(", ")}`,
+    );
+  }
+  return validateConfig(
+    {
+      path: loaded.localPresent ? `${loaded.sharedPath} + ${loaded.localPath}` : loaded.sharedPath,
+      defaultCategory: materialized.defaultCategory || "main",
+      environments: readProjectEnvironments(loaded.config),
+      profiles: materialized.profiles || {},
+      categories: materialized.categories || {},
+      overrides: loaded.overrides,
+    },
+    "projects/config",
+  );
+}
+
+async function loadConfig(file: string): Promise<SprinkleRefConfig> {
+  const parsed = parseConfig(await fs.readFile(file, "utf8"), file);
+  const raw = materializeRuntimeHost(projectWrappedConfig(parsed), parsed, process.env);
+  if (raw.extends) {
+    throw new Error(
+      "SprinkleRef config extends is no longer supported; use projects/config/shared.json plus local.json",
+    );
+  }
   return validateConfig(
     {
       path: file,
-      defaultCategory: raw.defaultCategory || base.defaultCategory,
-      profiles: { ...base.profiles, ...(raw.profiles || {}) },
-      categories: { ...base.categories, ...(raw.categories || {}) },
+      defaultCategory: raw.defaultCategory || "main",
+      environments: raw.environments || readProjectEnvironments(parsed),
+      profiles: raw.profiles || {},
+      categories: raw.categories || {},
     },
     file,
   );
 }
 
-function parseConfig(text: string, file: string): SprinkleRefConfigFile {
+function parseConfig(text: string, file: string): Record<string, unknown> {
   try {
-    return JSON.parse(stripJsonComments(text)) as SprinkleRefConfigFile;
+    return JSON.parse(stripJsonComments(text)) as Record<string, unknown>;
   } catch {
     throw new Error(`invalid SprinkleRef config JSON: ${file}`);
   }
 }
 
+function projectWrappedConfig(raw: Record<string, unknown>): SprinkleRefConfigFile {
+  if (raw.sprinkleref && typeof raw.sprinkleref === "object" && !Array.isArray(raw.sprinkleref)) {
+    return raw.sprinkleref as SprinkleRefConfigFile;
+  }
+  return raw as SprinkleRefConfigFile;
+}
+
 function emptyConfig(): SprinkleRefConfig {
-  return { defaultCategory: "main", profiles: {}, categories: {} };
+  return { defaultCategory: "main", environments: {}, profiles: {}, categories: {} };
 }
 
 export function validateConfig(config: SprinkleRefConfig, file = "SprinkleRef config") {
@@ -81,9 +131,10 @@ export function validateConfig(config: SprinkleRefConfig, file = "SprinkleRef co
   if (!categories[config.defaultCategory]) {
     throw new Error(`${file} missing default category ${config.defaultCategory}`);
   }
-  for (const [name, profile] of Object.entries(profiles)) validateBackend(file, name, profile);
+  for (const [name, profile] of Object.entries(profiles))
+    validateBackend(file, name, profile, { requireEnvironment: false });
   for (const [name, category] of Object.entries(categories))
-    validateCategory(file, name, category, profiles);
+    validateCategory(file, name, category, profiles, config.environments || {});
   return config;
 }
 
@@ -92,17 +143,29 @@ function validateCategory(
   name: string,
   category: SprinkleRefCategoryConfig,
   profiles: Record<string, SprinkleRefBackendConfig>,
+  environments: NonNullable<SprinkleRefConfig["environments"]>,
 ) {
   if ("profile" in category) {
-    if (!profiles[category.profile]) {
+    const profile = profiles[category.profile];
+    if (!profile) {
       throw new Error(`${file} category ${name} references missing profile ${category.profile}`);
     }
+    validateBackend(file, name, withNamedEnvironment(file, name, profile, category, environments), {
+      requireEnvironment: true,
+    });
     return;
   }
-  validateBackend(file, name, category);
+  validateBackend(file, name, withNamedEnvironment(file, name, category, category, environments), {
+    requireEnvironment: true,
+  });
 }
 
-function validateBackend(file: string, name: string, backend: SprinkleRefBackendConfig) {
+function validateBackend(
+  file: string,
+  name: string,
+  backend: SprinkleRefBackendConfig,
+  opts: { requireEnvironment: boolean },
+) {
   if (!BACKENDS.has(backend.backend)) {
     throw new Error(`${file} category ${name} has unsupported backend ${String(backend.backend)}`);
   }
@@ -112,19 +175,26 @@ function validateBackend(file: string, name: string, backend: SprinkleRefBackend
   if (backend.backend === "macos-keychain" && !backend.service) {
     throw new Error(`${file} category ${name} macos-keychain backend requires service`);
   }
-  if (backend.backend === "infisical") validateInfisical(file, name, backend);
+  if (backend.backend === "infisical") validateInfisical(file, name, backend, opts);
   if (backend.backend === "vault") validateVault(file, name, backend);
 }
 
-function validateInfisical(file: string, name: string, backend: SprinkleRefBackendConfig) {
+function validateInfisical(
+  file: string,
+  name: string,
+  backend: SprinkleRefBackendConfig,
+  opts: { requireEnvironment: boolean },
+) {
   if (backend.projectRef) {
     throw new Error(
       `${file} category ${name} infisical backend uses unsupported projectRef; use projectId`,
     );
   }
-  for (const key of ["host", "defaultEnvironment"] as const) {
-    if (!backend[key])
-      throw new Error(`${file} category ${name} infisical backend requires ${key}`);
+  if (!backend.host) {
+    throw new Error(`${file} category ${name} infisical backend requires host`);
+  }
+  if (opts.requireEnvironment && !backend.defaultEnvironment) {
+    throw new Error(`${file} category ${name} infisical backend requires defaultEnvironment`);
   }
   if (!backend.projectId && !backend.projectIdEnv) {
     throw new Error(
@@ -164,7 +234,14 @@ export function resolveSprinkleRefBackend(config: SprinkleRefConfig, category?: 
   if ("profile" in entry) {
     const backend = config.profiles[entry.profile];
     if (!backend) throw new Error(`SprinkleRef profile ${entry.profile} is not configured`);
-    return { category: selected, profile: entry.profile, backend };
+    return {
+      category: selected,
+      profile: entry.profile,
+      backend: withNamedEnvironment("", selected, backend, entry, config.environments || {}),
+    };
   }
-  return { category: selected, backend: entry };
+  return {
+    category: selected,
+    backend: withNamedEnvironment("", selected, entry, entry, config.environments || {}),
+  };
 }

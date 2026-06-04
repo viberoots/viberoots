@@ -143,14 +143,16 @@ async function writeProfileOverrides(
   profiles: Record<string, SprinkleRefBackendConfig>,
 ) {
   const raw = await readConfigFile(configPath);
+  const resolver = resolverConfigObject(raw);
   const resolved = await readSprinkleRefConfig(configPath);
-  raw.profiles = { ...(raw.profiles || {}), ...profiles };
+  resolver.profiles = { ...(resolver.profiles || {}), ...profiles };
   validateConfig(
     {
       path: configPath,
-      defaultCategory: raw.defaultCategory || "main",
-      profiles: { ...resolved.profiles, ...raw.profiles },
-      categories: { ...resolved.categories, ...(raw.categories || {}) },
+      defaultCategory: resolver.defaultCategory || "main",
+      environments: resolved.environments,
+      profiles: { ...resolved.profiles, ...resolver.profiles },
+      categories: { ...resolved.categories, ...(resolver.categories || {}) },
     },
     configPath,
   );
@@ -160,6 +162,12 @@ async function writeProfileOverrides(
 
 async function readConfigFile(configPath: string): Promise<SprinkleRefConfigFile> {
   return JSON.parse(await fs.readFile(configPath, "utf8")) as SprinkleRefConfigFile;
+}
+
+function resolverConfigObject(raw: SprinkleRefConfigFile): SprinkleRefConfigFile {
+  const wrapped = raw as SprinkleRefConfigFile & { sprinkleref?: SprinkleRefConfigFile };
+  if (wrapped.sprinkleref) return wrapped.sprinkleref;
+  return raw;
 }
 
 function envValue(env = process.env, name?: string) {

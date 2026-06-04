@@ -10,7 +10,7 @@ import {
 import { resolverConfigPath } from "./infisical-iac-bootstrap-preflight";
 import { readSprinkleRefConfig } from "./sprinkleref-config";
 import { resolveBootstrapAccessCredentialSinkBackend } from "./sprinkleref-bootstrap-guard";
-import { initSprinkleRefConfigs } from "./sprinkleref-templates";
+import { initLocalSprinkleRefValues, initSprinkleRefConfigs } from "./sprinkleref-templates";
 import type { SprinkleRefConfig } from "./sprinkleref-types";
 
 const STARTER_CATEGORY_PROFILES = ["infisical-default"];
@@ -41,6 +41,7 @@ export async function ensureRepoResolverConfig(opts: {
       platform: opts.platform || process.platform,
       mode: "create",
     });
+    await initLocalSprinkleRefValues(process.cwd());
   }
   const config = await readSprinkleRefConfig(configPath);
   const requiredProfiles = new Set(

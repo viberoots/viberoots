@@ -2,8 +2,8 @@ import {
   AWS_ACCOUNT_STACK_CONFIG_FIELDS_WITHOUT_DEFAULTS,
   NOW,
   assert,
-  exists,
   fakeSupabaseFetch,
+  exists,
   fsp,
   path,
   readAwsAccountConfig,
@@ -23,6 +23,36 @@ test("aws-account check canonical config guidance points back to stack.json", as
       await withControlPlaneArgv(["aws-account", "config-init", "--domain", "example.com"], () =>
         runAwsAccountCommand({ cwd: tmp, stdout: () => undefined }),
       );
+      await fsp.mkdir(path.join(tmp, "projects/config"), { recursive: true });
+      await fsp.writeFile(
+        path.join(tmp, "projects/config/shared.json"),
+        JSON.stringify(
+          {
+            schemaVersion: "viberoots-project-config@1",
+            activeRuntimeHost: "local-file",
+            sprinkleref: {
+              version: 1,
+              defaultCategory: "control",
+              categories: {
+                control: { backend: "local-file", file: ".local/missing-control.json" },
+              },
+            },
+          },
+          null,
+          2,
+        ),
+      );
+      await fsp.writeFile(
+        path.join(tmp, "projects/config/local.json"),
+        JSON.stringify(
+          {
+            schemaVersion: "viberoots-project-local-config@1",
+            activeRuntimeHost: "local-macos",
+          },
+          null,
+          2,
+        ),
+      );
       const out: string[] = [];
       const previousExitCode = process.exitCode;
       process.exitCode = undefined;
@@ -40,16 +70,19 @@ test("aws-account check canonical config guidance points back to stack.json", as
         process.exitCode = previousExitCode;
       }
       assert.ok(out[0]?.includes("Missing Values"));
-      assert.ok(out[0]?.includes("Local values or shared resolver refs:"));
+      assert.ok(out[0]?.includes("Shared project config:"));
       assert.equal(out[0]?.includes("selected SprinkleRef default/category chain"), false);
       assert.ok(out[0]?.includes("ref: config://control-plane/aws/account-id"));
       assert.ok(out[0]?.includes("category: control"));
-      assert.ok(out[0]?.includes("action: fill local values or write the ref in SprinkleRef"));
+      assert.ok(out[0]?.includes("action: add the shared value or ref to project config"));
       assert.ok(out[0]?.includes("ref: config://control-plane/supabase/org-id"));
       assert.ok(out[0]?.includes("ref: config://control-plane/supabase/project-ref"));
       assert.equal(out[0]?.includes("Bootstrap category:"), false);
       assert.ok(out[0]?.includes("ref: secret://control-plane/supabase/management-api-token"));
-      assert.ok(out[0]?.includes("config/sprinkleref/local/values.json"));
+      assert.ok(out[0]?.includes("Active local overrides"));
+      assert.ok(out[0]?.includes("activeRuntimeHost: shared=local-file local=local-macos"));
+      assert.ok(out[0]?.includes("projects/config/shared.json"));
+      assert.ok(out[0]?.includes("projects/config/local.json"));
       assert.equal(out[0]?.includes("passed with --config"), false);
       assert.ok(out[0]?.includes("Waiting on missing values listed above."));
       assert.ok(
@@ -59,6 +92,28 @@ test("aws-account check canonical config guidance points back to stack.json", as
         out[0]?.includes("control-plane aws-account check --json"),
         "automation command should use canonical config by default",
       );
+      const status = JSON.parse(
+        await fsp.readFile(
+          path.join(tmp, "buck-out/aws-account/control-example.com/status.json"),
+          "utf8",
+        ),
+      );
+      assert.deepEqual(status.localOverrides, [
+        { path: "activeRuntimeHost", sharedValue: "local-file", localValue: "local-macos" },
+      ]);
+      const oldGuard = process.env.VBR_DISALLOW_LOCAL_OVERRIDES;
+      process.env.VBR_DISALLOW_LOCAL_OVERRIDES = "1";
+      try {
+        await assert.rejects(
+          withControlPlaneArgv(["aws-account", "check"], () =>
+            runAwsAccountCommand({ cwd: tmp, stdout: () => undefined }),
+          ),
+          /local project config overrides are disabled: activeRuntimeHost/,
+        );
+      } finally {
+        if (oldGuard === undefined) delete process.env.VBR_DISALLOW_LOCAL_OVERRIDES;
+        else process.env.VBR_DISALLOW_LOCAL_OVERRIDES = oldGuard;
+      }
     });
   });
 });
@@ -128,86 +183,5 @@ test("aws-account check writes status and evidence without cloud mutation", asyn
       runAwsAccountCommand({ cwd: tmp, stdout: (text) => statusOut.push(text) }),
     );
     assert.ok(statusOut[0]?.includes('"nextPhase": "bootstrap-state"'));
-  });
-});
-
-test("aws-account check resolves Supabase token from SprinkleRef ref", async () => {
-  await runInTemp("aws-account-supabase-sprinkleref", async (tmp) => {
-    await removeCanonicalStackConfig(tmp);
-    await withCwd(tmp, async () => {
-      const secretRef = "secret://control-plane/supabase/management-api-token";
-      await fsp.mkdir(path.join(tmp, "config/sprinkleref"), { recursive: true });
-      await fsp.mkdir(path.join(tmp, ".local"), { recursive: true });
-      await fsp.writeFile(
-        path.join(tmp, "config/sprinkleref", "selected.json"),
-        JSON.stringify(
-          {
-            version: 1,
-            defaultCategory: "control",
-            categories: {
-              main: { backend: "local-file", file: ".local/main-secrets.json" },
-              control: { backend: "local-file", file: ".local/secrets.json" },
-            },
-          },
-          null,
-          2,
-        ),
-      );
-      await fsp.writeFile(
-        path.join(tmp, ".local", "secrets.json"),
-        JSON.stringify({ [secretRef]: "test-token" }, null, 2),
-      );
-      await withControlPlaneArgv(
-        [
-          "aws-account",
-          "config-init",
-          "--domain",
-          "example.com",
-          "--expected-aws-account-id",
-          "123456789012",
-          "--aws-organization-id",
-          "o-example",
-          "--supabase-org-id",
-          "supabase-org",
-          "--supabase-project-ref",
-          "project-ref",
-        ],
-        () => runAwsAccountCommand({ cwd: tmp, stdout: () => undefined }),
-      );
-      const out: string[] = [];
-      await withControlPlaneArgv(["aws-account", "check"], () =>
-        runAwsAccountCommand({
-          cwd: tmp,
-          now: () => NOW,
-          env: {},
-          httpFetch: fakeSupabaseFetch,
-          stdout: (text) => out.push(text),
-          toolResolver: (tool) => `/nix/store/fake-${tool}/bin/${tool}`,
-          commandRunner: async () => ({
-            stdout: JSON.stringify({ Account: "123456789012" }),
-            stderr: "",
-          }),
-        }),
-      );
-      assert.ok(out[0]?.includes("  PASS    check-supabase"));
-      const evidence = JSON.parse(
-        await fsp.readFile(
-          path.join(
-            tmp,
-            "buck-out",
-            "aws-account",
-            "control-example.com",
-            "check-supabase",
-            "supabase-readiness.json",
-          ),
-          "utf8",
-        ),
-      );
-      assert.equal(evidence.supabaseAccessToken.source, "sprinkleref");
-      assert.equal(evidence.supabaseAccessToken.ref, secretRef);
-      assert.equal(evidence.supabaseAccessToken.category, "control");
-      assert.equal(evidence.supabaseAccessToken.secretValuePrinted, false);
-      assert.doesNotMatch(JSON.stringify(evidence), /test-token/);
-    });
   });
 });

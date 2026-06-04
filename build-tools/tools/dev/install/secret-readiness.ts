@@ -4,6 +4,7 @@ import * as readline from "node:readline/promises";
 import path from "node:path";
 import process from "node:process";
 import { runNodeWithZx } from "../../lib/node-run";
+import { PROJECT_SHARED_CONFIG_PATH } from "../../deployments/project-config";
 import { loadDeploymentReadinessModules, sinkFromSelection } from "./secret-readiness-modules";
 
 export type SecretReadinessFlags = {
@@ -29,10 +30,6 @@ type SecretReadinessProbe = {
 
 const deploymentMetadataRoot = path.join("projects", "deployments");
 const familyMetadataSuffix = path.join("shared", "family.bzl");
-const resolverConfigRelativePaths = [
-  path.join("config", "sprinkleref", "selected.local.json"),
-  path.join("sprinkleref", "selected.local.json"),
-];
 
 export async function ensureInstallSecretReadiness(opts: {
   repoRoot: string;
@@ -91,12 +88,12 @@ export async function probeLocalSecretReadiness(repoRoot = process.cwd()) {
     resolveBootstrapAccessCredentialSinkBackend,
     resolveCredentialSinkSelection,
   } = await loadDeploymentReadinessModules();
-  const configPath = process.env.SPRINKLEREF_CONFIG || (await selectedResolverConfigPath(repoRoot));
+  const configPath = process.env.SPRINKLEREF_CONFIG || "";
   const metadataPaths = await discoverDeploymentFamilyMetadataPaths(repoRoot);
   try {
-    await readSprinkleRefConfig(configPath);
+    await readSprinkleRefConfig(configPath, repoRoot);
   } catch (error) {
-    if (!isFileAbsenceError(error)) throw error;
+    if (!isResolverConfigAbsenceError(error)) throw error;
     return { ready: false, reason: "missing resolver config" };
   }
   const args = {
@@ -106,7 +103,9 @@ export async function probeLocalSecretReadiness(repoRoot = process.cwd()) {
   };
   const selection = await resolveCredentialSinkSelection(args, {
     createMissingResolverConfig: false,
-    env: { ...process.env, SPRINKLEREF_CONFIG: configPath },
+    env: process.env.SPRINKLEREF_CONFIG
+      ? { ...process.env, SPRINKLEREF_CONFIG: process.env.SPRINKLEREF_CONFIG }
+      : { ...process.env, SPRINKLEREF_CONFIG: path.join(repoRoot, PROJECT_SHARED_CONFIG_PATH) },
   });
   const sink = await sinkFromSelection(args, selection, repoRoot, {
     LocalFileCredentialSink,
@@ -131,19 +130,6 @@ export async function probeLocalSecretReadiness(repoRoot = process.cwd()) {
 
 export async function isInstallSecretReadinessApplicable(repoRoot = process.cwd()) {
   return (await discoverDeploymentFamilyMetadataPaths(repoRoot)).length > 0;
-}
-
-async function selectedResolverConfigPath(repoRoot: string) {
-  for (const relativePath of resolverConfigRelativePaths) {
-    const candidate = path.join(repoRoot, relativePath);
-    try {
-      await fsp.access(candidate);
-      return candidate;
-    } catch (error) {
-      if (!isFileAbsenceError(error)) throw error;
-    }
-  }
-  return path.join(repoRoot, resolverConfigRelativePaths[0]);
 }
 
 async function discoverDeploymentFamilyMetadataPaths(repoRoot: string) {
@@ -178,6 +164,12 @@ async function walkDeployments(dir: string, found: string[]) {
 function isFileAbsenceError(error: unknown) {
   const code = (error as NodeJS.ErrnoException).code;
   return code === "ENOENT" || code === "ENOTDIR";
+}
+
+function isResolverConfigAbsenceError(error: unknown) {
+  if (isFileAbsenceError(error)) return true;
+  const message = error instanceof Error ? error.message : String(error);
+  return /missing projects\/config\/shared\.json sprinkleref config/.test(message);
 }
 
 function bootstrapArgs(flags: SecretReadinessFlags) {

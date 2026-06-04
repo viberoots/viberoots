@@ -1,7 +1,7 @@
 #!/usr/bin/env zx-wrapper
-import * as fs from "node:fs/promises";
 import { readFlagBoolFromTokens, readFlagStrFromTokens } from "../lib/argv";
 import { redactDeploymentAuthText } from "./deployment-auth-redaction";
+import { redactedProjectConfigOverrides } from "./project-config";
 import {
   assertBackendNeutralSecretRef,
   readSprinkleRefConfig,
@@ -35,6 +35,7 @@ export type SprinkleRefCheckDeps = {
 
 export async function runSprinkleRefCheck(deps: SprinkleRefCheckDeps): Promise<number> {
   const options = parseCheckOptions(deps.argv);
+  const config = await maybeReadConfig(options.configPath, deps.env);
   const refs = await collectCheckRefs({
     target: options.target,
     deps: options.deps,
@@ -42,13 +43,16 @@ export async function runSprinkleRefCheck(deps: SprinkleRefCheckDeps): Promise<n
     usageError,
   });
   const filtered = refs.refs.filter((entry) => options.schemes.has(entry.scheme));
-  const entries = await checkRefs(consolidateRefs(filtered), deps, options);
+  const entries = await checkRefs(consolidateRefs(filtered), deps, options, config);
   const report = {
     target: options.target,
     deps: options.target ? options.deps : undefined,
     scannedFiles: refs.scannedFiles,
     refs: entries,
     summary: summarize(entries),
+    localOverrides: redactedProjectConfigOverrides(config?.overrides || []).sort((a, b) =>
+      a.path.localeCompare(b.path),
+    ),
   };
   const out = deps.stdout || console.log;
   out(options.format === "json" ? JSON.stringify(report, null, 2) : renderReport(report));
@@ -89,8 +93,8 @@ async function checkRefs(
   refs: CheckableRef[],
   deps: SprinkleRefCheckDeps,
   options: ReturnType<typeof parseCheckOptions>,
+  config: Awaited<ReturnType<typeof maybeReadConfig>>,
 ): Promise<SprinkleRefCheckEntry[]> {
-  const config = await maybeReadConfig(options.configPath, deps.env);
   return await Promise.all(
     refs.map(async (entry) => {
       if (!validRef(entry.ref)) return base(entry, "invalid", "malformed deployment contract ref");
@@ -132,24 +136,13 @@ async function checkRefs(
 }
 
 async function maybeReadConfig(configPath: string, env: NodeJS.ProcessEnv = process.env) {
-  const selected =
-    configPath || env.SPRINKLEREF_CONFIG || (await existingDefaultConfigPath()) || "";
-  if (!selected) return undefined;
+  const selected = configPath || env.SPRINKLEREF_CONFIG || "";
   try {
     return await readSprinkleRefConfig(selected);
   } catch (error) {
+    if (!selected && configMissing(error)) return undefined;
     backendError(configReadErrorMessage(selected, error));
   }
-}
-
-async function existingDefaultConfigPath() {
-  for (const configPath of [
-    DEFAULT_SPRINKLEREF_CONFIG_PATH,
-    "config/sprinkleref/selected.local.json",
-  ]) {
-    if ((await fs.stat(configPath).catch(() => undefined))?.isFile()) return configPath;
-  }
-  return "";
 }
 
 function configReadErrorMessage(selected: string, error: unknown): string {
@@ -158,9 +151,14 @@ function configReadErrorMessage(selected: string, error: unknown): string {
     (error && typeof error === "object" && "code" in error && error.code === "ENOENT") ||
     /ENOENT/.test(message)
   ) {
-    return `SprinkleRef resolver config not found: ${selected}. Run build-tools/tools/deployments/infisical-bootstrap.ts repo --dry-run, then build-tools/tools/deployments/infisical-bootstrap.ts repo (or add --yes to skip the prompt), or run sprinkleref --init config/sprinkleref and edit the generated config for this environment. Then retry with --config ${selected}.`;
+    return `Project config not found: ${selected || DEFAULT_SPRINKLEREF_CONFIG_PATH}. Run sprinkleref --init projects/config and edit projects/config/shared.json plus gitignored projects/config/local.json.`;
   }
   return message;
+}
+
+function configMissing(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return /ENOENT|missing projects\/config\/shared\.json sprinkleref config/.test(message);
 }
 
 function createStore(

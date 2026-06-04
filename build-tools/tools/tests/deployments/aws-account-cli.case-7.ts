@@ -25,9 +25,11 @@ test("aws-account help describes local SprinkleRef first-run setup", async () =>
   assert.match(help, /normal first run:[\s\S]*control-plane aws-account check/);
   assert.match(help, /required coordinates:.*awsOrganizationId/);
   assert.match(help, /structured refs:.*config:\/\/.*secret:\/\//);
-  assert.match(help, /fill local non-secret coordinates.*local\/values\.json/);
-  assert.match(help, /fill local non-secret coordinates.*selected\/default resolver/);
-  assert.match(help, /sources:.*stack config.*local\/values\.json.*selected\/default resolver/);
+  assert.match(help, /fill local non-secret coordinates.*projects\/config\/local\.json/);
+  assert.match(
+    help,
+    /sources:.*stack config.*projects\/config\/shared\.json.*projects\/config\/local\.json.*SprinkleRef secrets/,
+  );
   assert.match(
     help,
     /sprinkleref --update secret:\/\/control-plane\/supabase\/management-api-token --create-missing/,
@@ -64,7 +66,10 @@ test("aws-account local redirect to bootstrap applies the bootstrap guard", asyn
     const status = await runBlockedCheck(tmp);
     assert.equal(status.phases["check-supabase"].state, "blocked");
     const evidence = await readSupabaseEvidence(tmp);
-    assert.equal(evidence.supabaseAccessToken.localValuesPath.endsWith("values.json"), true);
+    assert.equal(
+      evidence.supabaseAccessToken.localValuesPath.endsWith("projects/config/local.json"),
+      true,
+    );
     assert.match(evidence.errors.join("\n"), /bootstrap category must not use an Infisical/);
   });
 });
@@ -193,11 +198,14 @@ async function writeLocalFileBootstrapConfig(tmp: string) {
 }
 
 async function writeResolverConfig(tmp: string, bootstrap: Record<string, unknown>) {
-  await fsp.mkdir(path.join(tmp, "config", "sprinkleref"), { recursive: true });
+  await fsp.mkdir(path.join(tmp, "projects", "config"), { recursive: true });
   await fsp.writeFile(
-    path.join(tmp, "config", "sprinkleref", "selected.json"),
+    path.join(tmp, "projects", "config", "shared.json"),
     `${JSON.stringify(
-      { version: 1, defaultCategory: "bootstrap", categories: { bootstrap } },
+      {
+        schemaVersion: "viberoots-project-config@1",
+        sprinkleref: { version: 1, defaultCategory: "bootstrap", categories: { bootstrap } },
+      },
       null,
       2,
     )}\n`,
@@ -205,9 +213,9 @@ async function writeResolverConfig(tmp: string, bootstrap: Record<string, unknow
 }
 
 async function writeLocalValues(tmp: string, value: unknown) {
-  await fsp.mkdir(path.join(tmp, "config", "sprinkleref", "local"), { recursive: true });
+  await fsp.mkdir(path.join(tmp, "projects", "config"), { recursive: true });
   await fsp.writeFile(
-    path.join(tmp, "config", "sprinkleref", "local", "values.json"),
+    path.join(tmp, "projects", "config", "local.json"),
     `${JSON.stringify(
       { values: { "control-plane": { supabase: { "management-api-token": value } } } },
       null,

@@ -14,49 +14,54 @@ const VAULT_DEFAULT = {
   defaultPath: "/deployments",
 };
 
-export function sprinkleRefStarterConfigs(platform = process.platform) {
-  const bootstrap =
-    platform === "darwin"
-      ? { backend: "macos-keychain" as const, service: "viberoots-bootstrap" }
-      : { backend: "local-file" as const, file: ".local/infisical/bootstrap/credentials.json" };
-  const base: SprinkleRefConfigFile = {
+export function sprinkleRefStarterConfigs(_platform = process.platform) {
+  const shared = {
+    schemaVersion: "viberoots-project-config@1",
+    environments: {
+      staging: { infisicalEnvironment: "staging" },
+      prod: { infisicalEnvironment: "prod" },
+    },
+    runtimeHosts: {
+      "local-macos": { backend: "macos-keychain", service: "viberoots-bootstrap" },
+      "local-file": { backend: "local-file" },
+      "github-actions": ciBackend("github-actions", "VIBEROOTS_"),
+      jenkins: ciBackend("jenkins", "VIBEROOTS_"),
+      "gitlab-ci": ciBackend("gitlab-ci", "VIBEROOTS_"),
+      "bitbucket-pipelines": ciBackend("bitbucket-pipelines", "VIBEROOTS_"),
+    },
+    sprinkleref: {
+      version: 1,
+      defaultCategory: "control",
+      profiles: {
+        "vault-default": VAULT_DEFAULT,
+        "infisical-default": starterInfisicalProfile(),
+        "infisical-control": starterInfisicalProfile(),
+      },
+      categories: {
+        main: { profile: "infisical-default", environment: "staging" },
+        control: { profile: "infisical-control", environment: "prod" },
+      },
+    } satisfies SprinkleRefConfigFile,
+  };
+  return { "shared.json": shared };
+}
+
+export function starterRuntimeHost(platform = process.platform) {
+  return platform === "darwin" ? "local-macos" : "local-file";
+}
+
+export function starterSprinkleRefConfig(): SprinkleRefConfigFile {
+  return {
     version: 1,
-    defaultCategory: "main",
+    defaultCategory: "control",
     profiles: {
       "vault-default": VAULT_DEFAULT,
       "infisical-default": starterInfisicalProfile(),
-      "infisical-control": { ...starterInfisicalProfile(), defaultEnvironment: "prod" },
+      "infisical-control": starterInfisicalProfile(),
     },
     categories: {
-      main: { profile: "infisical-default" },
-      control: { profile: "infisical-control" },
-    },
-  };
-  return {
-    "base.json": base,
-    "local.macos.json": localConfig("macos-keychain", { service: "viberoots-bootstrap" }),
-    "local.file.json": localConfig("local-file", {
-      file: ".local/infisical/bootstrap/credentials.json",
-    }),
-    "ci.github.json": ciConfig("github-actions", "VIBEROOTS_"),
-    "ci.jenkins.json": ciConfig("jenkins", "VIBEROOTS_"),
-    "ci.gitlab.json": ciConfig("gitlab-ci", "VIBEROOTS_"),
-    "ci.bitbucket.json": ciConfig("bitbucket-pipelines", "VIBEROOTS_"),
-    "selected.json": {
-      version: 1,
-      extends: "./base.json",
-      defaultCategory: "control",
-      categories: {
-        bootstrap,
-        main: { profile: "infisical-default" },
-        control: { profile: "infisical-control" },
-      },
-    },
-    "selected.local.json": {
-      version: 1,
-      extends: "./selected.json",
-      defaultCategory: "control",
-      categories: {},
+      main: { profile: "infisical-default", environment: "staging" },
+      control: { profile: "infisical-control", environment: "prod" },
     },
   };
 }
@@ -82,7 +87,7 @@ export async function initSprinkleRefConfigs(opts: {
 export async function initLocalSprinkleRefValues(cwd: string) {
   const file = path.resolve(cwd, LOCAL_VALUES_PATH);
   const existing = await readExistingLocalValues(file);
-  const next = mergeLocalValueDefaults(existing);
+  const next = mergeLocalValueDefaults(existing, os.platform());
   await fs.mkdir(path.dirname(file), { recursive: true });
   await fs.writeFile(file, `${JSON.stringify(next, null, 2)}\n`, "utf8");
   return file;
@@ -99,12 +104,17 @@ async function readExistingLocalValues(file: string): Promise<Record<string, unk
     if (error && typeof error === "object" && "code" in error && error.code === "ENOENT") {
       return {};
     }
-    throw new Error(`invalid local SprinkleRef values JSON: ${LOCAL_VALUES_PATH}`);
+    throw new Error(`invalid project local config JSON: ${LOCAL_VALUES_PATH}`);
   }
 }
 
-function mergeLocalValueDefaults(existing: Record<string, unknown>) {
-  const root = { ...existing, schemaVersion: "sprinkleref-values@1" };
+function mergeLocalValueDefaults(existing: Record<string, unknown>, platform: NodeJS.Platform) {
+  const root = { ...existing, schemaVersion: "viberoots-project-local-config@1" };
+  root.activeRuntimeHost ??= starterRuntimeHost(platform);
+  const runtimeHosts = objectChild(root, "runtimeHosts");
+  const localFile = objectChild(runtimeHosts, "local-file");
+  localFile.backend ??= "local-file";
+  localFile.file ??= ".local/infisical/bootstrap/credentials.json";
   const values = objectChild(root, "values");
   const control = objectChild(values, "control-plane");
   const aws = objectChild(control, "aws");
@@ -129,23 +139,9 @@ function objectChild(parent: Record<string, unknown>, key: string): Record<strin
   return child;
 }
 
-function localConfig(backend: "local-file" | "macos-keychain", fields: Record<string, string>) {
-  return {
-    version: 1 as const,
-    extends: "./base.json",
-    defaultCategory: "main",
-    categories: { bootstrap: { backend, ...fields } },
-  };
-}
-
-function ciConfig(
+function ciBackend(
   backend: "github-actions" | "jenkins" | "gitlab-ci" | "bitbucket-pipelines",
   prefix: string,
 ) {
-  return {
-    version: 1 as const,
-    extends: "./base.json",
-    defaultCategory: "main",
-    categories: { bootstrap: { backend, scope: "repository", namePrefix: prefix } },
-  };
+  return { backend, scope: "repository", namePrefix: prefix };
 }

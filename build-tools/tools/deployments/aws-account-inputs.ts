@@ -1,5 +1,3 @@
-import * as fsp from "node:fs/promises";
-import path from "node:path";
 import { assertStackRef, type StackRefOptions } from "./aws-account-ref-schemes";
 import type { StackInputResolution, StackInputSource } from "./aws-account-input-types";
 import {
@@ -147,7 +145,7 @@ async function resolveRemoteRef(
   opts: RefResolutionOpts,
 ): Promise<StackInputResolution> {
   try {
-    const config = await readSelectedSprinkleRefConfig(await selectedConfigPath(opts), opts.env);
+    const config = await readSelectedSprinkleRefConfig("", opts.env, opts.cwd);
     const resolved = resolveSprinkleRefBackend(config, opts.category);
     assertBootstrapCategoryCanWrite(resolved);
     const store = createSprinkleRefStore(resolved.backend, {
@@ -184,18 +182,6 @@ async function resolveRemoteRef(
       error: String(error instanceof Error ? error.message : error),
     };
   }
-}
-
-async function selectedConfigPath(opts: { cwd: string; env?: NodeJS.ProcessEnv }) {
-  if (opts.env?.SPRINKLEREF_CONFIG) return "";
-  for (const rel of [
-    "config/sprinkleref/selected.json",
-    "config/sprinkleref/selected.local.json",
-  ]) {
-    const candidate = path.resolve(opts.cwd, rel);
-    if ((await fsp.stat(candidate).catch(() => undefined))?.isFile()) return candidate;
-  }
-  return "";
 }
 
 function stringMember(obj: Record<string, unknown>, key: string): string | undefined {

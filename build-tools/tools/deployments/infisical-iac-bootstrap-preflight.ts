@@ -100,5 +100,5 @@ function quoteShell(value: string) {
 }
 
 export function resolverConfigPath(dir = path.dirname(DEFAULT_SPRINKLEREF_CONFIG_PATH)) {
-  return path.join(dir, "selected.local.json");
+  return path.join(dir, "shared.json");
 }

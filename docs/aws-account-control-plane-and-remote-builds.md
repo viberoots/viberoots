@@ -119,10 +119,10 @@ hardening fields, such as `expectedAwsRoleArn`, and fields with sensible default
 Supabase token env, and Supabase API base URL, are omitted unless an operator explicitly supplies a
 non-default value.
 
-The preferred shared SprinkleRef resolver config is `config/sprinkleref/selected.json`.
-`config/sprinkleref/selected.local.json` remains an escape hatch for migration or exceptional
-per-clone resolver changes. Ordinary clone-local coordinates belong in the gitignored
-`config/sprinkleref/local/values.json`, which can be initialized with:
+The canonical project config pair is `projects/config/shared.json` plus gitignored
+`projects/config/local.json`. Shared non-secret resolver policy and repo-wide coordinates belong in
+`shared.json`; ordinary clone-local coordinates belong in `local.json`, which can be initialized
+with:
 
 ```bash
 sprinkleref --init-local
@@ -453,8 +453,8 @@ control-plane aws-account check
 ```
 
 Use structured `config://...` and `secret://...` refs in stack config, then fill non-secret
-coordinates in stack config, `config/sprinkleref/local/values.json`, or the selected/default
-resolver. Required coordinates include `domain`, `awsAccountId`, `awsOrganizationId`,
+coordinates in stack config, `projects/config/shared.json`, or `projects/config/local.json`.
+Required coordinates include `domain`, `awsAccountId`, `awsOrganizationId`,
 `supabaseOrgId`, and `supabaseProjectRef`. Write the Supabase Management API token with
 `sprinkleref --update secret://control-plane/supabase/management-api-token --create-missing`, or
 use the setup-shell fallback environment variable for a single run; do not put it in config/local
@@ -517,7 +517,7 @@ Defaults:
 The operator should normally provide only `--domain`, the expected AWS account id, Supabase project
 identifiers, the AWS organization id, and either the structured `supabaseAccessToken` ref or a
 setup-shell `SUPABASE_ACCESS_TOKEN` for the first stack. Prefer writing non-secret clone-local
-values to `config/sprinkleref/local/values.json` and keeping the shared refs in
+values to `projects/config/local.json` and keeping the shared refs in
 `config/control-plane/stack.json`. `config-init` writes the small checklist by default and records
 non-default overrides only when they are explicitly supplied. Use `--config <path>` only for
 exception cases, such as a second control-plane stack in the same clone. Override hostnames or
@@ -526,7 +526,7 @@ exception cases, such as a second control-plane stack in the same clone. Overrid
 For the first prerequisite check, prefer a SprinkleRef ref for the Supabase Management API token and
 keep the token value out of config files. Use `sprinkleref --init-local` for clone-local
 coordinates, and use `sprinkleref --update ... --create-missing` to write the token to the
-selected/default resolver when needed:
+canonical project config when needed:
 
 ```bash
 control-plane aws-account config-init \
@@ -557,8 +557,8 @@ bootstrap-selected access credentials.
 `check` prints a human-readable summary by default: a compact stack header, a phase result list, a
 stack-config checklist for missing setup values, a short problem or evidence section, the next
 command to run, and the machine-readable status file path. Missing `awsOrganizationId` is a blocking
-non-secret coordinate: fill it in stack config, `config/sprinkleref/local/values.json`, or the
-shared resolver according to the source shown in the summary. Use `--json` when a CI job or script
+non-secret coordinate: fill it in stack config, `projects/config/local.json`, or the shared project
+config according to the source shown in the summary. Use `--json` when a CI job or script
 needs the raw `aws-account-status@1` payload on stdout:
 
 ```bash
