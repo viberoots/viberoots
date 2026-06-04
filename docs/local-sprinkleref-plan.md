@@ -1420,3 +1420,217 @@ mapping cannot find those old records, and regression tests may still miss accid
 The added docs and fixture tests introduce a small amount of maintenance around examples, but keep
 the PR focused on closing PR-10 documentation and acceptance-test gaps without changing storage
 behavior.
+
+## PR-12: Canonical projects config shared/local split
+
+### 1. Intent
+
+Simplify SprinkleRef and control-plane setup configuration around a project-owned canonical config
+directory under `projects/`, so future `projects` submodule usage carries repo-specific deployment
+coordinates with the project tree. Replace the current spread of tracked resolver files and
+gitignored local values under root `config/sprinkleref/` with one committed shared config file and
+one gitignored individual-user config file.
+
+### 2. Scope of changes
+
+- Introduce `projects/config/` as the canonical project configuration directory.
+- Add committed `projects/config/shared.json` as the shared, repo-wide configuration source.
+- Add gitignored `projects/config/local.json` as the single individual-user configuration source.
+- Move shared non-secret values into `projects/config/shared.json`, including:
+  - shared SprinkleRef resolver categories and profile policy;
+  - shared Infisical host, project id, project name, environment names, and default paths;
+  - shared logical refs such as Infisical Universal Auth bootstrap credential refs;
+  - shared control-plane coordinates when they are repo-wide rather than operator-specific.
+- Model multiple deployment/control environments inside `projects/config/shared.json` as named
+  shared environment profiles, for example `staging`, `prod`, and future control-specific
+  environments. Categories and deployment lanes should select these named environments rather than
+  requiring separate resolver files.
+- Model multiple runtime hosts inside `projects/config/shared.json` as named runtime profiles, for
+  example `local-macos`, `local-file`, `github-actions`, `jenkins`, `gitlab-ci`, and
+  `bitbucket-pipelines`. Runtime profiles describe shared backend shape such as backend kind,
+  scope, and naming prefixes.
+- Move individual-user values into `projects/config/local.json`, including:
+  - local bootstrap sink selection and local credential file paths;
+  - local selection of the active runtime host when it cannot be inferred from environment;
+  - local AWS account and organization ids when they are operator-specific;
+  - one-off local Supabase coordinates when they are not shared repo infrastructure;
+  - raw local-only escape hatch values only when they must remain outside a secret backend.
+- Update SprinkleRef config loading so the default project config is the overlay of
+  `projects/config/shared.json` plus `projects/config/local.json` when present.
+- Add runtime host selection that can choose an explicit local setting, a CI environment-detected
+  host such as GitHub Actions or Jenkins, or a CLI/env override without requiring separate checked-in
+  `ci.*.json` and `local.*.json` resolver files.
+- Use simple deep-merge semantics where `projects/config/local.json` always overrides
+  `projects/config/shared.json` on overlapping fields.
+- While merging, record every path where shared and local both define a different value.
+- Report those recorded paths as active local overrides in config inspection, missing-value
+  diagnostics, and setup/apply commands. Redact secret-like values in override output.
+- Add one coarse safety guard, such as `--no-local-overrides` or
+  `VBR_DISALLOW_LOCAL_OVERRIDES=1`, that fails when any local override is active. Do not require a
+  maintained list of protected versus unprotected fields.
+- Update `sprinkleref --init-local` or its replacement to create/update
+  `projects/config/local.json`, not `config/sprinkleref/local/values.json`.
+- Update `control-plane aws-account check` and related missing-value diagnostics so they classify
+  missing values as either shared project config gaps or local operator setup gaps based on the new
+  shared/local source file.
+- Retire root `config/sprinkleref/selected.local.json` as the normal operator path.
+- Treat root `config/sprinkleref/**` as migration input or generated compatibility only during this
+  PR, with `projects/config/**` becoming the canonical path advertised by docs and command output.
+- Do not add additional per-provider config files unless they are generated artifacts from the two
+  canonical project config files.
+- Preserve support for multiple environments and multiple runtime hosts through named entries in the
+  two canonical files, not through a growing set of root-level selected config variants.
+
+### 3. External prerequisites
+
+- Operators need to move any existing uncommitted local values from
+  `config/sprinkleref/local/values.json` or `config/sprinkleref/selected.local.json` into
+  `projects/config/local.json`.
+- The checked-in shared Infisical project id and name remain valid shared repo infrastructure for
+  all operators using this clone.
+- If `projects` later becomes a submodule, the parent repository must preserve
+  `projects/config/local.json` as a parent-clone local file or document where that ignored file
+  should live.
+
+### 4. Tests to be added
+
+- Add config loader tests proving the default config path loads `projects/config/shared.json` and
+  overlays `projects/config/local.json` when present.
+- Add tests proving committed shared values such as Infisical `projectId`, `projectName`, host, and
+  environments are read from `projects/config/shared.json`.
+- Add tests proving local values such as bootstrap sink choice and local AWS coordinates are read
+  from `projects/config/local.json`.
+- Add tests proving multiple shared environments can coexist and that categories or deployment lanes
+  resolve the intended Infisical environment without separate resolver files.
+- Add tests proving multiple runtime host profiles can coexist in `projects/config/shared.json` and
+  that local, GitHub Actions, Jenkins, GitLab CI, and Bitbucket-style bootstrap backends can be
+  selected by explicit local config, CI environment detection, or CLI/env override.
+- Add precedence tests proving local config always overrides shared config on overlapping fields.
+- Add diagnostics tests proving every changed overlap path is reported as an active local override,
+  with secret-like values redacted.
+- Add safety-guard tests proving `--no-local-overrides` or `VBR_DISALLOW_LOCAL_OVERRIDES=1` fails
+  when any local override is active and passes when local config only fills previously missing
+  values.
+- Add missing-value classification tests proving shared config gaps and local setup gaps are reported
+  differently, including for `control-plane aws-account check`.
+- Add `--init-local` tests proving it creates or updates `projects/config/local.json` and preserves
+  existing local entries.
+- Add gitignore or repository hygiene tests proving `projects/config/shared.json` is tracked or
+  trackable and `projects/config/local.json` remains ignored.
+- Add regression tests proving commands no longer recommend `config/sprinkleref/local/values.json`
+  as the canonical local setup file.
+
+### 5. Docs to be added or updated
+
+- Update [Local SprinkleRef Design](local-sprinkleref.md) to describe `projects/config/shared.json`
+  and `projects/config/local.json` as the canonical shared/local split.
+- Update [SprinkleRef Resolver](sprinkleref.md) to describe default project config loading from
+  `projects/config/` and to demote root `config/sprinkleref/**` paths to migration or compatibility
+  status.
+- Update AWS account setup docs and command help examples so operators edit
+  `projects/config/local.json` for individual setup values.
+- Document the classification rule:
+  - committed shared config contains repo-wide non-secret coordinates and logical refs;
+  - gitignored local config contains individual operator settings;
+  - secret backends contain credentials and tokens.
+- Document how one shared/local config pair supports multiple environments and runtime hosts:
+  shared config defines the available named environments and runtime profiles, while local config or
+  runtime detection selects the active host for the current operator or CI job.
+- Document local override semantics: local config always wins, every changed overlap is reported as
+  an active local override, and operators can opt into a coarse no-local-overrides guard for stricter
+  runs.
+- Add a migration note showing how to move existing values from
+  `config/sprinkleref/local/values.json` and `config/sprinkleref/selected.local.json` into
+  `projects/config/local.json`.
+- Add migration examples showing how current `local.macos.json`, `local.file.json`,
+  `ci.github.json`, `ci.jenkins.json`, `ci.gitlab.json`, and `ci.bitbucket.json` settings map into
+  named runtime host profiles under `projects/config/shared.json`.
+- Document why this layout supports a future `projects` submodule: project-specific shared config
+  lives under `projects/`, while user-specific config remains one ignored file in the same canonical
+  directory.
+
+### 5.5. Expected regression scope
+
+- `deployment-only`
+- Expected implementation paths:
+  - `projects/config/shared.json`
+  - `.gitignore`
+  - `build-tools/tools/deployments/sprinkleref-config-select.ts`
+  - `build-tools/tools/deployments/sprinkleref-config.ts`
+  - `build-tools/tools/deployments/sprinkleref-templates.ts`
+  - `build-tools/tools/deployments/aws-account-local-values.ts`
+  - `build-tools/tools/deployments/aws-account-inputs.ts`
+  - `build-tools/tools/deployments/aws-account-utils.ts`
+  - `build-tools/tools/deployments/sprinkleref-check*.ts`
+  - `build-tools/tools/tests/deployments/**`
+  - `docs/**`
+- Keep the PR focused on the canonical shared/local project config split and the resulting
+  diagnostics. Avoid broader backend behavior changes.
+
+### 6. Acceptance criteria
+
+- `projects/config/shared.json` is the committed canonical shared project config.
+- `projects/config/local.json` is the single canonical gitignored individual-user config file.
+- Default SprinkleRef and control-plane setup commands use the overlay of shared plus local project
+  config without requiring `SPRINKLEREF_CONFIG` for the normal path.
+- Shared Infisical project coordinates remain checked in because they are repo-wide non-secret
+  infrastructure.
+- Multiple shared environments can be represented in `projects/config/shared.json`, and categories
+  or deployment lanes can select the intended environment without introducing per-environment
+  selected config files.
+- Multiple runtime hosts can be represented in `projects/config/shared.json`, and local/CI execution
+  can select `local-macos`, `local-file`, `github-actions`, `jenkins`, `gitlab-ci`, or
+  `bitbucket-pipelines` behavior without introducing per-host selected config files.
+- Individual operator settings are absent from tracked files and can be supplied through
+  `projects/config/local.json`.
+- Local config always wins on overlapping fields, and every changed overlap is visible in active
+  local override diagnostics.
+- A single no-local-overrides guard can fail any command when local config changes a shared value,
+  without maintaining a protected-field list.
+- Missing-value output clearly distinguishes shared project config gaps from local operator setup
+  gaps.
+- Docs and command output no longer present `config/sprinkleref/local/values.json` or
+  `selected.local.json` as the normal local setup path.
+- Focused tests cover loader precedence, init-local behavior, gitignore policy, diagnostics, and
+  migration docs.
+
+### 7. Risks
+
+- Moving canonical paths may break operator muscle memory and existing local files.
+- Local override warnings can become noisy if `local.json` intentionally overrides many shared
+  fields.
+- A single shared file could become cluttered if environments, runtime hosts, resolver categories,
+  and local-value schema are not grouped clearly.
+- Future `projects` submodule usage may require parent-repo guidance for ignored files inside the
+  submodule working tree.
+- Combining resolver policy and local values into one schema could blur the boundary between
+  shared routing metadata, local setup values, and credentials.
+
+### 8. Mitigations
+
+- Keep the schema small and explicit: one shared object, one local object, and local-wins merge
+  semantics.
+- Group shared config by purpose, for example shared environments, runtime host profiles, resolver
+  categories, and shared values, so adding a host or environment does not require another file.
+- Keep local override diagnostics compact, path-based, and redacted for secret-like values.
+- Provide the coarse no-local-overrides guard for strict validation or CI jobs that want to prove the
+  shared config is being used without local drift.
+- Emit direct migration diagnostics when old root `config/sprinkleref/**` files are present with
+  values that should move to `projects/config/local.json`.
+- Keep credentials represented as logical refs by default and reserve raw local values for an
+  explicitly documented escape hatch.
+- Add tests around override reporting so local config cannot silently change required shared
+  Infisical coordinates.
+
+### 9. Consequences of not implementing this PR
+
+SprinkleRef setup will remain split across root-level resolver files, legacy selected-local config,
+and a nested local values file. That makes the system harder to explain, keeps project-specific
+values outside the `projects` tree, and works against the longer-term goal of making `projects`
+portable as a submodule.
+
+### 10. Downsides for implementing this PR
+
+The migration touches several setup paths and docs at once, and operators with existing local files
+will need to move values into the new canonical file. The resulting model is simpler after the
+migration because normal setup has exactly one committed shared file and one ignored local file.
