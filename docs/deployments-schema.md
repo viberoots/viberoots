@@ -30,6 +30,7 @@ Minimum fields:
 | `preview`                       | no                                               | Explicit opt-in only.                                                                                                                                                                      |
 | `prerequisites`                 | no                                               | Explicit direct-edge deployment prerequisites.                                                                                                                                             |
 | `secret_backend`                | no                                               | Deployment-wide backend selector for `secret_requirements`; omitted means `vault/default`. Preferred shape is `<backend>/<profile-alias>`, such as `vault/default` or `infisical/default`. |
+| `deployment_context`            | no                                               | Single selector for shared provider topology in `projects/config/shared.json`; context defaults fill omitted non-secret provider fields and must match duplicated explicit metadata.       |
 | `vault_runtime`                 | no                                               | Stable Vault/IdP runtime metadata for deployment-derived JWT auth. Secret values must not be stored here.                                                                                  |
 | `infisical_runtime`             | no                                               | Non-secret Infisical routing metadata such as `site_url`, `project_id`, `environment`, and reviewed Universal Auth environment variable names.                                             |
 | `infisical_secret_mappings`     | no                                               | Optional map from declared `secret_requirements` contract IDs to non-secret `secret_path` and `secret_name` overrides.                                                                     |
@@ -54,6 +55,8 @@ Secret backend invariant:
   `infisical-regulated`
 - account-specific backend coordinates and credentials stay in local/CI
   SprinkleRef resolver config
+- `deployment_context` may provide a `secretBackend` default, but an explicit
+  `secret_backend` disagreement fails closed
 - Infisical metadata is routing data only; access tokens, client secrets,
   personal tokens, secret values, and rendered secret-bearing configs are
   rejected from reviewed metadata

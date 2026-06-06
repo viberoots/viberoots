@@ -11,6 +11,8 @@ const ALLOWED_INFISICAL_RUNTIME_KEYS = [
   "secret_path_prefix",
   "machine_identity_client_id_env",
   "machine_identity_client_secret_env",
+  "machine_identity_client_id_ref",
+  "machine_identity_client_secret_ref",
   "machine_identity_client_id_file_name",
   "machine_identity_client_secret_file_name",
   "machine_identity_id",

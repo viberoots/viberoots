@@ -2,7 +2,7 @@
 import type { DeploymentTarget } from "./contract";
 import { deploymentSecretFixturePath } from "./deployment-secret-fixture";
 import type { DeploymentSecretContext } from "./deployment-secret-context";
-import { infisicalCredentialFromRuntime } from "./deployment-secret-infisical-credentials";
+import { resolveInfisicalCredentialFromRuntime } from "./deployment-secret-infisical-runtime-credentials";
 import {
   cleanupDeploymentVaultRuntime,
   prepareDeploymentVaultRuntime,
@@ -46,7 +46,7 @@ export async function prepareDeploymentSecretRuntime(opts: {
     minted: true,
     secretContext: {
       kind: "infisical",
-      credential: infisicalCredentialFromRuntime({
+      credential: await resolveInfisicalCredentialFromRuntime({
         runtime: opts.deployment.infisicalRuntime,
         env: opts.env || process.env,
       }),

@@ -292,6 +292,44 @@ Local values are an implicit local-first resolution surface. They do not need to
 `projects/config/shared.json`, which lets shared config remain the same for every clone. Resolution
 should still report when a value came from `projects/config/local.json`.
 
+Shared deployment topology also belongs in `projects/config/shared.json`. A deployment selects one
+context, for example `deployment_context = "pleomino-prod"`, and the context fills omitted
+non-secret provider metadata:
+
+```json
+{
+  "deploymentContexts": {
+    "pleomino-prod": {
+      "secretBackend": "infisical/default",
+      "aws": { "accountId": "111122223333", "defaultRegion": "us-west-2" },
+      "infisical": {
+        "host": "https://app.infisical.com",
+        "projectId": "prod-project-id",
+        "environment": "prod",
+        "defaultPath": "/deployments/pleomino/prod",
+        "clientSecretRef": "secret://bootstrap/pleomino-prod/infisical/client-secret"
+      },
+      "cloudflare": {
+        "account": "web-platform",
+        "projectName": "pleomino-prod-pages",
+        "apiTokenRef": "secret://deployments/pleomino/prod/cloudflare-api-token"
+      }
+    },
+    "admin-prod": {
+      "secretBackend": "infisical/admin",
+      "aws": { "accountId": "444455556666", "defaultRegion": "us-east-1" },
+      "infisical": { "projectId": "admin-project-id", "environment": "prod" },
+      "cloudflare": { "account": "admin-platform", "projectName": "admin-prod-pages" }
+    }
+  }
+}
+```
+
+Context values are defaults and constraints. If deployment metadata duplicates a context-provided
+provider field, the values must match. Secret values still live in the selected backend or bootstrap
+lane; JSON context fields may contain logical `secret://...` refs but not plaintext tokens or
+passwords.
+
 Older `config/sprinkleref/*` resolver files should be deleted after their useful values are moved.
 Move shared resolver settings and prior `local.*.json` / `ci.*.json` runtime variants into
 `projects/config/shared.json`, move entries from `config/sprinkleref/local/values.json` and

@@ -28,6 +28,22 @@ That bootstrap safety guard applies both to standalone `sprinkleref` commands an
 AWS account stack ref resolution when stack config or local values explicitly choose
 `category: "bootstrap"`.
 
+Deployment authors select shared provider topology with one metadata field:
+`deployment_context = "<name>"`. The named context lives under
+`projects/config/shared.json` in `deploymentContexts`, and `projects/config/local.json` may fill or
+temporarily override missing clone-specific coordinates with the normal active-local-override
+diagnostics. Apps must stay backend-neutral: app packages declare logical refs and runtime
+requirements only, not resolver profiles, provider account ids, `deployment_context`, or
+`secret_backend`.
+
+Context records are shallow typed provider topology, not arbitrary overlays. Supported sections
+include `aws`, `infisical`, `supabase`, and `cloudflare`; values may be ids, names, regions, paths,
+URLs, or logical `secret://...` refs. Plaintext API tokens, client secrets, passwords, private keys,
+and other secret values are invalid in shared or local project config. A context `secretBackend`
+default can fill an omitted deployment `secret_backend`; if both are present and disagree, extraction
+fails closed. Context provider values fill omitted deployment metadata, while duplicated explicit
+`provider_target` or `infisical_runtime` values must match.
+
 Initialize starter configs:
 
 ```bash

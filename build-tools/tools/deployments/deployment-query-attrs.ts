@@ -26,6 +26,7 @@ export const DEPLOYMENT_CQUERY_ATTRS = [
   "ingress_hostnames",
   "resource_sizing",
   "vault_runtime",
+  "deployment_context",
   "secret_backend",
   "infisical_runtime",
   "infisical_secret_mappings",

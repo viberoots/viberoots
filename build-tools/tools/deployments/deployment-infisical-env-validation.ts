@@ -6,6 +6,10 @@ const UNIVERSAL_AUTH_ENV_FIELDS = [
   "machine_identity_client_id_env",
   "machine_identity_client_secret_env",
 ] as const;
+const UNIVERSAL_AUTH_REF_FIELDS = {
+  machine_identity_client_id_env: "machine_identity_client_id_ref",
+  machine_identity_client_secret_env: "machine_identity_client_secret_ref",
+} as const;
 
 export function pushInfisicalUniversalAuthEnvErrors(opts: {
   label: string;
@@ -19,6 +23,9 @@ function validateUniversalAuthEnvField(
   opts: { label: string; errors: string[]; rawRuntimeNode: Record<string, unknown> },
   field: (typeof UNIVERSAL_AUTH_ENV_FIELDS)[number],
 ) {
+  const refField = UNIVERSAL_AUTH_REF_FIELDS[field];
+  const refValue = opts.rawRuntimeNode[refField];
+  if (typeof refValue === "string" && refValue.trim().startsWith("secret://")) return;
   const value = opts.rawRuntimeNode[field];
   if (value === undefined || (typeof value === "string" && value.trim() === "")) {
     opts.errors.push(deploymentError(opts.label, `infisical_runtime.${field} is required`));

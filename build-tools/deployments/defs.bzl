@@ -33,22 +33,13 @@ github_app_requirements = _github_app_requirements
 migration_bundle = _migration_bundle
 
 def nixos_shared_host_static_webapp_deployment(**kwargs):
-    _nixos_shared_host_static_webapp_deployment(
-        deployment_target = deployment_target,
-        **kwargs
-    )
+    _nixos_shared_host_static_webapp_deployment(deployment_target = deployment_target, **kwargs)
 
 def nixos_shared_host_ssr_webapp_deployment(**kwargs):
-    _nixos_shared_host_ssr_webapp_deployment(
-        deployment_target = deployment_target,
-        **kwargs
-    )
+    _nixos_shared_host_ssr_webapp_deployment(deployment_target = deployment_target, **kwargs)
 
 def nixos_shared_host_multi_static_webapp_deployment(**kwargs):
-    _nixos_shared_host_multi_static_webapp_deployment(
-        deployment_target = deployment_target,
-        **kwargs
-    )
+    _nixos_shared_host_multi_static_webapp_deployment(deployment_target = deployment_target, **kwargs)
 
 def cloudflare_pages_static_webapp_deployment(
         name,
@@ -76,6 +67,7 @@ def cloudflare_pages_static_webapp_deployment(
         ingress_hostnames = [],
         resource_sizing = {},
         vault_runtime = {},
+        deployment_context = "",
         secret_backend = "",
         infisical_runtime = {},
         infisical_secret_mappings = {},
@@ -120,6 +112,7 @@ def cloudflare_pages_static_webapp_deployment(
         runtime_config_requirements = runtime_config_requirements,
         external_requirement_profiles = external_requirement_profiles,
         vault_runtime = vault_runtime,
+        deployment_context = deployment_context,
         secret_backend = secret_backend,
         infisical_runtime = infisical_runtime,
         infisical_secret_mappings = infisical_secret_mappings,
@@ -159,6 +152,7 @@ def cloudflare_containers_deployment(
         runtime_config_requirements = [],
         external_requirement_profiles = [],
         vault_runtime = {},
+        deployment_context = "",
         secret_backend = "",
         infisical_runtime = {},
         infisical_secret_mappings = {},
@@ -206,42 +200,31 @@ def cloudflare_containers_deployment(
         runtime_config_requirements = runtime_config_requirements,
         external_requirement_profiles = external_requirement_profiles,
         vault_runtime = vault_runtime,
+        deployment_context = deployment_context,
         secret_backend = secret_backend,
         infisical_runtime = infisical_runtime,
         infisical_secret_mappings = infisical_secret_mappings,
         release_actions = release_actions,
         target_exceptions = target_exceptions,
-        labels = labels + ["kind:deployment", "deployment:cloudflare-containers", "deployment-component:" + component_kind],
+        labels = labels + [
+            "kind:deployment",
+            "deployment:cloudflare-containers",
+            "deployment-component:" + component_kind,
+        ],
         visibility = visibility,
     )
 
 def s3_static_webapp_deployment(**kwargs):
-    _s3_static_webapp_deployment(
-        deployment_target = deployment_target,
-        require_shared_policy = _require_shared_policy,
-        **kwargs
-    )
+    _s3_static_webapp_deployment(deployment_target = deployment_target, require_shared_policy = _require_shared_policy, **kwargs)
 
 def vercel_next_webapp_deployment(**kwargs):
-    _vercel_next_webapp_deployment(
-        deployment_target = deployment_target,
-        require_shared_policy = _require_shared_policy,
-        **kwargs
-    )
+    _vercel_next_webapp_deployment(deployment_target = deployment_target, require_shared_policy = _require_shared_policy, **kwargs)
 
 def kubernetes_service_deployment(**kwargs):
-    _kubernetes_service_deployment(
-        deployment_target = deployment_target,
-        require_shared_policy = _require_shared_policy,
-        **kwargs
-    )
+    _kubernetes_service_deployment(deployment_target = deployment_target, require_shared_policy = _require_shared_policy, **kwargs)
 
 def opentofu_foundation_deployment(**kwargs):
-    _opentofu_foundation_deployment(
-        deployment_target = deployment_target,
-        require_shared_policy = _require_shared_policy,
-        **kwargs
-    )
+    _opentofu_foundation_deployment(deployment_target = deployment_target, require_shared_policy = _require_shared_policy, **kwargs)
 
 def container_runtime_service_deployment(**kwargs):
     kubernetes_service_deployment(**kwargs)

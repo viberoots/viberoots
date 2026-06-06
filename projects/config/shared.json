@@ -37,6 +37,48 @@
       "namePrefix": "VIBEROOTS_"
     }
   },
+  "deploymentContexts": {
+    "pleomino-prod": {
+      "secretBackend": "infisical/default",
+      "aws": {
+        "accountId": "",
+        "organizationId": "",
+        "defaultRegion": "us-west-2"
+      },
+      "infisical": {
+        "host": "https://app.infisical.com",
+        "projectId": "55d756b1-7523-4025-b144-cc23c20ff156",
+        "projectName": "viberoots-deployments",
+        "environment": "prod",
+        "defaultPath": "/deployments/pleomino/prod",
+        "clientIdRef": "secret://viberoots/bootstrap/viberoots-iac-bootstrap/client-id",
+        "clientSecretRef": "secret://viberoots/bootstrap/viberoots-iac-bootstrap/client-secret"
+      },
+      "supabase": {
+        "organizationId": "",
+        "projectRef": "",
+        "region": "us-west-2"
+      },
+      "cloudflare": {
+        "account": "web-platform",
+        "projectName": "pleomino-prod-pages",
+        "apiTokenRef": "secret://deployments/pleomino/prod/cloudflare-api-token"
+      }
+    },
+    "pleomino-staging": {
+      "secretBackend": "infisical/default",
+      "infisical": {
+        "host": "https://app.infisical.com",
+        "projectId": "55d756b1-7523-4025-b144-cc23c20ff156",
+        "environment": "staging",
+        "defaultPath": "/deployments/pleomino/staging"
+      },
+      "cloudflare": {
+        "account": "web-platform-staging",
+        "projectName": "pleomino-staging-pages"
+      }
+    }
+  },
   "sprinkleref": {
     "version": 1,
     "defaultCategory": "control",

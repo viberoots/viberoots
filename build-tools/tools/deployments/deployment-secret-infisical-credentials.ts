@@ -1,6 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import { DEPLOYMENT_AUTH_REDACTION, redactDeploymentAuthText } from "./deployment-auth-redaction";
 import type { DeploymentInfisicalRuntimeConfig } from "./deployment-secret-metadata";
+export type { DeploymentInfisicalRuntimeConfig } from "./deployment-secret-metadata";
 
 export const INFISICAL_MACHINE_IDENTITY_UNIVERSAL_AUTH =
   "infisical_machine_identity_universal_auth";

@@ -55,6 +55,7 @@ def _deployment_document(ctx):
         "ingress_hostnames": ctx.attrs.ingress_hostnames,
         "resource_sizing": ctx.attrs.resource_sizing,
         "vault_runtime": ctx.attrs.vault_runtime,
+        "deployment_context": ctx.attrs.deployment_context,
         "secret_backend": ctx.attrs.secret_backend,
         "infisical_runtime": ctx.attrs.infisical_runtime,
         "infisical_secret_mappings": ctx.attrs.infisical_secret_mappings,
@@ -101,6 +102,7 @@ _deployment_target_rule = rule(
         "ingress_hostnames": attrs.list(attrs.string(), default = []),
         "resource_sizing": attrs.dict(key = attrs.string(), value = attrs.string(), default = {}),
         "vault_runtime": attrs.dict(key = attrs.string(), value = attrs.string(), default = {}),
+        "deployment_context": attrs.string(default = ""),
         "secret_backend": attrs.string(default = ""),
         "infisical_runtime": attrs.dict(key = attrs.string(), value = attrs.string(), default = {}),
         "infisical_secret_mappings": attrs.dict(

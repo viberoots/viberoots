@@ -2,6 +2,7 @@
 import type { GraphNode } from "../lib/graph";
 import { normalizeTargetLabel } from "../lib/labels";
 import { readString, readStringRecord } from "./deployment-graph-readers";
+import { resolveDeploymentContextNodes } from "./deployment-contexts";
 import type {
   DeploymentPrerequisite,
   DeploymentPrerequisiteMode,
@@ -192,29 +193,32 @@ export function pushTokenFieldErrors(opts: {
 }
 
 export function createDeploymentExtractionContext(nodes: GraphNode[]): DeploymentExtractionContext {
+  const contextErrors: string[] = [];
+  const resolvedNodes = resolveDeploymentContextNodes(nodes, contextErrors);
   const { policies: laneGovernancePolicies, errors: laneGovernanceErrors } =
-    extractDeploymentLaneGovernancePolicies(nodes);
+    extractDeploymentLaneGovernancePolicies(resolvedNodes);
   const { policies: lanePolicies, errors: laneErrors } =
-    extractDeploymentLanePoliciesWithGovernance(nodes, laneGovernancePolicies);
+    extractDeploymentLanePoliciesWithGovernance(resolvedNodes, laneGovernancePolicies);
   const { policies: admissionPolicies, errors: admissionErrors } =
-    extractDeploymentAdmissionPolicies(nodes);
+    extractDeploymentAdmissionPolicies(resolvedNodes);
   const { actions: releaseActions, errors: releaseActionErrors } =
-    extractDeploymentReleaseActions(nodes);
+    extractDeploymentReleaseActions(resolvedNodes);
   const { exceptions: targetExceptions, errors: targetExceptionErrors } =
-    extractDeploymentTargetExceptions(nodes);
+    extractDeploymentTargetExceptions(resolvedNodes);
   const components = new Map<string, GraphNode>();
-  for (const node of nodes) {
+  for (const node of resolvedNodes) {
     const label = normalizeTargetLabel(String(node.name || ""));
     if (label) components.set(label, node);
   }
   return {
-    nodes,
+    nodes: resolvedNodes,
     components,
     lanePolicies,
     admissionPolicies,
     releaseActions,
     targetExceptions,
     errors: [
+      ...contextErrors,
       ...laneGovernanceErrors,
       ...laneErrors,
       ...admissionErrors,

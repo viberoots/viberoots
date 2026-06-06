@@ -1,6 +1,6 @@
 #!/usr/bin/env zx-wrapper
 import type { GraphNode } from "../lib/graph";
-import { readString, readStringRecord } from "./deployment-graph-readers";
+import { readString } from "./deployment-graph-readers";
 import { deploymentError } from "./contract-extract-shared";
 import { pushInfisicalCredentialSourceErrors } from "./deployment-infisical-credential-source-validation";
 import { pushInfisicalUniversalAuthEnvErrors } from "./deployment-infisical-env-validation";
@@ -12,22 +12,16 @@ import {
 } from "./deployment-secret-backend-selector";
 import type { DeploymentRequirement } from "./deployment-requirements";
 import type { DeploymentSecretBackendKind } from "./deployment-sprinkle-ref";
+import {
+  readDeploymentContextMetadata,
+  type DeploymentContextMetadata,
+} from "./deployment-context-metadata";
+import {
+  readInfisicalRuntime,
+  type DeploymentInfisicalRuntimeConfig,
+} from "./deployment-infisical-runtime";
 
-export type DeploymentInfisicalRuntimeConfig = {
-  siteUrl: string;
-  projectId: string;
-  environment: string;
-  secretPath?: string;
-  secretPathPrefix?: string;
-  machineIdentityClientIdEnv?: string;
-  machineIdentityClientSecretEnv?: string;
-  machineIdentityClientIdFileName?: string;
-  machineIdentityClientSecretFileName?: string;
-  machineIdentityId?: string;
-  preferredCredentialSource?: "machine_identity_universal_auth";
-  accessTokenTtlSeconds?: string;
-  accessTokenMaxUses?: string;
-};
+export type { DeploymentInfisicalRuntimeConfig } from "./deployment-infisical-runtime";
 
 export type DeploymentInfisicalSecretMapping = {
   secretName: string;
@@ -37,6 +31,7 @@ export type DeploymentInfisicalSecretMapping = {
 };
 
 export type DeploymentSecretMetadata = {
+  deploymentContext?: DeploymentContextMetadata;
   secretBackend?: DeploymentSecretBackendKind;
   secretBackendProfile?: string;
   infisicalRuntime?: DeploymentInfisicalRuntimeConfig;
@@ -69,40 +64,6 @@ function stringRecord(value: Record<string, unknown>): Record<string, string> {
 function readRawRecord(node: GraphNode, key: string): Record<string, unknown> {
   const value = node[key];
   return value && typeof value === "object" && !Array.isArray(value) ? value : {};
-}
-
-function readInfisicalRuntime(node: GraphNode): DeploymentInfisicalRuntimeConfig | undefined {
-  const runtime = readStringRecord(node, "infisical_runtime");
-  if (Object.keys(runtime).length === 0) return undefined;
-  const credentialSource =
-    runtime.preferred_credential_source === "infisical_machine_identity_universal_auth"
-      ? "machine_identity_universal_auth"
-      : runtime.preferred_credential_source;
-  return {
-    siteUrl: runtime.site_url || "",
-    projectId: runtime.project_id || "",
-    environment: runtime.environment || "",
-    ...(runtime.secret_path ? { secretPath: runtime.secret_path } : {}),
-    ...(runtime.secret_path_prefix ? { secretPathPrefix: runtime.secret_path_prefix } : {}),
-    ...(runtime.machine_identity_client_id_env
-      ? { machineIdentityClientIdEnv: runtime.machine_identity_client_id_env }
-      : {}),
-    ...(runtime.machine_identity_client_secret_env
-      ? { machineIdentityClientSecretEnv: runtime.machine_identity_client_secret_env }
-      : {}),
-    ...(runtime.machine_identity_client_id_file_name
-      ? { machineIdentityClientIdFileName: runtime.machine_identity_client_id_file_name }
-      : {}),
-    ...(runtime.machine_identity_client_secret_file_name
-      ? { machineIdentityClientSecretFileName: runtime.machine_identity_client_secret_file_name }
-      : {}),
-    ...(runtime.machine_identity_id ? { machineIdentityId: runtime.machine_identity_id } : {}),
-    ...(credentialSource ? { preferredCredentialSource: credentialSource } : {}),
-    ...(runtime.access_token_ttl_seconds
-      ? { accessTokenTtlSeconds: runtime.access_token_ttl_seconds }
-      : {}),
-    ...(runtime.access_token_max_uses ? { accessTokenMaxUses: runtime.access_token_max_uses } : {}),
-  };
 }
 
 function readInfisicalMappings(
@@ -138,6 +99,7 @@ export function deploymentSecretMetadata(
   const rawRuntimeNode = readRawRecord(node, "infisical_runtime");
   const runtime = readInfisicalRuntime(node);
   const mappings = readInfisicalMappings(node);
+  const deploymentContext = readDeploymentContextMetadata(node);
   validateDeploymentSecretMetadata({
     label,
     requirements,
@@ -150,6 +112,7 @@ export function deploymentSecretMetadata(
     selectorErrors: deploymentSecretBackendSelectorErrors({ secretBackend, secretBackendProfile }),
   });
   return {
+    ...(deploymentContext ? { deploymentContext } : {}),
     secretBackend: backend,
     secretBackendProfile: profile,
     ...(runtime ? { infisicalRuntime: runtime } : {}),

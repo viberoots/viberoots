@@ -1,6 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import type { DeploymentTarget } from "./contract";
-import { infisicalCredentialFromRuntime } from "./deployment-secret-infisical-credentials";
+import type { InfisicalCredentialConfig } from "./deployment-secret-infisical-credentials";
+import { resolveInfisicalCredentialFromRuntime } from "./deployment-secret-infisical-runtime-credentials";
 import {
   checkInfisicalAdminDiagnostic,
   infisicalAdminDiagnostic,
@@ -91,7 +92,7 @@ export function buildDeploymentAdminInfisicalPlan(
 
 async function machineIdentityAccessDiagnostic(opts: {
   deployment: DeploymentTarget;
-  credential: ReturnType<typeof infisicalCredentialFromRuntime>;
+  credential: InfisicalCredentialConfig;
   fetchImpl?: typeof fetch;
 }) {
   const runtime = opts.deployment.infisicalRuntime!;
@@ -139,7 +140,7 @@ async function machineIdentityAccessDiagnostic(opts: {
 
 async function secretDiagnostic(opts: {
   secret: ReturnType<typeof desiredSecrets>[number];
-  credential: ReturnType<typeof infisicalCredentialFromRuntime>;
+  credential: InfisicalCredentialConfig;
   fetchImpl?: typeof fetch;
 }) {
   const result = await checkInfisicalAdminDiagnostic(
@@ -195,9 +196,10 @@ export async function checkDeploymentAdminInfisical(opts: {
       diagnostics: [infisicalAdminDiagnostic("credential_env", "missing")],
     };
   }
-  const credential = infisicalCredentialFromRuntime({
+  const credential = await resolveInfisicalCredentialFromRuntime({
     runtime: opts.deployment.infisicalRuntime,
     env,
+    fetchImpl: opts.fetchImpl,
   });
   const diagnostics = [
     await checkInfisicalAdminDiagnostic(

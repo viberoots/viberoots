@@ -1,5 +1,6 @@
 #!/usr/bin/env zx-wrapper
 import * as fs from "node:fs/promises";
+import * as syncFs from "node:fs";
 import * as path from "node:path";
 import { stripJsonComments } from "./json-comments";
 
@@ -10,6 +11,7 @@ export const PROJECT_LOCAL_CONFIG_PATH = `${PROJECT_CONFIG_DIR}/local.json`;
 export type ProjectConfig = Record<string, unknown> & {
   sprinkleref?: Record<string, unknown>;
   runtimeHosts?: Record<string, unknown>;
+  deploymentContexts?: Record<string, unknown>;
   activeRuntimeHost?: string;
   values?: Record<string, unknown>;
 };
@@ -49,6 +51,21 @@ export async function readProjectConfig(cwd = process.cwd()): Promise<LoadedProj
   };
 }
 
+export function readProjectConfigSync(cwd = process.cwd()): LoadedProjectConfig {
+  const sharedPath = path.resolve(cwd, PROJECT_SHARED_CONFIG_PATH);
+  const localPath = path.resolve(cwd, PROJECT_LOCAL_CONFIG_PATH);
+  const shared = readOptionalObjectSync(sharedPath, PROJECT_SHARED_CONFIG_PATH);
+  const local = readOptionalObjectSync(localPath, PROJECT_LOCAL_CONFIG_PATH);
+  const overrides: ProjectConfigOverride[] = [];
+  return {
+    config: mergeProjectConfig(shared.value, local.value, "", overrides) as ProjectConfig,
+    sharedPath,
+    localPath,
+    localPresent: local.present,
+    overrides,
+  };
+}
+
 export function projectValueEntryPath(refPath: string): string {
   return `values.${refPath.split("/").filter(Boolean).join(".")}`;
 }
@@ -70,6 +87,22 @@ export function formatProjectConfigOverride(entry: RedactedProjectConfigOverride
 async function readOptionalObject(file: string, label: string) {
   try {
     const parsed = JSON.parse(stripJsonComments(await fs.readFile(file, "utf8")));
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      throw new Error(`${label} root must be an object`);
+    }
+    return { present: true, value: parsed as Record<string, unknown> };
+  } catch (error) {
+    if (error && typeof error === "object" && "code" in error && error.code === "ENOENT") {
+      return { present: false, value: {} };
+    }
+    if (error instanceof SyntaxError) throw new Error(`invalid project config JSON: ${label}`);
+    throw error;
+  }
+}
+
+function readOptionalObjectSync(file: string, label: string) {
+  try {
+    const parsed = JSON.parse(stripJsonComments(syncFs.readFileSync(file, "utf8")));
     if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
       throw new Error(`${label} root must be an object`);
     }
@@ -121,9 +154,7 @@ function redactProjectConfigValue(keyPath: string, value: unknown): unknown {
 }
 
 function isSecretLikePath(keyPath: string): boolean {
-  return /(^|\.|-|_)(secret|token|password|credential|private|clientSecret|apiKey|key)(\.|-|_|$)/i.test(
-    keyPath,
-  );
+  return /secret|token|password|credential|private|apikey|key/i.test(keyPath);
 }
 
 function stringifyDiagnosticValue(value: unknown): string {

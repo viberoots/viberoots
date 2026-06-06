@@ -50,3 +50,10 @@ REVIEWED_DEPLOYMENT_TEST_OWNERSHIP.update({
 REVIEWED_DEPLOYMENT_TEST_OWNERSHIP.update({
     "build-tools/tools/tests/deployments/sprinkleref-project-config.test.ts": True,
 })
+
+REVIEWED_DEPLOYMENT_TEST_OWNERSHIP.update({
+    "build-tools/tools/tests/deployments/deployment-contexts.scope.helpers.ts": False,
+    "build-tools/tools/tests/deployments/deployment-contexts.authoring.test.ts": True,
+    "build-tools/tools/tests/deployments/deployment-contexts.test.ts": True,
+    "build-tools/tools/tests/deployments/deployment-contexts.scope.test.ts": True,
+})

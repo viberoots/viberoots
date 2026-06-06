@@ -40,6 +40,7 @@ export type CloudflarePagesAdmittedContext = {
   admissionPolicyRef: string;
   admissionPolicyFingerprint: string;
   environmentStage: string;
+  deploymentContext?: CloudflarePagesDeployment["deploymentContext"];
   secretBackend?: DeploymentSecretBackendKind;
   secretBackendProfile?: string;
   infisicalRuntime?: CloudflarePagesDeployment["infisicalRuntime"];
@@ -78,6 +79,7 @@ async function baseContext(
     admissionPolicyRef: deployment.admissionPolicyRef,
     admissionPolicyFingerprint: deployment.admissionPolicy.fingerprint,
     environmentStage: deployment.environmentStage,
+    ...(deployment.deploymentContext ? { deploymentContext: deployment.deploymentContext } : {}),
     secretBackend: deployment.secretBackend || "vault",
     secretBackendProfile: deployment.secretBackendProfile,
     ...(deployment.infisicalRuntime ? { infisicalRuntime: deployment.infisicalRuntime } : {}),
