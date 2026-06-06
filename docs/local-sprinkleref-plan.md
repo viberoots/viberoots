@@ -1634,3 +1634,255 @@ portable as a submodule.
 The migration touches several setup paths and docs at once, and operators with existing local files
 will need to move values into the new canonical file. The resulting model is simpler after the
 migration because normal setup has exactly one committed shared file and one ignored local file.
+
+## PR-13: Deployment contexts for shared provider topology
+
+### 1. Intent
+
+Allow multiple deployments in the same repo to use different shared AWS accounts, Infisical
+projects, environments, and provider coordinates without reintroducing scattered app or
+deployment-local resolver config. Use one easy-to-reason-about selector:
+`deployment_context = "<name>"`. Keep `projects/config/shared.json` as the source of shared
+deployment context definitions, keep `projects/config/local.json` as the individual-user overlay,
+and keep apps backend-neutral.
+
+### 2. Scope of changes
+
+- Extend `projects/config/shared.json` with a `deploymentContexts` object keyed by names such as
+  `pleomino-prod`, `pleomino-staging`, or `admin-prod`.
+- Each deployment context may contain typed provider sections for shared non-secret topology, for
+  example:
+  - `aws`: account id, organization id, default region, optional expected role ARN, and other
+    non-secret AWS coordinates;
+  - `infisical`: host, project id/name, environment, default path, and logical refs for bootstrap
+    credentials required to access that Infisical project;
+  - `supabase`: organization id, project ref, region, or other non-secret managed-service
+    coordinates;
+  - `cloudflare`: account id, zone id, project name/id, and logical refs for provider API tokens;
+  - future typed provider sections when they have clear validation rules.
+- Keep deployment contexts intentionally shallow and typed. Do not add a generic arbitrary
+  `projects/config` overlay inside each context, and do not split contexts into a graph of reusable
+  subprofiles unless real duplication later justifies it.
+- Add deployment metadata support for selecting exactly one context, for example
+  `deployment_context = "pleomino-prod"`.
+- Resolve deployment context names by loading `projects/config/shared.json` plus the local overlay.
+  Shared config provides repo-wide non-secret topology; local config may fill missing values or
+  temporarily override values with the existing active-local-override diagnostics and guardrails.
+- Preserve the existing deployment `secret_backend = "<backend>/<profile-alias>"` selector while
+  the migration is in progress, but document how it relates to the selected deployment context.
+  In this PR, keep explicit `secret_backend` as the authoritative deployment secret-backend
+  selector for existing secret runtime paths. A deployment context may include a `secretBackend`
+  default such as `infisical/pleomino-prod`, but that default should only fill an omitted
+  deployment `secret_backend`; if both are present and disagree, fail closed rather than silently
+  choosing one.
+- Treat deployment context provider sections as shared defaults/constraints for provider topology,
+  not as replacements for every existing `provider_target` field. Context values may fill missing
+  non-secret fields such as account id, organization id, zone id, region, or Infisical project id.
+  If a deployment also declares the same field in `provider_target`, `infisical_runtime`, or another
+  provider-native metadata object, the values must match unless that field has an explicitly
+  documented override rule. Prefer fail-closed mismatch diagnostics over hidden precedence.
+- Keep raw credentials and token values out of deployment metadata, shared config, and local config.
+  Deployment contexts may contain logical secret refs such as
+  `secret://bootstrap/pleomino-prod/infisical/client-secret` or
+  `secret://deployments/pleomino/prod/cloudflare-api-token`, but never the secret value itself.
+- Route bootstrap secret refs, such as Infisical Universal Auth client id/client secret refs, through
+  the selected runtime host/bootstrap lane. These refs are named by the context, but their values
+  live in macOS Keychain, CI secret storage, an explicitly selected local file, or another allowed
+  bootstrap backend.
+- Route provider/runtime secret refs, such as Cloudflare API tokens, through the selected
+  deployment context's secret backend. Secret values remain in Infisical, Vault, or another
+  configured secret backend.
+- Decide whether existing deployment `infisical_runtime` fields are:
+  - durable deployment identity/replay metadata that should remain on deployment records or
+    admission evidence; or
+  - duplicated resolver topology that should move into the selected deployment context.
+- Where `infisical_runtime` is only duplicated resolver topology, replace raw project id,
+  environment, path, and credential ref duplication with a selected deployment context plus
+  generated or resolved runtime evidence.
+- Where `infisical_runtime` is needed for exact replay/audit identity, keep it as evidence derived
+  from the selected deployment context at admission time rather than as hand-maintained deployment
+  resolver configuration.
+- Add validation that apps under `projects/apps/**` cannot define SprinkleRef backend topology,
+  `deployment_context`, `secret_backend`, Infisical project ids, provider account ids, or similar
+  deployment resolver selection fields. App code and app metadata should declare logical refs and
+  build/runtime requirements only.
+- Update deployment extraction, admission, bootstrap, and secret runtime paths so they preserve
+  existing behavior while sourcing shared provider topology from the selected deployment context
+  where appropriate.
+- Add a small typed validator for deployment contexts instead of relying on broad string scans.
+  Validate known provider sections and known secret-ref fields explicitly so non-secret ids that
+  contain words like `key`, `token`, or `secret` in a field name are not accidentally rejected.
+- Keep the implementation focused on the single context selector. Do not add per-app config
+  overlays, per-deployment arbitrary `projects/config` overrides, or another file hierarchy below
+  `projects/config/`.
+
+### 3. External prerequisites
+
+- The repo's shared provider coordinates that are common to all operators must be known and safe to
+  commit as non-secret shared topology.
+- Any deployment that should use a different AWS account, Infisical project, Supabase project,
+  Cloudflare account, or similar provider coordinate needs a named deployment context added to
+  `projects/config/shared.json`.
+- Secret values referenced by a context must already exist in the selected secret backend or
+  bootstrap backend, or the deployment setup flow must create/check them without writing plaintext
+  into JSON config.
+- Operators with clone-specific account experiments can continue using `projects/config/local.json`
+  overrides, with active override diagnostics making that drift visible.
+
+### 4. Tests to be added
+
+- Add project config schema/loader tests proving multiple named deployment contexts can coexist in
+  `projects/config/shared.json`.
+- Add deployment metadata tests proving one deployment can select `deployment_context =
+  "pleomino-prod"` and another can select `deployment_context = "admin-prod"`, with each resolving
+  distinct typed provider sections.
+- Add tests proving two deployments can use different AWS account ids and different Infisical
+  project ids through deployment contexts.
+- Add tests proving missing, misspelled, or malformed deployment context names fail closed with
+  actionable diagnostics.
+- Add tests proving deployment metadata rejects inline context objects, inline resolver profile
+  objects, inline Infisical project credentials, unsupported `secret_backend_profile`, and malformed
+  selector names.
+- Add tests proving shared and local deployment contexts reject secret-looking plaintext values and
+  allow logical `secret://...` refs in provider sections, with field-aware validation rather than
+  broad substring matching.
+- Add tests proving context `secretBackend` defaults fill omitted `secret_backend` values and fail
+  closed when an explicit deployment `secret_backend` disagrees with the selected context.
+- Add tests proving context-derived provider values fill missing deployment metadata fields and
+  fail closed when duplicated explicit deployment metadata disagrees.
+- Add local overlay tests proving `projects/config/local.json` can fill a missing shared account
+  coordinate or temporarily override a shared coordinate, and that override reporting/redaction still
+  works for deployment-selected contexts.
+- Add bootstrap tests proving context-owned Infisical bootstrap refs resolve through the bootstrap
+  runtime host rather than requiring the same Infisical project before authentication.
+- Add provider secret tests proving context-owned runtime refs, such as Cloudflare API token refs,
+  resolve through the selected secret backend without writing values to JSON.
+- Add admission or runtime tests proving Infisical replay evidence records the concrete project,
+  environment, path, and secret identity derived from the selected deployment context without
+  requiring hand-maintained duplicated resolver topology in deployment metadata.
+- Add repository hygiene or lint tests proving app packages cannot declare backend topology fields
+  such as `deployment_context`, `secret_backend`, `infisical_runtime`, provider account ids,
+  Infisical project ids, or raw SprinkleRef resolver profile definitions.
+- Add regression tests proving existing deployments using `secret_backend = "infisical/default"`
+  keep working during the migration and have a documented relationship to the selected deployment
+  context.
+
+### 5. Docs to be added or updated
+
+- Update [SprinkleRef Resolver](sprinkleref.md) to explain the boundary:
+  - apps declare logical refs and requirements;
+  - deployments select one `deployment_context`;
+  - `projects/config/shared.json` defines what that context means;
+  - `projects/config/local.json` provides individual-user fills or temporary overrides.
+- Update [Local SprinkleRef Design](local-sprinkleref.md) with real examples showing two deployments
+  in one repo using different AWS accounts and different Infisical projects by selecting different
+  deployment contexts.
+- Update deployment authoring docs to document `deployment_context = "<name>"` and show a concrete
+  `projects/config/shared.json` example with typed `aws`, `infisical`, `supabase`, and `cloudflare`
+  sections.
+- Document the secret-value rule: deployment contexts may contain ids, names, regions, paths, URLs,
+  and logical secret refs, but must not contain API tokens, client secrets, passwords, private keys,
+  or other secret values.
+- Document how bootstrap refs named by a context resolve through runtime hosts and how runtime
+  provider refs resolve through the selected deployment secret backend.
+- Document context/default precedence: deployment context values fill omitted deployment metadata,
+  duplicated explicit deployment metadata must match by default, and any intentionally supported
+  override must be documented field-by-field.
+- Document that deployment contexts are typed provider topology records, not arbitrary config
+  overlays.
+- Document how exact Infisical replay/audit evidence is derived from selected deployment contexts
+  and where durable identity metadata belongs after admission.
+- Add an explicit anti-pattern section showing why app-level resolver config, deployment-local
+  inline backend profiles, and plaintext secret values in JSON config are not supported.
+
+### 5.5. Expected regression scope
+
+- `deployment-only`
+- Expected implementation paths:
+  - `projects/config/shared.json`
+  - `build-tools/deployments/*.bzl`
+  - `build-tools/tools/deployments/project-config.ts`
+  - deployment context resolution helpers under `build-tools/tools/deployments/`
+  - `build-tools/tools/deployments/deployment-secret-backend-selector.ts`
+  - `build-tools/tools/deployments/deployment-secret-metadata.ts`
+  - `build-tools/tools/deployments/deployment-secret-infisical*.ts`
+  - `build-tools/tools/deployments/infisical-iac-bootstrap-*.ts`
+  - AWS account/deployment metadata helpers under `build-tools/tools/deployments/`
+  - repository hygiene or lint tests under `build-tools/tools/tests/`
+  - `projects/deployments/**`
+  - `docs/**`
+- Avoid app implementation changes except for guardrail tests proving apps do not own resolver
+  topology.
+
+### 6. Acceptance criteria
+
+- `projects/config/shared.json` can define multiple named deployment contexts with typed provider
+  sections.
+- Deployment metadata can select exactly one deployment context without defining raw resolver
+  topology inline.
+- Two deployments in the same repo can select different AWS accounts and different Infisical
+  projects/accounts through different deployment contexts.
+- Deployment contexts allow logical secret refs but reject or flag plaintext secret values.
+- Context `secretBackend` defaults can fill omitted `secret_backend`, and explicit mismatches fail
+  closed.
+- Context provider values can fill omitted provider metadata, and duplicated explicit provider
+  metadata must match unless an override is documented for that field.
+- Bootstrap refs named by a deployment context resolve through the selected runtime host/bootstrap
+  lane, while runtime provider refs resolve through the selected secret backend.
+- App packages do not gain resolver override capability and are prevented from declaring backend
+  topology fields.
+- Existing `secret_backend = "infisical/default"` deployments continue to work through the named
+  shared profile path during the migration.
+- `secret_backend_profile` remains unsupported.
+- Duplicated `infisical_runtime` resolver topology is either removed in favor of selected shared
+  deployment contexts or clearly limited to generated/admission-time replay evidence.
+- Missing, malformed, or unknown deployment context selectors fail closed with diagnostics that
+  point to `projects/config/shared.json` or `projects/config/local.json` as appropriate.
+- Local overrides of selected shared topology remain visible in active local override diagnostics
+  and continue to respect the no-local-overrides guard.
+- Docs clearly explain why apps declare logical refs, deployments select one context, shared project
+  config defines the context, and secret values stay in secret backends.
+
+### 7. Risks
+
+- Deployment contexts could become an arbitrary override system if the schema allows untyped nested
+  config instead of validated provider sections.
+- Moving duplicated Infisical runtime metadata too aggressively could weaken replay or audit
+  evidence if exact project/environment/path identity is not recorded elsewhere.
+- Deployment context naming could conflict with existing environment-stage or provider-target
+  concepts if the selector is not introduced carefully.
+- App-level guardrails could reject legitimate app documentation examples if the lint is too broad.
+- Secret refs inside contexts could be confused with secret values unless docs and validators draw a
+  clear line.
+
+### 8. Mitigations
+
+- Keep the deployment metadata selector to one string field, `deployment_context`, and validate it
+  against named shared config entries.
+- Keep context provider sections shallow, typed, and validated per provider.
+- Preserve concrete backend identity in admission evidence and replay records even when deployment
+  metadata only selects a deployment context.
+- Introduce deployment context resolution through the existing deployment metadata/extraction layer
+  so provider-specific fields and context-derived fields have one documented precedence rule.
+- Add validators and docs that distinguish allowed logical secret refs from forbidden plaintext
+  secret values.
+- Prefer field-aware validation over broad secret-looking substring scans for deployment contexts.
+- Scope app guardrails to active app metadata/source patterns that would actually affect resolver
+  topology, and allow historical docs only through explicit test fixtures or allowlists.
+- Add tests for positive multi-account/multi-Infisical cases, context-owned secret refs, bootstrap
+  secret resolution, and negative inline-override/plaintext-secret cases.
+
+### 9. Consequences of not implementing this PR
+
+Deployments can already choose a secret backend profile, but broader account and provider topology
+selection will remain inconsistent. Teams may duplicate Infisical project ids, environments, AWS
+account ids, Supabase project refs, Cloudflare account ids, and credential refs in deployment
+metadata, or push those choices down into app directories. That would undermine the
+`projects/config` shared/local split and make multi-account repos harder to audit.
+
+### 10. Downsides for implementing this PR
+
+The PR adds one explicit selector concept to deployment metadata and requires careful migration of
+existing Infisical runtime fields. The payoff is a clearer boundary: shared project config owns
+typed deployment contexts, deployments choose one context, apps stay backend-neutral, and secret
+values remain in secret backends rather than JSON config.
