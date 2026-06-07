@@ -804,22 +804,34 @@ Field meanings with example values:
 
 Deployment metadata also carries backend routing fields:
 
-- `secretBackend`: normalized from `secret_backend`; omitted TARGETS metadata
-  becomes `vault`
+- `secretBackend`: normalized from the context-resolved backend selector. An
+  explicit `secret_backend` wins only when it agrees with the selected
+  deployment context. If `secret_backend` is omitted and the selected
+  `deployment_context` has `secretBackend`, that context value is used;
+  context-less deployments still use the legacy Vault default.
 - `secretBackendProfile`: normalized from the preferred
-  `secret_backend = "<backend>/<profile-alias>"` selector; omitted TARGETS
-  metadata becomes `vault-default`
-- `infisicalRuntime`: normalized from `infisical_runtime`; contains non-secret
-  Infisical routing data and reviewed Universal Auth environment variable names
+  `secret_backend = "<backend>/<profile-alias>"` selector after deployment
+  context defaults are applied. A context-provided
+  `secretBackend = "infisical/default"` therefore yields the
+  `infisical-default` profile even when TARGETS metadata omits
+  `secret_backend`; context-less deployments still use the legacy
+  `vault-default` profile.
+- `infisicalRuntime`: normalized from the selected deployment context plus any
+  explicit `infisical_runtime`; contains non-secret Infisical routing data and
+  reviewed Universal Auth environment variable names. Explicit deployment
+  values must agree with context-provided values.
 - `infisicalSecretMappings`: normalized from `infisical_secret_mappings`; maps
   declared contract IDs to non-secret `secretPath` and `secretName` overrides
 
-Infisical admission derives the default selector from the contract and
-`infisicalRuntime`:
+Infisical admission derives the default selector from the contract and the
+context-resolved `infisicalRuntime`:
 
-- `projectId` comes from `infisical_runtime.project_id`
-- `environment` comes from `infisical_runtime.environment`
-- `secretPath` comes from `infisical_runtime.secret_path`, defaulting to `/`
+- `projectId` comes from the selected context's Infisical `projectId` or an
+  agreeing `infisical_runtime.project_id`
+- `environment` comes from the selected context's Infisical `environment` or an
+  agreeing `infisical_runtime.environment`
+- `secretPath` comes from the selected context's Infisical `defaultPath` or an
+  agreeing `infisical_runtime.secret_path`, defaulting to `/`
 - `secretName` defaults to the final path segment of the contract ID
 
 The adapter reads shared secrets with `GET /api/v4/secrets/{secretName}`. It
@@ -988,13 +1000,15 @@ selection on auto so the CLI uses a public PKCE client on desktop terminals and
 device/print-only behavior on SSH/headless sessions.
 
 Local/direct Vault deploys derive the Vault role and bound claims from the
-selected deployment and its `vault_runtime` metadata, then create a typed context containing the
-Vault address. Local/direct Infisical deploys instead create a typed context containing the
-Universal Auth runtime credential. They read the reviewed `machine_identity_client_id_env` and
-`machine_identity_client_secret_env` names from `infisical_runtime` and create
-an in-memory Universal Auth context. Infisical deployments with non-empty
-`secret_requirements` must declare both env-name fields as valid environment
-variable names unless the provider-neutral fixture path below is active.
+selected deployment and its `vault_runtime` metadata, then create a typed
+context containing the Vault address. Local/direct Infisical deploys instead
+create a typed context containing the Universal Auth runtime credential. They
+read the reviewed `machine_identity_client_id_env` and
+`machine_identity_client_secret_env` names from context-resolved
+`infisicalRuntime` and create an in-memory Universal Auth context. Infisical
+deployments with non-empty `secret_requirements` must declare both env-name
+fields as valid environment variable names unless the provider-neutral fixture
+path below is active.
 Vault local/direct creates a typed context containing the Vault address.
 Protected service-backed deploys use a different boundary: the submitter's
 PKCE/device session authorizes the request, while the `mini` worker reads
@@ -1231,10 +1245,10 @@ The Infisical admin namespace is read-only in this release:
   Builds a local desired-state plan from reviewed deployment metadata. It does
   not call Infisical.
 - `deploy admin infisical check --deployment <label>`
-  Uses the reviewed Universal Auth credential source from `infisical_runtime` to
-  read live Infisical metadata and verify the project, environment, and mapped
-  shared secrets exist. It reads metadata only and requests secret reads with
-  `viewSecretValue=false`.
+  Uses the reviewed Universal Auth credential source from context-resolved
+  Infisical runtime metadata to read live Infisical metadata and verify the
+  project, environment, and mapped shared secrets exist. It reads metadata only
+  and requests secret reads with `viewSecretValue=false`.
 
 Example output fields:
 

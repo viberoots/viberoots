@@ -4,6 +4,66 @@ import { normalizeTargetLabel } from "../lib/labels";
 import { deploymentSecretBackendSelectorErrors } from "./deployment-secret-backend-selector";
 
 const PROVIDER_KEYS = new Set(["aws", "infisical", "supabase", "cloudflare"]);
+const PROVIDER_FIELDS: Record<string, Set<string>> = {
+  aws: fieldSet([
+    "account",
+    "accountId",
+    "account_id",
+    "organizationId",
+    "organization_id",
+    "region",
+    "defaultRegion",
+  ]),
+  cloudflare: fieldSet([
+    "account",
+    "accountId",
+    "account_id",
+    "project",
+    "projectName",
+    "projectId",
+    "id",
+    "customDomain",
+    "custom_domain",
+    "customDomainZoneId",
+    "custom_domain_zone_id",
+    "zoneId",
+    "zone_id",
+    "apiTokenRef",
+    "tokenRef",
+  ]),
+  infisical: fieldSet([
+    "host",
+    "site_url",
+    "projectId",
+    "project_id",
+    "projectName",
+    "project_name",
+    "projectSlug",
+    "project_slug",
+    "environment",
+    "defaultPath",
+    "secret_path",
+    "clientIdEnv",
+    "machine_identity_client_id_env",
+    "clientSecretEnv",
+    "machine_identity_client_secret_env",
+    "clientIdRef",
+    "machine_identity_client_id_ref",
+    "clientSecretRef",
+    "machine_identity_client_secret_ref",
+    "clientIdFileName",
+    "machine_identity_client_id_file_name",
+    "clientSecretFileName",
+    "machine_identity_client_secret_file_name",
+    "machineIdentityId",
+    "machine_identity_id",
+    "machineIdentityName",
+    "machine_identity_name",
+    "credentialSource",
+    "preferred_credential_source",
+  ]),
+  supabase: fieldSet(["organizationId", "organization_id", "projectRef", "project_ref", "region"]),
+};
 const APP_FORBIDDEN_KEYS = [
   "deployment_context",
   "secret_backend",
@@ -12,7 +72,14 @@ const APP_FORBIDDEN_KEYS = [
   "provider_target",
   "sprinkleref",
 ];
-const SECRET_REF_FIELDS = new Set(["apiTokenRef", "clientIdRef", "clientSecretRef", "tokenRef"]);
+const SECRET_REF_FIELDS = new Set([
+  "apiTokenRef",
+  "clientIdRef",
+  "clientSecretRef",
+  "machine_identity_client_id_ref",
+  "machine_identity_client_secret_ref",
+  "tokenRef",
+]);
 const SECRET_VALUE_FIELD_TOKENS = [
   "apitoken",
   "clientsecret",
@@ -113,6 +180,12 @@ function pushProviderFieldError(opts: {
 }) {
   const value = stringValue(opts.value);
   const fieldPath = `deployment_context ${opts.selector}.${opts.sectionName}.${opts.field}`;
+  const allowedFields = PROVIDER_FIELDS[opts.sectionName] || new Set<string>();
+  if (!allowedFields.has(opts.field)) {
+    opts.errors.push(
+      deploymentContextError(opts.label, `${fieldPath} is unsupported for ${opts.sectionName}`),
+    );
+  }
   if (SECRET_REF_FIELDS.has(opts.field) && !value.startsWith("secret://")) {
     opts.errors.push(deploymentContextError(opts.label, `${fieldPath} must be a secret:// ref`));
   } else if (looksSecretField(opts.field) && value && !value.startsWith("secret://")) {
@@ -151,4 +224,8 @@ function isRecord(value: unknown): value is ContextRecord {
 
 function stringValue(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
+}
+
+function fieldSet(fields: string[]) {
+  return new Set(fields);
 }

@@ -2108,3 +2108,90 @@ context-based Pleomino deployments.
 
 This adds one more follow-up PR after moving Pleomino onto contexts, but it closes the last known
 bootstrap gap and keeps resolver profile discovery aligned with the canonical deployment model.
+
+## PR-16: Tighten deployment context provider schemas and stale secret docs
+
+### 1. Intent
+
+Close the remaining documentation and validation gaps from the deployment context rollout. Deployment
+contexts should expose shallow typed provider sections, not arbitrary provider config overlays, and
+all docs should describe the context-resolved secret backend behavior implemented by PR-15.
+
+### 2. Scope of changes
+
+- Update deployment context validation so provider sections reject unknown or misspelled non-secret
+  fields per provider instead of accepting any object shape.
+- Keep provider section schemas shallow and explicit. Do not introduce deep provider config overlays
+  or generic pass-through bags.
+- Preserve existing secret-safety validation for provider sections, including plaintext secret
+  rejection and logical secret ref classification.
+- Update stale deployment secret docs that still say omitted `secret_backend` always becomes
+  `vault` / `vault-default` or that Infisical identity only comes from raw `infisical_runtime`.
+- Document that selected deployment contexts are applied before bootstrap profile discovery and may
+  provide the effective backend profile and Infisical identity.
+- Do not add backwards compatibility for misspelled or unknown context provider fields. There are no
+  users yet, so invalid shared config should fail closed.
+
+### 3. External prerequisites
+
+- Existing checked-in deployment contexts must use only the reviewed provider fields.
+- Operators should continue storing individual secret values outside checked-in config files.
+
+### 4. Tests to be added
+
+- Add validation tests proving unknown non-secret fields in typed provider sections are rejected with
+  actionable diagnostics.
+- Add coverage for at least the currently used provider sections, including Cloudflare and
+  Infisical, so misspelled shared topology fields fail closed.
+- Keep or update existing tests for plaintext secret rejection and allowed logical secret refs.
+- Add or update docs tests if this repository has a docs drift check for deployment secret docs.
+
+### 5. Docs to be added or updated
+
+- Update `docs/deployment-secrets-api.md` so context-resolved deployments are described correctly:
+  omitted `secret_backend` is filled from the selected context when present, bootstrap profile
+  discovery uses the context-resolved model, and Infisical identity may come from deployment
+  contexts.
+- Cross-reference the updated Infisical bootstrap docs where useful.
+
+### 5.5. Expected regression scope
+
+- `deployment-only`
+- Expected implementation paths:
+  - `build-tools/tools/deployments/deployment-context-validation.ts`
+  - `build-tools/tools/tests/deployments/**`
+  - `docs/deployment-secrets-api.md`
+  - `docs/infisical-bootstrap.md` only if wording needs alignment
+- Keep this PR focused on schema tightening and stale docs. Do not change runtime context merge
+  semantics beyond rejecting invalid provider fields.
+
+### 6. Acceptance criteria
+
+- Deployment context provider sections are shallow typed schemas with fail-closed unknown-field
+  validation.
+- Current checked-in deployment contexts pass the stricter validation.
+- Misspelled Cloudflare or Infisical provider fields in a context are rejected by tests.
+- Deployment secret docs no longer contradict PR-15 context-resolved backend/profile behavior.
+- Focused validation and final validation pass.
+
+### 7. Risks
+
+- A provider schema may accidentally omit a currently valid checked-in field.
+- Tightening validation can expose fixture data that was previously accepted only because provider
+  sections were generic objects.
+
+### 8. Mitigations
+
+- Build allowed provider fields from the existing typed context model and current checked-in
+  `projects/config/shared.json` usage.
+- Add targeted unknown-field tests before relying on broad final validation.
+
+### 9. Consequences of not implementing this PR
+
+Docs would continue describing pre-context bootstrap behavior, and typoed provider context fields
+could silently survive validation, weakening the typed shared-config model.
+
+### 10. Downsides for implementing this PR
+
+This is another cleanup PR after the main context work, but it keeps the change bounded to validation
+and documentation and removes the last known ambiguity in the plan.
