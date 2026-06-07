@@ -2,6 +2,7 @@ import { DEFAULT_GRAPH_PATH } from "../lib/graph-const";
 import { readGraph, type GraphNode } from "../lib/graph";
 import { normalizeTargetLabel } from "../lib/labels";
 import { resolveAllDeployments } from "./deployment-query";
+import { resolveDeploymentContextNodes } from "./deployment-contexts";
 import {
   emptyFanOut,
   executeDeploymentTargets,
@@ -50,7 +51,7 @@ export async function discoverDeploymentBootstrapTargets(
   } = {},
 ): Promise<DeploymentBootstrapDiscovery> {
   const graphPath = opts.graphPath || DEFAULT_GRAPH_PATH;
-  const fromGraph = await discoverFromGraph(graphPath);
+  const fromGraph = await discoverFromGraph(graphPath, opts.workspaceRoot);
   if (fromGraph.offeredTargets.length || fromGraph.unsupportedTargets.length) return fromGraph;
   try {
     return classifyDeploymentTargets(
@@ -145,10 +146,22 @@ function classifyDeploymentTargets(
   );
 }
 
-async function discoverFromGraph(graphPath: string): Promise<DeploymentBootstrapDiscovery> {
+async function discoverFromGraph(
+  graphPath: string,
+  workspaceRoot = process.cwd(),
+): Promise<DeploymentBootstrapDiscovery> {
   const nodes = await readGraph(graphPath).catch(() => []);
+  const contextErrors: string[] = [];
+  const contextResolvedNodes = resolveDeploymentContextNodes(nodes, contextErrors, workspaceRoot);
+  if (contextErrors.length > 0) {
+    return {
+      offeredTargets: [],
+      unsupportedTargets: contextErrors.map(contextErrorTarget),
+      source: "graph",
+    };
+  }
   return classifyCandidates(
-    nodes.filter(isInfisicalDeploymentNode).map((node) => ({
+    contextResolvedNodes.filter(isInfisicalDeploymentNode).map((node) => ({
       target: normalizeTargetLabel(String(node.name || "")),
       family: stringAttr(node, "deployment_family"),
     })),
@@ -191,6 +204,14 @@ function unsupportedReason(candidate: { family?: string }) {
   return candidate.family === "pleomino"
     ? "Infisical bootstrap currently supports only reviewed Pleomino staging/prod targets"
     : "deployment does not match a reviewed Infisical bootstrap family";
+}
+
+function contextErrorTarget(error: string) {
+  const [target, ...reason] = error.split(": ");
+  return {
+    target: normalizeTargetLabel(target || ""),
+    reason: reason.join(": ") || error,
+  };
 }
 
 function reportUnsupportedTargets(

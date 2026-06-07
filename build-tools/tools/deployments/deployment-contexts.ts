@@ -18,8 +18,12 @@ const CONTEXT_NAME = /^[a-z0-9][a-z0-9-]*$/;
 
 type ContextRecord = Record<string, unknown>;
 
-export function resolveDeploymentContextNodes(nodes: GraphNode[], errors: string[]): GraphNode[] {
-  const loaded = readProjectConfigSync();
+export function resolveDeploymentContextNodes(
+  nodes: GraphNode[],
+  errors: string[],
+  cwd = process.cwd(),
+): GraphNode[] {
+  const loaded = readProjectConfigSync(cwd);
   pushAppDeploymentTopologyErrors(nodes, errors);
   return nodes.map((node) =>
     resolveDeploymentContextNode({

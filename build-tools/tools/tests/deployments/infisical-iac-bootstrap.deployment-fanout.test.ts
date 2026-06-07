@@ -12,6 +12,15 @@ import {
   discoverDeploymentBootstrapTargets,
   runDeploymentBootstrapFanOut,
 } from "../../deployments/infisical-iac-bootstrap-deployments";
+import {
+  deploymentNode,
+  fanOutOnlyNode,
+  graph,
+  graphIn,
+  pleominoContextNode,
+  promptOnlyFanOutNode,
+  writeRepoOnlyResolver,
+} from "./infisical-iac-bootstrap.fanout-helpers";
 
 const staging = "//projects/deployments/pleomino/staging:deploy";
 const prod = "//projects/deployments/pleomino/prod:deploy";
@@ -31,6 +40,37 @@ test("deployment fan-out discovery uses reviewed graph metadata", async () => {
     },
   ]);
   assert.equal(discovery.source, "graph");
+});
+
+test("deployment fan-out discovery applies Pleomino deployment context defaults", async () => {
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), "infisical-context-fanout-"));
+  await writeRepoOnlyResolver(dir);
+  const graphPath = await graphIn(dir, [
+    pleominoContextNode(staging, "pleomino-staging"),
+    pleominoContextNode(prod, "pleomino-prod"),
+  ]);
+  const discovery = await discoverDeploymentBootstrapTargets({ graphPath, workspaceRoot: dir });
+  assert.deepEqual(discovery.offeredTargets, [prod, staging]);
+  assert.deepEqual(discovery.unsupportedTargets, []);
+  assert.equal(discovery.source, "graph");
+});
+
+test("deployment fan-out discovery fails closed on conflicting deployment context", async () => {
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), "infisical-context-conflict-"));
+  await writeRepoOnlyResolver(dir);
+  const graphPath = await graphIn(dir, [
+    {
+      ...pleominoContextNode(staging, "pleomino-staging"),
+      secret_backend: "vault/default",
+    },
+  ]);
+  const discovery = await discoverDeploymentBootstrapTargets({ graphPath, workspaceRoot: dir });
+  assert.deepEqual(discovery.offeredTargets, []);
+  assert.equal(discovery.unsupportedTargets[0]?.target, staging);
+  assert.match(
+    discovery.unsupportedTargets[0]?.reason || "",
+    /secret_backend vault\/default disagrees with deployment_context secretBackend infisical\/default/,
+  );
 });
 
 test("repo --without-deployments skips discovery and execution", async () => {
@@ -93,7 +133,7 @@ test("confirmed repo bootstrap performs repo setup before deployment fan-out pro
   await fs.mkdir(path.join(dir, "build-tools/tools/buck"), { recursive: true });
   await fs.writeFile(
     path.join(dir, "build-tools/tools/buck/graph.json"),
-    `${JSON.stringify({ nodes: [fanOutOnlyNode(staging)] }, null, 2)}\n`,
+    `${JSON.stringify({ nodes: [promptOnlyFanOutNode(staging)] }, null, 2)}\n`,
   );
   const output = await withInteractiveIo(["Y\n", "n\n"], async () => {
     await withCwd(dir, () =>
@@ -114,6 +154,7 @@ test("confirmed repo bootstrap performs repo setup before deployment fan-out pro
 
 test("repo dry-run reports non-empty deployment fan-out targets read-only", async () => {
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), "infisical-dry-run-fanout-"));
+  await writeRepoOnlyResolver(dir);
   const cwd = process.cwd();
   process.chdir(dir);
   try {
@@ -130,61 +171,11 @@ test("repo dry-run reports non-empty deployment fan-out targets read-only", asyn
     };
     assert.equal(report.deploymentFanOut?.readOnly, true);
     assert.deepEqual(report.deploymentFanOut?.offeredTargets, [staging]);
-    await assert.rejects(() => fs.stat(sharedConfigPath()), /ENOENT/);
+    await assert.rejects(() => fs.stat(path.join(".local", "bootstrap.json")), /ENOENT/);
   } finally {
     process.chdir(cwd);
   }
 });
-
-async function graph(nodes: unknown[]) {
-  const dir = await fs.mkdtemp(path.join(os.tmpdir(), "infisical-fanout-"));
-  const graphPath = path.join(dir, "graph.json");
-  await fs.writeFile(graphPath, `${JSON.stringify({ nodes }, null, 2)}\n`);
-  return graphPath;
-}
-
-function sharedConfigPath() {
-  return path.join("projects", "config", "shared.json");
-}
-
-function deploymentNode(name: string, family: string) {
-  return {
-    name,
-    rule_type: "deployment_target",
-    deployment_family: family,
-    environment_stage: "prod",
-    secret_backend: "infisical/default",
-    infisical_runtime: { project_id: "proj_1", environment: "prod" },
-  };
-}
-
-function fanOutOnlyNode(name: string) {
-  const node = deploymentNode(name, "pleomino");
-  delete (node as { secret_backend?: string }).secret_backend;
-  return node;
-}
-
-async function writeRepoOnlyResolver(dir: string) {
-  await fs.mkdir(path.join(dir, "projects/config"), { recursive: true });
-  await fs.writeFile(
-    path.join(dir, "projects/config/shared.json"),
-    `${JSON.stringify(
-      {
-        schemaVersion: "viberoots-project-config@1",
-        sprinkleref: {
-          version: 1,
-          defaultCategory: "main",
-          categories: {
-            main: { backend: "local-file", file: ".local/main.json" },
-            bootstrap: { backend: "local-file", file: ".local/bootstrap.json" },
-          },
-        },
-      },
-      null,
-      2,
-    )}\n`,
-  );
-}
 
 async function withCwd<T>(dir: string, run: () => Promise<T>) {
   const cwd = process.cwd();

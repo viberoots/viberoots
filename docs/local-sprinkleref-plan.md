@@ -2195,3 +2195,81 @@ could silently survive validation, weakening the typed shared-config model.
 
 This is another cleanup PR after the main context work, but it keeps the change bounded to validation
 and documentation and removes the last known ambiguity in the plan.
+
+## PR-17: Apply deployment contexts during bootstrap fan-out discovery
+
+### 1. Intent
+
+Close the remaining bootstrap gap for graph-only Infisical fan-out discovery. Repo bootstrap fan-out
+must recognize deployments whose raw graph metadata now selects a deployment context with
+Infisical topology, even when raw deployment metadata omits `secret_backend` and carries an empty
+`infisical_runtime`.
+
+### 2. Scope of changes
+
+- Update Infisical bootstrap deployment fan-out discovery so it applies selected deployment context
+  defaults before deciding whether a graph node is Infisical-backed.
+- Ensure Pleomino-shaped raw graph nodes with `deployment_context`, omitted `secret_backend`, empty
+  raw `infisical_runtime`, and secret requirements are included in Infisical bootstrap fan-out.
+- Remove stale fan-out fixture assumptions that require non-empty raw `infisical_runtime` for
+  context-based Pleomino deployments.
+- Keep behavior fail-closed when context resolution reports conflicts or invalid context metadata.
+- Do not add compatibility shims for pre-context Pleomino metadata shapes.
+
+### 3. External prerequisites
+
+- Checked-in deployment contexts must continue to define the shared Pleomino Infisical backend and
+  runtime topology in `projects/config/shared.json`.
+
+### 4. Tests to be added
+
+- Add or update fan-out tests using a graph node shaped like current Pleomino: selected context,
+  omitted `secret_backend`, empty raw `infisical_runtime`, and secret requirements.
+- Assert that fan-out includes the deployment and derives the Infisical project/environment/path from
+  the selected context.
+- Add a conflict/error regression proving invalid or conflicting context data prevents fan-out with
+  an actionable diagnostic.
+
+### 5. Docs to be added or updated
+
+- Update Infisical bootstrap docs if they still describe fan-out discovery as depending only on raw
+  `secret_backend` or raw `infisical_runtime`.
+
+### 5.5. Expected regression scope
+
+- `deployment-only`
+- Expected implementation paths:
+  - `build-tools/tools/deployments/infisical-iac-bootstrap-deployments.ts`
+  - `build-tools/tools/tests/deployments/infisical-iac-bootstrap.deployment-fanout.test.ts`
+  - `docs/infisical-bootstrap.md` if wording needs alignment
+- Keep this PR focused on bootstrap fan-out discovery. Do not change profile materialization,
+  admission, or provider schema behavior unless directly required by the fan-out fix.
+
+### 6. Acceptance criteria
+
+- Bootstrap fan-out discovery applies selected deployment contexts before classifying Infisical
+  deployments.
+- Current Pleomino-shaped graph metadata is included in Infisical bootstrap fan-out without raw
+  duplicated `infisical_runtime`.
+- Stale fan-out fixtures no longer encode the pre-context Pleomino shape.
+- Focused fan-out tests and final validation pass.
+
+### 7. Risks
+
+- Fan-out discovery could accidentally diverge from the context resolution used by profile
+  materialization and deployment extraction.
+
+### 8. Mitigations
+
+- Reuse the smallest existing deployment-context resolution helper needed by fan-out discovery.
+- Add direct regression coverage for the Pleomino-shaped graph node and context error path.
+
+### 9. Consequences of not implementing this PR
+
+Profile discovery would be context-aware, but bootstrap fan-out could still skip the real Pleomino
+deployments after PR-14 removed raw duplicated `infisical_runtime` metadata.
+
+### 10. Downsides for implementing this PR
+
+This is another cleanup PR, but it is narrow and aligns the last known bootstrap path with the
+context-resolved deployment model.

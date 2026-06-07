@@ -60,3 +60,7 @@ REVIEWED_DEPLOYMENT_TEST_OWNERSHIP.update({
     "build-tools/tools/tests/deployments/pleomino-deployment-context-explicit-provider.cquery.test.ts": True,
     "build-tools/tools/tests/deployments/pleomino-deployment-contexts.cquery.test.ts": True,
 })
+
+REVIEWED_DEPLOYMENT_TEST_OWNERSHIP.update({
+    "build-tools/tools/tests/deployments/infisical-iac-bootstrap.fanout-helpers.ts": False,
+})
