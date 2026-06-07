@@ -30,8 +30,8 @@ Non-goals:
 - no plaintext local storage path for true secrets
 - no direct AWS resource mutation or other infrastructure provisioning changes
 - no replacement of Infisical, Vault, or existing SprinkleRef backend implementations
-- no removal of existing `selected.local.json` compatibility until a migration path is implemented
-  and tested
+- no backwards-compatibility shims for deprecated `selected.local.json` paths; because there are no
+  users yet, old root paths may be rejected after migration diagnostics and tests exist
 
 Verify-scope organization:
 
@@ -140,8 +140,7 @@ secret material out of plaintext local JSON and preserving the compact setup UX.
   - `valuePrinted: false` for true secrets
 - Keep generated `inputs.json`, status output, and evidence redacted for true secrets.
 - Update existing setup docs so `config/sprinkleref/selected.json` is the preferred shared selector
-  and `config/sprinkleref/selected.local.json` is described only as an escape hatch or migration
-  artifact.
+  and `config/sprinkleref/selected.local.json` is described only as a deprecated migration artifact.
 
 ### 3. External prerequisites
 
@@ -196,7 +195,7 @@ secret material out of plaintext local JSON and preserving the compact setup UX.
   - hierarchical local values mapping
   - local redirect objects with `category: "bootstrap"`
   - shared `config/sprinkleref/selected.json` as the preferred selector
-  - `selected.local.json` as an escape hatch/migration path, not the normal local override path
+  - `selected.local.json` as a deprecated migration artifact, not the normal local override path
 - Update [AWS Account Control Plane And Remote Builds](aws-account-control-plane-and-remote-builds.md)
   with the new generated stack config shape, secret-class token handling, `sprinkleref --init-local`
   flow, and
@@ -251,8 +250,8 @@ secret material out of plaintext local JSON and preserving the compact setup UX.
 - Mark true secret fields explicitly and reject plaintext stack/local values for them.
 - Keep resolution order documented, tested, and reflected in human output.
 - Require cycle detection and unknown-category failures for redirects.
-- Keep `selected.local.json` as an escape hatch during migration while making the shared-selector plus
-  local-values path the preferred default.
+- Provide direct migration diagnostics for `selected.local.json` during migration while making the
+  shared-selector plus local-values path the only supported default.
 - Record source metadata in evidence for every resolved setup input.
 - Make `sprinkleref --init-local` preserve existing values and only add missing placeholders so it is
   safe to rerun.
@@ -299,8 +298,8 @@ and design assessments, so bootstrap token guidance, local redirect source metad
   The default init-local output must not print bootstrap token guidance.
 - Keep true secret handling unchanged: `sprinkleref --init-local` must not write plaintext secret
   values into `config/sprinkleref/local/values.json`.
-- Do not start broader resolver migration work, remove `selected.local.json` compatibility, or add a
-  new `bootstrap://` URI scheme.
+- Do not start broader resolver migration work beyond the local-values scope, reintroduce
+  `selected.local.json` compatibility shims, or add a new `bootstrap://` URI scheme.
 
 ### 3. External prerequisites
 
@@ -422,8 +421,7 @@ clone-local redirects.
   redirects may still provide their own `category` according to the PR-1 model.
 - Keep setup-shell environment fallback behavior unchanged for the Supabase Management API token.
 - Do not infer category from any `secret://...`, `config://...`, or `runtime://...` scheme/path
-  prefix, add a `bootstrap://` URI scheme, or remove existing `selected.local.json`
-  compatibility.
+  prefix, add a `bootstrap://` URI scheme, or reintroduce `selected.local.json` compatibility shims.
 
 ### 3. External prerequisites
 
@@ -552,7 +550,7 @@ existing bootstrap-category safety guard to AWS account stack ref resolution and
 - Keep `awsOrganizationId` non-secret: use `config://...` examples, do not redact it as a true
   secret, and do not suggest secret-token write commands for it.
 - Do not broaden this PR into resolver migration work, Supabase plan handling, direct AWS
-  provisioning, or removal of `selected.local.json` compatibility.
+  provisioning, or `selected.local.json` compatibility shims.
 
 ### 3. External prerequisites
 
@@ -673,7 +671,7 @@ stack category wins over every local value form, not only local redirect objects
 - Keep true secret plaintext rejection unchanged for local scalar values and local `{ "value": ... }`
   entries.
 - Do not change category defaults, generated stack config shape, bootstrap guard behavior, or
-  `selected.local.json` compatibility.
+  `selected.local.json` migration diagnostics.
 
 ### 3. External prerequisites
 
@@ -879,7 +877,7 @@ instead of being treated as missing local values.
 - Align resolver behavior with `sprinkleref --init-local`, which already validates the local values
   root as an object.
 - Do not change local values path conventions, stack config shape, category defaults, generated AWS
-  account setup config, or `selected.local.json` compatibility.
+  account setup config, or `selected.local.json` migration diagnostics.
 
 ### 3. External prerequisites
 
@@ -1086,8 +1084,8 @@ proves an intentional compatibility path is still required.
 - Keep only clone-local SprinkleRef values ignored, especially `config/sprinkleref/local/`.
 - Ensure shared resolver policy files such as `config/sprinkleref/base.json` and
   `config/sprinkleref/selected.json` are not ignored by the repo ignore policy.
-- Preserve `config/sprinkleref/selected.local.json` compatibility as an escape hatch or migration
-  artifact, but do not let the ignore policy hide the shared `selected.json` default.
+- Treat `config/sprinkleref/selected.local.json` only as a deprecated migration artifact, and do not
+  let the ignore policy hide the shared `selected.json` default.
 - Remove or rename the stale AWS account CLI flags:
   - `--supabase-access-token-ref`
   - `--supabase-access-token-ref-category`
@@ -1127,8 +1125,7 @@ proves an intentional compatibility path is still required.
 - Update `.gitignore` comments or local setup docs to explain that shared resolver config under
   `config/sprinkleref/` is tracked while `config/sprinkleref/local/` is ignored.
 - Update [SprinkleRef Resolver](sprinkleref.md) to clarify that `config/sprinkleref/selected.json`
-  is the tracked shared selector and `selected.local.json` is only an escape hatch or migration
-  artifact.
+  is the tracked shared selector and `selected.local.json` is only a deprecated migration artifact.
 - Update [AWS Account Control Plane And Remote Builds](aws-account-control-plane-and-remote-builds.md)
   and relevant command help so token setup uses `supabaseAccessToken` terminology and does not
   advertise stale `supabaseAccessTokenRef` inputs.
