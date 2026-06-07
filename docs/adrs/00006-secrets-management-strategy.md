@@ -6,10 +6,9 @@
 
 **Implementation note:** Current tooling supports Vault bootstrap/admin/runtime flows and gated
 Infisical live credential staging. The original non-goal wording below is historical for the
-initial scope; use [`../secrets-usage.md`](../secrets-usage.md),
-[`../control-plane-credential-staging.md`](../control-plane-credential-staging.md), and
-[`../control-plane-runtime-configuration.md`](../control-plane-runtime-configuration.md) for
-current operator commands.
+initial scope; use [`../secrets-usage.md`](../secrets-usage.md) and
+[`../control-plane-runtime-configuration.md`](../control-plane-runtime-configuration.md) for current
+operator commands.
 
 ## Context
 

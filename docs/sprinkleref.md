@@ -12,18 +12,20 @@ projects/config/local.json
 ```
 
 `projects/config/shared.json` is checked in and contains repo-wide non-secret routing metadata such
-as Infisical project coordinates, environments, runtime host profiles, resolver categories, and
-logical refs. `projects/config/local.json` is gitignored and contains individual operator values,
-such as local bootstrap sink selection, local file paths, and local AWS/Supabase sandbox
-coordinates. The tool loads shared config first, then deep-merges local config over it. When local
-config changes a shared value, commands report an `Active local overrides` section with redacted
-secret-like values. Set `VBR_DISALLOW_LOCAL_OVERRIDES=1` when a strict run should fail if any local
-override is active.
+as Infisical project coordinates, environments, runtime host profiles, control-plane profiles,
+resolver categories, and logical refs. `projects/config/local.json` is gitignored and contains
+individual operator values, such as local bootstrap sink selection, local file paths, and local
+AWS/Supabase sandbox coordinates. The tool loads shared config first, then deep-merges local config
+over it. When local config changes a shared value, commands report an `Active local overrides`
+section with redacted secret-like values. Set `VBR_DISALLOW_LOCAL_OVERRIDES=1` when a strict run
+should fail if any local override is active.
 
-`defaultCategory` is normally `main`. Omitted `--category` uses that category for ordinary
-deployment and application secrets. `--category bootstrap` is reserved for root credentials needed
-to access Infisical or Vault, so it must resolve to a non-Infisical backend such as macOS Keychain
-or restrictive local files.
+The current repo starter config sets `defaultCategory` to `control` so fresh control-plane setup
+commands resolve generated setup refs without relying on prefix inference. Omitted `--category`
+uses the configured default category. Use `--category main` for ordinary deployment and application
+secrets when the active default is `control`. `--category bootstrap` is reserved for root
+credentials needed to access Infisical or Vault, so it must resolve to a non-Infisical backend such
+as macOS Keychain or restrictive local files.
 That bootstrap safety guard applies both to standalone `sprinkleref` commands and to higher-level
 AWS account stack ref resolution when stack config or local values explicitly choose
 `category: "bootstrap"`.
@@ -37,20 +39,30 @@ requirements only, not resolver profiles, provider account ids, `deployment_cont
 `secret_backend`.
 
 Context records are shallow typed provider topology, not arbitrary overlays. Supported sections
-include `aws`, `infisical`, `supabase`, and `cloudflare`; values may be ids, names, regions, paths,
-URLs, or logical `secret://...` refs. Plaintext API tokens, client secrets, passwords, private keys,
-and other secret values are invalid in shared or local project config. A context `secretBackend`
-default can fill an omitted deployment `secret_backend`; if both are present and disagree, extraction
-fails closed. Context provider values fill omitted deployment metadata, while duplicated explicit
-`provider_target` or `infisical_runtime` values must match.
+include `aws`, `infisical`, `supabase`, and `cloudflare`; supported selectors include
+`secretBackend` and `controlPlane`. Values may be ids, names, regions, paths, URLs, or logical
+`secret://...` refs. Plaintext API tokens, client secrets, passwords, private keys, and other secret
+values are invalid in shared or local project config. A context `secretBackend` default can fill an
+omitted deployment `secret_backend`; if both are present and disagree, extraction fails closed.
+Context `controlPlane` selects a named entry in `controlPlanes`. Context provider values fill
+omitted deployment metadata, while duplicated explicit `provider_target` or `infisical_runtime`
+values must match.
+
+`controlPlanes` is checked-in shared topology. Each profile contains
+`serviceClient.controlPlaneUrl`, `serviceClient.controlPlaneTokenRef`, and optional
+`records.backend`. Control-plane URLs and selected profile names are shared config. Control-plane
+service tokens must be represented only by `secret://...` or `runtime://...` refs; plaintext token
+fields such as `controlPlaneToken`, `token`, or `bearerToken` are invalid in both shared and local
+project config. `records.backend` currently supports `service`.
 
 Pleomino is the checked-in context example. Staging selects
 `deployment_context = "pleomino-staging"` and production selects
-`deployment_context = "pleomino-prod"`. The shared config entries hold the Cloudflare account,
-Pages project, custom domain, zone id, Infisical project id/name/slug, environment, secret path, and
-Universal Auth machine identity metadata. The app and deployment family keep logical refs such as
-`secret://deployments/pleomino/cloudflare_api_token`; admission records store the resolved
-Infisical project/environment/path/name/version evidence needed for exact replay.
+`deployment_context = "pleomino-prod"`. The shared config entries hold the selected control-plane
+profile, Cloudflare account, Pages project, custom domain, zone id, Infisical project id/name/slug,
+environment, secret path, and Universal Auth machine identity metadata. The app and deployment
+family keep logical refs such as `secret://deployments/pleomino/cloudflare_api_token`; admission
+records store the resolved Infisical project/environment/path/name/version evidence needed for exact
+replay.
 
 Initialize starter configs:
 
@@ -121,7 +133,7 @@ instances/accounts, while categories name usage lanes:
   },
   "sprinkleref": {
     "version": 1,
-    "defaultCategory": "main",
+    "defaultCategory": "control",
     "profiles": {
       "infisical-default": {
         "backend": "infisical",
@@ -133,7 +145,8 @@ instances/accounts, while categories name usage lanes:
       }
     },
     "categories": {
-      "main": { "profile": "infisical-default" }
+      "main": { "profile": "infisical-default", "environment": "staging" },
+      "control": { "profile": "infisical-default", "environment": "prod" }
     }
   }
 }
@@ -237,23 +250,28 @@ Add, update, or remove ordinary secrets:
 
 ```bash
 sprinkleref \
-  --add secret://deployments/pleomino/staging/cloudflare_api_token
+  --add secret://deployments/pleomino/staging/cloudflare_api_token \
+  --category main
 
 sprinkleref \
   --add secret://deployments/pleomino/staging/cloudflare_api_token \
+  --category main \
   --overwrite-existing
 
 sprinkleref \
   --update secret://deployments/pleomino/prod/cloudflare_api_token \
+  --category main \
   --value-file .local/secrets/cloudflare-prod-token
 
 sprinkleref \
   --update secret://deployments/pleomino/prod/new_runtime_secret \
+  --category main \
   --create-missing \
   --value-file .local/secrets/new-runtime-secret
 
 sprinkleref \
-  --remove secret://deployments/pleomino/staging/cloudflare_api_token
+  --remove secret://deployments/pleomino/staging/cloudflare_api_token \
+  --category main
 ```
 
 When no `--value-env` or `--value-file` is supplied, the command prompts for the value instead of

@@ -29,7 +29,9 @@ Repository commands must not become a second imperative AWS provisioning engine.
 - [AWS EC2 Control Plane Host Profile](control-plane-aws-ec2-host-profile.md)
 - [Runtime Configuration](control-plane-runtime-configuration.md)
 - [Managed Dependencies](control-plane-managed-dependencies.md)
-- [Credential Staging](control-plane-credential-staging.md)
+- [Credential Staging](control-plane-runtime-configuration.md#credential-directory-contract)
+- [SprinkleRef Resolver](sprinkleref.md)
+- [Local SprinkleRef Design](local-sprinkleref.md)
 - [Remote Builds and Distributed Tests](../build-tools/docs/remote-build-setup.md)
 - [Infrastructure as Code Standard](adrs/00007-infrastructure-as-code-standard.md)
 
@@ -361,7 +363,7 @@ Automation target:
 
 - Supabase project is created in the selected region, `us-east-1` for the first stack.
 - Supabase Management API reports a Team or Enterprise plan that supports PrivateLink.
-- Supabase shares the PrivateLink resource with the new AWS account.
+- Supabase shares a VPC Lattice Resource Configuration with the new AWS account through AWS RAM.
 - AWS-side acceptance, endpoint wiring, private DNS, and validation evidence are handled by reviewed
   IaC and generated setup commands where the repo has control.
 
@@ -373,6 +375,8 @@ Human/provider step:
 Do not:
 
 - Use a public Supabase database URL as a temporary production fallback.
+- Assume Supabase API, Auth, Storage, or Realtime traffic is private because database PrivateLink is
+  configured. PrivateLink covers direct database and PgBouncer connections only.
 - Publish `db.control.example.com` in public DNS.
 - Proceed if Supabase and AWS are not in the same supported region.
 
@@ -642,8 +646,10 @@ Provider API boundaries:
 - Required CLIs and SDK-backed helper tools must come from the repo Nix flake or one of its flake
   inputs.
 - Durable AWS resources must be created or updated by OpenTofu.
-- Supabase PrivateLink setup may use Supabase dashboard/API evidence where available, but the
-  AWS-side RAM acceptance, endpoint, DNS, and validation path must stay IaC/evidence-driven.
+- Supabase PrivateLink setup may use Supabase dashboard/API evidence where available. The shared
+  resource is a VPC Lattice Resource Configuration delivered through AWS RAM; the AWS-side RAM
+  acceptance, endpoint or service-network association, DNS, and validation path must stay
+  IaC/evidence-driven.
 - Supabase API checks are read-only readiness checks. They validate that the supplied project ref,
   organization, region, and plan are accessible to the setup token before AWS-side IaC proceeds.
   The evidence records token source metadata only; it must never record the token value.
@@ -656,6 +662,9 @@ Selected baseline:
 
 - Database: Supabase Postgres over PrivateLink. The Supabase project, AWS VPC, and PrivateLink
   endpoint must be in a supported same-region pairing.
+- Scope: Supabase PrivateLink covers database and PgBouncer connections only. Supabase Management
+  API, Auth, Storage, and Realtime remain public Supabase service endpoints and must not be treated
+  as reachable through the database PrivateLink endpoint.
 - Public database access: not allowed for this setup. If PrivateLink is unavailable in the selected
   region or the API-reported Supabase plan is not Team or Enterprise, stop and change the
   region, Supabase organization plan, or account approach before continuing.
@@ -899,8 +908,8 @@ Artifact store:
 Secrets:
 
 - Use [Secrets Usage](secrets-usage.md) to choose Vault or Infisical for deployment secrets.
-- Use [Credential Staging](control-plane-credential-staging.md) for live control-plane credential
-  staging.
+- Use the [credential directory contract](control-plane-runtime-configuration.md#credential-directory-contract)
+  for live control-plane credential staging.
 - Keep bootstrap credentials outside the backend they unlock.
 
 ## Phase 4: Publish And Prove The Control-Plane Image

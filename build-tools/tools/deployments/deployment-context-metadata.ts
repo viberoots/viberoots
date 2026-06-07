@@ -10,6 +10,14 @@ export type DeploymentContextSecretRef = {
 
 export type DeploymentContextMetadata = {
   name: string;
+  controlPlane?: {
+    name: string;
+    serviceClient: {
+      controlPlaneUrl: string;
+      controlPlaneTokenRef: string;
+    };
+    records: { backend: "service" };
+  };
   localOverrides?: { path: string; sharedValue: unknown; localValue: unknown }[];
   secretRefs?: DeploymentContextSecretRef[];
 };
@@ -28,11 +36,26 @@ export function readDeploymentContextMetadata(
   const secretRefs = Array.isArray(record.secretRefs)
     ? (record.secretRefs as DeploymentContextSecretRef[])
     : undefined;
+  const controlPlane = readControlPlane(record.controlPlane);
   return {
     name,
+    ...(controlPlane ? { controlPlane } : {}),
     ...(localOverrides?.length ? { localOverrides } : {}),
     ...(secretRefs?.length ? { secretRefs } : {}),
   };
+}
+
+function readControlPlane(value: unknown): DeploymentContextMetadata["controlPlane"] | undefined {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
+  const record = value as DeploymentContextMetadata["controlPlane"];
+  if (
+    !record?.name ||
+    !record.serviceClient?.controlPlaneUrl ||
+    !record.serviceClient?.controlPlaneTokenRef
+  ) {
+    return undefined;
+  }
+  return record;
 }
 
 function stringValue(value: unknown) {

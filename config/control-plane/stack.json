@@ -1,6 +1,8 @@
 {
   "schemaVersion": "aws-account-stack-config@1",
-  "domain": "unfair.ly",
+  "domain": {
+    "ref": "config://control-plane/domain"
+  },
   "awsAccountId": {
     "ref": "config://control-plane/aws/account-id",
     "category": "control"

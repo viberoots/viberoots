@@ -1,5 +1,6 @@
 #!/usr/bin/env zx-wrapper
 import type { GraphNode } from "../lib/graph";
+import type { DeploymentControlPlaneProfile } from "./deployment-control-plane-profile";
 import type { RedactedProjectConfigOverride } from "./project-config";
 
 type ContextRecord = Record<string, unknown>;
@@ -14,12 +15,14 @@ export function applyContextSecretRefs(opts: {
   node: GraphNode;
   context: ContextRecord;
   localOverrides: RedactedProjectConfigOverride[];
+  controlPlane?: DeploymentControlPlaneProfile;
 }) {
   const secretRefs = contextSecretRefs(opts.context);
   opts.node.deployment_context_metadata = {
     name: stringValue(opts.node.deployment_context),
     ...(opts.localOverrides.length ? { localOverrides: opts.localOverrides } : {}),
     ...(secretRefs.length ? { secretRefs } : {}),
+    ...(opts.controlPlane ? { controlPlane: controlPlaneMetadata(opts.controlPlane) } : {}),
   };
   const cloudflareToken = secretRefs.find(
     (entry) => entry.provider === "cloudflare" && entry.field === "apiTokenRef",
@@ -43,8 +46,13 @@ export function contextSecretRefs(context: ContextRecord): ContextSecretRefRoute
 export function selectedContextOverrides(
   overrides: RedactedProjectConfigOverride[],
   selector: string,
+  controlPlaneName?: string,
 ): RedactedProjectConfigOverride[] {
-  return overrides.filter((entry) => entry.path.startsWith(`deploymentContexts.${selector}.`));
+  return overrides.filter(
+    (entry) =>
+      entry.path.startsWith(`deploymentContexts.${selector}.`) ||
+      (controlPlaneName && entry.path.startsWith(`controlPlanes.${controlPlaneName}.`)),
+  );
 }
 
 function appendCloudflareTokenRequirement(node: GraphNode, contractId: string) {
@@ -79,6 +87,16 @@ function secretRefRoute(provider: string, field: string) {
     return "bootstrap";
   }
   return "secret_backend";
+}
+
+function controlPlaneMetadata(
+  profile: DeploymentControlPlaneProfile,
+): DeploymentControlPlaneProfile {
+  return {
+    name: profile.name,
+    serviceClient: profile.serviceClient,
+    records: profile.records,
+  };
 }
 
 function isRecord(value: unknown): value is ContextRecord {

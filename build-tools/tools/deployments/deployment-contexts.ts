@@ -2,6 +2,7 @@
 import type { GraphNode } from "../lib/graph";
 import { normalizeDeploymentSecretBackendSelector } from "./deployment-secret-backend-selector";
 import { applyContextSecretRefs, selectedContextOverrides } from "./deployment-context-secret-refs";
+import { resolveContextControlPlane } from "./deployment-control-plane-profile";
 import {
   deploymentContextError,
   pushAppDeploymentTopologyErrors,
@@ -66,7 +67,18 @@ export function resolveDeploymentContextNode(opts: {
     return { ...opts.node };
   }
   const next = { ...opts.node };
-  const localOverrides = selectedContextOverrides(opts.overrides || [], selector);
+  const controlPlane = resolveContextControlPlane({
+    config: opts.config,
+    selector,
+    context,
+    label,
+    errors: opts.errors,
+  });
+  const localOverrides = selectedContextOverrides(
+    opts.overrides || [],
+    selector,
+    stringValue(context.controlPlane),
+  );
   if (process.env.VBR_DISALLOW_LOCAL_OVERRIDES === "1" && localOverrides.length > 0) {
     opts.errors.push(
       deploymentContextError(
@@ -78,7 +90,8 @@ export function resolveDeploymentContextNode(opts: {
   validateDeploymentContext({ context, selector, label, errors: opts.errors });
   applySecretBackendDefault({ node: next, context, label, errors: opts.errors });
   applyProviderDefaults({ node: next, context, label, errors: opts.errors });
-  applyContextSecretRefs({ node: next, context, localOverrides });
+  if (controlPlane) next.control_plane = controlPlane.graphMetadata;
+  applyContextSecretRefs({ node: next, context, localOverrides, controlPlane });
   return next;
 }
 

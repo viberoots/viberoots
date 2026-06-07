@@ -37,8 +37,29 @@
       "namePrefix": "VIBEROOTS_"
     }
   },
+  "controlPlanes": {
+    "pleomino-prod": {
+      "serviceClient": {
+        "controlPlaneUrl": "https://control-plane.unfair.ly",
+        "controlPlaneTokenRef": "secret://control-plane/pleomino/prod/service-token"
+      },
+      "records": {
+        "backend": "service"
+      }
+    },
+    "pleomino-staging": {
+      "serviceClient": {
+        "controlPlaneUrl": "https://staging.control-plane.unfair.ly",
+        "controlPlaneTokenRef": "secret://control-plane/pleomino/staging/service-token"
+      },
+      "records": {
+        "backend": "service"
+      }
+    }
+  },
   "deploymentContexts": {
     "pleomino-prod": {
+      "controlPlane": "pleomino-prod",
       "secretBackend": "infisical/default",
       "aws": {
         "accountId": "",
@@ -76,6 +97,7 @@
       }
     },
     "pleomino-staging": {
+      "controlPlane": "pleomino-staging",
       "secretBackend": "infisical/default",
       "infisical": {
         "host": "https://app.infisical.com",
@@ -101,6 +123,11 @@
         "zoneId": "9411ac5903acb1c2e29b3d4c04ef7e6f",
         "apiTokenRef": "secret://deployments/pleomino/cloudflare_api_token"
       }
+    }
+  },
+  "values": {
+    "control-plane": {
+      "domain": "unfair.ly"
     }
   },
   "sprinkleref": {

@@ -71,6 +71,10 @@ const APP_FORBIDDEN_KEYS = [
   "infisical_runtime",
   "provider_target",
   "sprinkleref",
+  "control_plane",
+  "controlPlane",
+  "controlPlaneUrl",
+  "controlPlaneTokenRef",
 ];
 const SECRET_REF_FIELDS = new Set([
   "apiTokenRef",
@@ -113,6 +117,17 @@ export function validateDeploymentContext(opts: {
   for (const [key, value] of Object.entries(opts.context)) {
     if (key === "secretBackend") {
       pushSecretBackendErrors(opts, value);
+      continue;
+    }
+    if (key === "controlPlane") {
+      if (!stringValue(value)) {
+        opts.errors.push(
+          deploymentContextError(
+            opts.label,
+            `deployment_context ${opts.selector}.controlPlane must be a non-empty string`,
+          ),
+        );
+      }
       continue;
     }
     if (!PROVIDER_KEYS.has(key)) {

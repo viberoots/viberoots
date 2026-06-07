@@ -11,6 +11,7 @@ export const PROJECT_LOCAL_CONFIG_PATH = `${PROJECT_CONFIG_DIR}/local.json`;
 export type ProjectConfig = Record<string, unknown> & {
   sprinkleref?: Record<string, unknown>;
   runtimeHosts?: Record<string, unknown>;
+  controlPlanes?: Record<string, unknown>;
   deploymentContexts?: Record<string, unknown>;
   activeRuntimeHost?: string;
   values?: Record<string, unknown>;

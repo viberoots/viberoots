@@ -24,10 +24,9 @@ manuals for day-to-day setup and operations; use plans and history as implementa
   service and worker runtime config, mounted credentials, and fail-closed validation.
 - [`control-plane-managed-dependencies.md`](control-plane-managed-dependencies.md): managed
   Postgres and S3-compatible artifact-store conformance.
-- [`control-plane-runtime-input.md`](control-plane-runtime-input.md): runtime input evidence for
-  generated cloud-control profiles.
-- [`control-plane-credential-staging.md`](control-plane-credential-staging.md): staged
-  control-plane credentials and live staging evidence.
+- [`control-plane-runtime-configuration.md`](control-plane-runtime-configuration.md): runtime input
+  evidence for generated cloud-control profiles, staged control-plane credentials, and live staging
+  evidence.
 - [`control-plane-aws-ec2-host-profile.md`](control-plane-aws-ec2-host-profile.md): generated AWS
   EC2 profile evidence and runtime artifact boundary.
 - [`deployment-control-plane-observability.md`](deployment-control-plane-observability.md):
