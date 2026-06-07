@@ -15,6 +15,7 @@ import { submitKubernetesProvisionOnly } from "./kubernetes-provision-only";
 import { readPreparedKubernetesPublisherConfigSnapshot } from "./kubernetes-config";
 import { runProtectedKubernetesDeployFrontDoor } from "./kubernetes-protected-front-door";
 import { resolveKubernetesReplaySource } from "./kubernetes-replay";
+import { shouldUseProtectedSharedServiceRoute } from "./deployment-service-client-selection";
 
 export async function runKubernetesDeployFrontDoor(opts: {
   workspaceRoot: string;
@@ -26,6 +27,9 @@ export async function runKubernetesDeployFrontDoor(opts: {
   sourceRunId: string;
   artifactDirFlag: string;
   backendDatabaseUrl?: string;
+  controlPlaneUrl: string;
+  controlPlaneToken?: string;
+  allowControlPlaneOverride: boolean;
   admissionEvidence?: unknown;
   smokeConnectOverride?: unknown;
   hasFlag?: (flag: string) => boolean;
@@ -46,12 +50,12 @@ export async function runKubernetesDeployFrontDoor(opts: {
       path.join(opts.workspaceRoot, ".local", "deployments", "kubernetes", "records"),
     ),
   );
-  const controlPlaneUrl =
-    getFlagStr("control-plane-url", "").trim() ||
-    String(process.env.VBR_DEPLOY_CONTROL_PLANE_URL || "").trim();
   if (
-    opts.deployment.protectionClass !== "local_only" &&
-    (opts.requireServiceForProtectedShared || !!controlPlaneUrl)
+    shouldUseProtectedSharedServiceRoute({
+      deployment: opts.deployment,
+      requireServiceForProtectedShared: opts.requireServiceForProtectedShared,
+      controlPlaneUrl: opts.controlPlaneUrl,
+    })
   ) {
     printDeployJson(
       await runProtectedKubernetesDeployFrontDoor({
@@ -61,8 +65,9 @@ export async function runKubernetesDeployFrontDoor(opts: {
         provisionOnly: opts.provisionOnly,
         rollback: opts.rollback,
         sourceRunId: opts.sourceRunId,
-        controlPlaneUrl,
-        controlPlaneToken: getFlagStr("control-plane-token", "").trim() || undefined,
+        controlPlaneUrl: opts.controlPlaneUrl,
+        controlPlaneToken: opts.controlPlaneToken,
+        allowControlPlaneOverride: opts.allowControlPlaneOverride,
         admissionEvidence: opts.admissionEvidence,
         smokeConnectOverride: opts.smokeConnectOverride,
         hasFlag: opts.hasFlag || (() => false),

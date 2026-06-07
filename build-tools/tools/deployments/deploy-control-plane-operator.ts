@@ -33,6 +33,8 @@ import {
   requireLookupSelector,
   resolveServiceClientForOperator,
 } from "./deploy-control-plane-operator-client";
+import { serviceClientSelectionEvidence } from "./deployment-service-client-selection";
+import type { SelectedDeploymentServiceClient } from "./deployment-service-client-selection";
 
 function operatorActionLabel(action: DeployControlPlaneOperatorAction): string {
   return `deploy --${action}`;
@@ -70,13 +72,13 @@ function serviceAction(action: DeployControlPlaneOperatorAction): DeploymentCont
         : "abort";
 }
 
-function operatorToken(controlPlaneToken?: string) {
-  return controlPlaneToken ? { controlPlaneToken } : {};
-}
+const operatorToken = (controlPlaneToken?: string) =>
+  controlPlaneToken ? { controlPlaneToken } : {};
 
 function buildRunActionRequest(
   action: DeploymentControlPlaneRunAction,
   status: DeploymentControlPlaneStatus,
+  serviceClient: SelectedDeploymentServiceClient,
   authSessionId?: string,
 ) {
   const requestedBy = requestedByFromFlags();
@@ -88,6 +90,7 @@ function buildRunActionRequest(
     action,
     ...(authSessionId ? { authSessionId } : {}),
     ...(requestedBy ? { requestedBy } : {}),
+    controlPlaneSelection: serviceClientSelectionEvidence(serviceClient),
   };
   if (action !== "approve") return request;
   const approval = status.approval;
@@ -123,6 +126,7 @@ async function runActionForOperator(opts: {
   status: DeploymentControlPlaneStatus;
   controlPlaneUrl: string;
   controlPlaneToken?: string;
+  serviceClient: SelectedDeploymentServiceClient;
   deployment: DeploymentTarget;
   vaultRuntimeInputs?: DeploymentVaultRuntimeInputs;
 }) {
@@ -136,7 +140,7 @@ async function runActionForOperator(opts: {
   const response = await submitNixosSharedHostControlPlaneRunActionViaService({
     controlPlaneUrl: opts.controlPlaneUrl,
     ...(opts.controlPlaneToken ? { token: opts.controlPlaneToken } : {}),
-    request: buildRunActionRequest(action, opts.status, authSessionId),
+    request: buildRunActionRequest(action, opts.status, opts.serviceClient, authSessionId),
   });
   printDeployJson(response);
 }
@@ -236,6 +240,7 @@ export async function maybeRunDeployControlPlaneOperatorCommand(opts: {
     action,
     status,
     controlPlaneUrl: serviceClient.controlPlaneUrl,
+    serviceClient,
     deployment: opts.deployment,
     vaultRuntimeInputs: opts.vaultRuntimeInputs,
     ...operatorToken(serviceClient.controlPlaneToken),

@@ -231,8 +231,12 @@ Examples:
   },
   "runtimeHosts": {
     "github-actions": {
-      "backend": "github-actions",
-      "namePrefix": "VIBEROOTS_"
+      "bindings": {
+        "control-plane-token": {
+          "kind": "env",
+          "name": "DEPLOY_CONTROL_PLANE_TOKEN"
+        }
+      }
     }
   }
 }
@@ -254,8 +258,9 @@ For an operator laptop:
 ```
 
 Both forms are valid. Use `secret://` when the resolver reads the token from a secret backend. Use
-`runtime://` when the selected host profile supplies the token by contract and the deploy command
-only needs to verify that the runtime binding exists.
+`runtime://` when the selected host profile supplies the token by contract. The current deploy CLI
+runtime token contract validates `runtimeHosts.<host>.bindings.<binding>` and supports `kind: "env"`
+bindings, then reads the named environment variable without printing the token value.
 
 ## Examples
 

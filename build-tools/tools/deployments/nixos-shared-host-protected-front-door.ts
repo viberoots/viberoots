@@ -8,7 +8,10 @@ import {
 import type { NixosSharedHostDeployment } from "./contract";
 import { isMultiComponentNixosSharedHostDeployment } from "./nixos-shared-host-components";
 import { runNixosSharedHostDirectServiceMutation } from "./nixos-shared-host-control-plane-service-front-door";
-import { resolveServiceClientFromFlags } from "./nixos-shared-host-service-client-config";
+import {
+  resolveProtectedSharedServiceClient,
+  serviceClientSelectionEvidence,
+} from "./deployment-service-client-selection";
 import type { DeploymentVaultRuntimeInputs } from "./deployment-vault-runtime-inputs";
 import {
   createAndWaitForServiceOwnedAuthSession,
@@ -44,6 +47,7 @@ export async function runProtectedNixosSharedHostDeployFrontDoor(opts: {
   smokeConnectOverride?: unknown;
   controlPlaneUrl: string;
   controlPlaneToken?: string;
+  allowControlPlaneOverride?: boolean;
   remote?: string;
   vaultRuntimeInputs?: DeploymentVaultRuntimeInputs;
   hasFlag: (flag: string) => boolean;
@@ -66,12 +70,16 @@ export async function runProtectedNixosSharedHostDeployFrontDoor(opts: {
       "nixos-shared-host --provision-only must not use --artifact-dir; default metadata-only runs do not load artifacts, and immutable reuse must be selected with --source-run-id",
     );
   }
-  const serviceClient = resolveServiceClientFromFlags({
+  const serviceClient = await resolveProtectedSharedServiceClient({
+    deployment: opts.deployment,
     controlPlaneUrl: opts.controlPlaneUrl,
     controlPlaneToken: opts.controlPlaneToken,
     remote: opts.remote,
+    allowControlPlaneOverride: opts.allowControlPlaneOverride,
+    workspaceRoot: opts.workspaceRoot,
     context: `nixos-shared-host ${opts.deployment.protectionClass} mutation`,
   });
+  const controlPlaneSelection = serviceClientSelectionEvidence(serviceClient);
   const idempotencyKey = getFlagStr("idempotency-key", "").trim();
   const result = opts.remove
     ? await runNixosSharedHostDirectServiceMutation({
@@ -85,6 +93,7 @@ export async function runProtectedNixosSharedHostDeployFrontDoor(opts: {
         ...(idempotencyKey ? { idempotencyKey } : {}),
         ...(await authSession(opts, serviceClient, "explicit_removal")),
         ...(opts.admissionEvidence ? { admissionEvidence: opts.admissionEvidence as any } : {}),
+        controlPlaneSelection,
       })
     : opts.provisionOnly
       ? await runNixosSharedHostDirectServiceMutation({
@@ -103,6 +112,7 @@ export async function runProtectedNixosSharedHostDeployFrontDoor(opts: {
           ...(opts.smokeConnectOverride
             ? { smokeConnectOverride: opts.smokeConnectOverride as any }
             : {}),
+          controlPlaneSelection,
         })
       : opts.publishOnly
         ? await runNixosSharedHostDirectServiceMutation({
@@ -122,6 +132,7 @@ export async function runProtectedNixosSharedHostDeployFrontDoor(opts: {
             ...(opts.smokeConnectOverride
               ? { smokeConnectOverride: opts.smokeConnectOverride as any }
               : {}),
+            controlPlaneSelection,
           })
         : await runNixosSharedHostDirectServiceMutation({
             workspaceRoot: opts.workspaceRoot,
@@ -147,13 +158,14 @@ export async function runProtectedNixosSharedHostDeployFrontDoor(opts: {
             ...(opts.smokeConnectOverride
               ? { smokeConnectOverride: opts.smokeConnectOverride as any }
               : {}),
+            controlPlaneSelection,
           });
   return result.kind === "result" ? summarizeDeploymentResult(result.result as any) : result.status;
 }
 
 async function authSession(
   opts: Parameters<typeof runProtectedNixosSharedHostDeployFrontDoor>[0],
-  serviceClient: ReturnType<typeof resolveServiceClientFromFlags>,
+  serviceClient: Awaited<ReturnType<typeof resolveProtectedSharedServiceClient>>,
   operationKind: string,
 ) {
   const explicitAuthSessionId = getFlagStr("auth-session-id", "").trim();

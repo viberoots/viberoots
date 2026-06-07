@@ -2,6 +2,7 @@
 import type { CloudflarePagesDeployment } from "./contract";
 import type { DeploymentAdmissionEvidence } from "./deployment-admission-evidence";
 import type { DeploymentControlPlaneAuthorization } from "./deployment-control-plane-contract";
+import type { DeploymentServiceClientSelectionEvidence } from "./deployment-service-client-selection";
 import type {
   CloudflarePagesPublishBehavior,
   CloudflarePagesPublishMode,
@@ -41,4 +42,5 @@ export type CloudflarePagesControlPlaneSubmitRequest = {
   cleanupReason?: CloudflarePagesPreviewCleanupReason;
   admissionEvidence?: DeploymentAdmissionEvidence;
   smokeConnectOverride?: CloudflarePagesSmokeConnectOverride;
+  controlPlaneSelection?: DeploymentServiceClientSelectionEvidence;
 };

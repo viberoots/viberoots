@@ -10,6 +10,7 @@ import {
   readDeployCliReadonlyFlags,
 } from "./deploy-cli-readonly";
 import { listDeploymentsForCli, printDeployJson } from "./deploy-front-door";
+import { DEPLOY_CLI_USAGE } from "./deploy-cli-usage";
 import { resolveSmokeConnectOverride } from "./deployment-cli-smoke";
 import {
   cleanupDeploymentSecretRuntime,
@@ -38,6 +39,10 @@ export async function runDeployCli(opts: {
   publicFrontDoor: boolean;
   deploymentJsonErrorMessage: string;
 }) {
+  if (getFlagBool("help")) {
+    console.log(DEPLOY_CLI_USAGE);
+    return;
+  }
   if (hasFlag("deployment-json")) throw new Error(opts.deploymentJsonErrorMessage);
   if (await maybeHandleDeploymentAdminCli(opts.workspaceRoot)) return;
   if (await maybeHandleDeploymentAuthCli(opts.workspaceRoot)) return;

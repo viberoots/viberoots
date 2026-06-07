@@ -34,6 +34,9 @@ export async function runProviderDeployFrontDoor(opts: {
       sourceRunId: flags.sourceRunId,
       artifactDirFlag: flags.artifactDirFlag,
       backendDatabaseUrl: flags.controlPlaneDatabaseUrl,
+      controlPlaneUrl: flags.controlPlaneUrl,
+      controlPlaneToken: flags.controlPlaneToken,
+      allowControlPlaneOverride: flags.allowControlPlaneOverride,
       ...(opts.admissionEvidence ? { admissionEvidence: opts.admissionEvidence as any } : {}),
       ...(opts.smokeConnectOverride
         ? { smokeConnectOverride: opts.smokeConnectOverride as any }
@@ -58,6 +61,9 @@ export async function runProviderDeployFrontDoor(opts: {
       sourceRunId: flags.sourceRunId,
       artifactDirFlag: flags.artifactDirFlag,
       cleanupReason: flags.cleanupReason,
+      controlPlaneUrl: flags.controlPlaneUrl,
+      controlPlaneToken: flags.controlPlaneToken,
+      allowControlPlaneOverride: flags.allowControlPlaneOverride,
       ...(opts.admissionEvidence ? { admissionEvidence: opts.admissionEvidence as any } : {}),
       ...(opts.smokeConnectOverride
         ? { smokeConnectOverride: opts.smokeConnectOverride as any }
@@ -75,6 +81,10 @@ export async function runProviderDeployFrontDoor(opts: {
       deployment,
       requireServiceForProtectedShared: opts.publicFrontDoor,
       artifactDirFlag: flags.artifactDirFlag,
+      controlPlaneUrl: flags.controlPlaneUrl,
+      controlPlaneToken: flags.controlPlaneToken,
+      allowControlPlaneOverride: flags.allowControlPlaneOverride,
+      hasFlag: opts.hasFlag,
     });
     return;
   }
@@ -87,7 +97,13 @@ export async function runProviderDeployFrontDoor(opts: {
       rollback: flags.rollback,
       sourceRunId: flags.sourceRunId,
       artifactDirFlag: flags.artifactDirFlag,
+      requireServiceForProtectedShared: opts.publicFrontDoor,
+      backendDatabaseUrl: flags.controlPlaneDatabaseUrl,
+      controlPlaneUrl: flags.controlPlaneUrl,
+      controlPlaneToken: flags.controlPlaneToken,
+      allowControlPlaneOverride: flags.allowControlPlaneOverride,
       ...(opts.admissionEvidence ? { admissionEvidence: opts.admissionEvidence as any } : {}),
+      hasFlag: opts.hasFlag,
     });
     return;
   }
@@ -100,7 +116,13 @@ export async function runProviderDeployFrontDoor(opts: {
       rollback: flags.rollback,
       sourceRunId: flags.sourceRunId,
       artifactDirFlag: flags.artifactDirFlag,
+      requireServiceForProtectedShared: opts.publicFrontDoor,
+      backendDatabaseUrl: flags.controlPlaneDatabaseUrl,
+      controlPlaneUrl: flags.controlPlaneUrl,
+      controlPlaneToken: flags.controlPlaneToken,
+      allowControlPlaneOverride: flags.allowControlPlaneOverride,
       ...(opts.admissionEvidence ? { admissionEvidence: opts.admissionEvidence as any } : {}),
+      hasFlag: opts.hasFlag,
     });
     return;
   }
@@ -116,6 +138,9 @@ export async function runProviderDeployFrontDoor(opts: {
       sourceRunId: flags.sourceRunId,
       artifactDirFlag: flags.artifactDirFlag,
       backendDatabaseUrl: flags.controlPlaneDatabaseUrl,
+      controlPlaneUrl: flags.controlPlaneUrl,
+      controlPlaneToken: flags.controlPlaneToken,
+      allowControlPlaneOverride: flags.allowControlPlaneOverride,
       ...(opts.admissionEvidence ? { admissionEvidence: opts.admissionEvidence as any } : {}),
       ...(opts.smokeConnectOverride
         ? { smokeConnectOverride: opts.smokeConnectOverride as any }
@@ -156,14 +181,20 @@ export async function runProviderDeployFrontDoor(opts: {
   const { maybeRunNixosSharedHostRemoteProfile } = await import(
     "./nixos-shared-host-remote-cli.ts"
   );
+  if (deployment.controlPlane && (opts.hasFlag("profile") || opts.hasFlag("profile-root"))) {
+    throw new Error(
+      "--profile cannot override deployment context controlPlane; pass --allow-control-plane-override with --control-plane-url for an explicit control-plane override",
+    );
+  }
   if (
-    await maybeRunNixosSharedHostRemoteProfile({
+    !deployment.controlPlane &&
+    (await maybeRunNixosSharedHostRemoteProfile({
       workspaceRoot: opts.workspaceRoot,
       deployment,
       defaultProfileName: opts.publicFrontDoor ? deployment.lanePolicy.defaultClientProfile : "",
       vaultRuntimeInputs: flags.vaultRuntimeInputs,
       ...(opts.admissionEvidence ? { admissionEvidence: opts.admissionEvidence as any } : {}),
-    })
+    }))
   ) {
     return;
   }
@@ -177,6 +208,9 @@ export async function runProviderDeployFrontDoor(opts: {
     sourceRunId: flags.sourceRunId,
     artifactDirFlag: flags.artifactDirFlag,
     vaultRuntimeInputs: flags.vaultRuntimeInputs,
+    controlPlaneUrl: flags.controlPlaneUrl,
+    controlPlaneToken: flags.controlPlaneToken,
+    allowControlPlaneOverride: flags.allowControlPlaneOverride,
     ...(opts.admissionEvidence ? { admissionEvidence: opts.admissionEvidence as any } : {}),
     ...(opts.smokeConnectOverride
       ? { smokeConnectOverride: opts.smokeConnectOverride as any }

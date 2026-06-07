@@ -26,6 +26,9 @@ export async function runNixosSharedHostDeployFrontDoor(opts: {
   rollback: boolean;
   sourceRunId: string;
   artifactDirFlag: string;
+  controlPlaneUrl: string;
+  controlPlaneToken?: string;
+  allowControlPlaneOverride: boolean;
   vaultRuntimeInputs?: DeploymentVaultRuntimeInputs;
   admissionEvidence?: unknown;
   smokeConnectOverride?: unknown;
@@ -97,10 +100,9 @@ export async function runNixosSharedHostDeployFrontDoor(opts: {
         artifactDirFlag: opts.artifactDirFlag,
         admissionEvidence: opts.admissionEvidence,
         smokeConnectOverride: opts.smokeConnectOverride,
-        controlPlaneUrl:
-          getFlagStr("control-plane-url", "").trim() ||
-          String(process.env.VBR_DEPLOY_CONTROL_PLANE_URL || "").trim(),
-        controlPlaneToken: getFlagStr("control-plane-token", "").trim() || undefined,
+        controlPlaneUrl: opts.controlPlaneUrl,
+        controlPlaneToken: opts.controlPlaneToken,
+        allowControlPlaneOverride: opts.allowControlPlaneOverride,
         remote: getFlagStr("remote", "").trim(),
         vaultRuntimeInputs: opts.vaultRuntimeInputs,
         hasFlag,

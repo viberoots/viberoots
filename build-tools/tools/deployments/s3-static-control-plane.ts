@@ -1,6 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import fs from "node:fs/promises";
 import type { S3StaticDeployment } from "./contract";
+import type { DeploymentServiceClientSelectionEvidence } from "./deployment-service-client-selection";
 import { terminalSubmissionFromAdmissionFailure } from "./deployment-provider-control-plane-admission-failure";
 import { assertCrossDeploymentExactPromotionEligible } from "./deployment-provider-promotion";
 import {
@@ -41,6 +42,7 @@ export type S3StaticControlPlaneSubmitRequest = {
   sourceRunId?: string;
   admissionEvidence?: unknown;
   smokeConnectOverride?: unknown;
+  controlPlaneSelection?: DeploymentServiceClientSelectionEvidence;
 };
 
 export async function queueS3StaticControlPlaneSubmission(opts: {

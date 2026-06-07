@@ -10,6 +10,8 @@ import { resolveCrossDeploymentPromotionSelection } from "./deployment-promotion
 import { resolveAppStoreConnectReplaySource } from "./app-store-connect-replay";
 import { submitAppStoreConnectDeploy } from "./app-store-connect-deploy";
 import { submitAppStoreConnectExactArtifactRun } from "./app-store-connect-exact-run";
+import { shouldUseProtectedSharedServiceRoute } from "./deployment-service-client-selection";
+import { runAppStoreConnectServiceFrontDoor } from "./app-store-connect-service-front-door";
 
 function sameDeploymentRollbackErrors(
   current: AppStoreConnectDeployment,
@@ -45,7 +47,13 @@ export async function runAppStoreConnectDeployFrontDoor(opts: {
   rollback: boolean;
   sourceRunId: string;
   artifactDirFlag: string;
+  requireServiceForProtectedShared: boolean;
+  backendDatabaseUrl?: string;
+  controlPlaneUrl: string;
+  controlPlaneToken?: string;
+  allowControlPlaneOverride: boolean;
   admissionEvidence?: unknown;
+  hasFlag?: (flag: string) => boolean;
 }) {
   if (
     getFlagBool("preview") ||
@@ -58,6 +66,16 @@ export async function runAppStoreConnectDeployFrontDoor(opts: {
       "app-store-connect deploys support only normal deploy and --publish-only reuse flows",
     );
   }
+  if (
+    shouldUseProtectedSharedServiceRoute({
+      deployment: opts.deployment,
+      requireServiceForProtectedShared: opts.requireServiceForProtectedShared,
+      controlPlaneUrl: opts.controlPlaneUrl,
+    })
+  ) {
+    printDeployJson(await runAppStoreConnectServiceFrontDoor(opts));
+    return;
+  }
   const recordsRoot = path.resolve(
     getFlagStr(
       "records-root",
@@ -65,6 +83,7 @@ export async function runAppStoreConnectDeployFrontDoor(opts: {
     ),
   );
   const controlPlaneDatabaseUrl =
+    opts.backendDatabaseUrl ||
     getFlagStr("control-plane-database-url", "").trim() ||
     String(process.env.VBR_DEPLOY_CONTROL_PLANE_DATABASE_URL || "").trim() ||
     undefined;

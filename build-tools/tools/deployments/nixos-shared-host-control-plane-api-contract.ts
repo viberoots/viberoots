@@ -18,6 +18,7 @@ import type {
 } from "./nixos-shared-host-control-plane-contract";
 import type { NixosSharedHostControlPlaneSourceSelection } from "./nixos-shared-host-control-plane-snapshot";
 import type { MiniCloudMigrationEvidence } from "./control-plane-mini-migration-preflight";
+import type { DeploymentServiceClientSelectionEvidence } from "./deployment-service-client-selection";
 
 export const NIXOS_SHARED_HOST_CONTROL_PLANE_SUBMIT_REQUEST_SCHEMA =
   "nixos-shared-host-control-plane-submit-request@1";
@@ -49,4 +50,5 @@ export type NixosSharedHostControlPlaneSubmitRequest = DeploymentExpectedArtifac
   smokeConnectOverride?: NixosSharedHostSmokeConnectOverride;
   artifactBindingProof?: DeploymentArtifactBindingProof;
   miniMigrationEvidence?: MiniCloudMigrationEvidence;
+  controlPlaneSelection?: DeploymentServiceClientSelectionEvidence;
 };

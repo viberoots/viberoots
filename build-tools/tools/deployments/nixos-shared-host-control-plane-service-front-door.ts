@@ -27,6 +27,7 @@ import {
   clientServiceAdmissionEvidence,
   resolveExpectedDeploymentSourceRevision,
 } from "./deployment-source-revision";
+import type { DeploymentServiceClientSelectionEvidence } from "./deployment-service-client-selection";
 
 export type NixosSharedHostServiceFrontDoorResponse =
   | { kind: "result"; result: { record: any } }
@@ -102,6 +103,7 @@ export async function runNixosSharedHostDirectServiceMutation(opts: {
   rollback?: boolean;
   idempotencyKey?: string;
   admissionEvidence?: DeploymentAdmissionEvidence;
+  controlPlaneSelection?: DeploymentServiceClientSelectionEvidence;
   smokeConnectOverride?: {
     protocol: "http:" | "https:";
     hostname: string;
@@ -150,6 +152,7 @@ export async function runNixosSharedHostDirectServiceMutation(opts: {
     ...(opts.rollback ? { rollback: true } : {}),
     ...(admissionEvidence ? { admissionEvidence } : {}),
     ...(opts.smokeConnectOverride ? { smokeConnectOverride: opts.smokeConnectOverride } : {}),
+    ...(opts.controlPlaneSelection ? { controlPlaneSelection: opts.controlPlaneSelection } : {}),
   };
   if (request.artifactDir || request.artifactDirsByComponentId) {
     const challenge = await createNixosSharedHostArtifactChallengeViaService({

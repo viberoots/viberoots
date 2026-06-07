@@ -12,7 +12,10 @@ import {
   readNixosSharedHostControlPlaneRecordViaService,
   submitNixosSharedHostControlPlaneViaService,
 } from "./nixos-shared-host-control-plane-client";
-import { resolveServiceClientFromCliProfileOrFlags } from "./deployment-service-client-profile";
+import {
+  resolveProtectedSharedServiceClient,
+  serviceClientSelectionEvidence,
+} from "./deployment-service-client-selection";
 import { uploadCloudflarePagesClientArtifact } from "./cloudflare-pages-artifact-upload-client";
 import { serviceSubmissionAdmissionEvidence } from "./deployment-service-client-contract";
 import { terminalControlPlaneRejectionMessage } from "./deployment-provider-protected-front-door";
@@ -87,15 +90,17 @@ export async function runProtectedCloudflarePagesDeployFrontDoor(opts: {
   smokeConnectOverride?: unknown;
   controlPlaneUrl: string;
   controlPlaneToken?: string;
+  allowControlPlaneOverride?: boolean;
   hasFlag: (flag: string) => boolean;
 }) {
   rejectServiceOnlyLocalFlags(opts.hasFlag);
   const admissionEvidence = serviceSubmissionAdmissionEvidence(opts.admissionEvidence as any);
-  const serviceClient = await resolveServiceClientFromCliProfileOrFlags({
-    workspaceRoot: opts.workspaceRoot,
+  const serviceClient = await resolveProtectedSharedServiceClient({
+    deployment: opts.deployment,
     controlPlaneUrl: opts.controlPlaneUrl,
     controlPlaneToken: opts.controlPlaneToken,
-    defaultProfileName: opts.deployment.lanePolicy.defaultClientProfile,
+    allowControlPlaneOverride: opts.allowControlPlaneOverride,
+    workspaceRoot: opts.workspaceRoot,
     context: `cloudflare-pages ${opts.deployment.protectionClass} mutation`,
   });
   const submissionId = createCloudflarePagesSubmissionId();
@@ -146,6 +151,7 @@ export async function runProtectedCloudflarePagesDeployFrontDoor(opts: {
     ...(opts.smokeConnectOverride
       ? { smokeConnectOverride: opts.smokeConnectOverride as any }
       : {}),
+    controlPlaneSelection: serviceClientSelectionEvidence(serviceClient),
   };
   const { final } = await submitNixosSharedHostControlPlaneViaService({
     controlPlaneUrl: serviceClient.controlPlaneUrl,

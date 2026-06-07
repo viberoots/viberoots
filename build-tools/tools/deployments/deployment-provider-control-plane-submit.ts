@@ -17,12 +17,30 @@ import {
   queueVercelControlPlaneSubmission,
   type VercelControlPlaneSubmitRequest,
 } from "./vercel-control-plane";
+import {
+  APP_STORE_CONNECT_CONTROL_PLANE_SUBMIT_REQUEST_SCHEMA,
+  queueAppStoreConnectControlPlaneSubmission,
+  type AppStoreConnectControlPlaneSubmitRequest,
+} from "./app-store-connect-control-plane";
+import {
+  CLOUDFLARE_CONTAINERS_CONTROL_PLANE_SUBMIT_REQUEST_SCHEMA,
+  queueCloudflareContainersControlPlaneSubmission,
+  type CloudflareContainersControlPlaneSubmitRequest,
+} from "./cloudflare-containers-control-plane";
+import {
+  GOOGLE_PLAY_CONTROL_PLANE_SUBMIT_REQUEST_SCHEMA,
+  queueGooglePlayControlPlaneSubmission,
+  type GooglePlayControlPlaneSubmitRequest,
+} from "./google-play-control-plane";
 import { assertNoProtectedSharedClientIdentityFields } from "./deployment-service-client-contract";
 
 export type DeploymentProviderServiceSubmitRequest =
   | S3StaticControlPlaneSubmitRequest
   | KubernetesControlPlaneSubmitRequest
-  | VercelControlPlaneSubmitRequest;
+  | VercelControlPlaneSubmitRequest
+  | AppStoreConnectControlPlaneSubmitRequest
+  | GooglePlayControlPlaneSubmitRequest
+  | CloudflareContainersControlPlaneSubmitRequest;
 
 export function isDeploymentProviderServiceSubmitRequest(request: {
   schemaVersion?: string;
@@ -30,7 +48,10 @@ export function isDeploymentProviderServiceSubmitRequest(request: {
   return (
     request.schemaVersion === S3_STATIC_CONTROL_PLANE_SUBMIT_REQUEST_SCHEMA ||
     request.schemaVersion === KUBERNETES_CONTROL_PLANE_SUBMIT_REQUEST_SCHEMA ||
-    request.schemaVersion === VERCEL_CONTROL_PLANE_SUBMIT_REQUEST_SCHEMA
+    request.schemaVersion === VERCEL_CONTROL_PLANE_SUBMIT_REQUEST_SCHEMA ||
+    request.schemaVersion === APP_STORE_CONNECT_CONTROL_PLANE_SUBMIT_REQUEST_SCHEMA ||
+    request.schemaVersion === GOOGLE_PLAY_CONTROL_PLANE_SUBMIT_REQUEST_SCHEMA ||
+    request.schemaVersion === CLOUDFLARE_CONTAINERS_CONTROL_PLANE_SUBMIT_REQUEST_SCHEMA
   );
 }
 
@@ -63,6 +84,30 @@ export async function queueDeploymentProviderControlPlaneSubmission(
       backend: opts.backend,
       request,
       ...(opts.objectStore ? { objectStore: opts.objectStore } : {}),
+    });
+  }
+  if (request.schemaVersion === APP_STORE_CONNECT_CONTROL_PLANE_SUBMIT_REQUEST_SCHEMA) {
+    return await queueAppStoreConnectControlPlaneSubmission({
+      workspaceRoot: opts.workspaceRoot,
+      recordsRoot: opts.paths.recordsRoot,
+      backend: opts.backend,
+      request,
+    });
+  }
+  if (request.schemaVersion === GOOGLE_PLAY_CONTROL_PLANE_SUBMIT_REQUEST_SCHEMA) {
+    return await queueGooglePlayControlPlaneSubmission({
+      workspaceRoot: opts.workspaceRoot,
+      recordsRoot: opts.paths.recordsRoot,
+      backend: opts.backend,
+      request,
+    });
+  }
+  if (request.schemaVersion === CLOUDFLARE_CONTAINERS_CONTROL_PLANE_SUBMIT_REQUEST_SCHEMA) {
+    return await queueCloudflareContainersControlPlaneSubmission({
+      workspaceRoot: opts.workspaceRoot,
+      recordsRoot: opts.paths.recordsRoot,
+      backend: opts.backend,
+      request,
     });
   }
   return await queueKubernetesControlPlaneSubmission({

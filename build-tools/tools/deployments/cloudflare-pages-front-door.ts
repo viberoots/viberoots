@@ -8,6 +8,7 @@ import { summarizeDeploymentResult } from "./deployment-execution";
 import { resolveArtifactDirForCli } from "./deployment-cli-resolve";
 import { runProtectedCloudflarePagesDeployFrontDoor } from "./cloudflare-pages-protected-front-door";
 import { submitCloudflarePagesTargetTransition } from "./cloudflare-pages-target-transition";
+import { shouldUseProtectedSharedServiceRoute } from "./deployment-service-client-selection";
 
 export async function runCloudflareDeployFrontDoor(opts: {
   workspaceRoot: string;
@@ -23,6 +24,9 @@ export async function runCloudflareDeployFrontDoor(opts: {
   sourceRunId: string;
   artifactDirFlag: string;
   cleanupReason: string;
+  controlPlaneUrl: string;
+  controlPlaneToken?: string;
+  allowControlPlaneOverride: boolean;
   admissionEvidence?: unknown;
   smokeConnectOverride?: unknown;
   provisionOnly: boolean;
@@ -39,12 +43,12 @@ export async function runCloudflareDeployFrontDoor(opts: {
     throw new Error("cloudflare-pages deploys do not support --remove yet");
   if (opts.rollback && !opts.publishOnly)
     throw new Error("cloudflare-pages rollback requires --publish-only");
-  const controlPlaneUrl =
-    getFlagStr("control-plane-url", "").trim() ||
-    String(process.env.VBR_DEPLOY_CONTROL_PLANE_URL || "").trim();
   if (
-    opts.deployment.protectionClass !== "local_only" &&
-    (opts.requireServiceForProtectedShared || !!controlPlaneUrl)
+    shouldUseProtectedSharedServiceRoute({
+      deployment: opts.deployment,
+      requireServiceForProtectedShared: opts.requireServiceForProtectedShared,
+      controlPlaneUrl: opts.controlPlaneUrl,
+    })
   ) {
     printDeployJson(
       await runProtectedCloudflarePagesDeployFrontDoor({
@@ -61,8 +65,9 @@ export async function runCloudflareDeployFrontDoor(opts: {
         cleanupReason: opts.cleanupReason,
         admissionEvidence: opts.admissionEvidence,
         smokeConnectOverride: opts.smokeConnectOverride,
-        controlPlaneUrl,
-        controlPlaneToken: getFlagStr("control-plane-token", "").trim() || undefined,
+        controlPlaneUrl: opts.controlPlaneUrl,
+        controlPlaneToken: opts.controlPlaneToken,
+        allowControlPlaneOverride: opts.allowControlPlaneOverride,
         hasFlag,
       }),
     );

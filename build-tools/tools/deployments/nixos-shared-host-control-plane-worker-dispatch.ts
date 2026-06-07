@@ -1,5 +1,8 @@
 #!/usr/bin/env zx-wrapper
 import { executeCloudflarePagesBackendSubmission } from "./cloudflare-pages-control-plane-backend-run";
+import { executeAppStoreConnectControlPlaneSubmission } from "./app-store-connect-control-plane-worker";
+import { executeCloudflareContainersControlPlaneSubmission } from "./cloudflare-containers-control-plane";
+import { executeGooglePlayControlPlaneSubmission } from "./google-play-control-plane-worker";
 import { executeKubernetesControlPlaneSubmission } from "./kubernetes-control-plane";
 import { executeS3StaticControlPlaneSubmission } from "./s3-static-control-plane";
 import { executeVercelControlPlaneSubmission } from "./vercel-control-plane";
@@ -23,6 +26,9 @@ const DISPATCH = {
   "s3-static": executeS3StaticControlPlaneSubmission,
   kubernetes: executeKubernetesControlPlaneSubmission,
   vercel: executeVercelControlPlaneSubmission,
+  "app-store-connect": executeAppStoreConnectControlPlaneSubmission,
+  "google-play": executeGooglePlayControlPlaneSubmission,
+  "cloudflare-containers": executeCloudflareContainersControlPlaneSubmission,
 } as const;
 
 export async function dispatchProviderControlPlaneSubmission(

@@ -53,6 +53,7 @@ export async function resolveServiceClientFromCliProfileOrFlags(opts: {
   remote?: string;
   defaultProfileName?: string;
   context: string;
+  env?: NodeJS.ProcessEnv;
 }): Promise<NixosSharedHostResolvedServiceClient> {
   const remote = opts.remote ?? getFlagStr("remote", "").trim();
   const defaultProfileName = String(opts.defaultProfileName || "").trim();
@@ -68,12 +69,13 @@ export async function resolveServiceClientFromCliProfileOrFlags(opts: {
       outputRoot: resolveProfileRoot(opts.workspaceRoot),
       profileName,
     });
-    return resolveServiceClientFromManifest(profile.manifest);
+    return resolveServiceClientFromManifest(profile.manifest, opts.env);
   }
   return resolveServiceClientFromFlags({
     controlPlaneUrl: opts.controlPlaneUrl,
     controlPlaneToken: opts.controlPlaneToken,
     remote,
     context: opts.context,
+    env: opts.env,
   });
 }

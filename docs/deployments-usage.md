@@ -280,26 +280,30 @@ Changing any of those fields creates a distinct submission.
 For service-backed workflows, the `deploy` CLI also covers the common operator
 inspection commands so you do not need to hand-build HTTP requests:
 
+Protected/shared deployment targets that select a `deployment_context` with a
+`controlPlane` use that context-selected service URL and service-token ref by
+default. `--control-plane-url` and `VBR_DEPLOY_CONTROL_PLANE_URL` are fallbacks
+only for commands without a selected context; if they disagree with a selected
+context, mutating commands fail unless `--allow-control-plane-override` is
+passed with an explicit override.
+
 ```bash
 deploy --deployment //projects/deployments/pleomino/prod:deploy \
   --status \
-  --deploy-run-id <deploy-run-id> \
-  --control-plane-url "$VBR_DEPLOY_CONTROL_PLANE_URL"
+  --deploy-run-id <deploy-run-id>
 ```
 
 ```bash
 deploy --deployment //projects/deployments/pleomino/prod:deploy \
   --print-run-lock-scope \
-  --deploy-run-id <deploy-run-id> \
-  --control-plane-url "$VBR_DEPLOY_CONTROL_PLANE_URL"
+  --deploy-run-id <deploy-run-id>
 ```
 
 ```bash
 deploy --deployment //projects/deployments/pleomino/prod:deploy \
   --approve \
   --deploy-run-id <deploy-run-id> \
-  --approval-id <ticket-or-review-ref> \
-  --control-plane-url "$VBR_DEPLOY_CONTROL_PLANE_URL"
+  --approval-id <ticket-or-review-ref>
 ```
 
 Use `--status` when you want the full run status JSON, `--print-run-lock-scope`
@@ -312,14 +316,12 @@ control-plane current-stage helpers rather than Git release-pointer files:
 ```bash
 deploy --deployment //projects/deployments/pleomino/prod:deploy \
   --current-stage-state \
-  --text \
-  --control-plane-url "$VBR_DEPLOY_CONTROL_PLANE_URL"
+  --text
 ```
 
 ```bash
 deploy --deployment //projects/deployments/pleomino/prod:deploy \
-  --stage-history \
-  --control-plane-url "$VBR_DEPLOY_CONTROL_PLANE_URL"
+  --stage-history
 ```
 
 The helpers derive deployment id and environment stage from reviewed deployment
@@ -386,7 +388,6 @@ the Jenkins build or promotion attempt:
 deploy --deployment //projects/deployments/pleomino/staging:deploy \
   --publish-only \
   --source-run-id "$DEV_DEPLOY_RUN_ID" \
-  --control-plane-url "$VBR_DEPLOY_CONTROL_PLANE_URL" \
   --idempotency-key "jenkins:${JOB_NAME}:${BUILD_TAG}:promote-staging"
 ```
 
@@ -394,7 +395,6 @@ deploy --deployment //projects/deployments/pleomino/staging:deploy \
 deploy --deployment //projects/deployments/pleomino/prod:deploy \
   --publish-only \
   --source-run-id "$STAGING_DEPLOY_RUN_ID" \
-  --control-plane-url "$VBR_DEPLOY_CONTROL_PLANE_URL" \
   --idempotency-key "jenkins:${JOB_NAME}:${BUILD_TAG}:promote-prod"
 ```
 
@@ -781,32 +781,28 @@ Protected/shared Vercel control-plane examples:
 ```bash
 # Deploy an already admitted prebuilt artifact through the control-plane service
 deploy --deployment //projects/deployments/console-staging:deploy \
-  --source-run-id <deploy-run-id> \
-  --control-plane-url "$VBR_DEPLOY_CONTROL_PLANE_URL"
+  --source-run-id <deploy-run-id>
 ```
 
 ```bash
 # Preview from an earlier accepted run through the control-plane service
 deploy --deployment //projects/deployments/console-staging:deploy \
   --preview \
-  --source-run-id <deploy-run-id> \
-  --control-plane-url "$VBR_DEPLOY_CONTROL_PLANE_URL"
+  --source-run-id <deploy-run-id>
 ```
 
 ```bash
 # Preview cleanup through the control-plane service
 deploy --deployment //projects/deployments/console-staging:deploy \
   --preview-cleanup \
-  --source-run-id <deploy-run-id> \
-  --control-plane-url "$VBR_DEPLOY_CONTROL_PLANE_URL"
+  --source-run-id <deploy-run-id>
 ```
 
 ```bash
 # Retry an earlier accepted run by replaying the recorded exact artifact
 deploy --deployment //projects/deployments/console-staging:deploy \
   --publish-only \
-  --source-run-id <deploy-run-id> \
-  --control-plane-url "$VBR_DEPLOY_CONTROL_PLANE_URL"
+  --source-run-id <deploy-run-id>
 ```
 
 ```bash
@@ -814,8 +810,7 @@ deploy --deployment //projects/deployments/console-staging:deploy \
 deploy --deployment //projects/deployments/console-staging:deploy \
   --publish-only \
   --rollback \
-  --source-run-id <deploy-run-id> \
-  --control-plane-url "$VBR_DEPLOY_CONTROL_PLANE_URL"
+  --source-run-id <deploy-run-id>
 ```
 
 Protected/shared Vercel mutations reject laptop-local artifact paths,

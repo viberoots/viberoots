@@ -1,5 +1,5 @@
 import path from "node:path";
-import { getFlagStr, hasFlag } from "../lib/cli";
+import { getFlagBool, getFlagStr, hasFlag } from "../lib/cli";
 import type { DeploymentTarget } from "./contract";
 import {
   readNixosSharedHostControlPlaneRecordViaService,
@@ -11,10 +11,8 @@ import {
   readNixosSharedHostStageHistoryViaService,
 } from "./nixos-shared-host-control-plane-stage-client";
 import { readNixosSharedHostClientProfile } from "./nixos-shared-host-install-dev-machine";
-import {
-  resolveServiceClientFromFlags,
-  resolveServiceClientFromManifest,
-} from "./nixos-shared-host-service-client-config";
+import { resolveServiceClientFromManifest } from "./nixos-shared-host-service-client-config";
+import { resolveProtectedSharedServiceClient } from "./deployment-service-client-selection";
 
 export type RunSelector = { submissionId?: string; deployRunId?: string };
 
@@ -52,18 +50,27 @@ export async function resolveServiceClientForOperator(opts: {
   actionLabel: string;
 }) {
   if (hasFlag("profile") || hasFlag("profile-root")) {
+    if (opts.deployment.controlPlane) {
+      throw new Error(
+        `${opts.actionLabel} cannot use --profile/--profile-root when deployment context selects a controlPlane`,
+      );
+    }
     const profile = await readNixosSharedHostClientProfile({
       outputRoot: resolveProfileRoot(opts.workspaceRoot),
       profileName: requireProfileName(),
     });
-    return resolveServiceClientFromManifest(profile.manifest);
+    return {
+      ...resolveServiceClientFromManifest(profile.manifest),
+      selectedSource: "explicit" as const,
+    };
   }
-  return resolveServiceClientFromFlags({
-    controlPlaneUrl:
-      getFlagStr("control-plane-url", "").trim() ||
-      String(process.env.VBR_DEPLOY_CONTROL_PLANE_URL || "").trim(),
+  return await resolveProtectedSharedServiceClient({
+    workspaceRoot: opts.workspaceRoot,
+    deployment: opts.deployment,
+    controlPlaneUrl: getFlagStr("control-plane-url", "").trim(),
     controlPlaneToken: getFlagStr("control-plane-token", "").trim() || undefined,
     remote: getFlagStr("remote", "").trim(),
+    allowControlPlaneOverride: getFlagBool("allow-control-plane-override"),
     context: opts.actionLabel,
   });
 }

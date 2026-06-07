@@ -14,6 +14,7 @@ import {
 import { submitVercelExactArtifactRun } from "./vercel-exact-run";
 import { resolveVercelReplaySource } from "./vercel-replay";
 import { runProtectedVercelDeployFrontDoor } from "./vercel-protected-front-door";
+import { shouldUseProtectedSharedServiceRoute } from "./deployment-service-client-selection";
 
 export async function runVercelDeployFrontDoor(opts: {
   workspaceRoot: string;
@@ -25,6 +26,9 @@ export async function runVercelDeployFrontDoor(opts: {
   rollback: boolean;
   sourceRunId: string;
   artifactDirFlag: string;
+  controlPlaneUrl: string;
+  controlPlaneToken?: string;
+  allowControlPlaneOverride: boolean;
   admissionEvidence?: unknown;
   smokeConnectOverride?: unknown;
   hasFlag?: (flag: string) => boolean;
@@ -32,12 +36,12 @@ export async function runVercelDeployFrontDoor(opts: {
   if (opts.rollback && !opts.publishOnly) {
     throw new Error("vercel rollback requires --publish-only");
   }
-  const controlPlaneUrl =
-    getFlagStr("control-plane-url", "").trim() ||
-    String(process.env.VBR_DEPLOY_CONTROL_PLANE_URL || "").trim();
   if (
-    opts.deployment.protectionClass !== "local_only" &&
-    (opts.requireServiceForProtectedShared || !!controlPlaneUrl)
+    shouldUseProtectedSharedServiceRoute({
+      deployment: opts.deployment,
+      requireServiceForProtectedShared: opts.requireServiceForProtectedShared,
+      controlPlaneUrl: opts.controlPlaneUrl,
+    })
   ) {
     printDeployJson(
       await runProtectedVercelDeployFrontDoor({
@@ -49,8 +53,9 @@ export async function runVercelDeployFrontDoor(opts: {
         rollback: opts.rollback,
         sourceRunId: opts.sourceRunId,
         artifactDirFlag: opts.artifactDirFlag,
-        controlPlaneUrl,
-        controlPlaneToken: getFlagStr("control-plane-token", "").trim() || undefined,
+        controlPlaneUrl: opts.controlPlaneUrl,
+        controlPlaneToken: opts.controlPlaneToken,
+        allowControlPlaneOverride: opts.allowControlPlaneOverride,
         admissionEvidence: opts.admissionEvidence,
         smokeConnectOverride: opts.smokeConnectOverride,
         hasFlag: opts.hasFlag || (() => false),
@@ -150,6 +155,9 @@ export async function runVercelDeployFrontDoorForCli(
     rollback: flags.rollback,
     sourceRunId: flags.sourceRunId,
     artifactDirFlag: flags.artifactDirFlag,
+    controlPlaneUrl: flags.controlPlaneUrl,
+    controlPlaneToken: flags.controlPlaneToken,
+    allowControlPlaneOverride: flags.allowControlPlaneOverride,
     ...(hasFlag ? { hasFlag } : {}),
     ...(admissionEvidence ? { admissionEvidence } : {}),
     ...(smokeConnectOverride ? { smokeConnectOverride } : {}),

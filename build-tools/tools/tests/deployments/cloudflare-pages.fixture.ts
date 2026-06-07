@@ -84,6 +84,8 @@ export function cloudflarePagesDeploymentFixture(
     runtimeConfigRequirements: overrides.runtimeConfigRequirements || [],
     releaseActions: overrides.releaseActions || [],
     targetExceptions: overrides.targetExceptions || [],
+    ...(overrides.deploymentContext ? { deploymentContext: overrides.deploymentContext } : {}),
+    ...(overrides.controlPlane ? { controlPlane: overrides.controlPlane } : {}),
     ...(overrides.smoke ? { smoke: overrides.smoke } : {}),
     ...(overrides.rolloutPolicy ? { rolloutPolicy: overrides.rolloutPolicy } : {}),
     ...(overrides.vaultRuntime ? { vaultRuntime: overrides.vaultRuntime } : {}),

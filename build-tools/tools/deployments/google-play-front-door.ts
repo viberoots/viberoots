@@ -10,6 +10,8 @@ import { resolveCrossDeploymentPromotionSelection } from "./deployment-promotion
 import { resolveGooglePlayReplaySource } from "./google-play-replay";
 import { submitGooglePlayDeploy } from "./google-play-deploy";
 import { submitGooglePlayExactArtifactRun } from "./google-play-exact-run";
+import { shouldUseProtectedSharedServiceRoute } from "./deployment-service-client-selection";
+import { runGooglePlayServiceFrontDoor } from "./google-play-service-front-door";
 
 function sameDeploymentRollbackErrors(
   current: GooglePlayDeployment,
@@ -45,7 +47,13 @@ export async function runGooglePlayDeployFrontDoor(opts: {
   rollback: boolean;
   sourceRunId: string;
   artifactDirFlag: string;
+  requireServiceForProtectedShared: boolean;
+  backendDatabaseUrl?: string;
+  controlPlaneUrl: string;
+  controlPlaneToken?: string;
+  allowControlPlaneOverride: boolean;
   admissionEvidence?: unknown;
+  hasFlag?: (flag: string) => boolean;
 }) {
   if (
     getFlagBool("preview") ||
@@ -58,6 +66,16 @@ export async function runGooglePlayDeployFrontDoor(opts: {
       "google-play deploys support only normal deploy and --publish-only reuse flows",
     );
   }
+  if (
+    shouldUseProtectedSharedServiceRoute({
+      deployment: opts.deployment,
+      requireServiceForProtectedShared: opts.requireServiceForProtectedShared,
+      controlPlaneUrl: opts.controlPlaneUrl,
+    })
+  ) {
+    printDeployJson(await runGooglePlayServiceFrontDoor(opts));
+    return;
+  }
   const recordsRoot = path.resolve(
     getFlagStr(
       "records-root",
@@ -65,6 +83,7 @@ export async function runGooglePlayDeployFrontDoor(opts: {
     ),
   );
   const controlPlaneDatabaseUrl =
+    opts.backendDatabaseUrl ||
     getFlagStr("control-plane-database-url", "").trim() ||
     String(process.env.VBR_DEPLOY_CONTROL_PLANE_DATABASE_URL || "").trim() ||
     undefined;

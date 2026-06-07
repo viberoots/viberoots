@@ -1,7 +1,10 @@
 #!/usr/bin/env zx-wrapper
 import { createNixosSharedHostSubmissionId } from "./nixos-shared-host-control-plane-snapshot";
 import type { VercelDeployment } from "./contract";
-import { resolveServiceClientFromCliProfileOrFlags } from "./deployment-service-client-profile";
+import {
+  resolveProtectedSharedServiceClient,
+  serviceClientSelectionEvidence,
+} from "./deployment-service-client-selection";
 import {
   finalizeProtectedFrontDoorSubmission,
   rejectServiceOnlyLocalFlags,
@@ -23,6 +26,7 @@ export async function runProtectedVercelDeployFrontDoor(opts: {
   artifactDirFlag: string;
   controlPlaneUrl: string;
   controlPlaneToken?: string;
+  allowControlPlaneOverride?: boolean;
   admissionEvidence?: unknown;
   smokeConnectOverride?: unknown;
   hasFlag: (flag: string) => boolean;
@@ -60,11 +64,12 @@ export async function runProtectedVercelDeployFrontDoor(opts: {
     deployment: opts.deployment,
     admissionEvidence,
   });
-  const serviceClient = await resolveServiceClientFromCliProfileOrFlags({
-    workspaceRoot: opts.workspaceRoot,
+  const serviceClient = await resolveProtectedSharedServiceClient({
+    deployment: opts.deployment,
     controlPlaneUrl: opts.controlPlaneUrl,
     controlPlaneToken: opts.controlPlaneToken,
-    defaultProfileName: opts.deployment.lanePolicy.defaultClientProfile,
+    allowControlPlaneOverride: opts.allowControlPlaneOverride,
+    workspaceRoot: opts.workspaceRoot,
     context: `vercel ${opts.deployment.protectionClass} mutation`,
   });
   return await finalizeProtectedFrontDoorSubmission({
@@ -80,6 +85,7 @@ export async function runProtectedVercelDeployFrontDoor(opts: {
       ...(opts.sourceRunId ? { sourceRunId: opts.sourceRunId } : {}),
       ...(admissionEvidence ? { admissionEvidence } : {}),
       ...(opts.smokeConnectOverride ? { smokeConnectOverride: opts.smokeConnectOverride } : {}),
+      controlPlaneSelection: serviceClientSelectionEvidence(serviceClient),
     },
   });
 }

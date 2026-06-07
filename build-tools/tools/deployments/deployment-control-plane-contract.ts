@@ -1,6 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import type { DeploymentPrincipal } from "./deployment-admission-evidence";
 import type { DeploymentArtifactBindingProvenance } from "./deployment-artifact-binding";
+import type { DeploymentServiceClientSelectionEvidence } from "./deployment-service-client-selection";
 import type { NixosSharedHostProgressiveRollout } from "./nixos-shared-host-progressive-rollout";
 import type { DeploymentTarget } from "./contract";
 
@@ -167,6 +168,7 @@ export type DeploymentControlPlaneSubmitRequest = {
   sourceRunId?: string;
   replaySelector?: DeploymentControlPlaneReplaySelector;
   authorization?: DeploymentControlPlaneAuthorization;
+  controlPlaneSelection?: DeploymentServiceClientSelectionEvidence;
 };
 
 export type DeploymentControlPlaneRunAction = "cancel" | "resume" | "abort" | "approve";
@@ -180,6 +182,7 @@ export type DeploymentControlPlaneRunActionRequest = {
   idempotencyKey?: string;
   approval?: DeploymentControlPlaneApprovalGrantRequest;
   authorization?: DeploymentControlPlaneAuthorization;
+  controlPlaneSelection?: DeploymentServiceClientSelectionEvidence;
 };
 
 export type DeploymentControlPlaneResponseBase = {

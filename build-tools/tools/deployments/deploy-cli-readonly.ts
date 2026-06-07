@@ -1,10 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import { getFlagBool, getFlagList, getFlagStr } from "../lib/cli";
 import type { DeploymentTarget } from "./contract";
-import {
-  selectedDeployControlPlaneOperatorAction,
-  type DeployControlPlaneOperatorAction,
-} from "./deploy-control-plane-operator-flags";
+import { selectedDeployControlPlaneOperatorAction } from "./deploy-control-plane-operator-flags";
 import {
   printDeployJson,
   printProviderTargetIdentityForCli,
@@ -20,34 +17,9 @@ import {
   type VaultBootstrapInputs,
   type VaultSecretTemplateFormat,
 } from "./deployment-vault-bootstrap";
-import {
-  readDeploymentVaultRuntimeInputsFromFlags,
-  type DeploymentVaultRuntimeInputs,
-} from "./deployment-vault-runtime";
-export type DeployCliReadonlyFlags = {
-  printTargetIdentity: boolean;
-  printVaultBootstrap: boolean;
-  printVaultSecretTemplates: boolean;
-  vaultBootstrapFormat: VaultBootstrapFormat;
-  vaultSecretTemplateFormat: VaultSecretTemplateFormat;
-  vaultBootstrapInputs: VaultBootstrapInputs;
-  vaultRuntimeInputs: DeploymentVaultRuntimeInputs;
-  validateOnly: boolean;
-  controlPlaneOperatorAction?: DeployControlPlaneOperatorAction;
-  remove: boolean;
-  provisionOnly: boolean;
-  publishOnly: boolean;
-  preview: boolean;
-  previewCleanup: boolean;
-  rollback: boolean;
-  retireTarget: boolean;
-  migrateTarget: boolean;
-  targetExceptionRef: string;
-  cleanupReason: string;
-  sourceRunId: string;
-  artifactDirFlag: string;
-  controlPlaneDatabaseUrl: string;
-};
+import { readDeploymentVaultRuntimeInputsFromFlags } from "./deployment-vault-runtime";
+import type { DeployCliReadonlyFlags } from "./deploy-cli-flags";
+export type { DeployCliReadonlyFlags } from "./deploy-cli-flags";
 export function readDeployCliReadonlyFlags(): DeployCliReadonlyFlags {
   return {
     printTargetIdentity: getFlagBool("print-target-identity"),
@@ -79,6 +51,9 @@ export function readDeployCliReadonlyFlags(): DeployCliReadonlyFlags {
     sourceRunId: getFlagStr("source-run-id", "").trim(),
     artifactDirFlag: getFlagStr("artifact-dir", "").trim(),
     controlPlaneDatabaseUrl: getFlagStr("control-plane-database-url", "").trim(),
+    controlPlaneUrl: getFlagStr("control-plane-url", "").trim(),
+    controlPlaneToken: getFlagStr("control-plane-token", "").trim() || undefined,
+    allowControlPlaneOverride: getFlagBool("allow-control-plane-override"),
   };
 }
 function readBootstrapFormat(): VaultBootstrapFormat {

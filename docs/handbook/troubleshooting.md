@@ -231,11 +231,13 @@ unexpected outcome.
     Vercel prebuilt artifact lineage.
   - The invocation passes a direct local-publish flag that is reserved for
     `local_only` Vercel fixtures.
-  - `--control-plane-url` (or the reviewed `--profile` workflow) is missing.
+  - The deployment target has no valid `deployment_context -> controlPlane`
+    selection, or an override URL disagrees with the selected control plane.
 - Fix:
-  - Re-run with `--control-plane-url "$VBR_DEPLOY_CONTROL_PLANE_URL"` (or the
-    reviewed profile), pass the admitted `--source-run-id`, and remove
-    laptop-local artifact or records overrides.
+  - Select a deployment context with a valid control-plane profile, pass the
+    admitted `--source-run-id`, and remove laptop-local artifact or records
+    overrides. Use `--allow-control-plane-override --control-plane-url <url>`
+    only for an intentional operator override.
   - For tests or development, use a `local_only` Vercel fixture deployment
     target instead of a protected/shared label.
 

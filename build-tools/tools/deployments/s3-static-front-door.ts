@@ -11,6 +11,7 @@ import { submitS3StaticExactArtifactRun } from "./s3-static-exact-run";
 import { submitS3StaticProvisionOnly } from "./s3-static-provision-only";
 import { runProtectedS3StaticDeployFrontDoor } from "./s3-static-protected-front-door";
 import { resolveS3StaticReplaySource } from "./s3-static-replay";
+import { shouldUseProtectedSharedServiceRoute } from "./deployment-service-client-selection";
 
 export async function runS3StaticDeployFrontDoor(opts: {
   workspaceRoot: string;
@@ -22,6 +23,9 @@ export async function runS3StaticDeployFrontDoor(opts: {
   sourceRunId: string;
   artifactDirFlag: string;
   backendDatabaseUrl?: string;
+  controlPlaneUrl: string;
+  controlPlaneToken?: string;
+  allowControlPlaneOverride: boolean;
   admissionEvidence?: unknown;
   smokeConnectOverride?: unknown;
   hasFlag?: (flag: string) => boolean;
@@ -42,12 +46,12 @@ export async function runS3StaticDeployFrontDoor(opts: {
       path.join(opts.workspaceRoot, ".local", "deployments", "s3-static", "records"),
     ),
   );
-  const controlPlaneUrl =
-    getFlagStr("control-plane-url", "").trim() ||
-    String(process.env.VBR_DEPLOY_CONTROL_PLANE_URL || "").trim();
   if (
-    opts.deployment.protectionClass !== "local_only" &&
-    (opts.requireServiceForProtectedShared || !!controlPlaneUrl)
+    shouldUseProtectedSharedServiceRoute({
+      deployment: opts.deployment,
+      requireServiceForProtectedShared: opts.requireServiceForProtectedShared,
+      controlPlaneUrl: opts.controlPlaneUrl,
+    })
   ) {
     printDeployJson(
       await runProtectedS3StaticDeployFrontDoor({
@@ -57,8 +61,9 @@ export async function runS3StaticDeployFrontDoor(opts: {
         provisionOnly: opts.provisionOnly,
         rollback: opts.rollback,
         sourceRunId: opts.sourceRunId,
-        controlPlaneUrl,
-        controlPlaneToken: getFlagStr("control-plane-token", "").trim() || undefined,
+        controlPlaneUrl: opts.controlPlaneUrl,
+        controlPlaneToken: opts.controlPlaneToken,
+        allowControlPlaneOverride: opts.allowControlPlaneOverride,
         admissionEvidence: opts.admissionEvidence,
         smokeConnectOverride: opts.smokeConnectOverride,
         hasFlag: opts.hasFlag || (() => false),

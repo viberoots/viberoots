@@ -32,6 +32,7 @@ export type DeploymentInfisicalSecretMapping = {
 
 export type DeploymentSecretMetadata = {
   deploymentContext?: DeploymentContextMetadata;
+  controlPlane?: DeploymentContextMetadata["controlPlane"];
   secretBackend?: DeploymentSecretBackendKind;
   secretBackendProfile?: string;
   infisicalRuntime?: DeploymentInfisicalRuntimeConfig;
@@ -113,6 +114,7 @@ export function deploymentSecretMetadata(
   });
   return {
     ...(deploymentContext ? { deploymentContext } : {}),
+    ...(deploymentContext?.controlPlane ? { controlPlane: deploymentContext.controlPlane } : {}),
     secretBackend: backend,
     secretBackendProfile: profile,
     ...(runtime ? { infisicalRuntime: runtime } : {}),
