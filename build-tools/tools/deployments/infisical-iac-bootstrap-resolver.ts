@@ -3,6 +3,7 @@ import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import { DEFAULT_GRAPH_PATH } from "../lib/graph-const";
 import { readGraph, type GraphNode } from "../lib/graph";
+import { resolveDeploymentContextNodes } from "./deployment-contexts";
 import {
   deploymentSecretBackendSelectorErrors,
   normalizeDeploymentSecretBackendSelector,
@@ -71,7 +72,10 @@ export async function repoBootstrapProfiles(opts: {
 
 export async function requiredBackendProfiles(graphPath = DEFAULT_GRAPH_PATH) {
   const profiles = new Set<string>();
-  const nodes = await readGraph(graphPath).catch(() => []);
+  const rawNodes = await readGraph(graphPath).catch(() => []);
+  const contextErrors: string[] = [];
+  const nodes = resolveDeploymentContextNodes(rawNodes, contextErrors);
+  if (contextErrors.length > 0) throw new Error(contextErrors.join("\n"));
   for (const node of nodes) {
     const secretBackend = stringAttr(node, "secret_backend");
     const secretBackendProfile = stringAttr(node, "secret_backend_profile");

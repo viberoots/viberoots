@@ -21,16 +21,18 @@ test("repo resolver profile discovery accepts unified backend selectors", async 
   ]);
 });
 
-test("repo resolver profile discovery maps omitted backend requirements to vault default", async () => {
+test("repo resolver profile discovery maps context backend requirements before defaults", async () => {
   const graphPath = await writeGraph([
     { name: "//deployments/app:build" },
     {
-      name: "//deployments/implicit-vault:deploy",
+      name: "//projects/deployments/pleomino/staging:deploy",
+      deployment_context: "pleomino-staging",
+      infisical_runtime: {},
       secret_requirements: [{ name: "api_token", contract_id: "secret://deployments/api_token" }],
     },
   ]);
   const profiles = await requiredBackendProfiles(graphPath);
-  assert.deepEqual([...profiles], ["vault-default"]);
+  assert.deepEqual([...profiles], ["infisical-default"]);
 });
 
 test("repo resolver profile discovery ignores nodes with no backend need", async () => {
@@ -53,6 +55,21 @@ test("repo resolver profile discovery rejects split backend metadata", async () 
   await assert.rejects(
     () => requiredBackendProfiles(graphPath),
     /secret_backend must use[\s\S]*secret_backend_profile is unsupported/,
+  );
+});
+
+test("repo resolver profile discovery rejects context backend conflicts", async () => {
+  const graphPath = await writeGraph([
+    {
+      name: "//projects/deployments/pleomino/staging:deploy",
+      deployment_context: "pleomino-staging",
+      secret_backend: "vault/default",
+      secret_requirements: [{ name: "api_token", contract_id: "secret://deployments/api_token" }],
+    },
+  ]);
+  await assert.rejects(
+    () => requiredBackendProfiles(graphPath),
+    /secret_backend vault\/default disagrees with deployment_context secretBackend infisical\/default/,
   );
 });
 

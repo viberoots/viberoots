@@ -2006,3 +2006,105 @@ fixture coverage and real deployment usage.
 This adds a second migration step after PR-13 and touches real Pleomino deployment metadata, but it
 keeps the risk focused on one deployment family and proves the deployment-context model on the path
 operators actually use.
+
+## PR-15: Use deployment contexts for bootstrap resolver profile discovery
+
+### 1. Intent
+
+Close the remaining gap between PR-13/PR-14 deployment context extraction and `repo bootstrap`
+profile discovery. Bootstrap profile discovery must apply selected deployment-context defaults
+before deciding which resolver backend profiles are required, so a deployment that omits
+`secret_backend` because its selected context supplies `secretBackend = "infisical"` requires the
+Infisical profile, not the legacy default backend profile.
+
+### 2. Scope of changes
+
+- Update the Infisical IaC bootstrap resolver/profile discovery path so it resolves the same
+  deployment-context defaults used by deployment extraction before computing required backend
+  profiles.
+- Ensure graph nodes shaped like the checked-in Pleomino deployments, with
+  `deployment_context = "pleomino-staging"` or `deployment_context = "pleomino-prod"`, omitted
+  `secret_backend`, and empty raw `infisical_runtime`, materialize the Infisical resolver profile
+  from the selected context.
+- Remove stale assumptions or tests that treat omitted deployment `secret_backend` as sufficient to
+  choose the legacy default backend when a selected deployment context provides a concrete
+  `secretBackend`.
+- Keep the behavior fail-closed when a selected context and an explicit deployment backend conflict.
+- Do not add compatibility shims for old context-less Pleomino metadata shapes. There are no users
+  yet, so this PR should clean up stale assumptions rather than preserving them.
+
+### 3. External prerequisites
+
+- `projects/config/shared.json` must contain the checked-in deployment contexts that define the
+  shared Pleomino secret backend and Infisical topology.
+- Local user secrets and runtime secret values remain outside the checked-in config files; this PR
+  only changes non-secret profile discovery.
+
+### 4. Tests to be added
+
+- Add a regression test for `requiredBackendProfiles` or the repo bootstrap profile-materialization
+  path using a deployment node shaped like current Pleomino: selected deployment context, secret
+  requirements, omitted `secret_backend`, and empty raw `infisical_runtime`.
+- Assert that the required backend profile is the context-derived Infisical profile, not the legacy
+  default backend profile.
+- Update any stale unified-selector tests that locked omitted `secret_backend` to the old default
+  without considering a selected deployment context.
+- Add or update a conflict regression proving an explicit deployment backend that disagrees with the
+  selected context still fails closed.
+
+### 5. Docs to be added or updated
+
+- Update Infisical bootstrap docs to state that `repo bootstrap` applies deployment context defaults
+  before deciding required resolver profiles.
+- Update SprinkleRef or deployment authoring docs if they still imply bootstrap resolver profile
+  selection reads only raw deployment metadata.
+
+### 5.5. Expected regression scope
+
+- `deployment-only`
+- Expected implementation paths:
+  - `build-tools/tools/deployments/infisical-iac-bootstrap-resolver.ts`
+  - deployment context resolver/extraction helpers under `build-tools/tools/deployments/`
+  - `build-tools/tools/tests/deployments/**`
+  - `docs/infisical-bootstrap.md`
+  - `docs/sprinkleref.md` or `docs/local-sprinkleref.md` if needed
+- Keep the PR focused on bootstrap resolver profile discovery. Do not introduce new context
+  inheritance, profile layering, or app/deployment override semantics.
+
+### 6. Acceptance criteria
+
+- `repo bootstrap` profile discovery applies selected deployment-context defaults before computing
+  required resolver backend profiles.
+- Pleomino-shaped raw graph nodes require the context-derived Infisical backend profile even when
+  raw deployment metadata omits `secret_backend`.
+- Legacy default backend selection is no longer applied ahead of an explicit selected deployment
+  context.
+- Conflicts between explicit deployment backend values and selected context backend values remain
+  fail-closed.
+- Focused resolver/bootstrap tests and final validation pass.
+
+### 7. Risks
+
+- Reusing extraction helpers in bootstrap discovery could accidentally pull in admission-only
+  behavior or make bootstrap depend on fields it does not need.
+- Changing default backend selection may expose tests that were relying on raw graph metadata rather
+  than the canonical context-resolved deployment model.
+
+### 8. Mitigations
+
+- Share the smallest context-resolution helper needed to compute backend profile identity.
+- Add narrow regression tests for the Pleomino-shaped node and the explicit-conflict path before
+  relying on broad final validation.
+- Remove stale tests or expectations that encode the pre-context behavior instead of layering
+  compatibility around them.
+
+### 9. Consequences of not implementing this PR
+
+PR-13/PR-14 deployment contexts would be correct for extraction/admission, but `repo bootstrap`
+could still ask operators for the wrong backend profile or skip the needed Infisical profile for
+context-based Pleomino deployments.
+
+### 10. Downsides for implementing this PR
+
+This adds one more follow-up PR after moving Pleomino onto contexts, but it closes the last known
+bootstrap gap and keeps resolver profile discovery aligned with the canonical deployment model.

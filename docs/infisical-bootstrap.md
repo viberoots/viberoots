@@ -79,8 +79,11 @@ is unset. Repo dry-run mirrors that closed state by reporting the profile in
 Repo dry-run reports the same backend profile set confirmed repo bootstrap will validate or
 materialize: graph-required profiles plus active profiles selected by resolver categories, even when
 the current deployment graph does not require that category-selected backend.
-Deployment graph nodes with secret requirements and omitted `secret_backend` contribute the implicit
-`vault/default` profile to repo bootstrap discovery, matching deployment metadata normalization.
+Repo bootstrap applies selected deployment-context defaults before computing required resolver
+profiles. Deployment graph nodes with secret requirements and omitted `secret_backend` use the
+selected context `secretBackend` when present, so Pleomino context deployments require the
+context-derived Infisical profile. Without a selected context backend, omitted `secret_backend`
+continues to contribute the implicit `vault/default` profile.
 
 Token-based `--no-login` bootstrap flows must pass exactly one of `--org-name` or
 `--organization-id`; login-based operator flows may still use interactive or `--yes` single-org
