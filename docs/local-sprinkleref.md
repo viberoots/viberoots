@@ -304,15 +304,27 @@ non-secret provider metadata:
       "aws": { "accountId": "111122223333", "defaultRegion": "us-west-2" },
       "infisical": {
         "host": "https://app.infisical.com",
-        "projectId": "prod-project-id",
+        "projectId": "5a927a1a-e78d-433e-affc-17cc051780c0",
+        "projectName": "pleomino-deployments",
+        "projectSlug": "pleomino-deployments",
         "environment": "prod",
-        "defaultPath": "/deployments/pleomino/prod",
-        "clientSecretRef": "secret://bootstrap/pleomino-prod/infisical/client-secret"
+        "defaultPath": "/",
+        "clientIdEnv": "PLEOMINO_PROD_INFISICAL_CLIENT_ID",
+        "clientSecretEnv": "PLEOMINO_PROD_INFISICAL_CLIENT_SECRET",
+        "clientIdRef": "secret://deployments/pleomino/prod/infisical-client-id",
+        "clientSecretRef": "secret://deployments/pleomino/prod/infisical-client-secret",
+        "clientIdFileName": "pleomino-prod-infisical-client-id",
+        "clientSecretFileName": "pleomino-prod-infisical-client-secret",
+        "machineIdentityId": "ceca24df-0e8b-457e-a5a8-cf20a122d2da",
+        "machineIdentityName": "pleomino-prod-deploy"
       },
       "cloudflare": {
-        "account": "web-platform",
+        "account": "web-platform-prod",
+        "accountId": "1b911846f80a89272c0dbaf44f5c810f",
         "projectName": "pleomino-prod-pages",
-        "apiTokenRef": "secret://deployments/pleomino/prod/cloudflare-api-token"
+        "customDomain": "pleomino.com",
+        "zoneId": "9411ac5903acb1c2e29b3d4c04ef7e6f",
+        "apiTokenRef": "secret://deployments/pleomino/cloudflare_api_token"
       }
     },
     "admin-prod": {

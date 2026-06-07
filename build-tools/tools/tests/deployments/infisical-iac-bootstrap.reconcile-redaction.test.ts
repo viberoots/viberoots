@@ -84,7 +84,7 @@ test("reconciliation mismatch fails with non-secret patch guidance", () => {
   );
   assert.throws(
     () => reconcileDeploymentMetadata({ ...reviewed, siteUrl: "https://wrong.example" }, reviewed),
-    /site url: live=https:\/\/wrong\.example reviewed=https:\/\/app\.infisical\.com[\s\S]*reviewed constants/,
+    /site url: live=https:\/\/wrong\.example reviewed=https:\/\/app\.infisical\.com[\s\S]*projects\/config\/shared\.json deployment contexts/,
   );
 });
 

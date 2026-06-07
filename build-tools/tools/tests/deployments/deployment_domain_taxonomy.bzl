@@ -56,4 +56,6 @@ REVIEWED_DEPLOYMENT_TEST_OWNERSHIP.update({
     "build-tools/tools/tests/deployments/deployment-contexts.authoring.test.ts": True,
     "build-tools/tools/tests/deployments/deployment-contexts.test.ts": True,
     "build-tools/tools/tests/deployments/deployment-contexts.scope.test.ts": True,
+    "build-tools/tools/tests/deployments/pleomino-deployment-context-explicit-provider.cquery.test.ts": True,
+    "build-tools/tools/tests/deployments/pleomino-deployment-contexts.cquery.test.ts": True,
 })

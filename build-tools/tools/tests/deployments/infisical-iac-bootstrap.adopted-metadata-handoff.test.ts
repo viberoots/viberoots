@@ -2,14 +2,14 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { reconcileDeploymentMetadata } from "../../deployments/infisical-iac-bootstrap-reconcile";
-import { parsePleominoReviewedMetadata } from "../../deployments/infisical-iac-bootstrap-reviewed-metadata";
+import { parsePleominoReviewedContextConfig } from "../../deployments/infisical-iac-bootstrap-reviewed-metadata";
 
 test("adopted project metadata drift becomes a reviewed handoff patch", () => {
-  const source = SOURCE.replace("proj_old", "reviewed-live-project").replace(
+  const source = SOURCE.replaceAll("proj_old", "reviewed-live-project").replace(
     "identity_old_staging",
     "reviewed-live-staging-identity",
   );
-  const reviewed = parsePleominoReviewedMetadata(source);
+  const reviewed = parsePleominoReviewedContextConfig(source);
   const result = reconcileDeploymentMetadata(LIVE_METADATA, reviewed, source, {
     allowReviewedIdHandoff: true,
   });
@@ -20,7 +20,7 @@ test("adopted project metadata drift becomes a reviewed handoff patch", () => {
 
 test("adopted project metadata handoff still requires live ids", () => {
   const source = SOURCE.replace("proj_old", "reviewed-live-project");
-  const reviewed = parsePleominoReviewedMetadata(source);
+  const reviewed = parsePleominoReviewedContextConfig(source);
   assert.throws(
     () =>
       reconcileDeploymentMetadata({ ...LIVE_METADATA, projectId: undefined }, reviewed, source, {
@@ -31,7 +31,7 @@ test("adopted project metadata handoff still requires live ids", () => {
 });
 
 test("adopted project metadata handoff does not relax reviewed file-name drift", () => {
-  const reviewed = parsePleominoReviewedMetadata(SOURCE);
+  const reviewed = parsePleominoReviewedContextConfig(SOURCE);
   assert.throws(
     () =>
       reconcileDeploymentMetadata(
@@ -59,7 +59,7 @@ const LIVE_METADATA = {
   projectSlug: "fixture-deployments",
   secretPath: "/",
   cloudflareSecretName: "cloudflare_api_token",
-  environments: { staging: { slug: "staging" } },
+  environments: { staging: { slug: "staging" }, prod: { slug: "prod" } },
   deploymentCredentials: [
     {
       stage: "staging",
@@ -70,29 +70,57 @@ const LIVE_METADATA = {
       clientIdFileName: "fixture-staging-infisical-client-id",
       clientSecretFileName: "fixture-staging-infisical-client-secret",
     },
+    {
+      stage: "prod",
+      identityId: "identity_live_prod",
+      identityName: "fixture-prod-deploy",
+      clientIdRef: "secret://deployments/fixture/prod/infisical-client-id",
+      clientSecretRef: "secret://deployments/fixture/prod/infisical-client-secret",
+      clientIdFileName: "fixture-prod-infisical-client-id",
+      clientSecretFileName: "fixture-prod-infisical-client-secret",
+    },
   ],
 };
 
-const SOURCE = `
-_INFISICAL_SITE_URL = "https://app.infisical.com"
-_INFISICAL_PROJECT_ID = "proj_old"
-_INFISICAL_PROJECT_NAME = "fixture-deployments"
-_INFISICAL_PROJECT_SLUG = "fixture-deployments"
-_INFISICAL_ENVIRONMENT_SLUGS = {"staging": "staging"}
-_INFISICAL_SECRET_PATH = "/"
-_INFISICAL_CLOUDFLARE_SECRET_NAME = "cloudflare_api_token"
-_INFISICAL_MACHINE_IDENTITY_IDS = {"staging": "identity_old_staging"}
-_INFISICAL_MACHINE_IDENTITY_NAMES = {"staging": "fixture-staging-deploy"}
-_INFISICAL_CREDENTIAL_FILE_NAMES = {
-  "staging": {
-    "client_id": "fixture-staging-infisical-client-id",
-    "client_secret": "fixture-staging-infisical-client-secret",
+const SOURCE = `${JSON.stringify(
+  {
+    deploymentContexts: {
+      "pleomino-staging": {
+        infisical: {
+          host: "https://app.infisical.com",
+          projectId: "proj_old",
+          projectName: "fixture-deployments",
+          projectSlug: "fixture-deployments",
+          environment: "staging",
+          defaultPath: "/",
+          machineIdentityId: "identity_old_staging",
+          machineIdentityName: "fixture-staging-deploy",
+          clientIdRef: "secret://deployments/fixture/staging/infisical-client-id",
+          clientSecretRef: "secret://deployments/fixture/staging/infisical-client-secret",
+          clientIdFileName: "fixture-staging-infisical-client-id",
+          clientSecretFileName: "fixture-staging-infisical-client-secret",
+        },
+        cloudflare: { apiTokenRef: "secret://deployments/fixture/cloudflare_api_token" },
+      },
+      "pleomino-prod": {
+        infisical: {
+          host: "https://app.infisical.com",
+          projectId: "proj_old",
+          projectName: "fixture-deployments",
+          projectSlug: "fixture-deployments",
+          environment: "prod",
+          defaultPath: "/",
+          machineIdentityId: "identity_old_prod",
+          machineIdentityName: "fixture-prod-deploy",
+          clientIdRef: "secret://deployments/fixture/prod/infisical-client-id",
+          clientSecretRef: "secret://deployments/fixture/prod/infisical-client-secret",
+          clientIdFileName: "fixture-prod-infisical-client-id",
+          clientSecretFileName: "fixture-prod-infisical-client-secret",
+        },
+        cloudflare: { apiTokenRef: "secret://deployments/fixture/cloudflare_api_token" },
+      },
+    },
   },
-}
-_INFISICAL_CREDENTIAL_REFS = {
-  "staging": {
-    "client_id": "secret://deployments/fixture/staging/infisical-client-id",
-    "client_secret": "secret://deployments/fixture/staging/infisical-client-secret",
-  },
-}
-`;
+  null,
+  2,
+)}\n`;

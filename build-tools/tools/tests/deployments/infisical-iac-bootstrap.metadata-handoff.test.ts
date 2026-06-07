@@ -4,24 +4,28 @@ import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
 import { test } from "node:test";
-import { reconcileDeploymentMetadata } from "../../deployments/infisical-iac-bootstrap-reconcile";
 import {
   applyMetadataHandoffPatch,
   buildMetadataHandoffPatch,
 } from "../../deployments/infisical-iac-bootstrap-metadata-handoff";
-import { parsePleominoReviewedMetadata } from "../../deployments/infisical-iac-bootstrap-reviewed-metadata";
+import {
+  parsePleominoReviewedContextConfig,
+  PLEOMINO_REVIEWED_CONTEXT_CONFIG_PATH,
+} from "../../deployments/infisical-iac-bootstrap-reviewed-metadata";
+import { reconcileDeploymentMetadata } from "../../deployments/infisical-iac-bootstrap-reconcile";
 
-test("placeholder reviewed metadata becomes a first-bootstrap handoff patch", () => {
-  const reviewed = parsePleominoReviewedMetadata(FIRST_BOOTSTRAP_SOURCE);
+test("placeholder context metadata becomes a first-bootstrap handoff patch", () => {
+  const reviewed = parsePleominoReviewedContextConfig(FIRST_BOOTSTRAP_SOURCE);
   const result = reconcileDeploymentMetadata(LIVE_METADATA, reviewed, FIRST_BOOTSTRAP_SOURCE);
   assert.equal(result.status, "metadata_handoff_required");
+  assert.equal(result.patch.path, PLEOMINO_REVIEWED_CONTEXT_CONFIG_PATH);
   assert.match(result.patch.unifiedDiff, /proj_live/);
   assert.match(result.patch.unifiedDiff, /identity_live_staging/);
   assert.doesNotMatch(result.patch.unifiedDiff, /cloudflare_api_token\n\+/);
 });
 
-test("missing live project id fails closed instead of handoff", () => {
-  const reviewed = parsePleominoReviewedMetadata(FIRST_BOOTSTRAP_SOURCE);
+test("missing live reviewed ids fail closed instead of partial handoff", () => {
+  const reviewed = parsePleominoReviewedContextConfig(FIRST_BOOTSTRAP_SOURCE);
   assert.throws(
     () =>
       reconcileDeploymentMetadata(
@@ -31,16 +35,15 @@ test("missing live project id fails closed instead of handoff", () => {
       ),
     /project id: live=<missing> reviewed=proj_pleomino_deployments/,
   );
-});
-
-test("missing live stage identity id fails closed instead of partial handoff", () => {
-  const reviewed = parsePleominoReviewedMetadata(FIRST_BOOTSTRAP_SOURCE);
   assert.throws(
     () =>
       reconcileDeploymentMetadata(
         {
           ...LIVE_METADATA,
-          deploymentCredentials: [{ ...LIVE_METADATA.deploymentCredentials[0], identityId: "" }],
+          deploymentCredentials: [
+            { ...LIVE_METADATA.deploymentCredentials[0]!, identityId: "" },
+            LIVE_METADATA.deploymentCredentials[1]!,
+          ],
         },
         reviewed,
         FIRST_BOOTSTRAP_SOURCE,
@@ -49,45 +52,23 @@ test("missing live stage identity id fails closed instead of partial handoff", (
   );
 });
 
-test("missing live credential file names fail closed instead of partial handoff", () => {
-  const reviewed = parsePleominoReviewedMetadata(FIRST_BOOTSTRAP_SOURCE);
-  assert.throws(
-    () =>
-      reconcileDeploymentMetadata(
-        {
-          ...LIVE_METADATA,
-          deploymentCredentials: [
-            {
-              ...LIVE_METADATA.deploymentCredentials[0],
-              clientIdFileName: undefined,
-              clientSecretFileName: "",
-            },
-          ],
-        },
-        reviewed,
-        FIRST_BOOTSTRAP_SOURCE,
-      ),
-    /staging client id file name: live=<missing> reviewed=<missing>[\s\S]*staging client secret file name: live=<missing> reviewed=<missing>/,
+test("empty reviewed host requires live output before handoff", () => {
+  const source = FIRST_BOOTSTRAP_SOURCE.replaceAll(
+    '"host": "https://app.infisical.com"',
+    '"host": ""',
   );
-});
-
-test("empty reviewed site url requires live output before handoff", () => {
-  const source = FIRST_BOOTSTRAP_SOURCE.replace(
-    '_INFISICAL_SITE_URL = "https://app.infisical.com"',
-    '_INFISICAL_SITE_URL = ""',
-  );
-  const reviewed = parsePleominoReviewedMetadata(source);
+  const reviewed = parsePleominoReviewedContextConfig(source);
   assert.throws(
     () => reconcileDeploymentMetadata({ ...LIVE_METADATA, siteUrl: undefined }, reviewed, source),
     /site url: live=<missing> reviewed=<missing>/,
   );
   const result = reconcileDeploymentMetadata(LIVE_METADATA, reviewed, source);
   assert.equal(result.status, "metadata_handoff_required");
-  assert.match(result.patch.unifiedDiff, /_INFISICAL_SITE_URL = "https:\/\/app\.infisical\.com"/);
+  assert.match(result.patch.unifiedDiff, /"host": "https:\/\/app\.infisical\.com"/);
 });
 
 test("metadata patch rejects required replacements without live after values", () => {
-  const reviewed = parsePleominoReviewedMetadata(FIRST_BOOTSTRAP_SOURCE);
+  const reviewed = parsePleominoReviewedContextConfig(FIRST_BOOTSTRAP_SOURCE);
   assert.throws(
     () =>
       buildMetadataHandoffPatch(
@@ -95,103 +76,62 @@ test("metadata patch rejects required replacements without live after values", (
         reviewed,
         FIRST_BOOTSTRAP_SOURCE,
       ),
-    /metadata patch missing live value for _INFISICAL_PROJECT_ID/,
+    /metadata patch missing live value for deploymentContexts\.pleomino-staging\.infisical\.projectId/,
   );
 });
 
 test("non-placeholder reviewed drift remains a hard reconciliation failure", () => {
-  const reviewed = parsePleominoReviewedMetadata(
-    FIRST_BOOTSTRAP_SOURCE.replace("proj_pleomino_deployments", "reviewed-live-project"),
-  );
+  const source = FIRST_BOOTSTRAP_SOURCE.replace("proj_pleomino_deployments", "reviewed-live");
+  const reviewed = parsePleominoReviewedContextConfig(source);
   assert.throws(
-    () => reconcileDeploymentMetadata(LIVE_METADATA, reviewed, FIRST_BOOTSTRAP_SOURCE),
-    /project id: live=proj_live reviewed=reviewed-live-project/,
+    () => reconcileDeploymentMetadata(LIVE_METADATA, reviewed, source),
+    /project id: live=proj_live reviewed=reviewed-live/,
   );
 });
 
-test("metadata patch changes only reviewed non-secret handoff constants", async () => {
-  const applied = await applyPatchToTemp(FIRST_BOOTSTRAP_SOURCE);
-  assert.match(applied, /_INFISICAL_PROJECT_ID = "proj_live"/);
-  assert.match(applied, /"staging": "identity_live_staging"/);
-  assert.match(applied, /"client_id": "pleomino-staging-infisical-client-id"/);
-  assert.match(applied, /secret:\/\/deployments\/pleomino\/staging\/infisical-client-id/);
-  assert.match(applied, /_INFISICAL_PROJECT_SLUG = "pleomino-deployments"/);
-  assert.match(applied, /_INFISICAL_CLOUDFLARE_SECRET_NAME = "cloudflare_api_token"/);
-});
-
-test("metadata patch ignores duplicate placeholder values before reviewed constants", async () => {
-  const applied = await applyPatchToTemp(`
-_UNRELATED_PLACEHOLDER = "proj_pleomino_deployments"
-_UNRELATED_IDS = {"staging": "identity_pleomino_staging_deploy"}
-_UNRELATED_FILES = {"client_id": "", "client_secret": ""}
-${FIRST_BOOTSTRAP_SOURCE}
-`);
-  assert.match(applied, /_UNRELATED_PLACEHOLDER = "proj_pleomino_deployments"/);
-  assert.match(applied, /_UNRELATED_IDS = \{"staging": "identity_pleomino_staging_deploy"\}/);
-  assert.match(applied, /_UNRELATED_FILES = \{"client_id": "", "client_secret": ""\}/);
-  assert.match(applied, /_INFISICAL_PROJECT_ID = "proj_live"/);
-  assert.match(applied, /"staging": "identity_live_staging"/);
-});
-
-test("metadata patch leaves unrelated duplicate live values unchanged", async () => {
-  const applied = await applyPatchToTemp(`
-${FIRST_BOOTSTRAP_SOURCE}
-_UNRELATED_LIVE_PROJECT = "proj_live"
-_VAULT_RUNTIME = {"project": "proj_pleomino_deployments"}
-# "pleomino-staging-infisical-client-id" is only a comment outside reviewed metadata.
-`);
-  assert.match(applied, /_UNRELATED_LIVE_PROJECT = "proj_live"/);
-  assert.match(applied, /_VAULT_RUNTIME = \{"project": "proj_pleomino_deployments"\}/);
-  assert.match(applied, /# "pleomino-staging-infisical-client-id" is only a comment/);
-  assert.match(applied, /_INFISICAL_PROJECT_ID = "proj_live"/);
-});
-
-test("metadata patch fails closed when required constants are missing", () => {
-  assert.throws(
-    () => buildPatch(FIRST_BOOTSTRAP_SOURCE.replace(/_INFISICAL_PROJECT_ID = "[^"]+"\n/, "")),
-    /cannot safely rewrite _INFISICAL_PROJECT_ID|missing _INFISICAL_PROJECT_ID/,
+test("metadata patch changes only reviewed non-secret context fields", async () => {
+  const applied = JSON.parse(await applyPatchToTemp(FIRST_BOOTSTRAP_SOURCE));
+  const infisical = applied.deploymentContexts["pleomino-staging"].infisical;
+  assert.equal(infisical.projectId, "proj_live");
+  assert.equal(infisical.machineIdentityId, "identity_live_staging");
+  assert.equal(infisical.clientIdFileName, "pleomino-staging-infisical-client-id");
+  assert.equal(
+    infisical.clientSecretRef,
+    "secret://deployments/pleomino/staging/infisical-client-secret",
+  );
+  assert.equal(
+    applied.deploymentContexts["pleomino-staging"].cloudflare.apiTokenRef,
+    "secret://deployments/pleomino/cloudflare_api_token",
   );
 });
 
-test("metadata patch fails closed when required stage entries are ambiguous", () => {
-  assert.throws(
-    () =>
-      buildPatch(
-        FIRST_BOOTSTRAP_SOURCE.replace(
-          /_INFISICAL_MACHINE_IDENTITY_IDS = \{"staging": "identity_pleomino_staging_deploy"\}/,
-          '_INFISICAL_MACHINE_IDENTITY_IDS = {"staging": "identity_pleomino_staging_deploy", "staging": "identity_pleomino_staging_deploy"}',
-        ),
-      ),
-    /cannot safely rewrite _INFISICAL_MACHINE_IDENTITY_IDS\.staging: expected one/,
-  );
+test("metadata patch fails closed when required context paths are missing", () => {
+  const source = FIRST_BOOTSTRAP_SOURCE.replace('"projectId": "proj_pleomino_deployments",\n', "");
+  assert.throws(() => buildPatch(source), /missing projectId in checked-in Pleomino metadata/);
 });
 
-test("metadata patch rejects unsupported reviewed scalar constants", async () => {
+test("metadata patch rejects unsupported reviewed paths", async () => {
   const patch = buildPatch(FIRST_BOOTSTRAP_SOURCE);
   patch.replacements = [
-    { label: "_INFISICAL_PROJECT_NAME", before: "pleomino-deployments", after: "renamed" },
+    { label: "deploymentContexts.pleomino-staging.missing.projectId", before: "old", after: "new" },
   ];
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), "infisical-metadata-handoff-"));
-  patch.path = path.join(dir, "family.bzl");
+  patch.path = path.join(dir, "shared.json");
   await fs.writeFile(patch.path, FIRST_BOOTSTRAP_SOURCE);
-  await assert.rejects(() => applyMetadataHandoffPatch(patch), /unsupported reviewed scalar/);
-  assert.match(
-    await fs.readFile(patch.path, "utf8"),
-    /_INFISICAL_PROJECT_NAME = "pleomino-deployments"/,
-  );
+  await assert.rejects(() => applyMetadataHandoffPatch(patch), /expected object at missing/);
 });
 
 async function applyPatchToTemp(source: string) {
   const patch = buildPatch(source);
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), "infisical-metadata-handoff-"));
-  patch.path = path.join(dir, "family.bzl");
+  patch.path = path.join(dir, "shared.json");
   await fs.writeFile(patch.path, source);
   await applyMetadataHandoffPatch(patch);
   return await fs.readFile(patch.path, "utf8");
 }
 
 function buildPatch(source: string) {
-  const reviewed = parsePleominoReviewedMetadata(source);
+  const reviewed = parsePleominoReviewedContextConfig(source);
   return buildMetadataHandoffPatch(LIVE_METADATA, reviewed, source);
 }
 
@@ -202,7 +142,7 @@ const LIVE_METADATA = {
   projectSlug: "pleomino-deployments",
   secretPath: "/",
   cloudflareSecretName: "cloudflare_api_token",
-  environments: { staging: { slug: "staging" } },
+  environments: { staging: { slug: "staging" }, prod: { slug: "prod" } },
   deploymentCredentials: [
     {
       stage: "staging",
@@ -213,26 +153,47 @@ const LIVE_METADATA = {
       clientIdFileName: "pleomino-staging-infisical-client-id",
       clientSecretFileName: "pleomino-staging-infisical-client-secret",
     },
+    {
+      stage: "prod",
+      identityId: "identity_live_prod",
+      identityName: "pleomino-prod-deploy",
+      clientIdRef: "secret://deployments/pleomino/prod/infisical-client-id",
+      clientSecretRef: "secret://deployments/pleomino/prod/infisical-client-secret",
+      clientIdFileName: "pleomino-prod-infisical-client-id",
+      clientSecretFileName: "pleomino-prod-infisical-client-secret",
+    },
   ],
 };
 
-const FIRST_BOOTSTRAP_SOURCE = `
-_INFISICAL_SITE_URL = "https://app.infisical.com"
-_INFISICAL_PROJECT_ID = "proj_pleomino_deployments"
-_INFISICAL_PROJECT_NAME = "pleomino-deployments"
-_INFISICAL_PROJECT_SLUG = "pleomino-deployments"
-_INFISICAL_ENVIRONMENT_SLUGS = {"staging": "staging"}
-_INFISICAL_SECRET_PATH = "/"
-_INFISICAL_CLOUDFLARE_SECRET_NAME = "cloudflare_api_token"
-_INFISICAL_MACHINE_IDENTITY_IDS = {"staging": "identity_pleomino_staging_deploy"}
-_INFISICAL_MACHINE_IDENTITY_NAMES = {"staging": "pleomino-staging-deploy"}
-_INFISICAL_CREDENTIAL_FILE_NAMES = {
-  "staging": {"client_id": "", "client_secret": ""},
-}
-_INFISICAL_CREDENTIAL_REFS = {
-  "staging": {
-    "client_id": "secret://deployments/pleomino/staging/infisical-client-id",
-    "client_secret": "secret://deployments/pleomino/staging/infisical-client-secret",
+const context = (stage: "staging" | "prod") => ({
+  secretBackend: "infisical/default",
+  infisical: {
+    host: "https://app.infisical.com",
+    projectId: "proj_pleomino_deployments",
+    projectName: "pleomino-deployments",
+    projectSlug: "pleomino-deployments",
+    environment: stage,
+    defaultPath: "/",
+    machineIdentityId: `identity_pleomino_${stage}_deploy`,
+    machineIdentityName: `pleomino-${stage}-deploy`,
+    clientIdRef: `secret://deployments/pleomino/${stage}/infisical-client-id`,
+    clientSecretRef: `secret://deployments/pleomino/${stage}/infisical-client-secret`,
+    clientIdFileName: "",
+    clientSecretFileName: "",
   },
-}
-`;
+  cloudflare: {
+    apiTokenRef: "secret://deployments/pleomino/cloudflare_api_token",
+  },
+});
+
+const FIRST_BOOTSTRAP_SOURCE = `${JSON.stringify(
+  {
+    schemaVersion: "viberoots-project-config@1",
+    deploymentContexts: {
+      "pleomino-staging": context("staging"),
+      "pleomino-prod": context("prod"),
+    },
+  },
+  null,
+  2,
+)}\n`;

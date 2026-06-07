@@ -5,6 +5,8 @@ import { readStringRecord } from "./deployment-graph-readers";
 export type DeploymentInfisicalRuntimeConfig = {
   siteUrl: string;
   projectId: string;
+  projectName?: string;
+  projectSlug?: string;
   environment: string;
   secretPath?: string;
   secretPathPrefix?: string;
@@ -32,6 +34,8 @@ export function readInfisicalRuntime(
   return {
     siteUrl: runtime.site_url || "",
     projectId: runtime.project_id || "",
+    ...(runtime.project_name ? { projectName: runtime.project_name } : {}),
+    ...(runtime.project_slug ? { projectSlug: runtime.project_slug } : {}),
     environment: runtime.environment || "",
     ...(runtime.secret_path ? { secretPath: runtime.secret_path } : {}),
     ...(runtime.secret_path_prefix ? { secretPathPrefix: runtime.secret_path_prefix } : {}),

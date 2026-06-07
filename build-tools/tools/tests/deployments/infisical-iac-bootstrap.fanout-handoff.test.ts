@@ -32,7 +32,7 @@ test("fan-out aggregates first-bootstrap handoffs separately from hard failures"
   );
   assert.equal(result.failures.length, 0);
   assert.match(logs.join("\n"), /First-bootstrap metadata handoff required/);
-  assert.match(logs.join("\n"), /family\.bzl/);
+  assert.match(logs.join("\n"), /projects\/config\/shared\.json/);
   assert.equal(logs.filter((line) => line.includes("--- a/projects")).length, 1);
 });
 
@@ -96,7 +96,7 @@ test("interactive metadata patch confirmation applies the reviewed patch", async
   await withInteractiveIo("Y\n", () =>
     applyFanOutMetadataHandoff(DEFAULT_BOOTSTRAP_ARGS, fanOutWithPatch(tempPatch)),
   );
-  assert.equal(await fs.readFile(tempPatch.path, "utf8"), '_INFISICAL_PROJECT_ID = "proj_new"\n');
+  assert.match(await fs.readFile(tempPatch.path, "utf8"), /proj_new/);
 });
 
 test("declined interactive metadata patch confirmation stops before writing", async () => {
@@ -108,7 +108,7 @@ test("declined interactive metadata patch confirmation stops before writing", as
       ),
     /metadata patch application cancelled/,
   );
-  assert.equal(await fs.readFile(tempPatch.path, "utf8"), '_INFISICAL_PROJECT_ID = "proj_old"\n');
+  assert.match(await fs.readFile(tempPatch.path, "utf8"), /proj_old/);
 });
 
 test("metadata patch gate rejects divergent fan-out patches before writing", async () => {
@@ -124,7 +124,7 @@ test("metadata patch gate rejects divergent fan-out patches before writing", asy
       ),
     /divergent first-bootstrap metadata patches[\s\S]*staging:deploy[\s\S]*prod:deploy/,
   );
-  assert.equal(await fs.readFile(tempPatch.path, "utf8"), '_INFISICAL_PROJECT_ID = "proj_old"\n');
+  assert.match(await fs.readFile(tempPatch.path, "utf8"), /proj_old/);
 });
 
 test("metadata patch gate applies identical multi-target handoff once", async () => {
@@ -137,7 +137,7 @@ test("metadata patch gate applies identical multi-target handoff once", async ()
     ]),
   );
   assert.deepEqual(result.targets, [staging, prod]);
-  assert.equal(await fs.readFile(tempPatch.path, "utf8"), '_INFISICAL_PROJECT_ID = "proj_new"\n');
+  assert.match(await fs.readFile(tempPatch.path, "utf8"), /proj_new/);
 });
 
 function fanOutWithPatch(item: MetadataHandoffPatch) {
@@ -158,8 +158,11 @@ function fanOutWithPatches(
 
 async function patchInTemp(): Promise<MetadataHandoffPatch> {
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), "metadata-gate-"));
-  const file = path.join(dir, "family.bzl");
-  await fs.writeFile(file, '_INFISICAL_PROJECT_ID = "proj_old"\n');
+  const file = path.join(dir, "shared.json");
+  await fs.writeFile(
+    file,
+    `${JSON.stringify({ deploymentContexts: { "pleomino-staging": { infisical: { projectId: "proj_old" } } } }, null, 2)}\n`,
+  );
   return { ...patch, path: file };
 }
 
@@ -183,13 +186,25 @@ async function withInteractiveIo<T>(inputText: string, run: () => Promise<T>) {
 
 const patch: MetadataHandoffPatch = {
   schemaVersion: "infisical-iac-bootstrap-metadata-patch@1",
-  path: "projects/deployments/pleomino/shared/family.bzl",
-  replacements: [{ label: "_INFISICAL_PROJECT_ID", before: "proj_old", after: "proj_new" }],
-  unifiedDiff: "--- a/projects/deployments/pleomino/shared/family.bzl\n+proj_new\n",
+  path: "projects/config/shared.json",
+  replacements: [
+    {
+      label: "deploymentContexts.pleomino-staging.infisical.projectId",
+      before: "proj_old",
+      after: "proj_new",
+    },
+  ],
+  unifiedDiff: "--- a/projects/config/shared.json\n+proj_new\n",
 };
 
 const prodPatch: MetadataHandoffPatch = {
   ...patch,
-  replacements: [{ label: "_INFISICAL_PROJECT_ID", before: "proj_old", after: "proj_prod" }],
-  unifiedDiff: "--- a/projects/deployments/pleomino/shared/family.bzl\n+proj_prod\n",
+  replacements: [
+    {
+      label: "deploymentContexts.pleomino-staging.infisical.projectId",
+      before: "proj_old",
+      after: "proj_prod",
+    },
+  ],
+  unifiedDiff: "--- a/projects/config/shared.json\n+proj_prod\n",
 };

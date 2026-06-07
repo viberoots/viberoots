@@ -1734,7 +1734,7 @@ and keep apps backend-neutral.
 - Add project config schema/loader tests proving multiple named deployment contexts can coexist in
   `projects/config/shared.json`.
 - Add deployment metadata tests proving one deployment can select `deployment_context =
-  "pleomino-prod"` and another can select `deployment_context = "admin-prod"`, with each resolving
+"pleomino-prod"` and another can select `deployment_context = "admin-prod"`, with each resolving
   distinct typed provider sections.
 - Add tests proving two deployments can use different AWS account ids and different Infisical
   project ids through deployment contexts.
@@ -1886,3 +1886,123 @@ The PR adds one explicit selector concept to deployment metadata and requires ca
 existing Infisical runtime fields. The payoff is a clearer boundary: shared project config owns
 typed deployment contexts, deployments choose one context, apps stay backend-neutral, and secret
 values remain in secret backends rather than JSON config.
+
+## PR-14: Move Pleomino deployments onto deployment contexts
+
+### 1. Intent
+
+Finish the PR-13 migration on the checked-in real deployment path by moving Pleomino's deployment
+family off hand-maintained Infisical resolver topology and onto selected deployment contexts.
+Pleomino should use `deployment_context = "<stage-context>"` for its shared provider topology, with
+concrete Infisical project/environment/path identity derived from the selected context for
+admission/replay evidence rather than duplicated by hand in deployment metadata.
+
+### 2. Scope of changes
+
+- Update `projects/deployments/pleomino/shared/family.bzl` so staging and prod deployment stages
+  select deployment contexts such as `pleomino-staging` and `pleomino-prod`.
+- Move Pleomino's shared non-secret Infisical topology that currently lives in
+  `_pleomino_infisical_runtime(stage)` into `projects/config/shared.json` deployment context
+  sections.
+- Move Cloudflare account, zone, project, and custom-domain shared coordinates into the selected
+  Pleomino deployment contexts when those values are shared topology rather than stage-local
+  provider target identity.
+- Remove hand-maintained `infisical_runtime = _pleomino_infisical_runtime(stage)` from Pleomino
+  stage metadata when the same topology can be derived from the selected deployment context.
+- Keep any exact replay/audit fields that must remain durable as generated/admission-time evidence,
+  not as manually duplicated resolver configuration in the deployment family.
+- Preserve existing `secret_backend = "infisical/default"` behavior only where it is still needed as
+  an explicit migration-compatible selector. Prefer letting the selected deployment context provide
+  the same default when that does not change existing secret runtime behavior.
+- Ensure context-derived `provider_target` and Infisical runtime values fail closed if a stage still
+  declares a conflicting explicit value.
+- Keep logical secret refs, such as Cloudflare API token refs and Infisical bootstrap refs, as refs.
+  Do not write plaintext secret values into Pleomino deployment metadata or project config.
+- Update any bootstrap, admission, check, or extraction paths that currently assume the real
+  Pleomino deployment family carries explicit `infisical_runtime` fields.
+
+### 3. External prerequisites
+
+- The existing Pleomino Infisical project id/name/slug, environment slugs, Cloudflare coordinates,
+  and logical secret refs must be safe to commit as shared non-secret deployment context topology.
+- Existing Pleomino deployment secrets must already live in the selected secret backend under the
+  same logical refs and derived Infisical coordinates, or setup/check commands must clearly report
+  what is missing without printing secret values.
+
+### 4. Tests to be added
+
+- Add tests proving the checked-in Pleomino staging and prod deployment targets select deployment
+  contexts and no longer hand-maintain duplicated Infisical resolver topology.
+- Add tests proving context-derived Pleomino Infisical runtime evidence matches the previous
+  project id, project name/slug, environment, path, credential refs, and machine identity metadata.
+- Add tests proving Pleomino Cloudflare provider target values are filled or checked from the
+  selected deployment context without changing provider target identity.
+- Add tests proving a conflict between a Pleomino deployment stage and its selected context fails
+  closed with an actionable diagnostic.
+- Add regression tests proving Pleomino secret admission/replay evidence still records concrete
+  Infisical project/environment/path/secret identity derived from the selected context.
+- Add docs or fixture tests proving Pleomino remains an example of the app/deployment/config
+  boundary: the app declares refs/requirements, the deployment selects a context, and shared config
+  defines provider topology.
+
+### 5. Docs to be added or updated
+
+- Update deployment authoring docs and SprinkleRef docs to use Pleomino as the concrete example for
+  `deployment_context = "pleomino-staging"` / `deployment_context = "pleomino-prod"`.
+- Document where the former Pleomino `infisical_runtime` values now live in
+  `projects/config/shared.json` and how admission evidence preserves concrete replay identity.
+- Update any Pleomino or Infisical bootstrap docs that still imply deployment families should define
+  raw Infisical runtime topology directly.
+
+### 5.5. Expected regression scope
+
+- `deployment-only`
+- Expected implementation paths:
+  - `projects/config/shared.json`
+  - `projects/deployments/pleomino/shared/family.bzl`
+  - deployment extraction/admission helpers under `build-tools/tools/deployments/`
+  - `build-tools/tools/tests/deployments/**`
+  - `docs/**`
+- Keep the PR focused on migrating the real Pleomino deployment path onto PR-13's deployment context
+  machinery. Do not introduce new context abstractions or app-level override behavior.
+
+### 6. Acceptance criteria
+
+- Pleomino staging and prod deployment stages select deployment contexts.
+- Pleomino no longer hand-maintains duplicated Infisical resolver topology in deployment metadata
+  when that topology is available from the selected context.
+- Pleomino's context-derived Infisical runtime/admission evidence preserves the same concrete
+  project, environment, path, and secret identity needed for replay.
+- Pleomino Cloudflare provider topology is filled or checked from deployment contexts without
+  changing provider target identity.
+- Existing Pleomino secret admission and deployment tests continue to pass.
+- Docs show Pleomino as the real checked-in example of the app/deployment/context boundary.
+
+### 7. Risks
+
+- Removing explicit Pleomino `infisical_runtime` fields too early could weaken exact replay evidence
+  if derived context metadata is not recorded in admission outputs.
+- Moving Cloudflare coordinates into contexts could accidentally change provider target identity if
+  context-derived fields and stage-specific fields are not compared carefully.
+- Tests that inspect Pleomino metadata may need updates from explicit runtime fields to
+  context-derived evidence.
+
+### 8. Mitigations
+
+- Keep conflict checks fail-closed whenever context-derived values disagree with explicit stage
+  metadata.
+- Preserve concrete Infisical identity in generated/admission-time evidence before removing
+  hand-maintained deployment runtime fields.
+- Add targeted Pleomino fixture tests before relying on broad final validation.
+
+### 9. Consequences of not implementing this PR
+
+PR-13's deployment context machinery would exist, but the main checked-in deployment family would
+still model the old duplicated Infisical runtime pattern. That would keep the design split between
+fixture coverage and real deployment usage.
+
+### 10. Downsides for implementing this PR
+
+This adds a second migration step after PR-13 and touches real Pleomino deployment metadata, but it
+keeps the risk focused on one deployment family and proves the deployment-context model on the path
+operators actually use.

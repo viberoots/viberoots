@@ -3,8 +3,6 @@ load("//projects/deployments/pleomino/shared:family.bzl", "pleomino_cloudflare_d
 pleomino_cloudflare_deployment(
     name = "deploy",
     stage = "staging",
-    account = "web-platform-staging",
-    project = "pleomino-staging-pages",
     domain = "staging.pleomino.com",
     admission_policy = "staging_release",
     protection_class = "shared_nonprod",

@@ -129,7 +129,13 @@ export function deploymentContextError(label: string, message: string): string {
 function looksSecretField(field: string) {
   if (SECRET_REF_FIELDS.has(field)) return false;
   const normalized = field.replace(/[^a-z0-9]/gi, "").toLowerCase();
-  if (normalized.endsWith("path") || normalized.endsWith("id") || normalized.endsWith("name")) {
+  if (
+    normalized.endsWith("path") ||
+    normalized.endsWith("id") ||
+    normalized.endsWith("name") ||
+    normalized.endsWith("env") ||
+    normalized.endsWith("filename")
+  ) {
     return false;
   }
   return SECRET_VALUE_FIELD_TOKENS.some((token) => normalized.includes(token));

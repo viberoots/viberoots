@@ -44,6 +44,14 @@ default can fill an omitted deployment `secret_backend`; if both are present and
 fails closed. Context provider values fill omitted deployment metadata, while duplicated explicit
 `provider_target` or `infisical_runtime` values must match.
 
+Pleomino is the checked-in context example. Staging selects
+`deployment_context = "pleomino-staging"` and production selects
+`deployment_context = "pleomino-prod"`. The shared config entries hold the Cloudflare account,
+Pages project, custom domain, zone id, Infisical project id/name/slug, environment, secret path, and
+Universal Auth machine identity metadata. The app and deployment family keep logical refs such as
+`secret://deployments/pleomino/cloudflare_api_token`; admission records store the resolved
+Infisical project/environment/path/name/version evidence needed for exact replay.
+
 Initialize starter configs:
 
 ```bash

@@ -62,8 +62,38 @@ async function writeRepoInputs(dir: string) {
     path.join(dir, "build-tools/tools/buck/graph.json"),
     `${JSON.stringify({ nodes: [deploymentNode()] }, null, 2)}\n`,
   );
-  await fs.mkdir(path.join(dir, "projects/deployments/pleomino/shared"), { recursive: true });
-  await fs.writeFile(path.join(dir, patch.path), '_INFISICAL_PROJECT_ID = "proj_old"\n');
+  await fs.mkdir(path.join(dir, "projects/config"), { recursive: true });
+  await fs.writeFile(
+    path.join(dir, patch.path),
+    `${JSON.stringify(
+      {
+        schemaVersion: "viberoots-project-config@1",
+        deploymentContexts: {
+          "pleomino-staging": { infisical: { projectId: "proj_old" } },
+        },
+        sprinkleref: {
+          version: 1,
+          defaultCategory: "main",
+          profiles: {
+            "infisical-default": {
+              backend: "infisical",
+              host: "https://app.infisical.com",
+              projectId: "proj_old",
+              defaultEnvironment: "staging",
+              clientIdRef: "secret://bootstrap/client-id",
+              clientSecretRef: "secret://bootstrap/client-secret",
+            },
+          },
+          categories: {
+            main: { profile: "infisical-default" },
+            bootstrap: { backend: "local-file", file: ".local/bootstrap.json" },
+          },
+        },
+      },
+      null,
+      2,
+    )}\n`,
+  );
 }
 
 function deploymentNode() {
@@ -94,7 +124,9 @@ function fixtureSession(): SharedInfisicalSession {
 }
 
 async function fixtureRequest(method: string, endpoint: string) {
-  if (method === "GET" && endpoint.startsWith("/api/v1/projects?")) return { projects: [] };
+  if (method === "GET" && endpoint.startsWith("/api/v1/projects?")) {
+    return { projects: [{ id: "proj_old", name: "viberoots-deployments", orgId: "org_fixture" }] };
+  }
   if (method === "POST" && endpoint === "/api/v1/projects") {
     return { project: { id: "proj_repo_fixture", name: "viberoots-deployments" } };
   }
@@ -116,7 +148,13 @@ async function withCwd<T>(dir: string, run: () => Promise<T>) {
 
 const patch: MetadataHandoffPatch = {
   schemaVersion: "infisical-iac-bootstrap-metadata-patch@1",
-  path: "projects/deployments/pleomino/shared/family.bzl",
-  replacements: [{ label: "_INFISICAL_PROJECT_ID", before: "proj_old", after: "proj_live" }],
-  unifiedDiff: "--- a/projects/deployments/pleomino/shared/family.bzl\n+proj_live\n",
+  path: "projects/config/shared.json",
+  replacements: [
+    {
+      label: "deploymentContexts.pleomino-staging.infisical.projectId",
+      before: "proj_old",
+      after: "proj_live",
+    },
+  ],
+  unifiedDiff: "--- a/projects/config/shared.json\n+proj_live\n",
 };

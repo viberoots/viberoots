@@ -23,9 +23,9 @@ Keep stage-specific facts in an explicit `deployment_stage_delta(...)` call:
 ```starlark
 deployment_stage_delta(
     stage = "staging",
+    deployment_context = "example-staging",
     admission_policy = "//projects/deployments/example-shared:staging_release",
     protection_class = "shared_nonprod",
-    provider_target = {"account": "web-platform", "project": "example-staging"},
     ingress_hostnames = ["staging.example.com"],
     resource_sizing = {"profile": "small"},
     secret_requirements = [example_secret("publish")],
@@ -33,10 +33,10 @@ deployment_stage_delta(
 )
 ```
 
-Provider target identity belongs in the stage delta, even when the provider
-macro also needs native runtime arguments such as app name or port. The family
-helper rejects matching keys when provider arguments drift away from the stage
-`provider_target`, so the Buck metadata remains the review source of truth.
+Shared provider target identity belongs in `projects/config/shared.json` deployment contexts. Keep
+only truly stage-local facts in the stage delta. If a deployment still declares explicit
+`provider_target` or `infisical_runtime` fields while selecting a context, extraction compares them
+with the context and fails closed on drift.
 
 The shared helper rejects attempts to set family-owned fields, such as
 `component` or `lane_policy`, from stage/provider arguments. Provider-native
@@ -51,8 +51,6 @@ reviewed stage delta:
 example_cloudflare_deployment(
     name = "deploy",
     stage = "staging",
-    account = "web-platform",
-    project = "example-staging",
     admission_policy = "staging_release",
     protection_class = "shared_nonprod",
 )
@@ -62,3 +60,7 @@ Do not create normal deployment packages by copying full metadata between
 stages. Add fields to the family wrapper or to `deployment_stage_delta(...)` so
 reviewers can tell whether a value is shared policy or an intentional stage
 difference.
+
+Pleomino follows this boundary: `projects/deployments/pleomino/shared/family.bzl` selects
+`pleomino-staging` or `pleomino-prod`, while `projects/config/shared.json` owns the shared
+Cloudflare and Infisical topology for those contexts.

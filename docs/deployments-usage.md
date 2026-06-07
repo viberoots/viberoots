@@ -623,6 +623,10 @@ step instead of editing Keycloak by hand.
   `secret://deployments/pleomino/cloudflare_api_token` contract. The secret is a
   shared Infisical secret named `cloudflare_api_token` at `/` in the
   `pleomino-deployments` project, with `staging` and `prod` environments.
+- Pleomino staging and production select `pleomino-staging` and `pleomino-prod`
+  deployment contexts. The contexts in `projects/config/shared.json` own the
+  shared Cloudflare Pages and Infisical topology; the deployment family keeps
+  only logical refs and stage policy.
 - Pleomino dev stays on the Vault-backed shared-host path so old dev workflows
   and old Vault-admitted replay records remain interpretable.
 - Before the first live Pleomino Infisical rollout, run the reviewed one-command
@@ -672,9 +676,9 @@ repeating the same check for production.
   from service credential files, not values to commit, paste into local shells,
   or install in CI.
 - If Infisical access is unavailable during rollout, restore Vault for new
-  admissions by changing only Pleomino staging and production metadata back to
-  `secret_backend = "vault/default"` and the existing Pleomino `vault_runtime`; keep the
-  `secret_requirements` contract ids unchanged. Do not edit recorded admitted
+  admissions by changing only Pleomino staging and production metadata to select
+  the reviewed Vault runtime and backend; keep the `secret_requirements` contract ids unchanged.
+  Do not edit recorded admitted
   contexts: old Vault-admitted runs continue replaying with Vault references,
   and any already-recorded Infisical runs continue replaying with their exact
   Infisical references.

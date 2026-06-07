@@ -47,8 +47,6 @@ function expectedTargets(deployment: (typeof deployments)[number]): string {
 pleomino_cloudflare_deployment(
     name = "deploy",
     stage = "${deployment.stage}",
-    account = "${deployment.account}",
-    project = "${deployment.project}",
     domain = "${deployment.domain}",
     admission_policy = "${deployment.stage}_release",
     protection_class = "${deployment.protectionClass}",

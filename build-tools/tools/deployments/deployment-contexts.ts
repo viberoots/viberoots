@@ -166,6 +166,8 @@ function providerTargetDefaults(section: ContextRecord) {
     organization_id: ["organization_id", "organizationId"],
     project: ["project", "projectName"],
     id: ["id", "projectId"],
+    custom_domain: ["custom_domain", "customDomain"],
+    custom_domain_zone_id: ["custom_domain_zone_id", "customDomainZoneId", "zoneId"],
     region: ["region", "defaultRegion"],
     zone_id: ["zone_id", "zoneId"],
   });
@@ -184,10 +186,23 @@ function infisicalRuntimeDefaults(section: ContextRecord) {
   const picked = pickAliases(section, {
     site_url: ["site_url", "host"],
     project_id: ["project_id", "projectId"],
+    project_name: ["project_name", "projectName"],
+    project_slug: ["project_slug", "projectSlug"],
     environment: ["environment"],
     secret_path: ["secret_path", "defaultPath"],
+    machine_identity_client_id_env: ["machine_identity_client_id_env", "clientIdEnv"],
+    machine_identity_client_secret_env: ["machine_identity_client_secret_env", "clientSecretEnv"],
     machine_identity_client_id_ref: ["machine_identity_client_id_ref", "clientIdRef"],
     machine_identity_client_secret_ref: ["machine_identity_client_secret_ref", "clientSecretRef"],
+    machine_identity_client_id_file_name: [
+      "machine_identity_client_id_file_name",
+      "clientIdFileName",
+    ],
+    machine_identity_client_secret_file_name: [
+      "machine_identity_client_secret_file_name",
+      "clientSecretFileName",
+    ],
+    machine_identity_id: ["machine_identity_id", "machineIdentityId"],
     preferred_credential_source: ["preferred_credential_source", "credentialSource"],
   });
   if (

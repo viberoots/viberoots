@@ -67,7 +67,7 @@ test("deployment_context resolves distinct shared provider topology", () => {
   );
   assert.equal(
     byLabel.get("//projects/deployments/pleomino/prod:deploy")?.providerTarget.account,
-    "web-platform",
+    "web-platform-prod",
   );
   assert.equal(
     byLabel.get("//projects/deployments/pleomino/prod:deploy")?.infisicalRuntime?.environment,
@@ -154,6 +154,9 @@ test("deployment context validation is field-aware for secret refs and plaintext
             account: "team-secret-ops",
             projectName: "safe-prod",
             apiTokenRef: "secret://deployments/safe/prod/cloudflare-token",
+          },
+          infisical: {
+            clientSecretEnv: "SAFE_PROD_INFISICAL_CLIENT_SECRET",
           },
         },
         "unsafe-prod": {

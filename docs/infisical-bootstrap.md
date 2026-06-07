@@ -33,12 +33,12 @@ build-tools/tools/deployments/infisical-bootstrap.ts deployment --target <buck-t
 build-tools/tools/deployments/infisical-bootstrap.ts deployment --target <buck-target> --yes
 ```
 
-Fresh Pleomino Infisical bootstrap is a two-phase reviewed metadata handoff. If OpenTofu creates or
-adopts live resources while `family.bzl` still has first-bootstrap placeholders, repo bootstrap
-prints a non-secret patch for the reviewed constants and pauses before applying it. Interactive
-operators can approve the `[Y/n]` metadata gate; non-interactive runs must add
-`--apply-metadata-patch`. Real drift against already-reviewed non-placeholder values still fails
-closed.
+Fresh Pleomino Infisical bootstrap is a reviewed metadata handoff into
+`projects/config/shared.json` deployment contexts. If OpenTofu creates or adopts live resources
+while context fields still have first-bootstrap placeholders, repo bootstrap prints a non-secret
+patch and pauses before applying it. Interactive operators can approve the `[Y/n]` metadata gate;
+non-interactive runs must add `--apply-metadata-patch`. Real drift against already-reviewed
+non-placeholder values still fails closed.
 
 This document intentionally redirects to the repo-root bootstrap spec at
 [`infisical-bootstrap.md`](../infisical-bootstrap.md). Keep command examples there and here on the

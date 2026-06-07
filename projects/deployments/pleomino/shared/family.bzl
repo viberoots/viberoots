@@ -3,45 +3,8 @@ load("//build-tools/deployments:family_defs.bzl", "compose_deployment_family_kwa
 
 _ACCOUNT_ID = "1b911846f80a89272c0dbaf44f5c810f"
 _ZONE_ID = "9411ac5903acb1c2e29b3d4c04ef7e6f"
-_INFISICAL_SITE_URL = "https://app.infisical.com"
-_INFISICAL_PROJECT_ID = "5a927a1a-e78d-433e-affc-17cc051780c0"
-_INFISICAL_PROJECT_NAME = "pleomino-deployments"
-_INFISICAL_PROJECT_SLUG = "pleomino-deployments"
-_INFISICAL_ENVIRONMENT_SLUGS = {
-    "staging": "staging",
-    "prod": "prod",
-}
-_INFISICAL_SECRET_PATH = "/"
 _INFISICAL_CLOUDFLARE_SECRET_NAME = "cloudflare_api_token"
 _INFISICAL_CLOUDFLARE_SECRET_REF = "secret://deployments/pleomino/cloudflare_api_token"
-_INFISICAL_MACHINE_IDENTITY_IDS = {
-    "staging": "8b9bc77a-ad32-459f-82a9-b72cd7a3530d",
-    "prod": "ceca24df-0e8b-457e-a5a8-cf20a122d2da",
-}
-_INFISICAL_MACHINE_IDENTITY_NAMES = {
-    "staging": "pleomino-staging-deploy",
-    "prod": "pleomino-prod-deploy",
-}
-_INFISICAL_CREDENTIAL_FILE_NAMES = {
-    "staging": {
-        "client_id": "pleomino-staging-infisical-client-id",
-        "client_secret": "pleomino-staging-infisical-client-secret",
-    },
-    "prod": {
-        "client_id": "pleomino-prod-infisical-client-id",
-        "client_secret": "pleomino-prod-infisical-client-secret",
-    },
-}
-_INFISICAL_CREDENTIAL_REFS = {
-    "staging": {
-        "client_id": "secret://deployments/pleomino/staging/infisical-client-id",
-        "client_secret": "secret://deployments/pleomino/staging/infisical-client-secret",
-    },
-    "prod": {
-        "client_id": "secret://deployments/pleomino/prod/infisical-client-id",
-        "client_secret": "secret://deployments/pleomino/prod/infisical-client-secret",
-    },
-}
 
 def _vault_runtime():
     return {
@@ -76,19 +39,17 @@ def _cloudflare_secret(step):
         "required": "true",
     }
 
-def _cloudflare_stage(stage, admission_policy, protection_class, account, project, domain, prerequisite):
+def _cloudflare_stage(stage, admission_policy, protection_class, domain, prerequisite):
     prerequisites = [] if not prerequisite else [{"deployment_id": prerequisite, "mode": "ordering_only"}]
     return deployment_stage_delta(
         stage = stage,
+        deployment_context = "pleomino-%s" % stage,
         admission_policy = "//projects/deployments/pleomino/shared:%s" % admission_policy,
         protection_class = protection_class,
-        provider_target = {"account": account, "project": project, "custom_domain": domain},
         ingress_hostnames = [domain],
         secret_requirements = [_cloudflare_secret(step) for step in ["provision", "publish", "preview_cleanup"]],
         external_requirement_profiles = ["cloudflare_provider"],
         prerequisites = prerequisites,
-        secret_backend = "infisical/default",
-        infisical_runtime = _pleomino_infisical_runtime(stage),
         preview = {
             "target_derivation": "provider_managed_source_run",
             "isolation_class": "isolated",
@@ -98,23 +59,6 @@ def _cloudflare_stage(stage, admission_policy, protection_class, account, projec
             "lock_scope": "shared",
         },
     )
-
-def _pleomino_infisical_runtime(stage):
-    env_prefix = "PLEOMINO_%s_INFISICAL" % stage.upper()
-    return {
-        "site_url": _INFISICAL_SITE_URL,
-        "project_id": _INFISICAL_PROJECT_ID,
-        "project_name": _INFISICAL_PROJECT_NAME,
-        "project_slug": _INFISICAL_PROJECT_SLUG,
-        "environment": _INFISICAL_ENVIRONMENT_SLUGS[stage],
-        "secret_path": _INFISICAL_SECRET_PATH,
-        "preferred_credential_source": "infisical_machine_identity_universal_auth",
-        "machine_identity_client_id_env": "%s_CLIENT_ID" % env_prefix,
-        "machine_identity_client_secret_env": "%s_CLIENT_SECRET" % env_prefix,
-        "machine_identity_client_id_file_name": _INFISICAL_CREDENTIAL_FILE_NAMES[stage]["client_id"],
-        "machine_identity_client_secret_file_name": _INFISICAL_CREDENTIAL_FILE_NAMES[stage]["client_secret"],
-        "machine_identity_id": _INFISICAL_MACHINE_IDENTITY_IDS[stage],
-    }
 
 def pleomino_dev_deployment(name):
     nixos_shared_host_static_webapp_deployment(**compose_deployment_family_kwargs(
@@ -143,17 +87,25 @@ def pleomino_dev_deployment(name):
         },
     ))
 
-def pleomino_cloudflare_deployment(name, stage, account, project, domain, admission_policy, protection_class, prerequisite):
+def pleomino_cloudflare_deployment(name, stage, domain, admission_policy, protection_class, prerequisite, account = "", project = ""):
+    if account:
+        fail(
+            "pleomino_cloudflare_deployment must not set account; provider_target.account comes from deployment context pleomino-%s" % stage,
+        )
+    if project:
+        fail(
+            "pleomino_cloudflare_deployment must not set project; provider_target.project comes from deployment context pleomino-%s" % stage,
+        )
     cloudflare_pages_static_webapp_deployment(**compose_deployment_family_kwargs(
         _family_defaults(),
-        _cloudflare_stage(stage, admission_policy, protection_class, account, project, domain, prerequisite),
+        _cloudflare_stage(stage, admission_policy, protection_class, domain, prerequisite),
         provider_args = {
             "name": name,
-            "account": account,
+            "account": "",
             "account_id": _ACCOUNT_ID,
-            "custom_domain": domain,
+            "custom_domain": "",
             "custom_domain_zone_id": _ZONE_ID,
-            "project": project,
+            "project": "",
         },
         include_provider_target = False,
     ))

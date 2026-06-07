@@ -6,6 +6,7 @@ _FAMILY_DEFAULT_FIELDS = [
 
 _STAGE_COMPOSED_FIELDS = [
     "admission_policy",
+    "deployment_context",
     "environment_stage",
     "external_requirement_profiles",
     "ingress_hostnames",
@@ -86,6 +87,7 @@ def deployment_stage_delta(
         stage,
         admission_policy,
         protection_class,
+        deployment_context = "",
         provider_target = {},
         prerequisites = [],
         secret_requirements = [],
@@ -104,6 +106,7 @@ def deployment_stage_delta(
         provider_native_facts = {}):
     return {
         "environment_stage": stage,
+        "deployment_context": deployment_context,
         "admission_policy": admission_policy,
         "protection_class": protection_class,
         "provider_target": provider_target,

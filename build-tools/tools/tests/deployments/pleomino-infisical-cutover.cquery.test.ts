@@ -32,6 +32,8 @@ import { runDeploymentCquery } from "./nixos-shared-host.extraction.from-targets
 const expectedRuntime = {
   siteUrl: "https://app.infisical.com",
   projectId: CUTOVER_PROJECT_ID,
+  projectName: "cutover-demo-deployments",
+  projectSlug: "cutover-demo-deployments",
   secretPath: "/",
   preferredCredentialSource: "machine_identity_universal_auth",
 };
