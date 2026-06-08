@@ -221,7 +221,8 @@ Project config validation must reject:
   when `records.backend` is `service`.
 - Disagreement between deployment metadata and selected context values.
 
-Read-only commands may report missing or invalid control-plane selection as a diagnostic. Mutating
+Read-only commands resolve and validate deployment contexts before reporting state, so missing or
+invalid protected/shared control-plane selection is a validation error there as well. Mutating
 protected/shared commands must fail before provider mutation, artifact upload, admission write, or
 record write.
 
