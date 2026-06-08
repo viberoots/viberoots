@@ -1,13 +1,15 @@
 #!/usr/bin/env zx-wrapper
 import { getFlagStr } from "../lib/cli";
-import { DEFAULT_GRAPH_PATH } from "../lib/graph-const";
 import { readCompositeGraph } from "../lib/graph-view";
+import { findRepoRoot } from "../lib/repo";
+import { deploymentGraphReadOptions } from "./deployment-graph-read-options";
 import { extractDeployments } from "./contract";
 
 async function main() {
-  const graphPath = getFlagStr("graph", DEFAULT_GRAPH_PATH);
-  const { nodes } = await readCompositeGraph({ graphPath });
-  const { deployments, errors } = extractDeployments(nodes);
+  const workspaceRoot = await findRepoRoot(process.cwd());
+  const graphPath = getFlagStr("graph", "");
+  const { nodes } = await readCompositeGraph(deploymentGraphReadOptions(workspaceRoot, graphPath));
+  const { deployments, errors } = extractDeployments(nodes, { workspaceRoot });
   if (errors.length > 0) {
     for (const error of errors) console.error(error);
     process.exit(1);

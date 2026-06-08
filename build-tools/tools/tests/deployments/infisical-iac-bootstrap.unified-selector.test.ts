@@ -35,6 +35,33 @@ test("repo resolver profile discovery maps context backend requirements before d
   assert.deepEqual([...profiles], ["infisical-default"]);
 });
 
+test("repo resolver profile discovery reads project config from graph workspace root", async () => {
+  const oldCwd = process.cwd();
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "infisical-bootstrap-workspace-root-"));
+  const nested = path.join(root, "projects", "deployments", "nested");
+  const graphPath = path.join(root, "build-tools", "tools", "buck", "graph.json");
+  try {
+    await fs.mkdir(nested, { recursive: true });
+    await writeProjectConfig(root, "vault/default");
+    await writeProjectConfig(nested, "infisical/default");
+    await writeJson(graphPath, {
+      nodes: [
+        {
+          name: "//projects/deployments/pleomino/prod:deploy",
+          deployment_context: "pleomino-prod",
+          secret_requirements: [{ name: "api_token", contract_id: "secret://deployments/api" }],
+        },
+      ],
+    });
+    process.chdir(nested);
+    const profiles = await requiredBackendProfiles(graphPath);
+    assert.deepEqual([...profiles], ["vault-default"]);
+  } finally {
+    process.chdir(oldCwd);
+    await fs.rm(root, { recursive: true, force: true });
+  }
+});
+
 test("repo resolver profile discovery ignores nodes with no backend need", async () => {
   const graphPath = await writeGraph([
     { name: "//deployments/app:build" },
@@ -76,6 +103,29 @@ test("repo resolver profile discovery rejects context backend conflicts", async 
 async function writeGraph(nodes: unknown[]) {
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), "infisical-bootstrap-unified-selector-"));
   const graphPath = path.join(dir, "graph.json");
-  await fs.writeFile(graphPath, `${JSON.stringify({ nodes }, null, 2)}\n`, "utf8");
+  await writeJson(graphPath, { nodes });
   return graphPath;
+}
+
+async function writeProjectConfig(root: string, secretBackend: string) {
+  await writeJson(path.join(root, "projects", "config", "shared.json"), {
+    schemaVersion: "viberoots-project-config@1",
+    controlPlanes: {
+      mini: {
+        serviceClient: {
+          controlPlaneUrl: "https://control.example",
+          controlPlaneTokenRef: "runtime://github-actions/control-plane-token",
+        },
+        records: { backend: "service" },
+      },
+    },
+    deploymentContexts: {
+      "pleomino-prod": { controlPlane: "mini", secretBackend },
+    },
+  });
+}
+
+async function writeJson(file: string, value: unknown) {
+  await fs.mkdir(path.dirname(file), { recursive: true });
+  await fs.writeFile(file, `${JSON.stringify(value, null, 2)}\n`, "utf8");
 }

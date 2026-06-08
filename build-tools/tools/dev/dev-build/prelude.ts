@@ -1,5 +1,6 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
+import { applyNixCacheHealthPolicy } from "../verify/nix-cache-health";
 async function pathExists(p: string): Promise<boolean> {
   try {
     await fsp.access(p);
@@ -11,14 +12,16 @@ async function pathExists(p: string): Promise<boolean> {
 
 export async function ensureBuckPreludeConfig(root: string): Promise<void> {
   try {
+    await applyNixCacheHealthPolicy(root);
     try {
       const preludeExists = await fsp
         .lstat(path.join(root, "prelude"))
         .then(() => true)
         .catch(() => false);
+      const preludeFileExists = await pathExists(path.join(root, "prelude", "prelude.bzl"));
       const rootCfgExists = await pathExists(path.join(root, ".buckconfig"));
       const toolCfgExists = await pathExists(path.join(root, "toolchains", ".buckconfig"));
-      if (preludeExists && rootCfgExists && toolCfgExists) {
+      if (preludeExists && preludeFileExists && rootCfgExists && toolCfgExists) {
         return;
       }
     } catch {}

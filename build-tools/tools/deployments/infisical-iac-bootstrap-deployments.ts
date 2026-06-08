@@ -1,6 +1,8 @@
+import * as path from "node:path";
 import { DEFAULT_GRAPH_PATH } from "../lib/graph-const";
 import { readGraph, type GraphNode } from "../lib/graph";
 import { normalizeTargetLabel } from "../lib/labels";
+import { findRepoRoot } from "../lib/repo";
 import { resolveAllDeployments } from "./deployment-query";
 import { resolveDeploymentContextNodes } from "./deployment-contexts";
 import {
@@ -50,14 +52,12 @@ export async function discoverDeploymentBootstrapTargets(
     graphPath?: string;
   } = {},
 ): Promise<DeploymentBootstrapDiscovery> {
-  const graphPath = opts.graphPath || DEFAULT_GRAPH_PATH;
-  const fromGraph = await discoverFromGraph(graphPath, opts.workspaceRoot);
+  const workspaceRoot = opts.workspaceRoot || (await findRepoRoot(process.cwd()));
+  const graphPath = opts.graphPath || path.join(workspaceRoot, DEFAULT_GRAPH_PATH);
+  const fromGraph = await discoverFromGraph(graphPath, workspaceRoot);
   if (fromGraph.offeredTargets.length || fromGraph.unsupportedTargets.length) return fromGraph;
   try {
-    return classifyDeploymentTargets(
-      await resolveAllDeployments(opts.workspaceRoot || process.cwd()),
-      "buck",
-    );
+    return classifyDeploymentTargets(await resolveAllDeployments(workspaceRoot), "buck");
   } catch (error) {
     return {
       ...fromGraph,
@@ -67,8 +67,11 @@ export async function discoverDeploymentBootstrapTargets(
   }
 }
 
-export async function buildDeploymentFanOutDryRunReport(args: BootstrapArgs) {
-  const discovery = await discoverDeploymentBootstrapTargets();
+export async function buildDeploymentFanOutDryRunReport(
+  args: BootstrapArgs,
+  opts: { workspaceRoot?: string; graphPath?: string } = {},
+) {
+  const discovery = await discoverDeploymentBootstrapTargets(opts);
   return {
     readOnly: true,
     suppressedByFlag: args.withoutDeployments,
@@ -82,6 +85,8 @@ export async function buildDeploymentFanOutDryRunReport(args: BootstrapArgs) {
 
 export async function runDeploymentBootstrapFanOut(opts: {
   args: BootstrapArgs;
+  workspaceRoot?: string;
+  graphPath?: string;
   execute: (args: BootstrapArgs) => Promise<DeploymentBootstrapExecutionResult | void>;
   discover?: () => Promise<DeploymentBootstrapDiscovery>;
   io?: FanOutIo;
@@ -91,7 +96,14 @@ export async function runDeploymentBootstrapFanOut(opts: {
     stderr("Deployment bootstrap fan-out skipped by --without-deployments.");
     return emptyFanOut({ offeredTargets: [], unsupportedTargets: [], source: "unavailable" }, true);
   }
-  const discovery = await (opts.discover || discoverDeploymentBootstrapTargets)();
+  const discovery = await (
+    opts.discover ||
+    (() =>
+      discoverDeploymentBootstrapTargets({
+        workspaceRoot: opts.workspaceRoot,
+        graphPath: opts.graphPath,
+      }))
+  )();
   reportUnsupportedTargets(discovery, stderr);
   if (discovery.offeredTargets.length === 0) {
     stderr("No supported deployment bootstrap targets were discovered.");

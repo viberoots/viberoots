@@ -150,12 +150,19 @@ deployment_context = "pleomino-prod"
 
 Context resolution must:
 
-1. Load `projects/config/shared.json`, then deep-merge `projects/config/local.json`.
+1. Load `projects/config/shared.json` from the resolved workspace root, then deep-merge
+   workspace-root `projects/config/local.json`.
 2. Validate every merged `controlPlanes` profile, including entries that no selected context uses.
 3. Validate `deploymentContexts.<selector>`.
 4. Validate `deploymentContexts.<selector>.controlPlane` when present.
 5. Resolve the selected control-plane profile from `controlPlanes`.
 6. Attach normalized control-plane metadata to the deployment graph node.
+
+Deployment-context extraction, provider front-door validation, and read-only inspection use the
+same resolved workspace root. Nested shell directories do not change which `projects/config`
+directory is canonical. Valid local-only extraction remains graceful when workspace-root
+`projects/config` is absent; protected/shared contexts still fail closed when the canonical config is
+missing or invalid.
 
 The normalized graph node should contain one provider-neutral field:
 

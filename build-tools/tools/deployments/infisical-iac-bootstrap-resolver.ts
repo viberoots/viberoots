@@ -3,6 +3,7 @@ import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import { DEFAULT_GRAPH_PATH } from "../lib/graph-const";
 import { readGraph, type GraphNode } from "../lib/graph";
+import { findRepoRoot } from "../lib/repo";
 import { resolveDeploymentContextNodes } from "./deployment-contexts";
 import {
   deploymentSecretBackendSelectorErrors,
@@ -20,18 +21,23 @@ export async function ensureRepoResolverConfig(opts: {
   dryRun: boolean;
   platform?: NodeJS.Platform;
   graphPath?: string;
+  workspaceRoot?: string;
   configPath?: string;
 }) {
-  const configPath = opts.configPath || resolverConfigPath();
+  const workspaceRoot = opts.workspaceRoot || (await findRepoRoot(process.cwd()));
+  const configPath =
+    opts.configPath || resolverConfigPath(path.join(workspaceRoot, "projects", "config"));
   const exists = await fileExists(configPath);
   if (!exists) {
     const profiles = await repoBootstrapProfiles({
       graphPath: opts.graphPath,
+      workspaceRoot,
       starterCategoryProfiles: true,
     });
     if (opts.dryRun) {
       return {
         configPath,
+        workspaceRoot,
         profiles,
         bootstrapCredentialProfiles: profiles.filter((profile) => profile.startsWith("infisical-")),
         validated: false,
@@ -42,15 +48,20 @@ export async function ensureRepoResolverConfig(opts: {
       platform: opts.platform || process.platform,
       mode: "create",
     });
-    await initLocalSprinkleRefValues(process.cwd());
+    await initLocalSprinkleRefValues(workspaceRoot);
   }
-  const config = await readSprinkleRefConfig(configPath);
+  const config = await readSprinkleRefConfig(configPath, workspaceRoot);
   const requiredProfiles = new Set(
-    await repoBootstrapProfiles({ graphPath: opts.graphPath, config }),
+    await repoBootstrapProfiles({
+      graphPath: opts.graphPath,
+      workspaceRoot,
+      config,
+    }),
   );
   validateRepoResolverConfig(config, requiredProfiles);
   return {
     configPath,
+    workspaceRoot,
     profiles: [...requiredProfiles].sort(),
     bootstrapCredentialProfiles: bootstrapCredentialProfiles(config, requiredProfiles),
     validated: true,
@@ -59,10 +70,14 @@ export async function ensureRepoResolverConfig(opts: {
 
 export async function repoBootstrapProfiles(opts: {
   graphPath?: string;
+  workspaceRoot?: string;
   config?: SprinkleRefConfig;
   starterCategoryProfiles?: boolean;
 }) {
-  const profiles = await requiredBackendProfiles(opts.graphPath || DEFAULT_GRAPH_PATH);
+  const profiles = await requiredBackendProfiles(
+    opts.graphPath || DEFAULT_GRAPH_PATH,
+    opts.workspaceRoot,
+  );
   if (opts.config) addCategoryProfiles(profiles, opts.config);
   if (opts.starterCategoryProfiles) {
     for (const profile of STARTER_CATEGORY_PROFILES) profiles.add(profile);
@@ -70,11 +85,27 @@ export async function repoBootstrapProfiles(opts: {
   return [...profiles].sort();
 }
 
-export async function requiredBackendProfiles(graphPath = DEFAULT_GRAPH_PATH) {
+async function workspaceRootForGraph(graphPath: string): Promise<string> {
+  const abs = path.resolve(graphPath);
+  const suffix = path.join("build-tools", "tools", "buck", "graph.json");
+  if (abs.endsWith(suffix)) {
+    return abs.slice(0, -suffix.length).replace(new RegExp(`${path.sep}$`), "");
+  }
+  return await findRepoRoot(process.cwd());
+}
+
+export async function requiredBackendProfiles(
+  graphPath = DEFAULT_GRAPH_PATH,
+  workspaceRoot?: string,
+) {
   const profiles = new Set<string>();
   const rawNodes = await readGraph(graphPath).catch(() => []);
   const contextErrors: string[] = [];
-  const nodes = resolveDeploymentContextNodes(rawNodes, contextErrors);
+  const nodes = resolveDeploymentContextNodes(
+    rawNodes,
+    contextErrors,
+    workspaceRoot || (await workspaceRootForGraph(graphPath)),
+  );
   if (contextErrors.length > 0) throw new Error(contextErrors.join("\n"));
   for (const node of nodes) {
     const secretBackend = stringAttr(node, "secret_backend");

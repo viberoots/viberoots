@@ -9,6 +9,7 @@ import { runFinalOrphanBuckCleanup } from "./final-orphan-cleanup";
 import { runVerifyLintPreflight } from "./lint-preflight";
 import { acquireVerifyLock } from "./lock";
 import { ensureVerifyPinnedNixpkgs } from "./nix-env";
+import { applyNixCacheHealthPolicy } from "./nix-cache-health";
 import { recordNixGcPreflight } from "./nix-gc-preflight";
 import { createVerifyPhaseTimer } from "./phase-timing";
 import { logVerifyRevision } from "./preflight";
@@ -47,6 +48,7 @@ export const defaultRunVerifyDeps = {
   ensureBuckPreludeConfig,
   ensureRepoLocalTmpRoot,
   ensureVerifyPinnedNixpkgs,
+  applyNixCacheHealthPolicy,
   exit: process.exit.bind(process),
   initializeVerifyProcessState,
   installVerifySignalHandlers,

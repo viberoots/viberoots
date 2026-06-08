@@ -1,3 +1,4 @@
+load("//build-tools/lang:nix_cache_health.bzl", "nix_cache_health_shell")
 def nix_bootstrap_env_core():
     return (
         "set -euo pipefail; "
@@ -61,9 +62,8 @@ def nix_bootstrap_env_core():
         + "if [ -n \"$FLK_PHYS\" ]; then FLK_ROOT=\"$FLK_PHYS\"; fi; "
         + "cd \"$WORKSPACE_ROOT\"; "
         + "test -f \"$FLK_ROOT/flake.nix\"; "
+        + nix_cache_health_shell()
     )
-
-
 def nix_bootstrap_env_pnpm_store():
     return (
         "if [ -z \"${LOCAL_PNPM_STORE:-}\" ] && [ -n \"${REPO_ROOT:-}\" ] && [ -f \"$REPO_ROOT/buck-out/.unified-pnpm-store/path\" ]; then "

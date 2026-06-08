@@ -59,9 +59,130 @@ tool_path() {
 	command -v "$tool"
 }
 
+env_strip_nix_cache_overrides() {
+	local text="${NIX_CONFIG:-}"
+	[[ -n "${text}" ]] || return 0
+	printf "%s\n" "${text}" | awk '
+		BEGIN {
+			skip["substituters"] = 1
+			skip["extra-substituters"] = 1
+			skip["connect-timeout"] = 1
+			skip["stalled-download-timeout"] = 1
+			skip["fallback"] = 1
+		}
+		{
+			line = $0
+			key = line
+			sub(/[[:space:]]*=.*/, "", key)
+			gsub(/^[[:space:]]+|[[:space:]]+$/, "", key)
+			if (skip[key] != 1) print line
+		}
+	'
+}
+
+env_nix_cache_info_url() {
+	local url="$1"
+	local base="${url%%\?*}"
+	base="${base%/}"
+	printf "%s/nix-cache-info\n" "${base}"
+}
+
+env_apply_nix_cache_health() {
+	[[ "${VBR_NIX_CACHE_POLICY:-auto}" != "off" ]] || return 0
+	command -v nix >/dev/null 2>&1 || return 0
+	command -v curl >/dev/null 2>&1 || return 0
+
+	local config
+	config="$(nix config show 2>/dev/null || true)"
+	[[ -n "${config}" ]] || return 0
+
+	local required_substituters
+	required_substituters="$(
+		printf "%s\n" "${config}" | awk '
+			{
+				eq = index($0, "=")
+				if (eq <= 0) next
+				key = substr($0, 1, eq - 1)
+				value = substr($0, eq + 1)
+				gsub(/^[[:space:]]+|[[:space:]]+$/, "", key)
+			}
+			key == "substituters" {
+				gsub(/^[[:space:]]+|[[:space:]]+$/, "", value)
+				print value
+			}
+		'
+	)"
+	local optional_substituters
+	optional_substituters="$(
+		printf "%s\n" "${config}" | awk '
+			{
+				eq = index($0, "=")
+				if (eq <= 0) next
+				key = substr($0, 1, eq - 1)
+				value = substr($0, eq + 1)
+				gsub(/^[[:space:]]+|[[:space:]]+$/, "", key)
+			}
+			key == "extra-substituters" {
+				gsub(/^[[:space:]]+|[[:space:]]+$/, "", value)
+				print value
+			}
+		'
+	)"
+	[[ -n "${required_substituters}${optional_substituters}" ]] || return 0
+
+	local available=()
+	local removed=()
+	local seen=" "
+	local substituter
+	for substituter in ${required_substituters} ${optional_substituters}; do
+		[[ "${seen}" != *" ${substituter} "* ]] || continue
+		seen="${seen}${substituter} "
+		case "${substituter}" in
+			http://*|https://*)
+				if curl -fsSI --max-time 3 "$(env_nix_cache_info_url "${substituter}")" >/dev/null 2>&1; then
+					available+=("${substituter}")
+				else
+					removed+=("${substituter}")
+				fi
+				;;
+			*)
+				available+=("${substituter}")
+				;;
+		esac
+	done
+
+	[[ "${#removed[@]}" -gt 0 ]] || return 0
+	if [[ "${VBR_NIX_CACHE_POLICY:-auto}" == "strict" ]]; then
+		echo "error: configured Nix substituter(s) unavailable: ${removed[*]}" 1>&2
+		return 1
+	fi
+
+	local optional_kept=()
+	for substituter in ${optional_substituters}; do
+		if [[ " ${available[*]} " == *" ${substituter} "* ]]; then
+			optional_kept+=("${substituter}")
+		fi
+	done
+	local required_kept=()
+	for substituter in ${required_substituters}; do
+		if [[ " ${available[*]} " == *" ${substituter} "* ]]; then
+			required_kept+=("${substituter}")
+		fi
+	done
+
+	local retained
+	retained="$(env_strip_nix_cache_overrides)"
+	local required_joined="${required_kept[*]}"
+	local optional_kept_joined="${optional_kept[*]}"
+	export NIX_CONFIG="${retained}"$'\n'"substituters = ${required_joined}"$'\n'"extra-substituters = ${optional_kept_joined}"$'\n''connect-timeout = 3'$'\n''stalled-download-timeout = 10'$'\n''fallback = true'
+	echo "[env] nix cache health: disabled unreachable substituter(s): ${removed[*]}" 1>&2
+	echo "[env] nix cache health: using optional substituter(s): ${optional_kept_joined:-<none>}" 1>&2
+}
+
 ensure_buck_prelude() {
 	local live_root="$1"
 	[[ -f "${live_root}/.buckconfig" ]] || return 0
+	env_apply_nix_cache_health || return 1
 	[[ -f "${live_root}/prelude/prelude.bzl" ]] && return 0
 	command -v nix >/dev/null 2>&1 || return 1
 

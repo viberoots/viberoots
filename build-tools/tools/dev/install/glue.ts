@@ -5,6 +5,7 @@ import process from "node:process";
 import { printSkip } from "../../lib/errors";
 import { nodeFlagsWithZx } from "../../lib/node-run";
 import { findRepoRoot } from "../../lib/repo";
+import { applyNixCacheHealthPolicy } from "../verify/nix-cache-health";
 import { discoverImportersWithLock } from "./importers";
 
 function repoRoot(): string {
@@ -31,6 +32,7 @@ export function zxNodeBase(): string {
 
 async function ensurePreludeSymlinkIfMissing() {
   const wsRoot = await workspaceRoot();
+  await applyNixCacheHealthPolicy(wsRoot);
   try {
     const check = await $({
       stdio: "pipe",

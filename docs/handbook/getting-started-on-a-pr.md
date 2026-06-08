@@ -182,6 +182,7 @@ These guardrails assume test tooling stays aligned with the dev shell and global
 
 - **Investigation default (including LLM agents)**: severe regressions here are almost never contention alone. We run this suite routinely at high volume without contention-only degradation. Treat large slowdowns/timeouts as a recently introduced systemic change until proven otherwise.
 - **Honor `XDG_CONFIG_HOME` for Nix**: if temp test environments hide or bypass it, Nix can ignore configured substituters and keys, forcing slow source builds and spurious failures.
+- **Keep optional Nix caches from becoming a hard gate**: `i`, `b`, `v`, and Buck Nix actions dynamically probe configured HTTP(S) substituters and remove unreachable caches from the current process when `VBR_NIX_CACHE_POLICY=auto` (the default). Use `VBR_NIX_CACHE_POLICY=strict` only when cache availability is itself being tested.
 
 - **Avoid `--impure` cache busts**: untracked files can force impure mode and invalidate flake snapshots. Track new tests early (for example, `git add` new files before `i`, `b`, or `v`) or exclude them intentionally from the flake source snapshot.
 - **Use the planner path**: prefer `graph-generator-selected` and avoid building larger outputs when a derivation path is enough, for example `nix eval ... .drvPath`.

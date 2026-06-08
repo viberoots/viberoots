@@ -21,6 +21,7 @@ import type { SprinkleRefBackendConfig, SprinkleRefConfigFile } from "./sprinkle
 export async function materializeRepoBackendProfiles(opts: {
   args: BootstrapArgs;
   configPath: string;
+  workspaceRoot?: string;
   requiredProfiles: string[];
   api?: InfisicalApi;
   organizationId?: string;
@@ -28,7 +29,7 @@ export async function materializeRepoBackendProfiles(opts: {
   env?: NodeJS.ProcessEnv;
   fetchImpl?: typeof fetch;
 }) {
-  const config = await readSprinkleRefConfig(opts.configPath);
+  const config = await readSprinkleRefConfig(opts.configPath, opts.workspaceRoot);
   const updates: Record<string, SprinkleRefBackendConfig> = {};
   const validatedExistingProfiles: string[] = [];
   const profiles = opts.requiredProfiles.map((name) => [name, config.profiles[name]] as const);
@@ -48,7 +49,8 @@ export async function materializeRepoBackendProfiles(opts: {
       if (result.status === "materialized") updates[name] = result.profile;
     }
   }
-  if (Object.keys(updates).length > 0) await writeProfileOverrides(opts.configPath, updates);
+  if (Object.keys(updates).length > 0)
+    await writeProfileOverrides(opts.configPath, updates, opts.workspaceRoot);
   return {
     profiles: opts.requiredProfiles,
     materializedProfiles: Object.keys(updates).sort(),
@@ -141,10 +143,11 @@ function validateInfisicalProfile(name: string, profile: SprinkleRefBackendConfi
 async function writeProfileOverrides(
   configPath: string,
   profiles: Record<string, SprinkleRefBackendConfig>,
+  workspaceRoot?: string,
 ) {
   const raw = await readConfigFile(configPath);
   const resolver = resolverConfigObject(raw);
-  const resolved = await readSprinkleRefConfig(configPath);
+  const resolved = await readSprinkleRefConfig(configPath, workspaceRoot);
   resolver.profiles = { ...(resolver.profiles || {}), ...profiles };
   validateConfig(
     {

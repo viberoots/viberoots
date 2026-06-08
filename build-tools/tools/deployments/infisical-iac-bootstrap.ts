@@ -1,7 +1,9 @@
 #!/usr/bin/env zx-wrapper
 import { pathToFileURL } from "node:url";
+import * as path from "node:path";
 import { parseBootstrapArgs, usage } from "./infisical-iac-bootstrap-args";
 import { getArgvTokens } from "../lib/argv";
+import { findRepoRoot } from "../lib/repo";
 import {
   resolveInfisicalHost,
   withDeploymentBootstrapDefaults,
@@ -38,21 +40,31 @@ const PLEOMINO_DEPLOYMENT_BOOTSTRAP_TARGETS = new Set([
 
 export async function runInfisicalIacBootstrap(
   args: BootstrapArgs,
-  context: { infisicalSession?: SharedInfisicalSession } = {},
+  context: {
+    infisicalSession?: SharedInfisicalSession;
+    workspaceRoot?: string;
+    configPath?: string;
+  } = {},
 ) {
   if (args.mode === "repo") {
-    if (args.dryRun) return dryRun(args);
+    if (args.dryRun) return dryRun(args, context);
     return await runRepoBootstrap(args, runInfisicalIacBootstrap);
   }
   const deploymentArgs = withDeploymentBootstrapDefaults(args);
   deploymentScopeFromTarget(deploymentArgs);
-  const reviewedSource = await readPleominoReviewedMetadataSource();
-  const reviewedMetadata = await readPleominoReviewedMetadata();
+  const workspaceRoot = context.workspaceRoot || (await findRepoRoot(process.cwd()));
+  const configPath =
+    context.configPath || path.join(workspaceRoot, DEFAULT_SPRINKLEREF_CONFIG_PATH);
+  const rootContext = { ...context, workspaceRoot, configPath };
+  const reviewedSource = await readPleominoReviewedMetadataSource(undefined, workspaceRoot);
+  const reviewedMetadata = await readPleominoReviewedMetadata(undefined, workspaceRoot);
   const effectiveArgs = withReviewedHost(deploymentArgs, reviewedMetadata.siteUrl);
-  if (effectiveArgs.dryRun) return dryRun(effectiveArgs);
+  if (effectiveArgs.dryRun) return dryRun(effectiveArgs, rootContext);
   await confirmBootstrapPreflight(effectiveArgs);
   const sinkSelection = await resolveCredentialSinkSelection(effectiveArgs, {
     createMissingResolverConfig: true,
+    workspaceRoot,
+    configPath,
   });
   const session =
     context.infisicalSession?.apiUrl === effectiveArgs.apiUrl
@@ -62,7 +74,10 @@ export async function runInfisicalIacBootstrap(
   const resolvedArgs = { ...effectiveArgs, organizationId: session.organizationId };
   const identity = session.identity;
   await ensureUniversalAuth(api, resolvedArgs, identity);
-  const sink = await createCredentialSink(effectiveArgs);
+  const sink = await createCredentialSink(effectiveArgs, {
+    workspaceRoot,
+    configPath,
+  });
   const credential =
     session.bootstrapCredential ??
     (await ensureBootstrapCredential({ api, args: resolvedArgs, identity, sink }));
@@ -126,9 +141,12 @@ function deploymentScopeFromTarget(args: BootstrapArgs) {
   return { kind: "pleomino" as const, target: args.target };
 }
 
-async function dryRun(args: BootstrapArgs) {
-  console.log(JSON.stringify(await buildDryRunReport(args), null, 2));
-  for (const line of await buildDryRunGuidance(args)) console.error(line);
+async function dryRun(
+  args: BootstrapArgs,
+  context: { workspaceRoot?: string; configPath?: string } = {},
+) {
+  console.log(JSON.stringify(await buildDryRunReport(args, context), null, 2));
+  for (const line of await buildDryRunGuidance(args, context)) console.error(line);
   if (args.mode === "repo") {
     printRepoFollowUpCommands(DEFAULT_SPRINKLEREF_CONFIG_PATH);
   }

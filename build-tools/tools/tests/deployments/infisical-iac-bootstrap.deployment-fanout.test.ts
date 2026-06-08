@@ -156,7 +156,10 @@ test("repo dry-run reports non-empty deployment fan-out targets read-only", asyn
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), "infisical-dry-run-fanout-"));
   await writeRepoOnlyResolver(dir);
   const cwd = process.cwd();
+  const oldEnv = { ...process.env };
   process.chdir(dir);
+  process.env.WORKSPACE_ROOT = dir;
+  process.env.LIVE_ROOT = dir;
   try {
     await fs.mkdir("build-tools/tools/buck", { recursive: true });
     await fs.writeFile(
@@ -174,16 +177,21 @@ test("repo dry-run reports non-empty deployment fan-out targets read-only", asyn
     await assert.rejects(() => fs.stat(path.join(".local", "bootstrap.json")), /ENOENT/);
   } finally {
     process.chdir(cwd);
+    process.env = oldEnv;
   }
 });
 
 async function withCwd<T>(dir: string, run: () => Promise<T>) {
   const cwd = process.cwd();
+  const oldEnv = { ...process.env };
   process.chdir(dir);
+  process.env.WORKSPACE_ROOT = dir;
+  process.env.LIVE_ROOT = dir;
   try {
     return await run();
   } finally {
     process.chdir(cwd);
+    process.env = oldEnv;
   }
 }
 

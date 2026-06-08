@@ -192,9 +192,12 @@ export function pushTokenFieldErrors(opts: {
   opts.errors.push(deploymentError(opts.label, opts.invalidMessage));
 }
 
-export function createDeploymentExtractionContext(nodes: GraphNode[]): DeploymentExtractionContext {
+export function createDeploymentExtractionContext(
+  nodes: GraphNode[],
+  opts: { workspaceRoot?: string } = {},
+): DeploymentExtractionContext {
   const contextErrors: string[] = [];
-  const resolvedNodes = resolveDeploymentContextNodes(nodes, contextErrors);
+  const resolvedNodes = resolveDeploymentContextNodes(nodes, contextErrors, opts.workspaceRoot);
   const { policies: laneGovernancePolicies, errors: laneGovernanceErrors } =
     extractDeploymentLaneGovernancePolicies(resolvedNodes);
   const { policies: lanePolicies, errors: laneErrors } =

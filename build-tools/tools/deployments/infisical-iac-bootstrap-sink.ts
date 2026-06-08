@@ -1,6 +1,7 @@
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import type { BootstrapArgs, CredentialSink } from "./infisical-iac-bootstrap-types";
+import { LocalFileCredentialSink } from "./infisical-iac-bootstrap-local-file-sink";
 import { resolverConfigPath } from "./infisical-iac-bootstrap-preflight";
 import { readSprinkleRefConfig } from "./sprinkleref-config";
 import * as bootstrapGuard from "./sprinkleref-bootstrap-guard";
@@ -8,7 +9,8 @@ import { createSprinkleRefStore } from "./sprinkleref-store";
 import { initLocalSprinkleRefValues, initSprinkleRefConfigs } from "./sprinkleref-templates";
 import type { SprinkleRefBackendConfig } from "./sprinkleref-types";
 
-type Store = Record<string, string>;
+export { LocalFileCredentialSink } from "./infisical-iac-bootstrap-local-file-sink";
+
 type SprinkleRefWritableStore = {
   describe(): string;
   has(ref: string): Promise<boolean>;
@@ -16,53 +18,6 @@ type SprinkleRefWritableStore = {
   add(ref: string, value: string): Promise<void>;
   update(ref: string, value: string): Promise<void>;
 };
-
-export class LocalFileCredentialSink implements CredentialSink {
-  private readonly file: string;
-
-  constructor(file: string) {
-    this.file = path.resolve(file);
-  }
-
-  describe() {
-    return `local secure sink ${this.file}`;
-  }
-
-  async has(ref: string) {
-    const store = await this.readStore();
-    return Boolean(store[ref]);
-  }
-
-  async read(ref: string) {
-    const store = await this.readStore();
-    return store[ref];
-  }
-
-  async write(ref: string, value: string, overwrite: boolean) {
-    const store = await this.readStore();
-    if (store[ref] && !overwrite) {
-      throw new Error(
-        `credential already exists for ${ref}; pass --force-overwrite-local-credentials to replace it`,
-      );
-    }
-    store[ref] = value;
-    await fs.mkdir(path.dirname(this.file), { recursive: true });
-    await fs.writeFile(this.file, `${JSON.stringify(store, null, 2)}\n`, { mode: 0o600 });
-    await fs.chmod(this.file, 0o600);
-  }
-
-  private async readStore(): Promise<Store> {
-    try {
-      const parsed = JSON.parse(await fs.readFile(this.file, "utf8")) as unknown;
-      return parsed && typeof parsed === "object" && !Array.isArray(parsed)
-        ? (parsed as Store)
-        : {};
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code === "ENOENT") return {};
-      throw error;
-    }
-  }
-}
 
 class SprinkleRefCredentialSink implements CredentialSink {
   private readonly category: string;
@@ -105,6 +60,8 @@ export async function resolveCredentialSinkSelection(
     platform?: NodeJS.Platform;
     env?: NodeJS.ProcessEnv;
     createMissingResolverConfig?: boolean;
+    workspaceRoot?: string;
+    configPath?: string;
   } = {},
 ): Promise<CredentialSinkSelection> {
   const env = opts.env || process.env;
@@ -115,14 +72,19 @@ export async function resolveCredentialSinkSelection(
   }
   if (args.credentialSink === "macos-keychain") return macosSelection(opts.platform);
   if (args.credentialSink === "sprinkleref") {
-    return await sprinklerefSelection(args, opts.platform, env, createMissingResolverConfig);
+    return await sprinklerefSelection(args, opts, createMissingResolverConfig);
   }
-  return await autoSprinkleRefSelection(args, opts.platform, env, createMissingResolverConfig);
+  return await autoSprinkleRefSelection(args, opts, createMissingResolverConfig);
 }
 
 export async function createCredentialSink(
   args: BootstrapArgs,
-  opts: { platform?: NodeJS.Platform; env?: NodeJS.ProcessEnv } = {},
+  opts: {
+    platform?: NodeJS.Platform;
+    env?: NodeJS.ProcessEnv;
+    workspaceRoot?: string;
+    configPath?: string;
+  } = {},
 ): Promise<CredentialSink> {
   const selection = await resolveCredentialSinkSelection(args, opts);
   if (args.credentialSink === "local-file")
@@ -130,7 +92,7 @@ export async function createCredentialSink(
   if (selection.kind === "sprinkleref") {
     return createSprinkleRefCredentialSinkFromBackend(
       selection.category || args.sprinkleCategory || "bootstrap",
-      await resolvedSprinkleRefBackend(args, selection.configPath),
+      await resolvedSprinkleRefBackend(args, selection.configPath, opts.workspaceRoot),
     );
   }
   if (selection.kind === "macos-keychain")
@@ -138,8 +100,12 @@ export async function createCredentialSink(
   return new LocalFileCredentialSink(args.localCredentialFile);
 }
 
-async function resolvedSprinkleRefBackend(args: BootstrapArgs, configPath?: string) {
-  const config = await readSprinkleRefConfig(configPath);
+async function resolvedSprinkleRefBackend(
+  args: BootstrapArgs,
+  configPath?: string,
+  workspaceRoot?: string,
+) {
+  const config = await readSprinkleRefConfig(configPath, workspaceRoot);
   return bootstrapGuard.resolveBootstrapAccessCredentialSinkBackend(
     config,
     args.sprinkleCategory || "bootstrap",
@@ -166,13 +132,17 @@ function createMacosCredentialSink(args: BootstrapArgs, platform: NodeJS.Platfor
 
 async function sprinklerefSelection(
   args: BootstrapArgs,
-  platform = process.platform,
-  env = process.env,
+  opts: {
+    platform?: NodeJS.Platform;
+    env?: NodeJS.ProcessEnv;
+    workspaceRoot?: string;
+    configPath?: string;
+  },
   createMissingResolverConfig = true,
 ): Promise<CredentialSinkSelection> {
-  const configPath = await ensureResolverConfigPath(platform, env, createMissingResolverConfig);
-  if (!configPath) return starterResolverSelection(args, platform);
-  const resolved = await resolvedSprinkleRefBackend(args, configPath);
+  const configPath = await ensureResolverConfigPath(opts, createMissingResolverConfig);
+  if (!configPath) return starterResolverSelection(args, opts.platform, opts.workspaceRoot);
+  const resolved = await resolvedSprinkleRefBackend(args, configPath, opts.workspaceRoot);
   return {
     kind: "sprinkleref",
     backend: resolved.backend.backend,
@@ -184,13 +154,17 @@ async function sprinklerefSelection(
 
 async function autoSprinkleRefSelection(
   args: BootstrapArgs,
-  platform?: NodeJS.Platform,
-  env: NodeJS.ProcessEnv = process.env,
+  opts: {
+    platform?: NodeJS.Platform;
+    env?: NodeJS.ProcessEnv;
+    workspaceRoot?: string;
+    configPath?: string;
+  },
   createMissingResolverConfig = true,
 ) {
-  const configPath = await ensureResolverConfigPath(platform, env, createMissingResolverConfig);
-  if (!configPath) return starterResolverSelection(args, platform);
-  const resolved = await resolvedSprinkleRefBackend(args, configPath);
+  const configPath = await ensureResolverConfigPath(opts, createMissingResolverConfig);
+  if (!configPath) return starterResolverSelection(args, opts.platform, opts.workspaceRoot);
+  const resolved = await resolvedSprinkleRefBackend(args, configPath, opts.workspaceRoot);
   return {
     kind: "sprinkleref" as const,
     backend: resolved.backend.backend,
@@ -200,35 +174,47 @@ async function autoSprinkleRefSelection(
   };
 }
 
-function starterResolverSelection(args: BootstrapArgs, platform = process.platform) {
+function starterResolverSelection(
+  args: BootstrapArgs,
+  platform = process.platform,
+  workspaceRoot = process.cwd(),
+) {
   const backend = platform === "darwin" ? "macos-keychain" : "local-file";
   const category = args.sprinkleCategory || "bootstrap";
   return {
     kind: "sprinkleref" as const,
     backend,
     category,
-    configPath: resolverConfigPath(),
+    configPath: resolverConfigPath(path.join(workspaceRoot, "projects", "config")),
     description: `${category} -> ${backend} (starter config not created during dry-run)`,
   };
 }
 
 async function ensureResolverConfigPath(
-  platform = process.platform,
-  env = process.env,
+  opts: {
+    platform?: NodeJS.Platform;
+    env?: NodeJS.ProcessEnv;
+    workspaceRoot?: string;
+    configPath?: string;
+  },
   createMissingResolverConfig = true,
 ) {
+  const platform = opts.platform || process.platform;
+  const env = opts.env || process.env;
   if (env.SPRINKLEREF_CONFIG) {
     await bootstrapGuard.assertBootstrapResolverConfigExists(env.SPRINKLEREF_CONFIG);
     return env.SPRINKLEREF_CONFIG;
   }
-  const selected = resolverConfigPath();
+  const workspaceRoot = opts.workspaceRoot || process.cwd();
+  const selected =
+    opts.configPath || resolverConfigPath(path.join(workspaceRoot, "projects", "config"));
   try {
     await fs.access(selected);
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
     if (!createMissingResolverConfig) return undefined;
     await initSprinkleRefConfigs({ dir: path.dirname(selected), platform, mode: "create" });
-    await initLocalSprinkleRefValues(process.cwd());
+    await initLocalSprinkleRefValues(workspaceRoot);
   }
   return selected;
 }

@@ -8,6 +8,7 @@ import * as path from "node:path";
 import { test } from "node:test";
 import { DEFAULT_BOOTSTRAP_ARGS } from "../../deployments/infisical-iac-bootstrap-config";
 import { runInfisicalIacBootstrap } from "../../deployments/infisical-iac-bootstrap";
+import { withTempWorkspace } from "./infisical-iac-bootstrap.test-env";
 
 test("deployment bootstrap rejects unsafe auto resolver before remote mutation", async () => {
   for (const [name, config, pattern] of [
@@ -181,31 +182,11 @@ async function writeJson(file: string, value: unknown) {
 }
 
 async function withCwdAndConfig(dir: string, configPath: string, run: () => Promise<void>) {
-  const cwd = process.cwd();
-  const oldConfig = process.env.SPRINKLEREF_CONFIG;
-  process.chdir(dir);
-  process.env.SPRINKLEREF_CONFIG = configPath;
-  try {
-    await run();
-  } finally {
-    process.chdir(cwd);
-    if (oldConfig === undefined) delete process.env.SPRINKLEREF_CONFIG;
-    else process.env.SPRINKLEREF_CONFIG = oldConfig;
-  }
+  await withTempWorkspace(dir, run, { configPath });
 }
 
 async function withCwdWithoutConfig(dir: string, run: () => Promise<void>) {
-  const cwd = process.cwd();
-  const oldConfig = process.env.SPRINKLEREF_CONFIG;
-  process.chdir(dir);
-  delete process.env.SPRINKLEREF_CONFIG;
-  try {
-    await run();
-  } finally {
-    process.chdir(cwd);
-    if (oldConfig === undefined) delete process.env.SPRINKLEREF_CONFIG;
-    else process.env.SPRINKLEREF_CONFIG = oldConfig;
-  }
+  await withTempWorkspace(dir, run, { clearConfig: true });
 }
 
 async function writeFakeTofu(file: string, marker: string) {

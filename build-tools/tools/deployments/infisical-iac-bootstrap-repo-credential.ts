@@ -17,11 +17,14 @@ export type SharedInfisicalSession = {
   bootstrapCredential?: BootstrapCredential;
 };
 
-export async function ensureRepoBootstrapCredential(args: BootstrapArgs) {
+export async function ensureRepoBootstrapCredential(
+  args: BootstrapArgs,
+  opts: { workspaceRoot?: string; configPath?: string } = {},
+) {
   const session = await createInfisicalSession(args);
   const resolvedArgs = { ...args, organizationId: session.organizationId };
   await ensureUniversalAuth(session.api, resolvedArgs, session.identity);
-  const sink = await createCredentialSink(args);
+  const sink = await createCredentialSink(args, opts);
   const bootstrapCredential = await ensureBootstrapCredential({
     api: session.api,
     args,

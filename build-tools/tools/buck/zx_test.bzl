@@ -3,6 +3,7 @@ load("@prelude//:build_mode.bzl", "BuildModeInfo")
 load("@prelude//:rules.bzl", "clone_rule")
 load("@prelude//decls:re_test_common.bzl", "re_test_common")
 load("@prelude//tests:re_utils.bzl", "get_re_executors_from_props")
+load("//build-tools/lang:nix_cache_health.bzl", "nix_cache_health_shell")
 load("//build-tools/lang:nix_shell.bzl", "nix_calling_env_export_source_snapshot")
 load("//build-tools/lang:remote_action_policy.bzl", "external_runner_command", "remote_ready_evidence", "run_nix_action", "stamp_remote_readiness_labels")
 load("//build-tools/lang:source_snapshot.bzl", "SourceSnapshotInfo")
@@ -34,6 +35,7 @@ def _zx_test_impl(ctx):
             + "  export BUCK_NESTED_ISO=\"zxtest-shared-$ISO_HASH\"; "
             + "fi; "
             + "export TMPDIR=\"${TMPDIR:-$WORKSPACE_ROOT/buck-out/tmp}\"; mkdir -p \"$TMPDIR\"; "
+            + nix_cache_health_shell().replace("%", "%%")
             + "if [ ! -e .buckconfig ] || ! grep -q '^prelude = prelude' .buckconfig 2>/dev/null; then "
             + "  PRELUDE_PATH=\"\"; "
             + "  if [ -n \"${VBR_SHARED_PRELUDE_PATH:-}\" ] && [ -e \"$VBR_SHARED_PRELUDE_PATH\" ]; then PRELUDE_PATH=\"$VBR_SHARED_PRELUDE_PATH\"; fi; "
@@ -96,7 +98,6 @@ def _zx_test_impl(ctx):
             + "SAFE=$(printf %%s \"$BUCK_TEST_TARGET\" | sed -E 's|^.*/:||; s/[^A-Za-z0-9._-]+/_/g' | cut -c1-200); "
             + "LOGDIR=\"$TEST_LOG_DIR/$SAFE\"; mkdir -p \"$LOGDIR\"; "
             + "ORIG_BUCK2=\"$(command -v buck2)\"; "
-            + ""
             + "SHIMROOT=\"$WORKSPACE_ROOT/buck-out/zx_shims/$SAFE\"; SHIMBIN=\"$SHIMROOT/bin\"; mkdir -p \"$SHIMBIN\"; WRAP=\"$SHIMBIN/buck2\"; "
             + "cat > \"$WRAP\" <<'EOSH'\n"
             + "#!/usr/bin/env bash\n"
@@ -218,7 +219,6 @@ def _zx_test_impl(ctx):
             default_output = stamp,
         ),
     ] + policy_info
-
 zx_test = clone_rule(
     "sh_test",
     extra_attrs = {

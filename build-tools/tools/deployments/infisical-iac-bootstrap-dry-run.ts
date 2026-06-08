@@ -1,3 +1,6 @@
+import * as path from "node:path";
+import { DEFAULT_GRAPH_PATH } from "../lib/graph-const";
+import { findRepoRoot } from "../lib/repo";
 import type { BootstrapArgs } from "./infisical-iac-bootstrap-types";
 import { withDeploymentBootstrapDefaults } from "./infisical-iac-bootstrap-config";
 import { buildDeploymentFanOutDryRunReport } from "./infisical-iac-bootstrap-deployments";
@@ -5,10 +8,22 @@ import { buildRepoDryRunMaterializationPlan } from "./infisical-iac-bootstrap-dr
 import { resolveCredentialSinkSelection } from "./infisical-iac-bootstrap-sink";
 import { DEFAULT_SPRINKLEREF_CONFIG_PATH } from "./sprinkleref-config-select";
 
-export async function buildDryRunReport(args: BootstrapArgs) {
-  const sink = await resolveCredentialSinkSelection(args);
+export async function buildDryRunReport(
+  args: BootstrapArgs,
+  context: { workspaceRoot?: string; configPath?: string } = {},
+) {
   if (args.mode === "repo") {
-    const materializationPlan = await buildRepoDryRunMaterializationPlan({ sink });
+    const workspaceRoot = context.workspaceRoot || (await findRepoRoot(process.cwd()));
+    const graphPath = path.join(workspaceRoot, DEFAULT_GRAPH_PATH);
+    const configPath =
+      context.configPath || path.join(workspaceRoot, DEFAULT_SPRINKLEREF_CONFIG_PATH);
+    const sink = await resolveCredentialSinkSelection(args, { workspaceRoot, configPath });
+    const materializationPlan = await buildRepoDryRunMaterializationPlan({
+      sink,
+      workspaceRoot,
+      graphPath,
+      configPath,
+    });
     return {
       schemaVersion: "infisical-repo-bootstrap-operations@1",
       mode: "repo",
@@ -20,10 +35,17 @@ export async function buildDryRunReport(args: BootstrapArgs) {
       credentialSink: sink.kind,
       credentialSinkBackend: sink.backend,
       materializationPlan,
-      deploymentFanOut: await buildDeploymentFanOutDryRunReport(args),
+      deploymentFanOut: await buildDeploymentFanOutDryRunReport(args, {
+        workspaceRoot,
+        graphPath,
+      }),
     };
   }
   const deploymentArgs = withDeploymentBootstrapDefaults(args);
+  const workspaceRoot = context.workspaceRoot || (await findRepoRoot(process.cwd()));
+  const configPath =
+    context.configPath || path.join(workspaceRoot, DEFAULT_SPRINKLEREF_CONFIG_PATH);
+  const sink = await resolveCredentialSinkSelection(args, { workspaceRoot, configPath });
   return {
     schemaVersion: "infisical-iac-bootstrap-operations@1",
     mode: "deployment",
@@ -38,7 +60,13 @@ export async function buildDryRunReport(args: BootstrapArgs) {
   };
 }
 
-export async function buildDryRunGuidance(args: BootstrapArgs): Promise<string[]> {
-  const sink = await resolveCredentialSinkSelection(args);
+export async function buildDryRunGuidance(
+  args: BootstrapArgs,
+  context: { workspaceRoot?: string; configPath?: string } = {},
+): Promise<string[]> {
+  const workspaceRoot = context.workspaceRoot || (await findRepoRoot(process.cwd()));
+  const configPath =
+    context.configPath || path.join(workspaceRoot, DEFAULT_SPRINKLEREF_CONFIG_PATH);
+  const sink = await resolveCredentialSinkSelection(args, { workspaceRoot, configPath });
   return [`Credential sink: ${sink.description}`];
 }

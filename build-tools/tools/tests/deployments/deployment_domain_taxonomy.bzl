@@ -73,6 +73,7 @@ REVIEWED_DEPLOYMENT_TEST_OWNERSHIP.update({
     "build-tools/tools/tests/deployments/deployment-context-provider-schema.test.ts": True,
     "build-tools/tools/tests/deployments/deployment-contexts.test.ts": True,
     "build-tools/tools/tests/deployments/deployment-contexts.scope.test.ts": True,
+    "build-tools/tools/tests/deployments/deployment-contexts.workspace-root.test.ts": True,
     "build-tools/tools/tests/deployments/pleomino-deployment-context-explicit-provider.cquery.test.ts": True,
     "build-tools/tools/tests/deployments/pleomino-deployment-contexts.cquery.test.ts": True,
     "build-tools/tools/tests/deployments/sprinkleref-check-control-plane.test.ts": True,

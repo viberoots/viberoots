@@ -55,6 +55,7 @@ function fakeRunVerifyDeps(calls: string[]): Partial<RunVerifyDeps> {
     ensureBuckPreludeConfig: async () => {},
     ensureRepoLocalTmpRoot: async () => {},
     ensureVerifyPinnedNixpkgs: async () => calls.push("ensure-pinned"),
+    applyNixCacheHealthPolicy: async () => calls.push("nix-cache-health"),
     exit: ((code: number) => {
       throw new VerifyExit(code);
     }) as RunVerifyDeps["exit"],

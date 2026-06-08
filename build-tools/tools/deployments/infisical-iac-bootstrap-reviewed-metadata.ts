@@ -7,14 +7,20 @@ import { stripJsonComments } from "./json-comments";
 export const PLEOMINO_REVIEWED_METADATA_PATH = "projects/deployments/pleomino/shared/family.bzl";
 export const PLEOMINO_REVIEWED_CONTEXT_CONFIG_PATH = "projects/config/shared.json";
 
-export async function readPleominoReviewedMetadata(file = PLEOMINO_REVIEWED_METADATA_PATH) {
-  const source = await readPleominoReviewedMetadataSource(file);
+export async function readPleominoReviewedMetadata(
+  file = PLEOMINO_REVIEWED_METADATA_PATH,
+  workspaceRoot = process.cwd(),
+) {
+  const source = await readPleominoReviewedMetadataSource(file, workspaceRoot);
   if (source.includes("_INFISICAL_SITE_URL")) return parsePleominoReviewedMetadata(source);
   return parsePleominoReviewedContextConfig(source);
 }
 
-export async function readPleominoReviewedMetadataSource(file = PLEOMINO_REVIEWED_METADATA_PATH) {
-  const resolved = path.resolve(file);
+export async function readPleominoReviewedMetadataSource(
+  file = PLEOMINO_REVIEWED_METADATA_PATH,
+  workspaceRoot = process.cwd(),
+) {
+  const resolved = path.isAbsolute(file) ? file : path.resolve(workspaceRoot, file);
   const source = await fs.readFile(resolved, "utf8");
   if (source.includes("_INFISICAL_SITE_URL")) return source;
   return await fs.readFile(pleominoContextConfigPath(resolved), "utf8");

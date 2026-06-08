@@ -28,9 +28,9 @@ type ContextRecord = Record<string, unknown>;
 export function resolveDeploymentContextNodes(
   nodes: GraphNode[],
   errors: string[],
-  cwd = process.cwd(),
+  workspaceRoot = process.cwd(),
 ): GraphNode[] {
-  const loaded = readProjectConfigSync(cwd);
+  const loaded = readProjectConfigSync(workspaceRoot);
   pushAppDeploymentTopologyErrors(nodes, errors);
   validateControlPlaneProfiles({
     config: loaded.config,

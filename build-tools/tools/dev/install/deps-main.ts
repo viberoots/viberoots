@@ -16,6 +16,7 @@ import { withExclusiveInstallLock } from "./lock";
 import { syncModuleContractsForWebapps } from "./module-contracts";
 import { runUvRefreshAll } from "./uv";
 import { ensureToolchainPathsFiles } from "../toolchain-paths";
+import { applyNixCacheHealthPolicy } from "../verify/nix-cache-health";
 import { discoverImportersWithLock } from "./importers";
 import { pruneNodeModulesHashesJson } from "../update-pnpm-hash/hashes-json";
 import { ensureInstallSecretReadiness } from "./secret-readiness";
@@ -88,6 +89,7 @@ const {
 const effSkipGoTidy =
   skipGoTidy || (glueOnly && String(process.env.INSTALL_DEPS_SKIP_GO_TIDY || "") !== "0");
 const repoRoot = await resolveWorkspaceRoot();
+await applyNixCacheHealthPolicy(repoRoot);
 // Make the selected workspace explicit so downstream helpers operate on the intended repo root.
 try {
   if (String(process.env.WORKSPACE_ROOT || "").trim() !== repoRoot) {

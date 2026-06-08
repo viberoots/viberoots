@@ -16,6 +16,7 @@ import { normalizeDevBuildTargetArgs } from "./target-args";
 import { maybeAutoImpureFromUntrackedFiles } from "./untracked";
 import { pruneDeadDevBuildIsolationDirs } from "../clean-temp-outs-lib";
 import { registerBuckIsolationSync } from "../verify/owned-process-state";
+import { applyNixCacheHealthPolicy } from "../verify/nix-cache-health";
 import { getArgvTokens } from "../../lib/cli";
 import { findRepoRoot } from "../../lib/repo";
 
@@ -59,6 +60,8 @@ export async function runDevBuild(): Promise<void> {
   try {
     process.chdir(root);
   } catch {}
+
+  await applyNixCacheHealthPolicy(root);
 
   const removedDeadDevBuildIsos = await pruneDeadDevBuildIsolationDirs(root).catch(() => []);
   if (removedDeadDevBuildIsos.length > 0) {

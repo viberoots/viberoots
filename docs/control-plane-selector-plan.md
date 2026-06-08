@@ -787,3 +787,186 @@ or later mutation-time failures to hide configuration errors.
 Validation becomes stricter for both checked-in and local config. Operators with stale local
 profiles or protected/shared contexts missing `controlPlane` must fix those entries before
 front-door, read-only, or mutation commands proceed.
+
+## PR-7: Workspace-root project-config validation for extraction
+
+### 1. Intent
+
+Make deployment-context extraction load canonical project config from the CLI workspace root, not
+from the process working directory, so repo, front-door, and read-only validation behave the same
+from nested directories as they do from the repository root.
+
+### 2. Scope of changes
+
+- Thread the resolved workspace root into shared deployment extraction before
+  `resolveDeploymentContextNodes` reads `projects/config`.
+- Remove or narrow any remaining `process.cwd()` fallback in deployment-context extraction paths
+  that already know the workspace root.
+- Preserve existing explicit workspace-root behavior in `--remote <name>` profile resolution.
+- Keep local-only contexts valid when project config is absent, while ensuring protected/shared
+  contexts still fail closed when canonical repo config is missing or invalid.
+- Do not add backwards compatibility shims or alternate config search paths; this is a clean
+  cut-over to canonical workspace-root config loading.
+
+### 3. External prerequisites
+
+- PR-1 through PR-6 must have landed.
+- CLI/provider extraction entrypoints must already resolve the repository workspace root.
+- The canonical project config directory remains `projects/config` under the workspace root.
+
+### 4. Tests to be added
+
+- Add a read-only or validate-only regression test that runs extraction from a nested working
+  directory and proves `projects/config/shared.json` is still loaded from the workspace root.
+- Add a protected/shared negative test proving a missing or invalid selected control plane is still
+  rejected from nested directories.
+- Add a local-only regression test proving omitted or absent `projects/config` does not break valid
+  local-only extraction.
+- Keep or extend `--remote <name>` workspace-root coverage to prove the remote-profile path remains
+  aligned with deployment-context extraction.
+
+### 5. Docs to be added or updated
+
+- Update [Control Plane Selector Design](control-plane-selector.md) if needed to state that all
+  deployment-context extraction and read-only validation load `projects/config` from the workspace
+  root.
+- Update troubleshooting or deployment usage docs if diagnostics change for nested-directory
+  invocations or missing canonical project config.
+- Update this plan if another extraction entrypoint still reads project config relative to
+  `process.cwd()`.
+
+### 5.5. Expected regression scope
+
+- `deployment-only`
+- Expected implementation paths:
+  - `build-tools/tools/deployments/contract-extract-shared.ts`
+  - `build-tools/tools/deployments/deployment-contexts.ts`
+  - `build-tools/tools/deployments/*contract-extract*.ts`
+  - `build-tools/tools/tests/deployments/**`
+  - `docs/**`
+- Keep changes focused on root propagation, validation determinism, tests, and docs.
+
+### 6. Acceptance criteria
+
+- Deployment-context extraction reads `projects/config` from the resolved workspace root, regardless
+  of the process working directory.
+- `deploy --validate-only`, read-only inspection, and provider front-door extraction reject
+  protected/shared invalid config consistently from nested directories.
+- Local-only extraction continues to degrade gracefully when `projects/config` is absent.
+- `--remote <name>` and context-selected control-plane resolution use the same canonical project
+  config root.
+- Tests and docs cover the nested-directory behavior.
+
+### 7. Risks
+
+- Some tests may have accidentally depended on running from a temporary current working directory
+  with ad hoc `projects/config` content.
+- Moving config loading to the canonical workspace root can surface real checked-in config issues in
+  read-only paths that were previously hidden by nested invocation behavior.
+
+### 8. Mitigations
+
+- Update tests to create explicit workspace roots instead of relying on ambient `process.cwd()`.
+- Keep diagnostics path-oriented so failures identify the canonical `projects/config` path.
+- Limit fallback behavior to valid local-only cases where project config is intentionally absent.
+
+### 9. Consequences of not implementing this PR
+
+Protected/shared repo and read-only validation remains dependent on the current shell directory,
+allowing nested invocations to miss canonical project config and bypass PR-6 fail-closed checks.
+
+### 10. Downsides for implementing this PR
+
+Extraction becomes less tolerant of ad hoc nested-directory config. Callers must provide or resolve
+the repository workspace root before deployment-context validation runs.
+
+## PR-8: Dynamic Nix cache fallback for PR validation
+
+### 1. Intent
+
+Keep repo build and validation scripts usable when a configured Nix cache is temporarily
+unreachable, without hardcoding any cache domain or silently changing global Nix daemon
+configuration.
+
+### 2. Scope of changes
+
+- Add a shared Nix cache health helper that discovers configured substituters from effective Nix
+  config, probes HTTP(S) caches dynamically, and rewrites only the current process `NIX_CONFIG`.
+- Wire the helper into `v` before seed builds and into `b`/prelude setup before Nix builds.
+- Wire equivalent cache-health behavior into Buck Nix action bootstrap so generated actions do not
+  fail only because a configured cache endpoint is unavailable.
+- Preserve non-HTTP(S) substituters and reachable caches, keep `cache.nixos.org` available when it
+  is configured, and do not write user, daemon, or checked-in config files.
+- Support `VBR_NIX_CACHE_POLICY=auto` as the default fallback mode,
+  `VBR_NIX_CACHE_POLICY=strict` for hard cache enforcement, and `VBR_NIX_CACHE_POLICY=off` for
+  debugging with untouched Nix config.
+
+### 3. External prerequisites
+
+- Nix remains the source of truth for configured substituters and trusted public keys.
+- `curl` or the TypeScript fetch runtime is available in the relevant script/action environment.
+
+### 4. Tests to be added
+
+- Add unit coverage proving auto mode removes only unreachable configured substituters discovered
+  dynamically and preserves unrelated `NIX_CONFIG` entries.
+- Add strict-mode coverage proving an unreachable configured cache fails closed.
+- Add off-mode coverage proving the helper leaves `NIX_CONFIG` unchanged.
+- Extend verify orchestration coverage so the cache-health phase runs before later local setup or
+  seed/build side effects.
+
+### 5. Docs to be added or updated
+
+- Update remote-build setup docs to describe configured-cache fallback policy without naming any
+  local/private cache domain.
+- Update PR handbook validation guidance to explain when to use `auto`, `strict`, and `off`.
+
+### 5.5. Expected regression scope
+
+- `build-system`
+- Expected implementation paths:
+  - `build-tools/tools/dev/verify/**`
+  - `build-tools/tools/dev/dev-build/**`
+  - `build-tools/tools/bin/_env.sh`
+  - `build-tools/lang/**`
+  - `build-tools/tools/tests/dev/**`
+  - `build-tools/tools/tests/remote-exec/**`
+  - `build-tools/docs/**`
+  - `docs/handbook/**`
+- Keep changes focused on per-process cache handling, validation reliability, tests, and docs.
+
+### 6. Acceptance criteria
+
+- `i`, `b`, `v`, and Buck Nix actions can proceed when a configured HTTP(S) cache is
+  unreachable, as long as remaining substituters or local builds can satisfy Nix.
+- The implementation discovers configured cache URLs dynamically and contains no hardcoded local
+  cache domain.
+- Strict mode makes cache availability a hard failure for tests that intentionally validate cache
+  health.
+- Off mode leaves Nix config untouched for debugging.
+- Tests and docs cover the cache policy behavior.
+
+### 7. Risks
+
+- Auto mode can hide a cache outage by falling back to source builds or lower-priority public
+  substituters, which may make validation slower.
+- Shell bootstrap and TypeScript bootstrap logic can drift if they parse effective Nix config
+  differently.
+
+### 8. Mitigations
+
+- Emit concise diagnostics when unreachable substituters are removed and when a reduced
+  substituter set is used.
+- Keep strict mode available for CI lanes or targeted tests where cache availability is the
+  behavior under test.
+- Keep the shell implementation minimal and aligned with the TypeScript unit-tested behavior.
+
+### 9. Consequences of not implementing this PR
+
+Transient DNS or network failures for a configured cache can make unrelated PR validation
+fail before the repository's actual build or test behavior is exercised.
+
+### 10. Downsides for implementing this PR
+
+Validation may continue after a cache outage and take longer than expected. Developers need to read
+the emitted cache-health diagnostics when a run unexpectedly slows down.

@@ -9,6 +9,7 @@ import { resolveImporterDir } from "../../lib/lockfiles";
 import { gcWaitConfig, nixGcLockMessage, waitForNoActiveNixGc } from "../../lib/nix-gc-lock";
 import { type ManagedCommandActivity, runManagedCommand } from "../../lib/managed-command";
 import { pathExists, repoRoot } from "../../lib/repo";
+import { applyNixCacheHealthPolicy } from "../verify/nix-cache-health";
 import { makeFilteredFlakeRef } from "../update-pnpm-hash/lockfile";
 import { flakeRefForImporter, sanitizeName } from "./common";
 import {
@@ -39,6 +40,7 @@ function usesTempRepoFakeNix(root: string, env: NodeJS.ProcessEnv = process.env)
 
 export async function relinkNodeModules(force: boolean) {
   const root = repoRoot();
+  await applyNixCacheHealthPolicy(root);
   const cwd = path.resolve(process.cwd());
   const importer = await resolveImporterDir(process.cwd()).catch(() => "."); // POSIX repo-relative
   const attr = !importer || importer === "." ? "default" : sanitizeName(importer);

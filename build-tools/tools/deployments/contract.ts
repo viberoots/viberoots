@@ -1,5 +1,6 @@
 #!/usr/bin/env zx-wrapper
 import type { GraphNode } from "../lib/graph";
+import type { DeploymentExtractionOptions } from "./contract-extract-options";
 import { createDeploymentExtractionContext, uniqueErrors } from "./contract-extract-shared";
 import { extractAppStoreConnectDeploymentsFromContext } from "./contract-extract-app-store-connect";
 import { extractCloudflarePagesDeploymentsFromContext } from "./contract-extract-cloudflare-pages";
@@ -10,64 +11,88 @@ import { extractNixosSharedHostDeploymentsFromContext } from "./contract-extract
 import { extractS3StaticDeploymentsFromContext } from "./contract-extract-s3-static";
 import { extractVercelDeploymentsFromContext } from "./contract-extract-vercel";
 
-export function extractNixosSharedHostDeployments(nodes: GraphNode[]) {
-  const context = createDeploymentExtractionContext(nodes);
+export function extractNixosSharedHostDeployments(
+  nodes: GraphNode[],
+  opts: DeploymentExtractionOptions = {},
+) {
+  const context = createDeploymentExtractionContext(nodes, opts);
   return {
     deployments: extractNixosSharedHostDeploymentsFromContext(context),
     errors: uniqueErrors(context.errors),
   };
 }
 
-export function extractCloudflarePagesDeployments(nodes: GraphNode[]) {
-  const context = createDeploymentExtractionContext(nodes);
+export function extractCloudflarePagesDeployments(
+  nodes: GraphNode[],
+  opts: DeploymentExtractionOptions = {},
+) {
+  const context = createDeploymentExtractionContext(nodes, opts);
   return {
     deployments: extractCloudflarePagesDeploymentsFromContext(context),
     errors: uniqueErrors(context.errors),
   };
 }
 
-export function extractCloudflareContainersDeployments(nodes: GraphNode[]) {
-  const context = createDeploymentExtractionContext(nodes);
+export function extractCloudflareContainersDeployments(
+  nodes: GraphNode[],
+  opts: DeploymentExtractionOptions = {},
+) {
+  const context = createDeploymentExtractionContext(nodes, opts);
   return {
     deployments: extractCloudflareContainersDeploymentsFromContext(context),
     errors: uniqueErrors(context.errors),
   };
 }
 
-export function extractAppStoreConnectDeployments(nodes: GraphNode[]) {
-  const context = createDeploymentExtractionContext(nodes);
+export function extractAppStoreConnectDeployments(
+  nodes: GraphNode[],
+  opts: DeploymentExtractionOptions = {},
+) {
+  const context = createDeploymentExtractionContext(nodes, opts);
   return {
     deployments: extractAppStoreConnectDeploymentsFromContext(context),
     errors: uniqueErrors(context.errors),
   };
 }
 
-export function extractGooglePlayDeployments(nodes: GraphNode[]) {
-  const context = createDeploymentExtractionContext(nodes);
+export function extractGooglePlayDeployments(
+  nodes: GraphNode[],
+  opts: DeploymentExtractionOptions = {},
+) {
+  const context = createDeploymentExtractionContext(nodes, opts);
   return {
     deployments: extractGooglePlayDeploymentsFromContext(context),
     errors: uniqueErrors(context.errors),
   };
 }
 
-export function extractS3StaticDeployments(nodes: GraphNode[]) {
-  const context = createDeploymentExtractionContext(nodes);
+export function extractS3StaticDeployments(
+  nodes: GraphNode[],
+  opts: DeploymentExtractionOptions = {},
+) {
+  const context = createDeploymentExtractionContext(nodes, opts);
   return {
     deployments: extractS3StaticDeploymentsFromContext(context),
     errors: uniqueErrors(context.errors),
   };
 }
 
-export function extractKubernetesDeployments(nodes: GraphNode[]) {
-  const context = createDeploymentExtractionContext(nodes);
+export function extractKubernetesDeployments(
+  nodes: GraphNode[],
+  opts: DeploymentExtractionOptions = {},
+) {
+  const context = createDeploymentExtractionContext(nodes, opts);
   return {
     deployments: extractKubernetesDeploymentsFromContext(context),
     errors: uniqueErrors(context.errors),
   };
 }
 
-export function extractVercelDeployments(nodes: GraphNode[]) {
-  const context = createDeploymentExtractionContext(nodes);
+export function extractVercelDeployments(
+  nodes: GraphNode[],
+  opts: DeploymentExtractionOptions = {},
+) {
+  const context = createDeploymentExtractionContext(nodes, opts);
   return {
     deployments: extractVercelDeploymentsFromContext(context),
     errors: uniqueErrors(context.errors),

@@ -1,5 +1,7 @@
 import * as fs from "node:fs/promises";
+import * as path from "node:path";
 import { DEFAULT_GRAPH_PATH } from "../lib/graph-const";
+import { findRepoRoot } from "../lib/repo";
 import { resolverConfigPath } from "./infisical-iac-bootstrap-preflight";
 import { isGeneratedInfisicalResolverProfile } from "./infisical-iac-bootstrap-profile-kind";
 import { repoBootstrapProfiles } from "./infisical-iac-bootstrap-resolver";
@@ -9,15 +11,19 @@ import type { SprinkleRefBackendConfig, SprinkleRefConfig } from "./sprinkleref-
 
 export async function buildRepoDryRunMaterializationPlan(opts: {
   sink: CredentialSinkSelection;
+  workspaceRoot?: string;
   graphPath?: string;
   configPath?: string;
   env?: NodeJS.ProcessEnv;
 }) {
-  const configPath = opts.configPath || resolverConfigPath();
+  const workspaceRoot = opts.workspaceRoot || (await findRepoRoot(process.cwd()));
+  const configPath =
+    opts.configPath || resolverConfigPath(path.join(workspaceRoot, "projects", "config"));
   const configExists = await exists(configPath);
-  const config = configExists ? await readSprinkleRefConfig(configPath) : undefined;
+  const config = configExists ? await readSprinkleRefConfig(configPath, workspaceRoot) : undefined;
   const profiles = await repoBootstrapProfiles({
-    graphPath: opts.graphPath || DEFAULT_GRAPH_PATH,
+    graphPath: opts.graphPath || path.join(workspaceRoot, DEFAULT_GRAPH_PATH),
+    workspaceRoot,
     config,
     starterCategoryProfiles: !configExists,
   });

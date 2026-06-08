@@ -12,6 +12,7 @@ import {
   isAffirmativeConfirmation,
 } from "../../deployments/infisical-iac-bootstrap-preflight";
 import { runInfisicalIacBootstrap } from "../../deployments/infisical-iac-bootstrap";
+import { withTempWorkspace } from "./infisical-iac-bootstrap.test-env";
 
 test("bootstrap preflight rejects non-interactive execution before side effects", async () => {
   const sideEffects: string[] = [];
@@ -169,17 +170,7 @@ const tmp = () => fs.mkdtemp(path.join(os.tmpdir(), "infisical-bootstrap-preflig
 const sharedConfigPath = () => path.join("projects", "config", "shared.json");
 
 async function withCwdAndEnv(dir: string, run: () => Promise<void>) {
-  const cwd = process.cwd();
-  const oldConfig = process.env.SPRINKLEREF_CONFIG;
-  delete process.env.SPRINKLEREF_CONFIG;
-  process.chdir(dir);
-  try {
-    await run();
-  } finally {
-    process.chdir(cwd);
-    if (oldConfig === undefined) delete process.env.SPRINKLEREF_CONFIG;
-    else process.env.SPRINKLEREF_CONFIG = oldConfig;
-  }
+  await withTempWorkspace(dir, run, { clearConfig: true });
 }
 
 function bootstrapRetryMessage(args: typeof DEFAULT_BOOTSTRAP_ARGS) {

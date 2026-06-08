@@ -33,7 +33,7 @@ test("auto credential sink reuses existing SprinkleRef resolver config", async (
     });
     assert.equal(selection.kind, "sprinkleref");
     assert.equal(selection.backend, "local-file");
-    assert.equal(selection.configPath, "projects/config/shared.json");
+    assert.ok(selection.configPath?.endsWith(sharedConfigPath()));
     await assertMissing("projects/config/local.json");
   });
 });
@@ -88,7 +88,7 @@ test("repo bootstrap creates and validates resolver profiles independent of cred
       }),
     );
     assert.doesNotMatch(output.stdout, /nextCommands/);
-    assert.match(output.stderr, /sprinkleref --check --config projects\/config\/shared\.json/);
+    assert.match(output.stderr, /projects\/config\/shared\.json/);
     const report = JSON.parse(output.stdout);
     assert.equal(report.nextCommands, undefined);
     assert.equal(report.bootstrapCredentialSinks.length, 2);
@@ -204,6 +204,8 @@ async function withCwdAndEnv(dir: string, run: () => Promise<void>) {
   const oldVaultAddr = process.env.VBR_VAULT_ADDR;
   const oldVaultToken = process.env.VBR_VAULT_TOKEN;
   const oldRuntimeHost = process.env.VBR_RUNTIME_HOST;
+  const oldWorkspaceRoot = process.env.WORKSPACE_ROOT;
+  const oldLiveRoot = process.env.LIVE_ROOT;
   const oldFetch = globalThis.fetch;
   delete process.env.SPRINKLEREF_CONFIG;
   process.env.VBR_RUNTIME_HOST = "local-file";
@@ -211,6 +213,8 @@ async function withCwdAndEnv(dir: string, run: () => Promise<void>) {
   process.env.INFISICAL_ACCESS_TOKEN = "admin-token";
   process.env.VBR_VAULT_ADDR = "https://vault.test";
   process.env.VBR_VAULT_TOKEN = "vault-token";
+  process.env.WORKSPACE_ROOT = dir;
+  process.env.LIVE_ROOT = dir;
   globalThis.fetch = fakeRepoBootstrapFetch as typeof fetch;
   process.chdir(dir);
   try {
@@ -229,6 +233,10 @@ async function withCwdAndEnv(dir: string, run: () => Promise<void>) {
     else process.env.VBR_VAULT_TOKEN = oldVaultToken;
     if (oldRuntimeHost === undefined) delete process.env.VBR_RUNTIME_HOST;
     else process.env.VBR_RUNTIME_HOST = oldRuntimeHost;
+    if (oldWorkspaceRoot === undefined) delete process.env.WORKSPACE_ROOT;
+    else process.env.WORKSPACE_ROOT = oldWorkspaceRoot;
+    if (oldLiveRoot === undefined) delete process.env.LIVE_ROOT;
+    else process.env.LIVE_ROOT = oldLiveRoot;
     globalThis.fetch = oldFetch;
   }
 }
@@ -237,7 +245,6 @@ async function writeJson(file: string, value: unknown) {
   await fs.mkdir(path.dirname(file), { recursive: true });
   await fs.writeFile(file, `${JSON.stringify(value, null, 2)}\n`);
 }
-
 async function writeGraph(nodes: unknown[]) {
   await writeJson(path.join("build-tools", "tools", "buck", "graph.json"), { nodes });
 }

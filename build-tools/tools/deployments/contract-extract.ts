@@ -1,5 +1,6 @@
 #!/usr/bin/env zx-wrapper
 import type { GraphNode } from "../lib/graph";
+import type { DeploymentExtractionOptions } from "./contract-extract-options";
 import type { DeploymentPrerequisiteMode, DeploymentTarget } from "./contract-types";
 import {
   createDeploymentExtractionContext,
@@ -124,11 +125,14 @@ function validateExternalRequirementMetadata(
   return errors;
 }
 
-export function extractDeployments(nodes: GraphNode[]): {
+export function extractDeployments(
+  nodes: GraphNode[],
+  opts: DeploymentExtractionOptions = {},
+): {
   deployments: DeploymentTarget[];
   errors: string[];
 } {
-  const context = createDeploymentExtractionContext(nodes);
+  const context = createDeploymentExtractionContext(nodes, opts);
   const deployments = [
     ...extractNixosSharedHostDeploymentsFromContext(context),
     ...extractCloudflarePagesDeploymentsFromContext(context),

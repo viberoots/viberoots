@@ -35,6 +35,10 @@ export async function runVerifyWithDeps(overrides: Partial<RunVerifyDeps> = {}):
     })
     .catch(cleanupEarlyFailure);
   const zxInitPath = path.join(root, "build-tools", "tools", "dev", "zx-init.mjs");
+  await timedPhase(
+    "nix-cache-health",
+    async () => await deps.applyNixCacheHealthPolicy(root),
+  ).catch(cleanupEarlyFailure);
   await timedPhase("ensure-pinned-nixpkgs", async () => await deps.ensureVerifyPinnedNixpkgs(root));
   if (args.explainSelection) {
     await deps.runExplainSelection({ root, selection, executionPolicy });

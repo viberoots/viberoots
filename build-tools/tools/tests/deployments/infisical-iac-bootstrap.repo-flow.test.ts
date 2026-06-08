@@ -44,9 +44,10 @@ test("repo bootstrap applies first-bootstrap metadata, resumes fan-out, and runs
   );
   assert.deepEqual(seenTargets, [staging, staging]);
   assert.deepEqual(credentialSetups, ["viberoots-iac-bootstrap"]);
+  const sharedConfig = path.join(dir, "projects/config/shared.json");
   assert.deepEqual(finalChecks, [
-    ["--check", "--config", "projects/config/shared.json"],
-    ["--check", "--category", "bootstrap", "--config", "projects/config/shared.json"],
+    ["--check", "--config", sharedConfig],
+    ["--check", "--category", "bootstrap", "--config", sharedConfig],
   ]);
   assert.match(await fs.readFile(path.join(dir, patch.path), "utf8"), /proj_live/);
   assert.equal(await fs.readFile(path.join(dir, ".local/bootstrap.json"), "utf8"), "{}\n");
@@ -138,11 +139,19 @@ async function fixtureRequest(method: string, endpoint: string) {
 
 async function withCwd<T>(dir: string, run: () => Promise<T>) {
   const cwd = process.cwd();
+  const oldWorkspaceRoot = process.env.WORKSPACE_ROOT;
+  const oldLiveRoot = process.env.LIVE_ROOT;
   process.chdir(dir);
+  process.env.WORKSPACE_ROOT = dir;
+  process.env.LIVE_ROOT = dir;
   try {
     return await run();
   } finally {
     process.chdir(cwd);
+    if (oldWorkspaceRoot === undefined) delete process.env.WORKSPACE_ROOT;
+    else process.env.WORKSPACE_ROOT = oldWorkspaceRoot;
+    if (oldLiveRoot === undefined) delete process.env.LIVE_ROOT;
+    else process.env.LIVE_ROOT = oldLiveRoot;
   }
 }
 

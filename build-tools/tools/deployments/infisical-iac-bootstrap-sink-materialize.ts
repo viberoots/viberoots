@@ -12,12 +12,13 @@ const VALIDATION_ACCOUNT = "viberoots-bootstrap-keychain-validation";
 export async function materializeBootstrapCredentialSink(opts: {
   args: BootstrapArgs;
   selection: CredentialSinkSelection;
+  workspaceRoot?: string;
   keychainRunner?: KeychainRunner;
   platform?: NodeJS.Platform;
 }) {
-  const file = await localSinkFile(opts.args, opts.selection);
+  const file = await localSinkFile(opts.args, opts.selection, opts.workspaceRoot);
   if (!file) {
-    const service = await keychainService(opts.args, opts.selection);
+    const service = await keychainService(opts.args, opts.selection, opts.workspaceRoot);
     if (service) {
       return await validateMacosKeychainBootstrapSink({
         service,
@@ -58,10 +59,14 @@ export async function validateMacosKeychainBootstrapSink(opts: {
   return { materialized: false, kind: "macos-keychain", service: opts.service };
 }
 
-async function localSinkFile(args: BootstrapArgs, selection: CredentialSinkSelection) {
+async function localSinkFile(
+  args: BootstrapArgs,
+  selection: CredentialSinkSelection,
+  workspaceRoot?: string,
+) {
   if (selection.kind === "local-file") return args.localCredentialFile;
   if (selection.kind !== "sprinkleref" || selection.backend !== "local-file") return undefined;
-  const config = await readSprinkleRefConfig(selection.configPath);
+  const config = await readSprinkleRefConfig(selection.configPath, workspaceRoot);
   const resolved = resolveBootstrapAccessCredentialSinkBackend(
     config,
     selection.category || args.sprinkleCategory || "bootstrap",
@@ -69,10 +74,14 @@ async function localSinkFile(args: BootstrapArgs, selection: CredentialSinkSelec
   return resolved.backend.file;
 }
 
-async function keychainService(args: BootstrapArgs, selection: CredentialSinkSelection) {
+async function keychainService(
+  args: BootstrapArgs,
+  selection: CredentialSinkSelection,
+  workspaceRoot?: string,
+) {
   if (selection.kind === "macos-keychain") return selection.description;
   if (selection.kind !== "sprinkleref" || selection.backend !== "macos-keychain") return undefined;
-  const config = await readSprinkleRefConfig(selection.configPath);
+  const config = await readSprinkleRefConfig(selection.configPath, workspaceRoot);
   const resolved = resolveBootstrapAccessCredentialSinkBackend(
     config,
     selection.category || args.sprinkleCategory || "bootstrap",

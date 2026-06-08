@@ -306,7 +306,7 @@ Recommended service mapping:
 
 Direct S3-compatible Nix binary caches are valid and simple for `nix copy --to s3://...`, but they push more signing, retention, indexing, and credential-boundary responsibility into CI and infrastructure. Use direct S3 only when the desired cache contract is intentionally a plain Nix store rather than a managed cache service.
 
-The home Attic endpoint `https://cache.home.kilty.io/` is useful evidence that the workflow already exists, but it is not the production cache target. Cloud workers and CI should use a production cloud endpoint such as `https://cache.<domain>/<cache-name>` with documented cache name, trusted public key, read credentials, publisher token, retention policy, and owner.
+Existing local or lab Attic endpoints are useful evidence that the workflow already exists, but they are not the production cache target. Cloud workers and CI should use a production cloud endpoint such as `https://cache.<domain>/<cache-name>` with documented cache name, trusted public key, read credentials, publisher token, retention policy, and owner.
 
 Developer machines should trust the cache without replacing the default substituter set:
 
@@ -321,6 +321,8 @@ trusted-substituters = https://cache.<domain>/<cache-name>?priority=30
 ```
 
 Use `extra-substituters` plus `extra-trusted-public-keys` in daemon config when the cache should be enabled by default. Use `trusted-substituters` plus the trusted public key as an admin allow-list for opt-in user configs. Untrusted users can opt into allow-listed caches with `extra-substituters`; they cannot make a new substituter trusted solely from `NIX_CONFIG`.
+
+Build and verify entrypoints should tolerate a temporarily unreachable cache. The repo wrappers discover the effective configured substituters from Nix, probe each HTTP(S) cache's `nix-cache-info`, and, by default, remove unreachable caches from the per-process `NIX_CONFIG` while keeping any reachable configured caches. Set `VBR_NIX_CACHE_POLICY=strict` when cache availability is a hard requirement, or `VBR_NIX_CACHE_POLICY=off` to leave Nix cache configuration untouched for debugging.
 
 For Cachix-backed caches, the developer setup remains:
 

@@ -1,3 +1,6 @@
+import * as path from "node:path";
+import { DEFAULT_GRAPH_PATH } from "../lib/graph-const";
+import { findRepoRoot } from "../lib/repo";
 import { InfisicalApi } from "./infisical-iac-bootstrap-api";
 import { runDeploymentBootstrapFanOut } from "./infisical-iac-bootstrap-deployments";
 import { applyFanOutMetadataHandoff } from "./infisical-iac-bootstrap-metadata-gate";
@@ -10,6 +13,7 @@ import { materializeBootstrapCredentialSink } from "./infisical-iac-bootstrap-si
 import { repoBootstrapCredentialRefs } from "./infisical-iac-bootstrap-identity";
 import { readSprinkleRefConfig } from "./sprinkleref-config";
 import { runSprinkleRefCheck } from "./sprinkleref-check";
+import { DEFAULT_SPRINKLEREF_CONFIG_PATH } from "./sprinkleref-config-select";
 import type { BootstrapArgs, Identity } from "./infisical-iac-bootstrap-types";
 import type {
   DeploymentBootstrapExecutionResult,
@@ -19,27 +23,50 @@ import type { SharedInfisicalSession } from "./infisical-iac-bootstrap-repo-cred
 
 export type RepoBootstrapDeps = {
   finalCheckRunner?: (argv: string[]) => Promise<number>;
-  repoCredentialFactory?: (args: BootstrapArgs) => Promise<SharedInfisicalSession>;
+  repoCredentialFactory?: (
+    args: BootstrapArgs,
+    opts?: { workspaceRoot?: string; configPath?: string },
+  ) => Promise<SharedInfisicalSession>;
 };
 
 export async function runRepoBootstrap(
   args: BootstrapArgs,
   execute: (
     args: BootstrapArgs,
-    context: { infisicalSession?: SharedInfisicalSession },
+    context: {
+      infisicalSession?: SharedInfisicalSession;
+      workspaceRoot?: string;
+      configPath?: string;
+    },
   ) => Promise<DeploymentBootstrapExecutionResult | void>,
   deps: RepoBootstrapDeps = {},
 ) {
   await confirmBootstrapPreflight(args);
-  const resolver = await ensureRepoResolverConfig({ dryRun: false });
-  const sink = await resolveCredentialSinkSelection(args, { createMissingResolverConfig: true });
+  const workspaceRoot = await findRepoRoot(process.cwd());
+  const graphPath = path.join(workspaceRoot, DEFAULT_GRAPH_PATH);
+  const configPath = path.join(workspaceRoot, DEFAULT_SPRINKLEREF_CONFIG_PATH);
+  const resolver = await ensureRepoResolverConfig({
+    dryRun: false,
+    workspaceRoot,
+    graphPath,
+    configPath,
+  });
+  const sink = await resolveCredentialSinkSelection(args, {
+    createMissingResolverConfig: true,
+    workspaceRoot,
+    configPath,
+  });
   const credential = (await hasRequiredInfisicalProfile(resolver))
-    ? await (deps.repoCredentialFactory || ensureRepoBootstrapCredential)(args)
+    ? await (deps.repoCredentialFactory || ensureRepoBootstrapCredential)(args, {
+        workspaceRoot,
+        configPath,
+      })
     : undefined;
   const materialization = await materializeRepoProfiles(args, resolver, credential);
   const credentialSinkMaterialization = await materializeBootstrapCredentialSink({
     args,
     selection: sink,
+    workspaceRoot,
   });
   console.log(
     JSON.stringify(
@@ -50,7 +77,12 @@ export async function runRepoBootstrap(
   );
   console.error(`Credential sink: ${sink.description}`);
   printRepoFollowUpCommands(resolver.configPath);
-  const fanOut = await runFanOutWithHandoff(args, credential, execute);
+  const fanOut = await runFanOutWithHandoff(
+    args,
+    credential,
+    { workspaceRoot, graphPath },
+    execute,
+  );
   if (fanOut.successes.length > 0) {
     await runFinalSprinkleRefChecks(resolver.configPath, deps.finalCheckRunner);
   }
@@ -100,12 +132,13 @@ function repoReport(
 async function runFanOutWithHandoff(
   args: BootstrapArgs,
   credential: SharedInfisicalSession | undefined,
+  context: { workspaceRoot: string; graphPath: string },
   execute: (
     args: BootstrapArgs,
     context: { infisicalSession?: SharedInfisicalSession },
   ) => Promise<DeploymentBootstrapExecutionResult | void>,
 ): Promise<DeploymentBootstrapFanOutResult> {
-  const run = () => runFanOut(args, credential, execute);
+  const run = () => runFanOut(args, credential, context, execute);
   const fanOut = await run();
   if ((await applyFanOutMetadataHandoff(args, fanOut)).status === "applied") return await run();
   return fanOut;
@@ -114,6 +147,7 @@ async function runFanOutWithHandoff(
 async function runFanOut(
   args: BootstrapArgs,
   credential: SharedInfisicalSession | undefined,
+  context: { workspaceRoot: string; graphPath: string },
   execute: (
     args: BootstrapArgs,
     context: { infisicalSession?: SharedInfisicalSession },
@@ -121,8 +155,14 @@ async function runFanOut(
 ): Promise<DeploymentBootstrapFanOutResult> {
   return await runDeploymentBootstrapFanOut({
     args,
+    workspaceRoot: context.workspaceRoot,
+    graphPath: context.graphPath,
     execute: async (deploymentArgs) =>
-      execute(deploymentArgs, credential ? { infisicalSession: credential } : {}),
+      execute(deploymentArgs, {
+        ...(credential ? { infisicalSession: credential } : {}),
+        workspaceRoot: context.workspaceRoot,
+        configPath: path.join(context.workspaceRoot, DEFAULT_SPRINKLEREF_CONFIG_PATH),
+      }),
   });
 }
 
@@ -135,6 +175,7 @@ async function materializeRepoProfiles(
     return await materializeRepoBackendProfiles({
       args,
       configPath: resolver.configPath,
+      workspaceRoot: resolver.workspaceRoot,
       requiredProfiles: resolver.profiles,
     });
   }
@@ -145,6 +186,7 @@ async function materializeRepoProfiles(
     organizationId: credential.organizationId,
     identity: credential.identity,
     configPath: resolver.configPath,
+    workspaceRoot: resolver.workspaceRoot,
     requiredProfiles: resolver.profiles,
   });
 }
@@ -152,7 +194,7 @@ async function materializeRepoProfiles(
 async function hasRequiredInfisicalProfile(
   resolver: Awaited<ReturnType<typeof ensureRepoResolverConfig>>,
 ) {
-  const config = await readSprinkleRefConfig(resolver.configPath);
+  const config = await readSprinkleRefConfig(resolver.configPath, resolver.workspaceRoot);
   return resolver.profiles.some((profile) => {
     const backend = config.profiles[profile];
     return profile.startsWith("infisical-") || backend?.backend === "infisical";

@@ -45,7 +45,9 @@ test("repo dry-run reports active category profile outside graph requirements", 
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), "infisical-bootstrap-profile-selection-"));
   await withRepoEnv(dir, async () => {
     await writeResolverConfig(inlineInfisicalProfile());
-    await writeGraph([{ name: "//deployments/vault:deploy", secret_backend: "vault/default" }]);
+    await writeJson(path.join(dir, "build-tools", "tools", "buck", "graph.json"), {
+      nodes: [{ name: "//deployments/vault:deploy", secret_backend: "vault/default" }],
+    });
     const plan = await buildRepoDryRunMaterializationPlan({
       configPath: "projects/config/shared.json",
       graphPath: path.join("build-tools", "tools", "buck", "graph.json"),
@@ -106,6 +108,31 @@ test("category projectIdEnv blockers appear in dry-run and fail confirmed materi
   });
 });
 
+test("repo dry-run materialization applies root local overrides from nested cwd", async () => {
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), "infisical-bootstrap-profile-selection-"));
+  const nested = path.join(dir, "projects", "deployments", "nested");
+  await fs.mkdir(nested, { recursive: true });
+  await withRepoEnv(nested, async () => {
+    await writeJson(path.join(dir, sharedConfigPath()), resolverConfig(inlineInfisicalProfile()));
+    await writeJson(path.join(dir, "projects/config/local.json"), {
+      sprinkleref: {
+        profiles: {
+          "infisical-operator": { projectId: "", projectIdEnv: "LOCAL_PROJECT_ID" },
+        },
+      },
+    });
+    await writeGraph([{ name: "//deployments/vault:deploy", secret_backend: "vault/default" }]);
+    const plan = await buildRepoDryRunMaterializationPlan({
+      workspaceRoot: dir,
+      configPath: path.join(dir, sharedConfigPath()),
+      graphPath: path.join(dir, "build-tools", "tools", "buck", "graph.json"),
+      env: {},
+      sink: { kind: "local-file", backend: "local-file", description: "local" },
+    });
+    assert.deepEqual(plan.unresolvedExistingProfiles, ["infisical-operator"]);
+  });
+});
+
 async function withRepoEnv(dir: string, run: () => Promise<void>) {
   const cwd = process.cwd();
   const oldEnv = { ...process.env };
@@ -114,6 +141,8 @@ async function withRepoEnv(dir: string, run: () => Promise<void>) {
     ...oldEnv,
     INFISICAL_ACCESS_TOKEN: "admin-token",
     VBR_INFISICAL_PROJECT_ID: "proj_repo_test",
+    WORKSPACE_ROOT: dir,
+    LIVE_ROOT: dir,
   };
   delete process.env.SPRINKLEREF_CONFIG;
   delete process.env.VBR_VAULT_ADDR;
@@ -142,7 +171,11 @@ async function writeGraph(nodes: unknown[]) {
 }
 
 async function writeResolverConfig(infisicalProfile: unknown) {
-  await writeJson("projects/config/shared.json", {
+  await writeJson("projects/config/shared.json", resolverConfig(infisicalProfile));
+}
+
+function resolverConfig(infisicalProfile: unknown) {
+  return {
     sprinkleref: {
       version: 1,
       defaultCategory: "main",
@@ -155,7 +188,7 @@ async function writeResolverConfig(infisicalProfile: unknown) {
         bootstrap: { backend: "local-file", file: ".local/bootstrap.json" },
       },
     },
-  });
+  };
 }
 
 function inlineInfisicalProfile() {

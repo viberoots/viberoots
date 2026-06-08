@@ -135,7 +135,7 @@ async function resolveDeploymentFromNodes(
   extraLabels: string[],
   opts?: { env?: NodeJS.ProcessEnv },
 ): Promise<DeploymentTarget> {
-  const extracted = extractDeployments(nodes);
+  const extracted = extractDeployments(nodes, { workspaceRoot });
   if (extracted.errors.length > 0) throw new Error(extracted.errors.join("\n"));
   const hit = extracted.deployments.find((deployment) => deployment.label === deploymentTarget);
   if (!hit) throw new Error(`deployment target not found: ${deploymentTarget}`);
@@ -149,6 +149,7 @@ async function resolveDeploymentFromNodes(
       [deploymentTarget, ...extraLabels, ...componentLabels],
       opts,
     ),
+    { workspaceRoot },
   );
   if (expanded.errors.length > 0) throw new Error(expanded.errors.join("\n"));
   const expandedHit = expanded.deployments.find(
@@ -183,7 +184,7 @@ export async function resolveAllDeployments(workspaceRoot: string): Promise<Depl
     extraLabels.length > 0
       ? await queryDeploymentNodesExpanded(workspaceRoot, [...labels, ...extraLabels])
       : nodes;
-  const extracted = extractDeployments(allNodes);
+  const extracted = extractDeployments(allNodes, { workspaceRoot });
   if (extracted.errors.length > 0) throw new Error(extracted.errors.join("\n"));
   const componentLabels = Array.from(
     new Set(extracted.deployments.flatMap((deployment) => componentTargetsFor(deployment))),
@@ -191,6 +192,7 @@ export async function resolveAllDeployments(workspaceRoot: string): Promise<Depl
   if (componentLabels.length === 0) return extracted.deployments;
   const expanded = extractDeployments(
     await queryDeploymentNodes(workspaceRoot, [...labels, ...extraLabels, ...componentLabels]),
+    { workspaceRoot },
   );
   if (expanded.errors.length > 0) throw new Error(expanded.errors.join("\n"));
   return expanded.deployments;

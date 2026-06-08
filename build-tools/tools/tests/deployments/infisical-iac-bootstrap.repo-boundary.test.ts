@@ -106,27 +106,7 @@ test("deployment bootstrap auto credential sink does not create starter resolver
 test("repo bootstrap dry-run reports preserved operator profiles separately", async () => {
   const dir = await tmp();
   await withCwdAndEnv(dir, async () => {
-    await writeJson("projects/config/shared.json", {
-      schemaVersion: "viberoots-project-config@1",
-      sprinkleref: {
-        version: 1,
-        defaultCategory: "main",
-        profiles: {
-          "infisical-default": {
-            backend: "infisical",
-            host: "https://app.infisical.com",
-            projectId: "proj_operator",
-            defaultEnvironment: "staging",
-            clientIdRef: "secret://operator/client-id",
-            clientSecretRef: "secret://operator/client-secret",
-          },
-        },
-        categories: {
-          main: { profile: "infisical-default" },
-          bootstrap: { backend: "local-file", file: ".local/bootstrap.json" },
-        },
-      },
-    });
+    await writeJson("projects/config/shared.json", resolverConfig("infisical-default", "operator"));
     await writeJson("graph.json", {
       nodes: [{ name: "//deployments/infisical:deploy", secret_backend: "infisical/default" }],
     });
@@ -145,22 +125,82 @@ test("repo bootstrap dry-run reports preserved operator profiles separately", as
   });
 });
 
+test("repo bootstrap dry-run reads resolver config from workspace root from nested cwd", async () => {
+  const dir = await tmp();
+  const nested = path.join(dir, "projects", "deployments", "nested");
+  await fs.mkdir(nested, { recursive: true });
+  await withCwdAndEnv(nested, async () => {
+    await writeJson(
+      path.join(dir, "projects/config/shared.json"),
+      resolverConfig("infisical-root", "root"),
+    );
+    await writeJson(
+      path.join(nested, "projects/config/shared.json"),
+      resolverConfig("infisical-nested", "nested"),
+    );
+    await writeJson(path.join(dir, "build-tools/tools/buck/graph.json"), {
+      nodes: [{ name: "//deployments/app:build" }],
+    });
+    const sink = await resolveCredentialSinkSelection({
+      ...DEFAULT_BOOTSTRAP_ARGS,
+      mode: "repo",
+    });
+    const plan = await buildRepoDryRunMaterializationPlan({ sink });
+    assert.deepEqual(
+      plan.profiles.map((profile) => profile.name),
+      ["infisical-root"],
+    );
+    assert.equal(plan.resolverConfig.path, path.join(dir, "projects/config/shared.json"));
+  });
+});
+
 async function tmp() {
   return await fs.mkdtemp(path.join(os.tmpdir(), "infisical-bootstrap-repo-boundary-"));
 }
 
 async function withCwdAndEnv(dir: string, run: () => Promise<void>) {
   const cwd = process.cwd();
-  const oldConfig = process.env.SPRINKLEREF_CONFIG;
+  const oldEnv = { ...process.env };
   delete process.env.SPRINKLEREF_CONFIG;
+  process.env.WORKSPACE_ROOT = workspaceRootForTemp(dir);
+  process.env.LIVE_ROOT = workspaceRootForTemp(dir);
   process.chdir(dir);
   try {
     await run();
   } finally {
     process.chdir(cwd);
-    if (oldConfig === undefined) delete process.env.SPRINKLEREF_CONFIG;
-    else process.env.SPRINKLEREF_CONFIG = oldConfig;
+    process.env = oldEnv;
   }
+}
+
+function workspaceRootForTemp(dir: string) {
+  const marker = `${path.sep}projects${path.sep}deployments${path.sep}`;
+  const markerIndex = dir.indexOf(marker);
+  return markerIndex >= 0 ? dir.slice(0, markerIndex) : dir;
+}
+
+function resolverConfig(profile: string, prefix: string) {
+  return {
+    schemaVersion: "viberoots-project-config@1",
+    sprinkleref: {
+      version: 1,
+      defaultCategory: "main",
+      profiles: {
+        [profile]: {
+          backend: "infisical",
+          host: `https://infisical.${prefix}.example`,
+          projectId: `proj_${prefix}`,
+          defaultEnvironment: "dev",
+          clientIdRef: `secret://${prefix}/client-id`,
+          clientSecretRef: `secret://${prefix}/client-secret`,
+        },
+      },
+      categories: {
+        main: { profile },
+        bootstrap: { backend: "local-file", file: ".local/bootstrap.json" },
+      },
+    },
+  };
 }
 
 async function assertMissing(file: string) {
