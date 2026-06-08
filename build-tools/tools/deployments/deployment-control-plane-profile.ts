@@ -24,6 +24,11 @@ const SERVICE_CLIENT_KEYS = new Set(["controlPlaneUrl", "controlPlaneTokenRef"])
 const RECORDS_KEYS = new Set(["backend"]);
 const TOKEN_REF = /^(secret|runtime):\/\/.+/;
 const PLAINTEXT_TOKEN_FIELDS = new Set(["controlPlaneToken", "token", "bearerToken"]);
+const PROFILE_NAME_CLASSIFICATION =
+  "selected control-plane profile names are shared config in deployment_context controlPlane";
+const CONTROL_PLANE_URL_CLASSIFICATION = "control-plane URLs are shared config";
+const SERVICE_TOKEN_REF_CLASSIFICATION =
+  "service-token refs are secret:// or runtime:// credentials";
 
 export function resolveContextControlPlane(opts: {
   config: ProjectConfig;
@@ -39,7 +44,7 @@ export function resolveContextControlPlane(opts: {
     opts.errors.push(
       deploymentContextError(
         opts.label,
-        `unknown deployment_context ${opts.selector}.controlPlane "${name}"`,
+        `unknown deployment_context ${opts.selector}.controlPlane "${name}" (${PROFILE_NAME_CLASSIFICATION})`,
       ),
     );
     return undefined;
@@ -49,7 +54,7 @@ export function resolveContextControlPlane(opts: {
     opts.errors.push(
       deploymentContextError(
         opts.label,
-        `unknown deployment_context ${opts.selector}.controlPlane "${name}"`,
+        `unknown deployment_context ${opts.selector}.controlPlane "${name}" (${PROFILE_NAME_CLASSIFICATION})`,
       ),
     );
     return undefined;
@@ -110,16 +115,24 @@ function readServiceClient(opts: {
   const controlPlaneUrl = stringValue(raw.controlPlaneUrl);
   const controlPlaneTokenRef = stringValue(raw.controlPlaneTokenRef);
   if (!controlPlaneUrl)
-    opts.errors.push(deploymentContextError(opts.label, `${path}.controlPlaneUrl is required`));
+    opts.errors.push(
+      deploymentContextError(
+        opts.label,
+        `${path}.controlPlaneUrl is required (${CONTROL_PLANE_URL_CLASSIFICATION})`,
+      ),
+    );
   if (!controlPlaneTokenRef) {
     opts.errors.push(
-      deploymentContextError(opts.label, `${path}.controlPlaneTokenRef is required`),
+      deploymentContextError(
+        opts.label,
+        `${path}.controlPlaneTokenRef is required (${SERVICE_TOKEN_REF_CLASSIFICATION})`,
+      ),
     );
   } else if (!TOKEN_REF.test(controlPlaneTokenRef)) {
     opts.errors.push(
       deploymentContextError(
         opts.label,
-        `${path}.controlPlaneTokenRef must be a secret:// or runtime:// ref`,
+        `${path}.controlPlaneTokenRef must be a secret:// or runtime:// credential ref (${SERVICE_TOKEN_REF_CLASSIFICATION}, not config://)`,
       ),
     );
   }

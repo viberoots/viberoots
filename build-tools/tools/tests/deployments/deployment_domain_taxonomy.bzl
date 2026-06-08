@@ -54,6 +54,7 @@ REVIEWED_DEPLOYMENT_TEST_OWNERSHIP.update({
 REVIEWED_DEPLOYMENT_TEST_OWNERSHIP.update({
     "build-tools/tools/tests/deployments/deployment-contexts.scope.helpers.ts": False,
     "build-tools/tools/tests/deployments/deployment-context-control-plane-boundary.test.ts": True,
+    "build-tools/tools/tests/deployments/deployment-context-control-plane-reporting.test.ts": True,
     "build-tools/tools/tests/deployments/deployment-context-control-plane.test.ts": True,
     "build-tools/tools/tests/deployments/deploy-cli-control-plane-usage.test.ts": True,
     "build-tools/tools/tests/deployments/deployment-service-client-provider-front-doors.test.ts": True,
@@ -65,6 +66,7 @@ REVIEWED_DEPLOYMENT_TEST_OWNERSHIP.update({
     "build-tools/tools/tests/deployments/deployment-contexts.scope.test.ts": True,
     "build-tools/tools/tests/deployments/pleomino-deployment-context-explicit-provider.cquery.test.ts": True,
     "build-tools/tools/tests/deployments/pleomino-deployment-contexts.cquery.test.ts": True,
+    "build-tools/tools/tests/deployments/sprinkleref-check-control-plane.test.ts": True,
 })
 
 REVIEWED_DEPLOYMENT_TEST_OWNERSHIP.update({

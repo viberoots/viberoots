@@ -71,7 +71,7 @@ Rollback requires an explicit `--source-run-id` selecting a prior admitted run. 
 
 ### No developer laptop authority for protected or shared targets
 
-Developer laptops do not hold provider, database, artifact-store, Infisical workload, or reviewed-source credentials for protected or shared deployments. A missing `--control-plane-url` for a protected or shared target is a fail-closed configuration error. Mixing the service-routed path with local-only flags (`--records-root`, `--control-plane-database-url`) is out of contract.
+Developer laptops do not hold provider, database, artifact-store, Infisical workload, or reviewed-source credentials for protected or shared deployments. Protected/shared targets normally select their service through checked-in `deployment_context` metadata and the referenced `controlPlanes.<name>` profile. Missing or invalid context/profile selection is a fail-closed configuration error. `--control-plane-url` is reserved for commands without deployment context or explicit reviewed overrides. Mixing the service-routed path with local-only flags (`--records-root`, `--control-plane-database-url`) is out of contract.
 
 ### Break-glass
 

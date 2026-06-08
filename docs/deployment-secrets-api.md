@@ -133,14 +133,16 @@ Common example values:
 
 Deployment-service routing:
 
-- `--control-plane-url <url>`: the deployment service URL
-- `--remote mini`: shorthand for the reviewed `mini` deployment service endpoint
+- `--control-plane-url <url>`: explicit deployment service URL for commands without a selected
+  deployment context
+- `--remote <name>`: named control-plane profile lookup; `--remote mini` requires
+  `projects/config/shared.json` `controlPlanes.mini`
 - `--control-plane-token <token>`: required bearer token for reviewed hosted
   protected/shared service requests; explicit local fixture flows may omit it
   only when `VBR_DEPLOY_LOCAL_FIXTURE_SERVICE=1` marks the service as
   non-production
-- `VBR_DEPLOY_CONTROL_PLANE_URL`: environment fallback for `--control-plane-url`
-- `VBR_DEPLOY_MINI_CONTROL_PLANE_URL`: optional override for `--remote mini`
+- `VBR_DEPLOY_CONTROL_PLANE_URL`: environment fallback only for commands without a selected
+  deployment context
 - `VBR_DEPLOY_CONTROL_PLANE_TOKEN`: environment fallback used by reviewed
   service clients and hosted service processes
 - `VBR_DEPLOYMENT_SECRET_FIXTURE_PATH`: provider-neutral local/test secret
@@ -153,12 +155,8 @@ Common example values:
 - `--control-plane-url http://127.0.0.1:7780`
   Use only for explicit local fixture flows with
   `VBR_DEPLOY_LOCAL_FIXTURE_SERVICE=1`.
-- `--control-plane-url https://deploy.apps.kilty.io`
-  Use the reviewed hosted `mini` deployment service endpoint from laptops and
-  automation outside the host.
 - `--remote mini`
-  Use the reviewed mini alias; defaults to `https://deploy.apps.kilty.io` unless
-  `VBR_DEPLOY_MINI_CONTROL_PLANE_URL` is set.
+  Use only when `controlPlanes.mini` exists in shared project config.
 - `VBR_DEPLOY_CONTROL_PLANE_TOKEN=replace-me`
   Example token environment variable for local or CI use.
 
@@ -290,13 +288,18 @@ deploy \
 Use the deployment service path:
 
 ```bash
-export VBR_DEPLOY_CONTROL_PLANE_URL='https://deploy.apps.kilty.io'
-export VBR_DEPLOY_CONTROL_PLANE_TOKEN='replace-me'
-
 deploy \
-  --deployment //projects/deployments/pleomino/prod:deploy \
-  --control-plane-url "$VBR_DEPLOY_CONTROL_PLANE_URL"
+  --deployment //projects/deployments/pleomino/prod:deploy
 ```
+
+Checked-in Pleomino protected/shared deploy targets carry a
+`deployment_context` selector. That context selects a named
+`projects/config/shared.json` `controlPlanes.<name>` profile, where the
+service URL is shared config and the service-token reference remains a
+`secret://` or `runtime://` credential ref. Use `--control-plane-url` or
+`VBR_DEPLOY_CONTROL_PLANE_URL` only for commands without a deployment context,
+or as an explicit operator override when the command also passes the reviewed
+override guard.
 
 Read the current status for one service-backed run:
 
@@ -304,8 +307,7 @@ Read the current status for one service-backed run:
 deploy \
   --deployment //projects/deployments/pleomino/prod:deploy \
   --status \
-  --deploy-run-id deploy-run-123 \
-  --control-plane-url "$VBR_DEPLOY_CONTROL_PLANE_URL"
+  --deploy-run-id deploy-run-123
 ```
 
 Print only the exact admitted target scope string:
@@ -314,8 +316,7 @@ Print only the exact admitted target scope string:
 deploy \
   --deployment //projects/deployments/pleomino/prod:deploy \
   --print-run-lock-scope \
-  --deploy-run-id deploy-run-123 \
-  --control-plane-url "$VBR_DEPLOY_CONTROL_PLANE_URL"
+  --deploy-run-id deploy-run-123
 ```
 
 Approve an existing waiting run without building the JSON payload yourself:
@@ -325,8 +326,7 @@ deploy \
   --deployment //projects/deployments/pleomino/prod:deploy \
   --approve \
   --deploy-run-id deploy-run-123 \
-  --approval-id ticket-123 \
-  --control-plane-url "$VBR_DEPLOY_CONTROL_PLANE_URL"
+  --approval-id ticket-123
 ```
 
 Operator helper flags:
@@ -352,8 +352,11 @@ approver or operator identity from the authenticated service session. Do not
 send client-supplied `requestedBy` or authorization grants for the reviewed
 shared path.
 
-For the reviewed `nixos-shared-host` client-profile workflow, replace
-`--control-plane-url ...` with `--profile mini`.
+For the reviewed `nixos-shared-host` client-profile workflow, use
+`deployment_context` plus the selected `controlPlanes.<name>` profile for
+checked-in protected/shared deploy targets. Use `--profile mini` for the
+installed host client profile, and reserve `--control-plane-url ...` for
+commands without context or explicit reviewed overrides.
 
 Expand from changed files:
 
@@ -1093,8 +1096,7 @@ For normal deploys, that value is the right starting point for `targetScopes`.
 deploy \
   --deployment //projects/deployments/pleomino/staging:deploy \
   --print-run-lock-scope \
-  --deploy-run-id "$DEPLOY_RUN_ID" \
-  --control-plane-url "$VBR_DEPLOY_CONTROL_PLANE_URL"
+  --deploy-run-id "$DEPLOY_RUN_ID"
 ```
 
 Use that `lockScope` value as the source of truth for the exact run.

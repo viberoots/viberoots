@@ -32,7 +32,8 @@ Concrete activities:
   the containerized successor from #4.
 - Confirm Bob has a client profile installed via `nixos-shared-host-install client install
 --profile the current personal server --control-plane-url https://the deployment control plane endpoint` (or equivalent for the chosen
-  provider).
+  provider). This URL belongs to client-profile setup; reviewed protected/shared deploy targets
+  should still select their control plane through checked-in deployment context/profile metadata.
 - Confirm Bob holds `submitter` and `admission_reporter` grants for the target deployment scope.
   Use `deploy auth explain-groups --deployment <label> --action submit` to verify the expected
   group shape before the run, then use `deploy admin identity grant-user --profile the current personal server --action

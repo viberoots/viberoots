@@ -138,6 +138,10 @@ The installed profile should be here:
 - `--control-plane-token-env VBR_DEPLOY_CONTROL_PLANE_TOKEN` is the default;
   the profile stores the env var name, not the token value
 
+This `--control-plane-url` flag belongs to client-profile installation. Normal
+protected/shared deploy commands use the selected `deployment_context` and
+checked-in `controlPlanes.<name>` profile, not a repo-global endpoint flag.
+
 What success looks like:
 
 - the `mini` profile is listed by `client list`

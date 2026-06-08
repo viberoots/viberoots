@@ -9,27 +9,47 @@ import {
   resolveServiceClientFromFlags,
   resolveServiceClientFromManifest,
 } from "../../deployments/nixos-shared-host-service-client-config";
+import { withProjectConfig } from "./deployment-contexts.scope.helpers";
 
-test("nixos shared-host service client resolves the reviewed mini remote alias", () => {
-  assert.equal(
-    resolveServiceClientFromFlags({
-      remote: "mini",
-      context: "deploy",
-      env: {},
-    }).controlPlaneUrl,
-    "https://deploy.apps.kilty.io",
-  );
-  assert.equal(
-    resolveServiceClientFromFlags({
-      remote: "mini",
-      context: "deploy",
-      env: {
-        VBR_DEPLOY_MINI_CONTROL_PLANE_URL: "http://127.0.0.1:7780",
-        [LOCAL_FIXTURE_SERVICE_ENV]: "1",
+test("nixos shared-host service client resolves --remote through control-plane profiles", async () => {
+  await withProjectConfig(
+    {
+      controlPlanes: {
+        mini: {
+          serviceClient: {
+            controlPlaneUrl: "https://deploy.apps.kilty.io",
+            controlPlaneTokenRef: "secret://control-plane/mini/service-token",
+          },
+          records: { backend: "service" },
+        },
       },
-    }).controlPlaneUrl,
-    "http://127.0.0.1:7780",
+    },
+    async () => {
+      assert.equal(
+        resolveServiceClientFromFlags({
+          remote: "mini",
+          context: "deploy",
+          env: {},
+        }).controlPlaneUrl,
+        "https://deploy.apps.kilty.io",
+      );
+    },
   );
+});
+
+test("nixos shared-host service client rejects --remote without a matching profile", () => {
+  assert.throws(
+    () =>
+      resolveServiceClientFromFlags({
+        remote: "mini",
+        context: "deploy",
+        env: {},
+      }),
+    /controlPlanes\.mini profile/,
+  );
+});
+
+test("nixos shared-host service client validates explicit control-plane URLs", () => {
   assert.equal(
     resolveServiceClientFromFlags({
       controlPlaneUrl: "http://127.0.0.1:7780",
@@ -46,6 +66,16 @@ test("nixos shared-host service client resolves the reviewed mini remote alias",
         env: {},
       }),
     /LOCAL_FIXTURE_SERVICE/,
+  );
+});
+
+test("nixos shared-host service client uses ambient URL for commands without context", () => {
+  assert.equal(
+    resolveServiceClientFromFlags({
+      context: "deploy status",
+      env: { VBR_DEPLOY_CONTROL_PLANE_URL: " https://deploy.apps.kilty.io " },
+    }).controlPlaneUrl,
+    "https://deploy.apps.kilty.io",
   );
 });
 

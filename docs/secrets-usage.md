@@ -497,9 +497,13 @@ For normal deploy flows, use that exact string in `targetScopes`.
 deploy \
   --deployment //projects/deployments/pleomino/staging:deploy \
   --print-run-lock-scope \
-  --deploy-run-id "$DEPLOY_RUN_ID" \
-  --control-plane-url "$VBR_DEPLOY_CONTROL_PLANE_URL"
+  --deploy-run-id "$DEPLOY_RUN_ID"
 ```
+
+Checked-in Pleomino protected/shared targets select the deployment service
+through their `deployment_context` and the referenced `controlPlanes.<name>`
+profile. Use `--control-plane-url` or `VBR_DEPLOY_CONTROL_PLANE_URL` only for
+commands without deployment context or an explicit reviewed override.
 
 Use that exact `lockScope` value in `targetScopes`.
 

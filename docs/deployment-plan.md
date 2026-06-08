@@ -6670,8 +6670,9 @@ missing.
 ### Scope & Changes
 
 - Remove the repo front-door fallback that directly calls the shared-host control-plane logic
-  in-process for `shared_nonprod` when `--control-plane-url` is absent; same-host mutation must
-  fail closed or submit through the reviewed service.
+  in-process for `shared_nonprod` when context-selected control-plane metadata is absent or invalid;
+  same-host mutation must fail closed or submit through the reviewed service. `--control-plane-url`
+  remains only for commands without deployment context or explicit reviewed overrides.
 - Make same-host `deploy`, `--publish-only`, `--provision-only`, and explicit removal flows use the
   reviewed service boundary rather than local peer mutation.
 - Rework the reviewed remote-profile and Jenkins wrapper flows so they submit to the central
@@ -10461,8 +10462,10 @@ deployment request, and polls or streams status.
   - open or print the returned login URL
   - poll session and deployment status until the submission is queued, rejected, or finished
 - Add a stable remote-client configuration contract:
-  - `--control-plane-url` / `VBR_DEPLOY_CONTROL_PLANE_URL`
-  - optional `--remote mini` or profile alias that resolves to the service endpoint
+  - deployment-context-selected `controlPlanes.<name>` service-client metadata as the normal path
+  - `--control-plane-url` / `VBR_DEPLOY_CONTROL_PLANE_URL` only for commands without deployment
+    context or explicit reviewed overrides
+  - optional `--remote <name>` profile selection that resolves through checked-in `controlPlanes`
   - no client-side Vault JWT, provider token, or PKCE callback material in normal server mode
 - Rework protected/shared service submission authorization:
   - reject client-supplied `requestedBy` and authorization grants in normal remote mode

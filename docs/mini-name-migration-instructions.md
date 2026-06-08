@@ -263,6 +263,10 @@ direnv exec . build-tools/tools/bin/nixos-shared-host-install \
 `--remote-repo-path` and `--control-plane-token-env` are omitted on purpose —
 the tool now defaults to `/srv/viberoots` and `VBR_DEPLOY_CONTROL_PLANE_TOKEN`
 respectively ([build-tools/tools/deployments/nixos-shared-host-install-prompt.ts:48](build-tools/tools/deployments/nixos-shared-host-install-prompt.ts)).
+The `--control-plane-url` flag here records the service endpoint in the local
+client profile. It is not the normal protected/shared deploy selector; checked-in
+deploy targets select their service through `deployment_context` and
+`controlPlanes.<name>`.
 
 ### B3. Verify the regenerated manifest
 

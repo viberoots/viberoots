@@ -186,6 +186,11 @@ direnv exec . build-tools/tools/bin/nixos-shared-host-install \
 A client profile is a local file that tells the deploy command how to reach
 `mini`.
 
+Protected/shared deployment targets normally select their control plane through
+`deployment_context` and `projects/config/shared.json` `controlPlanes`. Use a
+client profile for remote-host transport details; do not use a repo-global
+control-plane endpoint as the normal deploy path.
+
 It stores:
 
 - the SSH details for talking to `mini`

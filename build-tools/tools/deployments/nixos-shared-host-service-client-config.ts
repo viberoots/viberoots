@@ -1,6 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import type { NixosSharedHostClientManifest } from "./nixos-shared-host-install-contract";
 import { validateProtectedSharedServiceTransport } from "./deployment-service-transport-policy";
+import { readProjectConfigSync } from "./project-config";
 
 export type NixosSharedHostServiceClientPlan = {
   mode: "control-plane-service";
@@ -12,10 +13,6 @@ export type NixosSharedHostResolvedServiceClient = {
   controlPlaneUrl: string;
   controlPlaneToken?: string;
   plan: NixosSharedHostServiceClientPlan;
-};
-
-const REMOTE_ALIASES: Record<string, string> = {
-  mini: "https://deploy.apps.kilty.io",
 };
 
 function requireNonEmpty(value: string | undefined, message: string): string {
@@ -94,16 +91,12 @@ export function resolveServiceClientFromFlags(opts: {
 }): NixosSharedHostResolvedServiceClient {
   const env = opts.env || process.env;
   const remote = String(opts.remote || "").trim();
-  if (remote && !REMOTE_ALIASES[remote]) {
-    throw new Error(`--remote ${remote} is not a known deployment service alias`);
-  }
+  const remoteProfile = remote ? readRemoteControlPlaneProfile(remote, env) : undefined;
+  const ambientControlPlaneUrl = String(env.VBR_DEPLOY_CONTROL_PLANE_URL || "").trim();
   const controlPlaneUrl = validateProtectedSharedServiceTransport({
     controlPlaneUrl: requireNonEmpty(
-      opts.controlPlaneUrl ||
-        (remote === "mini"
-          ? String(env.VBR_DEPLOY_MINI_CONTROL_PLANE_URL || "").trim() || REMOTE_ALIASES.mini
-          : ""),
-      `${opts.context} requires --control-plane-url or VBR_DEPLOY_CONTROL_PLANE_URL (or --remote mini)`,
+      opts.controlPlaneUrl || remoteProfile?.controlPlaneUrl || ambientControlPlaneUrl,
+      `${opts.context} requires --control-plane-url or VBR_DEPLOY_CONTROL_PLANE_URL for commands without deployment context, or --remote <name> matching projects/config/shared.json controlPlanes.<name>; protected/shared deployments should normally select deployment_context controlPlane`,
     ),
     context: opts.context,
     env,
@@ -121,4 +114,45 @@ export function resolveServiceClientFromFlags(opts: {
         : {}),
     },
   };
+}
+
+function readRemoteControlPlaneProfile(
+  remote: string,
+  env: NodeJS.ProcessEnv,
+): {
+  controlPlaneUrl: string;
+  controlPlaneTokenRef: string;
+} {
+  const profile = readProjectConfigSync().config.controlPlanes?.[remote];
+  if (!isRecord(profile)) {
+    throw new Error(
+      `--remote ${remote} requires a matching projects/config/shared.json controlPlanes.${remote} profile`,
+    );
+  }
+  const serviceClient = profile.serviceClient;
+  if (!isRecord(serviceClient)) {
+    throw new Error(`controlPlanes.${remote}.serviceClient is required for --remote ${remote}`);
+  }
+  const controlPlaneUrl = String(serviceClient.controlPlaneUrl || "").trim();
+  const controlPlaneTokenRef = String(serviceClient.controlPlaneTokenRef || "").trim();
+  if (!controlPlaneUrl) {
+    throw new Error(`controlPlanes.${remote}.serviceClient.controlPlaneUrl is required`);
+  }
+  if (!/^(secret|runtime):\/\/.+/.test(controlPlaneTokenRef)) {
+    throw new Error(
+      `controlPlanes.${remote}.serviceClient.controlPlaneTokenRef must be a secret:// or runtime:// ref`,
+    );
+  }
+  return {
+    controlPlaneUrl: validateProtectedSharedServiceTransport({
+      controlPlaneUrl,
+      context: `controlPlanes.${remote}.serviceClient`,
+      env,
+    }),
+    controlPlaneTokenRef,
+  };
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value && typeof value === "object" && !Array.isArray(value));
 }

@@ -666,6 +666,11 @@ The client profile is written here:
 
 - `.local/deployments/nixos-shared-host/clients/mini.json`
 
+Protected/shared deploy commands use the selected `deployment_context` and
+checked-in `controlPlanes` profile for the control-plane authority. The local
+client profile supplies remote-host transport details and the service endpoint
+for that host; it is not a repo-global endpoint fallback.
+
 Optional verification:
 
 ```bash

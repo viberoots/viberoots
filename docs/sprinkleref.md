@@ -53,7 +53,9 @@ values must match.
 `records.backend`. Control-plane URLs and selected profile names are shared config. Control-plane
 service tokens must be represented only by `secret://...` or `runtime://...` refs; plaintext token
 fields such as `controlPlaneToken`, `token`, or `bearerToken` are invalid in both shared and local
-project config. `records.backend` currently supports `service`.
+project config. `sprinkleref --check` classifies those `controlPlaneTokenRef` values through the
+same secret/runtime credential handling and never as `config://` values. `records.backend`
+currently supports `service`.
 
 Pleomino is the checked-in context example. Staging selects
 `deployment_context = "pleomino-staging"` and production selects

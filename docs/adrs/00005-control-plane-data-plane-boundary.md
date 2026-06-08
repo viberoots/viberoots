@@ -36,11 +36,11 @@ Providers (Cloudflare Pages, Cloudflare Containers, NixOS shared host services, 
 
 **CI** builds artifacts and submits them to the control plane. CI is a submitter, not a mutating authority alongside the control plane.
 
-**Developer laptops** may operate `personal_dev` deployments directly. For protected and shared targets, laptops use the deploy CLI as a thin client (`build-tools/tools/bin/deploy --control-plane-url <url>`). Laptops do not hold provider API credentials, database credentials, artifact-store credentials, Infisical workload credentials, or reviewed-source credentials for protected or shared deploys.
+**Developer laptops** may operate `personal_dev` deployments directly. For protected and shared targets, laptops use the deploy CLI as a thin client and normally select the reviewed control plane through the deployment target's checked-in `deployment_context`, which points at a named `projects/config/shared.json` `controlPlanes.<name>` profile. Laptops do not hold provider API credentials, database credentials, artifact-store credentials, Infisical workload credentials, or reviewed-source credentials for protected or shared deploys.
 
 **Workers** hold provider API credentials during execution only. Credentials are mounted as files and are never persisted in deploy records, logs, or artifacts.
 
-**Missing `--control-plane-url` / `VBR_DEPLOY_CONTROL_PLANE_URL`** is a fail-closed configuration error for protected/shared targets. Mixing the service-routed path with local-only flags (`--records-root`, `--control-plane-database-url`) is out of contract for protected/shared use.
+**Control-plane selection** is fail-closed for protected/shared targets. A reviewed protected/shared deployment normally requires a `deployment_context` with a valid `controlPlane` selector and matching `controlPlanes.<name>` service-client profile. `--control-plane-url` and `VBR_DEPLOY_CONTROL_PLANE_URL` are reserved for commands without deployment context, or for an explicit reviewed operator override. Mixing the service-routed path with local-only flags (`--records-root`, `--control-plane-database-url`) is out of contract for protected/shared use.
 
 ### State authority rules
 
@@ -78,4 +78,4 @@ The control plane is designed to run identically on a NixOS host (mini) and on c
 - Any new provider integration must be implemented as a worker-side publish operation dispatched by the control plane, not as a parallel authority.
 - Credentials for new providers must be mounted at worker runtime and must not appear in submitted artifacts, admitted records, or log output.
 - Tools that surface deployment state must source it from `GET /api/v1/current-stage-state` or `GET /api/v1/records`, not from filesystem mirror files or provider-side tags.
-- If the control plane URL is absent for a protected/shared target, the CLI must fail closed immediately rather than falling back to a local or direct path.
+- If the context-selected control-plane profile is absent or invalid for a protected/shared target, the CLI must fail closed immediately rather than falling back to a local or direct path. Commands without deployment context may still require an explicit `--control-plane-url`, `VBR_DEPLOY_CONTROL_PLANE_URL`, or named profile.

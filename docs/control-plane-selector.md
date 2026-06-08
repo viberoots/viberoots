@@ -187,9 +187,9 @@ override flag. The intended clean-cut-over behavior is:
   mutating commands fail closed unless the operator passes `--allow-control-plane-override`.
 - `VBR_DEPLOY_CONTROL_PLANE_URL` is an escape hatch for commands without context. It must not
   silently override a context-selected control plane.
-- `--remote mini` should become a named profile selector, not a magic endpoint path. Under this
-  clean cut-over, `mini` should be represented in `controlPlanes` if it remains a supported
-  operator convenience.
+- `--remote <name>` is a named profile selector, not a magic endpoint path. `--remote mini`
+  requires `controlPlanes.mini`; without that checked-in profile the command fails before provider
+  mutation.
 
 The command output should report the selected control-plane name, URL, and selection source. It
 must not print token values.

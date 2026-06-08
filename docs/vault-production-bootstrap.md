@@ -211,8 +211,7 @@ identity in `targetScopes`.
 deploy \
   --deployment //projects/deployments/pleomino/staging:deploy \
   --print-vault-secret-templates \
-  --deploy-run-id "$DEPLOY_RUN_ID" \
-  --control-plane-url "$VBR_DEPLOY_CONTROL_PLANE_URL"
+  --deploy-run-id "$DEPLOY_RUN_ID"
 ```
 
 Use that exact `lockScope` value in `targetScopes`.

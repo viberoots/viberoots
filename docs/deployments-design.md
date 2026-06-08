@@ -6292,11 +6292,14 @@ Under the hood that may still mean:
 5. control-plane smoke checks run unless an explicit reviewed `smoke.exception` changes the protected/shared smoke policy
 
 For reviewed `cloudflare-pages` `shared_nonprod` and `production_facing` paths, the public repo
-`deploy` front door is now only that thin client. Callers must provide the central service endpoint
-with `--control-plane-url` or `VBR_DEPLOY_CONTROL_PLANE_URL`, and the public path should reject
-mixed local execution flags such as `--records-root` or `--control-plane-database-url` instead of
-quietly falling back to provider-local peer mutation. Any remaining local `recordsRoot` helpers are
-for fixture/internal compatibility, not the reviewed public protected/shared boundary.
+`deploy` front door is now only that thin client. Reviewed targets normally select the central
+service endpoint through checked-in `deployment_context` metadata and the referenced
+`controlPlanes.<name>` service-client profile. `--control-plane-url` and
+`VBR_DEPLOY_CONTROL_PLANE_URL` are reserved for commands without deployment context or explicit
+reviewed overrides, and the public path should reject mixed local execution flags such as
+`--records-root` or `--control-plane-database-url` instead of quietly falling back to provider-local
+peer mutation. Any remaining local `recordsRoot` helpers are for fixture/internal compatibility, not
+the reviewed public protected/shared boundary.
 
 The user should not need to think about that wiring.
 
