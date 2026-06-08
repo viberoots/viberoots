@@ -71,7 +71,8 @@ export async function resolveServiceClientFromCliProfileOrFlags(opts: {
     });
     return resolveServiceClientFromManifest(profile.manifest, opts.env);
   }
-  return resolveServiceClientFromFlags({
+  return await resolveServiceClientFromFlags({
+    workspaceRoot: opts.workspaceRoot,
     controlPlaneUrl: opts.controlPlaneUrl,
     controlPlaneToken: opts.controlPlaneToken,
     remote,

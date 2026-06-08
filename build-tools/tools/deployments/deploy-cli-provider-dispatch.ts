@@ -36,6 +36,7 @@ export async function runProviderDeployFrontDoor(opts: {
       backendDatabaseUrl: flags.controlPlaneDatabaseUrl,
       controlPlaneUrl: flags.controlPlaneUrl,
       controlPlaneToken: flags.controlPlaneToken,
+      remote: flags.remote,
       allowControlPlaneOverride: flags.allowControlPlaneOverride,
       ...(opts.admissionEvidence ? { admissionEvidence: opts.admissionEvidence as any } : {}),
       ...(opts.smokeConnectOverride
@@ -63,6 +64,7 @@ export async function runProviderDeployFrontDoor(opts: {
       cleanupReason: flags.cleanupReason,
       controlPlaneUrl: flags.controlPlaneUrl,
       controlPlaneToken: flags.controlPlaneToken,
+      remote: flags.remote,
       allowControlPlaneOverride: flags.allowControlPlaneOverride,
       ...(opts.admissionEvidence ? { admissionEvidence: opts.admissionEvidence as any } : {}),
       ...(opts.smokeConnectOverride
@@ -83,6 +85,7 @@ export async function runProviderDeployFrontDoor(opts: {
       artifactDirFlag: flags.artifactDirFlag,
       controlPlaneUrl: flags.controlPlaneUrl,
       controlPlaneToken: flags.controlPlaneToken,
+      remote: flags.remote,
       allowControlPlaneOverride: flags.allowControlPlaneOverride,
       hasFlag: opts.hasFlag,
     });
@@ -101,6 +104,7 @@ export async function runProviderDeployFrontDoor(opts: {
       backendDatabaseUrl: flags.controlPlaneDatabaseUrl,
       controlPlaneUrl: flags.controlPlaneUrl,
       controlPlaneToken: flags.controlPlaneToken,
+      remote: flags.remote,
       allowControlPlaneOverride: flags.allowControlPlaneOverride,
       ...(opts.admissionEvidence ? { admissionEvidence: opts.admissionEvidence as any } : {}),
       hasFlag: opts.hasFlag,
@@ -120,6 +124,7 @@ export async function runProviderDeployFrontDoor(opts: {
       backendDatabaseUrl: flags.controlPlaneDatabaseUrl,
       controlPlaneUrl: flags.controlPlaneUrl,
       controlPlaneToken: flags.controlPlaneToken,
+      remote: flags.remote,
       allowControlPlaneOverride: flags.allowControlPlaneOverride,
       ...(opts.admissionEvidence ? { admissionEvidence: opts.admissionEvidence as any } : {}),
       hasFlag: opts.hasFlag,
@@ -140,6 +145,7 @@ export async function runProviderDeployFrontDoor(opts: {
       backendDatabaseUrl: flags.controlPlaneDatabaseUrl,
       controlPlaneUrl: flags.controlPlaneUrl,
       controlPlaneToken: flags.controlPlaneToken,
+      remote: flags.remote,
       allowControlPlaneOverride: flags.allowControlPlaneOverride,
       ...(opts.admissionEvidence ? { admissionEvidence: opts.admissionEvidence as any } : {}),
       ...(opts.smokeConnectOverride
@@ -210,6 +216,7 @@ export async function runProviderDeployFrontDoor(opts: {
     vaultRuntimeInputs: flags.vaultRuntimeInputs,
     controlPlaneUrl: flags.controlPlaneUrl,
     controlPlaneToken: flags.controlPlaneToken,
+    remote: flags.remote,
     allowControlPlaneOverride: flags.allowControlPlaneOverride,
     ...(opts.admissionEvidence ? { admissionEvidence: opts.admissionEvidence as any } : {}),
     ...(opts.smokeConnectOverride

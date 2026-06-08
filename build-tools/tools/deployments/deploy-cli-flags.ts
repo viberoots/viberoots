@@ -32,5 +32,6 @@ export type DeployCliReadonlyFlags = {
   controlPlaneDatabaseUrl: string;
   controlPlaneUrl: string;
   controlPlaneToken?: string;
+  remote: string;
   allowControlPlaneOverride: boolean;
 };

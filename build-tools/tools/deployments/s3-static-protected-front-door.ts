@@ -23,6 +23,7 @@ export async function runProtectedS3StaticDeployFrontDoor(opts: {
   sourceRunId: string;
   controlPlaneUrl: string;
   controlPlaneToken?: string;
+  remote?: string;
   allowControlPlaneOverride?: boolean;
   admissionEvidence?: unknown;
   smokeConnectOverride?: unknown;
@@ -39,6 +40,7 @@ export async function runProtectedS3StaticDeployFrontDoor(opts: {
     deployment: opts.deployment,
     controlPlaneUrl: opts.controlPlaneUrl,
     controlPlaneToken: opts.controlPlaneToken,
+    remote: opts.remote,
     allowControlPlaneOverride: opts.allowControlPlaneOverride,
     workspaceRoot: opts.workspaceRoot,
     context: `s3-static ${opts.deployment.protectionClass} mutation`,

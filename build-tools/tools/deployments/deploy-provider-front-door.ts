@@ -28,6 +28,7 @@ export async function runNixosSharedHostDeployFrontDoor(opts: {
   artifactDirFlag: string;
   controlPlaneUrl: string;
   controlPlaneToken?: string;
+  remote?: string;
   allowControlPlaneOverride: boolean;
   vaultRuntimeInputs?: DeploymentVaultRuntimeInputs;
   admissionEvidence?: unknown;
@@ -103,7 +104,7 @@ export async function runNixosSharedHostDeployFrontDoor(opts: {
         controlPlaneUrl: opts.controlPlaneUrl,
         controlPlaneToken: opts.controlPlaneToken,
         allowControlPlaneOverride: opts.allowControlPlaneOverride,
-        remote: getFlagStr("remote", "").trim(),
+        remote: opts.remote,
         vaultRuntimeInputs: opts.vaultRuntimeInputs,
         hasFlag,
       }),

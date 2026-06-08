@@ -133,16 +133,17 @@ Common example values:
 
 Deployment-service routing:
 
-- `--control-plane-url <url>`: explicit deployment service URL for commands without a selected
-  deployment context
+- `--control-plane-url <url>`: explicit deployment service URL for commands
+  without a selected deployment context
 - `--remote <name>`: named control-plane profile lookup; `--remote mini` requires
-  `projects/config/shared.json` `controlPlanes.mini`
+  `projects/config/shared.json` `controlPlanes.mini` and resolves both
+  `serviceClient.controlPlaneUrl` and `serviceClient.controlPlaneTokenRef`
 - `--control-plane-token <token>`: required bearer token for reviewed hosted
   protected/shared service requests; explicit local fixture flows may omit it
   only when `VBR_DEPLOY_LOCAL_FIXTURE_SERVICE=1` marks the service as
   non-production
-- `VBR_DEPLOY_CONTROL_PLANE_URL`: environment fallback only for commands without a selected
-  deployment context
+- `VBR_DEPLOY_CONTROL_PLANE_URL`: environment fallback only for commands without
+  a selected deployment context
 - `VBR_DEPLOY_CONTROL_PLANE_TOKEN`: environment fallback used by reviewed
   service clients and hosted service processes
 - `VBR_DEPLOYMENT_SECRET_FIXTURE_PATH`: provider-neutral local/test secret
@@ -299,7 +300,10 @@ service URL is shared config and the service-token reference remains a
 `secret://` or `runtime://` credential ref. Use `--control-plane-url` or
 `VBR_DEPLOY_CONTROL_PLANE_URL` only for commands without a deployment context,
 or as an explicit operator override when the command also passes the reviewed
-override guard.
+override guard. Protected/shared deployments with a `deployment_context` fail
+closed when that context lacks a valid `controlPlane`, names an unknown
+`controlPlanes.<name>` profile, has a malformed profile, or cannot resolve the
+selected token ref; the CLI does not fall back to ambient URL or token material.
 
 Read the current status for one service-backed run:
 

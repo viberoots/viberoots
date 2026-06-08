@@ -53,6 +53,7 @@ export function readDeployCliReadonlyFlags(): DeployCliReadonlyFlags {
     controlPlaneDatabaseUrl: getFlagStr("control-plane-database-url", "").trim(),
     controlPlaneUrl: getFlagStr("control-plane-url", "").trim(),
     controlPlaneToken: getFlagStr("control-plane-token", "").trim() || undefined,
+    remote: getFlagStr("remote", "").trim(),
     allowControlPlaneOverride: getFlagBool("allow-control-plane-override"),
   };
 }

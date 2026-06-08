@@ -22,6 +22,7 @@ export async function runAppStoreConnectServiceFrontDoor(opts: {
   artifactDirFlag: string;
   controlPlaneUrl: string;
   controlPlaneToken?: string;
+  remote?: string;
   allowControlPlaneOverride: boolean;
   admissionEvidence?: unknown;
   hasFlag?: (flag: string) => boolean;
@@ -43,6 +44,7 @@ export async function runAppStoreConnectServiceFrontDoor(opts: {
     deployment: opts.deployment,
     controlPlaneUrl: opts.controlPlaneUrl,
     controlPlaneToken: opts.controlPlaneToken,
+    remote: opts.remote,
     allowControlPlaneOverride: opts.allowControlPlaneOverride,
     workspaceRoot: opts.workspaceRoot,
     context: `app-store-connect ${opts.deployment.protectionClass} mutation`,

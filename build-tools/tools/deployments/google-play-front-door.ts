@@ -51,6 +51,7 @@ export async function runGooglePlayDeployFrontDoor(opts: {
   backendDatabaseUrl?: string;
   controlPlaneUrl: string;
   controlPlaneToken?: string;
+  remote?: string;
   allowControlPlaneOverride: boolean;
   admissionEvidence?: unknown;
   hasFlag?: (flag: string) => boolean;
@@ -71,6 +72,7 @@ export async function runGooglePlayDeployFrontDoor(opts: {
       deployment: opts.deployment,
       requireServiceForProtectedShared: opts.requireServiceForProtectedShared,
       controlPlaneUrl: opts.controlPlaneUrl,
+      remote: opts.remote,
     })
   ) {
     printDeployJson(await runGooglePlayServiceFrontDoor(opts));

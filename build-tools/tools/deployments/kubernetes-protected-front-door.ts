@@ -26,6 +26,7 @@ export async function runProtectedKubernetesDeployFrontDoor(opts: {
   sourceRunId: string;
   controlPlaneUrl: string;
   controlPlaneToken?: string;
+  remote?: string;
   allowControlPlaneOverride?: boolean;
   admissionEvidence?: unknown;
   smokeConnectOverride?: unknown;
@@ -42,6 +43,7 @@ export async function runProtectedKubernetesDeployFrontDoor(opts: {
     deployment: opts.deployment,
     controlPlaneUrl: opts.controlPlaneUrl,
     controlPlaneToken: opts.controlPlaneToken,
+    remote: opts.remote,
     allowControlPlaneOverride: opts.allowControlPlaneOverride,
     workspaceRoot: opts.workspaceRoot,
     context: `kubernetes ${opts.deployment.protectionClass} mutation`,

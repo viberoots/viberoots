@@ -2,6 +2,7 @@
 import type { NixosSharedHostClientManifest } from "./nixos-shared-host-install-contract";
 import { validateProtectedSharedServiceTransport } from "./deployment-service-transport-policy";
 import { readProjectConfigSync } from "./project-config";
+import { resolveControlPlaneTokenRef } from "./deployment-control-plane-token-ref";
 
 export type NixosSharedHostServiceClientPlan = {
   mode: "control-plane-service";
@@ -12,6 +13,8 @@ export type NixosSharedHostServiceClientPlan = {
 export type NixosSharedHostResolvedServiceClient = {
   controlPlaneUrl: string;
   controlPlaneToken?: string;
+  controlPlaneName?: string;
+  controlPlaneTokenRef?: string;
   plan: NixosSharedHostServiceClientPlan;
 };
 
@@ -82,20 +85,33 @@ export function resolveServiceClientFromManifest(
   };
 }
 
-export function resolveServiceClientFromFlags(opts: {
+export async function resolveServiceClientFromFlags(opts: {
+  workspaceRoot?: string;
   controlPlaneUrl?: string;
   controlPlaneToken?: string;
   remote?: string;
   env?: NodeJS.ProcessEnv;
   context: string;
-}): NixosSharedHostResolvedServiceClient {
+}): Promise<NixosSharedHostResolvedServiceClient> {
   const env = opts.env || process.env;
   const remote = String(opts.remote || "").trim();
-  const remoteProfile = remote ? readRemoteControlPlaneProfile(remote, env) : undefined;
+  const remoteProfile = remote
+    ? readRemoteControlPlaneProfile(remote, opts.workspaceRoot || process.cwd(), env)
+    : undefined;
+  if (remote && String(opts.controlPlaneUrl || "").trim()) {
+    throw new Error(
+      `--remote ${remote} cannot be combined with --control-plane-url; controlPlanes.${remote}.serviceClient must supply the controlPlaneUrl`,
+    );
+  }
+  if (remote && String(opts.controlPlaneToken || "").trim()) {
+    throw new Error(
+      `--remote ${remote} cannot be combined with --control-plane-token; controlPlanes.${remote}.serviceClient.controlPlaneTokenRef must supply the token`,
+    );
+  }
   const ambientControlPlaneUrl = String(env.VBR_DEPLOY_CONTROL_PLANE_URL || "").trim();
   const controlPlaneUrl = validateProtectedSharedServiceTransport({
     controlPlaneUrl: requireNonEmpty(
-      opts.controlPlaneUrl || remoteProfile?.controlPlaneUrl || ambientControlPlaneUrl,
+      remoteProfile?.controlPlaneUrl || opts.controlPlaneUrl || ambientControlPlaneUrl,
       `${opts.context} requires --control-plane-url or VBR_DEPLOY_CONTROL_PLANE_URL for commands without deployment context, or --remote <name> matching projects/config/shared.json controlPlanes.<name>; protected/shared deployments should normally select deployment_context controlPlane`,
     ),
     context: opts.context,
@@ -103,27 +119,41 @@ export function resolveServiceClientFromFlags(opts: {
   });
   const controlPlaneToken = String(opts.controlPlaneToken || "").trim();
   const envToken = String(env.VBR_DEPLOY_CONTROL_PLANE_TOKEN || "").trim();
+  const remoteToken = remoteProfile
+    ? await resolveControlPlaneTokenRef({
+        tokenRef: remoteProfile.controlPlaneTokenRef,
+        workspaceRoot: opts.workspaceRoot,
+        env,
+      })
+    : "";
+  const selectedToken = remoteProfile ? remoteToken : controlPlaneToken || envToken;
+  const selectedEnvToken = remoteProfile ? "" : controlPlaneToken || envToken;
   return {
     controlPlaneUrl,
-    ...(controlPlaneToken || envToken ? { controlPlaneToken: controlPlaneToken || envToken } : {}),
+    ...(selectedToken ? { controlPlaneToken: selectedToken } : {}),
+    ...(remoteProfile
+      ? {
+          controlPlaneName: remote,
+          controlPlaneTokenRef: remoteProfile.controlPlaneTokenRef,
+        }
+      : {}),
     plan: {
       mode: "control-plane-service",
       controlPlaneUrl,
-      ...(controlPlaneToken || envToken
-        ? { controlPlaneTokenEnv: "VBR_DEPLOY_CONTROL_PLANE_TOKEN" }
-        : {}),
+      ...(selectedEnvToken ? { controlPlaneTokenEnv: "VBR_DEPLOY_CONTROL_PLANE_TOKEN" } : {}),
     },
   };
 }
 
 function readRemoteControlPlaneProfile(
   remote: string,
+  workspaceRoot: string,
   env: NodeJS.ProcessEnv,
 ): {
   controlPlaneUrl: string;
   controlPlaneTokenRef: string;
 } {
-  const profile = readProjectConfigSync().config.controlPlanes?.[remote];
+  const profile = readProjectConfigSync(workspaceRoot).config.controlPlanes?.[remote];
   if (!isRecord(profile)) {
     throw new Error(
       `--remote ${remote} requires a matching projects/config/shared.json controlPlanes.${remote} profile`,

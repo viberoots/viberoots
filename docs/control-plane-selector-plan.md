@@ -408,3 +408,136 @@ missing-value output would still steer operators toward the old single-global-en
 
 The clean cut-over removes familiar ambient endpoint shortcuts and may require local developers to
 fill proper control-plane profile/token refs before protected/shared deploy commands work.
+
+## PR-4: Remote profile token resolution and protected/shared fail-closed selection
+
+### 1. Intent
+
+Close the remaining clean cut-over gaps by making `--remote <name>` resolve a complete named
+`controlPlanes.<name>` service-client profile from the resolved workspace root, including its token
+ref, and by making protected/shared deployments fail closed whenever their selected deployment
+context cannot resolve a valid control plane.
+
+### 2. Scope of changes
+
+- Treat `--remote <name>` as a named `controlPlanes.<name>` selector across protected/shared
+  provider front doors.
+- Resolve both `serviceClient.controlPlaneUrl` and `serviceClient.controlPlaneTokenRef` from the
+  selected remote profile.
+- Ensure authenticated `--remote <name>` flows no longer depend on ambient token material or
+  explicit token flags when the selected profile has a resolvable token ref.
+- Make `readRemoteControlPlaneProfile` read from the resolved workspace root instead of
+  `process.cwd()`.
+- Update protected/shared front-door option plumbing so the named remote selector is passed
+  consistently through provider dispatch, service-client construction, and selected-source
+  evidence.
+- When a protected/shared deployment has a `deployment_context`, require that context to resolve a
+  valid `controlPlane`.
+- Fail closed for protected/shared context-selected deployments when the context is missing
+  `controlPlane`, names an unknown profile, has an invalid profile shape, or has an unresolvable
+  token ref.
+- Do not fall back to explicit `--control-plane-url`, ambient `VBR_DEPLOY_CONTROL_PLANE_URL`, or
+  ambient token material for protected/shared deployments whose context exists but lacks a resolved
+  control plane.
+- Preserve explicit override behavior only for the PR-2 override path where a valid selected
+  control plane already exists and `--allow-control-plane-override` is present.
+- Do not edit provider internals beyond the protected/shared front-door selection and
+  service-client wiring needed for this fail-closed behavior.
+
+### 3. External prerequisites
+
+- PR-1, PR-2, and PR-3 must have landed.
+- Existing protected/shared provider front-door tests must be able to assert selected-source
+  evidence, service URL selection, and token-ref resolution without live provider mutation.
+- Workspace-root resolution must be available from the deployment command context or a narrow shared
+  CLI helper.
+
+### 4. Tests to be added
+
+- Add `--remote <name>` tests proving the selected `controlPlanes.<name>` profile supplies both the
+  control-plane URL and token ref.
+- Add authenticated remote-profile tests proving `controlPlaneTokenRef` resolves through
+  `secret://...` or `runtime://...` handling without relying on ambient or explicit token material.
+- Add tests proving `readRemoteControlPlaneProfile` reads from the resolved workspace root when the
+  command is invoked from a nested directory.
+- Add protected/shared provider front-door tests proving `--remote <name>` is forwarded as a named
+  profile selector through each relevant provider command surface.
+- Add fail-closed tests proving protected/shared deployments with a `deployment_context` and no
+  resolved `controlPlane` reject ambient `VBR_DEPLOY_CONTROL_PLANE_URL` and explicit
+  `--control-plane-url` fallback.
+- Add negative tests for missing `deploymentContexts.<name>.controlPlane`, unknown named profiles,
+  invalid profile shape, and unresolvable token refs.
+- Keep existing local-only deployment and no-context explicit URL tests passing where the plan still
+  allows commands without deployment context to use explicit or ambient control-plane URLs.
+
+### 5. Docs to be added or updated
+
+- Update deployment usage docs so `--remote <name>` is documented as selecting
+  `controlPlanes.<name>` and resolving both URL and token ref.
+- Update troubleshooting docs to state that protected/shared deployments with a deployment context
+  must select a valid control plane and will not fall back to ambient or explicit URL/token values
+  when that selection is missing or invalid.
+- Update command help or examples for provider front doors that accept `--remote <name>` so the
+  selector behavior is consistent across protected/shared providers.
+- Update [Control Plane Selector Design](control-plane-selector.md) if the selected-source evidence
+  shape or workspace-root lookup behavior differs from the prior design.
+- Update this plan if implementation discovers additional protected/shared front doors that need
+  the same named-profile selector plumbing.
+
+### 5.5. Expected regression scope
+
+- `deployment-only`
+- Expected implementation paths:
+  - `build-tools/tools/deployments/*front-door*.ts`
+  - `build-tools/tools/deployments/*service-client*.ts`
+  - `build-tools/tools/deployments/*remote*.ts`
+  - `build-tools/tools/tests/deployments/**`
+  - `docs/**`
+- Keep changes focused on remote-profile lookup, workspace-root resolution, protected/shared
+  fail-closed selection, docs, and tests.
+
+### 6. Acceptance criteria
+
+- `--remote <name>` consistently selects `controlPlanes.<name>` across protected/shared provider
+  front doors.
+- Remote profile lookup resolves both control-plane URL and `controlPlaneTokenRef`.
+- Authenticated remote-profile flows do not require ambient or explicit token material when the
+  selected profile has a valid token ref.
+- Remote profile lookup works from nested command directories by reading config from the resolved
+  workspace root.
+- Protected/shared deployments with a deployment context fail closed when no valid selected
+  control plane is resolved.
+- Protected/shared context-selected deployments do not fall back to explicit or ambient
+  control-plane URLs or tokens when their context lacks a valid `controlPlane`.
+- Tests and docs cover named remote selection, token-ref resolution, workspace-root lookup, and
+  fail-closed protected/shared behavior.
+
+### 7. Risks
+
+- Tightening protected/shared fallback behavior can surface stale contexts that previously worked
+  only because ambient endpoint or token material was present.
+- Provider front doors may have inconsistent option plumbing that hides one command surface from
+  the named-profile selector path.
+- Workspace-root lookup changes can expose tests that accidentally depended on `process.cwd()`.
+
+### 8. Mitigations
+
+- Make fail-closed diagnostics name the deployment context, expected `controlPlane` field, selected
+  profile name if present, and the rejected fallback source.
+- Search protected/shared provider command surfaces for `--remote`, `--control-plane-url`, and
+  service-client construction during implementation and add provider-specific forwarding tests.
+- Add nested-directory fixtures so workspace-root lookup behavior is asserted directly instead of
+  inferred from the process working directory.
+
+### 9. Consequences of not implementing this PR
+
+The plan would still leave authenticated `--remote <name>` flows dependent on ambient token
+material, and protected/shared deployments could silently use explicit or ambient control-plane
+values even when their deployment context failed to select a valid control plane.
+
+### 10. Downsides for implementing this PR
+
+Operators with incomplete protected/shared deployment contexts must add valid `controlPlane`
+selectors and token refs before those commands run. Tests and command wiring become stricter
+because remote profile selection is now a complete service-client selection path rather than only a
+URL shortcut.

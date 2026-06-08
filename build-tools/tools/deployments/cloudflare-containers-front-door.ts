@@ -25,6 +25,7 @@ export async function runCloudflareContainersDeployFrontDoor(opts: {
   artifactDirFlag: string;
   controlPlaneUrl: string;
   controlPlaneToken?: string;
+  remote?: string;
   allowControlPlaneOverride: boolean;
   hasFlag?: (flag: string) => boolean;
 }) {
@@ -39,6 +40,7 @@ export async function runCloudflareContainersDeployFrontDoor(opts: {
       deployment: opts.deployment,
       requireServiceForProtectedShared: opts.requireServiceForProtectedShared,
       controlPlaneUrl: opts.controlPlaneUrl,
+      remote: opts.remote,
     })
   ) {
     rejectServiceOnlyLocalFlags(opts.hasFlag || (() => false), "cloudflare-containers");
@@ -46,6 +48,7 @@ export async function runCloudflareContainersDeployFrontDoor(opts: {
       deployment: opts.deployment,
       controlPlaneUrl: opts.controlPlaneUrl,
       controlPlaneToken: opts.controlPlaneToken,
+      remote: opts.remote,
       allowControlPlaneOverride: opts.allowControlPlaneOverride,
       workspaceRoot: opts.workspaceRoot,
       context: `cloudflare-containers ${opts.deployment.protectionClass} mutation`,

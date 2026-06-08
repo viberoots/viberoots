@@ -5,8 +5,11 @@ import { runAppStoreConnectDeployFrontDoor } from "../../deployments/app-store-c
 import { runCloudflareContainersDeployFrontDoor } from "../../deployments/cloudflare-containers-front-door";
 import { runProviderDeployFrontDoor } from "../../deployments/deploy-cli-provider-dispatch";
 import { runGooglePlayDeployFrontDoor } from "../../deployments/google-play-front-door";
+import { runS3StaticDeployFrontDoor } from "../../deployments/s3-static-front-door";
 import { appStoreConnectDeploymentFixture } from "./app-store-connect.fixture";
 import { googlePlayDeploymentFixture } from "./google-play.fixture";
+import { s3StaticDeploymentFixture } from "./s3-static.fixture";
+import { reviewedLaneAdmissionEvidenceFixture } from "./deployment-lane-governance.fixture";
 import { withEnv, withProjectConfig } from "./deployment-contexts.scope.helpers";
 import {
   SELECTED_URL,
@@ -60,6 +63,45 @@ test("provider front doors reject direct records/database paths for context-sele
       new RegExp(`service-only cloudflare-containers deploy does not support ${flag}`),
     );
   }
+});
+
+test("provider front doors fail closed when deployment context has no control plane", async () => {
+  const deployment = {
+    ...s3StaticDeploymentFixture(),
+    controlPlane: undefined,
+    deploymentContext: { name: "prod" } as any,
+  };
+  const admissionEvidence = reviewedLaneAdmissionEvidenceFixture({ deployment });
+  await assert.rejects(
+    () =>
+      runS3StaticDeployFrontDoor({
+        workspaceRoot: process.cwd(),
+        deployment,
+        requireServiceForProtectedShared: false,
+        publishOnly: false,
+        provisionOnly: true,
+        rollback: false,
+        sourceRunId: "",
+        artifactDirFlag: "",
+        controlPlaneUrl: "",
+        allowControlPlaneOverride: false,
+        admissionEvidence,
+        hasFlag: () => false,
+      }),
+    /deployment context prod must select a valid controlPlane/,
+  );
+  await assert.rejects(
+    () =>
+      runProviderDeployFrontDoor({
+        workspaceRoot: process.cwd(),
+        publicFrontDoor: false,
+        deployment,
+        flags: flags({ provisionOnly: true }),
+        admissionEvidence,
+        hasFlag: () => false,
+      }),
+    /deployment context prod must select a valid controlPlane/,
+  );
 });
 
 test("context-selected provider front doors submit to selected control-plane service", async () => {

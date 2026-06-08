@@ -29,6 +29,7 @@ export async function runKubernetesDeployFrontDoor(opts: {
   backendDatabaseUrl?: string;
   controlPlaneUrl: string;
   controlPlaneToken?: string;
+  remote?: string;
   allowControlPlaneOverride: boolean;
   admissionEvidence?: unknown;
   smokeConnectOverride?: unknown;
@@ -55,6 +56,7 @@ export async function runKubernetesDeployFrontDoor(opts: {
       deployment: opts.deployment,
       requireServiceForProtectedShared: opts.requireServiceForProtectedShared,
       controlPlaneUrl: opts.controlPlaneUrl,
+      remote: opts.remote,
     })
   ) {
     printDeployJson(
@@ -67,6 +69,7 @@ export async function runKubernetesDeployFrontDoor(opts: {
         sourceRunId: opts.sourceRunId,
         controlPlaneUrl: opts.controlPlaneUrl,
         controlPlaneToken: opts.controlPlaneToken,
+        remote: opts.remote,
         allowControlPlaneOverride: opts.allowControlPlaneOverride,
         admissionEvidence: opts.admissionEvidence,
         smokeConnectOverride: opts.smokeConnectOverride,

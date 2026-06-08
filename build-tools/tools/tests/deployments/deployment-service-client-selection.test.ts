@@ -128,6 +128,40 @@ test("context-selected control plane rejects remote alias override", async () =>
   );
 });
 
+test("protected/shared deployment context without control plane rejects URL fallback", async () => {
+  const missingControlPlane = cloudflarePagesDeploymentFixture({
+    controlPlane: undefined,
+    deploymentContext: { name: "prod" } as any,
+  });
+  await assert.rejects(
+    () =>
+      resolveProtectedSharedServiceClient({
+        deployment: missingControlPlane,
+        controlPlaneUrl: "https://explicit.example",
+        context: "cloudflare-pages shared_nonprod mutation",
+        env: {
+          VBR_DEPLOY_CONTROL_PLANE_URL: "https://ambient.example",
+          VBR_DEPLOY_CONTROL_PLANE_TOKEN: "ambient-token",
+        },
+      }),
+    /deployment context prod must select a valid controlPlane/,
+  );
+});
+
+test("context-selected control plane rejects unresolvable token refs before fallback", async () => {
+  await withRuntimeHostConfig(async () => {
+    await assert.rejects(
+      () =>
+        resolveProtectedSharedServiceClient({
+          deployment: deployment(),
+          context: "cloudflare-pages shared_nonprod mutation",
+          env: { VBR_DEPLOY_CONTROL_PLANE_TOKEN: "ambient-token" },
+        }),
+      /runtime control-plane token binding is unset: DEPLOY_CONTROL_PLANE_TOKEN/,
+    );
+  });
+});
+
 test("explicit override requires allow flag and records selected source", async () => {
   const client = await resolveProtectedSharedServiceClient({
     deployment: deployment(),

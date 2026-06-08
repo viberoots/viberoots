@@ -26,6 +26,7 @@ export async function runCloudflareDeployFrontDoor(opts: {
   cleanupReason: string;
   controlPlaneUrl: string;
   controlPlaneToken?: string;
+  remote?: string;
   allowControlPlaneOverride: boolean;
   admissionEvidence?: unknown;
   smokeConnectOverride?: unknown;
@@ -48,6 +49,7 @@ export async function runCloudflareDeployFrontDoor(opts: {
       deployment: opts.deployment,
       requireServiceForProtectedShared: opts.requireServiceForProtectedShared,
       controlPlaneUrl: opts.controlPlaneUrl,
+      remote: opts.remote,
     })
   ) {
     printDeployJson(
@@ -67,6 +69,7 @@ export async function runCloudflareDeployFrontDoor(opts: {
         smokeConnectOverride: opts.smokeConnectOverride,
         controlPlaneUrl: opts.controlPlaneUrl,
         controlPlaneToken: opts.controlPlaneToken,
+        remote: opts.remote,
         allowControlPlaneOverride: opts.allowControlPlaneOverride,
         hasFlag,
       }),

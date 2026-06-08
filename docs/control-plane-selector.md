@@ -188,8 +188,9 @@ override flag. The intended clean-cut-over behavior is:
 - `VBR_DEPLOY_CONTROL_PLANE_URL` is an escape hatch for commands without context. It must not
   silently override a context-selected control plane.
 - `--remote <name>` is a named profile selector, not a magic endpoint path. `--remote mini`
-  requires `controlPlanes.mini`; without that checked-in profile the command fails before provider
-  mutation.
+  requires `controlPlanes.mini` and resolves both `serviceClient.controlPlaneUrl` and
+  `serviceClient.controlPlaneTokenRef`; without that checked-in profile or resolvable token ref the
+  command fails before provider mutation.
 
 The command output should report the selected control-plane name, URL, and selection source. It
 must not print token values.
@@ -329,8 +330,8 @@ The clean cut-over implementation should:
 3. Attach normalized `control_plane` metadata during deployment context resolution.
 4. Update protected/shared front doors to use context-selected `control_plane` before ambient env
    fallback.
-5. Replace magic `--remote mini` handling with a named control-plane profile or reject it unless a
-   matching profile exists.
+5. Replace magic `--remote mini` handling with a named control-plane profile that resolves the URL
+   and token ref, or reject it unless a matching profile exists.
 6. Reject plaintext token fields and malformed token refs.
 7. Update docs and command help to describe context-selected control planes as the default path.
 8. Add tests for two contexts selecting different control planes, context-selected service routing,

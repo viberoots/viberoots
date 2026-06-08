@@ -241,6 +241,32 @@ unexpected outcome.
   - For tests or development, use a `local_only` Vercel fixture deployment
     target instead of a protected/shared label.
 
+## Protected/shared control-plane selection
+
+- Symptom: a protected/shared provider front door rejects before provider
+  mutation with a missing control-plane, unknown `controlPlanes.<name>`,
+  malformed profile, or unresolved `controlPlaneTokenRef` error.
+- Likely causes:
+  - The deployment target declares `deployment_context`, but the selected
+    context does not contain a valid `controlPlane`.
+  - The context names a profile missing from `projects/config/shared.json`
+    `controlPlanes`, or the profile is missing `serviceClient.controlPlaneUrl`
+    or `serviceClient.controlPlaneTokenRef`.
+  - `--remote <name>` was used for a command without context, but the named
+    profile is absent, malformed, or its `secret://...` / `runtime://...` token
+    ref cannot resolve in the current operator environment.
+- Fix:
+  - Add or correct `deploymentContexts.<name>.controlPlane` and the matching
+    `controlPlanes.<name>.serviceClient` profile in project config.
+  - For command-scoped remote selection, pass `--remote <name>` only when that
+    profile exists and its token ref is resolvable. `--remote` resolves both
+    the URL and token ref from the workspace root.
+  - Do not expect `--control-plane-url`, `VBR_DEPLOY_CONTROL_PLANE_URL`, or
+    `VBR_DEPLOY_CONTROL_PLANE_TOKEN` to rescue a protected/shared deployment
+    whose selected context is missing or invalid. Those fallbacks are accepted
+    only for commands without deployment context, or for an explicit reviewed
+    URL override when a valid selected control plane already exists.
+
 ### Admission and secret-runtime failures
 
 - Symptom: the control-plane service rejects the submission with an admission

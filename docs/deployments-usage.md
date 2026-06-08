@@ -287,6 +287,16 @@ only for commands without a selected context; if they disagree with a selected
 context, mutating commands fail unless `--allow-control-plane-override` is
 passed with an explicit override.
 
+For commands without a selected deployment context, `--remote <name>` selects a
+checked-in `projects/config/shared.json` `controlPlanes.<name>` profile. The
+profile supplies both `serviceClient.controlPlaneUrl` and
+`serviceClient.controlPlaneTokenRef`; the token ref must resolve through
+`secret://...` or `runtime://...` before the provider front door contacts the
+service. Protected/shared deployments that do have a `deployment_context` fail
+closed when that context does not resolve a valid control plane, even if
+`--control-plane-url`, `VBR_DEPLOY_CONTROL_PLANE_URL`, or ambient token
+material is present.
+
 ```bash
 deploy --deployment //projects/deployments/pleomino/prod:deploy \
   --status \

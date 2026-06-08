@@ -670,6 +670,9 @@ Protected/shared deploy commands use the selected `deployment_context` and
 checked-in `controlPlanes` profile for the control-plane authority. The local
 client profile supplies remote-host transport details and the service endpoint
 for that host; it is not a repo-global endpoint fallback.
+For provider front doors that accept `--remote <name>`, the name must match a
+checked-in `controlPlanes.<name>` service-client profile so the command can
+resolve both the URL and `controlPlaneTokenRef` from the workspace root.
 
 Optional verification:
 

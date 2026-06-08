@@ -1,6 +1,13 @@
 #!/usr/bin/env zx-wrapper
 import assert from "node:assert/strict";
+import * as fsp from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
 import { test } from "node:test";
+import {
+  DEPLOYMENT_SECRET_FIXTURE_PATH_ENV,
+  DEPLOYMENT_SECRET_FIXTURE_SCHEMA,
+} from "../../deployments/deployment-secret-fixture";
 import {
   LOCAL_FIXTURE_SERVICE_ENV,
   validateProtectedSharedServiceTransport,
@@ -11,54 +18,111 @@ import {
 } from "../../deployments/nixos-shared-host-service-client-config";
 import { withProjectConfig } from "./deployment-contexts.scope.helpers";
 
-test("nixos shared-host service client resolves --remote through control-plane profiles", async () => {
-  await withProjectConfig(
-    {
-      controlPlanes: {
-        mini: {
-          serviceClient: {
-            controlPlaneUrl: "https://deploy.apps.kilty.io",
-            controlPlaneTokenRef: "secret://control-plane/mini/service-token",
-          },
-          records: { backend: "service" },
-        },
-      },
-    },
-    async () => {
-      assert.equal(
-        resolveServiceClientFromFlags({
-          remote: "mini",
-          context: "deploy",
-          env: {},
-        }).controlPlaneUrl,
-        "https://deploy.apps.kilty.io",
-      );
-    },
-  );
+const SECRET_REF = "secret://control-plane/mini/service-token";
+const RUNTIME_REF = "runtime://github-actions/control-plane-token";
+
+test("nixos shared-host service client resolves --remote profile URL and runtime token ref", async () => {
+  await withProjectConfig(remoteProjectConfig(RUNTIME_REF), async () => {
+    const client = await resolveServiceClientFromFlags({
+      remote: "mini",
+      context: "deploy",
+      env: { DEPLOY_TOKEN: "runtime-token", VBR_DEPLOY_CONTROL_PLANE_TOKEN: "ambient-token" },
+    });
+    assert.equal(client.controlPlaneUrl, "https://deploy.apps.kilty.io");
+    assert.equal(client.controlPlaneToken, "runtime-token");
+    assert.equal(client.controlPlaneTokenRef, RUNTIME_REF);
+  });
 });
 
-test("nixos shared-host service client rejects --remote without a matching profile", () => {
-  assert.throws(
-    () =>
-      resolveServiceClientFromFlags({
+test("nixos shared-host service client resolves --remote secret token ref", async () => {
+  await withSecretFixture(async () => {
+    await withProjectConfig(remoteProjectConfig(SECRET_REF), async () => {
+      const client = await resolveServiceClientFromFlags({
         remote: "mini",
         context: "deploy",
         env: {},
-      }),
+      });
+      assert.equal(client.controlPlaneToken, "resolved-secret-token");
+    });
+  });
+});
+
+test("nixos shared-host service client reads --remote config from workspace root", async () => {
+  await withTempDir("remote-profile-root-", async (workspace) => {
+    await fsp.mkdir(path.join(workspace, "projects", "config"), { recursive: true });
+    await fsp.writeFile(
+      path.join(workspace, "projects", "config", "shared.json"),
+      `${JSON.stringify({ schemaVersion: "viberoots-project-config@1", ...remoteProjectConfig(RUNTIME_REF) })}\n`,
+    );
+    const nested = path.join(workspace, "projects", "apps", "demo");
+    await fsp.mkdir(nested, { recursive: true });
+    const oldCwd = process.cwd();
+    try {
+      process.chdir(nested);
+      const client = await resolveServiceClientFromFlags({
+        workspaceRoot: workspace,
+        remote: "mini",
+        context: "deploy",
+        env: { DEPLOY_TOKEN: "runtime-token" },
+      });
+      assert.equal(client.controlPlaneUrl, "https://deploy.apps.kilty.io");
+      assert.equal(client.controlPlaneToken, "runtime-token");
+    } finally {
+      process.chdir(oldCwd);
+    }
+  });
+});
+
+test("nixos shared-host service client rejects --remote without a matching profile", async () => {
+  await assert.rejects(
+    () => resolveServiceClientFromFlags({ remote: "mini", context: "deploy", env: {} }),
     /controlPlanes\.mini profile/,
   );
 });
 
-test("nixos shared-host service client validates explicit control-plane URLs", () => {
+test("nixos shared-host service client rejects malformed --remote profiles", async () => {
+  for (const [profile, expected] of [
+    [{}, /serviceClient is required/],
+    [
+      { serviceClient: { controlPlaneUrl: "https://deploy.apps.kilty.io" } },
+      /controlPlaneTokenRef/,
+    ],
+  ] as const) {
+    await withProjectConfig({ controlPlanes: { mini: profile } }, async () => {
+      await assert.rejects(
+        () => resolveServiceClientFromFlags({ remote: "mini", context: "deploy", env: {} }),
+        expected,
+      );
+    });
+  }
+});
+
+test("nixos shared-host service client rejects unresolvable --remote token refs", async () => {
+  await withProjectConfig(remoteProjectConfig(RUNTIME_REF), async () => {
+    await assert.rejects(
+      () =>
+        resolveServiceClientFromFlags({
+          remote: "mini",
+          context: "deploy",
+          env: { VBR_DEPLOY_CONTROL_PLANE_TOKEN: "ambient-token" },
+        }),
+      /runtime control-plane token binding is unset: DEPLOY_TOKEN/,
+    );
+  });
+});
+
+test("nixos shared-host service client validates explicit control-plane URLs", async () => {
   assert.equal(
-    resolveServiceClientFromFlags({
-      controlPlaneUrl: "http://127.0.0.1:7780",
-      context: "deploy",
-      env: { [LOCAL_FIXTURE_SERVICE_ENV]: "1" },
-    }).controlPlaneUrl,
+    (
+      await resolveServiceClientFromFlags({
+        controlPlaneUrl: "http://127.0.0.1:7780",
+        context: "deploy",
+        env: { [LOCAL_FIXTURE_SERVICE_ENV]: "1" },
+      })
+    ).controlPlaneUrl,
     "http://127.0.0.1:7780",
   );
-  assert.throws(
+  await assert.rejects(
     () =>
       resolveServiceClientFromFlags({
         controlPlaneUrl: "http://127.0.0.1:7780",
@@ -69,18 +133,16 @@ test("nixos shared-host service client validates explicit control-plane URLs", (
   );
 });
 
-test("nixos shared-host service client uses ambient URL for commands without context", () => {
-  assert.equal(
-    resolveServiceClientFromFlags({
-      context: "deploy status",
-      env: { VBR_DEPLOY_CONTROL_PLANE_URL: " https://deploy.apps.kilty.io " },
-    }).controlPlaneUrl,
-    "https://deploy.apps.kilty.io",
-  );
+test("nixos shared-host service client uses ambient URL for commands without context", async () => {
+  const client = await resolveServiceClientFromFlags({
+    context: "deploy status",
+    env: { VBR_DEPLOY_CONTROL_PLANE_URL: " https://deploy.apps.kilty.io " },
+  });
+  assert.equal(client.controlPlaneUrl, "https://deploy.apps.kilty.io");
 });
 
-test("nixos shared-host service client rejects insecure protected transport", () => {
-  assert.throws(
+test("nixos shared-host service client rejects insecure protected transport", async () => {
+  await assert.rejects(
     () =>
       resolveServiceClientFromFlags({
         controlPlaneUrl: "http://deploy.apps.kilty.io",
@@ -98,7 +160,7 @@ test("nixos shared-host service client rejects insecure protected transport", ()
       }),
     /LOCAL_FIXTURE_SERVICE/,
   );
-  assert.throws(
+  await assert.rejects(
     () =>
       resolveServiceClientFromFlags({
         controlPlaneUrl: "https://deploy.apps.kilty.io",
@@ -138,3 +200,51 @@ test("nixos shared-host service profile requires its configured token env", () =
     "service-token",
   );
 });
+
+function remoteProjectConfig(tokenRef: string) {
+  return {
+    runtimeHosts: {
+      "github-actions": {
+        bindings: { "control-plane-token": { kind: "env", name: "DEPLOY_TOKEN" } },
+      },
+    },
+    controlPlanes: {
+      mini: {
+        serviceClient: {
+          controlPlaneUrl: "https://deploy.apps.kilty.io",
+          controlPlaneTokenRef: tokenRef,
+        },
+        records: { backend: "service" },
+      },
+    },
+  };
+}
+
+function withSecretFixture(run: () => Promise<void>) {
+  return withTempDir("service-client-secret-", async (tmp) => {
+    const previous = process.env[DEPLOYMENT_SECRET_FIXTURE_PATH_ENV];
+    process.env[DEPLOYMENT_SECRET_FIXTURE_PATH_ENV] = path.join(tmp, "secrets.json");
+    await fsp.writeFile(
+      process.env[DEPLOYMENT_SECRET_FIXTURE_PATH_ENV],
+      JSON.stringify({
+        schemaVersion: DEPLOYMENT_SECRET_FIXTURE_SCHEMA,
+        contracts: { [SECRET_REF]: { value: "resolved-secret-token" } },
+      }),
+    );
+    try {
+      await run();
+    } finally {
+      if (previous === undefined) delete process.env[DEPLOYMENT_SECRET_FIXTURE_PATH_ENV];
+      else process.env[DEPLOYMENT_SECRET_FIXTURE_PATH_ENV] = previous;
+    }
+  });
+}
+
+async function withTempDir(prefix: string, run: (dir: string) => Promise<void>) {
+  const tmp = await fsp.mkdtemp(path.join(os.tmpdir(), prefix));
+  try {
+    await run(tmp);
+  } finally {
+    await fsp.rm(tmp, { recursive: true, force: true });
+  }
+}

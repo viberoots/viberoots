@@ -54,6 +54,7 @@ export function flags(overrides: Partial<DeployCliReadonlyFlags> = {}): DeployCl
     artifactDirFlag: "",
     controlPlaneDatabaseUrl: "",
     controlPlaneUrl: "",
+    remote: "",
     allowControlPlaneOverride: false,
     ...overrides,
   };

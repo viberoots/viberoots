@@ -90,6 +90,7 @@ export async function runProtectedCloudflarePagesDeployFrontDoor(opts: {
   smokeConnectOverride?: unknown;
   controlPlaneUrl: string;
   controlPlaneToken?: string;
+  remote?: string;
   allowControlPlaneOverride?: boolean;
   hasFlag: (flag: string) => boolean;
 }) {
@@ -99,6 +100,7 @@ export async function runProtectedCloudflarePagesDeployFrontDoor(opts: {
     deployment: opts.deployment,
     controlPlaneUrl: opts.controlPlaneUrl,
     controlPlaneToken: opts.controlPlaneToken,
+    remote: opts.remote,
     allowControlPlaneOverride: opts.allowControlPlaneOverride,
     workspaceRoot: opts.workspaceRoot,
     context: `cloudflare-pages ${opts.deployment.protectionClass} mutation`,

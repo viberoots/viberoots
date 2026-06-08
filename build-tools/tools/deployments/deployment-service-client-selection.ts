@@ -1,10 +1,8 @@
 #!/usr/bin/env zx-wrapper
-import { createRegisteredDeploymentSecretBackend } from "./deployment-secret-backend-registry";
-import type { DeploymentSecretBackendKind } from "./deployment-sprinkle-ref";
 import type { DeploymentTarget } from "./contract";
 import { type NixosSharedHostResolvedServiceClient } from "./nixos-shared-host-service-client-config";
-import { resolveRuntimeTokenBinding } from "./deployment-runtime-token-binding";
 import { resolveServiceClientFromCliProfileOrFlags } from "./deployment-service-client-profile";
+import { resolveControlPlaneTokenRef } from "./deployment-control-plane-token-ref";
 
 type SelectionSource = "context" | "explicit_override" | "explicit" | "ambient";
 
@@ -26,17 +24,25 @@ function selectedContext(deployment: DeploymentTarget) {
   return deployment.controlPlane;
 }
 
+function selectedDeploymentContextName(deployment: DeploymentTarget): string {
+  if (deployment.protectionClass === "local_only") return "";
+  return String(deployment.deploymentContext?.name || "").trim();
+}
+
 export function shouldUseProtectedSharedServiceRoute(opts: {
   deployment: DeploymentTarget;
   requireServiceForProtectedShared: boolean;
   controlPlaneUrl?: string;
+  remote?: string;
   env?: NodeJS.ProcessEnv;
 }) {
   if (opts.deployment.protectionClass === "local_only") return false;
   return Boolean(
     opts.requireServiceForProtectedShared ||
       opts.deployment.controlPlane ||
+      selectedDeploymentContextName(opts.deployment) ||
       String(opts.controlPlaneUrl || "").trim() ||
+      String(opts.remote || "").trim() ||
       String((opts.env || process.env).VBR_DEPLOY_CONTROL_PLANE_URL || "").trim(),
   );
 }
@@ -83,6 +89,12 @@ export function assertProtectedSharedServiceSelectionInputs(opts: {
   env?: NodeJS.ProcessEnv;
 }) {
   const contextSelection = selectedContext(opts.deployment);
+  const deploymentContextName = selectedDeploymentContextName(opts.deployment);
+  if (!contextSelection && deploymentContextName) {
+    throw new Error(
+      `protected/shared deployment context ${deploymentContextName} must select a valid controlPlane; rejecting --control-plane-url, VBR_DEPLOY_CONTROL_PLANE_URL, --remote, and ambient token fallback`,
+    );
+  }
   if (!contextSelection) return;
   if (String(opts.remote || "").trim()) {
     throw new Error(
@@ -102,45 +114,19 @@ export function assertProtectedSharedServiceSelectionInputs(opts: {
   });
 }
 
-async function resolveSecretToken(opts: {
-  tokenRef: string;
-  backend: DeploymentSecretBackendKind;
-  backendProfile?: string;
-}) {
-  const backend = createRegisteredDeploymentSecretBackend({ backend: opts.backend });
-  const material = await backend.acquire({
-    name: "control_plane_service_token",
-    step: "publish",
-    contractId: opts.tokenRef,
-    required: true,
-    backend: opts.backend,
-    backendProfile: opts.backendProfile,
-    referenceId: `${opts.backend}:${opts.tokenRef}`,
-  });
-  return material.value;
-}
-
 async function resolveContextToken(opts: {
   tokenRef: string;
   deployment: DeploymentTarget;
   workspaceRoot?: string;
   env: NodeJS.ProcessEnv;
 }) {
-  if (opts.tokenRef.startsWith("secret://")) {
-    return await resolveSecretToken({
-      tokenRef: opts.tokenRef,
-      backend: opts.deployment.secretBackend || "vault",
-      backendProfile: opts.deployment.secretBackendProfile,
-    });
-  }
-  if (opts.tokenRef.startsWith("runtime://")) {
-    return resolveRuntimeTokenBinding({
-      tokenRef: opts.tokenRef,
-      workspaceRoot: opts.workspaceRoot,
-      env: opts.env,
-    });
-  }
-  throw new Error("controlPlaneTokenRef must be a secret:// or runtime:// ref");
+  return resolveControlPlaneTokenRef({
+    tokenRef: opts.tokenRef,
+    backend: opts.deployment.secretBackend,
+    backendProfile: opts.deployment.secretBackendProfile,
+    workspaceRoot: opts.workspaceRoot,
+    env: opts.env,
+  });
 }
 
 export async function resolveProtectedSharedServiceClient(opts: {
@@ -157,21 +143,6 @@ export async function resolveProtectedSharedServiceClient(opts: {
   const contextSelection = selectedContext(opts.deployment);
   const explicitUrl = String(opts.controlPlaneUrl || "").trim();
   const ambientUrl = String(env.VBR_DEPLOY_CONTROL_PLANE_URL || "").trim();
-  if (!contextSelection) {
-    const serviceClient = await resolveServiceClientFromCliProfileOrFlags({
-      workspaceRoot: opts.workspaceRoot || process.cwd(),
-      controlPlaneUrl: explicitUrl || ambientUrl,
-      controlPlaneToken: opts.controlPlaneToken,
-      remote: opts.remote,
-      defaultProfileName: opts.deployment.lanePolicy.defaultClientProfile,
-      context: opts.context,
-      env,
-    });
-    return {
-      ...serviceClient,
-      selectedSource: explicitUrl || opts.remote ? "explicit" : "ambient",
-    };
-  }
   assertProtectedSharedServiceSelectionInputs({
     deployment: opts.deployment,
     controlPlaneUrl: explicitUrl,
@@ -179,6 +150,32 @@ export async function resolveProtectedSharedServiceClient(opts: {
     allowControlPlaneOverride: opts.allowControlPlaneOverride,
     env,
   });
+  if (!contextSelection) {
+    const remote = String(opts.remote || "").trim();
+    if (remote && explicitUrl) {
+      throw new Error(
+        `--remote ${remote} cannot be combined with --control-plane-url; controlPlanes.${remote}.serviceClient must supply the controlPlaneUrl`,
+      );
+    }
+    if (remote && String(opts.controlPlaneToken || "").trim()) {
+      throw new Error(
+        `--remote ${remote} cannot be combined with --control-plane-token; controlPlanes.${remote}.serviceClient.controlPlaneTokenRef must supply the token`,
+      );
+    }
+    const serviceClient = await resolveServiceClientFromCliProfileOrFlags({
+      workspaceRoot: opts.workspaceRoot || process.cwd(),
+      controlPlaneUrl: remote ? undefined : explicitUrl || ambientUrl,
+      controlPlaneToken: remote ? undefined : opts.controlPlaneToken,
+      remote,
+      defaultProfileName: opts.deployment.lanePolicy.defaultClientProfile,
+      context: opts.context,
+      env,
+    });
+    return {
+      ...serviceClient,
+      selectedSource: explicitUrl || remote ? "explicit" : "ambient",
+    };
+  }
   if (explicitUrl && opts.allowControlPlaneOverride) {
     const serviceClient = await resolveServiceClientFromCliProfileOrFlags({
       workspaceRoot: opts.workspaceRoot || process.cwd(),

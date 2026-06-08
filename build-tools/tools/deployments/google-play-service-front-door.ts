@@ -22,6 +22,7 @@ export async function runGooglePlayServiceFrontDoor(opts: {
   artifactDirFlag: string;
   controlPlaneUrl: string;
   controlPlaneToken?: string;
+  remote?: string;
   allowControlPlaneOverride: boolean;
   admissionEvidence?: unknown;
   hasFlag?: (flag: string) => boolean;
@@ -43,6 +44,7 @@ export async function runGooglePlayServiceFrontDoor(opts: {
     deployment: opts.deployment,
     controlPlaneUrl: opts.controlPlaneUrl,
     controlPlaneToken: opts.controlPlaneToken,
+    remote: opts.remote,
     allowControlPlaneOverride: opts.allowControlPlaneOverride,
     workspaceRoot: opts.workspaceRoot,
     context: `google-play ${opts.deployment.protectionClass} mutation`,

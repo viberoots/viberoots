@@ -28,6 +28,7 @@ export async function runVercelDeployFrontDoor(opts: {
   artifactDirFlag: string;
   controlPlaneUrl: string;
   controlPlaneToken?: string;
+  remote?: string;
   allowControlPlaneOverride: boolean;
   admissionEvidence?: unknown;
   smokeConnectOverride?: unknown;
@@ -41,6 +42,7 @@ export async function runVercelDeployFrontDoor(opts: {
       deployment: opts.deployment,
       requireServiceForProtectedShared: opts.requireServiceForProtectedShared,
       controlPlaneUrl: opts.controlPlaneUrl,
+      remote: opts.remote,
     })
   ) {
     printDeployJson(
@@ -55,6 +57,7 @@ export async function runVercelDeployFrontDoor(opts: {
         artifactDirFlag: opts.artifactDirFlag,
         controlPlaneUrl: opts.controlPlaneUrl,
         controlPlaneToken: opts.controlPlaneToken,
+        remote: opts.remote,
         allowControlPlaneOverride: opts.allowControlPlaneOverride,
         admissionEvidence: opts.admissionEvidence,
         smokeConnectOverride: opts.smokeConnectOverride,
@@ -157,6 +160,7 @@ export async function runVercelDeployFrontDoorForCli(
     artifactDirFlag: flags.artifactDirFlag,
     controlPlaneUrl: flags.controlPlaneUrl,
     controlPlaneToken: flags.controlPlaneToken,
+    remote: flags.remote,
     allowControlPlaneOverride: flags.allowControlPlaneOverride,
     ...(hasFlag ? { hasFlag } : {}),
     ...(admissionEvidence ? { admissionEvidence } : {}),
