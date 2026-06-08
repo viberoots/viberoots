@@ -1,19 +1,14 @@
 #!/usr/bin/env zx-wrapper
 import assert from "node:assert/strict";
-import * as fsp from "node:fs/promises";
-import os from "node:os";
-import path from "node:path";
 import { test } from "node:test";
-import {
-  DEPLOYMENT_SECRET_FIXTURE_PATH_ENV,
-  DEPLOYMENT_SECRET_FIXTURE_SCHEMA,
-} from "../../deployments/deployment-secret-fixture";
+import { activateDeploymentSecretContext } from "../../deployments/deployment-secret-context";
 import {
   resolveProtectedSharedServiceClient,
   serviceClientSelectionEvidence,
 } from "../../deployments/deployment-service-client-selection";
 import { cloudflarePagesDeploymentFixture } from "./cloudflare-pages.fixture";
 import { withProjectConfig } from "./deployment-contexts.scope.helpers";
+import { startFakeVaultServer } from "./vault.test-server";
 
 const SECRET_REF = "secret://control-planes/prod/service-token";
 const RUNTIME_REF = "runtime://github-actions/control-plane-token";
@@ -46,29 +41,8 @@ function deployment(tokenRef = RUNTIME_REF) {
   };
 }
 
-async function withSecretFixture(run: () => Promise<void>) {
-  const previous = process.env[DEPLOYMENT_SECRET_FIXTURE_PATH_ENV];
-  const tmp = await fsp.mkdtemp(path.join(os.tmpdir(), "service-client-selection-"));
-  const fixturePath = path.join(tmp, "secrets.json");
-  await fsp.writeFile(
-    fixturePath,
-    JSON.stringify({
-      schemaVersion: DEPLOYMENT_SECRET_FIXTURE_SCHEMA,
-      contracts: { [SECRET_REF]: { value: "resolved-secret-token" } },
-    }),
-  );
-  process.env[DEPLOYMENT_SECRET_FIXTURE_PATH_ENV] = fixturePath;
-  try {
-    await run();
-  } finally {
-    if (previous === undefined) delete process.env[DEPLOYMENT_SECRET_FIXTURE_PATH_ENV];
-    else process.env[DEPLOYMENT_SECRET_FIXTURE_PATH_ENV] = previous;
-    await fsp.rm(tmp, { recursive: true, force: true });
-  }
-}
-
 test("context-selected control plane supplies URL and resolves secret token ref", async () => {
-  await withSecretFixture(async () => {
+  await withVaultSecretContext(async () => {
     const client = await resolveProtectedSharedServiceClient({
       deployment: deployment(SECRET_REF),
       context: "cloudflare-pages shared_nonprod mutation",
@@ -225,4 +199,20 @@ function withRuntimeHostConfig(run: () => Promise<void>) {
     },
     run,
   );
+}
+
+async function withVaultSecretContext(run: () => Promise<void>) {
+  const server = await startFakeVaultServer({
+    [SECRET_REF]: { currentVersion: "1", versions: { "1": { value: "resolved-secret-token" } } },
+  });
+  const restore = activateDeploymentSecretContext({
+    kind: "vault",
+    credential: { kind: "token", addr: server.addr, token: server.token },
+  });
+  try {
+    await run();
+  } finally {
+    restore();
+    await server.close();
+  }
 }

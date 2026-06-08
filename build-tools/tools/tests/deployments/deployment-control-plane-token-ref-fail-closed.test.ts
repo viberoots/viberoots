@@ -54,7 +54,7 @@ test("invalid selected backend config fails before provider mutation", async () 
           ...deployment(STAGING_REF, control.url, control.url),
           infisicalRuntime: undefined,
         }),
-      /explicit deployment secret context|infisical_runtime/,
+      /requires a selected real DeploymentSecretContext; rejected missing secretContext/,
     );
     assert.deepEqual(control.paths, []);
   } finally {
@@ -95,7 +95,7 @@ test("fixture backend success alone does not satisfy selected control-plane toke
             context: "cloudflare-pages shared_nonprod mutation",
             env: {},
           }),
-        /required secret contract secret:\/\/control-plane\/pleomino\/staging\/service-token is missing/,
+        /requires a selected real DeploymentSecretContext; rejected missing secretContext/,
       );
     },
   );

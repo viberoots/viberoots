@@ -147,8 +147,10 @@ test("deployment_context rejects malformed context secretBackend", async () => {
 test("deployment context validation is field-aware for secret refs and plaintext secrets", async () => {
   await withProjectConfig(
     {
+      controlPlanes: testControlPlanes(),
       deploymentContexts: {
         "safe-prod": {
+          controlPlane: "test",
           secretBackend: "vault/default",
           cloudflare: {
             account: "team-secret-ops",
@@ -182,7 +184,12 @@ test("deployment context validation is field-aware for secret refs and plaintext
 
 test("local project config can fill missing shared context coordinates", async () => {
   await withProjectConfig(
-    { deploymentContexts: { "admin-prod": { cloudflare: { projectName: "admin-prod-pages" } } } },
+    {
+      controlPlanes: testControlPlanes(),
+      deploymentContexts: {
+        "admin-prod": { controlPlane: "test", cloudflare: { projectName: "admin-prod-pages" } },
+      },
+    },
     async () => {
       await writeJson("projects/config/local.json", {
         deploymentContexts: { "admin-prod": { cloudflare: { account: "admin-platform" } } },
@@ -222,4 +229,15 @@ async function withProjectConfig(shared: Record<string, unknown>, run: () => Pro
 async function writeJson(relativePath: string, value: unknown) {
   await fs.mkdir(path.dirname(relativePath), { recursive: true });
   await fs.writeFile(relativePath, `${JSON.stringify(value, null, 2)}\n`);
+}
+
+function testControlPlanes() {
+  return {
+    test: {
+      serviceClient: {
+        controlPlaneUrl: "https://control.example",
+        controlPlaneTokenRef: "runtime://github-actions/control-plane-token",
+      },
+    },
+  };
 }

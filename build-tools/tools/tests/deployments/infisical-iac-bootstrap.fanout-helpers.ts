@@ -69,6 +69,14 @@ export async function writeRepoOnlyResolver(dir: string) {
             bootstrap: { backend: "local-file", file: ".local/bootstrap.json" },
           },
         },
+        controlPlanes: {
+          pleomino: {
+            serviceClient: {
+              controlPlaneUrl: "https://control.example",
+              controlPlaneTokenRef: "runtime://github-actions/control-plane-token",
+            },
+          },
+        },
         deploymentContexts: {
           "pleomino-staging": pleominoDeploymentContext("staging"),
           "pleomino-prod": pleominoDeploymentContext("prod"),
@@ -82,6 +90,7 @@ export async function writeRepoOnlyResolver(dir: string) {
 
 function pleominoDeploymentContext(stage: "staging" | "prod") {
   return {
+    controlPlane: "pleomino",
     secretBackend: "infisical/default",
     infisical: {
       host: "https://app.infisical.com",

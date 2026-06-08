@@ -659,3 +659,131 @@ authenticate for real `secret://` service-token refs used by checked-in profiles
 Token resolution becomes stricter and requires protected/shared command paths to provide complete
 deployment context and secret backend information. Fixtures that relied on context-free registered
 secret backend behavior will need to be narrowed or rewritten to model the selected backend path.
+
+## PR-6: Post-cutover fail-closed validation hardening
+
+### 1. Intent
+
+Close the remaining validation gaps found by the end-of-range assessments by making protected/shared
+control-plane selection fail closed before front-door, read-only, or mutation code can fall back to
+fixtures or partially validated config.
+
+### 2. Scope of changes
+
+- Require protected/shared `secret://` control-plane token resolution to receive a selected real
+  `DeploymentSecretContext`.
+- Reject protected/shared `secret://` token resolution when `secretContext` is missing, even if the
+  fixture backend could resolve the same ref.
+- Keep fixture backend success scoped to explicitly fixture-only tests and contexts; fixture success
+  must not mask missing selected backend context in remote-profile, context-selected, or
+  protected/shared paths.
+- Add repo, front-door, and read-only project-config validation that rejects protected/shared
+  deployment contexts without a selected `controlPlane`.
+- Ensure validation fails before later context-resolution or mutating provider selection code when a
+  protected/shared context lacks `controlPlane`.
+- Validate every merged `controlPlanes` entry from shared and local project config, not only the
+  profile selected by a deployment context or named remote selector.
+- Reject plaintext token-shaped fields and malformed `controlPlaneTokenRef` values in unreferenced
+  shared and local control-plane profiles.
+- Preserve valid local-only contexts that do not require a protected/shared control-plane selection.
+- Keep diagnostics redacted while naming the config path, deployment context, profile name, and
+  rejected fallback source where applicable.
+- Do not broaden this PR into provider routing changes, secret backend provisioning, or new
+  control-plane profile features.
+
+### 3. External prerequisites
+
+- PR-1 through PR-5 must have landed.
+- Existing project-config validation, deployment context validation, protected/shared front-door
+  validation, and token-ref tests must be available to extend.
+- The merged shared/local project-config representation must expose all `controlPlanes` entries
+  before context selection filters are applied.
+
+### 4. Tests to be added
+
+- Add protected/shared token-ref tests proving `secret://` resolution without `secretContext`
+  fails, even when a fixture backend would return a token.
+- Add remote-profile and context-selected regression tests proving fixture backend success cannot
+  mask missing selected backend context.
+- Add front-door validation tests proving protected/shared contexts without `controlPlane` are
+  rejected before provider mutation.
+- Add read-only validation tests proving protected/shared repo inspection or planning paths reject
+  missing `controlPlane` instead of deferring failure to mutating selection.
+- Add project-config validation tests proving all merged `controlPlanes` entries are checked,
+  including unreferenced shared profiles and unreferenced local override profiles.
+- Add negative tests proving plaintext token-shaped fields and malformed token refs in unreferenced
+  profiles fail validation.
+- Add local-only regression tests proving contexts that are not protected/shared remain valid
+  without a selected control plane.
+- Add redaction tests proving diagnostics identify invalid paths and rejected fallback sources
+  without printing token values.
+
+### 5. Docs to be added or updated
+
+- Update [Control Plane Selector Design](control-plane-selector.md) to state that protected/shared
+  contexts must select a valid control plane during repo, front-door, read-only, and mutation
+  validation.
+- Update [SprinkleRef Resolver](sprinkleref.md) to state that protected/shared control-plane
+  `secret://` refs require selected real backend context and cannot be satisfied by fixture fallback.
+- Update deployment troubleshooting docs with diagnostics for missing `controlPlane`, missing
+  `secretContext`, rejected fixture fallback, and invalid unreferenced `controlPlanes` profiles.
+- Update this plan if implementation discovers another protected/shared validation entrypoint that
+  must share the same fail-closed rules.
+
+### 5.5. Expected regression scope
+
+- `deployment-only`
+- Expected implementation paths:
+  - `build-tools/tools/deployments/deployment-control-plane-token-ref.ts`
+  - `build-tools/tools/deployments/deployment-context-validation.ts`
+  - `build-tools/tools/deployments/project-config.ts`
+  - `build-tools/tools/deployments/*front-door*.ts`
+  - `build-tools/tools/deployments/*read-only*.ts`
+  - `build-tools/tools/tests/deployments/**`
+  - `docs/**`
+- Keep changes focused on fail-closed validation, merged profile validation, token-context
+  enforcement, docs, and tests.
+
+### 6. Acceptance criteria
+
+- Protected/shared `secret://` token resolution fails when selected real backend context is missing,
+  regardless of fixture backend behavior.
+- Fixture token resolution cannot satisfy remote-profile, context-selected, or protected/shared
+  paths unless the path is explicitly fixture-scoped.
+- Repo, front-door, read-only, and mutation validation all reject protected/shared contexts without
+  a selected valid `controlPlane`.
+- Every merged `controlPlanes` entry is validated for shape, token-ref scheme, and plaintext
+  token-shaped fields whether or not it is selected.
+- Unreferenced invalid shared or local control-plane profiles fail validation.
+- Local-only contexts that do not require protected/shared service routing remain valid.
+- Tests and docs cover the fail-closed behavior and redacted diagnostics.
+
+### 7. Risks
+
+- Validating every merged profile can surface stale local override profiles that were previously
+  ignored because no context selected them.
+- Moving protected/shared missing-control-plane failures earlier can require test fixtures to model
+  repo/front-door/read-only validation more completely.
+- Tight fixture scoping can break positive tests that accidentally relied on context-free fixture
+  token resolution.
+
+### 8. Mitigations
+
+- Make diagnostics point to the exact shared or local profile path that failed validation and the
+  accepted token-ref schemes.
+- Update fixtures in the same PR so protected/shared contexts include explicit control-plane
+  selectors where the test is not about missing-selection failure.
+- Keep fixture resolution tests under clearly named fixture-only helpers or contexts, and add
+  negative regression coverage for all protected/shared entrypoints.
+
+### 9. Consequences of not implementing this PR
+
+Protected/shared deployments can still pass through validation with missing selected control-plane
+context, unresolved real secret context, or invalid unreferenced profiles, allowing fixture fallback
+or later mutation-time failures to hide configuration errors.
+
+### 10. Downsides for implementing this PR
+
+Validation becomes stricter for both checked-in and local config. Operators with stale local
+profiles or protected/shared contexts missing `controlPlane` must fix those entries before
+front-door, read-only, or mutation commands proceed.

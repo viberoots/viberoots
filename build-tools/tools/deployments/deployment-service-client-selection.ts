@@ -3,6 +3,7 @@ import type { DeploymentTarget } from "./contract";
 import { type NixosSharedHostResolvedServiceClient } from "./nixos-shared-host-service-client-config";
 import { resolveServiceClientFromCliProfileOrFlags } from "./deployment-service-client-profile";
 import { resolveControlPlaneTokenRef } from "./deployment-control-plane-token-ref";
+import { deploymentSecretContext } from "./deployment-secret-context";
 
 type SelectionSource = "context" | "explicit_override" | "explicit" | "ambient";
 
@@ -142,6 +143,8 @@ async function resolveContextToken(opts: {
     vaultRuntime: opts.deployment.vaultRuntime,
     infisicalRuntime: opts.deployment.infisicalRuntime,
     infisicalSecretMappings: opts.deployment.infisicalSecretMappings,
+    secretContext: deploymentSecretContext(),
+    requireRealSecretContext: opts.tokenRef.startsWith("secret://"),
     workspaceRoot: opts.workspaceRoot,
     env: opts.env,
   });

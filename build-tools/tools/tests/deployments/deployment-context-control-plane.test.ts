@@ -169,7 +169,7 @@ test("control-plane selector and profile validation fail closed", async () => {
         },
         endpoint: "https://control.example",
       },
-      "controlPlanes.endpoint is unsupported",
+      "controlPlanes.unsupported-key.endpoint is unsupported",
     ],
     [
       "bad-records-shape",

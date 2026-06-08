@@ -305,6 +305,16 @@ deployment context, token ref, and backend kind, but they redact token values
 and backend payloads. `runtime://...` token refs remain separate runtime-host
 bindings and do not use SprinkleRef secret resolution.
 
+Fixture secret files do not satisfy protected/shared context-selected
+`secret://...` control-plane token refs when the selected real
+`DeploymentSecretContext` is missing. A diagnostic that says
+`rejected missing secretContext` or `rejected fixture fallback` means the
+deployment context must select a valid secret backend and runtime credential
+source before the provider front door will run. Project config validation also
+checks unreferenced `controlPlanes` entries from shared and local config; fix
+stale malformed refs or plaintext token-shaped fields even when no deployment
+currently selects that profile.
+
 ```bash
 deploy --deployment //projects/deployments/pleomino/prod:deploy \
   --status \

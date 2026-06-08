@@ -70,6 +70,33 @@ export function resolveContextControlPlane(opts: {
     : undefined;
 }
 
+export function validateControlPlaneProfiles(opts: {
+  config: ProjectConfig;
+  label: string;
+  errors: string[];
+}) {
+  const profiles = opts.config.controlPlanes;
+  if (profiles === undefined) return;
+  if (!isRecord(profiles)) {
+    opts.errors.push(deploymentContextError(opts.label, "controlPlanes must be an object"));
+    return;
+  }
+  for (const [name, profile] of Object.entries(profiles)) {
+    if (!isRecord(profile)) {
+      opts.errors.push(
+        deploymentContextError(opts.label, `controlPlanes.${name} must be an object`),
+      );
+      continue;
+    }
+    normalizeControlPlaneProfile({
+      name,
+      profile,
+      label: opts.label,
+      errors: opts.errors,
+    });
+  }
+}
+
 export function controlPlaneGraphMetadata(profile: DeploymentControlPlaneProfile) {
   return {
     name: profile.name,
@@ -90,8 +117,9 @@ function normalizeControlPlaneProfile(opts: {
   errors: string[];
 }): DeploymentControlPlaneProfile | undefined {
   const errorCount = opts.errors.length;
-  validateKeys(opts, "controlPlanes", opts.profile, PROFILE_KEYS);
-  rejectPlaintextTokenFields(opts, "controlPlanes", opts.profile);
+  const path = `controlPlanes.${opts.name}`;
+  validateKeys(opts, path, opts.profile, PROFILE_KEYS);
+  rejectPlaintextTokenFields(opts, path, opts.profile);
   const serviceClient = readServiceClient(opts);
   const records = readRecords(opts);
   if (!serviceClient || opts.errors.length > errorCount) return undefined;

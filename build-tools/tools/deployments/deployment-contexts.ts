@@ -2,7 +2,12 @@
 import type { GraphNode } from "../lib/graph";
 import { normalizeDeploymentSecretBackendSelector } from "./deployment-secret-backend-selector";
 import { applyContextSecretRefs, selectedContextOverrides } from "./deployment-context-secret-refs";
-import { resolveContextControlPlane } from "./deployment-control-plane-profile";
+import {
+  resolveContextControlPlane,
+  validateControlPlaneProfiles,
+} from "./deployment-control-plane-profile";
+import { applyProviderDefaults } from "./deployment-context-provider-defaults";
+import { KUBERNETES_PROVIDER, OPENTOFU_PROVIDER } from "./deployment-provider-targets";
 import {
   deploymentContextError,
   pushAppDeploymentTopologyErrors,
@@ -16,6 +21,7 @@ import {
 } from "./project-config";
 
 const CONTEXT_NAME = /^[a-z0-9][a-z0-9-]*$/;
+const DEFAULT_LOCAL_ONLY_PROVIDERS = new Set([KUBERNETES_PROVIDER, OPENTOFU_PROVIDER]);
 
 type ContextRecord = Record<string, unknown>;
 
@@ -26,6 +32,11 @@ export function resolveDeploymentContextNodes(
 ): GraphNode[] {
   const loaded = readProjectConfigSync(cwd);
   pushAppDeploymentTopologyErrors(nodes, errors);
+  validateControlPlaneProfiles({
+    config: loaded.config,
+    label: "projects/config",
+    errors,
+  });
   return nodes.map((node) =>
     resolveDeploymentContextNode({
       node,
@@ -88,11 +99,41 @@ export function resolveDeploymentContextNode(opts: {
     );
   }
   validateDeploymentContext({ context, selector, label, errors: opts.errors });
+  validateProtectedSharedContextControlPlane({
+    node: opts.node,
+    selector,
+    context,
+    label,
+    errors: opts.errors,
+  });
   applySecretBackendDefault({ node: next, context, label, errors: opts.errors });
   applyProviderDefaults({ node: next, context, label, errors: opts.errors });
   if (controlPlane) next.control_plane = controlPlane.graphMetadata;
   applyContextSecretRefs({ node: next, context, localOverrides, controlPlane });
   return next;
+}
+
+function validateProtectedSharedContextControlPlane(opts: {
+  node: GraphNode;
+  selector: string;
+  context: ContextRecord;
+  label: string;
+  errors: string[];
+}) {
+  if (!requiresContextControlPlane(opts.node)) return;
+  if (stringValue(opts.context.controlPlane)) return;
+  opts.errors.push(
+    deploymentContextError(
+      opts.label,
+      `protected/shared deployment_context ${opts.selector} must select a valid controlPlane`,
+    ),
+  );
+}
+
+function requiresContextControlPlane(node: GraphNode) {
+  const protectionClass = stringValue(node.protection_class);
+  if (protectionClass) return protectionClass !== "local_only";
+  return !DEFAULT_LOCAL_ONLY_PROVIDERS.has(stringValue(node.provider));
 }
 
 function contextByName(config: ProjectConfig, selector: string): ContextRecord | undefined {
@@ -125,119 +166,6 @@ function applySecretBackendDefault(opts: {
       ),
     );
   }
-}
-
-function applyProviderDefaults(opts: {
-  node: GraphNode;
-  context: ContextRecord;
-  label: string;
-  errors: string[];
-}) {
-  const section = providerSection(opts.node.provider, opts.context);
-  if (section) mergeRecordField(opts, "provider_target", providerTargetDefaults(section));
-  if (String(opts.node.provider || "") === "s3-static" && isRecord(opts.context.aws)) {
-    mergeRecordField(opts, "provider_target", awsProviderTargetDefaults(opts.context.aws));
-  }
-  const infisical = isRecord(opts.context.infisical) ? opts.context.infisical : undefined;
-  if (infisical) mergeRecordField(opts, "infisical_runtime", infisicalRuntimeDefaults(infisical));
-}
-
-function providerSection(provider: unknown, context: ContextRecord) {
-  const key = String(provider || "").startsWith("cloudflare")
-    ? "cloudflare"
-    : String(provider || "");
-  return isRecord(context[key]) ? context[key] : undefined;
-}
-
-function mergeRecordField(
-  opts: { node: GraphNode; label: string; errors: string[] },
-  fieldName: string,
-  defaults: Record<string, string>,
-) {
-  const existing = isRecord(opts.node[fieldName])
-    ? (opts.node[fieldName] as Record<string, unknown>)
-    : {};
-  const merged: Record<string, string> = {};
-  for (const [key, value] of Object.entries(existing))
-    if (typeof value === "string") merged[key] = value;
-  for (const [key, value] of Object.entries(defaults)) {
-    if (!value) continue;
-    if (merged[key] && merged[key] !== value) {
-      opts.errors.push(
-        deploymentContextError(
-          opts.label,
-          `${fieldName}.${key} ${merged[key]} disagrees with deployment_context ${value}`,
-        ),
-      );
-      continue;
-    }
-    merged[key] = value;
-  }
-  opts.node[fieldName] = merged;
-}
-
-function providerTargetDefaults(section: ContextRecord) {
-  return pickAliases(section, {
-    account: ["account", "accountId"],
-    account_id: ["account_id", "accountId"],
-    organization_id: ["organization_id", "organizationId"],
-    project: ["project", "projectName"],
-    id: ["id", "projectId"],
-    custom_domain: ["custom_domain", "customDomain"],
-    custom_domain_zone_id: ["custom_domain_zone_id", "customDomainZoneId", "zoneId"],
-    region: ["region", "defaultRegion"],
-    zone_id: ["zone_id", "zoneId"],
-  });
-}
-
-function awsProviderTargetDefaults(section: ContextRecord) {
-  return pickAliases(section, {
-    account: ["account", "accountId"],
-    account_id: ["account_id", "accountId"],
-    organization_id: ["organization_id", "organizationId"],
-    region: ["region", "defaultRegion"],
-  });
-}
-
-function infisicalRuntimeDefaults(section: ContextRecord) {
-  const picked = pickAliases(section, {
-    site_url: ["site_url", "host"],
-    project_id: ["project_id", "projectId"],
-    project_name: ["project_name", "projectName"],
-    project_slug: ["project_slug", "projectSlug"],
-    environment: ["environment"],
-    secret_path: ["secret_path", "defaultPath"],
-    machine_identity_client_id_env: ["machine_identity_client_id_env", "clientIdEnv"],
-    machine_identity_client_secret_env: ["machine_identity_client_secret_env", "clientSecretEnv"],
-    machine_identity_client_id_ref: ["machine_identity_client_id_ref", "clientIdRef"],
-    machine_identity_client_secret_ref: ["machine_identity_client_secret_ref", "clientSecretRef"],
-    machine_identity_client_id_file_name: [
-      "machine_identity_client_id_file_name",
-      "clientIdFileName",
-    ],
-    machine_identity_client_secret_file_name: [
-      "machine_identity_client_secret_file_name",
-      "clientSecretFileName",
-    ],
-    machine_identity_id: ["machine_identity_id", "machineIdentityId"],
-    preferred_credential_source: ["preferred_credential_source", "credentialSource"],
-  });
-  if (
-    !picked.preferred_credential_source &&
-    picked.machine_identity_client_id_ref &&
-    picked.machine_identity_client_secret_ref
-  ) {
-    picked.preferred_credential_source = "infisical_machine_identity_universal_auth";
-  }
-  return picked;
-}
-
-function pickAliases(section: ContextRecord, aliases: Record<string, string[]>) {
-  const picked: Record<string, string> = {};
-  for (const [field, keys] of Object.entries(aliases)) {
-    picked[field] = keys.map((key) => stringValue(section[key])).find(Boolean) || "";
-  }
-  return picked;
 }
 
 function isRecord(value: unknown): value is ContextRecord {

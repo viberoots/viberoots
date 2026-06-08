@@ -87,7 +87,7 @@ test("secret token refs fail closed without selected deployment secret context",
         context: "cloudflare-pages shared_nonprod mutation",
         env: {},
       }),
-    /could not be resolved through selected infisical secret backend[\s\S]*explicit deployment secret context/,
+    /requires a selected real DeploymentSecretContext; rejected missing secretContext/,
   );
 });
 

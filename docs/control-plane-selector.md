@@ -151,10 +151,11 @@ deployment_context = "pleomino-prod"
 Context resolution must:
 
 1. Load `projects/config/shared.json`, then deep-merge `projects/config/local.json`.
-2. Validate `deploymentContexts.<selector>`.
-3. Validate `deploymentContexts.<selector>.controlPlane` when present.
-4. Resolve the selected control-plane profile from `controlPlanes`.
-5. Attach normalized control-plane metadata to the deployment graph node.
+2. Validate every merged `controlPlanes` profile, including entries that no selected context uses.
+3. Validate `deploymentContexts.<selector>`.
+4. Validate `deploymentContexts.<selector>.controlPlane` when present.
+5. Resolve the selected control-plane profile from `controlPlanes`.
+6. Attach normalized control-plane metadata to the deployment graph node.
 
 The normalized graph node should contain one provider-neutral field:
 
@@ -211,6 +212,7 @@ Project config validation must reject:
 
 - `deploymentContexts.<name>.controlPlane` that does not match a key in `controlPlanes`.
 - Protected/shared deployment contexts without a selected control plane.
+- Invalid unreferenced `controlPlanes` entries from shared or local config.
 - `controlPlaneUrl` values that fail the protected/shared transport policy.
 - Plaintext `controlPlaneToken`, `token`, `bearerToken`, or similar fields in shared or local
   project config.

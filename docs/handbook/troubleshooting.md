@@ -92,6 +92,25 @@
   public custom-domain deployments derive smoke URL from `domain`; private and
   no-ingress services need explicit smoke metadata or a reviewed smoke exception.
 
+## Control-Plane Selector Diagnostics
+
+- `protected/shared deployment_context <name> must select a valid controlPlane`:
+  add `controlPlane` to the named `deploymentContexts.<name>` entry and ensure it
+  points at a valid `controlPlanes.<profile>` profile. `--control-plane-url`,
+  `VBR_DEPLOY_CONTROL_PLANE_URL`, `--remote`, and ambient token material cannot
+  stand in for a context-selected protected/shared control plane.
+- `rejected missing secretContext` or `rejected fixture fallback`: the selected
+  `secret://...` control-plane token ref needs a real selected Vault or
+  Infisical `DeploymentSecretContext`. Wire the context `secretBackend` and
+  backend runtime metadata, or use `runtime://...` when the runtime host supplies
+  the token. Fixture files are only for explicitly fixture-scoped tests.
+- `controlPlanes.<name>...controlPlaneTokenRef must be a secret:// or runtime://`:
+  fix the profile even if no deployment currently selects it. Shared and local
+  config are merged first, then every `controlPlanes` entry is validated.
+- `controlPlanes.<name>.<token field> must not contain a plaintext token`: remove
+  plaintext fields such as `controlPlaneToken`, `token`, or `bearerToken` from
+  shared and local config and replace them with a `controlPlaneTokenRef`.
+
 ## Overrides in CI
 
 - Ensure `NIX_GO_DEV_OVERRIDE_JSON` and `NIX_CPP_DEV_OVERRIDE_JSON` are unset. Locally, use `build-tools/tools/dev/clear-overrides.ts`.

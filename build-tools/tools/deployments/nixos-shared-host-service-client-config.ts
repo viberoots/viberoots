@@ -3,6 +3,7 @@ import type { NixosSharedHostClientManifest } from "./nixos-shared-host-install-
 import { validateProtectedSharedServiceTransport } from "./deployment-service-transport-policy";
 import { readProjectConfigSync } from "./project-config";
 import { resolveControlPlaneTokenRef } from "./deployment-control-plane-token-ref";
+import { validateControlPlaneProfiles } from "./deployment-control-plane-profile";
 
 export type NixosSharedHostServiceClientPlan = {
   mode: "control-plane-service";
@@ -122,6 +123,7 @@ export async function resolveServiceClientFromFlags(opts: {
   const remoteToken = remoteProfile
     ? await resolveControlPlaneTokenRef({
         tokenRef: remoteProfile.controlPlaneTokenRef,
+        requireRealSecretContext: remoteProfile.controlPlaneTokenRef.startsWith("secret://"),
         workspaceRoot: opts.workspaceRoot,
         env,
       })
@@ -153,7 +155,15 @@ function readRemoteControlPlaneProfile(
   controlPlaneUrl: string;
   controlPlaneTokenRef: string;
 } {
-  const profile = readProjectConfigSync(workspaceRoot).config.controlPlanes?.[remote];
+  const config = readProjectConfigSync(workspaceRoot).config;
+  const errors: string[] = [];
+  validateControlPlaneProfiles({
+    config,
+    label: "projects/config",
+    errors,
+  });
+  if (errors.length > 0) throw new Error(Array.from(new Set(errors)).join("\n"));
+  const profile = config.controlPlanes?.[remote];
   if (!isRecord(profile)) {
     throw new Error(
       `--remote ${remote} requires a matching projects/config/shared.json controlPlanes.${remote} profile`,

@@ -56,6 +56,8 @@ REVIEWED_DEPLOYMENT_TEST_OWNERSHIP.update({
     "build-tools/tools/tests/deployments/deployment-context-control-plane-boundary.test.ts": True,
     "build-tools/tools/tests/deployments/deployment-context-control-plane-reporting.test.ts": True,
     "build-tools/tools/tests/deployments/deployment-context-control-plane.test.ts": True,
+    "build-tools/tools/tests/deployments/deployment-context-default-local-only.test.ts": True,
+    "build-tools/tools/tests/deployments/deployment-control-plane-profile-validation.test.ts": True,
     "build-tools/tools/tests/deployments/deployment-control-plane-token-ref-fail-closed.test.ts": True,
     "build-tools/tools/tests/deployments/deployment-control-plane-token-ref-readonly.test.ts": True,
     "build-tools/tools/tests/deployments/deployment-control-plane-token-ref-redaction.test.ts": True,

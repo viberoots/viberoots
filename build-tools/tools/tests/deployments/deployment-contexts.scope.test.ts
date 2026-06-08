@@ -1,6 +1,5 @@
 #!/usr/bin/env zx-wrapper
 import assert from "node:assert/strict";
-import * as fs from "node:fs/promises";
 import { test } from "node:test";
 import { resolveInitialCloudflarePagesAdmittedContext } from "../../deployments/cloudflare-pages-admission";
 import {
@@ -18,17 +17,20 @@ import {
   writeJson,
 } from "./deployment-contexts.scope.helpers";
 
-const REPO_ROOT = process.cwd();
-
 test("deployment_context differentiates AWS accounts and Infisical projects", async () => {
   await withProjectConfig(
     {
+      controlPlanes: JSON.parse(
+        '{"test":{"serviceClient":{"controlPlaneUrl":"https://control.example","controlPlaneTokenRef":"runtime://github-actions/control-plane-token"}}}',
+      ),
       deploymentContexts: {
         "aws-staging": {
+          controlPlane: "test",
           aws: { accountId: "111122223333", defaultRegion: "us-west-2" },
           infisical: { projectId: "proj-staging", environment: "staging" },
         },
         "aws-prod": {
+          controlPlane: "test",
           aws: { accountId: "444455556666", defaultRegion: "us-east-1" },
           infisical: { projectId: "proj-prod", environment: "prod" },
         },
@@ -205,7 +207,7 @@ test("admission evidence carries deployment_context-derived metadata", async () 
       ).deployments[0];
       assert.ok(deployment);
       const admitted = await resolveInitialCloudflarePagesAdmittedContext({
-        workspaceRoot: REPO_ROOT,
+        workspaceRoot: process.cwd(),
         deployment,
         artifactIdentity: "static-webapp:abc123",
         deferSecretReferenceResolution: true,
@@ -236,15 +238,4 @@ test("context scenarios reject secret_backend_profile and preserve legacy backen
   );
   assert.deepEqual(legacy.errors, []);
   assert.equal(legacy.deployments[0]?.secretBackendProfile, "infisical-default");
-});
-
-test("deployment authoring macros forward deployment_context beyond Cloudflare Pages", async () => {
-  for (const file of [
-    "build-tools/deployments/s3_defs.bzl",
-    "build-tools/deployments/vercel_defs.bzl",
-  ]) {
-    const text = await fs.readFile(file, "utf8");
-    assert.match(text, /deployment_context = ""/);
-    assert.match(text, /deployment_context = deployment_context/);
-  }
 });

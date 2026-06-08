@@ -4,10 +4,7 @@ import * as fsp from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
-import {
-  DEPLOYMENT_SECRET_FIXTURE_PATH_ENV,
-  DEPLOYMENT_SECRET_FIXTURE_SCHEMA,
-} from "../../deployments/deployment-secret-fixture";
+import { activateDeploymentSecretContext } from "../../deployments/deployment-secret-context";
 import {
   LOCAL_FIXTURE_SERVICE_ENV,
   validateProtectedSharedServiceTransport,
@@ -17,6 +14,7 @@ import {
   resolveServiceClientFromManifest,
 } from "../../deployments/nixos-shared-host-service-client-config";
 import { withProjectConfig } from "./deployment-contexts.scope.helpers";
+import { startFakeVaultServer } from "./vault.test-server";
 
 const SECRET_REF = "secret://control-plane/mini/service-token";
 const RUNTIME_REF = "runtime://github-actions/control-plane-token";
@@ -35,7 +33,7 @@ test("nixos shared-host service client resolves --remote profile URL and runtime
 });
 
 test("nixos shared-host service client resolves --remote secret token ref", async () => {
-  await withSecretFixture(async () => {
+  await withVaultSecretContext(async () => {
     await withProjectConfig(remoteProjectConfig(SECRET_REF), async () => {
       const client = await resolveServiceClientFromFlags({
         remote: "mini",
@@ -220,24 +218,20 @@ function remoteProjectConfig(tokenRef: string) {
   };
 }
 
-function withSecretFixture(run: () => Promise<void>) {
-  return withTempDir("service-client-secret-", async (tmp) => {
-    const previous = process.env[DEPLOYMENT_SECRET_FIXTURE_PATH_ENV];
-    process.env[DEPLOYMENT_SECRET_FIXTURE_PATH_ENV] = path.join(tmp, "secrets.json");
-    await fsp.writeFile(
-      process.env[DEPLOYMENT_SECRET_FIXTURE_PATH_ENV],
-      JSON.stringify({
-        schemaVersion: DEPLOYMENT_SECRET_FIXTURE_SCHEMA,
-        contracts: { [SECRET_REF]: { value: "resolved-secret-token" } },
-      }),
-    );
-    try {
-      await run();
-    } finally {
-      if (previous === undefined) delete process.env[DEPLOYMENT_SECRET_FIXTURE_PATH_ENV];
-      else process.env[DEPLOYMENT_SECRET_FIXTURE_PATH_ENV] = previous;
-    }
+async function withVaultSecretContext(run: () => Promise<void>) {
+  const server = await startFakeVaultServer({
+    [SECRET_REF]: { currentVersion: "1", versions: { "1": { value: "resolved-secret-token" } } },
   });
+  const restore = activateDeploymentSecretContext({
+    kind: "vault",
+    credential: { kind: "token", addr: server.addr, token: server.token },
+  });
+  try {
+    await run();
+  } finally {
+    restore();
+    await server.close();
+  }
 }
 
 async function withTempDir(prefix: string, run: (dir: string) => Promise<void>) {

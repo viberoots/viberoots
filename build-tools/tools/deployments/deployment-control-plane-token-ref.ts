@@ -22,6 +22,7 @@ export async function resolveControlPlaneTokenRef(opts: {
   infisicalRuntime?: DeploymentInfisicalRuntimeConfig;
   infisicalSecretMappings?: Record<string, DeploymentInfisicalSecretMapping>;
   secretContext?: DeploymentSecretContext;
+  requireRealSecretContext?: boolean;
   workspaceRoot?: string;
   env: NodeJS.ProcessEnv;
 }): Promise<string> {
@@ -36,6 +37,7 @@ export async function resolveControlPlaneTokenRef(opts: {
       infisicalRuntime: opts.infisicalRuntime,
       infisicalSecretMappings: opts.infisicalSecretMappings,
       secretContext: opts.secretContext,
+      requireRealSecretContext: opts.requireRealSecretContext,
     });
   }
   if (opts.tokenRef.startsWith("runtime://")) {
@@ -58,8 +60,15 @@ async function resolveSecretToken(opts: {
   infisicalRuntime?: DeploymentInfisicalRuntimeConfig;
   infisicalSecretMappings?: Record<string, DeploymentInfisicalSecretMapping>;
   secretContext?: DeploymentSecretContext;
+  requireRealSecretContext?: boolean;
 }) {
   const secretContext = deploymentSecretContext(opts.secretContext);
+  if (opts.requireRealSecretContext && (!secretContext || secretContext.kind === "fixture")) {
+    const source = secretContext?.kind === "fixture" ? "fixture fallback" : "missing secretContext";
+    throw new Error(
+      `control-plane service token ref ${opts.tokenRef} requires a selected real DeploymentSecretContext; rejected ${source}${contextSuffix(opts.contextName)}`,
+    );
+  }
   const requirement = controlPlaneServiceTokenRequirement(opts.tokenRef);
   try {
     const [admitted] = await resolveInitialAdmittedSecretReferences({

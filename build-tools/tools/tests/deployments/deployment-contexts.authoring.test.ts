@@ -26,8 +26,17 @@ test("deployment authoring macros forward deployment_context across provider fam
 test("deployment context rejects camelCase plaintext secret fields but allows Ref fields", async () => {
   await withProjectConfig(
     {
+      controlPlanes: {
+        test: {
+          serviceClient: {
+            controlPlaneUrl: "https://control.example",
+            controlPlaneTokenRef: "runtime://github-actions/control-plane-token",
+          },
+        },
+      },
       deploymentContexts: {
         "safe-prod": {
+          controlPlane: "test",
           cloudflare: {
             account: "web-platform",
             projectName: "safe-prod",
@@ -39,6 +48,7 @@ test("deployment context rejects camelCase plaintext secret fields but allows Re
           },
         },
         "unsafe-prod": {
+          controlPlane: "test",
           cloudflare: { account: "web-platform", apiToken: "plaintext-token" },
           infisical: { clientSecret: "plaintext-secret" },
         },
