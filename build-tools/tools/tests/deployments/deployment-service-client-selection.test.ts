@@ -19,7 +19,7 @@ const SECRET_REF = "secret://control-planes/prod/service-token";
 const RUNTIME_REF = "runtime://github-actions/control-plane-token";
 
 function deployment(tokenRef = RUNTIME_REF) {
-  return cloudflarePagesDeploymentFixture({
+  const base = cloudflarePagesDeploymentFixture({
     controlPlane: {
       name: "prod",
       serviceClient: {
@@ -40,6 +40,10 @@ function deployment(tokenRef = RUNTIME_REF) {
       },
     },
   });
+  return {
+    ...base,
+    ...(tokenRef.startsWith("secret://") ? { secretBackend: "vault" as const } : {}),
+  };
 }
 
 async function withSecretFixture(run: () => Promise<void>) {

@@ -57,6 +57,15 @@ project config. `sprinkleref --check` classifies those `controlPlaneTokenRef` va
 same secret/runtime credential handling and never as `config://` values. `records.backend`
 currently supports `service`.
 
+For protected/shared deployments, `secret://...` control-plane service-token refs resolve through
+the selected deployment context's `DeploymentSecretContext` and configured secret backend. The
+resolver first records an exact backend reference for the one-off service-token requirement, then
+reads the token through the selected Vault or Infisical backend. Fixture secrets are valid only when
+the run is explicitly fixture-scoped; they are not a fallback for missing selected backend context.
+If the context, backend runtime metadata, or selected ref is missing, the command fails before
+provider mutation and reports only redacted diagnostics. `runtime://...` token refs stay on the
+runtime-host binding path and do not enter SprinkleRef secret resolution.
+
 Pleomino is the checked-in context example. Staging selects
 `deployment_context = "pleomino-staging"` and production selects
 `deployment_context = "pleomino-prod"`. The shared config entries hold the selected control-plane

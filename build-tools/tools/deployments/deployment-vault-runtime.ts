@@ -52,7 +52,7 @@ export async function prepareDeploymentVaultRuntime(opts: {
   env?: NodeJS.ProcessEnv;
 }): Promise<PreparedDeploymentVaultRuntime> {
   const env = opts.env || process.env;
-  if (opts.deployment.secretRequirements.length === 0) return { minted: false };
+  if (!deploymentNeedsVaultRuntime(opts.deployment)) return { minted: false };
   if (deploymentSecretFixturePath()) return { minted: false, secretContext: { kind: "fixture" } };
 
   const plan = resolveDeploymentVaultRuntimePlan({
@@ -111,4 +111,11 @@ export async function prepareDeploymentVaultRuntime(opts: {
       },
     },
   };
+}
+
+function deploymentNeedsVaultRuntime(deployment: DeploymentTarget) {
+  return (
+    deployment.secretRequirements.length > 0 ||
+    Boolean(deployment.controlPlane?.serviceClient.controlPlaneTokenRef.startsWith("secret://"))
+  );
 }

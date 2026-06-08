@@ -245,19 +245,48 @@ unexpected outcome.
 
 - Symptom: a protected/shared provider front door rejects before provider
   mutation with a missing control-plane, unknown `controlPlanes.<name>`,
-  malformed profile, or unresolved `controlPlaneTokenRef` error.
+  malformed profile, missing selected secret backend context, or unresolved
+  `controlPlaneTokenRef` error.
 - Likely causes:
   - The deployment target declares `deployment_context`, but the selected
     context does not contain a valid `controlPlane`.
+  - A protected/shared deployment has checked-in `controlPlane` metadata but no
+    real selected deployment context. For `secret://` service-token refs, the
+    deployment context is the authority that selects the secret backend and
+    target scope; control-plane metadata alone is not enough.
   - The context names a profile missing from `projects/config/shared.json`
     `controlPlanes`, or the profile is missing `serviceClient.controlPlaneUrl`
     or `serviceClient.controlPlaneTokenRef`.
+  - The selected `serviceClient.controlPlaneTokenRef` is `secret://...`, but
+    the selected deployment context does not provide an explicit secret backend
+    such as Vault or Infisical.
+  - The selected backend cannot build a `DeploymentSecretContext`: Vault needs
+    usable `vault_runtime` metadata and operator inputs, while Infisical needs
+    `infisical_runtime` metadata plus the configured machine identity or access
+    token credential source.
+  - The selected Vault or Infisical backend is reachable, but the requested
+    `secret://.../service-token` contract is missing, revoked, version-mismatched,
+    or not admitted for the selected target scope.
   - `--remote <name>` was used for a command without context, but the named
     profile is absent, malformed, or its `secret://...` / `runtime://...` token
     ref cannot resolve in the current operator environment.
 - Fix:
   - Add or correct `deploymentContexts.<name>.controlPlane` and the matching
     `controlPlanes.<name>.serviceClient` profile in project config.
+  - Ensure protected/shared deployment targets select a real deployment context,
+    not only derived `controlPlane` metadata. `secret://` control-plane tokens
+    intentionally fail closed without that selected context.
+  - For `secret://` service-token refs, configure the selected deployment
+    context's secret backend and runtime metadata:
+    - Vault: provide the reviewed `vault_runtime` configuration and the
+      operator inputs required to activate a Vault-backed
+      `DeploymentSecretContext`.
+    - Infisical: provide the reviewed `infisical_runtime` configuration and
+      the machine identity or access token source expected by that runtime.
+  - Verify the backend contains the exact checked-in
+    `serviceClient.controlPlaneTokenRef` contract for the selected context,
+    stage, and backend profile. Do not replace the ref with a plaintext token in
+    shared config, local config, command output, or CLI flags.
   - For command-scoped remote selection, pass `--remote <name>` only when that
     profile exists and its token ref is resolvable. `--remote` resolves both
     the URL and token ref from the workspace root.
@@ -266,6 +295,35 @@ unexpected outcome.
     whose selected context is missing or invalid. Those fallbacks are accepted
     only for commands without deployment context, or for an explicit reviewed
     URL override when a valid selected control plane already exists.
+
+### Control-plane service-token diagnostics
+
+- Symptom: the error mentions
+  `selected controlPlaneTokenRef ... requires a selected deployment context`,
+  `requires an explicit deployment secret backend`,
+  `explicit deployment secret context`, `infisical_runtime`, `vault_runtime`, or
+  `required secret contract ... is missing`.
+- Meaning:
+  - These are fail-closed authentication checks before any provider mutation.
+    They mean the selected `secret://` control-plane service token could not be
+    resolved through the selected deployment context's secret backend.
+  - Diagnostics may include non-secret selection metadata such as deployment
+    context name, control-plane name, backend kind, token ref path, target
+    scope, and whether the failure came from Vault or Infisical.
+  - Resolved token values, Infisical client secrets, Vault tokens, bearer
+    headers, and backend secret payloads are redacted from diagnostics,
+    readonly output, and submission evidence. Seeing the `secret://...` ref is
+    expected; seeing the resolved service token is a bug.
+- Fix:
+  - Keep `serviceClient.controlPlaneTokenRef` as `secret://...` or
+    `runtime://...`.
+  - For `secret://...`, repair the selected context/backend/runtime setup and
+    populate the backend contract. Do not add a plaintext token fallback.
+  - For `runtime://...`, repair the selected runtime-host binding or mounted
+    credential source for commands that intentionally use runtime delivery.
+  - Re-run the same command after the selected backend context can resolve the
+    service-token contract; the provider front door should then submit using
+    the selected control-plane URL and redacted selection evidence.
 
 ### Admission and secret-runtime failures
 

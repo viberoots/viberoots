@@ -19,6 +19,7 @@ import {
 } from "./deployment-vault-bootstrap";
 import { readDeploymentVaultRuntimeInputsFromFlags } from "./deployment-vault-runtime";
 import type { DeployCliReadonlyFlags } from "./deploy-cli-flags";
+import { withReadonlySecretContext } from "./deploy-cli-readonly-secret-context";
 export type { DeployCliReadonlyFlags } from "./deploy-cli-flags";
 export function readDeployCliReadonlyFlags(): DeployCliReadonlyFlags {
   return {
@@ -171,6 +172,7 @@ async function targetScopeForReadonlyVaultHelper(opts: {
   });
   return { value: status.lockScope, source: "deploy-run-lock-scope" as const };
 }
+
 export async function maybeHandleReadonlyDeployCli(opts: {
   workspaceRoot: string;
   deployment: DeploymentTarget;
@@ -184,38 +186,40 @@ export async function maybeHandleReadonlyDeployCli(opts: {
     printProviderTargetIdentityForCli(opts.deployment);
     return true;
   }
-  if (opts.flags.printVaultBootstrap) {
-    const targetScope = await targetScopeForReadonlyVaultHelper(opts);
-    const document = buildVaultBootstrapDocument({
-      deployment: opts.deployment,
-      inputs: opts.flags.vaultBootstrapInputs,
-      ...(targetScope ? { targetScope } : {}),
-    });
-    if (opts.flags.vaultBootstrapFormat !== "json") {
-      assertVaultBootstrapExecutableDocument(document);
+  return await withReadonlySecretContext(opts, async () => {
+    if (opts.flags.printVaultBootstrap) {
+      const targetScope = await targetScopeForReadonlyVaultHelper(opts);
+      const document = buildVaultBootstrapDocument({
+        deployment: opts.deployment,
+        inputs: opts.flags.vaultBootstrapInputs,
+        ...(targetScope ? { targetScope } : {}),
+      });
+      if (opts.flags.vaultBootstrapFormat !== "json") {
+        assertVaultBootstrapExecutableDocument(document);
+      }
+      console.log(renderVaultBootstrapDocument(document, opts.flags.vaultBootstrapFormat));
+      return true;
     }
-    console.log(renderVaultBootstrapDocument(document, opts.flags.vaultBootstrapFormat));
-    return true;
-  }
-  if (opts.flags.printVaultSecretTemplates) {
-    const targetScope = await targetScopeForReadonlyVaultHelper(opts);
-    console.log(
-      renderVaultSecretTemplatesDocument(
-        buildVaultSecretTemplatesDocument({
-          deployment: opts.deployment,
-          ...(targetScope ? { targetScope } : {}),
-        }),
-        opts.flags.vaultSecretTemplateFormat,
-      ),
+    if (opts.flags.printVaultSecretTemplates) {
+      const targetScope = await targetScopeForReadonlyVaultHelper(opts);
+      console.log(
+        renderVaultSecretTemplatesDocument(
+          buildVaultSecretTemplatesDocument({
+            deployment: opts.deployment,
+            ...(targetScope ? { targetScope } : {}),
+          }),
+          opts.flags.vaultSecretTemplateFormat,
+        ),
+      );
+      return true;
+    }
+    const { maybeRunDeployControlPlaneOperatorCommand } = await import(
+      "./deploy-control-plane-operator.ts"
     );
-    return true;
-  }
-  const { maybeRunDeployControlPlaneOperatorCommand } = await import(
-    "./deploy-control-plane-operator.ts"
-  );
-  return await maybeRunDeployControlPlaneOperatorCommand({
-    workspaceRoot: opts.workspaceRoot,
-    deployment: opts.deployment,
-    vaultRuntimeInputs: opts.flags.vaultRuntimeInputs,
+    return await maybeRunDeployControlPlaneOperatorCommand({
+      workspaceRoot: opts.workspaceRoot,
+      deployment: opts.deployment,
+      vaultRuntimeInputs: opts.flags.vaultRuntimeInputs,
+    });
   });
 }

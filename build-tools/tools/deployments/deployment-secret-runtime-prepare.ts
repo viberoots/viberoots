@@ -34,8 +34,13 @@ export async function prepareDeploymentSecretRuntime(opts: {
   env?: NodeJS.ProcessEnv;
 }): Promise<PreparedDeploymentSecretRuntime> {
   const backend = opts.deployment.secretBackend || "vault";
+  const needsSecretRuntime =
+    opts.deployment.secretRequirements.length > 0 ||
+    Boolean(
+      opts.deployment.controlPlane?.serviceClient.controlPlaneTokenRef.startsWith("secret://"),
+    );
   if (backend === "vault") return await prepareDeploymentVaultRuntime(opts);
-  if (opts.deployment.secretRequirements.length === 0) return { minted: false };
+  if (!needsSecretRuntime) return { minted: false };
   if (deploymentSecretFixturePath()) return { minted: false, secretContext: { kind: "fixture" } };
   if (!opts.deployment.infisicalRuntime) {
     throw new Error(

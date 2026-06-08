@@ -297,6 +297,14 @@ closed when that context does not resolve a valid control plane, even if
 `--control-plane-url`, `VBR_DEPLOY_CONTROL_PLANE_URL`, or ambient token
 material is present.
 
+If the selected service-token ref is `secret://...`, the CLI resolves it through
+the selected deployment context's Vault or Infisical `DeploymentSecretContext`.
+Missing backend runtime metadata, missing credential source, or an unresolved
+service-token ref fails before provider mutation. Diagnostics may name the
+deployment context, token ref, and backend kind, but they redact token values
+and backend payloads. `runtime://...` token refs remain separate runtime-host
+bindings and do not use SprinkleRef secret resolution.
+
 ```bash
 deploy --deployment //projects/deployments/pleomino/prod:deploy \
   --status \

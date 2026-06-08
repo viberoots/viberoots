@@ -77,8 +77,8 @@ without yet changing protected/shared execution routing.
 - Reuse the existing protected/shared service transport validator for `controlPlaneUrl` validation
   where possible.
 - Preserve current local override detection and redaction for `projects/config/local.json`.
-- Do not change `--control-plane-url`, `VBR_DEPLOY_CONTROL_PLANE_URL`, or `--remote mini` execution
-  behavior in this PR.
+- Do not change `--control-plane-url` or `VBR_DEPLOY_CONTROL_PLANE_URL` execution behavior in this
+  PR. Later PRs intentionally cut `--remote <name>` over to named control-plane profile selection.
 
 ### 3. External prerequisites
 
@@ -541,3 +541,121 @@ Operators with incomplete protected/shared deployment contexts must add valid `c
 selectors and token refs before those commands run. Tests and command wiring become stricter
 because remote profile selection is now a complete service-client selection path rather than only a
 URL shortcut.
+
+## PR-5: Non-fixture control-plane token ref resolution through selected SprinkleRef backend
+
+### 1. Intent
+
+Close the protected/shared authentication gap by making `secret://` control-plane token refs resolve
+through the selected deployment context's real SprinkleRef secret backend and project-config
+resolver path, not through the fixture-only registered deployment secret backend.
+
+### 2. Scope of changes
+
+- Update `deployment-control-plane-token-ref.ts` so `secret://...` token refs use the selected
+  deployment context's `DeploymentSecretContext` and configured SprinkleRef backend.
+- Ensure the resolver can load the selected project's shared/local config needed to resolve
+  non-fixture Infisical, Vault, Keychain, or other registered SprinkleRef backend refs.
+- Preserve fixture backend support only for tests or explicitly fixture-scoped contexts; do not let
+  fixture fallback mask missing real backend context in protected/shared paths.
+- Resolve checked-in profile token refs such as
+  `secret://control-plane/.../service-token` for `pleomino-prod` and `pleomino-staging` through the
+  same non-fixture path used by real protected/shared deploys.
+- Fail closed with redacted diagnostics when a `secret://` token ref lacks a selected deployment
+  context, cannot construct a `DeploymentSecretContext`, or cannot resolve through the selected
+  backend.
+- Keep `runtime://...` behavior separate from SprinkleRef secret resolution.
+- Keep token values out of command output, JSON evidence, logs, diagnostics, and test snapshots.
+- Do not broaden this PR into changing provider mutation behavior, provisioning secret backends, or
+  adding plaintext token fallbacks.
+
+### 3. External prerequisites
+
+- PR-1 through PR-4 must have landed.
+- Project config and deployment context resolution must expose enough information to construct the
+  selected `DeploymentSecretContext` for protected/shared command paths.
+- Tests must be able to exercise non-fixture SprinkleRef backend selection without live secret
+  service mutation, using mocked backend adapters or existing registered backend test harnesses.
+
+### 4. Tests to be added
+
+- Add protected/shared token-ref tests proving `secret://control-plane/.../service-token` resolves
+  through the selected SprinkleRef backend with a real `DeploymentSecretContext`.
+- Add tests for `pleomino-prod` and `pleomino-staging` profile token refs proving they enter the
+  non-fixture backend resolver path instead of `createRegisteredDeploymentSecretBackend` without
+  context.
+- Add Infisical/Vault-style backend tests proving selected backend config from project config is
+  honored when resolving control-plane service tokens.
+- Add negative tests proving missing deployment context, missing secret backend selection, invalid
+  backend config, and unresolved `secret://` token refs fail before provider mutation.
+- Add regression tests proving fixture backend success alone is not sufficient for protected/shared
+  `secret://` token resolution.
+- Add redaction tests proving resolved token values and backend secret payloads are never printed in
+  errors, evidence, logs, or snapshots.
+- Keep existing `runtime://...` token-ref tests passing and add coverage proving runtime refs do
+  not enter the SprinkleRef secret backend resolver.
+
+### 5. Docs to be added or updated
+
+- Update [SprinkleRef Resolver](sprinkleref.md) to document that control-plane
+  `secret://...` service-token refs resolve through the selected deployment context's SprinkleRef
+  backend and require a valid `DeploymentSecretContext`.
+- Update deployment usage and troubleshooting docs to explain failures for missing secret backend
+  context, unresolved control-plane service-token refs, and redacted diagnostics.
+- Update [Control Plane Selector Design](control-plane-selector.md) if the concrete
+  `DeploymentSecretContext` handoff or resolver ownership differs from the prior design.
+- Update this plan if implementation discovers additional protected/shared token resolver call
+  sites that need the same selected-backend behavior.
+
+### 5.5. Expected regression scope
+
+- `deployment-only`
+- Expected implementation paths:
+  - `build-tools/tools/deployments/deployment-control-plane-token-ref.ts`
+  - `build-tools/tools/deployments/*secret*.ts`
+  - `build-tools/tools/deployments/*sprinkleref*.ts`
+  - `build-tools/tools/deployments/project-config.ts`
+  - `build-tools/tools/tests/deployments/**`
+  - `docs/**`
+- Keep changes focused on selected-backend token resolution, fail-closed diagnostics, docs, and
+  tests.
+
+### 6. Acceptance criteria
+
+- Protected/shared `secret://` control-plane token refs resolve through the selected
+  `DeploymentSecretContext` and SprinkleRef backend.
+- Checked-in profiles such as `pleomino-prod` and `pleomino-staging` can use
+  `secret://control-plane/.../service-token` refs without relying on fixture-only backend behavior.
+- Fixture backend tests do not mask missing real backend context for protected/shared paths.
+- Infisical/Vault-style non-fixture token refs have direct regression coverage.
+- Missing or invalid backend context fails closed before provider mutation with redacted
+  diagnostics.
+- Token values are never printed in output, evidence, logs, diagnostics, or snapshots.
+
+### 7. Risks
+
+- Real backend context construction may expose protected/shared command paths that currently do not
+  carry full deployment context or workspace-root information.
+- Existing positive tests may pass only because fixture backend resolution is too permissive.
+- Redacted errors can become too vague if they omit the selected context, profile, or backend name.
+
+### 8. Mitigations
+
+- Thread the existing resolved deployment context and workspace-root data into token resolution
+  instead of adding a second config-loading path.
+- Keep fixture-only behavior explicitly scoped and add regression tests that fail when
+  protected/shared paths resolve without a real backend context.
+- Include non-secret diagnostic fields such as deployment context name, control-plane profile name,
+  token-ref path, and backend type while redacting token values and secret payloads.
+
+### 9. Consequences of not implementing this PR
+
+Protected/shared deployments can select the right control-plane URL while still failing to
+authenticate for real `secret://` service-token refs used by checked-in profiles such as
+`pleomino-prod` and `pleomino-staging`.
+
+### 10. Downsides for implementing this PR
+
+Token resolution becomes stricter and requires protected/shared command paths to provide complete
+deployment context and secret backend information. Fixtures that relied on context-free registered
+secret backend behavior will need to be narrowed or rewritten to model the selected backend path.

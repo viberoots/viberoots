@@ -86,6 +86,13 @@ boundary are shared repo topology. Token values are not checked in. A checked-in
 profile may point at a secret ref for the service token, or at a runtime ref when the selected
 runtime host supplies the token through a host-local credential contract.
 
+When the selected profile uses a `secret://...` token ref, protected/shared commands resolve it
+through the selected deployment context's secret backend context, not through a context-free fixture
+backend. The deployment context must provide enough Vault or Infisical runtime metadata to construct
+a `DeploymentSecretContext`; otherwise the command fails closed before provider mutation. The
+resolver may include the deployment context name, profile name, token ref path, and backend kind in
+diagnostics, but token values and backend payloads remain redacted.
+
 `projects/config/local.json` may override shared values for local testing, but commands must report
 active local overrides with the same redaction rules used by existing project config overrides. Set
 `VBR_DISALLOW_LOCAL_OVERRIDES=1` to fail if a local override changes shared topology.
@@ -191,6 +198,9 @@ override flag. The intended clean-cut-over behavior is:
   requires `controlPlanes.mini` and resolves both `serviceClient.controlPlaneUrl` and
   `serviceClient.controlPlaneTokenRef`; without that checked-in profile or resolvable token ref the
   command fails before provider mutation.
+- `secret://` token refs use the selected deployment secret backend and explicit
+  `DeploymentSecretContext`. `runtime://` token refs use runtime-host bindings and never fall back
+  into SprinkleRef resolution.
 
 The command output should report the selected control-plane name, URL, and selection source. It
 must not print token values.

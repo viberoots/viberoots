@@ -119,11 +119,8 @@ export async function runDeployCli(opts: {
       "--retire-target/--migrate-target cannot be combined with deploy, publish-only, remove, or preview flags",
     );
   }
-  const serviceBackedWorkerRuntime = usesServiceBackedWorkerRuntime(
-    deployment,
-    opts.publicFrontDoor,
-  );
-  const secretRuntime = serviceBackedWorkerRuntime
+  const skipSecretRuntime = shouldSkipSecretRuntime(deployment, opts.publicFrontDoor);
+  const secretRuntime = skipSecretRuntime
     ? { minted: false }
     : await prepareDeploymentSecretRuntime({
         workspaceRoot: opts.workspaceRoot,
@@ -158,5 +155,12 @@ export function usesServiceBackedWorkerRuntime(
       isCloudflarePagesDeployment(deployment) ||
       isKubernetesDeployment(deployment) ||
       isVercelDeployment(deployment))
+  );
+}
+
+function shouldSkipSecretRuntime(deployment: DeploymentTarget, publicFrontDoor: boolean) {
+  return (
+    usesServiceBackedWorkerRuntime(deployment, publicFrontDoor) &&
+    !deployment.controlPlane?.serviceClient.controlPlaneTokenRef.startsWith("secret://")
   );
 }

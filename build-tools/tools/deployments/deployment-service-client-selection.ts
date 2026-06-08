@@ -120,10 +120,28 @@ async function resolveContextToken(opts: {
   workspaceRoot?: string;
   env: NodeJS.ProcessEnv;
 }) {
+  const contextName = selectedDeploymentContextName(opts.deployment);
+  if (opts.tokenRef.startsWith("secret://")) {
+    if (!contextName) {
+      throw new Error(
+        `selected controlPlaneTokenRef ${opts.tokenRef} requires a selected deployment context before resolving protected/shared service credentials`,
+      );
+    }
+    if (!opts.deployment.secretBackend) {
+      throw new Error(
+        `selected controlPlaneTokenRef ${opts.tokenRef} requires an explicit deployment secret backend before resolving protected/shared service credentials`,
+      );
+    }
+  }
   return resolveControlPlaneTokenRef({
     tokenRef: opts.tokenRef,
     backend: opts.deployment.secretBackend,
     backendProfile: opts.deployment.secretBackendProfile,
+    contextName,
+    targetScope: `control-plane:${opts.deployment.deploymentId}`,
+    vaultRuntime: opts.deployment.vaultRuntime,
+    infisicalRuntime: opts.deployment.infisicalRuntime,
+    infisicalSecretMappings: opts.deployment.infisicalSecretMappings,
     workspaceRoot: opts.workspaceRoot,
     env: opts.env,
   });
