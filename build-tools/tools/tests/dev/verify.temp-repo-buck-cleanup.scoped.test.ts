@@ -237,7 +237,9 @@ test(
     await mkScript(ownedWasmScript);
     await mkScript(foreignScript);
     const owned = spawn(process.execPath, [ownedScript], { stdio: "ignore" });
-    const ownedWasm = spawn(process.execPath, [ownedWasmScript], { stdio: "ignore" });
+    const ownedWasm = spawn(process.execPath, ["--experimental-strip-types", ownedWasmScript], {
+      stdio: "ignore",
+    });
     const foreign = spawn(process.execPath, [foreignScript], { stdio: "ignore" });
     const ownedKey = `${ownedTmp}/projects/apps/demo-vite-ssr/server/dev.mjs`;
     const ownedWasmKey = `${ownedTmp}/build-tools/tools/dev/wasm-watch-coordinator-daemon.ts`;
