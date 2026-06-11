@@ -102,14 +102,19 @@ The normal first-run command shape is:
 sprinkleref --init
 sprinkleref --init-local
 control-plane aws-account config-init --domain deploy.example.com
+control-plane aws-account setup-plan
 control-plane aws-account check
 ```
 
 `sprinkleref --init` is safe in a checked-in repo that already has
 `projects/config/shared.json`; it reports that no shared files were written. `sprinkleref
 --init-local` creates or updates `projects/config/local.json` with local placeholders. The
-first `control-plane aws-account check` should be allowed to reach a clear missing-values report;
-that report is part of the setup workflow, not a crash.
+first `control-plane aws-account setup-plan` prints the deterministic next-step checklist from the
+current stack config, merged project config, and secret/runtime source metadata. It is read-only
+with respect to AWS, Supabase, Infisical, Vault, and cloud resources. Use it after each value change
+to discover the next command. The first `control-plane aws-account check` should be allowed to
+reach a clear missing-values or readiness report; that report is part of the setup workflow, not a
+crash.
 
 Expected ownership for the common missing values:
 
@@ -161,6 +166,11 @@ exist. Capture every non-secret output as evidence and feed it into setup-doctor
 cutover commands. When an organization owns additional cloud-foundation resources outside this repo,
 keep those resources declarative/IaC-owned and import their reviewed outputs through the same typed
 evidence gates.
+
+`control-plane aws-account setup-plan` may point at reviewed plan/evidence commands such as
+`control-plane aws-account check` and `control-plane aws-account bootstrap`, but it does not run
+provider APIs, OpenTofu, or durable provisioning itself. Treat any durable AWS change as reviewed
+IaC/evidence work, not as custom setup-plan automation.
 
 ## Prerequisites
 

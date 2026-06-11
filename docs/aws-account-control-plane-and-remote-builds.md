@@ -93,14 +93,15 @@ The guided command accepts flags, a generated canonical JSON stack config file, 
 config file. Generate the canonical first-stack config with:
 
 ```bash
-control-plane aws-account config-init
+control-plane aws-account config-init --domain <domain>
+control-plane aws-account setup-plan
 ```
 
 By default this writes `config/control-plane/stack.json`. The file is intentionally minimal:
 defaults and derived values stay implicit, while account/provider values without defaults are
 written as inline values or structured SprinkleRef refs. This keeps the file usable as a short
 setup checklist instead of a dump of every derived option.
-The `check` and `bootstrap` commands load this canonical file automatically, so `--config` is only
+`setup-plan`, `check`, and `bootstrap` load this canonical file automatically, so `--config` is only
 needed for exception cases, such as a second control-plane stack in the same clone.
 
 The config file is the safer path because it records account ids, organization ids, domain,
@@ -128,7 +129,15 @@ with:
 
 ```bash
 sprinkleref --init-local
+control-plane aws-account setup-plan
 ```
+
+`setup-plan` is the normal way to discover the next AWS setup command after initialization. It
+prints source-aware setup categories for repo config initialization, local operator config
+initialization, shared non-secret project config values, secret backend writes, runtime credential
+sources, AWS login/readiness checks, Supabase account/project readiness checks, and reviewed
+IaC/evidence work. It is read-only with respect to AWS, Supabase, Infisical, Vault, and durable
+cloud resources.
 
 AWS account setup refs dispatch by URI scheme. Non-secret `config://...` refs resolve through
 merged `projects/config/shared.json` and `projects/config/local.json` values even if an older stack
@@ -146,6 +155,10 @@ A local value can redirect a true secret to the configured bootstrap category:
 ```
 
 Do not write the Supabase Management API token itself to local JSON.
+
+When `setup-plan` points at reviewed IaC or evidence work, treat those commands as plan/evidence
+entrypoints. Do not interpret the setup checklist as permission for a custom imperative AWS
+provisioning path.
 
 Required account prerequisites, dumbed down:
 
@@ -452,19 +465,22 @@ The normal first run starts by generating the small stack config checklist and l
 placeholder file:
 
 ```bash
-control-plane aws-account config-init
+control-plane aws-account config-init --domain <domain>
 sprinkleref --init-local
+control-plane aws-account setup-plan
 sprinkleref --update secret://control-plane/supabase/management-api-token --create-missing
 control-plane aws-account check
 ```
 
-Use structured `config://...` and `secret://...` refs in stack config, then fill non-secret
-coordinates in stack config, `projects/config/shared.json`, or `projects/config/local.json`.
-Required coordinates include `domain`, `awsAccountId`, `awsOrganizationId`,
-`supabaseOrgId`, and `supabaseProjectRef`. Write the Supabase Management API token with
+Use structured `config://...` and `secret://...` refs in stack config, then let `setup-plan`
+classify the remaining work. Fill non-secret coordinates in stack config,
+`projects/config/shared.json`, or `projects/config/local.json`. Required coordinates include
+`domain`, `awsAccountId`, `awsOrganizationId`, `supabaseOrgId`, and `supabaseProjectRef`. Write the
+Supabase Management API token with
 `sprinkleref --update secret://control-plane/supabase/management-api-token --create-missing`, or
 use the setup-shell fallback environment variable for a single run; do not put it in config/local
-JSON as plaintext.
+JSON as plaintext. Rerun `control-plane aws-account setup-plan` after changes until it points at the
+readiness checks.
 
 `bootstrap` is the guided entrypoint after local setup values exist. The current implementation
 covers prerequisite checks and the remote-state bootstrap plan/apply path. Later foundation, DNS,
@@ -479,6 +495,7 @@ control-plane aws-account bootstrap
 control-plane aws-account status
 control-plane aws-account resume
 control-plane aws-account check
+control-plane aws-account setup-plan
 control-plane aws-account evidence
 control-plane aws-account clean
 control-plane aws-account config-init
@@ -492,6 +509,7 @@ Subcommand intent:
 | `status`      | Read `status.json` and summarize completed, blocked, and next phases.                                              | None                          |
 | `resume`      | Continue from the last incomplete phase using the existing evidence directory.                                     | Same as resumed phase         |
 | `check`       | Run prerequisite checks only: tools, AWS login, and Supabase readiness.                                            | None                          |
+| `setup-plan`  | Print the source-aware first-run checklist from stack/project/secret/runtime metadata.                             | None                          |
 | `evidence`    | Validate and summarize evidence files, redaction status, freshness, and missing artifacts.                         | None                          |
 | `clean`       | Remove incomplete generated run output after confirmation; never delete cloud resources.                           | Local generated files only    |
 | `config-init` | Write a reviewable minimal stack config with empty unknowns and explicit non-default overrides.                    | Local config file only        |

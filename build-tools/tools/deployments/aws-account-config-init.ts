@@ -106,14 +106,14 @@ export async function initStackConfig(cwd: string, deps: RunDeps): Promise<void>
         "Next:",
         "  Run sprinkleref --init-local to create clone-local coordinate placeholders.",
         "  Or export SUPABASE_ACCESS_TOKEN=<token> in the setup shell for this run.",
-        "  control-plane aws-account check",
+        "  control-plane aws-account setup-plan",
       ]
     : [
         "Next:",
         `  Edit ${relativePath(cwd, configPath)} and fill "domain".`,
         "  Run sprinkleref --init-local to create clone-local coordinate placeholders.",
         "  Or export SUPABASE_ACCESS_TOKEN=<token> in the setup shell for this run.",
-        "  control-plane aws-account check",
+        "  control-plane aws-account setup-plan",
       ];
   (deps.stdout || console.log)(
     [

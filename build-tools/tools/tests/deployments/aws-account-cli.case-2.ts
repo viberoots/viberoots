@@ -222,7 +222,8 @@ test("aws-account config-init with domain skips stale fill-domain guidance", asy
       const text = out.join("\n");
       assert.match(text, /AWS account stack config written/);
       assert.match(text, /sprinkleref --init-local/);
-      assert.match(text, /control-plane aws-account check/);
+      assert.match(text, /control-plane aws-account setup-plan/);
+      assert.doesNotMatch(text, /control-plane aws-account check/);
       assert.doesNotMatch(text, /fill "domain"/);
       const config = JSON.parse(
         await fsp.readFile(path.join(tmp, "config/control-plane/stack.json"), "utf8"),

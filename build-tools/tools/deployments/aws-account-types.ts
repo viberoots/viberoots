@@ -32,6 +32,7 @@ export type Subcommand =
   | "status"
   | "resume"
   | "check"
+  | "setup-plan"
   | "evidence"
   | "clean"
   | "config-init";

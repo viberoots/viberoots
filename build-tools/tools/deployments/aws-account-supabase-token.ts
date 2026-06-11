@@ -115,6 +115,7 @@ export function tokenSource(metadata: Record<string, unknown>): StackInputSource
     source: inputSourceName(metadata.source),
     ref: typeof metadata.ref === "string" ? metadata.ref : undefined,
     category: typeof metadata.category === "string" ? metadata.category : undefined,
+    categoryExplicit: metadata.categoryExplicit === true,
     env: typeof metadata.env === "string" ? metadata.env : undefined,
     localValuesPath:
       typeof metadata.localValuesPath === "string" ? metadata.localValuesPath : undefined,

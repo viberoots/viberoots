@@ -61,14 +61,21 @@ export function assertNoSupabaseAccessTokenRefCliInputs(): void {
 export function selectedSubcommand(): Subcommand {
   const [, subcommand = "bootstrap"] = getPositionals();
   if (
-    ["bootstrap", "status", "resume", "check", "evidence", "clean", "config-init"].includes(
-      subcommand,
-    )
+    [
+      "bootstrap",
+      "status",
+      "resume",
+      "check",
+      "setup-plan",
+      "evidence",
+      "clean",
+      "config-init",
+    ].includes(subcommand)
   ) {
     return subcommand as Subcommand;
   }
   throw new Error(
-    "usage: control-plane aws-account <bootstrap|status|resume|check|evidence|clean|config-init>",
+    "usage: control-plane aws-account <bootstrap|status|resume|check|setup-plan|evidence|clean|config-init>",
   );
 }
 
@@ -153,13 +160,14 @@ export function printJson(value: unknown, deps: RunDeps): void {
 export function printUsage(stdout = console.log) {
   stdout(
     [
-      "usage: control-plane aws-account <bootstrap|status|resume|check|evidence|clean|config-init>",
+      "usage: control-plane aws-account <bootstrap|status|resume|check|setup-plan|evidence|clean|config-init>",
       "",
       "defaults: --stack control --region us-east-1 --service deploy --auth-service auth --private-db-service db",
       "canonical config: config/control-plane/stack.json",
       "normal first run:",
       "  control-plane aws-account config-init [--domain <domain>]",
       "  sprinkleref --init-local",
+      "  control-plane aws-account setup-plan",
       "  fill local non-secret coordinates in projects/config/local.json",
       "  sprinkleref --update secret://control-plane/supabase/management-api-token --create-missing",
       "  control-plane aws-account check",

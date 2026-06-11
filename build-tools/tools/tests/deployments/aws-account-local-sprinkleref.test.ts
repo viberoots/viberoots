@@ -3,3 +3,4 @@ import "./aws-account-local-sprinkleref.case-2";
 import "./aws-account-local-sprinkleref.case-3";
 import "./aws-account-local-sprinkleref.case-4";
 import "./aws-account-local-sprinkleref.case-5";
+import "./aws-account-local-sprinkleref.case-6";

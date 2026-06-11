@@ -18,6 +18,7 @@ import { checkSupabase } from "./aws-account-check-supabase";
 import { bootstrapState } from "./aws-account-bootstrap";
 import { cleanEvidence, printStatus, validateEvidence } from "./aws-account-evidence";
 import { printCheckResult } from "./aws-account-output";
+import { printSetupPlan, printSetupPlanWithoutStack } from "./aws-account-setup-plan";
 import { freshStatus, nextPhase, readStatus, writeStatusAndInputs } from "./aws-account-status";
 import {
   assertNoOperatorSupabasePlanInput,
@@ -40,6 +41,7 @@ export async function runAwsAccountCommand(deps: RunDeps = {}): Promise<void> {
   const cwd = deps.cwd || process.cwd();
   const config = await readAwsAccountConfigForCommand(cwd, deps, subcommand);
   if (!config) return;
+  if (subcommand === "setup-plan") return printSetupPlan(config, deps);
   if (subcommand === "status") return printStatus(config, deps);
   if (subcommand === "clean") return cleanEvidence(config, deps);
   if (subcommand === "evidence") return validateEvidence(config, deps);
@@ -55,6 +57,10 @@ async function readAwsAccountConfigForCommand(
   try {
     return await readAwsAccountConfig(cwd);
   } catch (error) {
+    if (subcommand === "setup-plan" && isMissingStackIdentityError(error)) {
+      await printSetupPlanWithoutStack(cwd, deps);
+      return undefined;
+    }
     if (subcommand !== "check" && subcommand !== "bootstrap") {
       throw error;
     }
