@@ -83,3 +83,7 @@ REVIEWED_DEPLOYMENT_TEST_OWNERSHIP.update({
 REVIEWED_DEPLOYMENT_TEST_OWNERSHIP.update({
     "build-tools/tools/tests/deployments/infisical-iac-bootstrap.fanout-helpers.ts": False,
 })
+
+REVIEWED_DEPLOYMENT_TEST_OWNERSHIP.update({
+    "build-tools/tools/tests/deployments/deploy.front-door.operator-readiness.test.ts": True,
+})

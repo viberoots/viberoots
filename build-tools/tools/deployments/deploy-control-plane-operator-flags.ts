@@ -2,6 +2,7 @@
 import { getFlagBool } from "../lib/cli";
 
 export type DeployControlPlaneOperatorAction =
+  | "operator-readiness"
   | "status"
   | "record"
   | "current-stage-state"
@@ -19,6 +20,7 @@ export function selectedDeployControlPlaneOperatorAction():
   const selected = (
     [
       ["status", getFlagBool("status")],
+      ["operator-readiness", getFlagBool("operator-readiness")],
       ["record", getFlagBool("record")],
       ["current-stage-state", getFlagBool("current-stage-state")],
       ["stage-history", getFlagBool("stage-history")],
@@ -38,4 +40,10 @@ export function selectedDeployControlPlaneOperatorAction():
     );
   }
   return selected[0];
+}
+
+export function deployControlPlaneOperatorActionLabel(
+  action: DeployControlPlaneOperatorAction,
+): string {
+  return `deploy --${action}`;
 }

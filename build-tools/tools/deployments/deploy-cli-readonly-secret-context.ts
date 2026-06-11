@@ -38,6 +38,7 @@ function needsReadonlySecretContext(opts: {
   if (!opts.deployment.controlPlane?.serviceClient.controlPlaneTokenRef.startsWith("secret://")) {
     return false;
   }
+  if (opts.flags.controlPlaneOperatorAction === "operator-readiness") return false;
   if (opts.flags.controlPlaneOperatorAction) return true;
   return (
     (opts.flags.printVaultBootstrap || opts.flags.printVaultSecretTemplates) &&

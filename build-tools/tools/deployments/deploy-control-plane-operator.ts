@@ -13,6 +13,7 @@ import {
   type DeploymentControlPlaneStatus,
 } from "./deployment-control-plane-contract";
 import {
+  deployControlPlaneOperatorActionLabel,
   selectedDeployControlPlaneOperatorAction,
   type DeployControlPlaneOperatorAction,
 } from "./deploy-control-plane-operator-flags";
@@ -22,6 +23,7 @@ import {
   formatDeploymentControlPlaneRecordText,
   formatDeploymentControlPlaneStatusText,
 } from "./deployment-control-plane-status-format";
+import { maybeRunDeployOperatorReadinessCommand } from "./deploy-operator-readiness";
 import { formatDeploymentStageStateAuditEventText } from "./deployment-stage-state-audit-format";
 import { submitNixosSharedHostControlPlaneRunActionViaService } from "./nixos-shared-host-control-plane-client";
 import {
@@ -33,12 +35,10 @@ import {
   requireLookupSelector,
   resolveServiceClientForOperator,
 } from "./deploy-control-plane-operator-client";
-import { serviceClientSelectionEvidence } from "./deployment-service-client-selection";
-import type { SelectedDeploymentServiceClient } from "./deployment-service-client-selection";
-
-function operatorActionLabel(action: DeployControlPlaneOperatorAction): string {
-  return `deploy --${action}`;
-}
+import {
+  serviceClientSelectionEvidence,
+  type SelectedDeploymentServiceClient,
+} from "./deployment-service-client-selection";
 
 function requestedByFromFlags() {
   const principalId = getFlagStr("requested-by-principal", "").trim();
@@ -96,7 +96,7 @@ function buildRunActionRequest(
   const approval = status.approval;
   if (status.lifecycleState !== "pending_approval" || !approval || approval.state !== "pending") {
     throw new Error(
-      `${operatorActionLabel("approve")} requires a run currently waiting for approval`,
+      `${deployControlPlaneOperatorActionLabel("approve")} requires a run currently waiting for approval`,
     );
   }
   const approvalId = getFlagStr("approval-id", "").trim();
@@ -165,7 +165,8 @@ export async function maybeRunDeployControlPlaneOperatorCommand(opts: {
 }): Promise<boolean> {
   const action = selectedDeployControlPlaneOperatorAction();
   if (!action) return false;
-  const actionLabel = operatorActionLabel(action);
+  if (await maybeRunDeployOperatorReadinessCommand(opts)) return true;
+  const actionLabel = deployControlPlaneOperatorActionLabel(action);
   const serviceClient = await resolveServiceClientForOperator({
     workspaceRoot: opts.workspaceRoot,
     deployment: opts.deployment,

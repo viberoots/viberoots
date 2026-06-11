@@ -104,6 +104,7 @@ sprinkleref --init-local
 control-plane aws-account config-init --domain deploy.example.com
 control-plane aws-account setup-plan
 control-plane aws-account check
+deploy --deployment <label> --operator-readiness
 ```
 
 `sprinkleref --init` is safe in a checked-in repo that already has
@@ -115,6 +116,13 @@ with respect to AWS, Supabase, Infisical, Vault, and cloud resources. Use it aft
 to discover the next command. The first `control-plane aws-account check` should be allowed to
 reach a clear missing-values or readiness report; that report is part of the setup workflow, not a
 crash.
+
+After a deployment target exists, `deploy --deployment <label> --operator-readiness` provides the
+deployment-side navigation view. It summarizes the selected deployment context, control-plane
+profile, secret backend, control-plane token ref source, and any existing AWS/Supabase/cache
+readiness evidence. It is not a replacement for `control-plane aws-account setup-plan`,
+`control-plane aws-account check`, or `deploy --deployment <label> --validate-only`; use those
+commands for the fail-closed diagnostics and evidence that operators act on.
 
 Expected ownership for the common missing values:
 

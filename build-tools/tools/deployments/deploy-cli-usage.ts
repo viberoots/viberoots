@@ -14,4 +14,9 @@ Control-plane selection:
     context-selected deployment and records that source as an explicit override; the token
     still resolves from the selected secret:// or runtime:// controlPlaneTokenRef.
   VBR_DEPLOY_CONTROL_PLANE_URL never overrides a context-selected deployment.
+
+Operator readiness:
+  --operator-readiness prints a read-only navigation summary for the selected deployment context,
+    control plane, secret backend, existing AWS/Supabase/cache evidence, and exact follow-up
+    commands. It does not replace fail-closed setup/check diagnostics.
 `;

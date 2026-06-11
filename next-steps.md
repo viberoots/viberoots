@@ -257,13 +257,13 @@ diagnostics have settled.
 1. AWS control-plane setup automation. Status: landed as PR-1. This comes first because every later
    operator path needs one executable way to ask "what should I do next?" from a clean or partially
    configured clone.
-2. Non-fixture control-plane token resolution hardening. Status: in progress as PR-2. This comes
+2. Non-fixture control-plane token resolution hardening. Status: landed as PR-2. This comes
    second because the setup plan must not lead operators into a path where protected/shared
    deployments can accidentally use ambient token material.
-3. Remote build/cache readiness on top of the stable cache fallback. Status: next as PR-3. This
+3. Remote build/cache readiness on top of the stable cache fallback. Status: landed as PR-3. This
    comes third because cache and remote-build readiness should consume the stable account,
    control-plane, and token-selection model rather than defining a parallel readiness model.
-4. Operator workflow/UI improvements after CLI diagnostics are stable. Status: planned as PR-4. This
+4. Operator workflow/UI improvements after CLI diagnostics are stable. Status: in progress as PR-4. This
    comes last because a higher-level summary should present settled CLI state, not become a second
    source of truth while diagnostics are still changing.
 

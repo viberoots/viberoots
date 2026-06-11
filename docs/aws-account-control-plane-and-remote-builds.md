@@ -139,6 +139,19 @@ sources, AWS login/readiness checks, Supabase account/project readiness checks, 
 IaC/evidence work. It is read-only with respect to AWS, Supabase, Infisical, Vault, and durable
 cloud resources.
 
+Once a deployment context has been selected in repo metadata, use the deployment operator summary as
+a navigation aid:
+
+```bash
+deploy --deployment <label> --operator-readiness
+```
+
+The summary reports the selected deployment context, control-plane profile, secret backend,
+redacted control-plane credential source, and existing AWS/Supabase/cache evidence from the
+`control-plane aws-account` status files. It deliberately links back to `setup-plan`, `check`, and
+`deploy --validate-only`; those commands remain the source of truth for mutation boundaries,
+readiness evidence, and fail-closed diagnostics.
+
 AWS account setup refs dispatch by URI scheme. Non-secret `config://...` refs resolve through
 merged `projects/config/shared.json` and `projects/config/local.json` values even if an older stack
 file still contains a `category` field. Categories are SprinkleRef backend lanes for

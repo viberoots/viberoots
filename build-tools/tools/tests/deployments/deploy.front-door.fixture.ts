@@ -87,7 +87,12 @@ export async function writeTempListedDeploymentWorkspace(tmp: string): Promise<v
 
 export async function writeTempCloudflareValidationWorkspace(
   tmp: string,
-  opts: { appLabels?: string[]; infisicalSiteUrl?: string; wranglerConfig?: string } = {},
+  opts: {
+    appLabels?: string[];
+    deploymentContext?: string;
+    infisicalSiteUrl?: string;
+    wranglerConfig?: string;
+  } = {},
 ): Promise<void> {
   const appTargetsPath = path.join(tmp, "sandbox", "apps", "demo", "TARGETS");
   const sharedTargetsPath = path.join(tmp, "sandbox", "deployments", "shared", "TARGETS");
@@ -167,6 +172,7 @@ export async function writeTempCloudflareValidationWorkspace(
       '    environment_stage = "staging",',
       '    admission_policy = "//sandbox/deployments/shared:staging_release",',
       '    protection_class = "shared_nonprod",',
+      ...(opts.deploymentContext ? [`    deployment_context = "${opts.deploymentContext}",`] : []),
       ...(opts.infisicalSiteUrl
         ? [
             '    secret_backend = "infisical/default",',
