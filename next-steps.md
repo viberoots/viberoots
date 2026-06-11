@@ -18,7 +18,7 @@ configured, checked, and explained by the current docs and tooling.
   `Pass 1423 / Fail 1`; the single failure was
   `root//:deployments_deployment_service_hosted_token_enforcement_docs`. After diagnosing and
   fixing that docs parity gap, a fresh full run passed with `Pass 1424 / Fail 0 / Fatal 0 / Skip 0 /
-  Build failure 0`.
+Build failure 0`.
 - The cleanup harness failure was traced to the test using executable marker scripts as dummy process
   command lines. The failing subtest only needed command-line markers, but the prior dummy wasm
   process depended on executing a `.ts` file with `--experimental-strip-types`, which could exit
@@ -240,24 +240,331 @@ useful historical docs clearly labeled.
 No deletion was performed. Ambiguous historical files were labeled rather than removed, so no
 approval is needed for this pass.
 
-## Phase 5: Resume Feature Work
+## Phase 5: Ordered Feature PR Plan
+
+Status: active.
 
 ### Intent
 
 Continue control-plane, remote-build, and deployment feature work only after the setup path is
-stable.
+stable. The ordering below is intentional: make the AWS setup path more executable first, then
+harden the token boundary it depends on, then build on that stable account/control-plane base for
+remote build/cache readiness, and leave richer operator workflow/UI work until the CLI behavior and
+diagnostics have settled.
 
-### Candidate Work
+### Ordering
 
-- Continue non-fixture control-plane token resolution hardening if gaps remain.
-- Continue remote build/cache readiness work on top of the now-stable cache fallback.
-- Continue AWS control-plane setup automation after the setup guide is proven.
-- Continue UI/operator workflow work after CLI diagnostics are stable.
+1. AWS control-plane setup automation.
+2. Non-fixture control-plane token resolution hardening.
+3. Remote build/cache readiness on top of the stable cache fallback.
+4. Operator workflow/UI improvements after CLI diagnostics are stable.
 
-### Acceptance Criteria
+Each PR must include tests and docs for the operator path it changes. No PR in this phase should
+introduce a second config model or move app packages away from backend-neutral deployment metadata.
 
-- New feature PRs include docs and tests for the operator path they affect.
-- New work does not add a second config model.
+## PR-1: AWS setup automation command plan
+
+### 1. Intent
+
+Turn the proven AWS setup guide into an executable operator checklist that can be generated from the
+current repo config, stack config, and readiness checks without mutating durable cloud resources.
+
+### 2. Scope of changes
+
+- Add or extend an AWS setup command surface that prints a deterministic next-step plan for a clean
+  clone and for a partially configured clone.
+- Reuse existing `control-plane aws-account check`, project config, stack config, and SprinkleRef
+  resolution helpers instead of adding a parallel setup model.
+- Classify each setup step as one of:
+  - repo config initialization
+  - local operator config initialization
+  - shared non-secret project config value
+  - secret backend write
+  - runtime credential source
+  - AWS login/readiness check
+  - Supabase account/project/readiness check
+  - reviewed IaC/evidence step
+- Make the command output source-aware and secret-safe:
+  - print refs and config paths
+  - do not print secret values
+  - do not ask operators to paste tokens into JSON
+  - do not imply that provider dashboards are authoritative evidence
+- Keep cloud resource mutation out of this PR. Generated commands may point at reviewed IaC,
+  readiness, and evidence commands, but must not create a new imperative AWS provisioning path.
+- Update AWS setup docs so the generated plan is the normal way to discover the next command after
+  first-run initialization.
+
+### 3. External prerequisites
+
+- No live AWS, Supabase, Infisical, or Vault credentials are required for tests.
+- Real operators still need their actual AWS account id, AWS organization id, Supabase org id,
+  Supabase project ref, Supabase Management API token, and reviewed AWS login outside the synthetic
+  test fixtures.
+
+### 4. Tests to be added
+
+- Add CLI tests proving the setup-plan command works when `projects/config/shared.json` exists and
+  `projects/config/local.json` is absent.
+- Add CLI tests proving initialized local placeholders produce actionable next steps rather than
+  crashes or stale guidance.
+- Add tests proving non-secret `config://...` values are reported as project config work and true
+  `secret://...` values are reported as secret backend work.
+- Add tests proving generated output does not include secret values, plaintext token placeholders, or
+  instructions to store secret values in JSON.
+- Add tests proving reviewed IaC/evidence steps are described as plan/evidence work, not direct
+  durable AWS mutation performed by a custom command.
+
+### 5. Docs to be added or updated
+
+- Update [AWS Control Plane Setup Guide](docs/control-plane-guide.md) to make the setup-plan command
+  the recommended first diagnostic after initialization.
+- Update [AWS Account Control Plane And Remote Builds](docs/aws-account-control-plane-and-remote-builds.md)
+  with the same command flow and value ownership model.
+- Update command help text for the affected `control-plane aws-account` command surface.
+
+### 5.5. Expected regression scope
+
+- `deployment-only`
+- Expected implementation paths:
+  - `build-tools/tools/deployments/aws-account*.ts`
+  - `build-tools/tools/deployments/control-plane*.ts` only if needed for existing command dispatch
+  - `build-tools/tools/tests/deployments/aws-account*.ts`
+  - `docs/control-plane-guide.md`
+  - `docs/aws-account-control-plane-and-remote-builds.md`
+
+### 6. Acceptance criteria
+
+- A clean clone can ask the repo for the next AWS setup steps without reading design history.
+- The generated plan uses the current `projects/config/shared.json` and `projects/config/local.json`
+  model.
+- Missing shared values, missing local values, missing secrets, and missing runtime credentials are
+  classified differently and remediated precisely.
+- The command is read-only with respect to durable AWS/Supabase/Infisical/Vault resources.
+- Focused tests and docs cover the operator-facing behavior.
+
+### 7. Risks
+
+- A generated checklist can drift from the setup guide and become another stale runbook.
+- A command named like automation can be misread as owning durable AWS mutation.
+- Adding setup planning could duplicate existing `check` diagnostics.
+
+### 8. Mitigations
+
+- Build the checklist from the same helpers as `check` where possible.
+- Label durable provider work as reviewed IaC/evidence steps.
+- Keep docs pointed at the generated command as the canonical next-step surface.
+
+### 9. Consequences of not implementing this PR
+
+AWS setup remains documented and tested, but operators still have to translate a long guide into the
+next concrete command themselves.
+
+### 10. Downsides for implementing this PR
+
+The CLI surface grows another setup-oriented command that must stay aligned with `check` and the
+AWS setup docs.
+
+## PR-2: Control-plane token resolution hardening
+
+### 1. Intent
+
+Close remaining non-fixture token-resolution gaps so protected/shared deployment paths consistently
+use selected `secret://...` or `runtime://...` control-plane token refs and never silently fall back
+to ambient token material.
+
+### 2. Scope of changes
+
+- Audit protected/shared service-client resolution for ambient URL/token fallback behavior.
+- Fail closed when a deployment context selects a control plane but token resolution would require a
+  plaintext, `config://...`, missing backend, missing runtime binding, or mismatched ambient value.
+- Preserve explicit local fixture and reviewed break-glass paths only where the command surface
+  already makes that mode explicit.
+- Keep token values redacted in diagnostics, evidence, logs, and generated command output.
+- Update docs and troubleshooting for the final selected-token behavior.
+
+### 3. External prerequisites
+
+- No live secret backend credentials are required for tests; use existing fake SprinkleRef/runtime
+  credential fixtures.
+
+### 4. Tests to be added
+
+- Add positive tests for selected `secret://...` and `runtime://...` token refs.
+- Add negative tests for plaintext, `config://...`, missing backend context, missing runtime binding,
+  and ambient token fallback under a selected deployment context.
+- Add diagnostics tests proving output names the selected profile/ref without printing token values.
+- Add fixture-mode tests proving local fixture token behavior remains explicit and narrow.
+
+### 5. Docs to be added or updated
+
+- Update [Deployment And Secrets API](docs/deployment-secrets-api.md),
+  [Deployments Usage](docs/deployments-usage.md), and
+  [Troubleshooting](docs/handbook/troubleshooting.md) where token-resolution wording changes.
+
+### 5.5. Expected regression scope
+
+- `deployment-only`
+- Expected implementation paths:
+  - `build-tools/tools/deployments/*service-client*.ts`
+  - `build-tools/tools/deployments/*control-plane*.ts`
+  - `build-tools/tools/tests/deployments/*service-client*.ts`
+  - `docs/**`
+
+### 6. Acceptance criteria
+
+- Context-selected protected/shared runs cannot use ambient token material by accident.
+- All accepted control-plane service-token sources are `secret://...` or `runtime://...`.
+- Diagnostics are actionable and redacted.
+- Fixture/break-glass behavior remains explicit.
+
+### 7. Risks
+
+- Tightening token resolution can expose existing tests that rely on implicit fixture behavior.
+
+### 8. Mitigations
+
+- Convert tests to explicit fixture mode rather than adding compatibility fallbacks.
+
+### 9. Consequences of not implementing this PR
+
+Protected/shared deployment authority can remain harder to reason about when ambient operator state
+is present.
+
+### 10. Downsides for implementing this PR
+
+Some local commands may require more explicit fixture or runtime setup.
+
+## PR-3: Remote build and cache readiness checks
+
+### 1. Intent
+
+Build on the stable optional-cache fallback by giving operators a clear readiness surface for remote
+build/cache setup without making optional cache outages fail local validation by default.
+
+### 2. Scope of changes
+
+- Add or extend readiness checks that describe remote build/cache prerequisites and current status.
+- Keep optional cache outage handling dynamic and domain-agnostic.
+- Preserve strict cache behavior behind explicit opt-in policy.
+- Connect AWS setup evidence and cache readiness without making cache setup a prerequisite for the
+  basic AWS control-plane setup rehearsal.
+- Update docs and troubleshooting for the readiness states.
+
+### 3. External prerequisites
+
+- No live cache server is required for ordinary tests.
+- Tests may use fake/unreachable substituter inputs and local fixture config.
+
+### 4. Tests to be added
+
+- Add tests for reachable optional cache, unreachable optional cache, no optional cache, and strict
+  cache policy behavior.
+- Add tests proving readiness output derives substituter identities dynamically and does not hardcode
+  private domains.
+- Add tests proving AWS setup/check paths can report cache readiness without failing the basic setup
+  flow.
+
+### 5. Docs to be added or updated
+
+- Update [AWS Control Plane Setup Guide](docs/control-plane-guide.md) and relevant handbook
+  troubleshooting docs with cache readiness states and strict-policy behavior.
+
+### 5.5. Expected regression scope
+
+- `deployment-only` and build/dev tooling only where cache-health helpers already live.
+- Expected implementation paths:
+  - existing cache-health/env setup helpers
+  - `build-tools/tools/deployments/**` only for readiness surfacing
+  - focused tests under existing verify/deployment test surfaces
+  - `docs/**`
+
+### 6. Acceptance criteria
+
+- Optional cache outages do not fail default local validation.
+- Strict cache policy remains available and fail-closed.
+- Readiness diagnostics are dynamic, domain-agnostic, and actionable.
+
+### 7. Risks
+
+- Cache readiness can blur local developer ergonomics with production readiness.
+
+### 8. Mitigations
+
+- Keep default validation and production readiness checks separate in wording and behavior.
+
+### 9. Consequences of not implementing this PR
+
+Remote build/cache setup remains harder to evaluate, even though optional local fallback is stable.
+
+### 10. Downsides for implementing this PR
+
+The readiness surface adds another status category operators must understand.
+
+## PR-4: Operator workflow and UI readiness surface
+
+### 1. Intent
+
+Improve operator workflow after the CLI behavior is stable by presenting setup, readiness, and
+diagnostic state in a clearer operator-facing surface without hiding fail-closed CLI behavior.
+
+### 2. Scope of changes
+
+- Identify the existing operator-facing command or UI surface best suited for control-plane setup
+  readiness.
+- Add a minimal workflow/readiness view that summarizes:
+  - selected deployment context
+  - selected control plane
+  - selected secret backend
+  - missing config values
+  - missing secret/runtime credentials
+  - AWS/Supabase/cache readiness
+- Link back to exact CLI commands for remediation.
+- Keep the CLI as the source of truth for mutation, evidence, and fail-closed diagnostics.
+
+### 3. External prerequisites
+
+- PR-1 through PR-3 should have landed so the UI/workflow layer can consume stable setup and
+  readiness state.
+
+### 4. Tests to be added
+
+- Add rendering or command-output tests for the summary view.
+- Add tests proving missing secrets remain redacted.
+- Add tests proving remediation commands match the CLI surfaces from earlier PRs.
+
+### 5. Docs to be added or updated
+
+- Update the setup guide and any operator workflow docs to describe the summary view as a navigation
+  aid, not a replacement for reviewed setup/check commands.
+
+### 5.5. Expected regression scope
+
+- `deployment-only`
+- Expected implementation paths depend on the selected existing workflow/UI surface and should be
+  kept narrow.
+
+### 6. Acceptance criteria
+
+- Operators can see a concise readiness summary after the setup/check foundations are stable.
+- The summary does not expose secrets and does not bypass CLI guardrails.
+- Docs and tests cover the workflow.
+
+### 7. Risks
+
+- A UI or summary layer can mask the exact fail-closed diagnostic that operators need.
+
+### 8. Mitigations
+
+- Include exact command remediation and keep detailed diagnostics in the CLI.
+
+### 9. Consequences of not implementing this PR
+
+Setup remains CLI/documentation-driven only.
+
+### 10. Downsides for implementing this PR
+
+The operator surface must be maintained as setup/readiness commands evolve.
+
 - New work does not weaken fail-closed protected/shared behavior.
 
 ## Coordination Model
