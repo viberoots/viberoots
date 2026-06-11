@@ -172,8 +172,8 @@ env_apply_nix_cache_health() {
 
 	local retained
 	retained="$(env_strip_nix_cache_overrides)"
-	local required_joined="${required_kept[*]}"
-	local optional_kept_joined="${optional_kept[*]}"
+	local required_joined="${required_kept[*]-}"
+	local optional_kept_joined="${optional_kept[*]-}"
 	export NIX_CONFIG="${retained}"$'\n'"substituters = ${required_joined}"$'\n'"extra-substituters = ${optional_kept_joined}"$'\n''connect-timeout = 3'$'\n''stalled-download-timeout = 10'$'\n''fallback = true'
 	echo "[env] nix cache health: disabled unreachable substituter(s): ${removed[*]}" 1>&2
 	echo "[env] nix cache health: using optional substituter(s): ${optional_kept_joined:-<none>}" 1>&2

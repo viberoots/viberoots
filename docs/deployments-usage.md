@@ -285,7 +285,10 @@ Protected/shared deployment targets that select a `deployment_context` with a
 default. `--control-plane-url` and `VBR_DEPLOY_CONTROL_PLANE_URL` are fallbacks
 only for commands without a selected context; if they disagree with a selected
 context, mutating commands fail unless `--allow-control-plane-override` is
-passed with an explicit override.
+passed with an explicit URL override. That override does not replace the
+selected service-token ref: `--control-plane-token` and
+`VBR_DEPLOY_CONTROL_PLANE_TOKEN` remain invalid token substitutes for
+context-selected protected/shared deployments.
 
 For commands without a selected deployment context, `--remote <name>` selects a
 checked-in `projects/config/shared.json` `controlPlanes.<name>` profile. The

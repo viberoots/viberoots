@@ -64,6 +64,7 @@ REVIEWED_DEPLOYMENT_TEST_OWNERSHIP.update({
     "build-tools/tools/tests/deployments/deployment-control-plane-token-ref.test.ts": True,
     "build-tools/tools/tests/deployments/deploy-cli-control-plane-usage.test.ts": True,
     "build-tools/tools/tests/deployments/deployment-service-client-nixos-remote.test.ts": True,
+    "build-tools/tools/tests/deployments/deployment-service-client-operator-selection.test.ts": True,
     "build-tools/tools/tests/deployments/deployment-service-client-provider-front-doors.test.ts": True,
     "build-tools/tools/tests/deployments/deployment-service-client-provider-remote.test.ts": True,
     "build-tools/tools/tests/deployments/deployment-service-client-remote-consistency.test.ts": True,

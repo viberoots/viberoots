@@ -141,23 +141,49 @@ test("context-selected control plane rejects unresolvable token refs before fall
 });
 
 test("explicit override requires allow flag and records selected source", async () => {
-  const client = await resolveProtectedSharedServiceClient({
-    deployment: deployment(),
-    controlPlaneUrl: "https://override.example",
-    controlPlaneToken: "override-token",
-    allowControlPlaneOverride: true,
-    context: "cloudflare-pages shared_nonprod mutation",
-    env: { DEPLOY_CONTROL_PLANE_TOKEN: "runtime-token" },
+  await withRuntimeHostConfig(async () => {
+    const client = await resolveProtectedSharedServiceClient({
+      deployment: deployment(),
+      controlPlaneUrl: "https://override.example",
+      allowControlPlaneOverride: true,
+      context: "cloudflare-pages shared_nonprod mutation",
+      env: {
+        DEPLOY_CONTROL_PLANE_TOKEN: "runtime-token",
+        VBR_DEPLOY_CONTROL_PLANE_TOKEN: "ambient-token",
+      },
+    });
+    assert.equal(client.controlPlaneUrl, "https://override.example");
+    assert.equal(client.controlPlaneToken, "runtime-token");
+    assert.equal(client.selectedSource, "explicit_override");
+    assert.equal(client.controlPlaneName, "prod");
+    assert.deepEqual(serviceClientSelectionEvidence(client), {
+      source: "explicit_override",
+      controlPlaneUrl: "https://override.example",
+      controlPlaneName: "prod",
+      controlPlaneTokenRef: RUNTIME_REF,
+    });
   });
-  assert.equal(client.controlPlaneUrl, "https://override.example");
-  assert.equal(client.controlPlaneToken, "override-token");
-  assert.equal(client.selectedSource, "explicit_override");
-  assert.equal(client.controlPlaneName, "prod");
-  assert.deepEqual(serviceClientSelectionEvidence(client), {
-    source: "explicit_override",
-    controlPlaneUrl: "https://override.example",
-    controlPlaneName: "prod",
-  });
+});
+
+test("selected control plane rejects raw token override even with URL override allowed", async () => {
+  await assert.rejects(
+    () =>
+      resolveProtectedSharedServiceClient({
+        deployment: deployment(),
+        controlPlaneUrl: "https://override.example",
+        controlPlaneToken: "override-token",
+        allowControlPlaneOverride: true,
+        context: "cloudflare-pages shared_nonprod mutation",
+        env: { DEPLOY_CONTROL_PLANE_TOKEN: "runtime-token" },
+      }),
+    (error) => {
+      assert(error instanceof Error);
+      assert.match(error.message, /--control-plane-token cannot override/);
+      assert.match(error.message, /runtime:\/\/github-actions\/control-plane-token/);
+      assert.doesNotMatch(error.message, /override-token|runtime-token/);
+      return true;
+    },
+  );
 });
 
 test("commands without context keep explicit and ambient fallback order", async () => {

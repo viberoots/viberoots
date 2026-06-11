@@ -6,7 +6,6 @@ import {
   serviceClientSelectionEvidence,
   shouldUseProtectedSharedServiceRoute,
 } from "../../deployments/deployment-service-client-selection";
-import { resolveServiceClientForOperator } from "../../deployments/deploy-control-plane-operator-client";
 import { runS3StaticDeployFrontDoor } from "../../deployments/s3-static-front-door";
 import { cloudflarePagesDeploymentFixture } from "./cloudflare-pages.fixture";
 import { kubernetesDeploymentFixture } from "./kubernetes.fixture";
@@ -136,52 +135,6 @@ test("runtime token refs require runtimeHosts binding and do not print token mat
   });
 });
 
-test("operator resolver enforces context selection and explicit override", async () => {
-  await withRuntimeHostConfig(async () => {
-    await withArgv(["--control-plane-url", "https://other.example"], async () => {
-      await assert.rejects(
-        () =>
-          resolveServiceClientForOperator({
-            workspaceRoot: process.cwd(),
-            deployment: deployment(),
-            actionLabel: "deploy --status",
-          }),
-        /disagrees with deployment context controlPlane prod/,
-      );
-    });
-    await withArgv(
-      [
-        "--control-plane-url",
-        "https://override.example",
-        "--control-plane-token",
-        "override-token",
-        "--allow-control-plane-override",
-      ],
-      async () => {
-        const client = await resolveServiceClientForOperator({
-          workspaceRoot: process.cwd(),
-          deployment: deployment(),
-          actionLabel: "deploy --status",
-        });
-        assert.equal(client.controlPlaneUrl, "https://override.example");
-        assert.equal(client.controlPlaneToken, "override-token");
-        assert.equal(client.selectedSource, "explicit_override");
-      },
-    );
-    await withArgv(["--profile", "mini"], async () => {
-      await assert.rejects(
-        () =>
-          resolveServiceClientForOperator({
-            workspaceRoot: process.cwd(),
-            deployment: deployment(),
-            actionLabel: "deploy --status",
-          }),
-        /cannot use --profile\/--profile-root when deployment context selects a controlPlane/,
-      );
-    });
-  });
-});
-
 test("ambient control-plane URL cannot override context selection", async () => {
   await withRuntimeHostConfig(async () => {
     await assert.rejects(
@@ -200,13 +153,13 @@ test("ambient control-plane URL cannot override context selection", async () => 
     const client = await resolveProtectedSharedServiceClient({
       deployment: deployment(),
       controlPlaneUrl: "https://override.example",
-      controlPlaneToken: "override-token",
       allowControlPlaneOverride: true,
       context: "cloudflare-pages shared_nonprod mutation",
       env: { DEPLOY_CONTROL_PLANE_TOKEN: "runtime-token" },
     });
     assert.equal(client.selectedSource, "explicit_override");
     assert.equal(client.controlPlaneUrl, "https://override.example");
+    assert.equal(client.controlPlaneToken, "runtime-token");
   });
 });
 
@@ -236,14 +189,4 @@ function controlPlane(name: string, controlPlaneUrl: string, tokenRef = RUNTIME_
     serviceClient: { controlPlaneUrl, controlPlaneTokenRef: tokenRef },
     records: { backend: "service" as const },
   };
-}
-
-async function withArgv(args: string[], run: () => Promise<void>) {
-  const oldArgv = process.argv;
-  process.argv = ["node", "test", ...args];
-  try {
-    await run();
-  } finally {
-    process.argv = oldArgv;
-  }
 }

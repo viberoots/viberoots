@@ -254,10 +254,33 @@ diagnostics have settled.
 
 ### Ordering
 
-1. AWS control-plane setup automation.
-2. Non-fixture control-plane token resolution hardening.
-3. Remote build/cache readiness on top of the stable cache fallback.
-4. Operator workflow/UI improvements after CLI diagnostics are stable.
+1. AWS control-plane setup automation. Status: landed as PR-1. This comes first because every later
+   operator path needs one executable way to ask "what should I do next?" from a clean or partially
+   configured clone.
+2. Non-fixture control-plane token resolution hardening. Status: in progress as PR-2. This comes
+   second because the setup plan must not lead operators into a path where protected/shared
+   deployments can accidentally use ambient token material.
+3. Remote build/cache readiness on top of the stable cache fallback. Status: next as PR-3. This
+   comes third because cache and remote-build readiness should consume the stable account,
+   control-plane, and token-selection model rather than defining a parallel readiness model.
+4. Operator workflow/UI improvements after CLI diagnostics are stable. Status: planned as PR-4. This
+   comes last because a higher-level summary should present settled CLI state, not become a second
+   source of truth while diagnostics are still changing.
+
+This is primarily a sequencing decision, not a scope discovery decision. The useful work is already
+described below; the ordering decides which dependency to stabilize first. PR-1 and PR-2 are
+foundational. PR-3 depends on those foundations. PR-4 is intentionally delayed until the CLI behavior
+and diagnostics from PR-1 through PR-3 are stable enough to summarize.
+
+Coordinator gates:
+
+- Start the next PR only after the current PR has focused tests, docs, self-review, and a committed
+  validation result.
+- Keep each PR self-contained: implementation, tests, and docs travel together.
+- Use subagents for narrow implementation or review packets, but commit from this coordinator only
+  after staged changes and validation evidence are checked here.
+- If a broad validation run fails and the PR does not include a fix for that failure, stop the PR
+  sequence and investigate the root cause before continuing.
 
 Each PR must include tests and docs for the operator path it changes. No PR in this phase should
 introduce a second config model or move app packages away from backend-neutral deployment metadata.

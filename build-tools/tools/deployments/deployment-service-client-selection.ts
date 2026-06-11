@@ -9,23 +9,18 @@ type SelectionSource = "context" | "explicit_override" | "explicit" | "ambient";
 
 export type SelectedDeploymentServiceClient = NixosSharedHostResolvedServiceClient & {
   selectedSource: SelectionSource;
-  controlPlaneName?: string;
-  controlPlaneTokenRef?: string;
 };
 
-export type DeploymentServiceClientSelectionEvidence = {
-  source: SelectionSource;
-  controlPlaneUrl: string;
-  controlPlaneName?: string;
-  controlPlaneTokenRef?: string;
-};
+export type DeploymentServiceClientSelectionEvidence = Pick<
+  SelectedDeploymentServiceClient,
+  "controlPlaneUrl" | "controlPlaneName" | "controlPlaneTokenRef"
+> & { source: SelectionSource };
 
 function selectedContext(deployment: DeploymentTarget) {
-  if (deployment.protectionClass === "local_only") return undefined;
-  return deployment.controlPlane;
+  return deployment.protectionClass === "local_only" ? undefined : deployment.controlPlane;
 }
 
-function selectedDeploymentContextName(deployment: DeploymentTarget): string {
+function selectedDeploymentContextName(deployment: DeploymentTarget) {
   if (deployment.protectionClass === "local_only") return "";
   return String(deployment.deploymentContext?.name || "").trim();
 }
@@ -82,9 +77,21 @@ function assertAmbientUrlDoesNotOverride(opts: {
   );
 }
 
+function assertRawTokenDoesNotOverrideSelectedRef(opts: {
+  contextName: string;
+  tokenRef: string;
+  token: string | undefined;
+}) {
+  if (!String(opts.token || "").trim()) return;
+  throw new Error(
+    `--control-plane-token cannot override deployment context controlPlane ${opts.contextName} token ref ${opts.tokenRef}; selected protected/shared control-plane tokens must resolve from secret:// or runtime:// refs`,
+  );
+}
+
 export function assertProtectedSharedServiceSelectionInputs(opts: {
   deployment: DeploymentTarget;
   controlPlaneUrl?: string;
+  controlPlaneToken?: string;
   remote?: string;
   allowControlPlaneOverride?: boolean;
   env?: NodeJS.ProcessEnv;
@@ -112,6 +119,11 @@ export function assertProtectedSharedServiceSelectionInputs(opts: {
     contextName: contextSelection.name,
     selectedUrl: contextSelection.serviceClient.controlPlaneUrl,
     ambientUrl: String((opts.env || process.env).VBR_DEPLOY_CONTROL_PLANE_URL || "").trim(),
+  });
+  assertRawTokenDoesNotOverrideSelectedRef({
+    contextName: contextSelection.name,
+    tokenRef: contextSelection.serviceClient.controlPlaneTokenRef,
+    token: opts.controlPlaneToken,
   });
 }
 
@@ -167,6 +179,7 @@ export async function resolveProtectedSharedServiceClient(opts: {
   assertProtectedSharedServiceSelectionInputs({
     deployment: opts.deployment,
     controlPlaneUrl: explicitUrl,
+    controlPlaneToken: opts.controlPlaneToken,
     remote: opts.remote,
     allowControlPlaneOverride: opts.allowControlPlaneOverride,
     env,
@@ -198,17 +211,22 @@ export async function resolveProtectedSharedServiceClient(opts: {
     };
   }
   if (explicitUrl && opts.allowControlPlaneOverride) {
-    const serviceClient = await resolveServiceClientFromCliProfileOrFlags({
-      workspaceRoot: opts.workspaceRoot || process.cwd(),
-      controlPlaneUrl: explicitUrl,
-      controlPlaneToken: opts.controlPlaneToken,
-      context: opts.context,
+    const token = await resolveContextToken({
+      tokenRef: contextSelection.serviceClient.controlPlaneTokenRef,
+      deployment: opts.deployment,
+      workspaceRoot: opts.workspaceRoot,
       env,
     });
     return {
-      ...serviceClient,
+      controlPlaneUrl: explicitUrl,
+      controlPlaneToken: token,
+      plan: {
+        mode: "control-plane-service",
+        controlPlaneUrl: explicitUrl,
+      },
       selectedSource: "explicit_override",
       controlPlaneName: contextSelection.name,
+      controlPlaneTokenRef: contextSelection.serviceClient.controlPlaneTokenRef,
     };
   }
   const token = await resolveContextToken({

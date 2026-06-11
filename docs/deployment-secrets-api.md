@@ -138,14 +138,16 @@ Deployment-service routing:
 - `--remote <name>`: named control-plane profile lookup; `--remote mini` requires
   `projects/config/shared.json` `controlPlanes.mini` and resolves both
   `serviceClient.controlPlaneUrl` and `serviceClient.controlPlaneTokenRef`
-- `--control-plane-token <token>`: explicit bearer-token override for commands
-  without a selected deployment context, local fixture flows, or reviewed
-  break-glass/operator override paths. For checked-in protected/shared deploy
-  targets with `deployment_context`, the normal path is the selected
+- `--control-plane-token <token>`: explicit bearer-token input for commands
+  without a selected deployment context and for explicit local fixture flows.
+  It is not accepted as a token override for checked-in protected/shared deploy
+  targets with `deployment_context`. Those targets use the selected
   `controlPlanes.<name>.serviceClient.controlPlaneTokenRef`, which must be
-  `secret://...` or `runtime://...`. A hosted deployment service requires a
-  required bearer token on loopback and remote service requests; the local
-  fixture exception must be explicit with `VBR_DEPLOY_LOCAL_FIXTURE_SERVICE=1`.
+  `secret://...` or `runtime://...`, even when
+  `--allow-control-plane-override --control-plane-url <url>` intentionally
+  changes the service URL. A hosted deployment service requires a required
+  bearer token on loopback and remote service requests; the local fixture
+  exception must be explicit with `VBR_DEPLOY_LOCAL_FIXTURE_SERVICE=1`.
 - `VBR_DEPLOY_CONTROL_PLANE_URL`: environment fallback only for commands without
   a selected deployment context
 - `VBR_DEPLOY_CONTROL_PLANE_TOKEN`: environment fallback for commands without a

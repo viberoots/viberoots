@@ -11,6 +11,7 @@ Control-plane selection:
   --remote <name> requires a matching controlPlanes.<name> profile and resolves both
     serviceClient.controlPlaneUrl and serviceClient.controlPlaneTokenRef.
   --allow-control-plane-override permits a mismatching explicit --control-plane-url for a
-    context-selected deployment and records that source as an explicit override.
+    context-selected deployment and records that source as an explicit override; the token
+    still resolves from the selected secret:// or runtime:// controlPlaneTokenRef.
   VBR_DEPLOY_CONTROL_PLANE_URL never overrides a context-selected deployment.
 `;

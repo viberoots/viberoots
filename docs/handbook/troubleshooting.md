@@ -314,7 +314,10 @@ unexpected outcome.
     `VBR_DEPLOY_CONTROL_PLANE_TOKEN` to rescue a protected/shared deployment
     whose selected context is missing or invalid. Those fallbacks are accepted
     only for commands without deployment context, or for an explicit reviewed
-    URL override when a valid selected control plane already exists.
+    URL override when a valid selected control plane already exists. The URL
+    override still uses the selected `secret://...` or `runtime://...`
+    `controlPlaneTokenRef`; raw `--control-plane-token` material remains
+    rejected for context-selected protected/shared deployments.
 
 ### Control-plane service-token diagnostics
 
