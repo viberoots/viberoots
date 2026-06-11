@@ -242,7 +242,7 @@ approval is needed for this pass.
 
 ## Phase 5: Ordered Feature PR Plan
 
-Status: active.
+Status: complete for the ordered PR-1 through PR-4 sequence.
 
 ### Intent
 
@@ -263,7 +263,7 @@ diagnostics have settled.
 3. Remote build/cache readiness on top of the stable cache fallback. Status: landed as PR-3. This
    comes third because cache and remote-build readiness should consume the stable account,
    control-plane, and token-selection model rather than defining a parallel readiness model.
-4. Operator workflow/UI improvements after CLI diagnostics are stable. Status: in progress as PR-4. This
+4. Operator workflow/UI improvements after CLI diagnostics are stable. Status: landed as PR-4. This
    comes last because a higher-level summary should present settled CLI state, not become a second
    source of truth while diagnostics are still changing.
 
