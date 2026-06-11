@@ -281,6 +281,18 @@ unexpected outcome.
 
 ## Protected/shared control-plane selection
 
+- Operator navigation:
+  - Run `deploy --deployment <label> --operator-readiness` when you need a
+    concise read-only summary of the selected deployment context, selected
+    control-plane profile, selected secret backend, control-plane token ref
+    source, and existing AWS/Supabase/cache evidence.
+  - Treat that output as a navigation aid only. It deliberately points back to
+    `control-plane aws-account setup-plan`, `control-plane aws-account check`,
+    and `deploy --deployment <label> --validate-only`; those commands remain
+    the source of truth for fail-closed diagnostics and evidence.
+  - The summary may print a `secret://...` ref or runtime environment variable
+    name, but it must not print resolved token values, Vault tokens, Infisical
+    client secrets, bearer headers, or backend secret payloads.
 - Symptom: a protected/shared provider front door rejects before provider
   mutation with a missing control-plane, unknown `controlPlanes.<name>`,
   malformed profile, missing selected secret backend context, or unresolved

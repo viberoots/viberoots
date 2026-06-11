@@ -154,8 +154,9 @@ Make the setup and reference docs internally consistent and remove stale mental 
   `docs/control-plane-selector.md`.
 - AWS setup instructions are precise enough to follow without reading the design history. Status:
   improved in `docs/control-plane-guide.md` and validated by the clean setup rehearsal.
-- Troubleshooting entries correspond to actual fail-closed diagnostics. Status: not yet broadly
-  audited outside the touched control-plane docs.
+- Troubleshooting entries correspond to actual fail-closed diagnostics. Status: complete for the
+  current control-plane selector, token-resolution, cache-readiness, and operator-readiness
+  surfaces.
 - Old plans do not look like active implementation instructions when they are already complete.
   Status: complete for `docs/local-sprinkleref-plan.md` and
   `docs/control-plane-selector-plan.md`; both now have historical implementation-plan headers.
