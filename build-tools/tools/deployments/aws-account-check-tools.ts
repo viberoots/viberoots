@@ -1,4 +1,9 @@
 import path from "node:path";
+import {
+  evaluateNixCacheReadinessFromConfig,
+  type NixCachePolicy,
+  type NixCacheReadiness,
+} from "../lib/nix-cache-readiness";
 import { ensureNixStoreToolPathSync } from "../lib/tool-paths";
 import { CONTROL_PLANE_CONFIG_REFS } from "./aws-account-ref-schemes";
 import type {
@@ -24,22 +29,47 @@ export async function checkTools(
       errors.push(String(error instanceof Error ? error.message : error));
     }
   }
+  const cacheReadiness = await checkCacheReadiness(deps);
   const evidence = path.join(config.evidenceDir, "check-tools", "tools.json");
   await writeEvidence(evidence, {
     schemaVersion: "aws-account-tools@1",
     checkedAt: now,
     resolved,
     errors,
+    cacheReadiness,
   });
+  const cacheError = cacheReadiness.state === "failed" ? ` ${cacheReadiness.message}` : "";
   return {
-    state: errors.length > 0 ? "failed" : "passed",
+    state: errors.length > 0 || cacheReadiness.state === "failed" ? "failed" : "passed",
     message:
       errors.length > 0
         ? `required flake-provided tools are missing or not from /nix/store: ${errors.join("; ")}`
-        : "all required tools resolve from the repo Nix environment",
+        : `all required tools resolve from the repo Nix environment.${cacheError}`,
     evidence,
+    cacheReadiness,
     checkedAt: now,
   };
+}
+
+async function checkCacheReadiness(deps: RunDeps): Promise<NixCacheReadiness> {
+  const runner = deps.commandRunner || defaultCommandRunner;
+  const env = deps.env || process.env;
+  try {
+    const config = await runner("nix", ["config", "show"], { env });
+    return evaluateNixCacheReadinessFromConfig(config.stdout, cachePolicy(env), async (url) => {
+      const fetchImpl = deps.httpFetch || globalThis.fetch;
+      const response = await fetchImpl(url, { method: "HEAD" });
+      return response.ok || response.status === 405;
+    });
+  } catch {
+    return evaluateNixCacheReadinessFromConfig("", cachePolicy(env), async () => true);
+  }
+}
+
+function cachePolicy(env: NodeJS.ProcessEnv): NixCachePolicy {
+  return env.VBR_NIX_CACHE_POLICY === "strict" || env.VBR_NIX_CACHE_POLICY === "off"
+    ? env.VBR_NIX_CACHE_POLICY
+    : "auto";
 }
 
 export async function checkAwsLogin(

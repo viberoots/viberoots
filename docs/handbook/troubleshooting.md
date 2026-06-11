@@ -116,6 +116,25 @@
 - Ensure `NIX_GO_DEV_OVERRIDE_JSON` and `NIX_CPP_DEV_OVERRIDE_JSON` are unset. Locally, use `build-tools/tools/dev/clear-overrides.ts`.
 - Shared helper: `build-tools/tools/nix/lib/lang-helpers.nix` centralizes override parsing and CI guard (`readDevOverrides`, `guardNoDevOverridesInCI`). Templates import it to emit a local warning (trace) when overrides are set and to throw in CI if overrides are present.
 
+## Remote build/cache readiness
+
+- Symptom: `i`, `b`, or `v` logs `nix cache health: disabled unreachable substituter(s)`.
+  - Meaning: default `VBR_NIX_CACHE_POLICY=auto` dynamically removed unreachable configured
+    substituters for the current process and kept local fallback enabled.
+  - Fix: no local action is required unless you are validating remote-build or cache readiness.
+    Repair the named cache endpoint, credentials, DNS, or network route before treating the cache as
+    production-ready.
+- Symptom: `control-plane aws-account check` records `cacheReadiness.state = "degraded"`.
+  - Meaning: AWS/Supabase setup can still proceed, but at least one configured remote cache was not
+    reachable from this shell.
+  - Fix: inspect `buck-out/aws-account/<stack-domain>/check-tools/tools.json`; the
+    `cacheReadiness.statuses` entries list the dynamic substituter identities and reachability.
+- Symptom: cache readiness fails under `VBR_NIX_CACHE_POLICY=strict`.
+  - Meaning: strict mode is intentionally fail-closed and should be used only when cache
+    availability is the thing being tested.
+  - Fix: rerun the readiness check after the listed substituters respond to `nix-cache-info`, or
+    switch back to the default `auto` policy for ordinary local validation.
+
 ## Duplicate/malformed patches
 
 ## Go import lookup errors (vendor mode)

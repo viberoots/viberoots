@@ -1,7 +1,7 @@
 import process from "node:process";
 import "zx/globals";
+import { parseNixCacheConfigValues } from "../../lib/nix-cache-readiness";
 
-const CACHE_KEYS = new Set(["substituters", "extra-substituters"]);
 const OVERRIDE_KEYS = new Set([
   "substituters",
   "extra-substituters",
@@ -24,28 +24,6 @@ type CacheHealthResult = {
   removed: string[];
   nixConfig?: string;
 };
-
-function splitWords(value: string): string[] {
-  return value
-    .split(/\s+/)
-    .map((part) => part.trim())
-    .filter(Boolean);
-}
-
-function parseConfigValues(text: string): Map<string, string[]> {
-  const values = new Map<string, string[]>();
-  for (const rawLine of text.split("\n")) {
-    const line = rawLine.trim();
-    if (!line || line.startsWith("#")) continue;
-    const eq = line.indexOf("=");
-    if (eq <= 0) continue;
-    const key = line.slice(0, eq).trim();
-    const value = line.slice(eq + 1).trim();
-    if (!CACHE_KEYS.has(key)) continue;
-    values.set(key, [...(values.get(key) || []), ...splitWords(value)]);
-  }
-  return values;
-}
 
 function unique(values: string[]): string[] {
   const seen = new Set<string>();
@@ -120,7 +98,7 @@ export async function applyNixCacheHealthPolicy(
 
   const log = deps.log || ((line: string) => process.stderr.write(`${line}\n`));
   const effectiveConfig = await (deps.readEffectiveConfig || defaultReadEffectiveConfig)();
-  const parsed = parseConfigValues(effectiveConfig);
+  const parsed = parseNixCacheConfigValues(effectiveConfig);
   const required = unique(parsed.get("substituters") || []);
   const optional = unique(parsed.get("extra-substituters") || []);
   const configured = unique([...required, ...optional]);

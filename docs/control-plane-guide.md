@@ -375,6 +375,25 @@ These optional validators run only when the topology selects the corresponding c
 AWS/Supabase setup does not require Cloudflare, Vercel, Attic, or remote build fleet evidence unless
 those capabilities are selected in the generated provider-capability list.
 
+Remote build/cache readiness is reported separately from the minimal AWS/Supabase setup rehearsal.
+`control-plane aws-account check` records a `cacheReadiness` object in
+`check-tools/tools.json` with the configured `substituters`, `extra-substituters`, per-substituter
+reachability, and one of these states:
+
+- `ready`: configured HTTP substituters responded to `nix-cache-info`, and local/non-HTTP
+  substituters were treated as local.
+- `degraded`: default `VBR_NIX_CACHE_POLICY=auto` kept local validation usable by falling back away
+  from unreachable substituters. This is actionable operator evidence, not a basic setup failure.
+- `not_configured`: no Nix substituters were configured for the current shell.
+- `disabled`: `VBR_NIX_CACHE_POLICY=off` skipped cache readiness.
+- `failed`: explicit `VBR_NIX_CACHE_POLICY=strict` found an unreachable substituter and failed the
+  readiness check.
+
+Use `strict` only when cache availability is itself the policy under review, such as production
+remote-build readiness or cache cutover checks. Keep the default `auto` policy for ordinary local
+validation so optional cache outages do not block AWS account setup, Supabase checks, or repository
+verify runs.
+
 For ingress, this implementation uses repo-owned OpenTofu resources rather than provider-hook-only
 evidence. The AWS foundation module owns the default ALB/NLB, HTTPS/TLS listener, target group,
 target registration inputs, target-group readiness health check, Route53 record, ACM attachment,

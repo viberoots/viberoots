@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import { test } from "node:test";
 import { applyNixCacheHealthPolicy } from "../../dev/verify/nix-cache-health";
+import { evaluateNixCacheReadinessFromConfig } from "../../lib/nix-cache-readiness";
 
 async function withEnv<T>(env: NodeJS.ProcessEnv, fn: () => Promise<T>): Promise<T> {
   const prev = { ...process.env };
@@ -110,6 +111,57 @@ test("nix cache health off mode leaves NIX_CONFIG unchanged", async () => {
       assert.equal(process.env.NIX_CONFIG, "substituters = https://offline.example");
     },
   );
+});
+
+test("nix cache readiness reports reachable, absent, degraded, and strict states", async () => {
+  const reachable = await evaluateNixCacheReadinessFromConfig(
+    [
+      "substituters = https://primary.example/cache",
+      "extra-substituters = https://remote-builder-cache.example/cache",
+    ].join("\n"),
+    "auto",
+    async () => true,
+  );
+  assert.equal(reachable.state, "ready");
+  assert.deepEqual(
+    reachable.statuses.map((entry) => entry.url),
+    ["https://primary.example/cache", "https://remote-builder-cache.example/cache"],
+  );
+
+  const absent = await evaluateNixCacheReadinessFromConfig("", "auto", async () => true);
+  assert.equal(absent.state, "not_configured");
+
+  const degraded = await evaluateNixCacheReadinessFromConfig(
+    "extra-substituters = https://stale.dynamic.example/cache",
+    "auto",
+    async () => false,
+  );
+  assert.equal(degraded.state, "degraded");
+  assert.match(degraded.message, /https:\/\/stale\.dynamic\.example\/cache/);
+
+  const strict = await evaluateNixCacheReadinessFromConfig(
+    "extra-substituters = https://strict.dynamic.example/cache",
+    "strict",
+    async () => false,
+  );
+  assert.equal(strict.state, "failed");
+  assert.doesNotMatch(JSON.stringify(strict), /home\.kilty|kilty\.io/);
+});
+
+test("nix cache readiness redacts query and userinfo from recorded substituter identities", async () => {
+  const probed: string[] = [];
+  const readiness = await evaluateNixCacheReadinessFromConfig(
+    "extra-substituters = https://operator:secret@cache.example/path?token=abc123",
+    "auto",
+    async (url) => {
+      probed.push(url);
+      return false;
+    },
+  );
+  assert.equal(readiness.state, "degraded");
+  assert.deepEqual(readiness.optionalSubstituters, ["https://<redacted>@cache.example/path"]);
+  assert.deepEqual(probed, ["https://operator:secret@cache.example/path/nix-cache-info"]);
+  assert.doesNotMatch(JSON.stringify(readiness), /secret|token=abc123/);
 });
 
 test("nix cache health runs before dev-build and install nix entrypoints", async () => {

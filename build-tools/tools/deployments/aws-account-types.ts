@@ -1,4 +1,5 @@
 import type { StackInputResolution, StackInputSource } from "./aws-account-inputs";
+import type { NixCacheReadiness } from "../lib/nix-cache-readiness";
 import type { RedactedProjectConfigOverride } from "./project-config";
 
 export const AWS_ACCOUNT_STATUS_SCHEMA = "aws-account-status@1";
@@ -76,6 +77,7 @@ export type PhaseRecord = {
   state: PhaseState;
   message: string;
   evidence?: string;
+  cacheReadiness?: NixCacheReadiness;
   checkedAt?: string;
   missingConfigFields?: MissingConfigField[];
   resolvedInputSources?: Record<string, StackInputSource>;
@@ -114,7 +116,7 @@ export type CommandRunner = (
 export type ToolResolver = (tool: string) => string;
 export type HttpFetch = (
   url: string,
-  init?: { headers?: Record<string, string> },
+  init?: { headers?: Record<string, string>; method?: string },
 ) => Promise<{ ok: boolean; status: number; text: () => Promise<string> }>;
 
 export type RunDeps = {
