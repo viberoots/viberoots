@@ -4,20 +4,16 @@
     "ref": "config://control-plane/domain"
   },
   "awsAccountId": {
-    "ref": "config://control-plane/aws/account-id",
-    "category": "control"
+    "ref": "config://control-plane/aws/account-id"
   },
   "awsOrganizationId": {
-    "ref": "config://control-plane/aws/organization-id",
-    "category": "control"
+    "ref": "config://control-plane/aws/organization-id"
   },
   "supabaseOrgId": {
-    "ref": "config://control-plane/supabase/org-id",
-    "category": "control"
+    "ref": "config://control-plane/supabase/org-id"
   },
   "supabaseProjectRef": {
-    "ref": "config://control-plane/supabase/project-ref",
-    "category": "control"
+    "ref": "config://control-plane/supabase/project-ref"
   },
   "supabaseAccessToken": {
     "ref": "secret://control-plane/supabase/management-api-token",

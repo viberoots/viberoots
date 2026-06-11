@@ -168,7 +168,9 @@ export async function runWebappLocalTsDependencyTest(options: {
       let mainEvalSerial = 0;
       const evaluateMainText = async (): Promise<string> => {
         mainEvalSerial += 1;
-        return await evaluateRenderedAppText(`${mainModuleUrl}?t=${Date.now()}-${mainEvalSerial}`);
+        return await evaluateRenderedAppText(`${mainModuleUrl}?t=${Date.now()}-${mainEvalSerial}`, {
+          cacheBustImports: true,
+        });
       };
       const firstMainModule = await httpGet(mainModuleUrl);
       assert.equal(firstMainModule.status, 200);
@@ -213,11 +215,12 @@ export async function runWebappLocalTsDependencyTest(options: {
       );
       assert.equal(observed, "dep:phase1-b|app:phase1-local");
 
-      const currentMainModule = await httpGet(mainModuleUrl);
+      const finalProbeToken = `${Date.now()}-${mainEvalSerial + 1}`;
+      const currentMainModule = await httpGet(`${mainModuleUrl}?t=${finalProbeToken}`);
       assert.equal(currentMainModule.status, 200);
       const currentDepSpec = extractImportedUrl(currentMainModule.body, "/demo-lib");
       const currentDepModuleUrl = toAbsoluteModuleUrl(mainModuleUrl, currentDepSpec);
-      const nextModule = await httpGet(currentDepModuleUrl);
+      const nextModule = await httpGet(`${currentDepModuleUrl}?__vbr_eval=${finalProbeToken}`);
       assert.equal(nextModule.status, 200);
       assert.match(nextModule.body, /phase1-b/);
     } catch (error) {

@@ -31,7 +31,7 @@ them:
   "controlPlanes": {
     "viberoots-prod": {
       "serviceClient": {
-        "controlPlaneUrl": "https://deploy.control.unfair.ly",
+        "controlPlaneUrl": "https://deploy.control.example.com",
         "controlPlaneTokenRef": "secret://control-planes/viberoots-prod/service-token"
       },
       "records": {

@@ -12,10 +12,10 @@ Use this guide when you want the shortest path to:
 
 - understand what `SprinkleRef` means
 - know when a deployment should declare `secret_requirements`
-- resolve secrets at runtime through the current Vault-backed helpers and the
-  backend-neutral metadata contract
-- bootstrap Vault as the production source of truth and, when needed, export
-  the reviewed local/test secret fixture format
+- resolve secrets at runtime through the selected Vault or Infisical backend and
+  the backend-neutral metadata contract
+- bootstrap the selected production secret backend and, when needed, export the
+  reviewed local/test secret fixture format
 - find the right API reference or deeper design doc
 
 ## Reviewed Front Door
@@ -32,6 +32,8 @@ For secret-runtime integration and public helper signatures, open
 For production Vault bring-up and the optional local/test export bridge into
 `VBR_DEPLOYMENT_SECRET_FIXTURE_PATH`, open
 [Vault Production Bootstrap Runbook](vault-production-bootstrap.md).
+For Infisical-backed deployments, use the deployment context's reviewed
+`infisical_runtime` metadata and the repo's Infisical setup docs.
 
 ## Plain-Language Glossary
 
@@ -45,9 +47,9 @@ For production Vault bring-up and the optional local/test export bridge into
 - secret fixture: the reviewed local/test override file format named by
   `deployment-secret-fixture@1`
 - `secret_backend`: the deployment-wide backend selector for
-  `secret_requirements`; omitted means `vault/default`
-- Vault: the default backend that stores the real secret values
-- Infisical: an alternate backend selected with
+  `secret_requirements`; deployment contexts may supply the default selector
+- Vault: a supported backend that stores real secret values
+- Infisical: a supported backend selected with
   `secret_backend = "infisical/default"`
 
 ## How The Layers Fit Together
@@ -56,10 +58,11 @@ For production Vault bring-up and the optional local/test export bridge into
   metadata.
 - admitted secret references are the replay/runtime reference layer that freezes
   the exact non-secret resolution details for one run.
-- Vault is the default production backend that stores and serves the real secret
-  values.
-- Infisical can be selected per deployment with reviewed non-secret
-  `infisical_runtime` routing metadata.
+- Vault and Infisical are supported production backends that store and serve real
+  secret values.
+- Infisical is selected per deployment with reviewed non-secret
+  `infisical_runtime` routing metadata; Vault uses reviewed `vault_runtime`
+  metadata.
 - the secret fixture is the local/test/bootstrap override format for
   non-production flows that intentionally do not read Vault directly.
 
@@ -69,7 +72,8 @@ For production Vault bring-up and the optional local/test export bridge into
 - admission freezes admitted secret references, not secret values
 - runtime secret values are resolved only when a lifecycle step actually needs
   them
-- Vault is the default backend, but callers use the stable `SprinkleRef` layer
+- callers use the stable `SprinkleRef` layer instead of coding directly to the
+  selected backend
 - Infisical metadata names reviewed Universal Auth credential environment
   variable names. The selected source is
   `infisical_machine_identity_universal_auth`; Infisical CLI sessions, personal
@@ -428,10 +432,11 @@ new Infisical value after rotation when a recorded version was admitted.
 For local development, isolated tests, or explicit bootstrap-oriented
 workflows, use the fixture override shown below.
 
-For production secret storage and optional fixture export, use
-[Vault Production Bootstrap Runbook](vault-production-bootstrap.md)
-to bootstrap Vault as the source of truth and then export the secret fixture
-when one of those non-production workflows needs it.
+For production secret storage and optional fixture export, use the selected
+backend's setup path. Vault-backed deployments use
+[Vault Production Bootstrap Runbook](vault-production-bootstrap.md). Infisical-backed deployments use
+the reviewed `infisical_runtime` metadata and Infisical setup flow. Export the
+secret fixture only when an explicit non-production workflow needs it.
 
 That means:
 

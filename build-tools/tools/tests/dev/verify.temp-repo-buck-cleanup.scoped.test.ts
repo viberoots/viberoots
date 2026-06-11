@@ -236,11 +236,13 @@ test(
     await mkScript(ownedScript);
     await mkScript(ownedWasmScript);
     await mkScript(foreignScript);
-    const owned = spawn(process.execPath, [ownedScript], { stdio: "ignore" });
-    const ownedWasm = spawn(process.execPath, ["--experimental-strip-types", ownedWasmScript], {
-      stdio: "ignore",
-    });
-    const foreign = spawn(process.execPath, [foreignScript], { stdio: "ignore" });
+    const spawnMarkerProcess = (marker: string) =>
+      spawn(process.execPath, ["-e", "setInterval(() => {}, 1000)", marker], {
+        stdio: "ignore",
+      });
+    const owned = spawnMarkerProcess(ownedScript);
+    const ownedWasm = spawnMarkerProcess(ownedWasmScript);
+    const foreign = spawnMarkerProcess(foreignScript);
     const ownedKey = `${ownedTmp}/projects/apps/demo-vite-ssr/server/dev.mjs`;
     const ownedWasmKey = `${ownedTmp}/build-tools/tools/dev/wasm-watch-coordinator-daemon.ts`;
     const foreignKey = `${foreignTmp}/projects/apps/demo-vite-ssr/server/dev.mjs`;

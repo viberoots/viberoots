@@ -1,12 +1,8 @@
 import { assertStackRef, type StackRefOptions } from "./aws-account-ref-schemes";
 import type { StackInputResolution, StackInputSource } from "./aws-account-input-types";
-import {
-  LOCAL_VALUES_PATH,
-  localRedirectSource,
-  localSource,
-  readLocalValue,
-} from "./aws-account-local-values";
+import { LOCAL_VALUES_PATH, localRedirectSource, readLocalValue } from "./aws-account-local-values";
 import { assertBootstrapCategoryCanWrite } from "./sprinkleref-bootstrap-guard";
+import { resolveProjectConfigRef } from "./aws-account-project-config-refs";
 import { resolveSprinkleRefBackend } from "./sprinkleref-config";
 import { readSelectedSprinkleRefConfig } from "./sprinkleref-config-select";
 import { createSprinkleRefStore } from "./sprinkleref-store";
@@ -79,6 +75,9 @@ async function resolveRef(
   opts: RefResolutionOpts,
   seen: Set<string>,
 ): Promise<StackInputResolution> {
+  if (refScheme(ref) === "config") {
+    return await resolveProjectConfigRef(cwd, ref, opts, seen, resolveRef);
+  }
   const cycleKey = `${opts.category || ""}:${opts.categoryExplicit ? "explicit" : ""}:${ref}`;
   if (seen.has(cycleKey)) throw new Error(`local SprinkleRef redirect cycle for ${ref}`);
   seen.add(cycleKey);
@@ -194,4 +193,8 @@ function optionalStringMember(obj: Record<string, unknown>, key: string, label: 
   const value = obj[key];
   if (typeof value !== "string" || !value.trim()) throw new Error(`${label} must be a string`);
   return value.trim();
+}
+
+function refScheme(ref: string): string {
+  return ref.slice(0, ref.indexOf("://"));
 }

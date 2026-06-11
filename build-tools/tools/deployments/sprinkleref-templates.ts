@@ -76,9 +76,22 @@ export async function initSprinkleRefConfigs(opts: {
   const written: string[] = [];
   for (const [name, config] of Object.entries(configs)) {
     const file = path.join(opts.dir, name);
-    await fs.writeFile(file, `${JSON.stringify(config, null, 2)}\n`, {
-      flag: opts.mode === "overwrite" ? "w" : "wx",
-    });
+    try {
+      await fs.writeFile(file, `${JSON.stringify(config, null, 2)}\n`, {
+        flag: opts.mode === "overwrite" ? "w" : "wx",
+      });
+    } catch (error) {
+      if (
+        opts.mode !== "overwrite" &&
+        error &&
+        typeof error === "object" &&
+        "code" in error &&
+        error.code === "EEXIST"
+      ) {
+        continue;
+      }
+      throw error;
+    }
     written.push(file);
   }
   return written;

@@ -1,5 +1,10 @@
 # Local SprinkleRef Plan
 
+Status: historical implementation plan. The active operator-facing model is documented in
+[Local SprinkleRef Design](local-sprinkleref.md), [SprinkleRef](sprinkleref.md), and
+[AWS Control Plane Setup Guide](control-plane-guide.md). Keep this file for implementation
+traceability; do not treat older PR sections in this file as current setup instructions.
+
 This plan implements the local and clone-specific resolution model described in
 [Local SprinkleRef Design](local-sprinkleref.md).
 

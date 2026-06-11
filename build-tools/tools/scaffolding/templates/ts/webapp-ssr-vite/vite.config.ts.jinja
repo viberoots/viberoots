@@ -1,7 +1,7 @@
 import * as fsp from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { defineConfig } from "vite";
+import { defineConfig, type Plugin, type ViteDevServer } from "vite";
 
 type PackageJson = {
   dependencies?: Record<string, string>;
@@ -49,6 +49,48 @@ const optimizeDepsInclude = [
   "react-native-web",
 ];
 
+function realPathSafe(filePath: string): string {
+  try {
+    return fsp.realpathSync.native(filePath);
+  } catch {
+    return path.resolve(filePath);
+  }
+}
+
+function invalidateModulesByRealPath(server: ViteDevServer, changedPath: string): void {
+  const changedRealPath = realPathSafe(changedPath);
+  const moduleGraph = server.moduleGraph as ViteDevServer["moduleGraph"] & {
+    fileToModulesMap?: Map<string, Set<unknown>>;
+  };
+  const modules = new Set<unknown>();
+  for (const candidate of [changedPath, changedRealPath]) {
+    for (const mod of moduleGraph.getModulesByFile(candidate) || []) modules.add(mod);
+  }
+  for (const [modulePath, moduleSet] of moduleGraph.fileToModulesMap || []) {
+    if (realPathSafe(modulePath) !== changedRealPath) continue;
+    for (const mod of moduleSet) modules.add(mod);
+  }
+  for (const mod of modules) {
+    server.moduleGraph.invalidateModule(
+      mod as Parameters<typeof server.moduleGraph.invalidateModule>[0],
+    );
+  }
+}
+
+function workspaceDependencyWatchPlugin(): Plugin {
+  return {
+    name: "{{ name }}-workspace-dependency-watch",
+    configureServer(server) {
+      const projectsRoot = path.join(workspaceRoot, "projects");
+      server.watcher.add(projectsRoot);
+      server.watcher.on("all", (_eventName, changedPath) => {
+        if (!path.resolve(changedPath).startsWith(projectsRoot + path.sep)) return;
+        invalidateModulesByRealPath(server, changedPath);
+      });
+    },
+  };
+}
+
 export default defineConfig(({ isSsrBuild }) => ({
   appType: "custom",
   clearScreen: false,
@@ -85,4 +127,5 @@ export default defineConfig(({ isSsrBuild }) => ({
   ssr: {
     noExternal: optimizeDepsExclude,
   },
+  plugins: [workspaceDependencyWatchPlugin()],
 }));

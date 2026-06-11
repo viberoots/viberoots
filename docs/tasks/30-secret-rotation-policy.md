@@ -46,11 +46,11 @@ What is missing is an end-to-end answer to "what do I do when a credential needs
    account and "rotate the bootstrap password immediately after first use" but does not define an
    ongoing rotation cycle or automated revocation path for Jenkins-bound secrets.
 
-5. **Provider API keys** — Cloudflare API tokens, Vercel tokens, database URLs, and similar
-   provider credentials stored as `secret://deployments/...` contracts in Infisical or Infisical. The
-   Infisical bootstrap runbook includes a minimal rotation procedure (write new KV version, verify one
+5. **Provider API keys** — Cloudflare API tokens, Vercel tokens, database URLs, and similar provider
+   credentials stored as `secret://deployments/...` contracts in Infisical or Vault. The Infisical
+   bootstrap runbook includes a minimal rotation procedure (write new KV version, verify one
    deployment run reads the new value, regenerate any fixture exports that reference the old value).
-   The Infisical equivalent is not documented.
+   The Vault equivalent is not documented.
 
 6. **Postgres deployment service database URL** — passed as
    `VBR_DEPLOY_CONTROL_PLANE_DATABASE_URL` to the control plane. No rotation policy exists.

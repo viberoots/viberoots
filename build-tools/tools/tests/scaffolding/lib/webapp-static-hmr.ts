@@ -151,18 +151,25 @@ export async function moduleUrlResolvesToFile(
 function transformEsmForEval(
   code: string,
   moduleUrl: string,
+  opts: { importCacheBuster?: string } = {},
 ): { code: string; exportEntries: Array<{ exportName: string; localName: string }> } {
   const exportEntries: Array<{ exportName: string; localName: string }> = [];
   let out = code;
   out = out.replace(
     /import\s+([A-Za-z_$][\w$]*)\s+from\s+["']([^"']+)["'];?/g,
     (_, local, spec) => {
-      const depUrl = toAbsoluteModuleUrl(moduleUrl, String(spec));
+      const depUrl = cacheBustModuleUrl(
+        toAbsoluteModuleUrl(moduleUrl, String(spec)),
+        opts.importCacheBuster,
+      );
       return `const { default: ${String(local)} } = await __import("${depUrl}");`;
     },
   );
   out = out.replace(/import\s+\{([^}]+)\}\s+from\s+["']([^"']+)["'];?/g, (_, imports, spec) => {
-    const depUrl = toAbsoluteModuleUrl(moduleUrl, String(spec));
+    const depUrl = cacheBustModuleUrl(
+      toAbsoluteModuleUrl(moduleUrl, String(spec)),
+      opts.importCacheBuster,
+    );
     return `const {${String(imports)}} = await __import("${depUrl}");`;
   });
   out = out.replace(/export\s+const\s+([A-Za-z_$][\w$]*)\s*=/g, (_, name) => {
@@ -183,9 +190,22 @@ function transformEsmForEval(
   return { code: out, exportEntries };
 }
 
-export async function evaluateRenderedAppText(mainModuleUrl: string): Promise<string> {
+function cacheBustModuleUrl(moduleUrl: string, token?: string): string {
+  if (!token) return moduleUrl;
+  const parsed = new URL(moduleUrl);
+  parsed.searchParams.set("__vbr_eval", token);
+  return parsed.toString();
+}
+
+export async function evaluateRenderedAppText(
+  mainModuleUrl: string,
+  opts: { cacheBustImports?: boolean } = {},
+): Promise<string> {
   const moduleCache = new Map<string, Record<string, unknown>>();
   const appEl = { textContent: "" };
+  const importCacheBuster = opts.cacheBustImports
+    ? new URL(mainModuleUrl).searchParams.get("t") || String(Date.now())
+    : undefined;
   const fakeDocument = {
     getElementById(id: string) {
       return id === "app" ? appEl : null;
@@ -199,7 +219,7 @@ export async function evaluateRenderedAppText(mainModuleUrl: string): Promise<st
     if (res.status !== 200) {
       throw new Error(`expected 200 from module url '${moduleUrl}', got ${res.status}`);
     }
-    const transformed = transformEsmForEval(res.body, moduleUrl);
+    const transformed = transformEsmForEval(res.body, moduleUrl, { importCacheBuster });
     const exportObjectSrc =
       transformed.exportEntries.length === 0
         ? "{}"

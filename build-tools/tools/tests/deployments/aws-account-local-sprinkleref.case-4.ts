@@ -11,7 +11,7 @@ import {
 const ACCOUNT_REF = "config://control-plane/aws/account-id";
 const ORG_REF = "config://control-plane/aws/organization-id";
 
-test("aws-account explicit stack categories prevent different-ref local redirects", async () => {
+test("aws-account explicit stack categories do not prevent different-ref config redirects", async () => {
   await runInTemp("aws-account-explicit-category-blocks-target-redirect", async (tmp) => {
     await writeStack(tmp, {
       domain: "example.com",
@@ -23,14 +23,16 @@ test("aws-account explicit stack categories prevent different-ref local redirect
     });
     await writeLocalValues(tmp, {
       "control-plane": {
-        aws: { "account-id": { ref: ORG_REF } },
+        aws: { "account-id": { ref: ORG_REF }, "organization-id": "local-org-id" },
       },
     });
     const config = await readAwsAccountConfig(tmp);
-    assert.equal(config.awsAccountId, "ops-account-id");
+    assert.equal(config.awsAccountId, "local-org-id");
     assert.equal(config.inputSources.awsAccountId.ref, ACCOUNT_REF);
-    assert.equal(config.inputSources.awsAccountId.category, "ops");
-    assert.equal(config.inputSources.awsAccountId.categoryExplicit, true);
+    assert.equal(config.inputSources.awsAccountId.redirectRef, ORG_REF);
+    assert.equal(config.inputSources.awsAccountId.redirectSource?.ref, ORG_REF);
+    assert.equal(config.inputSources.awsAccountId.category, undefined);
+    assert.equal(config.inputSources.awsAccountId.categoryExplicit, undefined);
     assert.match(
       config.inputSources.awsAccountId.localValuesPath || "",
       /projects\/config\/local\.json$/,
@@ -49,15 +51,15 @@ test("aws-account uncategorized stack refs allow different-ref local redirects",
     });
     await writeLocalValues(tmp, {
       "control-plane": {
-        aws: { "account-id": { ref: ORG_REF } },
+        aws: { "account-id": { ref: ORG_REF }, "organization-id": "local-org-id" },
       },
     });
     const config = await readAwsAccountConfig(tmp);
-    assert.equal(config.awsAccountId, "main-org-id");
+    assert.equal(config.awsAccountId, "local-org-id");
     assert.equal(config.inputSources.awsAccountId.ref, ACCOUNT_REF);
     assert.equal(config.inputSources.awsAccountId.redirectRef, ORG_REF);
     assert.equal(config.inputSources.awsAccountId.redirectSource?.ref, ORG_REF);
-    assert.equal(config.inputSources.awsAccountId.category, "main");
-    assert.equal(config.inputSources.awsAccountId.categoryExplicit, false);
+    assert.equal(config.inputSources.awsAccountId.category, undefined);
+    assert.equal(config.inputSources.awsAccountId.categoryExplicit, undefined);
   });
 });

@@ -118,11 +118,13 @@ sprinkleref --update secret://control-plane/supabase/management-api-token --crea
 Add `--category bootstrap` only when the stack field or local value explicitly opts into the
 bootstrap category. It never writes a plaintext token placeholder.
 
-Generated AWS account setup refs declare `category: "control"` in stack config. Resolver code does
-not infer a category from `control-plane` ref prefixes. When a stack ref declares a category
-explicitly, that category resolves the original logical ref and wins over matching local scalar,
-`{ "value": ... }`, and redirect entries, including redirects to a different target ref. Stack refs
-without an explicit category continue to use local values first.
+Generated AWS account setup refs dispatch by URI scheme. Non-secret `config://...` refs resolve
+through merged `projects/config/shared.json` and `projects/config/local.json` values first; a
+`category` field on a `config://...` stack ref is ignored because categories are SprinkleRef
+resolver lanes, not project-config selectors. Secret `secret://...` setup refs, such as the
+Supabase Management API token, may declare `category: "control"` or another explicit category and
+resolve through that SprinkleRef/backend lane. Resolver code does not infer a category from
+`control-plane` ref prefixes.
 
 Project config may define named backend profiles separately from categories. Profiles name backend
 instances/accounts, while categories name usage lanes:

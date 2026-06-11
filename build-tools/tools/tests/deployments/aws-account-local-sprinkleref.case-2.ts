@@ -19,30 +19,25 @@ import {
   writeStack,
 } from "./aws-account-local-sprinkleref.helpers";
 
-test("aws-account resolver handles remote fallback and unknown redirect categories", async () => {
-  await runInTemp("aws-account-remote-fallback", async (tmp) => {
+test("aws-account resolver handles config refs through project config", async () => {
+  await runInTemp("aws-account-project-config-refs", async (tmp) => {
     const ref = "config://control-plane/aws/account-id";
     const orgRef = "config://control-plane/aws/organization-id";
-    await writeRemote(tmp, "control", { [ref]: "remote-id" });
     await writeStack(tmp, { domain: "example.com", awsAccountId: { ref } });
     let config = await readAwsAccountConfig(tmp);
-    assert.equal(config.awsAccountId, "remote-id");
-    assert.equal(config.inputSources.awsAccountId.source, "sprinkleref");
+    assert.equal(config.awsAccountId, undefined);
+    assert.equal(config.inputSources.awsAccountId.source, "missing");
+    assert.match(config.inputErrors.awsAccountId, /missing in project config values/);
+    await writeJson(path.join(tmp, "projects/config/shared.json"), {
+      schemaVersion: "viberoots-project-config@1",
+      values: { "control-plane": { aws: { "account-id": "shared-id" } } },
+    });
+    config = await readAwsAccountConfig(tmp);
+    assert.equal(config.awsAccountId, "shared-id");
+    assert.equal(config.inputSources.awsAccountId.source, "local-values");
     await writeLocalValues(tmp, { "control-plane": { aws: { "account-id": "local-id" } } });
     config = await readAwsAccountConfig(tmp);
     assert.equal(config.awsAccountId, "local-id");
-    await writeLocalValues(tmp, {
-      "control-plane": { aws: { "account-id": { ref, category: "unknown" } } },
-    });
-    const unresolved = await resolveStackRef(tmp, ref);
-    assert.match(unresolved.error || "", /category unknown/);
-    await writeLocalValues(tmp, {
-      "control-plane": { aws: { "account-id": { ref } } },
-    });
-    const redirected = await resolveStackRef(tmp, ref);
-    assert.equal(redirected.value, "remote-id");
-    assert.equal(redirected.source.source, "sprinkleref");
-    assert.equal(redirected.category, "control");
     await writeLocalValues(tmp, {
       "control-plane": { aws: { "account-id": { ref: orgRef }, "organization-id": "local-org" } },
     });

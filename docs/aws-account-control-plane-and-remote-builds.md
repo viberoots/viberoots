@@ -130,9 +130,11 @@ with:
 sprinkleref --init-local
 ```
 
-When a stack ref declares `category` explicitly, resolver category selection stays explicit:
-matching local scalar, `{ "value": ... }`, and redirect entries do not override that category.
-Local values remain local-first for stack refs that omit `category`.
+AWS account setup refs dispatch by URI scheme. Non-secret `config://...` refs resolve through
+merged `projects/config/shared.json` and `projects/config/local.json` values even if an older stack
+file still contains a `category` field. Categories are SprinkleRef backend lanes for
+`secret://...` refs such as the Supabase Management API token; they are not selectors for
+project-config coordinates.
 
 A local value can redirect a true secret to the configured bootstrap category:
 

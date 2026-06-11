@@ -62,6 +62,73 @@ The AWS profile should normally run:
 The control plane remains the deployment authority. AWS, Supabase, S3, PrivateLink, DNS, and TLS are
 runtime dependencies and provider-capability evidence, not independent deployment authorities.
 
+## Repo Config Authority
+
+Before running AWS setup commands, make sure the repo config model is clear:
+
+- `projects/config/shared.json` is the checked-in shared topology surface.
+- `projects/config/local.json` is the gitignored per-operator override surface.
+- `config/control-plane/stack.json` is the AWS account setup stack input file.
+- `config://...` refs name non-secret project config values.
+- `secret://...` refs name true secrets in the selected secret backend.
+- `runtime://...` refs name values supplied by the selected runtime host contract.
+
+The stack file may reference project config values, but it is not the source of truth for shared
+deployment topology. Non-secret values such as AWS account ids, AWS organization ids, Supabase org
+ids, Supabase project refs, Infisical project ids, Cloudflare zone ids, service URLs, domains, and
+regions belong in shared project config when they are common to the repo. Local-only substitutions
+belong in `projects/config/local.json`.
+
+Control-plane service tokens, Supabase Management API tokens, database URLs, Infisical client
+secrets, provider API tokens, private keys, and artifact-store secret keys are never stored in
+shared or local project config as plaintext. Use `secret://...` when the value is resolved through
+SprinkleRef and the selected Vault/Infisical/local-file backend. Use `runtime://...` when the value
+is supplied by a host credential file, CI secret variable, or another reviewed runtime binding.
+
+AWS account setup follows scheme-first resolution:
+
+- `config://control-plane/aws/account-id`,
+  `config://control-plane/aws/organization-id`,
+  `config://control-plane/supabase/org-id`, and
+  `config://control-plane/supabase/project-ref` resolve from merged project config values.
+- `secret://control-plane/supabase/management-api-token` resolves through the selected SprinkleRef
+  backend lane.
+- A stale `category` field on a `config://...` stack value is ignored. Categories are
+  SprinkleRef/backend lanes for `secret://...` refs, not project config selectors.
+
+The normal first-run command shape is:
+
+```bash
+sprinkleref --init
+sprinkleref --init-local
+control-plane aws-account config-init --domain deploy.example.com
+control-plane aws-account check
+```
+
+`sprinkleref --init` is safe in a checked-in repo that already has
+`projects/config/shared.json`; it reports that no shared files were written. `sprinkleref
+--init-local` creates or updates `projects/config/local.json` with local placeholders. The
+first `control-plane aws-account check` should be allowed to reach a clear missing-values report;
+that report is part of the setup workflow, not a crash.
+
+Expected ownership for the common missing values:
+
+| Value                               | Ref                                                             | Owner                                             |
+| ----------------------------------- | --------------------------------------------------------------- | ------------------------------------------------- |
+| control-plane domain                | `config://control-plane/domain`                                 | shared project config unless local-only           |
+| AWS account id                      | `config://control-plane/aws/account-id`                         | shared project config                             |
+| AWS organization id                 | `config://control-plane/aws/organization-id`                    | shared project config                             |
+| Supabase organization id            | `config://control-plane/supabase/org-id`                        | shared project config                             |
+| Supabase project ref                | `config://control-plane/supabase/project-ref`                   | shared project config                             |
+| Supabase Management API token       | `secret://control-plane/supabase/management-api-token`          | selected secret backend or reviewed runtime input |
+| deployment control-plane token      | `secret://.../service-token` or `runtime://.../service-token`   | selected secret backend or runtime host contract  |
+| deployment provider/API credentials | `secret://deployments/<deployment>/<provider-or-credential-id>` | selected deployment secret backend                |
+
+If `projects/config/local.json` is absent, setup should degrade to missing-value diagnostics. It
+should not throw a file-not-found error, infer a secret backend for non-secret `config://...` refs,
+or fall back to ambient control-plane URL/token environment variables for protected/shared
+deployment contexts.
+
 ## What Is IaC Today
 
 The current repo can already define or generate these pieces:
@@ -987,6 +1054,16 @@ do not satisfy protected/shared readiness by themselves.
 - [ ] Supabase project exists in the same region as the AWS VPC.
 - [ ] Supabase PrivateLink regional availability is confirmed for that region, or public TLS is
       explicitly selected.
+- [ ] `projects/config/shared.json` contains shared non-secret topology for the selected control
+      plane, AWS account, Supabase project, deployment contexts, and secret backend selectors.
+- [ ] `projects/config/local.json` is absent or contains only gitignored local overrides and local
+      placeholders; it does not contain plaintext secrets.
+- [ ] `control-plane aws-account config-init` has produced `config/control-plane/stack.json` with
+      `config://...` refs for non-secret coordinates and `secret://...` or `runtime://...` refs for
+      secrets.
+- [ ] `control-plane aws-account check` reaches either a passing state or an actionable
+      missing-values report that classifies `config://` values as project config and `secret://`
+      values as secret backend work.
 - [ ] Supabase Postgres database URL is staged only as a credential file.
 - [ ] PrivateLink is either complete and proven from the VPC, or public TLS is explicitly selected.
 - [ ] AWS VPC, subnets, security groups, ingress, S3, and endpoints are provisioned by reviewed IaC

@@ -100,17 +100,28 @@ export async function initStackConfig(cwd: string, deps: RunDeps): Promise<void>
   }
   const values = buildStackConfigValues({}, deps);
   await writeStackConfig(configPath, values);
+  const hasDomain = typeof values.domain === "string" && values.domain.trim().length > 0;
+  const next = hasDomain
+    ? [
+        "Next:",
+        "  Run sprinkleref --init-local to create clone-local coordinate placeholders.",
+        "  Or export SUPABASE_ACCESS_TOKEN=<token> in the setup shell for this run.",
+        "  control-plane aws-account check",
+      ]
+    : [
+        "Next:",
+        `  Edit ${relativePath(cwd, configPath)} and fill "domain".`,
+        "  Run sprinkleref --init-local to create clone-local coordinate placeholders.",
+        "  Or export SUPABASE_ACCESS_TOKEN=<token> in the setup shell for this run.",
+        "  control-plane aws-account check",
+      ];
   (deps.stdout || console.log)(
     [
       "AWS account stack config written",
       "",
       `Path: ${relativePath(cwd, configPath)}`,
       "",
-      "Next:",
-      `  Edit ${relativePath(cwd, configPath)} and fill "domain".`,
-      "  Run sprinkleref --init-local to create clone-local coordinate placeholders.",
-      "  Or export SUPABASE_ACCESS_TOKEN=<token> in the setup shell for this run.",
-      "  control-plane aws-account check",
+      ...next,
       "",
       "The check/bootstrap commands load this canonical file automatically.",
       "Pass --config <path> only when using a different file.",

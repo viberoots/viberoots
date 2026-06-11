@@ -223,7 +223,8 @@ function initStructuredField(
     }
   }
   if (Object.hasOwn(fromFile, key)) return fromFile[key] as string | { ref: string };
-  return { ref: defaultStackRef(key), category: "control" };
+  const ref = defaultStackRef(key);
+  return ref.startsWith("secret://") ? { ref, category: "control" } : { ref };
 }
 
 function defaultStackRef(key: string): string {

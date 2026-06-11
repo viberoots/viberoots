@@ -209,3 +209,25 @@ test("aws-account check loads canonical stack config without --config", async ()
     });
   });
 });
+
+test("aws-account config-init with domain skips stale fill-domain guidance", async () => {
+  await runInTemp("aws-account-config-init-domain-guidance", async (tmp) => {
+    await removeCanonicalStackConfig(tmp);
+    await withCwd(tmp, async () => {
+      const out: string[] = [];
+      await withControlPlaneArgv(
+        ["aws-account", "config-init", "--domain", "deploy.example.com"],
+        () => runAwsAccountCommand({ cwd: tmp, stdout: (text) => out.push(text) }),
+      );
+      const text = out.join("\n");
+      assert.match(text, /AWS account stack config written/);
+      assert.match(text, /sprinkleref --init-local/);
+      assert.match(text, /control-plane aws-account check/);
+      assert.doesNotMatch(text, /fill "domain"/);
+      const config = JSON.parse(
+        await fsp.readFile(path.join(tmp, "config/control-plane/stack.json"), "utf8"),
+      );
+      assert.equal(config.domain, "deploy.example.com");
+    });
+  });
+});

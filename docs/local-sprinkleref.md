@@ -75,8 +75,9 @@ Rules:
 - Plain scalar means inline value.
 - `{ "value": ... }` means explicit inline value. This form exists so future fields can hold object
   or array values without changing the field model.
-- `{ "ref": "config://..." }`, `{ "ref": "runtime://..." }`, or `{ "ref": "secret://..." }`
-  means resolve through SprinkleRef.
+- `{ "ref": "config://..." }` means resolve through merged project config values.
+- `{ "ref": "runtime://..." }` means resolve through the selected runtime host contract.
+- `{ "ref": "secret://..." }` means resolve through the selected SprinkleRef backend lane.
 - `{ "value": ..., "ref": ... }` is invalid.
 - Empty string, `{ "value": "" }`, and `{ "ref": "" }` are missing for required fields.
 - True secret fields must reject inline scalar and `{ "value": ... }`.
@@ -99,16 +100,10 @@ Recommended generated shape:
 {
   "schemaVersion": "aws-account-stack-config@1",
   "domain": "",
-  "awsAccountId": { "ref": "config://control-plane/aws/account-id", "category": "control" },
-  "awsOrganizationId": {
-    "ref": "config://control-plane/aws/organization-id",
-    "category": "control"
-  },
-  "supabaseOrgId": { "ref": "config://control-plane/supabase/org-id", "category": "control" },
-  "supabaseProjectRef": {
-    "ref": "config://control-plane/supabase/project-ref",
-    "category": "control"
-  },
+  "awsAccountId": { "ref": "config://control-plane/aws/account-id" },
+  "awsOrganizationId": { "ref": "config://control-plane/aws/organization-id" },
+  "supabaseOrgId": { "ref": "config://control-plane/supabase/org-id" },
+  "supabaseProjectRef": { "ref": "config://control-plane/supabase/project-ref" },
   "supabaseAccessToken": {
     "ref": "secret://control-plane/supabase/management-api-token",
     "category": "control"
@@ -298,8 +293,18 @@ non-secret provider metadata:
 
 ```json
 {
+  "controlPlanes": {
+    "pleomino-prod": {
+      "serviceClient": {
+        "controlPlaneUrl": "https://deploy.pleomino.example.com",
+        "controlPlaneTokenRef": "secret://control-planes/pleomino-prod/service-token"
+      },
+      "records": { "backend": "service" }
+    }
+  },
   "deploymentContexts": {
     "pleomino-prod": {
+      "controlPlane": "pleomino-prod",
       "secretBackend": "infisical/default",
       "aws": { "accountId": "111122223333", "defaultRegion": "us-west-2" },
       "infisical": {
@@ -328,6 +333,7 @@ non-secret provider metadata:
       }
     },
     "admin-prod": {
+      "controlPlane": "pleomino-prod",
       "secretBackend": "infisical/admin",
       "aws": { "accountId": "444455556666", "defaultRegion": "us-east-1" },
       "infisical": { "projectId": "admin-project-id", "environment": "prod" },
@@ -361,20 +367,17 @@ For a stack field with an inline value:
 For a stack field with `{ "ref": "<scheme>://..." }`:
 
 1. CLI flag, when supplied.
-2. If the stack ref declares `category`, resolve the original logical ref through that category;
-   local values do not satisfy scalar, `{ "value": ... }`, or redirect target-ref changes for that
-   ref.
-3. Conventional local values file at `projects/config/local.json`.
-4. If the local entry is scalar or `{ "value": ... }`, use it only when the requested field is not
-   secret-class.
-5. If the local entry is `{ "ref": "<scheme>://...", "category": "<category>" }`, resolve the target
-   ref through that category.
-6. If the local entry is `{ "ref": "<scheme>://..." }`, resolve the target ref through the current
-   category chain.
-7. If no local entry resolves, use the configured category/backend resolver, such as Infisical or
-   Vault.
-8. Default, when the field has one.
-9. Missing/blocking.
+2. Dispatch by URI scheme.
+3. `config://...` resolves through merged `projects/config/shared.json` and
+   `projects/config/local.json` values. A stale `category` field is ignored for this scheme.
+4. `runtime://...` resolves through the selected runtime host contract.
+5. `secret://...` resolves through the selected SprinkleRef backend lane. If the stack ref declares
+   `category`, that category resolves the secret ref explicitly.
+6. Local project config entries may be scalar, `{ "value": ... }`, or redirect objects. A redirect
+   to another `config://...` target still resolves from project config; a redirect to
+   `secret://...` resolves through the selected backend.
+7. Default, when the field has one.
+8. Missing/blocking.
 
 For `supabaseAccessToken`:
 
@@ -391,13 +394,12 @@ For `supabaseAccessToken`:
 The token value must never be printed or written into stack config, local values, inputs, or
 evidence.
 
-Generated control-plane setup refs should declare `category: "control"` explicitly. Resolver code
-must not infer `control` from a `control-plane` ref prefix. A local redirect to
-`category: "bootstrap"` is an explicit clone-local decision to use the bootstrap lane for that one
-value only when the stack ref has no explicit category. Redirects that change the target ref are
-also ignored when the stack ref declares a category, so an explicit category always applies to the
-original logical ref. Local scalar and `{ "value": ... }` entries are also local-first only for stack
-refs without an explicit category.
+Generated control-plane setup refs dispatch by URI scheme. Non-secret `config://...` coordinates
+such as AWS account ids and Supabase project refs resolve through merged project config values even
+if an old stack file still contains a `category` field. Categories are SprinkleRef resolver lanes,
+so they apply to `secret://...` setup refs such as the Supabase Management API token, not to
+project-config coordinates. Resolver code must not infer `control` from a `control-plane` ref
+prefix.
 
 ## Developer Experience
 
@@ -470,20 +472,20 @@ Stack Config
   Missing:
     awsAccountId
       ref: config://control-plane/aws/account-id
-      category: control
-      action: fill projects/config/local.json or write the ref in SprinkleRef
+      source: shared project config
+      action: fill projects/config/shared.json or projects/config/local.json
     supabaseOrgId
       ref: config://control-plane/supabase/org-id
-      category: control
-      action: fill projects/config/local.json or write the ref in SprinkleRef
+      source: shared project config
+      action: fill projects/config/shared.json or projects/config/local.json
     supabaseProjectRef
       ref: config://control-plane/supabase/project-ref
-      category: control
-      action: fill projects/config/local.json or write the ref in SprinkleRef
+      source: shared project config
+      action: fill projects/config/shared.json or projects/config/local.json
     supabaseAccessToken
       ref: secret://control-plane/supabase/management-api-token
       category: control
-      action: fill projects/config/local.json or write the ref in SprinkleRef
+      action: write the ref in the selected SprinkleRef backend
 
 Resolved:
     domain                        inline

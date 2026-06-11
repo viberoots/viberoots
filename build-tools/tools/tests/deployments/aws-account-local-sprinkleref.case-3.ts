@@ -9,15 +9,17 @@ import {
   runInTemp,
   test,
   withControlPlaneArgv,
+  writeJson,
   writeLocalValues,
   writeResolver,
   writeStack,
 } from "./aws-account-local-sprinkleref.helpers";
 
 const ACCOUNT_REF = "config://control-plane/aws/account-id";
+const ORG_REF = "config://control-plane/aws/organization-id";
 const TOKEN_REF = "secret://control-plane/supabase/management-api-token";
 
-test("aws-account bare setup refs do not infer control from ref prefix", async () => {
+test("aws-account config refs resolve from project config, not SprinkleRef prefix inference", async () => {
   await runInTemp("aws-account-no-prefix-category-inference", async (tmp) => {
     await writeStack(tmp, {
       domain: "example.com",
@@ -27,37 +29,42 @@ test("aws-account bare setup refs do not infer control from ref prefix", async (
       main: { [ACCOUNT_REF]: "main-id" },
       control: { [ACCOUNT_REF]: "control-id" },
     });
+    await writeJson(path.join(tmp, "projects/config/local.json"), {
+      schemaVersion: "viberoots-project-local-config@1",
+      values: { "control-plane": { aws: { "account-id": "project-config-id" } } },
+    });
     const config = await readAwsAccountConfig(tmp);
-    assert.equal(config.awsAccountId, "main-id");
-    assert.equal(config.inputSources.awsAccountId.category, "main");
-    assert.equal(config.inputSources.awsAccountId.categoryExplicit, false);
+    assert.equal(config.awsAccountId, "project-config-id");
+    assert.equal(config.inputSources.awsAccountId.source, "local-values");
+    assert.equal(config.inputSources.awsAccountId.category, undefined);
   });
 });
 
-test("aws-account config-init refs resolve through explicit control category", async () => {
+test("aws-account config-init emits scheme-first config refs without categories", async () => {
   await runInTemp("aws-account-config-init-explicit-control-category", async (tmp) => {
     await writeResolver(tmp, "main", {
       main: { [ACCOUNT_REF]: "main-id" },
       control: { [ACCOUNT_REF]: "control-id" },
     });
+    await writeJson(path.join(tmp, "projects/config/local.json"), {
+      schemaVersion: "viberoots-project-local-config@1",
+      values: { "control-plane": { aws: { "account-id": "project-config-id" } } },
+    });
     await fsp.rm(path.join(tmp, "config/control-plane/stack.json"), { force: true });
     await withControlPlaneArgv(["aws-account", "config-init", "--domain", "example.com"], () =>
       runAwsAccountCommand({ cwd: tmp, stdout: () => undefined }),
     );
+    const stack = JSON.parse(
+      await fsp.readFile(path.join(tmp, "config/control-plane/stack.json"), "utf8"),
+    );
+    assert.deepEqual(stack.awsAccountId, { ref: ACCOUNT_REF });
     const config = await readAwsAccountConfig(tmp);
-    assert.equal(config.awsAccountId, "control-id");
-    assert.deepEqual(config.inputSources.awsAccountId, {
-      source: "sprinkleref",
-      ref: ACCOUNT_REF,
-      category: "control",
-      backend: `local-file ${path.join(tmp, ".local/control.json")}`,
-      categoryExplicit: true,
-      valuePrinted: true,
-    });
+    assert.equal(config.awsAccountId, "project-config-id");
+    assert.equal(config.inputSources.awsAccountId.source, "local-values");
   });
 });
 
-test("aws-account explicit stack categories override generated control category", async () => {
+test("aws-account explicit stack categories are ignored for config refs", async () => {
   await runInTemp("aws-account-explicit-stack-category", async (tmp) => {
     await writeStack(tmp, {
       domain: "example.com",
@@ -68,14 +75,18 @@ test("aws-account explicit stack categories override generated control category"
       control: { [ACCOUNT_REF]: "control-id" },
       bootstrap: { [ACCOUNT_REF]: "bootstrap-id" },
     });
+    await writeLocalValues(tmp, {
+      "control-plane": { aws: { "account-id": "project-config-id" } },
+    });
     const config = await readAwsAccountConfig(tmp);
-    assert.equal(config.awsAccountId, "bootstrap-id");
-    assert.equal(config.inputSources.awsAccountId.category, "bootstrap");
-    assert.equal(config.inputSources.awsAccountId.categoryExplicit, true);
+    assert.equal(config.awsAccountId, "project-config-id");
+    assert.equal(config.inputSources.awsAccountId.source, "local-values");
+    assert.equal(config.inputSources.awsAccountId.category, undefined);
+    assert.equal(config.inputSources.awsAccountId.categoryExplicit, undefined);
   });
 });
 
-test("aws-account arbitrary explicit stack categories override local redirects", async () => {
+test("aws-account arbitrary explicit stack categories do not override config local redirects", async () => {
   await runInTemp("aws-account-explicit-arbitrary-category", async (tmp) => {
     await writeStack(tmp, {
       domain: "example.com",
@@ -87,12 +98,17 @@ test("aws-account arbitrary explicit stack categories override local redirects",
       ops: { [ACCOUNT_REF]: "ops-id" },
     });
     await writeLocalValues(tmp, {
-      "control-plane": { aws: { "account-id": { ref: ACCOUNT_REF, category: "control" } } },
+      "control-plane": {
+        aws: {
+          "account-id": { ref: ORG_REF, category: "control" },
+          "organization-id": "local-org",
+        },
+      },
     });
     const config = await readAwsAccountConfig(tmp);
-    assert.equal(config.awsAccountId, "ops-id");
-    assert.equal(config.inputSources.awsAccountId.category, "ops");
-    assert.equal(config.inputSources.awsAccountId.categoryExplicit, true);
+    assert.equal(config.awsAccountId, "local-org");
+    assert.equal(config.inputSources.awsAccountId.source, "local-values");
+    assert.equal(config.inputSources.awsAccountId.redirectRef, ORG_REF);
     assert.match(
       config.inputSources.awsAccountId.localValuesPath || "",
       /projects\/config\/local\.json$/,
@@ -100,7 +116,7 @@ test("aws-account arbitrary explicit stack categories override local redirects",
   });
 });
 
-test("aws-account explicit stack categories override local scalar and value entries", async () => {
+test("aws-account explicit stack categories do not override local scalar and value entries", async () => {
   await runInTemp("aws-account-explicit-category-over-local-values", async (tmp) => {
     await writeStack(tmp, {
       domain: "example.com",
@@ -114,14 +130,14 @@ test("aws-account explicit stack categories override local scalar and value entr
       "control-plane": { aws: { "account-id": "local-id" } },
     });
     let config = await readAwsAccountConfig(tmp);
-    assert.equal(config.awsAccountId, "ops-id");
-    assert.equal(config.inputSources.awsAccountId.source, "sprinkleref");
+    assert.equal(config.awsAccountId, "local-id");
+    assert.equal(config.inputSources.awsAccountId.source, "local-values");
     await writeLocalValues(tmp, {
       "control-plane": { aws: { "account-id": { value: "local-id" } } },
     });
     config = await readAwsAccountConfig(tmp);
-    assert.equal(config.awsAccountId, "ops-id");
-    assert.equal(config.inputSources.awsAccountId.category, "ops");
+    assert.equal(config.awsAccountId, "local-id");
+    assert.equal(config.inputSources.awsAccountId.category, undefined);
   });
 });
 
@@ -210,7 +226,7 @@ test("aws-account malformed local redirect categories fail closed", async () => 
   });
 });
 
-test("aws-account explicit unknown categories fail closed", async () => {
+test("aws-account explicit unknown categories on config refs report project config misses", async () => {
   await runInTemp("aws-account-explicit-unknown-category", async (tmp) => {
     await writeStack(tmp, {
       domain: "example.com",
@@ -222,7 +238,9 @@ test("aws-account explicit unknown categories fail closed", async () => {
     });
     const config = await readAwsAccountConfig(tmp);
     assert.equal(config.awsAccountId, undefined);
-    assert.match(config.inputSources.awsAccountId.category, /unknown/);
-    assert.match(config.inputSources.awsAccountId.source, /missing/);
+    assert.equal(config.inputSources.awsAccountId.category, undefined);
+    assert.equal(config.inputSources.awsAccountId.source, "missing");
+    assert.match(config.inputErrors.awsAccountId, /missing in project config values/);
+    assert.doesNotMatch(config.inputErrors.awsAccountId, /SprinkleRef category unknown/);
   });
 });

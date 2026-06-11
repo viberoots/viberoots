@@ -104,19 +104,15 @@ test("aws-account config-init writes canonical stack config with empty unknowns"
     assert.equal(config.domain, "");
     assert.deepEqual(config.awsAccountId, {
       ref: "config://control-plane/aws/account-id",
-      category: "control",
     });
     assert.deepEqual(config.awsOrganizationId, {
       ref: "config://control-plane/aws/organization-id",
-      category: "control",
     });
     assert.deepEqual(config.supabaseOrgId, {
       ref: "config://control-plane/supabase/org-id",
-      category: "control",
     });
     assert.deepEqual(config.supabaseProjectRef, {
       ref: "config://control-plane/supabase/project-ref",
-      category: "control",
     });
     assert.deepEqual(config.supabaseAccessToken, {
       ref: "secret://control-plane/supabase/management-api-token",

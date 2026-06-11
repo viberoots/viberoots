@@ -1,5 +1,11 @@
 # Control Plane Selector Plan
 
+Status: historical implementation plan. The active operator-facing model is documented in
+[Control Plane Selector Design](control-plane-selector.md),
+[Deployments Usage](deployments-usage.md), and
+[AWS Control Plane Setup Guide](control-plane-guide.md). Keep this file for implementation
+traceability; do not treat older PR sections in this file as current setup instructions.
+
 This plan implements [Control Plane Selector Design](control-plane-selector.md).
 
 Reviewed context:

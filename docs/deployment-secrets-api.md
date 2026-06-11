@@ -138,14 +138,20 @@ Deployment-service routing:
 - `--remote <name>`: named control-plane profile lookup; `--remote mini` requires
   `projects/config/shared.json` `controlPlanes.mini` and resolves both
   `serviceClient.controlPlaneUrl` and `serviceClient.controlPlaneTokenRef`
-- `--control-plane-token <token>`: required bearer token for reviewed hosted
-  protected/shared service requests; explicit local fixture flows may omit it
-  only when `VBR_DEPLOY_LOCAL_FIXTURE_SERVICE=1` marks the service as
-  non-production
+- `--control-plane-token <token>`: explicit bearer-token override for commands
+  without a selected deployment context, local fixture flows, or reviewed
+  break-glass/operator override paths. For checked-in protected/shared deploy
+  targets with `deployment_context`, the normal path is the selected
+  `controlPlanes.<name>.serviceClient.controlPlaneTokenRef`, which must be
+  `secret://...` or `runtime://...`. A hosted deployment service requires a
+  required bearer token on loopback and remote service requests; the local
+  fixture exception must be explicit with `VBR_DEPLOY_LOCAL_FIXTURE_SERVICE=1`.
 - `VBR_DEPLOY_CONTROL_PLANE_URL`: environment fallback only for commands without
   a selected deployment context
-- `VBR_DEPLOY_CONTROL_PLANE_TOKEN`: environment fallback used by reviewed
-  service clients and hosted service processes
+- `VBR_DEPLOY_CONTROL_PLANE_TOKEN`: environment fallback for commands without a
+  selected deployment context and for hosted service process configuration. It
+  must not silently replace the `secret://...` or `runtime://...` token ref
+  selected by a checked-in protected/shared deployment context.
 - `VBR_DEPLOYMENT_SECRET_FIXTURE_PATH`: provider-neutral local/test secret
   fixture path. Infisical protected/shared workers reject it by default and
   accept it only when `VBR_DEPLOY_LOCAL_FIXTURE_SERVICE=1` explicitly marks the
@@ -159,7 +165,9 @@ Common example values:
 - `--remote mini`
   Use only when `controlPlanes.mini` exists in shared project config.
 - `VBR_DEPLOY_CONTROL_PLANE_TOKEN=replace-me`
-  Example token environment variable for local or CI use.
+  Example token environment variable for local fixture use, ad hoc commands
+  without a selected context, or the hosted service process itself. Do not use
+  it to bypass a checked-in context-selected `controlPlaneTokenRef`.
 
 Service-process configuration:
 
@@ -1177,10 +1185,10 @@ The runtime contract is intentionally narrow:
 
 - `enterStep(step)` resolves only the secrets needed for that lifecycle step
 - initial admission freezes `admittedSecretReferences` with the exact non-secret
-  Vault selector information needed for replay-safe runtime fetches
+  backend selector information needed for replay-safe runtime fetches
 - `SprinkleRef` stays the contract layer, admitted secret references stay the
-  replay/runtime layer, Vault stays the production backend, and the secret
-  fixture stays the local/test override format
+  replay/runtime layer, Vault and Infisical are supported selected production
+  backends, and the secret fixture stays the local/test override format
 - required contracts fail when missing, revoked, expired, or no longer
   refreshable
 - routine flows cannot consume `break_glass` credentials
@@ -1329,7 +1337,7 @@ Open [Deployments Usage](deployments-usage.md)
 when you want the fastest operator command path.
 
 Open [Secrets Usage](secrets-usage.md)
-when you need the shortest explanation of the `SprinkleRef` and Vault model.
+when you need the shortest explanation of the `SprinkleRef` and selected-backend model.
 
 Open [Vault Production Bootstrap Runbook](vault-production-bootstrap.md)
 when you need the operator workflow for initializing Vault, enabling KV/JWT auth,

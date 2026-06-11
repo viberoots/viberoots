@@ -53,8 +53,9 @@ Secret backend invariant:
 - preferred values use `<backend>/<profile-alias>` and normalize to existing
   backend-prefixed resolver profiles such as `vault-default` or
   `infisical-regulated`
-- account-specific backend coordinates and credentials stay in local/CI
-  SprinkleRef resolver config
+- shared backend routing metadata, deployment contexts, and non-secret account
+  coordinates live in `projects/config/shared.json`; clone-local overrides live
+  in `projects/config/local.json`; secret values stay in the selected backend
 - `deployment_context` may provide a `secretBackend` default, but an explicit
   `secret_backend` disagreement fails closed
 - Infisical metadata is routing data only; access tokens, client secrets,
