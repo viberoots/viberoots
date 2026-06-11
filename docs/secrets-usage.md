@@ -253,7 +253,7 @@ deployment, from deployment metadata to runtime use.
 We will:
 
 1. declare a secret in deployment metadata
-2. set up the currently documented Vault-backed secret source
+2. set up a selected Vault or Infisical secret source
 3. run the deployment
 4. explain what the system does with that secret at runtime
 
@@ -860,7 +860,7 @@ or generating the optional local/test runtime export from Vault.
 
 Open [Deployments Design](deployments-design.md)
 when you need the architectural rationale behind `SprinkleRef`, replay
-snapshots, and Vault-backed resolution.
+snapshots, and backend-selected secret resolution.
 
 Open [Deployment Contract](deployments-contract.md)
 when you need the fail-closed rules for secret references, approval binding, and

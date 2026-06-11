@@ -281,8 +281,8 @@ unexpected outcome.
     such as Vault or Infisical.
   - The selected backend cannot build a `DeploymentSecretContext`: Vault needs
     usable `vault_runtime` metadata and operator inputs, while Infisical needs
-    `infisical_runtime` metadata plus the configured machine identity or access
-    token credential source.
+    `infisical_runtime` metadata plus the configured Universal Auth machine
+    identity or reviewed runtime credential source.
   - The selected Vault or Infisical backend is reachable, but the requested
     `secret://.../service-token` contract is missing, revoked, version-mismatched,
     or not admitted for the selected target scope.
@@ -301,7 +301,8 @@ unexpected outcome.
       operator inputs required to activate a Vault-backed
       `DeploymentSecretContext`.
     - Infisical: provide the reviewed `infisical_runtime` configuration and
-      the machine identity or access token source expected by that runtime.
+      the Universal Auth machine identity or reviewed runtime credential source
+      expected by that runtime.
   - Verify the backend contains the exact checked-in
     `serviceClient.controlPlaneTokenRef` contract for the selected context,
     stage, and backend profile. Do not replace the ref with a plaintext token in

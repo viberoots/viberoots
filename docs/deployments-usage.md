@@ -126,8 +126,8 @@ computes the expected artifact identity, requests a short-lived one-time
 challenge from `mini`, then submits a proof bound to the finalized staged
 artifact reference. `mini` recomputes the admitted identity from the staged
 bytes and rejects missing proofs, replayed challenges, or identity drift before
-worker queueing.
-must not rely on a laptop-local path as authority.
+worker queueing. Protected/shared service-backed runs must not rely on a
+laptop-local path as authority.
 
 Use this when:
 
@@ -710,7 +710,9 @@ repeating the same check for production.
   contexts: old Vault-admitted runs continue replaying with Vault references,
   and any already-recorded Infisical runs continue replaying with their exact
   Infisical references.
-- use this guide plus [Deployment Provider Capabilities](deployment-provider-capabilities.md)
+- Use this guide plus
+  [Deployment Provider Capabilities](deployment-provider-capabilities.md) for
+  the exact supported behavior.
 
 Scaffold-first examples:
 
