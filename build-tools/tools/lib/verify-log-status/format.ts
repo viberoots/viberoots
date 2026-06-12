@@ -23,6 +23,8 @@ export function formatVerifyStatusJsonLine(st: VerifyStatus): string {
     pass_name: st.passName ?? null,
     pass_index: st.passIndex ?? null,
     pass_total: st.passTotal ?? null,
+    group_completed: st.groupCompleted ?? null,
+    group_total: st.groupTotal ?? null,
   };
   return JSON.stringify(out);
 }
@@ -67,6 +69,12 @@ export function formatVerifyStatusText(
   const completed = st.pass + st.fail + st.fatal + st.skip;
   const total = st.remaining === undefined ? undefined : completed + st.remaining;
   const testsProgress = total === undefined || total <= 0 ? undefined : `${completed}/${total}`;
+  const groupProgress =
+    st.groupCompleted === undefined || st.groupTotal === undefined
+      ? undefined
+      : `${st.groupCompleted}/${st.groupTotal}`;
+  const testsProgressText =
+    groupProgress && testsProgress ? `${groupProgress}, ${testsProgress}` : testsProgress;
   const testsRatio = total === undefined || total <= 0 ? undefined : completed / Math.max(1, total);
   const elapsedSeconds = parseDurationSeconds(st.elapsed);
   const projectedSeconds = parseDurationSeconds(st.projectedDuration);
@@ -116,7 +124,7 @@ export function formatVerifyStatusText(
     `${label("Projected:")}       ${val(`${projectedDuration} duration, ${projectedEndTime} end`)}`,
   );
   lines.push(
-    `${label("Tests:")}           ${val(`${formatProgressBar(testsRatio)} ${testsProgress || "?"}`)}`,
+    `${label("Tests:")}           ${val(`${formatProgressBar(testsRatio)} ${testsProgressText || "?"}`)}`,
   );
   lines.push(`${label("Time:")}            ${val(timeProgress)}`);
   lines.push(

@@ -81,6 +81,8 @@ env_strip_nix_cache_overrides() {
 }
 
 env_apply_nix_cache_health() {
+	[[ "${VBR_NIX_CACHE_HEALTH_APPLIED:-}" != "1" ]] || return 0
+	export VBR_NIX_CACHE_HEALTH_APPLIED=1
 	[[ "${VBR_NIX_CACHE_POLICY:-auto}" != "off" ]] || return 0
 	command -v nix >/dev/null 2>&1 || return 0
 

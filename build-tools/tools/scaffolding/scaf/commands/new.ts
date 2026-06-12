@@ -211,11 +211,9 @@ export async function cmdNew(args: string[], flags: ScafFlags) {
         primaryImporter: importer,
       });
       for (const imp of importersToRefresh) {
-        if (imp === importer) {
-          await timeAsyncDetail("scafNew ensureImporterLockfileFresh", async () => {
-            await ensureImporterLockfileFresh({ repoRoot, importer: imp });
-          });
-        }
+        await timeAsyncDetail("scafNew ensureImporterLockfileFresh", async () => {
+          await ensureImporterLockfileFresh({ repoRoot, importer: imp });
+        });
       }
       // Keep lockfile contents stable before computing fixed-output pnpm store hashes.
       await timeAsyncDetail("scafNew formatImporterLockfiles", async () => {

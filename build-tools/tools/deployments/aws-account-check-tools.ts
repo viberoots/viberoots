@@ -54,6 +54,13 @@ export async function checkTools(
 async function checkCacheReadiness(deps: RunDeps): Promise<NixCacheReadiness> {
   const runner = deps.commandRunner || defaultCommandRunner;
   const env = deps.env || process.env;
+  if (env.VBR_NIX_CACHE_HEALTH_APPLIED === "1") {
+    return evaluateNixCacheReadinessFromConfig(
+      String(env.NIX_CONFIG || ""),
+      cachePolicy(env),
+      async () => true,
+    );
+  }
   try {
     const config = await runner("nix", ["config", "show"], { env });
     return evaluateNixCacheReadinessFromConfig(config.stdout, cachePolicy(env), async (url) => {

@@ -18,6 +18,8 @@ export function emptyNdjson(pid: number, error: string): string {
     source: "derived",
     stopped: false,
     stop_reason: null,
+    group_completed: null,
+    group_total: null,
     error,
   });
 }

@@ -28,6 +28,7 @@ test("nix cache health removes unreachable optional extra-substituters dynamical
         "extra-substituters = https://stale.example/cache https://kept.example",
       ].join("\n"),
       VBR_NIX_CACHE_POLICY: "auto",
+      VBR_NIX_CACHE_HEALTH_APPLIED: "",
     },
     async () => {
       const result = await applyNixCacheHealthPolicy("/tmp/repo", {
@@ -49,13 +50,28 @@ test("nix cache health removes unreachable optional extra-substituters dynamical
       assert.match(String(process.env.NIX_CONFIG), /extra-substituters = https:\/\/kept\.example/);
       assert.doesNotMatch(String(process.env.NIX_CONFIG), /cache\.nixos\.org/);
       assert.doesNotMatch(String(process.env.NIX_CONFIG), /stale\.example/);
+      assert.equal(process.env.VBR_NIX_CACHE_HEALTH_APPLIED, "1");
       assert.match(logs.join("\n"), /disabled unreachable substituter/);
     },
   );
 });
 
+test("nix cache health skips repeated probes after the environment is marked handled", async () => {
+  await withEnv({ VBR_NIX_CACHE_HEALTH_APPLIED: "1" }, async () => {
+    const result = await applyNixCacheHealthPolicy("/tmp/repo", {
+      readEffectiveConfig: async () => {
+        throw new Error("should not read config after cache health is marked handled");
+      },
+      probeUrl: async () => {
+        throw new Error("should not probe after cache health is marked handled");
+      },
+    });
+    assert.equal(result.changed, false);
+  });
+});
+
 test("nix cache health auto mode disables unreachable primary substituters", async () => {
-  await withEnv({ VBR_NIX_CACHE_POLICY: "auto" }, async () => {
+  await withEnv({ VBR_NIX_CACHE_POLICY: "auto", VBR_NIX_CACHE_HEALTH_APPLIED: "" }, async () => {
     const result = await applyNixCacheHealthPolicy("/tmp/repo", {
       readEffectiveConfig: async () => "substituters = https://cache.nixos.org/",
       probeUrl: async () => false,
@@ -70,7 +86,7 @@ test("nix cache health auto mode disables unreachable primary substituters", asy
 
 test("nix cache health probes original query-bearing cache urls", async () => {
   const probed: string[] = [];
-  await withEnv({ VBR_NIX_CACHE_POLICY: "strict" }, async () => {
+  await withEnv({ VBR_NIX_CACHE_POLICY: "strict", VBR_NIX_CACHE_HEALTH_APPLIED: "" }, async () => {
     await applyNixCacheHealthPolicy("/tmp/repo", {
       readEffectiveConfig: async () => "extra-substituters = https://cache.example/path?token=a=b",
       probeUrl: async (url) => {
@@ -83,7 +99,7 @@ test("nix cache health probes original query-bearing cache urls", async () => {
 });
 
 test("nix cache health strict mode fails instead of rewriting substituters", async () => {
-  await withEnv({ VBR_NIX_CACHE_POLICY: "strict" }, async () => {
+  await withEnv({ VBR_NIX_CACHE_POLICY: "strict", VBR_NIX_CACHE_HEALTH_APPLIED: "" }, async () => {
     await assert.rejects(
       async () =>
         await applyNixCacheHealthPolicy("/tmp/repo", {
@@ -100,6 +116,7 @@ test("nix cache health off mode leaves NIX_CONFIG unchanged", async () => {
     {
       NIX_CONFIG: "substituters = https://offline.example",
       VBR_NIX_CACHE_POLICY: "off",
+      VBR_NIX_CACHE_HEALTH_APPLIED: "",
     },
     async () => {
       const result = await applyNixCacheHealthPolicy("/tmp/repo", {
@@ -188,6 +205,7 @@ test("nix cache health runs before dev-build and install nix entrypoints", async
   assertOrder(glue, "await applyNixCacheHealthPolicy(wsRoot)", "nix build");
 
   const buck = await fsp.readFile("build-tools/lang/nix_cache_health.bzl", "utf8");
+  assert.match(buck, /VBR_NIX_CACHE_HEALTH_APPLIED/);
   assert.match(buck, /printf -v NIX_CONFIG '%s\\nsubstituters =%s\\nextra-substituters =%s/);
   assert.match(buck, /nix store info --store/);
   assert.doesNotMatch(buck, /\$\(cat/);
@@ -199,6 +217,13 @@ test("nix cache health runs before dev-build and install nix entrypoints", async
 
   const zxTest = await fsp.readFile("build-tools/tools/buck/zx_test.bzl", "utf8");
   assertOrder(zxTest, "nix_cache_health_shell()", "PRELUDE_PATH");
+
+  const verifyBuckEnv = await fsp.readFile(
+    "build-tools/tools/dev/verify/buck2-test-env.ts",
+    "utf8",
+  );
+  assert.match(verifyBuckEnv, /maybeEnvArg\("NIX_CONFIG"/);
+  assert.match(verifyBuckEnv, /maybeEnvArg\("VBR_NIX_CACHE_HEALTH_APPLIED"/);
 });
 
 function assertOrder(source: string, first: string, second: string): void {

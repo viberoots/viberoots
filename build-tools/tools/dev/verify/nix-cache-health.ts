@@ -82,6 +82,10 @@ export async function applyNixCacheHealthPolicy(
   deps: NixCacheHealthDeps = {},
 ): Promise<CacheHealthResult> {
   const policy = policyFromEnv();
+  if (process.env.VBR_NIX_CACHE_HEALTH_APPLIED === "1") {
+    return { changed: false, kept: [], removed: [] };
+  }
+  process.env.VBR_NIX_CACHE_HEALTH_APPLIED = "1";
   if (policy === "off") return { changed: false, kept: [], removed: [] };
 
   const log = deps.log || ((line: string) => process.stderr.write(`${line}\n`));

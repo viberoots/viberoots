@@ -23,6 +23,8 @@ export type VerifyStatus = {
   passName?: string;
   passIndex?: number;
   passTotal?: number;
+  groupCompleted?: number;
+  groupTotal?: number;
 };
 
 const ANSI_RE = /\x1b\[[0-9;?]*[A-Za-z]/g;

@@ -13,30 +13,38 @@ export function preferredPnpmStoreDir(defaultStoreDir: string): {
   return { storeDir: defaultStoreDir, usesSharedPrefetch: false };
 }
 
-const PNPM_WORKSPACE_MARKER = [
-  "packages:",
-  "  - ./",
-  "supportedArchitectures:",
-  "  os:",
-  "    - darwin",
-  "    - linux",
-  "    - win32",
-  "  cpu:",
-  "    - x64",
-  "    - arm64",
-  "    - arm",
-  "  libc:",
-  "    - glibc",
-  "    - musl",
-  "",
-].join("\n");
+function pnpmWorkspaceMarker(packages: string[]): string {
+  const packageLines = Array.from(new Set(["./", ...packages]))
+    .sort()
+    .map((pkg) => `  - ${pkg}`);
+  return [
+    "packages:",
+    ...packageLines,
+    "supportedArchitectures:",
+    "  os:",
+    "    - darwin",
+    "    - linux",
+    "    - win32",
+    "  cpu:",
+    "    - x64",
+    "    - arm64",
+    "    - arm",
+    "  libc:",
+    "    - glibc",
+    "    - musl",
+    "",
+  ].join("\n");
+}
 
 export function pnpmFlakeRef(repoRoot: string): string {
   // Keep path: so newly scaffolded/untracked files are visible to flake evaluation.
   return `path:${path.resolve(repoRoot)}#pnpm`;
 }
 
-export async function ensureLocalWorkspaceMarker(importerAbs: string): Promise<{
+export async function ensureLocalWorkspaceMarker(
+  importerAbs: string,
+  packages: string[] = [],
+): Promise<{
   workspaceFileAbs: string;
   hadLocalWorkspaceFile: boolean;
 }> {
@@ -45,7 +53,7 @@ export async function ensureLocalWorkspaceMarker(importerAbs: string): Promise<{
   try {
     if (!hadLocalWorkspaceFile) {
       await fsp.mkdir(importerAbs, { recursive: true });
-      await fsp.writeFile(workspaceFileAbs, PNPM_WORKSPACE_MARKER, "utf8");
+      await fsp.writeFile(workspaceFileAbs, pnpmWorkspaceMarker(packages), "utf8");
     }
   } catch {}
   return { workspaceFileAbs, hadLocalWorkspaceFile };

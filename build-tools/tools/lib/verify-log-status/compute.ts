@@ -84,6 +84,26 @@ function aggregateVerifyPassStatus(
     begins.every((begin) => passExitForBegin(begin, exits) !== undefined);
   const aggregateRemaining =
     totalTargets === undefined ? remaining : Math.max(0, totalTargets - completed);
+  const groupProgress = (() => {
+    const targetLabels =
+      latestBegin.targetLabels && latestBegin.targetLabels.size > 0
+        ? latestBegin.targetLabels
+        : undefined;
+    if (latestExit) {
+      return {
+        groupCompleted: latestExit.pass + latestExit.fail,
+        groupTotal: latestBegin.targetCount,
+      };
+    }
+    if (!targetLabels) {
+      return { groupCompleted: undefined, groupTotal: latestBegin.targetCount };
+    }
+    const current = deriveInProgressCounts(lines.slice(latestBegin.idx), { targetLabels });
+    return {
+      groupCompleted: current.pass + current.fail + current.fatal + current.skip,
+      groupTotal: latestBegin.targetCount,
+    };
+  })();
   return {
     ...base,
     pass,
@@ -98,6 +118,8 @@ function aggregateVerifyPassStatus(
     passName: latestBegin.name || undefined,
     passIndex: latestBegin.index,
     passTotal: latestBegin.total,
+    groupCompleted: groupProgress.groupCompleted,
+    groupTotal: groupProgress.groupTotal,
   };
 }
 

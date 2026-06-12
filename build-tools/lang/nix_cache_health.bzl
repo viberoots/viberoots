@@ -1,6 +1,7 @@
 def nix_cache_health_shell():
     return (
-        "if [ \"${VBR_NIX_CACHE_POLICY:-auto}\" != \"off\" ] && command -v nix >/dev/null 2>&1; then "
+        "if [ \"${VBR_NIX_CACHE_HEALTH_APPLIED:-}\" != \"1\" ] && [ \"${VBR_NIX_CACHE_POLICY:-auto}\" != \"off\" ] && command -v nix >/dev/null 2>&1; then "
+        + "  export VBR_NIX_CACHE_HEALTH_APPLIED=1; "
         + "  NIX_CACHE_TMPDIR=\"${TMPDIR:-${TMP:-/tmp}}\"; mkdir -p \"$NIX_CACHE_TMPDIR\"; "
         + "  NIX_CACHE_CONFIG_FILE=\"$NIX_CACHE_TMPDIR/vbr-nix-cache-config.txt\"; "
         + "  nix config show > \"$NIX_CACHE_CONFIG_FILE\" 2>/dev/null || true; "

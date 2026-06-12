@@ -30,10 +30,13 @@ test("verify-log-status: aggregates completed pass counts with current pass prog
   assert.equal(st.passName, "shared");
   assert.equal(st.passIndex, 2);
   assert.equal(st.passTotal, 2);
+  assert.equal(st.groupCompleted, 1);
+  assert.equal(st.groupTotal, 2);
   assert.equal(st.remaining, 1);
   assert.equal(st.source, "derived");
 
   const out = formatVerifyStatusText(st, { isTty: false });
+  assert.match(out, /Tests:\s+\[█████████████████████░░░░░░░░░░░\] 1\/2, 2\/3/);
   assert.match(out, /Pass group:\s+shared \(2\/2\)/);
   assert.match(out, /\n  Pass:\s+2\n/);
 });
@@ -66,6 +69,8 @@ test("verify-log-status: final multi-pass status uses aggregate pass exit counts
   assert.equal(st.passName, "shared");
   assert.equal(st.passIndex, 2);
   assert.equal(st.passTotal, 2);
+  assert.equal(st.groupCompleted, 2);
+  assert.equal(st.groupTotal, 2);
   assert.equal(st.completionRateAvgPerMinute, 6);
   assert.equal(st.completionRateRecentPerMinute, 1);
 });
@@ -116,6 +121,8 @@ test("verify-log-status: aggregates overlapping in-progress passes without reset
   assert.equal(st.passName, "resource-limited");
   assert.equal(st.passIndex, 2);
   assert.equal(st.passTotal, 3);
+  assert.equal(st.groupCompleted, 1);
+  assert.equal(st.groupTotal, 2);
 });
 
 test("verify-log-status: does not double-count overlapped pass output after one pass exits", () => {

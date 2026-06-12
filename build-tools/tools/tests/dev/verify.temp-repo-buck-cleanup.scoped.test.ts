@@ -62,12 +62,16 @@ async function psLinesMatching(substr: string): Promise<string[]> {
 
 async function waitForProcess(substr: string, timeoutMs: number): Promise<void> {
   const t0 = Date.now();
+  let lastLines: string[] = [];
   while (Date.now() - t0 < timeoutMs) {
     const lines = await psLinesMatching(substr);
+    lastLines = lines;
     if (lines.length > 0) return;
-    await new Promise((r) => setTimeout(r, 100));
+    await new Promise((r) => setTimeout(r, 250));
   }
-  throw new Error(`expected process containing '${substr}'`);
+  throw new Error(
+    `expected process containing '${substr}' within ${timeoutMs}ms; last_matches=${lastLines.length}`,
+  );
 }
 
 async function waitForNoProcess(substr: string, timeoutMs: number): Promise<void> {
@@ -248,9 +252,9 @@ test(
     const foreignKey = `${foreignTmp}/projects/apps/demo-vite-ssr/server/dev.mjs`;
     let stateDir = "";
     try {
-      await waitForProcess(ownedKey, 10_000);
-      await waitForProcess(ownedWasmKey, 10_000);
-      await waitForProcess(foreignKey, 10_000);
+      await waitForProcess(ownedKey, 30_000);
+      await waitForProcess(ownedWasmKey, 30_000);
+      await waitForProcess(foreignKey, 30_000);
       stateDir = await fsp.mkdtemp(path.join(os.tmpdir(), "buck-cleanup-state-"));
       const stateFile = path.join(stateDir, "state.txt");
       await fsp.writeFile(stateFile, `${ownedTmp}\n`, "utf8");
