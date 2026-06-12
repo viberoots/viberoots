@@ -80,17 +80,9 @@ env_strip_nix_cache_overrides() {
 	'
 }
 
-env_nix_cache_info_url() {
-	local url="$1"
-	local base="${url%%\?*}"
-	base="${base%/}"
-	printf "%s/nix-cache-info\n" "${base}"
-}
-
 env_apply_nix_cache_health() {
 	[[ "${VBR_NIX_CACHE_POLICY:-auto}" != "off" ]] || return 0
 	command -v nix >/dev/null 2>&1 || return 0
-	command -v curl >/dev/null 2>&1 || return 0
 
 	local config
 	config="$(nix config show 2>/dev/null || true)"
@@ -139,7 +131,7 @@ env_apply_nix_cache_health() {
 		seen="${seen}${substituter} "
 		case "${substituter}" in
 			http://*|https://*)
-				if curl -fsSI --max-time 3 "$(env_nix_cache_info_url "${substituter}")" >/dev/null 2>&1; then
+				if nix store info --store "${substituter}" --option connect-timeout 3 >/dev/null 2>&1; then
 					available+=("${substituter}")
 				else
 					removed+=("${substituter}")

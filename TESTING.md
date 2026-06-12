@@ -145,7 +145,8 @@ PREWARM_ATTRS="toolchains.go,toolchains.cxx" node build-tools/tools/dev/prewarm-
 
 ## Optional Nix cache fallback
 
-`i`, `b`, `v`, and Buck Nix actions probe configured HTTP(S) substituters before using them. With
+`i`, `b`, `v`, and Buck Nix actions probe configured HTTP(S) substituters through
+`nix store info --store <substituter>` before using them. With
 the default `VBR_NIX_CACHE_POLICY=auto`, unreachable optional caches are removed from the current
 process and local builds continue. Logs look like:
 

@@ -388,8 +388,8 @@ Remote build/cache readiness is reported separately from the minimal AWS/Supabas
 `check-tools/tools.json` with the configured `substituters`, `extra-substituters`, per-substituter
 reachability, and one of these states:
 
-- `ready`: configured HTTP substituters responded to `nix-cache-info`, and local/non-HTTP
-  substituters were treated as local.
+- `ready`: `nix store info --store <substituter>` could access configured HTTP substituters using the current Nix
+  credentials, and local/non-HTTP substituters were treated as local.
 - `degraded`: default `VBR_NIX_CACHE_POLICY=auto` kept local validation usable by falling back away
   from unreachable substituters. This is actionable operator evidence, not a basic setup failure.
 - `not_configured`: no Nix substituters were configured for the current shell.

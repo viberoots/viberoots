@@ -137,7 +137,8 @@
 - Symptom: cache readiness fails under `VBR_NIX_CACHE_POLICY=strict`.
   - Meaning: strict mode is intentionally fail-closed and should be used only when cache
     availability is the thing being tested.
-  - Fix: rerun the readiness check after the listed substituters respond to `nix-cache-info`, or
+  - Fix: rerun the readiness check after `nix store info --store <substituter>` succeeds for the
+    listed substituters, or
     switch back to the default `auto` policy for ordinary local validation.
 
 ## Duplicate/malformed patches

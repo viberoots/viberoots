@@ -75,13 +75,8 @@ async function substituterStatus(
 ): Promise<NixCacheSubstituterStatus> {
   const identity = substituterIdentity(url);
   if (!/^https?:\/\//.test(url)) return { url: identity, role, kind: "local", state: "not_probed" };
-  const ok = await probe(cacheInfoUrl(url), 3000).catch(() => false);
+  const ok = await probe(url, 3000).catch(() => false);
   return { url: identity, role, kind: "http", state: ok ? "reachable" : "unreachable" };
-}
-
-function cacheInfoUrl(raw: string): string {
-  const base = raw.split("?")[0].replace(/\/+$/, "");
-  return `${base}/nix-cache-info`;
 }
 
 function substituterIdentity(raw: string): string {

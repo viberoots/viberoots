@@ -57,9 +57,14 @@ async function checkCacheReadiness(deps: RunDeps): Promise<NixCacheReadiness> {
   try {
     const config = await runner("nix", ["config", "show"], { env });
     return evaluateNixCacheReadinessFromConfig(config.stdout, cachePolicy(env), async (url) => {
-      const fetchImpl = deps.httpFetch || globalThis.fetch;
-      const response = await fetchImpl(url, { method: "HEAD" });
-      return response.ok || response.status === 405;
+      try {
+        await runner("nix", ["store", "info", "--store", url, "--option", "connect-timeout", "3"], {
+          env,
+        });
+        return true;
+      } catch {
+        return false;
+      }
     });
   } catch {
     return evaluateNixCacheReadinessFromConfig("", cachePolicy(env), async () => true);

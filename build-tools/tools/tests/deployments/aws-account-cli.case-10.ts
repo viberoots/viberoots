@@ -93,8 +93,15 @@ async function withReadyAccountConfig(tmp: string, run: () => Promise<void>) {
   });
 }
 
-async function fakeCommandRunner(file: string) {
+async function fakeCommandRunner(file: string, args: string[] = []) {
   if (file === "nix") {
+    if (args[0] === "store" && args[1] === "info") {
+      const store = args[args.indexOf("--store") + 1] || "";
+      if (store.includes("unreachable.dynamic.example")) {
+        throw new Error(`unreachable test substituter: ${store}`);
+      }
+      return { stdout: "", stderr: "" };
+    }
     return {
       stdout: [
         "substituters = https://cache.nixos.org/",
@@ -107,14 +114,6 @@ async function fakeCommandRunner(file: string) {
 }
 
 async function cacheAwareFetch(url: string, init?: { headers?: Record<string, string> }) {
-  if (url.includes("/nix-cache-info")) {
-    const host = new URL(url).hostname;
-    return {
-      ok: host === "reachable.dynamic.example" || host === "cache.nixos.org",
-      status: host === "unreachable.dynamic.example" ? 503 : 200,
-      text: async () => "",
-    };
-  }
   return fakeSupabaseFetch(url, init);
 }
 

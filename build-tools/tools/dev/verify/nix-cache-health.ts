@@ -62,25 +62,13 @@ async function defaultReadEffectiveConfig(): Promise<string> {
   return String(process.env.NIX_CONFIG || "");
 }
 
-function cacheInfoUrl(raw: string): string {
-  const base = raw.split("?")[0].replace(/\/+$/, "");
-  return `${base}/nix-cache-info`;
-}
-
 async function defaultProbeUrl(url: string, timeoutMs: number): Promise<boolean> {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
-  try {
-    const res = await fetch(cacheInfoUrl(url), {
-      method: "HEAD",
-      signal: controller.signal,
-    });
-    return res.ok || res.status === 405;
-  } catch {
-    return false;
-  } finally {
-    clearTimeout(timer);
-  }
+  const timeoutSecs = String(Math.max(1, Math.ceil(timeoutMs / 1000)));
+  const res = await $({
+    stdio: "ignore",
+    reject: false,
+  })`nix store info --store ${url} --option connect-timeout ${timeoutSecs}`;
+  return (res as any).exitCode === 0;
 }
 
 function policyFromEnv(): NixCachePolicy {

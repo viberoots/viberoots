@@ -1,6 +1,6 @@
 def nix_cache_health_shell():
     return (
-        "if [ \"${VBR_NIX_CACHE_POLICY:-auto}\" != \"off\" ] && command -v nix >/dev/null 2>&1 && command -v curl >/dev/null 2>&1; then "
+        "if [ \"${VBR_NIX_CACHE_POLICY:-auto}\" != \"off\" ] && command -v nix >/dev/null 2>&1; then "
         + "  NIX_CACHE_TMPDIR=\"${TMPDIR:-${TMP:-/tmp}}\"; mkdir -p \"$NIX_CACHE_TMPDIR\"; "
         + "  NIX_CACHE_CONFIG_FILE=\"$NIX_CACHE_TMPDIR/vbr-nix-cache-config.txt\"; "
         + "  nix config show > \"$NIX_CACHE_CONFIG_FILE\" 2>/dev/null || true; "
@@ -18,8 +18,7 @@ def nix_cache_health_shell():
         + "      NIX_CACHE_SEEN=\"$NIX_CACHE_SEEN$NIX_CACHE_SUB \"; "
         + "      case \"$NIX_CACHE_SUB\" in "
         + "        http://*|https://*) "
-        + "          NIX_CACHE_BASE=\"${NIX_CACHE_SUB%%\\?*}\"; NIX_CACHE_BASE=\"${NIX_CACHE_BASE%/}\"; "
-        + "          if curl -fsSI --max-time 3 \"$NIX_CACHE_BASE/nix-cache-info\" >/dev/null 2>&1; then "
+        + "          if nix store info --store \"$NIX_CACHE_SUB\" --option connect-timeout 3 >/dev/null 2>&1; then "
         + "            NIX_CACHE_AVAILABLE=\"$NIX_CACHE_AVAILABLE ${NIX_CACHE_SUB}\"; "
         + "          else "
         + "            NIX_CACHE_REMOVED=\"$NIX_CACHE_REMOVED ${NIX_CACHE_SUB}\"; "
