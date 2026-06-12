@@ -36,6 +36,9 @@ Turbo-mode policy for this plan:
 
 - Use focused validation for each PR.
 - Run scope review for every PR before commit.
+- Every PR is expected to leave the repository with tests passing for its declared scope. Turbo mode
+  changes how much validation is run before merging a PR; it does not permit known failing tests or
+  broken workflows to be carried forward.
 - Record deferred broad validation in an integration debt ledger in this plan.
 - Run full validation at the explicit de-risking checkpoints below. The default plan requires two
   full-suite runs.
@@ -60,6 +63,9 @@ De-risking checkpoints:
 
 Turbo validation cadence:
 
+- Each PR must run and pass the focused validation listed below, including any new or changed tests
+  for that PR. If a full-suite run is deferred, the PR should still be treated as green only when the
+  targeted evidence is clean and there are no known failures in affected areas.
 - PR-1: focused fixture validation; no full validation unless probes touch production paths.
 - PRs 2-3: focused validation plus nearby root-resolution, activation, and command-entrypoint
   tests.
@@ -94,9 +100,9 @@ different reasons.
 
 Integration debt ledger:
 
-| PR | Commit | Focused validation | Deferred validation | Notes |
-| --- | --- | --- | --- | --- |
-| _Fill during implementation_ |  |  |  |  |
+| PR   | Commit    | Focused validation                                                                                                                                                              | Deferred validation                                                                                                            | Notes                                        |
+| ---- | --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------- |
+| PR-1 | _pending_ | `v //:viberoots_buck_cell_fixture //:viberoots_nix_split_flake_fixture //:viberoots_root_coupling_inventory` (`buck-out/tmp/codex-test-logs/pr1-focused-v-20260612-164154.log`) | Full `i && b && ALL_TESTS=1 v` deferred by Checkpoint A because PR-1 is fixture-only and does not touch production build paths | Baseline root-coupling counts recorded below |
 
 ## PR-1: Architecture probes and migration inventory
 
@@ -126,6 +132,16 @@ depends on them.
   - `//third_party/providers`
   - hard-coded `third_party/providers` filesystem paths
 - Add an initial integration debt ledger entry template for later turbo-mode PRs.
+
+Baseline inventory from `build-tools/tools/dev/viberoots-root-coupling-inventory.ts`:
+
+| Pattern                                             | Count |
+| --------------------------------------------------- | ----: |
+| `//build-tools`                                     |  1408 |
+| `$WORKSPACE_ROOT/build-tools`                       |    31 |
+| `$FLK_ROOT/build-tools`                             |     9 |
+| `//third_party/providers`                           |   324 |
+| hard-coded `third_party/providers` filesystem paths |   467 |
 
 ### 3. External prerequisites
 
