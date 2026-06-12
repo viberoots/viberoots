@@ -26,12 +26,12 @@ const STRING_WITH_NUMBERING_PATTERN =
 const SYMBOL_PATTERN = /\b[A-Za-z_][A-Za-z0-9_.-]*\b/g;
 
 const DOC_ALLOWLIST_PREFIXES = [
-  "docs/design-history/",
-  "docs/build-history/",
+  "docs/history/designs/legacy/",
+  "docs/history/build-system/logs/",
   "docs/pnpm/",
   "docs/handbook/nix-gaps-prs.md",
-  "docs/build-history/vite-ssr.md",
-  "docs/build-history/webapp-ssr.md",
+  "docs/history/build-system/logs/vite-ssr.md",
+  "docs/history/build-system/logs/webapp-ssr.md",
 ];
 const DOC_ARTIFACT_REF_PATTERN =
   /(build-tools\/tools\/tests\/[A-Za-z0-9_./-]+|\/\/:[A-Za-z0-9_.-]+|[A-Za-z0-9_.-]+\.test\.ts)/;

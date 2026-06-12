@@ -18,7 +18,7 @@ async function main() {
   if (rendered !== current) {
     await writeDeploymentsDesignDoc(rendered);
   }
-  console.log("wrote docs/deployments-design.md");
+  console.log("wrote docs/history/designs/deployments-design.md");
 }
 
 main().catch((error) => {

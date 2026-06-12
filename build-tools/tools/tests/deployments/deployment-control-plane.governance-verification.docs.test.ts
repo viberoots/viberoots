@@ -10,7 +10,7 @@ async function read(rel: string) {
 
 test("deployment control plane docs keep service-owned governance verification aligned", async () => {
   const [designDoc, usageDoc, sharedHostUsageDoc, setupDoc] = await Promise.all([
-    read("docs/deployments-design.md"),
+    read("docs/history/designs/deployments-design.md"),
     read("docs/deployments-usage.md"),
     read("docs/nixos-shared-host-usage.md"),
     read("docs/nixos-shared-host-setup.md"),

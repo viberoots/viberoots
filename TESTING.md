@@ -27,6 +27,11 @@ build-system changes just because they live under `build-tools/**`. Reviewed dep
 docs select a compact deployment documentation contract bucket instead of the full deployment
 matrix.
 
+Verify chooses its default scope from the merge-base diff plus the dirty worktree. Base refs are
+resolved from `GITHUB_BASE_REF` when present, then `github/main`, `origin/main`, and `main`; dirty,
+untracked, renamed, and deleted paths from `git status --porcelain=v1` are unioned with committed
+changes. If you need to see broad coverage regardless of that selection, set `ALL_TESTS=1`.
+
 - Default scoped verify:
 
 ```
@@ -125,6 +130,9 @@ If a target does not publish `run.dev`, `d` fails with a deterministic error.
 `node build-tools/tools/dev/nix-gaps-inventory-check.ts --starlark-api docs/handbook/starlark-api.md --nix-gaps docs/handbook/nix-gaps.md --exceptions docs/handbook/nix-gaps-exceptions.json`
 
 The verify run fails fast if inventory, exception policy, or allowlist state drifts.
+Before Buck starts, verify also checks for active `nix store gc` / `nix-store --gc` processes. It
+logs `nix gc preflight` status, waits briefly if GC is active, and fails before the test phase if GC
+does not stop.
 
 - Enabled by default: `VERIFY_PREWARM=1` (set `VERIFY_PREWARM=0` to disable)
 - Prewarms by attempting to build these flake attrs when available:
@@ -146,9 +154,9 @@ PREWARM_ATTRS="toolchains.go,toolchains.cxx" node build-tools/tools/dev/prewarm-
 ## Optional Nix cache fallback
 
 `i`, `b`, `v`, and Buck Nix actions probe configured HTTP(S) substituters through
-`nix store info --store <substituter>` before using them. With
-the default `VBR_NIX_CACHE_POLICY=auto`, unreachable optional caches are removed from the current
-process and local builds continue. Logs look like:
+`nix store info --store <substituter>` before using them. With the default
+`VBR_NIX_CACHE_POLICY=auto`, unreachable configured HTTP(S) caches are removed from the current
+process, Nix fallback stays enabled, and local builds continue. Logs look like:
 
 ```
 [env] nix cache health: disabled unreachable substituter(s): https://...
@@ -157,6 +165,15 @@ process and local builds continue. Logs look like:
 
 Use `VBR_NIX_CACHE_POLICY=strict` only when cache reachability is the behavior under test. Use
 `VBR_NIX_CACHE_POLICY=off` to skip the dynamic cache probe entirely.
+
+## Verify status output
+
+Use `l --status`, `build-tools/tools/bin/tail-log --status`, or `s` to inspect the current or latest
+verify run. Text status can show both the active pass group and total suite progress, for example
+`Tests: [..] 12/40, 120/900`, plus `Pass group: resource-limited (2/3)`. JSON status exposes the
+same fields as `pass_index`, `pass_total`, `group_completed`, and `group_total`. `GC detected: yes`
+means the verify log included a GC preflight warning; treat that run as potentially contended before
+using timing evidence.
 
 ## Verify remote execution policy
 

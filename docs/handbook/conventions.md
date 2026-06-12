@@ -15,7 +15,7 @@ These anchors describe the stable, final layout:
 - `build-tools/docs/lang/` — language design docs
 - `projects/apps/` — application roots
 - `projects/libs/` — library roots
-- `docs/build-history/` — historical build notes
+- `docs/history/build-system/logs/` — historical build notes
 - `patches/` — repo-level patch overlays
 - `third_party/` — external provider and vendored metadata
 - `toolchains/` — Buck toolchain wiring

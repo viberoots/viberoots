@@ -5,14 +5,14 @@ This document proposes how to add first-class PNPM projects to this monorepo, in
 ### Goals
 
 - **Workspaces:** Enable PNPM workspaces under `projects/apps/*` and `projects/libs/*` (no `packages/*`) without breaking the root `package.json` dev tooling.
-- **Hermeticity:** Keep installs reproducible using Nix; prefer immutable `node_modules` realized in the Nix store, symlinked in dev shells (see `docs/pnpm/hermetic-node-modules.md`).
+- **Hermeticity:** Keep installs reproducible using Nix; prefer immutable `node_modules` realized in the Nix store, symlinked in dev shells (see `build-tools/docs/pnpm/hermetic-node-modules.md`).
 - **Build invalidation:** Use importer‑scoped providers derived from per‑project `pnpm-lock.yaml` for precise Buck2 rebuilds and impacted tests.
 - **Patching:** Use PNPM’s native `patchedDependencies` and optional flat `patches/node/*.patch` for advanced cases; wire providers automatically.
 - **Scaffolding:** Provide a generator to create a new PNPM project with TS, ESLint/Prettier, and tests.
 
 ### Linking expectations
 
-I follow the repo-wide linking model described in `build-tools/docs/cpp-linking.md`, `build-tools/docs/wasm-linking.md`, and `build-tools/docs/linking-roadmap.md`. If this language does not introduce native or cross-language linking, `deps` remains a graph edge list and no link intent is inferred.
+I follow the repo-wide linking model described in `build-tools/docs/cpp-linking.md`, `build-tools/docs/wasm-linking.md`, and `docs/history/build-system/linking-roadmap.md`. If this language does not introduce native or cross-language linking, `deps` remains a graph edge list and no link intent is inferred.
 
 - `deps` is the Buck graph edge list. It does not imply link intent.
 - `link_deps` declares linkable inputs. `header_deps` is include-only when that concept applies.
@@ -71,7 +71,7 @@ policy enforcement current:
   - `build-tools/tools/buck/providers/node.ts`: parses `pnpm-lock.yaml` and emits `TARGETS.node.auto` with one provider per importer.
   - `build-tools/tools/buck/sync-providers.ts`: unified orchestrator (canonical provider sync entrypoint).
   - `build-tools/tools/buck/gen-auto-map.ts`: maps target labels to provider deps, including `lockfile:<path>#<importer>`.
-  - `docs/pnpm/hermetic-node-modules.md`: documents immutable, Nix‑built `node_modules`.
+  - `build-tools/docs/pnpm/hermetic-node-modules.md`: documents immutable, Nix‑built `node_modules`.
 - Sidecars & Composite Graph API:
   - Glue emits a Node sidecar index at `build-tools/tools/buck/node-lock-index.json` (via `build-tools/tools/buck/gen-provider-index.ts`) alongside `build-tools/tools/buck/graph.json`.
   - Consumption MUST go through the Composite Graph API (`build-tools/tools/lib/graph-view.ts` or CLI `build-tools/tools/buck/graph-view.ts`). Do not read `graph.json` directly.
@@ -102,7 +102,7 @@ policy enforcement current:
    - Keep the root `package.json` for shared dev tools; the root can remain an importer if desired.
 
 2. **Nix hermetic installs (per importer)**
-   - Reuse `docs/pnpm/hermetic-node-modules.md`, but instantiate the derivations per `pnpm-lock.yaml` path (per project importer).
+   - Reuse `build-tools/docs/pnpm/hermetic-node-modules.md`, but instantiate the derivations per `pnpm-lock.yaml` path (per project importer).
    - Keep the dev shell symlink behavior so tools resolve from Nix‑built `node_modules`.
 
 3. **Provider wiring (already scaffolded)**

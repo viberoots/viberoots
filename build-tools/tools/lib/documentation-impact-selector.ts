@@ -73,7 +73,7 @@ export function isReviewedDeploymentDocumentationPath(relPath: string): boolean 
     p.startsWith("docs/nixos-shared-host") ||
     p.startsWith("docs/sprinkleref") ||
     p.startsWith("docs/secrets-usage.md") ||
-    p.startsWith("docs/mini-deployment.md") ||
+    p.startsWith("docs/history/designs/mini-deployment.md") ||
     p.startsWith("docs/cloud-control") ||
     p.startsWith("docs/control-plane") ||
     p.startsWith("projects/docs/phase_0_") ||

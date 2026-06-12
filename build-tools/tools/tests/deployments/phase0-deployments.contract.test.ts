@@ -23,13 +23,13 @@ const REMOVED_LABELS = [
 ];
 const OPERATOR_DOCS = [
   "docs/deployments-usage.md",
-  "docs/deployment-adjustment.md",
-  "docs/pleomino-deployment-directory-migration.md",
+  "docs/history/designs/deployment-adjustment.md",
+  "docs/history/migrations/pleomino-deployment-directory-migration.md",
   "docs/secrets-usage.md",
   "docs/deployments-schema.md",
-  "docs/infisical-design.md",
+  "docs/history/designs/infisical-design.md",
   "docs/infisical-bootstrap.md",
-  "docs/repo-rename.md",
+  "docs/history/migrations/repo-rename.md",
   "projects/docs/phase_0_architecture.md",
   "projects/docs/phase_0_build_deployment_companion.md",
   "projects/docs/phase_0_engineering_companion.md",

@@ -1,7 +1,13 @@
 # Build Tools Documentation
 
-This index separates current build-system references from plans and exploratory designs. Use the
-current references for implementation work.
+This index points to current build-system references. Historical build-system plans, brainstorms,
+roadmaps, and old implementation logs live under
+[`../../docs/history/build-system/`](../../docs/history/build-system/).
+
+Build-system-owned documentation lives here with the build tooling it describes. Repo-wide
+contributor, deployment, control-plane, secrets, and ADR documentation lives under
+[`../../docs/`](../../docs/README.md). App, library, and package-specific docs belong beside the
+owning package under [`../../projects/`](../../projects/).
 
 ## Current References
 
@@ -13,7 +19,14 @@ current references for implementation work.
   fresh AWS account setup path that combines control-plane bootstrap with remote-build readiness.
 - [`cpp-linking.md`](cpp-linking.md) and [`cpp-linking.examples.md`](cpp-linking.examples.md):
   C++ linking behavior.
+- [`cpp/curated-providers.md`](cpp/curated-providers.md): C++ curated nixpkgs dependency usage.
+- [`cpp/overlays.md`](cpp/overlays.md): C++ nixpkgs overlay and patch workflow.
+- [`cpp-provider-sync-migration.md`](cpp-provider-sync-migration.md): current C++ provider-sync
+  status.
 - [`go-linking.md`](go-linking.md): Go linking behavior.
+- [`pnpm/hermetic-node-modules.md`](pnpm/hermetic-node-modules.md): hermetic PNPM `node_modules`
+  materialization.
+- [`python-wasm-wasi.md`](python-wasm-wasi.md): Python WASM/WASI usage.
 - [`wasm-linking.md`](wasm-linking.md) and [`wasm-node-linking.md`](wasm-node-linking.md): Wasm
   linking references.
 - [`lang/README.md`](lang/README.md): language design enforcement requirements.
@@ -29,27 +42,15 @@ current references for implementation work.
 - [`../../docs/handbook/starlark-api.md`](../../docs/handbook/starlark-api.md): Starlark API
   reference.
 
-## Active Designs And Roadmaps
+## Current Design References
 
-These docs are design context. Confirm current behavior in code or current references before using
-them as operating instructions:
+These docs describe active contracts or implementation models:
 
 - [`abstractions.md`](abstractions.md)
 - [`mapping-design.md`](mapping-design.md)
-- [`python-freshness.md`](python-freshness.md)
-- [`uv2nix-design.md`](uv2nix-design.md)
 - [`node-wasm-staging-contract-design.md`](node-wasm-staging-contract-design.md)
-- [`linking-roadmap.md`](linking-roadmap.md)
 
-## Historical Plans And Brainstorms
+## History Archive
 
-These files are implementation history or exploratory planning:
-
-- [`build-system-brainstorming.md`](build-system-brainstorming.md)
-- [`go-templates-dev-plan.md`](go-templates-dev-plan.md)
-- [`go-templates-phase-1-design.md`](go-templates-phase-1-design.md)
-- [`node-cpp-addon-plan.md`](node-cpp-addon-plan.md)
-- [`ts-cpp-go-wasm-plan.md`](ts-cpp-go-wasm-plan.md)
-- [`ts-cpp-go-web-brainstorming.md`](ts-cpp-go-web-brainstorming.md)
-- [`wasm-node-plan.md`](wasm-node-plan.md)
-- [`nix-rename.md`](nix-rename.md)
+- [`../../docs/history/build-system/`](../../docs/history/build-system/): build-system plans,
+  brainstorms, roadmaps, old language experiments, and implementation logs.

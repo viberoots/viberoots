@@ -1320,8 +1320,8 @@ Protected/shared observability and durable-record redaction rules:
 ## Companion Docs
 
 - [Deployment Contract](deployments-contract.md)
-- [Deployment Design](deployments-design.md)
+- [Deployment Design](history/designs/deployments-design.md)
 - [Deployment Control-Plane Observability](deployment-control-plane-observability.md)
 - [Deployment Provider Capabilities](deployment-provider-capabilities.md)
 - [Deployment Scenarios](deployment-scenarios.md)
-- [Deployment Implementation Plan](deployment-plan.md)
+- [Deployment Implementation Plan](history/plans/deployment-plan.md)

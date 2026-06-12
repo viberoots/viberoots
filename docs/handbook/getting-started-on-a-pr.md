@@ -52,8 +52,8 @@ I maintain an explicit inventory for docs that contain scaffold command guidance
 - Classification is required for scaffold-command docs under these areas:
   - `docs/handbook`
   - `build-tools/docs`
-  - `docs/design-history`
-  - `docs/pnpm`
+  - `docs/history/designs/legacy`
+  - `docs/history/build-system/pnpm`
 - Active docs are implementation guidance and must keep canonical TypeScript commands (`scaf new ts ...`) for canonical TypeScript templates.
 - Archival docs are historical records and may keep legacy command examples when explicitly classified as archival.
 
@@ -95,12 +95,15 @@ When adding or materially editing scaffold command guidance:
   - `never`: bypass selector mode and use existing build-system test scope behavior
 - Runtime prefix migration:
   - update old runtime environment variables to `VBR_*`
-  - see `docs/runtime-prefix-migration.md`
+  - see `docs/history/migrations/runtime-prefix-migration.md`
 - Verify project-impact default (PR-1.5):
   - default `v` behavior for non-build-system app/lib edits is dependency-aware project selection
   - selected test scope = changed projects + full recursive downstream dependents
   - project-local methodology exception edits (for example `projects/apps/<name>/methodology-exceptions.json`) stay on this project-impact path
-  - build-system edits still keep existing broad-scope/fallback behavior
+  - build-system code/tooling edits keep the broad build-system scope; Markdown and reStructuredText
+    docs do not count as build-system edits just because they live under `build-tools/**`
+  - default change detection uses merge-base refs (`GITHUB_BASE_REF`, then `github/main`,
+    `origin/main`, `main`) plus dirty worktree status
 - Verify deployment-aware build-system scope (PR-4.5.3):
   - `VBR_DEPLOYMENT_TEST_SCOPE=auto|always|never v`
   - `auto`: safe deployment-owned build-system edits run the reviewed deployment suite plus safety floor
@@ -122,6 +125,9 @@ When adding or materially editing scaffold command guidance:
     selection; use `ALL_TESTS=1 v` for the full suite)
   - `v` lint/prettier preflight is changed-file scoped by default; `VERIFY_SKIP_LINT=1` still skips
     the preflight when explicitly requested
+  - status helpers (`l --status`, `s`, or `build-tools/tools/bin/tail-log --status`) can show both
+    active pass-group counts and total suite counts; JSON status exposes `pass_index`,
+    `pass_total`, `group_completed`, and `group_total`
 - `runInTemp` Buck isolation contract:
   - use plain `buck2 ...` inside `runInTemp`; the temp-repo shim injects the registered isolation
   - explicit `buck2 --isolation-dir ...` is linted across multiline strings, template-built commands,
@@ -187,7 +193,7 @@ These guardrails assume test tooling stays aligned with the dev shell and global
 
 - **Investigation default (including LLM agents)**: severe regressions here are almost never contention alone. We run this suite routinely at high volume without contention-only degradation. Treat large slowdowns/timeouts as a recently introduced systemic change until proven otherwise.
 - **Honor `XDG_CONFIG_HOME` for Nix**: if temp test environments hide or bypass it, Nix can ignore configured substituters and keys, forcing slow source builds and spurious failures.
-- **Keep optional Nix caches from becoming a hard gate**: `i`, `b`, `v`, and Buck Nix actions dynamically probe configured HTTP(S) substituters and remove unreachable caches from the current process when `VBR_NIX_CACHE_POLICY=auto` (the default). Use `VBR_NIX_CACHE_POLICY=strict` only when cache availability is itself being tested.
+- **Keep configured Nix caches from becoming a hard gate**: `i`, `b`, `v`, and Buck Nix actions dynamically probe configured HTTP(S) substituters and remove unreachable caches from the current process when `VBR_NIX_CACHE_POLICY=auto` (the default). Nix fallback remains enabled, so ordinary local validation should continue without the cache. Use `VBR_NIX_CACHE_POLICY=strict` only when cache availability is itself being tested, and `VBR_NIX_CACHE_POLICY=off` only when you need to skip the dynamic probe.
 
 - **Avoid `--impure` cache busts**: untracked files can force impure mode and invalidate flake snapshots. Track new tests early (for example, `git add` new files before `i`, `b`, or `v`) or exclude them intentionally from the flake source snapshot.
 - **Use the planner path**: prefer `graph-generator-selected` and avoid building larger outputs when a derivation path is enough, for example `nix eval ... .drvPath`.
@@ -265,7 +271,7 @@ These guardrails assume test tooling stays aligned with the dev shell and global
 - **Keep `gomod2nix` incremental**: avoid shelling out to `gomod2nix` when `go.mod` has no `require/replace`; write/validate the minimal `gomod2nix.toml` directly, and skip project scans when `go.mod`/`go.sum` mtimes are older than `gomod2nix.toml`.
 - **Prefer bounded-concurrency seed copies**: per-file copy loops in temp-repo setup can become global bottlenecks under verify fan-out; use bounded parallel file copies rather than fully serial recursion.
 - **Avoid parallel `direnv exec` for profiling**: concurrent `direnv`/Nix eval can block on `.direnv/flake-profile` and distort timing; collect timing baselines with serialized runs.
-- **Keep Nix GC idle during verify**: active `nix store gc`/`nix-store --gc` can contend on `/nix/var/nix/db/db.sqlite` and can invalidate just-realized store paths during temp-repo tests. Verify now waits briefly for active GC and fails before Buck starts if GC remains active. Stop GC jobs and re-run before diagnosing target-level regressions.
+- **Keep Nix GC idle during verify**: active `nix store gc`/`nix-store --gc` can contend on `/nix/var/nix/db/db.sqlite` and can invalidate just-realized store paths during temp-repo tests. Verify waits briefly for active GC and fails before Buck starts if GC remains active. Stop GC jobs and re-run before diagnosing target-level regressions. `l --status` / `s` will show `GC detected: yes` when the log contains a GC preflight warning.
 - **Keep macOS metadata indexing out of verify temp trees**: on Darwin, verify keeps high-churn temp repos under `/tmp/viberoots-verify-$USER.noindex/tmpdir` instead of the watched checkout or per-user `/var/folders` temp area, clears stale current and legacy repo-local `buck-out/tmp/tmpdir*` contents at startup when not in explicit concurrent-verify mode, and writes `.metadata_never_index` markers under generated output/temp roots. If `fseventsd`, `mds`, or `mds_stores` stays near the top of `ps` or pass/min drops sharply, treat that as run-level contention and investigate the temp-root policy before accepting full-suite timing evidence.
 - **Treat invalid store-path errors during verify as GC-corruption signals for that run**: if logs include `error: path '/nix/store/... .drv' is not valid` together with verify GC warning/notice lines, treat the run as tainted by concurrent store mutation. Stop GC and re-run the affected targets first; do not use that run for regression attribution.
 - **Keep Nix store optimisation out of the default verify path**: `v` skips `nix store optimise` unless `VERIFY_NIX_OPTIMISE=1` or `VERIFY_NIX_OPTIMIZE=1` is set. Treat optimisation as explicit recovery/maintenance work, not normal test setup.

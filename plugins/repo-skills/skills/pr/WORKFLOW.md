@@ -220,7 +220,7 @@ $pr 4.5.1 from docs/another-plan.md
 If the run also depends on an extra doc outside the standard required set, name it explicitly in the prompt, for example:
 
 ```text
-$pr 4.5.1 and also read docs/mini-deployment.md
+$pr 4.5.1 and also read docs/history/designs/mini-deployment.md
 ```
 
 The equivalent longer sentence forms are also valid:
@@ -234,5 +234,5 @@ Use $pr for PR 4.5.1 from docs/another-plan.md.
 ```
 
 ```text
-Use $pr for PR 4.5.1 and also read docs/mini-deployment.md.
+Use $pr for PR 4.5.1 and also read docs/history/designs/mini-deployment.md.
 ```

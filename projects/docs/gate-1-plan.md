@@ -1,6 +1,7 @@
 # Gate 1 Development Plan: Ragie ACL Filter Behavior
 
 **Date:** April 28, 2026  
+**Status:** Product pilot implementation plan; not a current repo operator runbook.
 **Scope:** Implement the Phase 0 architecture through Gate 1 in `phase_0_engineering_companion.md`.  
 **Gate:** Ragie ACL filter behavior validated against real Ragie.  
 **References:** `phase_0_architecture.md`, `phase_0_build_deployment_companion.md`, `phase_0_engineering_companion.md`.

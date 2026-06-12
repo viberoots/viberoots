@@ -13,8 +13,8 @@ import {
 const DOC_SCOPE_ROOTS = [
   "docs/handbook",
   "build-tools/docs",
-  "docs/design-history",
-  "docs/pnpm",
+  "docs/history/designs/legacy",
+  "docs/history/build-system/pnpm",
 ] as const;
 
 function escapeRegexFragment(value: string): string {

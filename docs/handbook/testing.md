@@ -58,6 +58,17 @@ This report includes:
 - Sum of per-test durations parsed from Buck completion lines (for an effective parallelism estimate).
 - Aggregated `[timing]` bucket totals across the suite and estimated wall-clock impact per bucket.
 
+## Verify status
+
+Use `l --status`, `s`, or `build-tools/tools/bin/tail-log --status` while `v` is running or after the
+latest run completes. The text view reports elapsed/projected time, pass/fail/fatal/skip/build
+failure counts, remaining tests, and GC detection. For multi-pass verify plans it can show both the
+active pass group count and total test count in the `Tests:` row, plus `Pass group: <name>
+(<index>/<total>)`.
+
+Use `--json` when a script needs stable fields. The JSON line includes `pass_index`, `pass_total`,
+`group_completed`, and `group_total` when pass-group data is available.
+
 ### Verify helper
 
 - Default scoped verify:
@@ -86,12 +97,23 @@ files do not count as build-system changes by themselves, including files below 
 Active deployment/operator docs are still guarded: changes to those reviewed docs run the
 deployment documentation contract bucket, not the full deployment domain.
 
+Default scope selection reads committed changes from a merge-base diff and then unions in the dirty
+worktree from `git status --porcelain=v1`. Merge-base candidates are `GITHUB_BASE_REF` when present,
+then `github/main`, `origin/main`, and `main`; if none exist, verify falls back to `HEAD~1...HEAD`.
+
 ## Optional Nix caches
 
 The local wrappers and Buck Nix actions use `VBR_NIX_CACHE_POLICY=auto` by default. They probe
-configured HTTP(S) substituters, disable unreachable optional caches for the current process, and
-continue with local fallback. Use `VBR_NIX_CACHE_POLICY=strict` only when cache availability is
-itself under test.
+configured HTTP(S) substituters, disable unreachable configured caches for the current process, keep
+Nix fallback enabled, and continue locally. Use `VBR_NIX_CACHE_POLICY=strict` only when cache
+availability is itself under test; use `VBR_NIX_CACHE_POLICY=off` to skip the dynamic probe.
+
+## Nix GC preflight
+
+Before Buck starts, `v` checks for active `nix store gc` / `nix-store --gc` processes. If GC is
+active, verify writes a `nix gc preflight warning`, waits briefly, and fails before the test phase if
+GC remains active. A status view with `GC detected: yes` means that run saw GC contention and should
+not be used as clean timing evidence without a rerun.
 
 ## External runner helper (C++)
 

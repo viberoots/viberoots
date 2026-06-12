@@ -57,7 +57,7 @@ test("deployment verify scope leaves unrelated paths unclassified", () => {
   const unrelatedPaths = [
     "build-tools/tools/nix/node-modules/store.nix",
     "build-tools/tools/tests/scaffolding/template-taxonomy.contract.test.ts",
-    "docs/deployment-plan.md",
+    "docs/history/plans/deployment-plan.md",
     "projects/apps/pleomino/TARGETS",
     "projects/deployments/pleomino/dev/TARGETS",
   ];
@@ -76,7 +76,7 @@ test("deployment verify scope leaves unrelated paths unclassified", () => {
 
 test("deployment verify scope docs enumerate the reviewed support paths exactly", async () => {
   const doc = await fsp.readFile(
-    path.join(process.cwd(), "docs/deployment-verify-scope.md"),
+    path.join(process.cwd(), "docs/history/migrations/deployment-verify-scope.md"),
     "utf8",
   );
   for (const relPath of REVIEWED_DEPLOYMENT_OWNED_SUPPORT_PATHS) {

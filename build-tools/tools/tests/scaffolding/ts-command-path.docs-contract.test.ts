@@ -18,11 +18,11 @@ const DOCS_WITH_REQUIRED_TS_EXAMPLES: Array<{ path: string; requiredFragments: s
     requiredFragments: ["scaf new ts cpp-addon demo"],
   },
   {
-    path: "docs/design-history/pnpm-pr-8.5.md",
+    path: "docs/history/designs/legacy/pnpm-pr-8.5.md",
     requiredFragments: ["scaf new ts webapp-static <name>", "scaf new ts webapp-static demo --yes"],
   },
   {
-    path: "docs/design-history/nix-node-test.md",
+    path: "docs/history/designs/legacy/nix-node-test.md",
     requiredFragments: ["scaf new ts lib", "scaf new ts cli"],
   },
   {

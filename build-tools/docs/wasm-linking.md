@@ -472,7 +472,7 @@ Python extension modules (`build-tools/docs/python-extension-design.md`) are ano
 
 ## Implementation sequence
 
-See `build-tools/docs/linking-roadmap.md` for a proposed order that implements shared primitives once and then applies them across native C++, Wasm, and Python extension modules.
+See `docs/history/build-system/linking-roadmap.md` for a proposed order that implements shared primitives once and then applies them across native C++, Wasm, and Python extension modules.
 
 ## Notes to update in `build-tools/docs/cpp-linking.md`
 

@@ -31,12 +31,12 @@ async function readDoc(name: string): Promise<string> {
 test("mini migration docs cover Infisical worker secret boundary", async () => {
   const [nixosUsage, miniMigration, secretsApi] = await Promise.all([
     readDoc("nixos-shared-host-usage.md"),
-    readDoc("mini-name-migration-instructions.md"),
+    readDoc("history/migrations/mini-name-migration-instructions.md"),
     readDoc("deployment-secrets-api.md"),
   ]);
   for (const fragment of [
     /Mini Pre-`viberoots` Infisical Migration/,
-    /docs\/mini-name-migration-instructions\.md/,
+    /docs\/history\/migrations\/mini-name-migration-instructions\.md/,
     /secret_backend = "infisical\/default"/,
     /pre-`viberoots` control-plane identity/,
     /server-local Infisical credential references/,

@@ -1,54 +1,164 @@
 # viberoots
 
-viberoots is a Buck2 + Nix monorepo with deployment-control-plane tooling, cloud-control setup
-guides, secret-backend runbooks, and language build infrastructure. The repo is organized around
-two active user surfaces:
+viberoots is a Buck2 + Nix monorepo containing build infrastructure, deployment tooling,
+scaffolding, templates, repo-local automation, and shared libraries. Use it to develop repo
+projects, generate new project surfaces, manage reviewed deployment contexts, and run consistent
+local or CI verification.
 
-- Deployment operators: use the deployment CLI, control-plane setup, cloud provider evidence, and
-  secrets documentation under [`docs/`](docs/README.md).
-- Build-system contributors: use Buck2/Nix language macros, provider sync, patching, CI, and
-  remote-build documentation under [`build-tools/docs/`](build-tools/docs/README.md) and
-  [`docs/handbook/`](docs/handbook/README.md).
+## Quick Start
 
-## Start Here
+Install only the external tools needed to enter the repository and let Nix provide the rest
+automatically:
 
-- Repository documentation map: [`docs/README.md`](docs/README.md)
-- Build-system documentation map: [`build-tools/docs/README.md`](build-tools/docs/README.md)
-- Contributor handbook: [`docs/handbook/README.md`](docs/handbook/README.md)
-- ADR index: [`docs/adrs/README.md`](docs/adrs/README.md)
-- Deployment operator guide: [`docs/deployments-usage.md`](docs/deployments-usage.md)
-- Control-plane operator guide: [`docs/control-plane-guide.md`](docs/control-plane-guide.md)
-- Remote builds and distributed tests:
-  [`build-tools/docs/remote-build-setup.md`](build-tools/docs/remote-build-setup.md)
+1. Install Git so you can clone and update the repository.
+2. Install Nix with the [Determinate Nix Installer](https://determinate.systems/nix-installer/).
+   Determinate Nix provides the Nix command and flakes support used by this repo.
+3. Install `direnv` and `nix-direnv`. Choose one setup path.
+
+   `nix-darwin` is a macOS system-configuration layer for Nix. Use it if you already manage, or want
+   to manage, workstation tools declaratively; otherwise use the vanilla macOS helper path.
+
+   **With nix-darwin**
+
+   If you manage workstation tools with `nix-darwin`, add:
+
+   ```nix
+   {
+     nix.enable = false;
+     programs.direnv.enable = true;
+   }
+   ```
+
+   `nix.enable = false` lets Determinate Nix manage Nix configuration while `nix-darwin`
+   manages the rest of the system. `programs.direnv.enable` installs `direnv`, wires shell
+   integration, and enables `nix-direnv` by default.
+
+   **Without nix-darwin**
+
+   On vanilla macOS, use the repo bootstrap helper in the clone step below. Do not install
+   `direnv`/`nix-direnv` manually unless the helper reports a problem.
+
+   The helper installs missing `direnv`/`nix-direnv` packages with `nix profile install`, wires
+   `~/.config/direnv/direnvrc`, and adds the zsh hook to `~/.zshrc`.
+
+Then clone the repo and run the normal local verification path:
+
+```bash
+git clone <repo-url> viberoots
+cd viberoots
+```
+
+If you did not use `nix-darwin`, run the bootstrap helper now:
+
+```bash
+./build-tools/tools/bootstrap/macos-direnv.sh
+source ~/.zshrc
+```
+
+The first command installs and wires `direnv`/`nix-direnv`. The second command reloads your zsh
+configuration so `direnv` is available in the current terminal.
+
+Then allow the repo shell and run tests:
+
+```bash
+direnv allow
+i && b && v
+```
+
+Nothing else needs to be installed for normal repo work; Nix supplies the rest automatically.
+No repo-specific `/etc/nix/nix.custom.conf` entries are required for normal local development. Keep
+private substituters, access tokens, and remote builders out of public setup instructions; configure
+them only when you own that infrastructure.
+
+## Topic Entrypoints
+
+- **Repository Map**: [`docs/README.md`](docs/README.md) is the main documentation index for
+  current repo docs, ADRs, operator references, and documentation placement rules.
+- **Build System**: [`build-tools/docs/README.md`](build-tools/docs/README.md) covers Buck2/Nix architecture,
+  language rules, remote execution, linking, scaffolding, and generated glue.
+- **Language Work**: [`build-tools/docs/lang/README.md`](build-tools/docs/lang/README.md) covers language design
+  requirements. [`docs/handbook/new-language-walkthrough.md`](docs/handbook/new-language-walkthrough.md)
+  covers the add-a-language workflow.
+- **Contributor Workflow**: [`docs/handbook/README.md`](docs/handbook/README.md) and [`TESTING.md`](TESTING.md) cover
+  verification, CI, patching, local setup, and PR workflow.
+- **Apps And Libraries**: [`projects/apps/`](projects/apps/) and [`projects/libs/`](projects/libs/) contain package-local
+  code and docs. Use the local development commands below for normal builds, tests, and dev
+  servers.
+- **Deployments**: [`docs/deployments-usage.md`](docs/deployments-usage.md) covers the deployment CLI.
+  [`docs/control-plane-guide.md`](docs/control-plane-guide.md) covers protected/shared
+  control-plane setup.
+- **Secrets And Configuration**: [`docs/sprinkleref.md`](docs/sprinkleref.md), [`docs/secrets-usage.md`](docs/secrets-usage.md),
+  and [`docs/deployment-secrets-api.md`](docs/deployment-secrets-api.md) cover secret references,
+  backend usage, and the secret API.
+- **Remote Builds And Distributed Tests**: [`build-tools/docs/remote-build-setup.md`](build-tools/docs/remote-build-setup.md) covers setup
+  and operation.
+- **Product And Project Planning**: [`projects/docs/`](projects/docs/) contains product-specific planning artifacts.
+- **Documentation History**: [`docs/history/README.md`](docs/history/README.md) contains archived plans, migrations, completed
+  task tracks, investigations, and old design notes.
+- **Repo-Local Automation**: [`plugins/repo-skills/`](plugins/repo-skills/) contains Codex skills and PR/test workflow helpers.
+- **Architecture Decisions**: [`docs/adrs/README.md`](docs/adrs/README.md) contains accepted ADRs.
 
 ## Repo Layout
 
 - `build-tools/`: Buck2/Nix build system, language macros, toolchain helpers, and tests.
+- `build-tools/deployments/`: reusable deployment package implementations and infrastructure
+  foundations.
 - `build-tools/docs/`: build-system reference docs, active designs, and remote-build setup.
-- `docs/`: deployment, control-plane, secrets, ADR, task, and handbook documentation.
-- `docs/build-history/` and `docs/design-history/`: historical notes and earlier design records.
-- `projects/apps/` and `projects/libs/`: application and library roots.
+- `config/`: repo-level control-plane configuration templates and supporting config roots.
+- `docs/`: repo-wide deployment, control-plane, secrets, ADR, handbook, and documentation-placement
+  guidance.
+- `docs/history/`: archived plans, migrations, historical tasks, investigations, and old design
+  notes.
+- `plugins/`: repo-local Codex skills and plugin metadata.
+- Root workspace files: `flake.nix`, `package.json`, `pnpm-workspace.yaml`, `TARGETS`, and CI files
+  define the repository-wide development shell, package workspace, Buck package root, and automation
+  entrypoints.
+- `projects/apps/` and `projects/libs/`: application and library roots, including package-local
+  docs. Current app roots include data-room services and Pleomino.
+- `projects/docs/`: product-specific planning artifacts.
+- `projects/deployments/`: deployment-family metadata and package-local deployment docs.
 - `projects/config/shared.json`: checked-in deployment contexts, control-plane profiles, and
   non-secret shared project configuration.
 - `projects/config/local.json`: gitignored local overrides and operator-local config values.
 - `patches/`: repo-level patch overlays where a language contract supports global patches.
 - `third_party/`: external provider metadata and generated provider glue.
-- `toolchains/` and `target_platforms/`: Buck toolchain and platform wiring.
+- `toolchains/`: Buck and Nix toolchain wiring.
+- `types/`: shared TypeScript declarations.
 
-## Build Quickstart
+## Local Development Commands
 
-Use the dev helper for normal local work. It runs the startup checks, refreshes generated glue, and
-then delegates to Buck:
+After `direnv allow`, the repo shell provides short wrappers for normal local work:
 
 ```bash
-nix develop -c build-tools/tools/dev/dev-build.ts build //...
-nix develop -c build-tools/tools/dev/dev-build.ts test //...
+i        # install/link dependencies and refresh generated glue
+b        # build the default repo scope
+v        # run impacted tests and verification checks
 ```
 
-Generate glue directly when you need to refresh the build metadata without running a build:
+The usual local check is:
 
 ```bash
-node build-tools/tools/dev/install-deps.ts --glue-only
+i && b && v
+```
+
+Run dev servers and other dev runnables with `d`:
+
+```bash
+d //projects/apps/pleomino:app
+```
+
+`d` uses the target's declared `run.dev` command and reports a clear error when the target is not a
+dev runnable. For targeted work, pass Buck labels through the wrappers:
+
+```bash
+b //projects/apps/pleomino:app
+v //projects/apps/pleomino:latency-guardrail
+```
+
+Refresh generated glue without running a build:
+
+```bash
+i --glue-only
 ```
 
 For more detail, read:
@@ -67,16 +177,18 @@ The short local verification path is:
 i && b && v
 ```
 
-`v` may select the impacted subset for the current change. Use the forced full-suite path when you
-need pre-merge evidence for the entire repo:
+`v` selects an impacted subset from the merge-base diff plus the dirty worktree. Use the forced
+full-suite path when you need pre-merge evidence for the entire repo:
 
 ```bash
 i && b && ALL_TESTS=1 v
 ```
 
-Coverage is opt-in (`v --coverage` or `ALL_TESTS=1 v --coverage`). The local wrappers and Buck Nix
-actions use `VBR_NIX_CACHE_POLICY=auto` by default, so temporarily unreachable optional Nix caches
-are removed from the current process instead of failing unrelated builds. Use
+Coverage is opt-in (`v --coverage` or `ALL_TESTS=1 v --coverage`). Use `s`, `l --status`, or
+`build-tools/tools/bin/tail-log --status` to inspect active pass-group and total suite progress. The
+local wrappers and Buck Nix actions use `VBR_NIX_CACHE_POLICY=auto` by default, so temporarily
+unreachable configured HTTP(S) Nix caches are removed from the current process instead of failing
+unrelated builds. Use
 `VBR_NIX_CACHE_POLICY=strict` only when cache availability is what you are testing.
 
 ## Deployment Config
@@ -93,23 +205,32 @@ Start with:
 - [`docs/sprinkleref.md`](docs/sprinkleref.md)
 - [`docs/secrets-usage.md`](docs/secrets-usage.md)
 
-## Go Quickstart
+## Language Work
 
-Go builds are one supported language surface in the broader build system. Scaffold examples:
+The build system has current language surfaces for Node/TypeScript, Go, C/C++, Python, and Rust.
+The deepest scaffold coverage is for TypeScript/Node webapps, services, and libraries, plus Go
+libraries and CLIs; the shared Buck/Nix language layer also provides library, binary, test, native
+extension, and artifact rules across the other supported languages.
 
-```bash
-scaf new go lib demo-lib --yes --path=projects/libs/demo-lib
-scaf new go cli demo-cli --yes --path=projects/apps/demo-cli
-```
+Language support is more than per-language compilation. The repo provides:
 
-Generate the module lock and refresh glue:
+- package patching through repo-level and package-local patch overlays
+- wasm producer targets for browser/runtime assets, including Go, C/C++, and Python wasm variants
+- module surfaces and provider wiring that connect packages across languages without ad hoc path
+  coupling
+- generated glue, lockfile integration, and Nix package definitions that keep local, CI, and remote
+  builds on the same contracts
 
-```bash
-build-tools/tools/bin/gomod2nix --dir projects/apps/demo-cli
-cp projects/apps/demo-cli/gomod2nix.toml gomod2nix.toml
-node build-tools/tools/dev/install-deps.ts --glue-only
-```
+Start with:
 
-Go patching is package-local. Place patches under the owning target's package directory, for
-example `<pkg>/patches/go/`, with filenames like
-`golang.org__x__net@v0.24.0.patch`.
+- [`build-tools/docs/lang/README.md`](build-tools/docs/lang/README.md)
+- [`build-tools/docs/scaffolding.md`](build-tools/docs/scaffolding.md)
+- [`docs/handbook/patching.md`](docs/handbook/patching.md)
+- [`docs/handbook/new-language-walkthrough.md`](docs/handbook/new-language-walkthrough.md)
+- [`docs/handbook/adding-language.md`](docs/handbook/adding-language.md)
+
+## License
+
+Except for `projects/`, this repository is licensed under the MIT License. The `projects/`
+directory is excluded from the license grant and all rights in those files are reserved unless a
+separate license file inside `projects/` says otherwise. See [`LICENSE`](LICENSE).

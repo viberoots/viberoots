@@ -3,25 +3,25 @@ export const ALLOWED_PATHS = new Set([
   "build-tools/tools/dev/stale-names-lint-allowlists.ts",
   "build-tools/tools/tests/linting/no-stale-viberoots-names.enforcement.test.ts",
   "build-tools/tools/tests/deployments/nixos-shared-host.control-plane-service-env.test.ts",
-  "docs/repo-rename.md",
-  "docs/runtime-prefix-migration.md",
+  "docs/history/migrations/repo-rename.md",
+  "docs/history/migrations/runtime-prefix-migration.md",
   "docs/contributor-naming-conventions.md",
-  "docs/mini-name-migration-instructions.md",
-  "mayday-test-time-debugging.md",
+  "docs/history/migrations/mini-name-migration-instructions.md",
+  "docs/history/investigations/mayday-test-time-debugging.md",
   "pnpm-lock.yaml",
 ]);
 
 export const ALLOWED_PREFIXES = [
-  "docs/build-history/",
-  "docs/design-history/",
+  "docs/history/build-system/logs/",
+  "docs/history/designs/legacy/",
   "third_party/uv2nix/",
 ];
 
 export const PLAN_NUMBER_SKIP_PATHS = new Set([
   "build-tools/tools/tests/linting/rename-inventory.closeout.test.ts",
   "build-tools/tools/tests/linting/stale-names-lint.behavior.test.ts",
-  "docs/deployment-plan.md",
-  "docs/external-deployments-plan.md",
+  "docs/history/plans/deployment-plan.md",
+  "docs/history/plans/external-deployments-plan.md",
   "docs/handbook/nix-gaps-plan.md",
   "docs/handbook/nix-gaps-prs.md",
   "build-tools/tools/nix/shared-host-identity-provider-migration.nix",

@@ -5,10 +5,10 @@ import path from "node:path";
 import { test } from "node:test";
 
 const repoRoot = process.cwd();
-const scanRoots = ["build-tools", "docs", "projects", "infisical-bootstrap.md"] as const;
+const scanRoots = ["build-tools", "docs", "projects"] as const;
 const allowedHistoricalFiles = new Set([
-  "docs/infisical-plan.md",
-  "docs/pleomino-deployment-directory-migration.md",
+  "docs/history/plans/infisical-plan.md",
+  "docs/history/migrations/pleomino-deployment-directory-migration.md",
 ]);
 const stalePatterns = [
   /(?:\/\/)?projects\/deployments\/pleomino-[A-Za-z0-9_-]+(?::|\/|\b)/g,

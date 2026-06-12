@@ -4,6 +4,9 @@
 **Companion to:** `phase_0_architecture.md`
 **Purpose:** Working engineering artifact — pilot-readiness gates, coding discipline, and what to listen for during design-partner conversations.
 
+**Repository status note:** Product pilot planning artifact, not a current repo operator runbook.
+Confirm implementation status before treating unchecked gates or package names as active work.
+
 This document is intentionally short. The architecture document is the source of truth for design decisions; this document is what the team uses week-to-week.
 
 ---

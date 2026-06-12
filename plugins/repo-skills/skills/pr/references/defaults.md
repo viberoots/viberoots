@@ -6,5 +6,5 @@ Run `repo_root="$(git rev-parse --show-toplevel)"; python3 "$repo_root/plugins/r
 
 Run `repo_root="$(git rev-parse --show-toplevel)"; python3 "$repo_root/plugins/repo-skills/skills/pr/scripts/resolve_pr_identifier.py" <pr-number>` from anywhere inside the repo to record an explicit clone-local `$pr` numeric argument, or the same command without `<pr-number>` to advance from the last recorded value and print the next default PR identifier.
 
-- `default_plan_document`: `docs/deployment-plan.md`
+- `default_plan_document`: `docs/history/plans/deployment-plan.md`
 - `last_pr_numeric_argument`: `unset`

@@ -23,7 +23,7 @@ Use the deeper references when needed:
   for install details, alternate install modes, status, and uninstall
 - [NixOS Shared Host Technician Checklist](nixos-shared-host-technician-checklist.md)
   for the short SOP handoff path
-- [Mini Shared-Dev Deployment Design](mini-deployment.md)
+- [Mini Shared-Dev Deployment Design](history/designs/mini-deployment.md)
   for background on why `mini` is set up this way
 - [Deployment Contract](deployments-contract.md)
   for the strict system rules behind these workflows
@@ -44,7 +44,7 @@ Use this entry sequence:
    reference
 3. open [NixOS Shared Host Technician Checklist](nixos-shared-host-technician-checklist.md)
    when you need the short SOP handoff
-4. open [Mini Shared-Dev Deployment Design](mini-deployment.md)
+4. open [Mini Shared-Dev Deployment Design](history/designs/mini-deployment.md)
    only when you need the design rationale behind the `mini` workflow
 
 Current supported scope:
@@ -434,7 +434,7 @@ not, update the reviewed identity mapper before retrying the self-service flow.
 ### Mini Pre-`viberoots` Infisical Migration
 
 If `mini` is still on the pre-`viberoots` control-plane identity, run the
-checked migration procedure in [docs/mini-name-migration-instructions.md](mini-name-migration-instructions.md)
+checked migration procedure in [docs/history/migrations/mini-name-migration-instructions.md](history/migrations/mini-name-migration-instructions.md)
 before enabling `secret_backend = "infisical/default"` on protected/shared
 deployments. The required order is:
 

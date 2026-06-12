@@ -567,12 +567,15 @@ directly. Direct submit requests are mainly for tooling and integrations.
 
 This is a minimal example showing the shape of a
 `cloudflare-pages-control-plane-submit-request@1` request after an artifact has
-already been uploaded to the service:
+already been uploaded to the service. Direct API callers must resolve the
+reviewed `secret://...` or `runtime://...` service-token ref from the selected
+control-plane profile before setting `DEPLOY_CONTROL_PLANE_TOKEN`; do not use
+ambient shell token material as a substitute for a context-selected token ref.
 
 ```bash
 curl \
   -H 'Content-Type: application/json' \
-  -H "Authorization: Bearer $VBR_DEPLOY_CONTROL_PLANE_TOKEN" \
+  -H "Authorization: Bearer $DEPLOY_CONTROL_PLANE_TOKEN" \
   -X POST \
   https://deploy.apps.kilty.io/api/v1/submissions \
   -d '{
@@ -641,7 +644,7 @@ Read status by `submissionId`:
 
 ```bash
 curl \
-  -H "Authorization: Bearer $VBR_DEPLOY_CONTROL_PLANE_TOKEN" \
+  -H "Authorization: Bearer $DEPLOY_CONTROL_PLANE_TOKEN" \
   'https://deploy.apps.kilty.io/api/v1/status?submissionId=submission-2026-04-16T12:00:00Z'
 ```
 
@@ -649,7 +652,7 @@ Read the finalized record by `deployRunId`:
 
 ```bash
 curl \
-  -H "Authorization: Bearer $VBR_DEPLOY_CONTROL_PLANE_TOKEN" \
+  -H "Authorization: Bearer $DEPLOY_CONTROL_PLANE_TOKEN" \
   'https://deploy.apps.kilty.io/api/v1/records?deployRunId=deploy-run-123'
 ```
 
@@ -664,7 +667,7 @@ Approve an existing `pending_approval` run instead of resubmitting it:
 ```bash
 curl \
   -H 'Content-Type: application/json' \
-  -H "Authorization: Bearer $VBR_DEPLOY_CONTROL_PLANE_TOKEN" \
+  -H "Authorization: Bearer $DEPLOY_CONTROL_PLANE_TOKEN" \
   -X POST \
   https://deploy.apps.kilty.io/api/v1/run-actions \
   -d '{
@@ -702,7 +705,7 @@ Cancel a queued run:
 ```bash
 curl \
   -H 'Content-Type: application/json' \
-  -H "Authorization: Bearer $VBR_DEPLOY_CONTROL_PLANE_TOKEN" \
+  -H "Authorization: Bearer $DEPLOY_CONTROL_PLANE_TOKEN" \
   -X POST \
   https://deploy.apps.kilty.io/api/v1/run-actions \
   -d '{
@@ -1348,7 +1351,7 @@ Open [Vault Production Bootstrap Runbook](vault-production-bootstrap.md)
 when you need the operator workflow for initializing Vault, enabling KV/JWT auth,
 writing policies, storing secrets, and exporting the current secret fixture.
 
-Open [Deployments Design](deployments-design.md)
+Open [Deployments Design](history/designs/deployments-design.md)
 when you need the architectural rationale behind the API surface.
 
 Open [Deployment Contract](deployments-contract.md)

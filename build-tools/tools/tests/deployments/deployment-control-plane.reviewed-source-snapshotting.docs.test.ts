@@ -10,8 +10,8 @@ async function read(rel: string) {
 
 test("deployment control plane docs keep reviewed-source snapshotting and mismatch guidance aligned", async () => {
   const [designDoc, miniDoc, usageDoc, sharedHostUsageDoc] = await Promise.all([
-    read("docs/deployments-design.md"),
-    read("docs/mini-deployment.md"),
+    read("docs/history/designs/deployments-design.md"),
+    read("docs/history/designs/mini-deployment.md"),
     read("docs/deployments-usage.md"),
     read("docs/nixos-shared-host-usage.md"),
   ]);

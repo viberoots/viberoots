@@ -267,8 +267,8 @@ Before approving a deployment-system change, confirm:
 
 ## Companion Docs
 
-- [Deployment Design](deployments-design.md)
+- [Deployment Design](history/designs/deployments-design.md)
 - [Deployment Schema](deployments-schema.md)
 - [Deployment Provider Capabilities](deployment-provider-capabilities.md)
 - [Deployment Scenarios](deployment-scenarios.md)
-- [Deployment Implementation Plan](deployment-plan.md)
+- [Deployment Implementation Plan](history/plans/deployment-plan.md)

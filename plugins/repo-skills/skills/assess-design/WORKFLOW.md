@@ -84,4 +84,4 @@ Use the default design spec when no argument is provided.
 
 `Use $assess-design to review the saved design spec and determine whether it is fully implemented, covered by existing tests, and compliant with our methodology and guardrails.`
 
-`Use $assess-design to review docs/deployments-design.md and determine whether it is fully implemented, covered by existing tests, and compliant with our methodology and guardrails.`
+`Use $assess-design to review docs/history/designs/deployments-design.md and determine whether it is fully implemented, covered by existing tests, and compliant with our methodology and guardrails.`

@@ -35,9 +35,9 @@ source files, test files, templates, scaffolds, or operator-facing docs:
 - `kiltyj/viberoots` (repository slug only)
 - `git@github.com:kiltyj/viberoots.git`
 
-Exceptions: `docs/repo-rename.md`, `docs/runtime-prefix-migration.md`,
-`docs/contributor-naming-conventions.md`, `docs/mini-name-migration-instructions.md`,
-`pnpm-lock.yaml`, files under `docs/build-history/`, and files under `docs/design-history/`.
+Exceptions: `docs/history/migrations/repo-rename.md`, `docs/history/migrations/runtime-prefix-migration.md`,
+`docs/contributor-naming-conventions.md`, `docs/history/migrations/mini-name-migration-instructions.md`,
+`pnpm-lock.yaml`, files under `docs/history/build-system/logs/`, and files under `docs/history/designs/legacy/`.
 
 ## In-house concept names
 

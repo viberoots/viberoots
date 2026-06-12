@@ -10,7 +10,7 @@ async function read(relativePath: string) {
 
 test("deployment control plane docs stay aligned on separated roles and composable scopes", async () => {
   const [designDoc, contractDoc, scenariosDoc] = await Promise.all([
-    read("docs/deployments-design.md"),
+    read("docs/history/designs/deployments-design.md"),
     read("docs/deployments-contract.md"),
     read("docs/deployment-scenarios.md"),
   ]);

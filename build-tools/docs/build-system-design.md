@@ -50,8 +50,8 @@
 Use these docs as the source of truth for migration scope and completion:
 
 - Inventory: `docs/handbook/nix-gaps.md`
-- Phase plan: `docs/handbook/nix-gaps-plan.md`
-- Execution sequence: `docs/handbook/nix-gaps-prs.md`
+- Phase plan: `docs/history/build-system/nix-gaps-plan.md`
+- Execution sequence: `docs/history/build-system/nix-gaps-prs.md`
 
 Current status in those docs:
 
@@ -609,6 +609,12 @@ sequenceDiagram
 **Common commands:**
 
 ```bash
+# Default local validation (scope-aware, coverage off)
+i && b && v
+
+# Full local validation (scope forced to //..., coverage off)
+i && b && ALL_TESTS=1 v
+
 # Build a Go binary target (example)
 buck2 build //features/payments:service
 
@@ -620,6 +626,13 @@ patch-pkg start go golang.org/x/net
 # edit…
 patch-pkg apply go golang.org/x/net
 ```
+
+Plain `v` is scope-aware. It resolves changed paths from a merge-base diff plus dirty worktree
+status, treats Markdown/reStructuredText as documentation even under `build-tools/**`, and reserves
+the broad build-system scope for actual build-system code/tooling changes. Cache outages are not a
+default validation failure: `VBR_NIX_CACHE_POLICY=auto` probes configured HTTP(S) substituters,
+removes unreachable ones for the current process, and keeps Nix fallback enabled. Use
+`VBR_NIX_CACHE_POLICY=strict` only in cache-readiness lanes.
 
 ### Runnable-target contract (`run.prod` / `run.dev`)
 
@@ -680,7 +693,9 @@ Behavior:
 I keep template test selection as a deterministic tool contract before verify/CI wiring.
 
 - Entrypoint: `node build-tools/tools/dev/select-template-tests.ts`
-- Source of truth for changed paths: merge-base diff plus working tree status.
+- Source of truth for changed paths: merge-base diff plus working tree status. Merge-base candidates
+  are `GITHUB_BASE_REF` when present, then `github/main`, `origin/main`, and `main`; if none are
+  available, selection falls back to `HEAD~1...HEAD`.
 - Template id extraction uses only paths under:
   `build-tools/tools/scaffolding/templates/<language>/<template>/...`
 - Selector mode is one of:
@@ -721,7 +736,8 @@ changes that do not touch build-system paths.
   - if requested targets are explicit (not `//...`), keep explicit targets (existing behavior)
   - if `VBR_TEMPLATE_TEST_SCOPE=never`, keep existing build-system scope behavior
   - if template selector mode is `template-only`, run template-targeted selection (existing behavior)
-  - if build-system changes are detected, keep existing build-system scope/fallback behavior
+  - if build-system code/tooling changes are detected, keep existing build-system scope behavior;
+    Markdown and reStructuredText files are documentation changes, including below `build-tools/**`
   - otherwise (`no-template-impact` + no build-system changes), run `project-impact`
 - `project-impact` graph resolution:
   - map changed paths to owning projects under `projects/apps/<name>` and `projects/libs/<name>`
@@ -1256,8 +1272,8 @@ Before adding a new language, define its macro inventory and migration policy us
 
 1. Add each public macro to `docs/handbook/nix-gaps.md` with a route classification.
 2. Classify each macro as artifact-producing, orchestration wrapper, or probe-only.
-3. Add or extend phases in `docs/handbook/nix-gaps-plan.md` using dependency order and measurable acceptance criteria.
-4. Add concrete PR slices in `docs/handbook/nix-gaps-prs.md`, including tests and docs per PR.
+3. Add or extend phases in `docs/history/build-system/nix-gaps-plan.md` using dependency order and measurable acceptance criteria.
+4. Add concrete PR slices in `docs/history/build-system/nix-gaps-prs.md`, including tests and docs per PR.
 5. Enforce inventory coverage and exception policy checks in CI before calling the migration complete.
 
 ### PNPM Importer‑scoped Providers (Node)
@@ -1447,7 +1463,7 @@ As of PR‑3 in `quad-alignment-6.md`, the historical `go_module_patch(...)` pro
 
 Some macros must produce a **planner-visible** node without building a normal artifact (for example, C++ Emscripten `.js` + `.wasm` bundles, or other non-standard shapes). These targets still participate in invalidation and planner discovery.
 
-Planner-visible stubs are not automatically migration debt. They are acceptable only when the macro is explicitly classified as probe/test-only in `docs/handbook/nix-gaps.md`. If a macro contract expects a production artifact, a planner-visible stub is a temporary gap and must be tracked in `docs/handbook/nix-gaps-plan.md` and `docs/handbook/nix-gaps-prs.md`.
+Planner-visible stubs are not automatically migration debt. They are acceptable only when the macro is explicitly classified as probe/test-only in `docs/handbook/nix-gaps.md`. If a macro contract expects a production artifact, a planner-visible stub is a temporary gap and must be tracked in `docs/history/build-system/nix-gaps-plan.md` and `docs/history/build-system/nix-gaps-prs.md`.
 
 - **Canonical rule**: use `//build-tools/lang:planner_stub.bzl:planner_stub`. Do not introduce ad-hoc `genrule` stubs.
 - **Contract**: a planner-visible stub should carry:

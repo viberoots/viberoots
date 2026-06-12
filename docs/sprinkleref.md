@@ -111,7 +111,7 @@ roots fail as malformed project config rather than being treated as a missing fi
 `localValuesPath` for the JSON file and `localValuesEntryPath` for the resolved hierarchical entry,
 for example `values.control-plane.aws.account-id`. Local redirect evidence keeps the local ref in
 `ref` and records the redirected target as `redirectRef` with `redirectSource` details. The command
-also prints the normal token write command for the canonical project config:
+also prints the normal token write command for the selected secret backend:
 
 ```bash
 sprinkleref --update secret://control-plane/supabase/management-api-token --create-missing

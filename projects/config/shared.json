@@ -40,7 +40,7 @@
   "controlPlanes": {
     "pleomino-prod": {
       "serviceClient": {
-        "controlPlaneUrl": "https://control-plane.unfair.ly",
+        "controlPlaneUrl": "https://control-plane.viberoots.example",
         "controlPlaneTokenRef": "secret://control-plane/pleomino/prod/service-token"
       },
       "records": {
@@ -49,7 +49,7 @@
     },
     "pleomino-staging": {
       "serviceClient": {
-        "controlPlaneUrl": "https://staging.control-plane.unfair.ly",
+        "controlPlaneUrl": "https://staging.control-plane.viberoots.example",
         "controlPlaneTokenRef": "secret://control-plane/pleomino/staging/service-token"
       },
       "records": {
@@ -127,7 +127,7 @@
   },
   "values": {
     "control-plane": {
-      "domain": "unfair.ly"
+      "domain": "viberoots.example"
     }
   },
   "sprinkleref": {

@@ -15,7 +15,7 @@ Use this guide when you want the shortest path to the day-to-day workflows:
 
 Use the deeper docs when needed:
 
-- [Deployments Design](deployments-design.md)
+- [Deployments Design](history/designs/deployments-design.md)
   for model rationale, authoring structure, and policy intent
 - [Deployment Contract](deployments-contract.md)
   for fail-closed shared operator and implementation guarantees
@@ -31,7 +31,7 @@ Use the deeper docs when needed:
 - [NixOS Shared Host Usage](nixos-shared-host-usage.md)
   for the reviewed `mini` host workflow and the start-here path for first-time
   `mini` setup
-- [Runtime Prefix Migration](runtime-prefix-migration.md)
+- [Runtime Prefix Migration](history/migrations/runtime-prefix-migration.md)
   for updating old runtime environment variables to `VBR_*`
 
 ## Main Command
@@ -882,6 +882,6 @@ Open [Deployment Scenarios](deployment-scenarios.md)
 when you need canonical expected behavior for a concrete operation such as
 preview, retry, rollback, promotion, or provision-only.
 
-Open [Deployments Design](deployments-design.md)
+Open [Deployments Design](history/designs/deployments-design.md)
 when you are creating a new deployment definition or need architecture
 background.

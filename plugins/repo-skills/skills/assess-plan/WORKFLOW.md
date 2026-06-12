@@ -84,4 +84,4 @@ Use the default spec when no argument is provided.
 
 `Use $assess-plan to review the shared default spec and determine whether it is fully implemented, covered by existing tests, and compliant with our methodology and guardrails.`
 
-`Use $assess-plan to review docs/deployments-design.md and determine whether it is fully implemented, covered by existing tests, and compliant with our methodology and guardrails.`
+`Use $assess-plan to review docs/history/designs/deployments-design.md and determine whether it is fully implemented, covered by existing tests, and compliant with our methodology and guardrails.`

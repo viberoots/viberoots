@@ -433,8 +433,8 @@ Expected behavior:
 
 ## Companion Docs
 
-- [Deployment Design](deployments-design.md)
+- [Deployment Design](history/designs/deployments-design.md)
 - [Deployment Contract](deployments-contract.md)
 - [Deployment Schema](deployments-schema.md)
 - [Deployment Provider Capabilities](deployment-provider-capabilities.md)
-- [Deployment Implementation Plan](deployment-plan.md)
+- [Deployment Implementation Plan](history/plans/deployment-plan.md)

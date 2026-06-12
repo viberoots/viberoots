@@ -38,7 +38,7 @@ const EXPECTED = {
     clientIdFile: "pleomino-staging-infisical-client-id",
     clientSecretFile: "pleomino-staging-infisical-client-secret",
     machineIdentityId: "8b9bc77a-ad32-459f-82a9-b72cd7a3530d",
-    controlPlaneUrl: "https://staging.control-plane.unfair.ly",
+    controlPlaneUrl: "https://staging.control-plane.viberoots.example",
     controlPlaneTokenRef: "secret://control-plane/pleomino/staging/service-token",
   },
   prod: {
@@ -54,7 +54,7 @@ const EXPECTED = {
     clientIdFile: "pleomino-prod-infisical-client-id",
     clientSecretFile: "pleomino-prod-infisical-client-secret",
     machineIdentityId: "ceca24df-0e8b-457e-a5a8-cf20a122d2da",
-    controlPlaneUrl: "https://control-plane.unfair.ly",
+    controlPlaneUrl: "https://control-plane.viberoots.example",
     controlPlaneTokenRef: "secret://control-plane/pleomino/prod/service-token",
   },
 };

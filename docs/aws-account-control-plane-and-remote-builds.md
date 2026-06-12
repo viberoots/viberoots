@@ -488,12 +488,12 @@ control-plane aws-account check
 Use structured `config://...` and `secret://...` refs in stack config, then let `setup-plan`
 classify the remaining work. Fill non-secret coordinates in stack config,
 `projects/config/shared.json`, or `projects/config/local.json`. Required coordinates include
-`domain`, `awsAccountId`, `awsOrganizationId`, `supabaseOrgId`, and `supabaseProjectRef`. Write the
-Supabase Management API token with
+`domain`, `awsAccountId`, `awsOrganizationId`, `supabaseOrgId`, and `supabaseProjectRef`. Store the
+Supabase Management API token through the selected SprinkleRef backend with
 `sprinkleref --update secret://control-plane/supabase/management-api-token --create-missing`, or
-use the setup-shell fallback environment variable for a single run; do not put it in config/local
-JSON as plaintext. Rerun `control-plane aws-account setup-plan` after changes until it points at the
-readiness checks.
+use the setup-shell fallback environment variable for a single run; do not put it in stack config,
+`projects/config/shared.json`, or `projects/config/local.json` as plaintext. Rerun
+`control-plane aws-account setup-plan` after changes until it points at the readiness checks.
 
 `bootstrap` is the guided entrypoint after local setup values exist. The current implementation
 covers prerequisite checks and the remote-state bootstrap plan/apply path. Later foundation, DNS,
@@ -562,8 +562,8 @@ exception cases, such as a second control-plane stack in the same clone. Overrid
 
 For the first prerequisite check, prefer a SprinkleRef ref for the Supabase Management API token and
 keep the token value out of config files. Use `sprinkleref --init-local` for clone-local
-coordinates, and use `sprinkleref --update ... --create-missing` to write the token to the
-canonical project config when needed:
+coordinates, and use `sprinkleref --update ... --create-missing` to write the token to the selected
+secret backend when needed:
 
 ```bash
 control-plane aws-account config-init \

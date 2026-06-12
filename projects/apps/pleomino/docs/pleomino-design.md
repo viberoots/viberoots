@@ -7,7 +7,7 @@ sandbox-only virtual board puzzle using React Native Web components. The app was
 scaffolded from `ts/webapp-ssr-vite`, then migrated to the current static-PWA delivery shape.
 
 Current runtime note: Pleomino now uses the static-PWA app shape described in
-[`projects/apps/pleomino/docs/pleomino-static.md`](/Users/kiltyj/Code/viberoots/projects/apps/pleomino/docs/pleomino-static.md).
+[`pleomino-static.md`](pleomino-static.md).
 The gameplay architecture in this document still applies; SSR delivery references are historical.
 
 ## Key Changes / Design Content
@@ -485,7 +485,7 @@ flowchart TD
 
 ## Appendix A: Development Plan (PR Sequence)
 
-This plan follows the same PR structure used in `docs/design-history/quad-alignment-48.md`.
+This plan follows the same PR structure used in `docs/history/designs/legacy/quad-alignment-48.md`.
 Each PR includes implementation, tests, and documentation updates together.
 
 Scope: deliver a production-ready sandbox pleomino webapp on `ts/webapp-ssr-vite` with React

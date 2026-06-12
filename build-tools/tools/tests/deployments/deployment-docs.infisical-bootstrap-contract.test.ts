@@ -8,7 +8,7 @@ const repoRoot = process.cwd();
 
 test("Infisical bootstrap docs keep interactive confirmation and canonical repo command wording", async () => {
   const docs = await Promise.all(
-    ["docs/deployments-usage.md", "docs/infisical-bootstrap.md", "infisical-bootstrap.md"].map(
+    ["docs/deployments-usage.md", "docs/infisical-bootstrap.md"].map(
       async (name) => [name, await fsp.readFile(path.join(repoRoot, name), "utf8")] as const,
     ),
   );

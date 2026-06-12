@@ -6,13 +6,13 @@ import { test } from "node:test";
 
 const repoRoot = process.cwd();
 const activeDocs = [
-  "docs/deployment-plan.md",
+  "docs/history/plans/deployment-plan.md",
   "docs/deployments-contract.md",
-  "docs/deployments-design.md",
+  "docs/history/designs/deployments-design.md",
   "docs/deployments-schema.md",
   "docs/deployments-usage.md",
   "docs/deployment-scenarios.md",
-  "docs/deployments-implementation-plan.md",
+  "docs/history/plans/deployments-implementation-plan.md",
   "docs/deployment-provider-capabilities.md",
   "docs/deployment-control-plane-observability.md",
   "docs/handbook/ci.md",
@@ -81,7 +81,10 @@ test("stale branch enforcement catches full Git ref authority examples", () => {
 });
 
 test("deployment plan records the adjusted protected/shared model", async () => {
-  const plan = await fsp.readFile(path.join(repoRoot, "docs/deployment-plan.md"), "utf8");
+  const plan = await fsp.readFile(
+    path.join(repoRoot, "docs/history/plans/deployment-plan.md"),
+    "utf8",
+  );
   assert.match(
     plan,
     /Git-triggered, CI-built, Buck2-defined,\s+control-plane-admitted deployments/i,

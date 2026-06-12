@@ -13,7 +13,7 @@ Provider sync writes deterministic Buck provider glue from lockfiles and patch i
     `--emit-index`
 - Go and C++ provider sync are **no-ops/removed** by design. Go and C++ macros use labels,
   package-local patch inputs, and provider-edge helpers rather than generated language-specific
-  provider files (see `docs/handbook/cpp-provider-sync-migration.md`).
+  provider files (see `build-tools/docs/cpp-provider-sync-migration.md`).
 - **Idempotency**: re-running should not change output when inputs are unchanged.
 - **Tests**: create a single patch using fixtures and assert stable provider name and paths.
 

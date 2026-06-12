@@ -230,7 +230,7 @@ Update:
    - add section on default selection and ambiguity behavior.
 3. `build-tools/docs/build-system-design.md` (required short note)
    - confirm deterministic source-resolution contract and no ambiguity fallbacks.
-4. `docs/handbook/nix-gaps-plan.md`
+4. `docs/history/build-system/nix-gaps-plan.md`
    - add/keep reference to this design as the implementation source of truth.
 
 Checkpoint:
@@ -256,7 +256,7 @@ Docs:
 - `docs/handbook/starlark-api.md`
 - `build-tools/docs/wasm-node-linking.md`
 - `build-tools/docs/build-system-design.md`
-- `docs/handbook/nix-gaps-plan.md`
+- `docs/history/build-system/nix-gaps-plan.md`
 
 ## Non-Goals
 
@@ -502,7 +502,7 @@ outputs are consumed consistently by `node_asset_stage` and `node_wasm_inline_mo
 - Add a short "implementation completed" status update to
   `build-tools/docs/node-wasm-staging-contract-design.md`.
 - If route wording changed materially, align `docs/handbook/nix-gaps.md` and
-  `docs/handbook/nix-gaps-plan.md`.
+  `docs/history/build-system/nix-gaps-plan.md`.
 
 ### Acceptance Criteria
 

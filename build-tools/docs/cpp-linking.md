@@ -769,7 +769,7 @@ This document and `build-tools/docs/wasm-linking.md` share the same core semanti
 
 If I implement either C++ native linking or Wasm linking first, I want to avoid duplicating these mechanics.
 
-This same shared model is also intended to be reused by `docs/design-history/python-extension-design.md` (Python extension modules), which is another “native link consumer” that benefits from the same deterministic closure resolution.
+This same shared model is also intended to be reused by `docs/history/designs/legacy/python-extension-design.md` (Python extension modules), which is another “native link consumer” that benefits from the same deterministic closure resolution.
 
 ### Shared semantics helper for deterministic traversal
 
@@ -793,8 +793,8 @@ Both designs rely on the exported Buck graph containing the intent attributes:
 
 If the exporter needs to be extended to emit these fields, I should do it once and reuse it for both native C++ and Wasm.
 
-Python extension modules (`docs/design-history/python-extension-design.md`) should reuse the same attribute names for the same semantics, rather than inventing a parallel surface.
+Python extension modules (`docs/history/designs/legacy/python-extension-design.md`) should reuse the same attribute names for the same semantics, rather than inventing a parallel surface.
 
 ## Implementation sequence
 
-See `build-tools/docs/linking-roadmap.md` for a proposed order that implements shared primitives once and then applies them across native C++, Wasm, and Python extension modules.
+See `docs/history/build-system/linking-roadmap.md` for a proposed order that implements shared primitives once and then applies them across native C++, Wasm, and Python extension modules.

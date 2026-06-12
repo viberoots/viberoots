@@ -152,7 +152,7 @@ test("deployment-impact: deployment project paths trigger deployment and project
 
 test("deployment-impact: unrelated paths keep no-deployment-impact mode", () => {
   const result = resolveDeploymentImpactSelection(
-    ["docs/deployment-plan.md", "projects/apps/pleomino/src/index.ts"],
+    ["docs/history/plans/deployment-plan.md", "projects/apps/pleomino/src/index.ts"],
     { deploymentTargetLabels },
   );
 

@@ -24,14 +24,14 @@ const ALLOWED_PATHS = new Set([
   "build-tools/tools/tests/deployments/nixos-shared-host.control-plane-service-env.test.ts",
   "build-tools/tools/tests/linting/no-stale-viberoots-names.enforcement.test.ts",
   "docs/contributor-naming-conventions.md",
-  "docs/mini-name-migration-instructions.md",
-  "docs/repo-rename.md",
-  "docs/runtime-prefix-migration.md",
-  "mayday-test-time-debugging.md",
+  "docs/history/migrations/mini-name-migration-instructions.md",
+  "docs/history/migrations/repo-rename.md",
+  "docs/history/migrations/runtime-prefix-migration.md",
+  "docs/history/investigations/mayday-test-time-debugging.md",
   "pnpm-lock.yaml",
 ]);
 
-const ALLOWED_PREFIXES = ["docs/build-history/", "docs/design-history/"];
+const ALLOWED_PREFIXES = ["docs/history/build-system/logs/", "docs/history/designs/legacy/"];
 const retiredInputContractTerm = ["secret", "spec"].join("");
 const retiredInputContractTitle = "Secret" + "spec";
 

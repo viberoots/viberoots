@@ -141,7 +141,7 @@ test("SSR runtime-consistency policy docs: runtime consistency and startup guida
   assert.match(templateReadme, /\[wasm-watch\] sync:ok/);
 
   const hmrPlan = await fsp.readFile(
-    path.join(REPO_ROOT, "docs", "design-history", "hmr-plan.md"),
+    path.join(REPO_ROOT, "docs", "history", "designs", "legacy", "hmr-plan.md"),
     "utf8",
   );
   assert.match(hmrPlan, /### Phase 3 Closeout Status/);

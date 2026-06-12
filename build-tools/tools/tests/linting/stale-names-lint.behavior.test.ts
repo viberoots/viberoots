@@ -140,9 +140,13 @@ test("stale-names-lint rejects stale names in supplied file paths", async () => 
 });
 
 test("stale-names-lint rejects retired input-contract term everywhere", async () => {
-  const result = await execFileAsync("zx-wrapper", [script, "docs/deployment-plan.md"], {
-    cwd: process.cwd(),
-  });
+  const result = await execFileAsync(
+    "zx-wrapper",
+    [script, "docs/history/plans/deployment-plan.md"],
+    {
+      cwd: process.cwd(),
+    },
+  );
   assert.match(result.stderr, /no stale names found/);
 
   const mixed = await writeFixture(

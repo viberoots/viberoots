@@ -4,6 +4,10 @@
 **Companion to:** `phase_0_architecture.md` and `phase_0_engineering_companion.md`  
 **Purpose:** Describe how the Phase 0 architecture should be adapted to this repository's layout, build system, and deployment model without changing the runtime architecture.
 
+**Repository status note:** Product pilot planning artifact, not a current deployment operator
+runbook. Use the active docs under `docs/` for current deployment commands and validate package
+names against the repository before implementation.
+
 This document is intentionally narrower than the architecture. It does not replace the product or security design. Its job is to explain how the existing repo machinery should wrap that design so reviewers can tell where code, build targets, deployment targets, secrets, promotion rules, and deploy-blocking gates belong.
 
 ## 1. Summary

@@ -1,5 +1,9 @@
 # Pleomino Infisical Backend
 
+Status: active deployment-package reference for Pleomino's Infisical OpenTofu stack. For normal
+operator bootstrap commands, start with `docs/infisical-bootstrap.md`; use this file when inspecting
+or debugging the package-local Infisical module.
+
 This package owns the non-secret Infisical infrastructure for the Pleomino
 staging and production deployment-secret cutover.
 

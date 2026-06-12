@@ -17,7 +17,7 @@ I keep stable anchor directories for the reorg. These are structural only:
 - `projects/libs/` — library roots
 - `build-tools/docs/` — build-system docs
 - `build-tools/docs/lang/` — language-specific build docs
-- `docs/build-history/` — historical build notes
+- `docs/history/build-system/logs/` — historical build notes
 
 ## CLI parsing (required)
 

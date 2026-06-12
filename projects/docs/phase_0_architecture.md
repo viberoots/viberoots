@@ -5,6 +5,10 @@
 **Scope:** Data room application for investor diligence, 3–10 design-partner customers
 **Boundary:** Management console + permissioned remote MCP server
 
+Repository status note: this is a product/application architecture artifact, not a current
+deployment-control-plane operator runbook. Confirm implementation status before treating any Phase 0
+item as landed.
+
 ---
 
 ## 1. Executive summary

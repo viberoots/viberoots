@@ -1,6 +1,6 @@
 ---
 name: prs
-description: Work through a numeric range of planned PRs from the shared plan document in sequence. Use when the user invokes `$prs <range> [plan-document]`, such as `$prs 1-10 docs/external-deployments-plan.md` or `$prs 11-15`, and wants each PR implemented by a dedicated subagent using the `pr` skill, committed through the `cc` skill only after self-review, full-suite validation, full-suite timing-regression checks, and a separate scope-review subagent pass, then notified via ntfy with PR summary evidence, assessed with `assess-plan` and known `assess-design`, augmented with follow-up PRs when gaps remain, and never pushed unless explicitly requested.
+description: Work through a numeric range of planned PRs from the shared plan document in sequence. Use when the user invokes `$prs <range> [plan-document]`, such as `$prs 1-10 docs/history/plans/external-deployments-plan.md` or `$prs 11-15`, and wants each PR implemented by a dedicated subagent using the `pr` skill, committed through the `cc` skill only after self-review, full-suite validation, full-suite timing-regression checks, and a separate scope-review subagent pass, then notified via ntfy with PR summary evidence, assessed with `assess-plan` and known `assess-design`, augmented with follow-up PRs when gaps remain, and never pushed unless explicitly requested.
 ---
 
 # PRs
@@ -18,7 +18,7 @@ Never push to a remote unless the original user prompt explicitly asks for a pus
 Use the skill with a required numeric PR identifier or inclusive numeric range, plus an optional plan document path:
 
 ```text
-$prs 1-10 docs/external-deployments-plan.md
+$prs 1-10 docs/history/plans/external-deployments-plan.md
 ```
 
 ```text
@@ -32,7 +32,7 @@ $prs 4.5.1-4.5.3 docs/build-plan.md
 Accept a single PR number as a one-item range:
 
 ```text
-$prs 7 docs/deployment-plan.md
+$prs 7 docs/history/plans/deployment-plan.md
 ```
 
 ## Resolve Inputs

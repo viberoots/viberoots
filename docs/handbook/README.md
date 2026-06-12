@@ -27,14 +27,11 @@ Use this index for day-to-day repo work. Build-system design references live und
 - [`new-language-walkthrough.md`](new-language-walkthrough.md): fast path for adding a language.
 - [`adding-language.md`](adding-language.md): deeper reference for language integration.
 - [`node-macros.md`](node-macros.md) and [`node-tests.md`](node-tests.md): Node-specific behavior.
-- [`cpp-provider-sync-migration.md`](cpp-provider-sync-migration.md): C++ provider-sync status.
+- [`../../build-tools/docs/cpp-provider-sync-migration.md`](../../build-tools/docs/cpp-provider-sync-migration.md):
+  C++ provider-sync status.
 
-## Plans And Historical Notes
+## History Archive
 
-These are planning/history documents, not current setup manuals:
-
-- [`nix-gaps.md`](nix-gaps.md), [`nix-gaps-plan.md`](nix-gaps-plan.md),
-  [`nix-gaps-prs.md`](nix-gaps-prs.md), and [`nix-gaps-baseline.md`](nix-gaps-baseline.md)
-- [`e2e-test-gaps.md`](e2e-test-gaps.md)
-- [`logging-enhancement.md`](logging-enhancement.md)
-- [`reorg-phase-0-baseline.md`](reorg-phase-0-baseline.md)
+Historical plans, baselines, and gap ledgers live under
+[`../history/`](../history/README.md). Current policy inventory remains in
+[`nix-gaps.md`](nix-gaps.md).

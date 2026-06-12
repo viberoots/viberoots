@@ -1,10 +1,43 @@
 # viberoots Documentation
 
-This index separates current operator manuals from plans, ADRs, and historical records. Prefer the
-manuals for day-to-day setup and operations; use plans and history as implementation context. The
-repository-local deployment configuration model is centered on checked-in
+This index points to current operator manuals, references, ADRs, and contributor documentation.
+Prefer these documents for day-to-day setup and operations. Historical plans, migration notes,
+completed task backlogs, and old design records live under [`history/`](history/README.md).
+
+The repository-local deployment configuration model is centered on checked-in
 `projects/config/shared.json` plus gitignored `projects/config/local.json`; detailed reference
 documents describe that model and remain the source of truth for command syntax.
+
+## Documentation Placement
+
+Use ownership to choose where new documentation lives:
+
+- Put repo-wide contributor, deployment, control-plane, secrets, ADR, and operator documentation in
+  [`docs/`](README.md).
+- Put build-system-owned references in [`../build-tools/docs/`](../build-tools/docs/README.md):
+  Buck2/Nix architecture, language macros, scaffolding, linking, wasm, remote builds, and generated
+  build glue.
+- Put app, library, or package-specific documentation beside the owning package under
+  [`../projects/`](../projects/). Use `README.md` or a package-local `docs/` directory.
+- Put product-level planning that spans several packages in [`../projects/docs/`](../projects/docs/).
+- Put inactive plans, migrations, investigations, old designs, and completed task tracks under
+  [`history/`](history/README.md).
+
+Do not add project-specific documentation to top-level `docs/` unless it describes a repo-wide
+contract or operator workflow.
+
+## Linking Conventions
+
+Write Markdown links so they work in GitHub and native Markdown viewers:
+
+- Prefer relative links from the current file, including the `.md` filename or `README.md` for
+  directory indexes.
+- Use normal fragment links for headings in the same file, such as
+  `[Start Here](#start-here)`.
+- Avoid absolute filesystem paths, `file://` links, editor-specific links, and generated-output
+  paths.
+- When a doc links to code, link to the checked-in source file rather than generated artifacts.
+- Keep link text descriptive enough that the destination is clear without reading the URL.
 
 ## Start Here
 
@@ -46,29 +79,17 @@ documents describe that model and remain the source of truth for command syntax.
 - [`deployment-secrets-api.md`](deployment-secrets-api.md): secret API reference.
 - [`adrs/README.md`](adrs/README.md): accepted architecture decision records.
 - [`handbook/README.md`](handbook/README.md): contributor handbook and build-tooling references.
+- [`../projects/docs/`](../projects/docs/): product-specific planning artifacts for the data-room
+  / Ragie Phase 0 pilot.
 
 ## Build System
 
 Build-system documentation lives primarily in [`../build-tools/docs/README.md`](../build-tools/docs/README.md).
 Contributor workflows and repo conventions live in [`handbook/README.md`](handbook/README.md).
 
-## Plans And Gap Trackers
+## History Archive
 
-These files are implementation plans or completed gap ledgers. They are useful for archaeology and
-follow-up planning, but they are not the first source of truth for current commands:
-
-- [`deployment-plan.md`](deployment-plan.md)
-- [`control-plane-plan.md`](control-plane-plan.md)
-- [`cloud-control-plan.md`](cloud-control-plan.md)
-- [`control-plane-gaps.md`](control-plane-gaps.md)
-- [`external-deployments-plan.md`](external-deployments-plan.md)
-- [`infisical-plan.md`](infisical-plan.md)
-- [`tasks/README.md`](tasks/README.md)
-
-## Historical Records
-
-- [`build-history/`](build-history/): prior build-system notes and migration records.
-- [`design-history/`](design-history/): earlier product and deployment designs.
-- Root-level migration docs such as [`repo-rename.md`](repo-rename.md) and
-  [`runtime-prefix-migration.md`](runtime-prefix-migration.md) are historical unless linked from an
-  active runbook.
+Use [`history/README.md`](history/README.md) for implementation plans, design archaeology,
+migration notes, completed task tracks, old build-system logs, investigation notes, and validation
+ledgers. The history archive is retained for traceability; current commands and supported behavior
+are documented by the manuals and references above.

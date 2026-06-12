@@ -15,10 +15,6 @@ export const ACTIVE_DOC_COMMAND_CONTRACT: DocCommandContractEntry[] = [
     requiredFragments: ["scaf new ts ..."],
   },
   {
-    path: "docs/handbook/e2e-test-gaps.md",
-    requiredFragments: ["scaf new ts go-addon demo --yes"],
-  },
-  {
     path: "build-tools/docs/node-call-cpp.md",
     requiredFragments: ["scaf new ts cpp-addon <name>", "scaf new ts cpp-addon demo"],
   },
@@ -56,13 +52,14 @@ export const ACTIVE_DOC_COMMAND_CONTRACT: DocCommandContractEntry[] = [
 ];
 
 export const ARCHIVAL_DOC_COMMAND_CONTRACT: string[] = [
-  "docs/build-history/template-name-cleanup.md",
-  "docs/design-history/linking-plan-3.md",
-  "docs/design-history/nix-node-test.md",
-  "docs/design-history/pnpm-pr-8.5.md",
-  "docs/pnpm/node-pr-3.5.md",
-  "docs/pnpm/node-golang-addon-test.md",
-  "docs/pnpm/node-golang-addon.md",
+  "docs/history/build-system/e2e-test-gaps.md",
+  "docs/history/build-system/logs/template-name-cleanup.md",
+  "docs/history/designs/legacy/linking-plan-3.md",
+  "docs/history/designs/legacy/nix-node-test.md",
+  "docs/history/designs/legacy/pnpm-pr-8.5.md",
+  "docs/history/build-system/pnpm/node-pr-3.5.md",
+  "docs/history/build-system/pnpm/node-golang-addon-test.md",
+  "docs/history/build-system/pnpm/node-golang-addon.md",
 ];
 
 export function allClassifiedDocPaths(): string[] {

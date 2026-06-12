@@ -10,7 +10,7 @@ This page is the detailed install and maintenance reference that page sends you
 to. Hand
 [NixOS Shared Host Technician Checklist](nixos-shared-host-technician-checklist.md)
 to technicians when they need the short SOP. Use
-[Mini Shared-Dev Deployment Design](mini-deployment.md)
+[Mini Shared-Dev Deployment Design](history/designs/mini-deployment.md)
 and [Deployment Contract](deployments-contract.md)
 for deeper system rules.
 

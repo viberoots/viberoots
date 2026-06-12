@@ -43,13 +43,13 @@ non-interactive runs must add `--apply-metadata-patch`. Real drift against alrea
 non-placeholder values still fails closed.
 
 This document intentionally redirects to the repo-root bootstrap spec at
-[`infisical-bootstrap.md`](../infisical-bootstrap.md). Keep command examples there and here on the
+[`infisical-bootstrap.md`](history/designs/infisical-bootstrap-spec.md). Keep command examples there and here on the
 same `repo` or `deployment --target <buck-target>` mode vocabulary.
 
 Pleomino deployment targets use canonical family labels such as
 `//projects/deployments/pleomino/staging:deploy`. The old flat
 `projects/deployments/pleomino-*` packages are migration history; see
-[`pleomino-deployment-directory-migration.md`](pleomino-deployment-directory-migration.md).
+[`pleomino-deployment-directory-migration.md`](history/migrations/pleomino-deployment-directory-migration.md).
 Pleomino is currently the only checked-in live deployment family; new families
 should be introduced only through an explicit product-approved plan PR.
 

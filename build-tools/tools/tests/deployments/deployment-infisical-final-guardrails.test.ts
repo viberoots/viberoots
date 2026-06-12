@@ -32,15 +32,15 @@ const checkedInMetadataRoots = ["projects/deployments", "build-tools/deployments
 const docsWithInfisicalExamples = [
   "docs/deployment-secrets-api.md",
   "docs/deployments-usage.md",
-  "docs/mini-name-migration-instructions.md",
+  "docs/history/migrations/mini-name-migration-instructions.md",
   "docs/nixos-shared-host-setup.md",
   "docs/nixos-shared-host-usage.md",
   "docs/secrets-usage.md",
 ];
 const docsWithInfisicalResolverExamples = [
   ...docsWithInfisicalExamples,
-  "docs/infisical-design.md",
-  "infisical-bootstrap.md",
+  "docs/history/designs/infisical-design.md",
+  "docs/history/designs/infisical-bootstrap-spec.md",
 ];
 
 async function walkFiles(
@@ -141,7 +141,7 @@ test("Infisical resolver docs show Universal Auth profile fields", async () => {
 });
 
 test("Infisical plan keeps follow-up sections traceable", async () => {
-  const plan = await readRelative("docs/infisical-plan.md");
+  const plan = await readRelative("docs/history/plans/infisical-plan.md");
   const prefix = "PR" + "-";
   for (const pr of [16, 17, 18]) {
     assert.match(plan, new RegExp(`^## ${prefix}${pr}: `, "m"));

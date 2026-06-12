@@ -861,7 +861,7 @@ Open [Vault Production Bootstrap Runbook](vault-production-bootstrap.md)
 when you are setting up Vault itself, configuring JWT auth roles, writing secrets,
 or generating the optional local/test runtime export from Vault.
 
-Open [Deployments Design](deployments-design.md)
+Open [Deployments Design](history/designs/deployments-design.md)
 when you need the architectural rationale behind `SprinkleRef`, replay
 snapshots, and backend-selected secret resolution.
 

@@ -20,7 +20,7 @@ Scope: Introduce PHP (Composer-based) with hermetic, reproducible builds, Buck2-
 
 ### Linking expectations
 
-I follow the repo-wide linking model described in `build-tools/docs/cpp-linking.md`, `build-tools/docs/wasm-linking.md`, and `build-tools/docs/linking-roadmap.md`. If this language does not introduce native or cross-language linking, `deps` remains a graph edge list and no link intent is inferred.
+I follow the repo-wide linking model described in `build-tools/docs/cpp-linking.md`, `build-tools/docs/wasm-linking.md`, and `docs/history/build-system/linking-roadmap.md`. If this language does not introduce native or cross-language linking, `deps` remains a graph edge list and no link intent is inferred.
 
 - `deps` is the Buck graph edge list. It does not imply link intent.
 - `link_deps` declares linkable inputs. `header_deps` is include-only when that concept applies.

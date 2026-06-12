@@ -125,7 +125,8 @@
     full pre-merge command.
 - Symptom: `i`, `b`, or `v` logs `nix cache health: disabled unreachable substituter(s)`.
   - Meaning: default `VBR_NIX_CACHE_POLICY=auto` dynamically removed unreachable configured
-    substituters for the current process and kept local fallback enabled.
+    HTTP(S) substituters for the current process and kept Nix fallback enabled. This is not a local
+    validation failure by itself.
   - Fix: no local action is required unless you are validating remote-build or cache readiness.
     Repair the named cache endpoint, credentials, DNS, or network route before treating the cache as
     production-ready.
@@ -140,6 +141,25 @@
   - Fix: rerun the readiness check after `nix store info --store <substituter>` succeeds for the
     listed substituters, or
     switch back to the default `auto` policy for ordinary local validation.
+
+## Verify scope or status looks surprising
+
+- Symptom: a docs-only change below `build-tools/**` did not trigger full build-system scope.
+  - Meaning: Markdown and reStructuredText files are scoped as documentation, not build-system
+    tooling. Reviewed deployment/operator docs still run their documentation contract bucket.
+  - Fix: use `ALL_TESTS=1 v` when you intentionally need full `//...` coverage.
+- Symptom: `v` selected tests for files you have not committed.
+  - Meaning: default scope selection unions merge-base changes with dirty worktree status from
+    `git status --porcelain=v1`; untracked, renamed, deleted, and modified files all count.
+  - Fix: stage/commit, clean, or intentionally leave those files present before rerunning. Use
+    `v --explain-selection` when available to inspect the selected scope without running tests.
+- Symptom: `l --status` or `s` shows two progress counts in the `Tests:` row.
+  - Meaning: the first count is the active target pass group, and the second is total suite
+    progress. JSON status exposes the same data as `group_completed`, `group_total`, `pass_index`,
+    and `pass_total`.
+- Symptom: status shows `GC detected: yes`.
+  - Meaning: the verify log contains a Nix GC preflight warning. Treat timing from that run as
+    potentially contended and rerun after stopping `nix store gc` / `nix-store --gc`.
 
 ## Duplicate/malformed patches
 
