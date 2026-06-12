@@ -274,6 +274,8 @@ hooks. It is not project source and should be ignored by Git.
 ## Design Goals
 
 - Running `nix develop` from the workspace root exposes the same commands users run today.
+- User-facing command-line tools and interpreters are provided by Nix dev shells, not by Buck cell
+  paths.
 - Running Buck from the workspace root still uses root-cell labels for product code.
 - Project code does not need to vendor viberoots implementation files.
 - The default same-checkout dogfood layout uses a Git submodule so viberoots has separate upstream
@@ -522,9 +524,10 @@ inputs.viberoots.lib.mkWorkspace {
 }
 ```
 
-`workspaceSrc` is the project/workspace root. `viberootsInput` is the flake source providing tools,
-templates, prelude, and toolchains. Do not use a generic `src` parameter for this API; it is too
-easy to confuse the workspace source with the viberoots source.
+`workspaceSrc` is the project/workspace root. `viberootsInput` is the flake source providing the
+dev shell definitions, templates, prelude, toolchain definitions, and reusable tool source. Do not
+use a generic `src` parameter for this API; it is too easy to confuse the workspace source with the
+viberoots source.
 
 Conceptual shape:
 
@@ -579,6 +582,22 @@ scaf new ...
 v
 buck2 build //projects/apps/foo:app
 ```
+
+All user-facing executables must come from the Nix dev shell. This includes `buck2`, language
+toolchains, package managers, `scaf`, `v`, `i`, `b`, `viberoots`, `zx-wrapper`, and any interpreters
+used by build actions.
+
+Buck cell paths are not a tool installation mechanism. They locate:
+
+- Starlark rules and macros loaded by `TARGETS` files;
+- prelude and toolchain definition files;
+- generated provider targets and metadata;
+- script source files used as Buck action inputs.
+
+When a Buck rule runs a viberoots script, the script source may come from
+`@viberoots//build-tools/...`, but the executable that runs it must come from the Nix-provided
+environment. For example, Buck may locate a TypeScript source file in the `viberoots` cell, while
+the `node` or `zx-wrapper` used to run it comes from `nix develop`.
 
 The tools must resolve two roots:
 
@@ -956,6 +975,8 @@ Common changes:
 
 - replace implicit `process.cwd()` assumptions with `WORKSPACE_ROOT` where reading project files;
 - use `VIBEROOTS_ROOT` for tool templates, Nix helper sources, and reusable script paths;
+- keep executable discovery on the Nix-provided `PATH`; do not discover user-facing tools by walking
+  Buck cell directories;
 - move workspace-generated state currently written under `build-tools/tools/buck/` to a
   workspace-owned location such as `.viberoots/workspace/buck/`;
 - keep reusable tool source under `VIBEROOTS_ROOT/build-tools/**`;
