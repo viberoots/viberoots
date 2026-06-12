@@ -31,6 +31,11 @@ Build failure 0`.
 - A later OCI image failure was traced to a new deployment helper being untracked: local TypeScript
   tests could import it, but the Nix/Git source snapshot used by the OCI test could not. The helper
   and its test case are now staged so the source snapshot includes them.
+- A later full-suite slowdown was traced to two infrastructure issues rather than one test body:
+  active Nix GC could invalidate store paths while Buck was loading, and a stale toolchain generation
+  lock could make temp-repo scaffold tests wait until timeout. Verify now waits for active Nix GC to
+  finish or fails before Buck starts, and toolchain generation locks record owners and clean up stale
+  ownerless/dead-owner locks.
 - The earlier full-suite docs failure was traced to `docs/deployment-secrets-api.md` losing the exact
   hosted-service "required bearer token" wording that the parity test enforces. The API reference
   now explicitly connects `--control-plane-token <token>`, hosted-service bearer-token enforcement,
@@ -65,6 +70,9 @@ Build failure 0`.
   opt-in with `VBR_NIX_CACHE_POLICY=strict`.
 - Whole-suite validation is green after the fixes: `i && b && ALL_TESTS=1 v` completed with the
   default verify phase passing 18 targets and the expanded `ALL_TESTS=1` phase passing 1424 targets.
+- Post-reboot validation of the current pushed state is green: `i && b && v` completed in 5146s with
+  the broad verify phase passing 1427 targets and reporting `Fail 0 / Fatal 0 / Skip 0 / Build
+  failure 0`.
 
 ## Operating Principles
 
@@ -696,5 +704,6 @@ Resolved for the first implementation slice:
 
 Open follow-up:
 
-- None for this stabilization pass. The fresh `i && b && ALL_TESTS=1 v` run completed green after
-  the cleanup, HMR, OCI source-visibility, and docs parity fixes.
+- None for this stabilization pass. The fresh post-reboot `i && b && v` run completed green after
+  the cleanup, HMR, OCI source-visibility, docs parity, Nix GC preflight, and stale toolchain-lock
+  fixes.
