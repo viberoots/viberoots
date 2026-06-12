@@ -1,8 +1,10 @@
 # SprinkleRef Resolver
 
-SprinkleRef stable refs stay backend-neutral. Use `secret://deployments/...` for true secrets and
-`config://...` or `runtime://...` for non-secret declarations, then select the storage backend
-through a resolver config and optional category.
+SprinkleRef stable refs stay backend-neutral. Use `secret://deployments/...` for true secrets that
+are read from a secret backend, `config://...` for non-secret configuration declarations, and
+`runtime://...` for values supplied by the current runtime host contract. A runtime ref may still
+identify secret material, such as a control-plane service token delivered through a CI environment
+binding; it is not looked up in the SprinkleRef secret backend.
 
 Project config lives outside deployment metadata:
 
@@ -331,8 +333,10 @@ sprinkleref --check --format json
 `--check` scans tracked repository files for `secret://`, `config://`, and `runtime://` references
 while skipping generated output and dependency directories. `secret://` refs are presence-checked
 through the canonical project config by default, or through an explicit config when one is supplied.
-`config://` and `runtime://` refs are non-secret contract declarations and are not looked up in
-secret stores.
+`config://` refs are non-secret contract declarations. `runtime://` refs are runtime-host
+contracts; some are non-secret runtime config, while control-plane service-token runtime refs point
+at secret material supplied by host bindings. Neither scheme is looked up in SprinkleRef secret
+stores.
 
 Target checks use Buck metadata and default to transitive dependencies. Use `--deps none`,
 `--deps direct`, `--deps transitive`, or `--no-deps` to adjust the target closure. Target output

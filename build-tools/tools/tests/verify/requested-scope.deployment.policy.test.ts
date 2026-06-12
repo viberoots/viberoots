@@ -2,6 +2,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { resolveRequestedVerifyScope } from "../../dev/verify/requested-scope";
+import { summarizeVerifyScopeDecision } from "../../dev/verify/selection-output";
 
 const defaultArgs = {
   coverage: false,
@@ -121,6 +122,35 @@ test("mixed build-system deployment impact keeps the existing selection", async 
   assert.equal(result.selection.selectorMode, "no-template-impact");
   assert.equal(result.selection.reason, "fallback-build-system-scope");
   assert.deepEqual(result.selection.targets, ["//..."]);
+});
+
+test("reviewed deployment documentation changes select only documentation contract targets", async () => {
+  const result = await resolveRequestedVerifyScope({
+    root: process.cwd(),
+    invocationCwd: process.cwd(),
+    args: defaultArgs,
+    env: {},
+    deps: {
+      resolveTemplateScope: async () =>
+        baseDecision({
+          targets: ["//docs/..."],
+          reason: "non-build-system-scope",
+        }),
+      collectChangedPaths: async () => [
+        "docs/nixos-shared-host-setup.md",
+        "build-tools/tools/deployments/control-plane-host-profile/saas-oci-profile.md",
+      ],
+      listDeploymentTargets: async () => {
+        throw new Error("deployment domain query should not run for docs-only changes");
+      },
+      deploymentDocContractTargets: ["//:deployment_docs_front_door_parity"],
+    },
+  });
+
+  assert.equal(result.selection.selectorMode, "documentation-contract");
+  assert.equal(result.selection.reason, "documentation-contract-targeted");
+  assert.deepEqual(result.selection.targets, ["//:deployment_docs_front_door_parity"]);
+  assert.match(summarizeVerifyScopeDecision(result.selection), /documentationPaths=2/);
 });
 
 test("never mode bypasses deployment selection", async () => {

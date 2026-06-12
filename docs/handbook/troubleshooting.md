@@ -118,6 +118,11 @@
 
 ## Remote build/cache readiness
 
+- Symptom: `v` completed but did not run the whole test suite.
+  - Meaning: plain `v` is scope-aware. It selects the relevant Buck tests for the current change set
+    unless a selector or environment override asks for broader coverage.
+  - Fix: use `ALL_TESTS=1 v` for a forced `//...` run, or `i && b && ALL_TESTS=1 v` for the
+    full pre-merge command.
 - Symptom: `i`, `b`, or `v` logs `nix cache health: disabled unreachable substituter(s)`.
   - Meaning: default `VBR_NIX_CACHE_POLICY=auto` dynamically removed unreachable configured
     substituters for the current process and kept local fallback enabled.
@@ -136,6 +141,10 @@
     switch back to the default `auto` policy for ordinary local validation.
 
 ## Duplicate/malformed patches
+
+- Ensure one patch per `module@version`; file name must be `<encodedImport>@<version>.patch`.
+- If the same module/version needs multiple edits, fold them into one patch file and keep the
+  patch idempotent.
 
 ## Go import lookup errors (vendor mode)
 
@@ -157,8 +166,6 @@
 
 - Symptom: CI test `linting_no_vendored_go` fails with `.go` files under `third_party/go`.
 - Fix: remove vendored files; do not copy from `GOMODCACHE`. Third‑party is resolved by Nix and `gomod2nix.toml`.
-
-- Ensure one patch per `module@version`; file name must be `<encodedImport>@<version>.patch`.
 
 ## Node patch changes don’t seem to invalidate targets
 

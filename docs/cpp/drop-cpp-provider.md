@@ -1,5 +1,10 @@
 ### Drop C++ Provider Reliance — Design, Migration, and Acceptance
 
+**Status:** Historical migration design. Current C++ targets declare nixpkgs inputs with
+`nixpkg_deps`; macro wiring still passes through the shared language wiring layer and generated
+auto-map indirection where needed. Treat the acceptance criteria below as migration rationale, not
+as the current operator interface.
+
 This document proposes removing the C++ provider dependency path (auto_map → provider deps) and adopting explicit, per‑target nixpkgs dependency declaration via `nixpkg_deps`, while preserving precise invalidation and impacted‑tests detection.
 
 ---

@@ -68,9 +68,11 @@ advances but produces a new stage-specific artifact. In both modes promotion eli
 control-plane stage state, not from mutable git refs or provider tags.
 
 **7. Secret isolation.**
-Deployments declare `infisical_runtime` and `infisical_secret_mappings` for per-deployment secret
-namespacing within Infisical. Secret names are derived deterministically from contract IDs using
-snake_case so that mappings are reviewable and collisions are structurally prevented.
+Deployments declare backend-neutral `secret://...` contract ids and reviewed backend routing through
+deployment metadata and project config. Infisical-backed deployments add reviewed runtime metadata
+and secret mappings for per-deployment namespacing. Secret names are derived deterministically from
+contract IDs using snake_case so that mappings are reviewable and collisions are structurally
+prevented.
 
 **Admission isolation (cross-cutting).**
 Each protected or shared first-run deploy goes through two sequential admission stages:
@@ -114,8 +116,9 @@ Stage history is append-only. There is no cross-tenant state sharing in the data
 ### Obligations
 
 - Every concrete deployment must declare `environment_stage`, provider-target identity, and (for
-  protected or shared deployments) `lane_policy`, `admission_policy`, and any required secret
-  mappings in authoritative Buck metadata.
+  protected or shared deployments) `lane_policy`, `admission_policy`, and required secret
+  contract ids in authoritative Buck metadata. Shared topology and local operator values belong in
+  `projects/config/shared.json` and gitignored `projects/config/local.json`, respectively.
 - Implementations must reject any preview publish that lacks explicit preview identity selectors.
   Inferring preview identity from ambient git state or provider defaults is out of contract.
 - Control-plane queries for current stage state must use backend-native identifiers

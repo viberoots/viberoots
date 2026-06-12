@@ -16,7 +16,8 @@ The repository already uses three deployment contract URI schemes:
 
 - `secret://` for sensitive secret contract IDs.
 - `config://` for non-secret public runtime config contract IDs.
-- `runtime://` for non-secret runtime input contract IDs.
+- `runtime://` for runtime-host input contract IDs. Some are non-secret runtime config; others,
+  such as control-plane service-token refs, point at secret material supplied by a host binding.
 
 `sprinkleref --check` treats these as first-class deployment contract refs. Other URI schemes such
 as `https://`, `s3://`, `evidence://`, or `approval://` are ignored unless a later design adds them.
@@ -166,10 +167,12 @@ metadata or an explicitly supplied local config source. JSON output should mark 
 
 ### `runtime://`
 
-Runtime refs are non-secret runtime inputs. In repo-wide text scanning, a discovered `runtime://`
-ref is reported as declared because it is not a secret backend entry. In target-scoped checks, it is
-satisfied when the selected target closure exposes the ref through deployment requirement metadata
-for the relevant lifecycle step.
+Runtime refs are runtime-host contracts, not secret-backend entries. In repo-wide text scanning, a
+discovered `runtime://` ref is reported as declared. In target-scoped checks, it is satisfied when
+the selected target closure exposes the ref through deployment requirement metadata for the relevant
+lifecycle step. Control-plane service-token refs additionally validate through
+`runtimeHosts.<host>.bindings.<binding>` at deploy time; the current token-binding implementation
+supports `kind: "env"` and reads only the named environment variable.
 
 The checker should report declaration and source information before it attempts value lookup.
 
@@ -233,13 +236,5 @@ JSON output should use the same model:
 - Raw backend responses that may contain secret material.
 
 It may print non-secret contract IDs, backend names, category names, file paths, line numbers, and
-reviewed non-secret config values when the scheme is `config://` or `runtime://`.
-
-## Open Questions
-
-- Whether non-secret `config://` and `runtime://` value display should be opt-in with
-  `--show-non-secret-values`.
-- Whether CI should require zero `Unchecked` refs or allow them when a backend config is not
-  available.
-- Whether target-scoped checks should expose only `--no-deps` or the fuller
-  `--deps none|direct|transitive` option.
+reviewed non-secret config values. It must not print runtime-host values for `runtime://` refs
+because a runtime binding can carry secret material.

@@ -99,9 +99,10 @@ These controls are already implemented in-repo and have landed across test/runti
 PRs after PR-11 should use them consistently and avoid bypassing them.
 
 1. Coverage remains opt-in.
-   - Keep default runs without coverage: `i && b && v` (or `buck2 test //...`).
+   - Keep default scoped runs without coverage: `i && b && v`.
+   - Use `i && b && ALL_TESTS=1 v` when the merge gate requires the forced full suite.
    - Enable coverage only when explicitly required by the PR/task/CI context:
-     `v --coverage` or `buck2 test //... -- --env COVERAGE=1`.
+     `v --coverage`, `ALL_TESTS=1 v --coverage`, or `buck2 test //... -- --env COVERAGE=1`.
    - Evidence: `TESTING.md` section `Coverage policy (canonical)` documents default coverage-off
      and explicit opt-in.
 

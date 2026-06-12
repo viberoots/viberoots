@@ -220,10 +220,12 @@ operators should run:
 sprinkleref --check --target <deployment-target>
 ```
 
-Use `--config <resolver.json>` when checking secret backend presence, and
-`--format json` for CI. The checker is read-only: it inventories
-`secret://`, `config://`, and `runtime://` contracts, reports source locations
-and direct/dependency scope, and never prints secret values.
+By default the checker reads `projects/config/shared.json` plus gitignored
+`projects/config/local.json` when checking secret backend presence. Use
+`--config <path>` only for an explicit project/resolver config override, and
+`--format json` for CI. The checker is read-only: it inventories `secret://`,
+`config://`, and `runtime://` contracts, reports source locations and
+direct/dependency scope, and never prints secret values.
 
 The `github_app` profile declares the platform-owned GitHub App identity used
 by server-side app code. It requires `github_app_private_key` at `publish`

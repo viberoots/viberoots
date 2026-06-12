@@ -11,8 +11,14 @@ CI runs zx-backed stages and does not commit generated glue.
 5. `nix-build-graph-generator` (optional)
 6. `wheelhouse-preload` (Python; optional cache push)
 7. `buck-test`
+8. `cpp-addon-smoke`
 
 Run locally with `CI=true build-tools/tools/ci/run-stage.ts --stage <name>`.
+
+CI and local wrappers use the same default Nix cache policy as developer commands:
+`VBR_NIX_CACHE_POLICY=auto` probes configured HTTP(S) substituters, disables unreachable optional
+caches for the current process, and continues with local fallback. Use `strict` only for cache
+readiness lanes.
 
 ## What each stage does (simple)
 

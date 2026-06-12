@@ -20,7 +20,7 @@ Each PR still needs a focused quality gate before commit:
 
 ## Reduced Full Validation
 
-Full `i && b && v` does not need to run after every PR while turbo mode is active.
+Full `i && b && ALL_TESTS=1 v` does not need to run after every PR while turbo mode is active.
 
 Recommended cadence:
 
@@ -80,7 +80,7 @@ Parallelize only where ownership boundaries are clear:
 
 After PR-18 lands, turbo mode ends. The final pass must restore full confidence before the range is considered complete:
 
-- Run full `i && b && v`.
+- Run full `i && b && ALL_TESTS=1 v`.
 - Rerun targeted selectors for all high-risk touched subsystems.
 - Review the integration debt ledger and close every listed risk.
 - Run `assess-plan` against `remote-build-plan.md`.

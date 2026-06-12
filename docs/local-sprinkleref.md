@@ -6,7 +6,10 @@ developer-specific account coordinates or plaintext secrets into the repository.
 The goal is good developer experience without weakening the existing SprinkleRef model:
 
 - `secret://...` remains the backend-neutral logical reference for true secrets.
-- `config://...` and `runtime://...` identify non-secret configuration/runtime values.
+- `config://...` identifies non-secret configuration values.
+- `runtime://...` identifies values supplied by the selected runtime host contract. Runtime refs can
+  be non-secret config or secret material delivered by a reviewed host binding, such as an
+  environment variable.
 - Resolver config chooses where refs are stored.
 - `bootstrap` remains a SprinkleRef category/lane for root credentials needed to access a primary
   secret manager such as Infisical or Vault.
@@ -562,13 +565,10 @@ A gitignored local file is still plaintext. It is acceptable for private coordin
 not become the recommended storage for true secrets. Secret-class refs should use remote secret
 managers or the bootstrap category backed by macOS Keychain or another reviewed non-plaintext store.
 
-## Implementation Notes
+## Current Implementation
 
-- Add parser support for scalar, `{ "value": ... }`, and `{ "ref": ... }` stack config fields.
-- Add local hierarchical values lookup at `projects/config/local.json`.
-- Add redirect support for local values entries with `{ "ref": "secret://...", "category": "..." }`.
-- Enforce secret-class restrictions so `supabaseAccessToken` cannot be inline or plaintext local.
-- Preserve existing `bootstrap` guardrails: the `bootstrap` category must not use Infisical when it
-  stores credentials needed to access Infisical.
-- Add cycle detection for ref redirects.
-- Update `config-init`, `check`, JSON evidence, and docs together so the UX remains consistent.
+The current implementation supports scalar, `{ "value": ... }`, and `{ "ref": ... }` stack config
+fields; hierarchical values in `projects/config/local.json`; local redirect objects with
+`{ "ref": "secret://...", "category": "..." }`; secret-class rejection for inline or plaintext
+`supabaseAccessToken`; bootstrap-category guardrails; redirect cycle detection; and source-aware
+check/evidence output.

@@ -20,7 +20,9 @@ Open the usage guides first when you want the shortest operator path:
 
 - [Deployments Usage](deployments-usage.md)
 - [Secrets Usage](secrets-usage.md)
+- [SprinkleRef Reference](sprinkleref.md)
 - [Vault Production Bootstrap Runbook](vault-production-bootstrap.md)
+- [Infisical Bootstrap Runbook](infisical-bootstrap.md)
 
 ## Plain-Language Glossary
 
@@ -145,8 +147,8 @@ Deployment-service routing:
   `controlPlanes.<name>.serviceClient.controlPlaneTokenRef`, which must be
   `secret://...` or `runtime://...`, even when
   `--allow-control-plane-override --control-plane-url <url>` intentionally
-  changes the service URL. A hosted deployment service requires a required
-  bearer token on loopback and remote service requests; the local fixture
+  changes the service URL. The required bearer token for a hosted deployment
+  service is required on loopback and remote service requests; the local fixture
   exception must be explicit with `VBR_DEPLOY_LOCAL_FIXTURE_SERVICE=1`.
 - `VBR_DEPLOY_CONTROL_PLANE_URL`: environment fallback only for commands without
   a selected deployment context
@@ -824,15 +826,16 @@ Deployment metadata also carries backend routing fields:
 - `secretBackend`: normalized from the context-resolved backend selector. An
   explicit `secret_backend` wins only when it agrees with the selected
   deployment context. If `secret_backend` is omitted and the selected
-  `deployment_context` has `secretBackend`, that context value is used;
-  context-less deployments still use the legacy Vault default.
+  `deployment_context` has `secretBackend`, that context value is used. Current
+  shared/protected deployments should select a reviewed deployment context
+  rather than relying on an implicit backend default.
 - `secretBackendProfile`: normalized from the preferred
   `secret_backend = "<backend>/<profile-alias>"` selector after deployment
   context defaults are applied. A context-provided
   `secretBackend = "infisical/default"` therefore yields the
   `infisical-default` profile even when TARGETS metadata omits
-  `secret_backend`; context-less deployments still use the legacy
-  `vault-default` profile.
+  `secret_backend`. Context-less local/fixture flows must make their backend
+  choice explicit when they need secret resolution.
 - `infisicalRuntime`: normalized from the selected deployment context plus any
   explicit `infisical_runtime`; contains non-secret Infisical routing data and
   reviewed Universal Auth environment variable names. Explicit deployment
@@ -938,12 +941,12 @@ const runtime = createDeploymentSecretRuntimeForAdmittedContext({
 
 Use the convenience helper when your code already has admitted deployment
 context and you do not want to wire the backend, requirements, and target scope
-by hand. It selects the backend from admitted secret references first, then
-`admittedContext.secretBackend`, then an explicit deployment metadata default,
-then the Vault default. Admission records created by current provider flows carry
-`secretBackend` as non-secret routing metadata. Infisical-backed admissions also
-carry `infisicalRuntime` and `infisicalSecretMappings`, which are routing data
-only. The helper rejects mixed backends in a single admitted context.
+by hand. It selects the backend from admitted secret references first, then from
+the admitted context's reviewed `secretBackend` routing metadata. Admission
+records created by current provider flows carry `secretBackend` as non-secret
+routing metadata. Infisical-backed admissions also carry `infisicalRuntime` and
+`infisicalSecretMappings`, which are routing data only. The helper rejects mixed
+backends in a single admitted context.
 
 An Infisical-admitted reference freezes non-secret replay data, for example:
 

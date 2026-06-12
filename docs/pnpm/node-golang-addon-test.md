@@ -1,6 +1,13 @@
 ## Node Golang Addon — End‑to‑End Test Design (user‑flow realistic)
 
-I’m designing a single, self‑contained E2E test that exercises a real user flow: scaffold a Node package backed by a Go c‑archive and a C N‑API addon, generate the minimum glue, produce an importer lockfile, build the test derivation, and validate runtime behavior. The design follows the repository’s methodology and build system principles, and mirrors proven patterns from existing Node addon tests.
+**Status:** Historical test design. Use it as rationale for the user-flow coverage; current test
+names and helper behavior may have moved with the scaffolding suite.
+
+This note designs a single, self-contained E2E test that exercises a real user flow: scaffold a
+Node package backed by a Go c-archive and a C N-API addon, generate the minimum glue, produce an
+importer lockfile, build the test derivation, and validate runtime behavior. The design follows the
+repository's methodology and build system principles, and mirrors proven patterns from existing
+Node addon tests.
 
 ### Scope
 

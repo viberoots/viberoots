@@ -26,8 +26,9 @@ Python provider sync activation in sparse/partial clones is lockfile‑driven: t
 
 - Follow `@METHODOLOGY.XML` and `@build-tools/docs/build-system-design.md` at all times.
 - Never commit without verifying that all tests are wired and passing:
-  - baseline pre-merge command: `i && b && v` (coverage-off by default)
-  - coverage is opt-in; only run `v --coverage` or `buck2 test //... -- --env COVERAGE=1` when explicitly required by the PR/task/CI job
+  - default PR loop: `i && b && v` (coverage-off and scope-aware by default)
+  - full pre-merge command: `i && b && ALL_TESTS=1 v` (coverage-off by default)
+  - coverage is opt-in; only run `v --coverage`, `ALL_TESTS=1 v --coverage`, or `buck2 test //... -- --env COVERAGE=1` when explicitly required by the PR/task/CI job
   - canonical policy location: `TESTING.md` section `Coverage policy (canonical)`
 - Use Conventional Commits and real newlines in commit messages.
 - Keep files small and focused (≤ 250 lines ideally); split modules when needed.
@@ -65,8 +66,11 @@ When adding or materially editing scaffold command guidance:
 ### 3. Commands cheat sheet
 
 - Build/test:
-  - Default full verify run: `v`
-  - Full verify run with coverage (opt-in): `v --coverage`
+  - Install/update dependencies and generated glue: `i`
+  - Recursive build: `b`
+  - Default scoped verify run: `v`
+  - Full verify run: `ALL_TESTS=1 v`
+  - Full verify run with coverage (opt-in): `ALL_TESTS=1 v --coverage`
   - Buck direct full test with coverage (opt-in): `buck2 test //... -- --env COVERAGE=1`
   - Single target build/test: `buck2 build //<pkg>:<name>`, `buck2 test //<pkg>:<name>`
   - Policy gate (inventory + exceptions): `node build-tools/tools/dev/nix-gaps-inventory-check.ts --starlark-api docs/handbook/starlark-api.md --nix-gaps docs/handbook/nix-gaps.md --exceptions docs/handbook/nix-gaps-exceptions.json`
@@ -114,7 +118,8 @@ When adding or materially editing scaffold command guidance:
 - Nix builds (planner outputs):
   - `nix build .#graph-generator`
 - Repo wrappers (preferred; thin shims that delegate into TypeScript and ensure the dev shell is loaded):
-  - `i` (install deps), `b` (build), `v` (verify / full test suite)
+  - `i` (install deps and generated glue), `b` (recursive build), `v` (verify with scope
+    selection; use `ALL_TESTS=1 v` for the full suite)
   - `v` lint/prettier preflight is changed-file scoped by default; `VERIFY_SKIP_LINT=1` still skips
     the preflight when explicitly requested
 - `runInTemp` Buck isolation contract:

@@ -4,9 +4,10 @@
 **Date:** 2026-05-25  
 **Authors:** viberoots team
 
-**Implementation note:** Current tooling supports Vault bootstrap/admin/runtime flows and gated
-Infisical live credential staging. The original non-goal wording below is historical for the
-initial scope; use [`../secrets-usage.md`](../secrets-usage.md) and
+**Implementation note:** Current tooling supports Vault and Infisical production flows,
+backend-neutral `secret://` contract ids, `config://` project values, and `runtime://` runtime-host
+bindings. Use [`../secrets-usage.md`](../secrets-usage.md),
+[`../sprinkleref.md`](../sprinkleref.md), and
 [`../control-plane-runtime-configuration.md`](../control-plane-runtime-configuration.md) for current
 operator commands.
 
@@ -45,17 +46,27 @@ Two categories govern how secrets are resolved:
 
 `--category bootstrap` is reserved exclusively for Infisical/Vault bootstrap credentials.
 
-### Vault: default production backend
+### Vault and Infisical: supported production backends
 
-HashiCorp Vault is the default and supported production secret backend. It is configured via `VBR_VAULT_ADDR` and `VBR_VAULT_TOKEN`, using mount `secret` and default path `/deployments`. Vault bootstrap, admin, direct runtime, and replay support are non-goals and will not be implemented.
+Vault and Infisical are supported production secret backends. Backend routing is selected through
+reviewed deployment metadata and project config, not hardcoded in application code. Vault-backed
+flows use reviewed Vault runtime metadata and setup commands. Infisical-backed flows use reviewed
+Infisical runtime metadata and Universal Auth. Neither backend may store the bootstrap credential
+that unlocks itself.
 
-### Infisical: additional supported backend
+### Infisical
 
-Infisical is a supported backend added for provider parity, not as a Vault replacement. Deployments opt in via `secret_backend = "infisical/default"` in TARGETS. The only operator-visible Infisical workload credential source is Universal Auth (client ID + client secret). No personal tokens, ambient CLI sessions, client-submitted tokens, or client-submitted secret values are permitted in protected or shared flows.
+Infisical is a supported backend added for provider parity, not as a Vault replacement. Deployments
+select Infisical through reviewed backend selection and deployment context metadata. The only
+operator-visible Infisical workload credential source is Universal Auth (client ID + client secret).
+No personal tokens, ambient CLI sessions, client-submitted tokens, or client-submitted secret values
+are permitted in protected or shared flows.
 
 Secret names in Infisical are derived deterministically in snake_case from contract IDs by default.
 
-The initial implementation scope is: deployment-wide backend selection, direct shared secrets only, and read-only admin diagnostics. Per-requirement mixed-backend deployments and Infisical admin sync/mutation flows are non-goals.
+Current implementation scope is deployment-wide backend selection plus reviewed readiness and admin
+diagnostics. Per-requirement mixed-backend deployments remain deferred unless a follow-on ADR
+accepts that complexity.
 
 ### Fixture and test override
 
@@ -85,7 +96,9 @@ No Infisical access token, Universal Auth client secret, personal token, secret 
 
 ### Trade-offs
 
-- Resolver config selection is an additional operational concern: operators must ensure the correct `sprinkleref/*.json` config is active for each environment.
+- Resolver config selection is an additional operational concern: operators must ensure
+  `projects/config/shared.json` and gitignored `projects/config/local.json` select the intended
+  backend, category, deployment context, and runtime host.
 - The deployment-wide backend selection model means a single deployment cannot mix Vault and Infisical requirements in the first implementation; per-requirement backend selection is explicitly deferred.
 - Redaction being deployment-owned (not a shared library) means each deployment path must independently maintain correct redaction coverage.
 

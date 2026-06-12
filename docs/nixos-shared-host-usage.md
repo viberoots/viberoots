@@ -107,14 +107,16 @@ deployment-service flags directly to the remote wrapper commands.
 
 ## Deployment Secrets For `mini`
 
-If your `mini` deployments use deployment secrets, Vault remains the default
-backend and its canonical setup instructions live in
-[Vault Production Bootstrap Runbook](vault-production-bootstrap.md). Deployments
-may also select Infisical with `secret_backend = "infisical/default"` after the
-deployment service and worker are on the current `viberoots` control-plane
-shape. The worker reads only non-secret `infisical_runtime` routing metadata
-from the execution snapshot and resolves the Universal Auth client id and client
-secret from server-local environment variables on `mini`.
+If your `mini` deployments use deployment secrets, the selected
+`deployment_context` chooses the backend profile. Vault remains supported for
+targets that select it, and its canonical setup instructions live in
+[Vault Production Bootstrap Runbook](vault-production-bootstrap.md). Current
+Pleomino staging/prod shared contexts select Infisical with
+`secret_backend = "infisical/default"` after the deployment service and worker
+are on the current `viberoots` control-plane shape. The worker reads only
+non-secret `infisical_runtime` routing metadata from the execution snapshot and
+resolves the Universal Auth client id and client secret from server-local
+credential files or reviewed server-local environment variables on `mini`.
 
 If you want `mini` itself to run the local services, the reviewed importable
 starting modules live here:
@@ -340,10 +342,11 @@ that still points at an old control-plane token environment variable name.
 Do not pass `--control-plane-url`, `--apply-host`, or `--apply-host-dry-run`
 to those wrappers. They read that information from the installed profile.
 
-Do not pass Vault JWT files, Vault tokens, fixture paths, provider credentials,
-or client-supplied principals through these client commands. For protected/shared
-`mini` runs, the deployment service derives the authenticated principal and the
-worker uses server-local Vault credential sources.
+Do not pass Vault JWT files, Vault tokens, Infisical Universal Auth secrets,
+fixture paths, provider credentials, or client-supplied principals through these
+client commands. For protected/shared `mini` runs, the deployment service derives
+the authenticated principal and the worker uses server-local credential sources
+for the backend selected by the frozen deployment context.
 `--admit-and-deploy` is an authorized shortcut for constructing
 `admissionEvidence.checks`; it does not bypass service-side authorization. The
 same principal still needs `submitter` to request the deploy and

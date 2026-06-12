@@ -27,6 +27,9 @@ export function isBuildSystemPath(relPath: string): boolean {
   if (!p) {
     return false;
   }
+  if (p.endsWith(".md") || p.endsWith(".rst")) {
+    return false;
+  }
   if (p.startsWith("build-tools/docs/")) {
     return false;
   }

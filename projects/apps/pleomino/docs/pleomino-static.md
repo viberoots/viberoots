@@ -1,10 +1,17 @@
-# Pleomino Static PWA Plan (`docs/pleomino-static.md`)
+# Pleomino Static PWA Design Note (`projects/apps/pleomino/docs/pleomino-static.md`)
+
+Current status: this migration has landed. `projects/apps/pleomino/TARGETS` exposes a static PWA app
+through `node_webapp(name = "app_raw")` plus `node_asset_stage(name = "app", labels =
+["lang:node", "kind:app", "webapp:static", "webapp:pwa"])`, and the app no longer depends on an
+app-local SSR/Express runtime. The PR sections below are retained as implementation history and
+acceptance rationale, not as open work unless an item is explicitly marked incomplete.
 
 ## Conclusion
 
-Yes, Pleomino appears to be a strong candidate for a static PWA template.
+Pleomino is a static PWA template consumer and served as the proof case for the reusable
+`ts/webapp-static-pwa` shape.
 
-What Pleomino currently uses server code for:
+What the historical SSR-backed Pleomino shape used server code for:
 
 - serving the HTML shell and static assets
 - injecting SSR markup into `#app`
@@ -23,7 +30,8 @@ Historically, Pleomino shipped with an app-local server wrapper that only handle
 delivery plus SSR shell generation. The actual game logic, persistence, worker runtime, wasm
 solver, and offline behavior all live on the client.
 
-That means Pleomino should be able to migrate off the current `ts/webapp-ssr-vite` app shape and onto a stronger `ts/webapp-static-pwa` scaffold, provided the new template bakes in the right contracts for:
+That historical shape is why Pleomino migrated off the former `ts/webapp-ssr-vite` app shape and
+onto the stronger `ts/webapp-static-pwa` contract, with explicit support for:
 
 - installability
 - offline reloads
@@ -45,15 +53,16 @@ But based on Pleomino, it is missing important production-grade PWA contracts:
 - no explicit static-PWA testing contract
 - no documented migration path for SSR apps that are actually client-owned
 
-So the plan should be:
+The implemented path was:
 
-1. create a **new static PWA-oriented template** by extending the existing static webapp path rather than replacing it blindly
+1. create a **new static PWA-oriented template** by extending the existing static webapp path rather
+   than replacing it blindly
 2. migrate Pleomino onto that template once the template contract is proven
 
 ## Goals
 
-1. Create a reusable `ts/webapp-static-pwa` scaffold derived from repo learnings.
-2. Move Pleomino from `webapp-ssr-vite` to that new scaffold with no functional regressions.
+1. Maintain the reusable `ts/webapp-static-pwa` scaffold derived from repo learnings.
+2. Keep Pleomino aligned with that scaffold with no functional regressions.
 3. Preserve:
    - offline play
    - offline solve

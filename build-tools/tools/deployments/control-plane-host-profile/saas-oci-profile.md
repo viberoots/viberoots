@@ -1,5 +1,9 @@
 # SaaS OCI Profile
 
+This note scopes SaaS OCI substrates for the deployment control-plane host profile. It is substrate
+conformance guidance, not a complete deployment-provider reference or a substitute for deployment
+target metadata.
+
 This profile is valid only for selected platforms that preserve the control-plane runtime boundary:
 
 - deploy an immutable image reference by digest

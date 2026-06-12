@@ -141,9 +141,18 @@ metadata rather than edited by hand.
 
 The source-of-truth split should be:
 
+- `projects/config/shared.json`:
+  - reviewed `deploymentContexts`, including selected secret backend, non-secret backend runtime
+    routing, and provider routing metadata
+  - reviewed `controlPlanes`, including service URL and service-token refs such as `secret://...`
+    or `runtime://...`
+- `projects/config/local.json`:
+  - operator-local overrides and bootstrap credential locations
+  - never the shared production contract
 - deployment metadata in repo:
   - `appName`
   - provider family / deployment kind
+  - `deployment_context` for protected/shared stages
   - app artifact contract
   - container-facing runtime contract such as exposed port and optional health path
 - generated host manifest:
@@ -158,6 +167,7 @@ This means:
 
 - no hand-maintained host-owned registry of apps
 - no second app-owned source of truth on the host
+- no primary protected/shared reliance on ambient global control-plane URLs or provider tokens
 - the generated manifest is allowed because it is derived from authoritative metadata
 
 ## Future Isolation And Placement

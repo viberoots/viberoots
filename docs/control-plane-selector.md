@@ -341,21 +341,13 @@ provider accounts:
 This is allowed because deployment context selects both the provider topology and the
 control-plane service authority. They do not need to vary together.
 
-## Implementation Scope
+## Current Implementation
 
-The clean cut-over implementation should:
-
-1. Add `controlPlanes` to the project config type.
-2. Add `controlPlane` to deployment context validation.
-3. Attach normalized `control_plane` metadata during deployment context resolution.
-4. Update protected/shared front doors to use context-selected `control_plane` before ambient env
-   fallback.
-5. Replace magic `--remote mini` handling with a named control-plane profile that resolves the URL
-   and token ref, or reject it unless a matching profile exists.
-6. Reject plaintext token fields and malformed token refs.
-7. Update docs and command help to describe context-selected control planes as the default path.
-8. Add tests for two contexts selecting different control planes, context-selected service routing,
-   override rejection, token-ref validation, and local override diagnostics.
-
-Because this is a clean cut-over, the implementation should remove code and docs that imply a
-single repo-global deployment service endpoint for all protected/shared deployments.
+The implementation lives in the project-config readers, deployment-context resolver, control-plane
+profile validator, and protected/shared service-client selection path. `projects/config/shared.json`
+and `projects/config/local.json` are merged before validation; every merged `controlPlanes` entry is
+checked, including unreferenced local override profiles. Deployment context resolution attaches
+normalized `control_plane` metadata to graph nodes, and protected/shared front doors use that
+context-selected profile before any ambient service URL fallback. `--remote <name>` is a named
+profile lookup and fails unless `controlPlanes.<name>` supplies both the service URL and a
+`secret://...` or `runtime://...` token ref.

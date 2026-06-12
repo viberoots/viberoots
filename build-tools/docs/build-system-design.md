@@ -1,4 +1,4 @@
-# Nix Dynamic Derivations + Buck2 + Go Patching — Implementation Guide
+# Buck2 + Nix Build System — Implementation Guide
 
 > **Audience:** Engineers (and future LLM agents) who will be responsible for implementing this design.  
 > **Scope today:** The repo is multi-language (Go, C++, Node PNPM, Python uv). This document remains **language-agnostic** at the contract level so additional languages can be added without redesign. For the canonical cross-language contract inventory, see `build-tools/docs/abstractions.md`.
@@ -32,7 +32,7 @@
 
 ## What you're building (conceptual overview)
 
-**Goal:** Combine **Buck2** (fine-grained graph, change detection, impacted tests) with **Nix** (hermetic toolchains, reproducible builds) and a **Go patching** workflow.
+**Goal:** Combine **Buck2** (fine-grained graph, change detection, impacted tests) with **Nix** (hermetic toolchains, reproducible builds) and language-specific patching workflows.
 
 - Buck2 remains the **source of truth** for the dependency graph and test impact analysis.
 - Artifact-producing public macro builds are migrated to Nix-backed paths using dynamic derivations.
@@ -78,7 +78,7 @@ Guardrails for all current and future languages:
 - **Authoritative exporter enabled (Go).** Labels come from authoritative `go list -deps -json -test=all`, batched by config, after codegen.
   - Go `module:*` labels are derived from the authoritative `go list` JSON per tuple batch.
   - This is an explicit contract: the exporter does not rely on process-global caches for Go labeling, and it does not use secondary fallbacks (for example parsing `go.mod`) that could hide bugs in the primary `go list` path.
-- **Node (optional, experimental): PNPM-only.** Lockfile providers are **importer-scoped**; label format `lockfile:<path>#<importer>` (see “Later / Optional — Node”).
+- **Node: PNPM-only and importer-scoped.** Lockfile providers are **importer-scoped**; label format `lockfile:<path>#<importer>`. Provider sync runs conditionally when PNPM lockfiles are present.
 
 ### Macro-level link intent contract (shared across languages)
 
@@ -105,7 +105,9 @@ The Buck graph exporter must include these intent fields in `build-tools/tools/b
 
 ### Nix Features (enable globally)
 
-**Tool versions (pin or newer):** Node ≥ 18.x, PNPM ≥ 8.x, Go ≥ 1.22, Buck2 ≥ 2024-xx, Nix ≥ 2.18.
+Use the dev shell’s pinned tools instead of installing ad hoc host versions. The flake and tests
+enforce the active Node, PNPM, Go, Buck2, Nix, Python, and uv versions; prose in this document should
+describe contracts rather than stale version floors.
 
 Set once in **devshell** and **CI** so dynamic derivations and flakes work consistently everywhere:
 

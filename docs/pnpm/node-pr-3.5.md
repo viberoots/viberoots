@@ -1,5 +1,8 @@
 ## Completing PR 3.5 — Node templates using nix_node_test with auto‑discovery
 
+**Status:** Historical implementation proposal. The active scaffolding templates and Node macros are
+the source of truth for current defaults.
+
 This proposal closes the remaining gaps to fully implement and validate PR 3.5 from `docs/design-history/nix-node-test.md`: migrate Node scaffolding templates to rely on the hermetic `nix_node_test` external runner with default discovery, avoid legacy test shims, and add focused zx tests.
 
 ### Goals

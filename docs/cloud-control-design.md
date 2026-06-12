@@ -930,16 +930,20 @@ split it from runtime behavior changes instead of hiding it inside control-plane
 If implementation experience invalidates this design, update this document before using it as input
 to a delivery-planning document.
 
-## Open Questions
+## Current Decisions
 
-- Should the first EC2 host profile be NixOS-only, or should the non-NixOS profile also generate an
-  AWS systemd/Podman bundle?
-- Is there any control-plane artifact workload that still benefits enough from Supabase Storage S3 to
-  justify using it instead of AWS S3 in the AWS-hosted topology?
-- Should operator auth move first to Supabase Auth or WorkOS?
-- Should reviewed-source access move from SSH deploy key to GitHub App before cloud cutover?
-- Do we want multi-region standby, or is one cloud host plus mini fallback enough for the first
-  migration?
+- The AWS EC2 host profile supports the NixOS VM path and also emits systemd/Podman compatibility
+  artifacts for reviewed non-NixOS OCI hosts.
+- AWS S3 through a VPC endpoint is the default artifact-store path for the AWS-hosted topology after
+  conformance passes. Supabase Storage S3, Cloudflare R2, and other S3-compatible stores remain
+  alternate profiles that require explicit backend evidence.
+- Reviewed-source access supports SSH and GitHub App modes. Select the mode in generated runtime
+  input and stage only the credential files required by that mode.
+- Operator auth remains behind the auth-provider abstraction. Supabase Auth or WorkOS can replace
+  the current provider only after the persistence and runtime boundaries are cloud-shaped.
+- The first migration keeps mini as a compatible standby while the cloud host proves durable
+  database, artifact-store, worker, readiness, and ingress behavior. Multi-region standby is a later
+  topology decision, not a prerequisite for first cloud cutover.
 
 ## Recommended Path
 

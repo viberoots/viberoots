@@ -37,7 +37,8 @@ Vercel-hosted Next.js management console
   request_access, fetch_full_document
 + OpenTofu IaC, invoked through deployment-owned `opentofu-stack` provisioners
   (no separate top-level `infra/` tree); state in S3/R2
-+ Buck/Nix builds; admitted immutable artifacts; secrets via SprinkleRef/Vault
++ Buck/Nix builds; admitted immutable artifacts; secrets via SprinkleRef, with the backend selected
+  by deployment context
 ```
 
 The **security rule** that drives the architecture:
@@ -1939,15 +1940,18 @@ This is the differentiated product proof. Everything else in the architecture ex
 
 ### 14.1 Secrets
 
-Phase 0 uses the repo's `SprinkleRef` contract model with Vault as the production secret backend; see §17.6 for the build/deployment-side details. The architecture-level rules:
+Phase 0 uses the repo's `SprinkleRef` contract model; the selected deployment context chooses the
+secret backend profile. Current checked-in shared Pleomino staging/prod contexts use Infisical, while
+Vault remains a supported backend for reviewed targets that explicitly select it. See §17.6 for the
+build/deployment-side details. The architecture-level rules:
 
-- Ragie API key, WorkOS API key, Supabase service role key, and `source_grant_secret` (HMAC key) are all declared via `secret_requirements` with stable `SprinkleRef` contract IDs and resolved through Vault at runtime. They are never available to browser code, Vercel frontend runtime, or MCP clients.
+- Ragie API key, WorkOS API key, Supabase service role key, and `source_grant_secret` (HMAC key) are all declared via `secret_requirements` with stable `SprinkleRef` contract IDs and resolved through the selected backend at runtime. They are never available to browser code, Vercel frontend runtime, or MCP clients.
 - Vercel environment variables hold only AuthKit public client config; never backend service credentials. The Vercel publisher receives only what the thin console needs.
 - The `source_grant_secret` is never exposed; tokens are HMAC'd inside the web process before storage. The contract supports versioned rotation (§7.2); Phase 0 ships with a single secret version.
 - Step-specific secret requirements (`publish`, `provision`, `smoke`, `preview_cleanup`) keep audit clear about what was used when.
 - Ragie key rotation runbook tested before first design partner.
 - **Connect source-system credentials (Drive/Notion/Slack OAuth tokens) are held by Ragie, not by the platform.** This is a deliberate Phase 0 throwaway tradeoff: it removes a credential-management burden from us but means a Ragie compromise would expose connected source systems. The production replacement either takes ownership of these tokens directly or accepts this dependency explicitly with contractual safeguards. This is one of the six replacement triggers in §8.8.6.
-- **GitHub credentials are platform-held by design.** The GitHub App private key and optional webhook secret are declared through `SprinkleRef`/Vault. Per-tenant rows store installation and repository IDs only. Installation access tokens are short-lived, minted by the worker, and never persisted.
+- **GitHub credentials are platform-held by design.** The GitHub App private key and optional webhook secret are declared through `SprinkleRef` and resolved through the selected backend. Per-tenant rows store installation and repository IDs only. Installation access tokens are short-lived, minted by the worker, and never persisted.
 
 ### 14.2 Customer data deletion
 
@@ -2025,18 +2029,18 @@ For `search_documents`:
 
 Scale assumption: 5–10 design-partner customers, 1–3 vaults each, 50–200 documents per vault, ≤50,000 retrieval calls/month. Total ~5,000–15,000 indexed pages — under Ragie Pro's 60k included pages.
 
-| Item                                                                       |     Estimate / month |
-| -------------------------------------------------------------------------- | -------------------: |
-| WorkOS AuthKit (free up to 1M users)                                       |                   $0 |
-| Ragie Pro ($500 base, all pages within included quota)                     |                 $500 |
-| Ragie Connect add-ons (Drive, Notion, Slack; usage-dependent)              |              $75–300 |
-| GitHub App snapshot importer (incremental worker/runtime/storage overhead) |              $25–150 |
-| Supabase Pro                                                               |              $25–100 |
-| Vercel (Pro for previews + custom domain)                                  |              $20–100 |
-| Container runtime (web + worker process types; sized for webhook bursts)   |              $80–300 |
-| Vault (self-hosted on the same container runtime, or HCP Vault dev tier)   |                $0–50 |
-| OpenTofu state in R2                                                       |                 $1–5 |
-| **Total**                                                                  | **~$700–1,400 / mo** |
+| Item                                                                                     |     Estimate / month |
+| ---------------------------------------------------------------------------------------- | -------------------: |
+| WorkOS AuthKit (free up to 1M users)                                                     |                   $0 |
+| Ragie Pro ($500 base, all pages within included quota)                                   |                 $500 |
+| Ragie Connect add-ons (Drive, Notion, Slack; usage-dependent)                            |              $75–300 |
+| GitHub App snapshot importer (incremental worker/runtime/storage overhead)               |              $25–150 |
+| Supabase Pro                                                                             |              $25–100 |
+| Vercel (Pro for previews + custom domain)                                                |              $20–100 |
+| Container runtime (web + worker process types; sized for webhook bursts)                 |              $80–300 |
+| Secret backend (Infisical for current shared Pleomino contexts, or Vault where selected) |                $0–50 |
+| OpenTofu state in R2                                                                     |                 $1–5 |
+| **Total**                                                                                | **~$700–1,400 / mo** |
 
 The container runtime range may skew higher than initially estimated because web and worker run as separate process types with enough headroom for webhook bursts and ingestion concurrency. The Ragie Connect range is a planning estimate; actual cost depends on document volume and sync cadence per source — verify against Ragie's current pricing before finalizing the Phase 0 budget. Supabase Storage covers direct-upload originals and sanitized GitHub snapshots in Phase 0 (no Connect mirrors), so GitHub repository size and hygiene thresholds affect the Storage line.
 
@@ -2335,9 +2339,24 @@ The platform/data-room split adds one specific operational concern: migrations m
 
 ### 17.6 Secrets
 
-Secrets use the repo's `SprinkleRef` contract model with Vault as the production backend. Every deployment provider and provisioner declares its secrets in `secret_requirements` with stable contract IDs (e.g., `secret://deployments/platform/vercel_api_token`, `secret://deployments/platform/supabase_service_role_key`, `secret://deployments/platform/source_grant_hmac_secret`). Step-specific requirements (`publish`, `provision`, `smoke`, `preview_cleanup`) make audit clear about what was used when.
+Secrets use the repo's `SprinkleRef` contract model. Every deployment provider and provisioner
+declares its secrets in `secret_requirements` with stable contract IDs (e.g.,
+`secret://deployments/platform/vercel_api_token`,
+`secret://deployments/platform/supabase_service_role_key`,
+`secret://deployments/platform/source_grant_hmac_secret`). The deployment's
+`deployment_context` resolves to a checked-in `deploymentContexts` entry in
+`projects/config/shared.json`, which selects the backend profile and any non-secret runtime routing
+metadata. Step-specific requirements (`publish`, `provision`, `smoke`, `preview_cleanup`) make audit
+clear about what was used when.
 
 Secret values never live in `TARGETS` files, Vercel project settings committed to the repo, `.env` files, or CI variables that bypass the deployment secret runtime. Local/test fixtures are explicit non-production overrides.
+
+Service-token references and backend credentials stay as `secret://` or `runtime://` refs in repo
+metadata. For Infisical-backed contexts, the deployment context maps those refs to folder/path and
+key lookups inside the selected Infisical project/environment; `secret://...` is not used as a
+literal Infisical secret key. Protected/shared deployments also select control-plane clients from
+`projects/config/shared.json` `controlPlanes`, rather than relying on ambient global control-plane
+URLs.
 
 The `source_grant_secret` HMAC key (§7.2) is one of these secrets and follows the same contract model. Phase 0 uses a single secret version; the versioned-rotation contract documented in §7.2 ships in Phase 1.
 

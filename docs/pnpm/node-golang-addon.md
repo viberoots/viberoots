@@ -1,5 +1,8 @@
 ## Node Golang Addon Scaffold — Design & Implementation Plan
 
+**Status:** Historical design note for the scaffold and its validation surface. Check the current
+scaffolding templates and tests before relying on a specific file layout or command sequence.
+
 This design adds a first‑class scaffolding template for a Node addon implemented in Go, built reproducibly via Buck2 + Nix, and aligned with our repository methodology and build‑system design.
 
 - Audience: engineers and LLM agents implementing the scaffold and its tests

@@ -1,22 +1,24 @@
-# Pleomino Vite Webapp Design Doc (`docs/pleomino-design.md`)
+# Pleomino Webapp Design Doc (`projects/apps/pleomino/docs/pleomino-design.md`)
 
 ## Summary
 
-Create a detailed design document for a `scaf`-generated `ts/webapp-ssr-vite` app that implements a single-player, sandbox-only virtual board puzzle using React Native Web components.  
-The doc will be implementation-ready and aligned to repo conventions (`METHODOLOGY.XML`, scaffold contracts, Starlark API usage, and PR workflow).
+This document records the gameplay and application design for Pleomino, a single-player,
+sandbox-only virtual board puzzle using React Native Web components. The app was originally
+scaffolded from `ts/webapp-ssr-vite`, then migrated to the current static-PWA delivery shape.
 
-Current runtime note: Pleomino has since migrated onto the static-PWA app shape in
+Current runtime note: Pleomino now uses the static-PWA app shape described in
 [`projects/apps/pleomino/docs/pleomino-static.md`](/Users/kiltyj/Code/viberoots/projects/apps/pleomino/docs/pleomino-static.md).
-The gameplay architecture in this document still applies, but delivery/runtime references should be
-read alongside that static-PWA migration plan.
+The gameplay architecture in this document still applies; SSR delivery references are historical.
 
 ## Key Changes / Design Content
 
 1. **Scaffold + Build Integration**
 
-- Specify bootstrap command: `scaf new ts webapp-ssr-vite pleomino --yes`.
-- Define `TARGETS` usage with `node_webapp(name = "app_raw")` and `node_asset_stage(name = "app", app = ":app_raw", labels = ["lang:node","kind:app","webapp:ssr","framework:vite"], out = "dist")`.
-- Keep SSR baseline intact; game runs in client-hydrated RN Web UI with deterministic initial state for SSR.
+- Historical bootstrap command: `scaf new ts webapp-ssr-vite pleomino --yes`.
+- Current `TARGETS` usage keeps `node_webapp(name = "app_raw")` and publishes through
+  `node_asset_stage(name = "app", app = ":app_raw", labels = ["lang:node","kind:app","webapp:static","webapp:pwa"], out = "dist")`.
+- The game runs in a client-owned RN Web UI with deterministic startup and static-PWA app-shell
+  delivery.
 
 2. **System Architecture**
 
@@ -102,7 +104,8 @@ read alongside that static-PWA migration plan.
 
 - full-board solve path reaches win state
 - no-overlap invariant maintained across random interaction sequences
-- SSR render + hydration consistency (no state mismatch warnings).
+- static app-shell startup and hydration consistency, including persisted-state restore without
+  startup flash.
 
 4. **Manual acceptance scenarios**
 
@@ -119,9 +122,11 @@ read alongside that static-PWA migration plan.
 
 ## Implementation Status
 
-- PR-1 is implemented in `projects/apps/pleomino` with scaffolded SSR app wiring:
+- PR-1 is implemented in `projects/apps/pleomino` and began with scaffolded SSR app wiring:
   - `node_webapp(name = "app_raw")`
-  - `node_asset_stage(name = "app", app = ":app_raw", labels = ["lang:node","kind:app","webapp:ssr","framework:vite"], out = "dist")`
+  - historical labels: `["lang:node","kind:app","webapp:ssr","framework:vite"]`
+- Current app wiring is static-PWA aligned:
+  - `node_asset_stage(name = "app", app = ":app_raw", labels = ["lang:node","kind:app","webapp:static","webapp:pwa"], out = "dist")`
 - The template placeholder screen is replaced by a deterministic pleomino shell:
   - board container with fixed `10x15` grid rendering
   - piece-tray placeholder panel for pre-catalog state
@@ -563,10 +568,10 @@ Implement.
 - Release verification commands:
   - baseline: `i && b && v`
   - pleomino app-specific checks:
-    - `cd projects/apps/pleomino && pnpm run build:ssr`
+    - `cd projects/apps/pleomino && pnpm run build`
     - `cd projects/apps/pleomino && pnpm run test`
-  - SSR contract must continue to expose built server/client artifacts through
-    `node_asset_stage(name = "app", app = ":app_raw", labels = ["lang:node","kind:app","webapp:ssr","framework:vite"], out = "dist")`
+  - static-PWA contract must continue to expose the built static artifact through
+    `node_asset_stage(name = "app", app = ":app_raw", labels = ["lang:node","kind:app","webapp:static","webapp:pwa"], out = "dist")`
 
 ---
 
@@ -1031,7 +1036,7 @@ production-readiness checks.
 - Add performance guardrails:
   - memoized selectors where needed
   - avoid unnecessary rerenders during drag
-- Validate SSR/prod pipeline behavior with final app wiring (`build:ssr`, `start:ssr`,
+- Validate static-PWA production pipeline behavior with final app wiring (`pnpm run build`,
   `node_asset_stage` output expectations).
 
 ### Tests (in this PR)

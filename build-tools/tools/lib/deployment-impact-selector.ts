@@ -1,5 +1,6 @@
 import { isBuildSystemPath, isIgnoredBuildSystemScopePath } from "./build-system-test-scope";
 import { classifyReviewedBuildSystemVerifyPath } from "./deployment-verify-scope";
+import { isDocumentationPath } from "./documentation-impact-selector";
 import { packagePathFromLabel } from "./labels";
 import { normalizeRepoPath, projectFromRepoPath, toSortedUnique } from "./project-graph";
 
@@ -99,6 +100,9 @@ export function resolveDeploymentImpactSelection(
 
   for (const relPath of normalizedChangedPaths) {
     if (isIgnoredBuildSystemScopePath(relPath)) {
+      continue;
+    }
+    if (isDocumentationPath(relPath)) {
       continue;
     }
     if (classifyReviewedBuildSystemVerifyPath(relPath) === "deployment-owned") {

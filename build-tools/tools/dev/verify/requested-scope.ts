@@ -1,20 +1,12 @@
 import { collectChangedPaths } from "../../lib/build-system-test-scope";
-import {
-  type DeploymentImpactDiagnostics,
-  deploymentProjectPrefixesFromLabels,
-  resolveDeploymentImpactSelection,
-} from "../../lib/deployment-impact-selector";
-import { listDeploymentTargets } from "../../deployments/deployment-query";
-import {
-  DEPLOYMENT_SAFETY_FLOOR_TARGETS,
-  queryDeploymentDomainTargets,
-} from "../../lib/deployment-test-targets";
+import type { DocumentationImpactDiagnostics } from "../../lib/documentation-impact-selector";
 import {
   type ProjectImpactSelectorDiagnostics,
-  type ProjectImpactSelectorResult,
   resolveProjectImpactSelection,
 } from "../../lib/project-impact-selector";
-import { toSortedUnique } from "../../lib/project-graph";
+import type { DeploymentImpactDiagnostics } from "../../lib/deployment-impact-selector";
+import { listDeploymentTargets } from "../../deployments/deployment-query";
+import { queryDeploymentDomainTargets } from "../../lib/deployment-test-targets";
 import type { VerifyArgs } from "./args";
 import { normalizeVerifyTargets } from "./args";
 import {
@@ -23,6 +15,14 @@ import {
   type VerifySelectionDiagnostics as VerifyTemplateSelectionDiagnostics,
 } from "./template-test-scope";
 import { allTestsRequested, parseDeploymentTestScopeMode } from "./scope-env";
+import {
+  resolveDocumentationOverride,
+  type ResolveDocumentationVerifyScopeDeps,
+} from "./documentation-scope";
+import {
+  resolveDeploymentOverride,
+  type ResolveDeploymentVerifyScopeDeps,
+} from "./deployment-scope";
 
 export type VerifyDeploymentScopeMode = "auto" | "always" | "never";
 
@@ -43,9 +43,14 @@ export type VerifyScopeDecision = Omit<
   selectorMode:
     | VerifyTemplateScopeDecision["selectorMode"]
     | "all-tests"
+    | "documentation-contract"
     | "deployment-only"
     | "deployment-and-project-impact";
-  diagnostics: VerifyTemplateSelectionDiagnostics | DeploymentVerifySelectionDiagnostics | null;
+  diagnostics:
+    | VerifyTemplateSelectionDiagnostics
+    | DeploymentVerifySelectionDiagnostics
+    | DocumentationImpactDiagnostics
+    | null;
 };
 
 type ResolveRequestedVerifyScopeDeps = {
@@ -54,8 +59,8 @@ type ResolveRequestedVerifyScopeDeps = {
   listDeploymentTargets: typeof listDeploymentTargets;
   queryDeploymentDomainTargets: typeof queryDeploymentDomainTargets;
   resolveProjectImpactSelection: typeof resolveProjectImpactSelection;
-  deploymentSafetyFloorTargets: readonly string[];
-};
+} & ResolveDocumentationVerifyScopeDeps &
+  ResolveDeploymentVerifyScopeDeps;
 
 function isDefaultVerifyTargetSet(targets: string[]): boolean {
   return targets.length === 1 && targets[0] === "//...";
@@ -68,113 +73,6 @@ function withDeploymentMode(
   return {
     ...decision,
     requestedDeploymentMode,
-  };
-}
-
-function guardDeploymentSelection(
-  message: string,
-  diagnostics: DeploymentImpactDiagnostics,
-  extra: Record<string, unknown> = {},
-): never {
-  throw new Error(
-    [
-      `deployment selector guardrail failed: ${message}`,
-      "diagnostics:",
-      JSON.stringify({ ...diagnostics, ...extra }, null, 2),
-    ].join("\n"),
-  );
-}
-
-function deploymentProjectTargets(
-  baseDecision: VerifyTemplateScopeDecision,
-  projectImpact: ProjectImpactSelectorResult,
-): string[] {
-  const baseProjectTargets =
-    baseDecision.selectorMode === "project-impact" ||
-    baseDecision.selectorMode === "project-closure"
-      ? baseDecision.targets
-      : [];
-  return toSortedUnique([
-    ...baseProjectTargets,
-    ...(projectImpact.mode === "project-impact" ? projectImpact.targets : []),
-  ]);
-}
-
-async function resolveDeploymentOverride(opts: {
-  root: string;
-  env: NodeJS.ProcessEnv;
-  baseDecision: VerifyTemplateScopeDecision;
-  requestedDeploymentMode: VerifyDeploymentScopeMode;
-  deps?: Partial<ResolveRequestedVerifyScopeDeps>;
-}): Promise<VerifyScopeDecision | null> {
-  if (opts.requestedDeploymentMode === "never") return null;
-
-  const collectPaths = opts.deps?.collectChangedPaths || collectChangedPaths;
-  const changedPaths = await collectPaths(opts.root, opts.env);
-  const resolveDeploymentLabels = opts.deps?.listDeploymentTargets || listDeploymentTargets;
-  const deploymentTargetLabels = await resolveDeploymentLabels(opts.root);
-  const impact = resolveDeploymentImpactSelection(changedPaths, {
-    deploymentTargetLabels,
-  });
-  if (opts.requestedDeploymentMode === "always" && impact.mode !== "deployment-only") {
-    guardDeploymentSelection(
-      "VBR_DEPLOYMENT_TEST_SCOPE=always requires deployment-only changes",
-      impact.diagnostics,
-    );
-  }
-  if (impact.mode === "mixed-build-system" || impact.mode === "no-deployment-impact") {
-    return null;
-  }
-
-  const resolveDeploymentTargets =
-    opts.deps?.queryDeploymentDomainTargets || queryDeploymentDomainTargets;
-  const deploymentDomainTargets = await resolveDeploymentTargets(opts.root);
-  if (deploymentDomainTargets.length === 0)
-    guardDeploymentSelection("zero resolved deployment-domain test targets", impact.diagnostics);
-  const deploymentSafetyFloorTargets = toSortedUnique(
-    opts.deps?.deploymentSafetyFloorTargets || DEPLOYMENT_SAFETY_FLOOR_TARGETS,
-  );
-  if (deploymentSafetyFloorTargets.length === 0)
-    guardDeploymentSelection("zero deployment safety-floor targets", impact.diagnostics);
-
-  let projectImpactDiagnostics: ProjectImpactSelectorDiagnostics | null = null;
-  let projectTargets: string[] = [];
-  if (impact.mode === "deployment-and-project-impact") {
-    const resolveProjectImpact =
-      opts.deps?.resolveProjectImpactSelection || resolveProjectImpactSelection;
-    const deploymentProjectPrefixes = deploymentProjectPrefixesFromLabels(deploymentTargetLabels);
-    const projectImpact = await resolveProjectImpact({
-      root: opts.root,
-      changedPaths,
-      projectPrefixes: deploymentProjectPrefixes,
-    });
-    projectImpactDiagnostics = projectImpact.diagnostics;
-    projectTargets = deploymentProjectTargets(opts.baseDecision, projectImpact);
-  }
-
-  const selectedTargets = toSortedUnique([
-    ...deploymentDomainTargets,
-    ...deploymentSafetyFloorTargets,
-    ...projectTargets,
-  ]);
-  return {
-    ...opts.baseDecision,
-    requestedDeploymentMode: opts.requestedDeploymentMode,
-    selectorMode: impact.mode,
-    targets: selectedTargets,
-    diagnostics: {
-      requestedMode: opts.requestedDeploymentMode,
-      ...impact.diagnostics,
-      deploymentDomainTargets,
-      deploymentSafetyFloorTargets,
-      projectTargets,
-      projectImpactDiagnostics,
-      selectedTargets,
-    },
-    reason:
-      impact.mode === "deployment-only"
-        ? "deployment-targeted"
-        : "deployment-and-project-impact-targeted",
   };
 }
 
@@ -230,6 +128,19 @@ export async function resolveRequestedVerifyScope(opts: {
     return {
       args,
       selection: withDeploymentMode(baseDecision, requestedDeploymentMode),
+    };
+  }
+  const documentationDecision = await resolveDocumentationOverride({
+    root: opts.root,
+    env,
+    baseDecision,
+    requestedDeploymentMode,
+    deps: opts.deps,
+  });
+  if (documentationDecision) {
+    return {
+      args,
+      selection: documentationDecision,
     };
   }
   const deploymentDecision = await resolveDeploymentOverride({

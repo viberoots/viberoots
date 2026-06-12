@@ -4,21 +4,39 @@
 
 Coverage is opt-in.
 
-- Default local and pre-merge verification runs use coverage-off commands:
+- Default local verification is coverage-off and scope-aware:
   - `i && b && v`
+- Full pre-merge verification is coverage-off unless coverage is explicitly requested:
+  - `i && b && ALL_TESTS=1 v`
+- Direct Buck runs are useful for focused debugging, but they bypass verify preflights, scope
+  diagnostics, seed preparation, and final cleanup:
   - `buck2 test //...`
 - Enable coverage only when a PR, task, or CI job explicitly requires it:
   - `v --coverage`
+  - `ALL_TESTS=1 v --coverage`
   - `buck2 test //... -- --env COVERAGE=1`
 
 ## Fast runs (default)
 
-Coverage is disabled by default for speed.
+Coverage is disabled by default for speed. Plain `v` lets verify choose the appropriate scope from
+the current change set. Set `ALL_TESTS=1` (also accepts `true`, `yes`, or `on`) when you need to
+force `//...`.
 
-- Run all tests:
+Documentation has its own scope. Markdown and reStructuredText files are not treated as
+build-system changes just because they live under `build-tools/**`. Reviewed deployment/operator
+docs select a compact deployment documentation contract bucket instead of the full deployment
+matrix.
+
+- Default scoped verify:
 
 ```
-buck2 test //...
+i && b && v
+```
+
+- Full verify:
+
+```
+i && b && ALL_TESTS=1 v
 ```
 
 ## Runs with coverage
@@ -28,7 +46,7 @@ Enable coverage explicitly by passing `COVERAGE=1` through Buck2's test executor
 - Run all tests with coverage and generate reports in `coverage/`:
 
 ```
-buck2 test //... -- --env COVERAGE=1
+ALL_TESTS=1 v --coverage
 ```
 
 - Print a summary to the console (after a covered run):
@@ -40,9 +58,7 @@ pnpm coverage:summary
 - Open the HTML report (after a covered run):
 
 ```
-open coverage/lcov-report/index.html  # macOS
-# or use the coverage:summary script with --open-browser
-pnpm coverage:summary --open-browser
+pnpm coverage:open
 ```
 
 Notes:
@@ -89,8 +105,6 @@ buck2 test //:scaffolding_help -- --env COVERAGE=1
 
 CI should always use the pure path. Local development can opt into `--impure` for fast iteration.
 
-```
-
 ## Runnable target commands
 
 Use runnable contracts for developer execution instead of assuming `bin/*` exists for every app target.
@@ -126,10 +140,22 @@ Notes:
 - You can customize the attribute list for local experiments by running the script directly:
 
 ```
-
 PREWARM_ATTRS="toolchains.go,toolchains.cxx" node build-tools/tools/dev/prewarm-toolchains.ts
+```
+
+## Optional Nix cache fallback
+
+`i`, `b`, `v`, and Buck Nix actions probe configured HTTP(S) substituters before using them. With
+the default `VBR_NIX_CACHE_POLICY=auto`, unreachable optional caches are removed from the current
+process and local builds continue. Logs look like:
 
 ```
+[env] nix cache health: disabled unreachable substituter(s): https://...
+[env] nix cache health: using optional substituter(s): <none>
+```
+
+Use `VBR_NIX_CACHE_POLICY=strict` only when cache reachability is the behavior under test. Use
+`VBR_NIX_CACHE_POLICY=off` to skip the dynamic cache probe entirely.
 
 ## Verify remote execution policy
 
@@ -172,16 +198,11 @@ During `v`, verify prepares a single Nix-store seed and exports it to all tests:
 Examples:
 
 ```
-
 # Only copy the tools tree (plus flake.nix if present)
-
 TEST_RSYNC_ROOTS=tools buck2 test //build-tools/tools/tests/rsync:rsync_roots_only_tools_test_ts
 
 # Multiple roots:
-
 TEST_RSYNC_ROOTS="apps/demo,cpp,build-tools/tools/nix" buck2 test //<target>
-
 ```
 
 This optimization is best-effort and opt-in; tests remain deterministic regardless of whether `TEST_RSYNC_ROOTS` is set.
-```

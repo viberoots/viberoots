@@ -133,9 +133,12 @@ sprinkleref --check --target //projects/deployments/pleomino/staging:deploy
 ```
 
 The checker inventories `secret://`, `config://`, and `runtime://` refs without
-printing secret values. Add `--config <resolver.json>` when you want
-`secret://` refs presence-checked against a concrete resolver backend; otherwise
-secret refs are reported as intentionally unchecked.
+printing secret values. By default it reads the canonical project config pair,
+`projects/config/shared.json` plus gitignored `projects/config/local.json`, when
+that config exists. Use `--config <path>` only for an explicit project/resolver
+config override; retired `config/sprinkleref/*` files are not compatibility
+inputs. If no project config exists, secret refs are reported as intentionally
+unchecked.
 
 In this example, `targetEnvironment.lockScope` is the exact value the runtime
 checks against `targetScopes`. Operators should treat that `lockScope` value as

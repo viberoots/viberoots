@@ -1,7 +1,10 @@
 # viberoots Documentation
 
 This index separates current operator manuals from plans, ADRs, and historical records. Prefer the
-manuals for day-to-day setup and operations; use plans and history as implementation context.
+manuals for day-to-day setup and operations; use plans and history as implementation context. The
+repository-local deployment configuration model is centered on checked-in
+`projects/config/shared.json` plus gitignored `projects/config/local.json`; detailed reference
+documents describe that model and remain the source of truth for command syntax.
 
 ## Start Here
 
@@ -24,9 +27,6 @@ manuals for day-to-day setup and operations; use plans and history as implementa
   service and worker runtime config, mounted credentials, and fail-closed validation.
 - [`control-plane-managed-dependencies.md`](control-plane-managed-dependencies.md): managed
   Postgres and S3-compatible artifact-store conformance.
-- [`control-plane-runtime-configuration.md`](control-plane-runtime-configuration.md): runtime input
-  evidence for generated cloud-control profiles, staged control-plane credentials, and live staging
-  evidence.
 - [`control-plane-aws-ec2-host-profile.md`](control-plane-aws-ec2-host-profile.md): generated AWS
   EC2 profile evidence and runtime artifact boundary.
 - [`deployment-control-plane-observability.md`](deployment-control-plane-observability.md):

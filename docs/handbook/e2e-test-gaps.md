@@ -12,7 +12,7 @@ This plan closes the gaps surfaced by the new e2e test for the scaffolded Go add
   - On a temp scaffolded project created by `scaf new ts go-addon demo`:
     - `nix build .#node-test.libs_demo` succeeds; the test report exists and the Node addon runs `add(2, 3) = 5`.
     - Optional: `buck2 test --target-platforms prelude//platforms:default //projects/libs/demo:unit` succeeds.
-  - Full repository suite passes with `i && b && v` after direnv loads.
+  - Full repository suite passes with `i && b && ALL_TESTS=1 v` after direnv loads.
 
 ### Gaps diagnosed
 

@@ -23,6 +23,9 @@ export function summarizeVerifyScopeDecision(d: VerifyScopeDecision): string {
   if ("deploymentDomainTargets" in d.diagnostics) {
     return `${base} deploymentTargets=${d.diagnostics.deploymentDomainTargets.length} projectTargets=${d.diagnostics.projectTargets.length} targetSelectors=${d.targets.length}`;
   }
+  if ("documentationPaths" in d.diagnostics) {
+    return `${base} documentationPaths=${d.diagnostics.documentationPaths.length} targetSelectors=${d.targets.length}`;
+  }
   if ("requestedProjects" in d.diagnostics) {
     return `${base} requestedProjectCount=${d.diagnostics.requestedProjects.length} closureProjectCount=${d.diagnostics.resolvedDependencyClosure.length} targetSelectors=${d.targets.length}`;
   }

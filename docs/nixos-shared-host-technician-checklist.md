@@ -113,9 +113,10 @@ What success looks like:
 - both processes validate mounted database, artifact-store, and reviewed-source credential files
 - the reviewed-source credential files point at the host-managed GitHub SSH deploy key for the
   private reviewed repo
-- worker-side Vault credential variables are present only on `mini`, and
-  fixture paths or laptop Vault token/JWT variables are not exported into the
-  service submission path
+- worker-side credential files or variables for the selected backend are present
+  only on `mini`, and fixture paths, laptop Vault token/JWT variables, or
+  Infisical Universal Auth secrets are not exported into the service submission
+  path
 - operators know that normal inspection stays on the service, keyed by
   `submissionId` or `deployRunId`
 - operators know `pending_approval` runs are resumed with the `approve` action

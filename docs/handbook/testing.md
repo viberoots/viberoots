@@ -3,7 +3,8 @@
 ## Conventions
 
 - One test per file.
-- External timeouts: 300s per test, 300s for full suite.
+- Prefer bounded commands for focused debugging. Full verify owns its own Buck, Nix, and test
+  budgets and usually takes longer than a single external `timeout` wrapper.
 - Use zx `#!/usr/bin/env zx-wrapper` for tests.
 - Do not modify PATH inside tests; rely on the dev shell to supply tools.
 
@@ -42,7 +43,8 @@ The verify log should also include both final cleanup summaries, including
 ## Coverage
 
 - Enable: `COVERAGE=1` via Buck test executor `-- --env COVERAGE=1`.
-- Open report: `pnpm coverage:open` after full run.
+- Preferred verify path: `ALL_TESTS=1 v --coverage`.
+- Open report: `pnpm coverage:open` after a covered run.
 
 ## Timing analysis (`TEST_TIMING=summary`)
 
@@ -58,22 +60,38 @@ This report includes:
 
 ### Verify helper
 
-- Force the default helper to run every Buck test, even when scope selection would narrow it:
+- Default scoped verify:
+  - `build-tools/tools/bin/verify`
+  - `v`
+- Force verify to run every Buck test, even when scope selection would narrow it:
   - `ALL_TESTS=1 build-tools/tools/bin/verify`
   - `ALL_TESTS=true build-tools/tools/bin/verify`
-- Full suite without coverage:
-  - `build-tools/tools/bin/verify`
+  - `ALL_TESTS=1 v`
 - Full suite with coverage (single merged report):
-  - `build-tools/tools/bin/verify --coverage`
+  - `ALL_TESTS=1 build-tools/tools/bin/verify --coverage`
+  - `ALL_TESTS=1 v --coverage`
 - Focused target(s):
-  - `build-tools/tools/bin/verify //<target>` (40s external timeout per focused run)
+  - `build-tools/tools/bin/verify //<target>`
   - `build-tools/tools/bin/verify --coverage //<target>`
 
 ## Running
 
-- Full: `timeout -k 10s 300s buck2 test //...`
+- Default PR loop: `i && b && v`
+- Full suite: `i && b && ALL_TESTS=1 v`
 - Specific: `buck2 test //<target>`
 - Single-test external timeout (preferred): `timeout -k 10s 300s buck2 test //<target>`
+
+Documentation-only changes are scoped separately from code changes. Markdown and reStructuredText
+files do not count as build-system changes by themselves, including files below `build-tools/**`.
+Active deployment/operator docs are still guarded: changes to those reviewed docs run the
+deployment documentation contract bucket, not the full deployment domain.
+
+## Optional Nix caches
+
+The local wrappers and Buck Nix actions use `VBR_NIX_CACHE_POLICY=auto` by default. They probe
+configured HTTP(S) substituters, disable unreachable optional caches for the current process, and
+continue with local fallback. Use `VBR_NIX_CACHE_POLICY=strict` only when cache availability is
+itself under test.
 
 ## External runner helper (C++)
 
@@ -134,5 +152,7 @@ Do not copy/paste shell fragments between languages. If you need to change the b
 
 ## On-demand vs prebuild (what to do locally vs CI)
 
-- **Local**: Buck already builds on-demand. Run `buck2 test` or `buck2 build` and it will invoke Nix derivations as needed. You can skip the separate Nix stage if you prefer.
+- **Local**: `i` refreshes dependencies and generated glue, `b` runs the recursive Buck build, and
+  `v` runs verify preflights plus the selected Buck test passes. Direct `buck2 test`/`buck2 build`
+  still build on demand and can be useful for focused debugging.
 - **CI**: We keep a separate Nix build stage to warm caches and isolate template/patch errors. Later Buck stages mostly hit cache and provide clean graph-level diagnostics.

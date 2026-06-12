@@ -6,9 +6,10 @@
 
 ## Context
 
-viberoots delivers software across heterogeneous provider families (Cloudflare Pages,
-Cloudflare Containers, NixOS shared hosts, Apple App Store). Before this decision was
-codified, there was no canonical answer to several structural questions:
+viberoots delivers software across heterogeneous provider families: Cloudflare Pages,
+Cloudflare Containers, NixOS shared hosts, mobile app stores, S3-compatible static
+hosting, Kubernetes, and Vercel. Before this decision was codified, there was no
+canonical answer to several structural questions:
 
 - Where does authoritative deployment metadata live, and is the provider configuration
   file allowed to supplement or override it?
@@ -50,6 +51,10 @@ deployments are out of scope for a single deployment unit by design.
 | `cloudflare-containers` | Containerized workloads on Cloudflare |
 | `nixos-shared-host` | NixOS-hosted services via shared control plane |
 | `app-store-connect` | Apple App Store releases |
+| `google-play` | Google Play releases |
+| `s3-static` | Static sites on S3-compatible object storage |
+| `kubernetes` | Kubernetes-hosted workloads |
+| `vercel` | Vercel-hosted web apps |
 
 ### 4. Environment classification governs admission and mutation policy
 
@@ -79,6 +84,10 @@ environment branches are not a valid source for lane policy. Lane policy specifi
 the stage source-ref policy, allowed promotion edges, artifact reuse mode
 (`same_artifact` or `rebuild_per_stage`), trusted reporter identities, and approval
 boundaries.
+
+Deployment targets may select shared project topology through `deployment_context`
+entries in `projects/config/shared.json`; this does not replace lane policy,
+admission policy, or Buck-owned deployment metadata.
 
 ### 6. Preview is a publish mode, not an operation kind
 

@@ -14,19 +14,20 @@ A monorepo collapses that coordination overhead into one graph. The tradeoff is 
 
 The repository is organized as a single monorepo with the following top-level layout:
 
-| Directory               | Responsibility                                                                                                   |
-| ----------------------- | ---------------------------------------------------------------------------------------------------------------- |
-| `build-tools/`          | Build system root: Starlark helpers, per-language support, TypeScript/zx tooling, deployment targets and configs |
-| `projects/apps/`        | Application roots (Go CLIs, etc.)                                                                                |
-| `projects/libs/`        | Shared library roots                                                                                             |
-| `projects/deployments/` | Deployment package roots; one directory per deployment-id, each exposing a `:deploy` Buck target                 |
-| `docs/`                 | Design and operational documentation                                                                             |
-| `patches/`              | Repo-level patch overlays                                                                                        |
-| `third_party/`          | External provider metadata (no Go source vendoring)                                                              |
-| `toolchains/`           | Buck toolchain wiring                                                                                            |
-| `flake.nix`             | Nix devshell and hermetic build outputs                                                                          |
-| `TARGETS`               | Authoritative deployment and project metadata (Buck2)                                                            |
-| `METHODOLOGY.XML`       | Project methodology and architectural principles                                                                 |
+| Directory               | Responsibility                                                                                                           |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| `build-tools/`          | Build system root: Starlark helpers, per-language support, TypeScript/zx tooling, deployment tooling, and test harnesses |
+| `projects/apps/`        | Application roots (web apps, services, CLIs, and other runnable products)                                                |
+| `projects/libs/`        | Shared library roots                                                                                                     |
+| `projects/deployments/` | Deployment package roots; one directory per deployment-id, each exposing a `:deploy` Buck target                         |
+| `projects/config/`      | Repository-specific deployment topology: checked-in `shared.json` plus gitignored `local.json`                           |
+| `docs/`                 | Design and operational documentation                                                                                     |
+| `patches/`              | Repo-level patch overlays                                                                                                |
+| `third_party/`          | External provider metadata (no Go source vendoring)                                                                      |
+| `toolchains/`           | Buck toolchain wiring                                                                                                    |
+| `flake.nix`             | Nix devshell and hermetic build outputs                                                                                  |
+| `TARGETS`               | Authoritative deployment and project metadata (Buck2)                                                                    |
+| `METHODOLOGY.XML`       | Project methodology and architectural principles                                                                         |
 
 Two complementary build systems are used together and are both required:
 
@@ -60,5 +61,6 @@ Buck2 macros stamp `lang:<go|cpp|python|rust|node>` and `kind:<bin|lib|test>` la
 
 - Every new language added to the repo must have a corresponding support subtree under `build-tools/` and toolchain entry under `toolchains/` before any project-level code is introduced.
 - Every new deployment target must live under `projects/deployments/` and expose a `:deploy` Buck target; ad-hoc deployment scripts outside this structure are not permitted.
+- Shared deployment topology belongs under `projects/config/shared.json`; per-operator values and local overrides belong under `projects/config/local.json`.
 - Go dependency changes must be reflected in `gomod2nix.toml` and must not introduce source files into `third_party/go`.
 - All Buck targets must carry the canonical `lang:` and `kind:` stamps to remain visible to the graph exporter.

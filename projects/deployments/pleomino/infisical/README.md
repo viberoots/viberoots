@@ -17,21 +17,21 @@ the project name or slug.
 
 The module intentionally does not manage real `cloudflare_api_token` values or
 write placeholder values. The Infisical provider has an `infisical_secret`
-resource with write-only value support, but PR-12 must not create even dummy
-application secret values through IaC. The module therefore emits
+resource with write-only value support, but this module must not create even
+dummy application secret values through IaC. The module therefore emits
 `cloudflare_secret_metadata_reconciliation` as the reviewed provider-gap
 handoff:
 
 - Object name: `pleomino-deployments/staging/cloudflare_api_token`
 - Expected result: shared Infisical secret `cloudflare_api_token` exists at `/`
   in `staging`
-- Reconcile path: after PR-17, run the reviewed `sprinkleref add/update` flow
-  for `secret://deployments/pleomino/cloudflare_api_token` in `staging`
+- Reconcile path: run the reviewed `sprinkleref --add` or `sprinkleref --update` flow for
+  `secret://deployments/pleomino/cloudflare_api_token` in `staging`
 - Object name: `pleomino-deployments/prod/cloudflare_api_token`
 - Expected result: shared Infisical secret `cloudflare_api_token` exists at `/`
   in `prod`
-- Reconcile path: after PR-17, run the reviewed `sprinkleref add/update` flow
-  for `secret://deployments/pleomino/cloudflare_api_token` in `prod`
+- Reconcile path: run the reviewed `sprinkleref --add` or `sprinkleref --update` flow for
+  `secret://deployments/pleomino/cloudflare_api_token` in `prod`
 
 If Infisical later adds a true metadata-only placeholder resource, add or import
 that metadata-only object into this module without storing a secret value in

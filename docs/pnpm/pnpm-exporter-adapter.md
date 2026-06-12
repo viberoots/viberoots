@@ -1,5 +1,8 @@
 ## PNPM Exporter Adapter — Validate‑Only + Sidecar Index
 
+**Status:** Historical design note. The active graph exporter, glue pipeline, and Composite Graph API
+are the source of truth for current sidecar names and validation behavior.
+
 This document proposes a minimal Node/PNPM exporter adapter that increases uniformity and diagnostics for graph/tooling consumers while preserving a single source of truth for importer‑scoped labels and invalidation behavior.
 
 ### Goals

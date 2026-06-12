@@ -18,7 +18,7 @@ Use this index for day-to-day repo work. Build-system design references live und
 - [`provider-sync-cookbook.md`](provider-sync-cookbook.md): provider glue generation.
 - [`macro-stamping-cookbook.md`](macro-stamping-cookbook.md): macro labels and exporter behavior.
 - [`exporter-adapter-cookbook.md`](exporter-adapter-cookbook.md): exporter adapter expectations.
-- [`planner-plugin-cookbook.md`](planner-plugin-cookbook.md): planner plugin patterns.
+- [`adding-language.md`](adding-language.md): planner and provider integration patterns.
 - [`starlark-api.md`](starlark-api.md): Starlark API reference.
 - [`language-interop.md`](language-interop.md): language interop notes.
 

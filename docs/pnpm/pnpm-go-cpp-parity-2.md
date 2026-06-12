@@ -1,5 +1,9 @@
 ## PNPM–Go–C++ Parity (PR-Next)
 
+**Status:** Historical planning note. Current repo paths use `projects/apps/*` and
+`projects/libs/*`; confirm implementation against the active build macros before treating any
+unchecked implementation sketch below as current behavior.
+
 > Purpose: Close remaining gaps between PNPM (Node), Go, and C++ patching/invalidation while preserving our design principles (Buck2 as orchestrator; Nix as hermetic builder; patch UX via zx; idempotent glue; cross‑platform parity).
 
 ### Context (Current State)
@@ -12,7 +16,7 @@
   - Patch UX complete with strict verification and nixpkgs resolution.
   - Providers are stamp targets whose inputs include overlays, patch files, and lockfile; Buck invalidates when any input changes.
 - PNPM (Node)
-  - Patch UX complete using native `pnpm patch`/`patch-commit` (per‑importer patches under `apps/*`/`libs/*`).
+  - Patch UX complete using native `pnpm patch`/`patch-commit` (per‑importer patches under `projects/apps/*`/`projects/libs/*`).
   - Providers are importer‑scoped stamps (lockfile + importer identity). However, provider genrules intentionally avoid referencing lockfiles/patch paths as srcs due to Buck package boundary constraints in `third_party/providers/`.
   - Consequence: Node patch changes may not propagate precise Buck invalidation signals to dependent targets.
 
@@ -35,7 +39,9 @@
 
 - Problem: Provider stamps in `third_party/providers/` cannot include importer‑local patch files as `srcs` (they live outside the provider package), so changing a patch file does not directly invalidate consumer targets.
 - Approach: Mirror Go’s strategy at the target site. In `build-tools/node/defs.bzl`, resolve the importer directory from the lockfile label (already enforced by macros), and include importer‑local `patches/node/*.patch` in the consumer target’s `srcs`.
-- Effect: Any change to `apps/<imp>/patches/node/*.patch` becomes an input to the Node target’s Buck rule key, matching Go’s precision and C++’s stamp‑based behavior.
+- Effect: Any change to `projects/apps/<imp>/patches/node/*.patch` or
+  `projects/libs/<imp>/patches/node/*.patch` becomes an input to the Node target's Buck rule key,
+  matching Go's precision and C++'s stamp-based behavior.
 
 Implementation sketch (illustrative; actual edits will follow repo style and helpers):
 
@@ -147,5 +153,3 @@ Notes:
 - Minimalism: No new rule types or extra provider complexity; small macro enhancement mirrors the existing Go approach.
 
 ---
-
-If you’d like, I can implement Phase 1 immediately and provide the targeted tests in the `build-tools/tools/tests/scaffolding` and `build-tools/tools/tests/e2e` areas consistent with our conventions.

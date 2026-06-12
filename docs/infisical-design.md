@@ -217,7 +217,9 @@ so `"infisical/regulated"` becomes `secretBackend = "infisical"` and
 Bare backend values such as `secret_backend = "infisical"` are invalid; use
 `secret_backend = "infisical/default"` instead. Deployment metadata selects only
 the alias; account-specific host, organization, project, and credential details
-stay in local or CI SprinkleRef resolver config.
+stay in the canonical project config pair, with shared resolver/profile metadata
+in `projects/config/shared.json` and machine-local overrides or sink selection in
+gitignored `projects/config/local.json`.
 
 This field answers only which backend satisfies `secret_requirements`. It does
 not change contract ids, lifecycle steps, target scopes, or provider credential

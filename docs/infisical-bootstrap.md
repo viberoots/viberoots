@@ -9,9 +9,11 @@ i --without-secrets
 i --machine-label <label>
 ```
 
-`i` checks only local resolver config plus repo and Pleomino deployment Universal Auth credentials
-for this machine. It does not require application secrets such as Cloudflare tokens. Use `--yes` for
-non-interactive pre-confirmation, `--without-secrets` for dependency-only automation, and
+`i` checks the canonical project config pair plus repo and Pleomino deployment Universal Auth
+credentials for this machine. It uses `projects/config/shared.json` for shared resolver/profile
+metadata and gitignored `projects/config/local.json` for local sink selection and overrides. It does
+not require application secrets such as Cloudflare tokens. Use `--yes` for non-interactive
+pre-confirmation, `--without-secrets` for dependency-only automation, and
 `--machine-label <label>` when the hostname is not a useful Infisical revocation label. Automation
 can also set `INSTALL_DEPS_WITHOUT_SECRETS=1`; non-interactive setup may be explicitly allowed with
 `INSTALL_DEPS_SETUP_SECRETS=1`.

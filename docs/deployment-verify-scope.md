@@ -86,12 +86,21 @@ The fail-closed classifier covers changed paths with these stable modes:
 
 Decision order is conservative:
 
-1. Any reviewed shared build-system path broadens immediately to `mixed-build-system`.
-2. Any unknown or unreviewed relevant `build-tools/**` path broadens immediately to
+1. Markdown and reStructuredText are documentation by default, including files under
+   `build-tools/**`. They do not broaden to full build-system verification unless a separate
+   non-documentation file in the same change-set requires it.
+2. Reviewed deployment/operator documentation paths select the deployment documentation contract
+   bucket instead of the full deployment domain. This includes active deployment docs under
+   `docs/deployment*`, `docs/deployments*`, `docs/infisical*`, `docs/nixos-shared-host*`,
+   `docs/sprinkleref*`, `projects/docs/phase_0_*`, `projects/deployments/**`, and deployment
+   profile docs under `build-tools/tools/deployments/**`.
+3. Any reviewed shared build-system path broadens immediately to `mixed-build-system`.
+4. Any unknown or unreviewed relevant `build-tools/**` path broadens immediately to
    `mixed-build-system`.
-3. Any change under `projects/deployments/**` produces `deployment-and-project-impact`.
-4. Remaining reviewed deployment-owned build-system changes produce `deployment-only`.
-5. Everything else stays `no-deployment-impact`.
+5. Any non-documentation change under `projects/deployments/**` produces
+   `deployment-and-project-impact`.
+6. Remaining reviewed deployment-owned build-system changes produce `deployment-only`.
+7. Everything else stays `no-deployment-impact`.
 
 Because the taxonomy table now lives under `build-tools/tools/tests/deployments/**`, a taxonomy-only
 edit resolves to `deployment-only`, while edits to the shared loader shim still broaden to
@@ -120,6 +129,8 @@ The first execution control is:
 
 - `VBR_DEPLOYMENT_TEST_SCOPE=auto|always|never`
 - `auto`:
+  - reviewed deployment/operator documentation-only changes run the documentation contract bucket
+    rather than `domain:deployment`
   - `deployment-only` runs `domain:deployment` targets plus the reviewed deployment safety floor
   - `deployment-and-project-impact` runs that same deployment suite plus project-impact targets for
     the changed app/lib/deployment projects

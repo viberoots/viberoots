@@ -1,5 +1,9 @@
 # Mayday test-time debugging summary
 
+This is a historical performance investigation note. For current validation commands, use
+`TESTING.md` and `docs/handbook/testing.md`: the ordinary PR loop is `i && b && v`, and the forced
+full-suite command is `i && b && ALL_TESTS=1 v`.
+
 ## Current conclusion
 
 We have a proven root-cause chain and a targeted fix.

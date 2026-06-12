@@ -11,7 +11,7 @@ viberoots is a monorepo that deploys services across developer laptops, CI envir
 - Workload services need credentials to access secrets backends at runtime without embedding secrets in artifacts or images.
 - The deployment control plane must admit only verified, reviewer-approved releases; developer laptops and CI runners are explicitly not deployment authorities.
 - Secrets references must be stable across backend changes and environments without hardcoding backend-specific paths into application code.
-- Bootstrap credentials (those required to reach the secrets backend itself) cannot be stored in the same secrets backend they unlock; they require a separate, non-Infisical resolution path.
+- Bootstrap credentials (those required to reach a secrets backend itself) cannot be stored in the same secrets backend they unlock; they require a separate resolution path.
 - CI submitters must provide evidence sufficient to bind a build to a trusted source revision, verified check results, and an immutable artifact identity before the control plane will admit a release.
 
 The team evaluated personal tokens, ambient CLI sessions, and client-submitted tokens for workload authentication and rejected all of them for shared or protected flows due to auditability, rotation, and blast-radius concerns.
@@ -29,11 +29,11 @@ All secret references in the repository use `secret://deployments/...` URIs (Spr
 SprinkleRef defines two categories:
 
 - `main` — ordinary deployment and application secrets; resolved via the configured production secrets backend.
-- `bootstrap` — root credentials needed to reach the secrets backend itself; must resolve via a non-Infisical backend (macOS Keychain or restrictive local files). Infisical is never the resolver for the `bootstrap` category.
+- `bootstrap` — root credentials needed to reach a secrets backend itself; must resolve via a backend that is not the backend it unlocks, commonly macOS Keychain or restrictive local files.
 
-### 3. HashiCorp Vault as the default production secrets backend
+### 3. Vault and Infisical as supported production secrets backends
 
-Vault is the default production secrets backend. Vault address and token are supplied via environment variables (`VBR_VAULT_ADDR`, `VBR_VAULT_TOKEN`). No Vault credentials are baked into images or stored in deployment records.
+Vault and Infisical are supported production secrets backends. Backend routing is selected through reviewed deployment metadata and project config. No Vault tokens, Infisical Universal Auth client secrets, provider credentials, or rendered backend configuration are baked into images or stored in deployment records.
 
 ### 4. No credentials in artifacts, logs, or records
 
@@ -74,12 +74,12 @@ Supabase and/or WorkOS-style providers are the candidate identity providers for 
 ### Trade-offs
 
 - Universal Auth client secrets require out-of-band provisioning and rotation procedures; teams cannot rely on ambient session authentication for automation.
-- The two-category (main/bootstrap) resolver model adds a configuration step for each new environment: both a `main` resolver and a `bootstrap` resolver must be declared before secrets can be resolved.
+- The two-category (`main`/`bootstrap`) resolver model adds a configuration step for each new environment: both a `main` resolver and a `bootstrap` resolver must be declared before secrets can be resolved.
 - CI submitters bear a richer evidence burden than a simple token-and-tag approach; pipelines must be instrumented to capture and forward all required admission fields.
 
 ### Obligations
 
-- Every new service workload identity must be provisioned as a machine identity in Infisical; personal token use for any workload is a policy violation.
-- Any resolver configuration that maps the `bootstrap` category to Infisical must be treated as a misconfiguration and corrected.
+- Every new Infisical-backed service workload identity must be provisioned as a machine identity; personal token use for any workload is a policy violation.
+- Any resolver configuration that maps the `bootstrap` category to the backend it unlocks must be treated as a misconfiguration and corrected.
 - Deployment record schemas must be reviewed for any field that could inadvertently persist a secret value or rendered secret-bearing config; such fields are prohibited.
 - When the application-layer identity provider decision is made (Supabase, WorkOS, or otherwise), a follow-on ADR must record that decision and its integration constraints against this architecture.

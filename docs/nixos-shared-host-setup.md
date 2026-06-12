@@ -35,9 +35,10 @@ available for low-level token smoke/debug checks, but normal deploys should let
 the deploy front door choose the credential source and keep workload JWTs in
 memory for local/direct runs. For protected service-backed runs, configure the
 deployment worker with the server-local credential source environment variables
-or files named by `vault_runtime`; the client must not submit Vault JWTs,
-Vault tokens, fixture paths, provider secrets, PKCE verifiers, requested
-principals, authorization grants, or client secrets.
+or files named by `vault_runtime` or `infisical_runtime`; the client must not
+submit Vault JWTs, Vault tokens, Infisical Universal Auth secrets, fixture paths,
+provider secrets, PKCE verifiers, requested principals, authorization grants, or
+client secrets.
 
 Current supported scope:
 
@@ -624,10 +625,11 @@ Required worker-side secret-source prep:
   host-secret path and load `/etc/deployment-host/reviewed-source-ssh.env` into
   both the service and worker systemd units so reviewed-source snapshots can
   fetch the private GitHub repository over SSH
-- set the server-local credential variable referenced by `vault_runtime`, for
-  example `VBR_DEPLOYER_CLIENT_SECRET` for a reviewed service-account client
-  secret, or `VBR_DEPLOYMENT_OIDC_TOKEN` for an external workload identity
-  token
+- set the server-local credential file or variable referenced by the selected
+  backend runtime metadata (`vault_runtime` or `infisical_runtime`), for example
+  `VBR_DEPLOYER_CLIENT_SECRET` for a reviewed service-account client secret,
+  `VBR_DEPLOYMENT_OIDC_TOKEN` for an external workload identity token, or the
+  Infisical credential filenames named by the deployment context
 - keep `VBR_DEPLOYMENT_SECRET_FIXTURE_PATH`, ambient Vault JWTs, ambient Vault
   tokens, provider tokens, PKCE verifiers, and client secrets out of both the
   protected/shared client submission and the worker process environment unless a

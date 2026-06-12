@@ -28,6 +28,9 @@ two active user surfaces:
 - `docs/`: deployment, control-plane, secrets, ADR, task, and handbook documentation.
 - `docs/build-history/` and `docs/design-history/`: historical notes and earlier design records.
 - `projects/apps/` and `projects/libs/`: application and library roots.
+- `projects/config/shared.json`: checked-in deployment contexts, control-plane profiles, and
+  non-secret shared project configuration.
+- `projects/config/local.json`: gitignored local overrides and operator-local config values.
 - `patches/`: repo-level patch overlays where a language contract supports global patches.
 - `third_party/`: external provider metadata and generated provider glue.
 - `toolchains/` and `target_platforms/`: Buck toolchain and platform wiring.
@@ -55,6 +58,40 @@ For more detail, read:
 - [`build-tools/tools/ci/run-stage.ts`](build-tools/tools/ci/run-stage.ts) for the CI stage runner
 - [`docs/handbook/patching.md`](docs/handbook/patching.md)
 - [`docs/handbook/new-language-walkthrough.md`](docs/handbook/new-language-walkthrough.md)
+
+## Verification
+
+The short local verification path is:
+
+```bash
+i && b && v
+```
+
+`v` may select the impacted subset for the current change. Use the forced full-suite path when you
+need pre-merge evidence for the entire repo:
+
+```bash
+i && b && ALL_TESTS=1 v
+```
+
+Coverage is opt-in (`v --coverage` or `ALL_TESTS=1 v --coverage`). The local wrappers and Buck Nix
+actions use `VBR_NIX_CACHE_POLICY=auto` by default, so temporarily unreachable optional Nix caches
+are removed from the current process instead of failing unrelated builds. Use
+`VBR_NIX_CACHE_POLICY=strict` only when cache availability is what you are testing.
+
+## Deployment Config
+
+Deployment targets should select reviewed context from `projects/config/shared.json`. That context
+chooses provider topology, secret backend routing, and a named `controlPlanes.<name>` profile for
+protected/shared deployments. True secrets stay as backend-neutral `secret://...` refs; runtime-host
+inputs use `runtime://...`; non-secret project values use `config://...`.
+
+Start with:
+
+- [`docs/deployments-usage.md`](docs/deployments-usage.md)
+- [`docs/control-plane-guide.md`](docs/control-plane-guide.md)
+- [`docs/sprinkleref.md`](docs/sprinkleref.md)
+- [`docs/secrets-usage.md`](docs/secrets-usage.md)
 
 ## Go Quickstart
 

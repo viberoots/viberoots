@@ -1,10 +1,10 @@
-## scaf implementation layout (PR-2)
+# scaf CLI Architecture
 
-This directory contains the implementation of the `scaf` CLI.
+This directory contains the current implementation of the `scaf` CLI.
 
 `build-tools/tools/scaffolding/scaf.ts` is a thin entrypoint that calls into `build-tools/tools/scaffolding/scaf/main.ts`.
 
-### Relocation map (from old monolith)
+## Module Map
 
 - Argument parsing and usage text:
   - `usage()` → `build-tools/tools/scaffolding/scaf/usage.ts`
