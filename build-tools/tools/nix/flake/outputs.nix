@@ -1,12 +1,24 @@
 { self, nixpkgs, buck2, gomod2nix }:
 let
-  sys = import ./for-all-systems.nix { inherit nixpkgs buck2 gomod2nix; };
+  version = "0.0.0-dev";
+  releaseTag = "v${version}";
+  mkWorkspace =
+    { workspaceSrc
+    , viberootsInput ? self
+    , workspaceName ? "viberoots"
+    }:
+      import ./workspace.nix {
+        inherit nixpkgs buck2 gomod2nix workspaceSrc viberootsInput workspaceName version releaseTag;
+      };
+  workspace = mkWorkspace {
+    workspaceSrc = ../../../..;
+    viberootsInput = self;
+    workspaceName = "viberoots";
+  };
 in
-{
-  apps = sys.forAllSystemsLight (ctx: import ./outputs-apps.nix ctx);
-  devShells = sys.forAllSystemsLight (ctx: import ./outputs-devshells.nix ctx);
-  packages = sys.forAllSystemsHeavy (ctx: import ./outputs-packages.nix ctx);
-  checks = sys.forAllSystemsHeavy (ctx: import ./outputs-checks.nix ctx);
+workspace // {
+  lib = workspace.lib // {
+    inherit mkWorkspace version releaseTag;
+  };
 }
-
 

@@ -1,15 +1,19 @@
-{ pkgs, zx-wrapper, ... }:
+{ pkgs, zx-wrapper, viberootsRoot, version, releaseTag, ... }:
 let
   remoteTools = import ./packages/remote-worker-tools.nix { inherit pkgs zx-wrapper; };
-  viberoots = import ../packages/viberoots-command.nix { inherit pkgs zx-wrapper; };
+  viberoots = import ../packages/viberoots-command.nix {
+    inherit pkgs zx-wrapper version releaseTag;
+    viberootsSrc = viberootsRoot;
+  };
   bootstrap = pkgs.writeShellScriptBin "remote-worker-bootstrap" ''
     set -euo pipefail
-    helper="$PWD/build-tools/tools/remote-exec/remote-worker-bootstrap.ts"
+    helper="${viberootsRoot}/build-tools/tools/remote-exec/remote-worker-bootstrap.ts"
     if [ ! -f "$helper" ]; then
-      echo "remote-worker-bootstrap: run from repo root (missing $helper)" >&2
+      echo "remote-worker-bootstrap: viberoots source is missing $helper" >&2
       exit 1
     fi
     exec ${remoteTools.remote-worker-tools}/bin/zx-wrapper \
+      --import "${viberootsRoot}/build-tools/tools/dev/zx-init.mjs" \
       "$helper" \
       --remote-worker-tools "${remoteTools.remote-worker-tools}" \
       "$@"
@@ -28,8 +32,9 @@ in
     type = "app";
     program = "${pkgs.writeShellScriptBin "bulk-move" ''
       set -euo pipefail
-      if [ ! -f "$PWD/build-tools/tools/dev/bulk-move.ts" ]; then
-        echo "bulk-move: run from repo root (missing build-tools/tools/dev/bulk-move.ts)" >&2
+      helper="${viberootsRoot}/build-tools/tools/dev/bulk-move.ts"
+      if [ ! -f "$helper" ]; then
+        echo "bulk-move: viberoots source is missing $helper" >&2
         exit 1
       fi
       exec ${pkgs.nodejs_22}/bin/node \
@@ -37,8 +42,8 @@ in
         --experimental-top-level-await \
         --disable-warning=ExperimentalWarning \
         --import="${pkgs.nodePackages.zx}/lib/node_modules/zx/build/globals.js" \
-        --import="$PWD/build-tools/tools/dev/zx-init.mjs" \
-        "$PWD/build-tools/tools/dev/bulk-move.ts" "$@"
+        --import="${viberootsRoot}/build-tools/tools/dev/zx-init.mjs" \
+        "$helper" "$@"
     ''}/bin/bulk-move";
   };
   viberoots = {

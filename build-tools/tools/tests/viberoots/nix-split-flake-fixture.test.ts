@@ -3,15 +3,25 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
-import { runInScratchTemp } from "../lib/test-helpers";
 
 async function writeFile(file: string, text: string): Promise<void> {
   await fsp.mkdir(path.dirname(file), { recursive: true });
   await fsp.writeFile(file, text, "utf8");
 }
 
+async function runInNixTemp(name: string, fn: (tmp: string) => Promise<void>): Promise<void> {
+  const root = path.resolve("buck-out/tmp", name);
+  await fsp.mkdir(root, { recursive: true });
+  const tmp = await fsp.mkdtemp(path.join(root, "case-"));
+  try {
+    await fn(tmp);
+  } finally {
+    await fsp.rm(tmp, { recursive: true, force: true });
+  }
+}
+
 test("viberoots Nix fixture receives workspaceSrc outside viberoots source", async () => {
-  await runInScratchTemp("viberoots-nix-split", async (tmp, $) => {
+  await runInNixTemp("viberoots-nix-split", async (tmp) => {
     await writeFile(path.join(tmp, "workspace-marker"), "workspace\n");
     await writeFile(path.join(tmp, "viberoots/own-source-marker"), "viberoots\n");
     await writeFile(
@@ -58,5 +68,21 @@ test("viberoots Nix fixture receives workspaceSrc outside viberoots source", asy
     assert.equal(probe.viberootsHasOwnMarker, true);
     assert.equal(probe.workspaceHasOwnMarker, false);
     assert.notEqual(probe.workspacePath, probe.viberootsPath);
+  });
+});
+
+test("real viberoots mkWorkspace exposes metadata for external workspace source", async () => {
+  await runInNixTemp("viberoots-real-mkworkspace", async (tmp) => {
+    const repoRoot = process.cwd();
+    await writeFile(path.join(tmp, "workspace-marker"), "workspace\n");
+
+    const result = await $({
+      cwd: repoRoot,
+      stdio: "pipe",
+    })`nix eval --json --accept-flake-config .#lib.mkWorkspace --apply ${`mk: (mk { workspaceSrc = ${tmp}; viberootsInput = { outPath = ./.; }; workspaceName = "external-probe"; }).lib`}`;
+    const probe = JSON.parse(String(result.stdout || "{}"));
+    assert.equal(probe.workspaceName, "external-probe");
+    assert.equal(probe.version, "0.0.0-dev");
+    assert.equal(probe.releaseTag, "v0.0.0-dev");
   });
 });

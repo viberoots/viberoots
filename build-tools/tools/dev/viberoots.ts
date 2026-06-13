@@ -63,7 +63,8 @@ function buildVersionStatus() {
   const resolvedRevision = revision(roots.viberootsRoot, roots.sourceMode, roots.workspaceRoot);
   return {
     sourceMode: roots.sourceMode,
-    declaredVersion: "unknown",
+    declaredVersion: process.env.VIBEROOTS_VERSION || "unknown",
+    releaseTag: process.env.VIBEROOTS_RELEASE_TAG || "unknown",
     workspaceRoot: roots.workspaceRoot,
     viberootsRoot: roots.viberootsRoot,
     viberootsCurrent: roots.viberootsCurrent,

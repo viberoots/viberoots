@@ -10,7 +10,8 @@ test("devshell wires viberoots as a Nix-provided PATH command", async () => {
   assert.match(devshell, /buildInputs = \[[^\]]*\bviberootsCommand\b/s);
   assert.match(devshell, /export PATH="\$vbr_nix_bin:\$repo_prefix/);
   assert.match(devshell, /export PATH="\$vbr_nix_bin:\$d\/build-tools\/tools\/bin/);
-  assert.match(devshell, /viberoots init-workspace --shell-entry/);
+  assert.match(devshell, /export VIBEROOTS_ROOT="\$\{viberootsRoot\}"/);
+  assert.match(devshell, /viberoots init-workspace --shell-entry --source "\$\{viberootsRoot\}"/);
 
   const built = await $({
     stdio: "pipe",
@@ -59,5 +60,7 @@ viberoots version --json
   assert.ok(jsonStart >= 0, "expected viberoots version --json output");
   const status = JSON.parse(stdout.slice(jsonStart));
   assert.equal(status.workspaceRoot, process.cwd());
+  assert.equal(status.declaredVersion, "0.0.0-dev");
+  assert.equal(status.releaseTag, "v0.0.0-dev");
   assert.ok(["local", "remote"].includes(status.sourceMode));
 });

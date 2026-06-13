@@ -1,7 +1,10 @@
-{ pkgs, buck2Input }:
+{ pkgs, buck2Input, viberootsRoot ? ../../../.., version ? "0.0.0-dev", releaseTag ? "v${version}" }:
 let
   zx-wrapper = import ./lib/zx-wrapper.nix { inherit pkgs; };
-  viberootsCommand = import ./packages/viberoots-command.nix { inherit pkgs zx-wrapper; };
+  viberootsCommand = import ./packages/viberoots-command.nix {
+    inherit pkgs zx-wrapper version releaseTag;
+    viberootsSrc = viberootsRoot;
+  };
   agent-safehouse = pkgs.stdenvNoCC.mkDerivation {
     pname = "agent-safehouse";
     version = "0.9.0";
@@ -172,7 +175,8 @@ EOF
       _vbr_apply_dev_path
 
       if [ -f flake.nix ]; then
-        viberoots init-workspace --shell-entry >/dev/null || {
+        export VIBEROOTS_ROOT="${viberootsRoot}"
+        viberoots init-workspace --shell-entry --source "${viberootsRoot}" >/dev/null || {
           echo "(devShell) viberoots workspace activation failed" >&2
           return 1 2>/dev/null || exit 1
         }
@@ -275,8 +279,8 @@ EOF
       fi
     '';
     buildInputs = [
-      pkgs.git pkgs.buck2 pkgs.go pkgs.pnpm pkgs.nodejs_22 zx-wrapper viberootsCommand pkgs.jq pkgs.rsync pkgs.copier pkgs.yq
-      pkgs.jc pkgs.coreutils pkgs.gomod2nix pkgs.opentofu pkgs.infisical pkgs.awscli2 pkgs.dnsutils
+      pkgs.git pkgs.nix pkgs.buck2 pkgs.go pkgs.pnpm pkgs.nodejs_22 pkgs.python3 pkgs.uv zx-wrapper viberootsCommand pkgs.jq pkgs.rsync pkgs.copier pkgs.yq
+      pkgs.jc pkgs.bash pkgs.coreutils pkgs.gomod2nix pkgs.opentofu pkgs.infisical pkgs.awscli2 pkgs.dnsutils
       pkgs.openssl pkgs.postgresql_16
     ] ++ (if pkgs.stdenv.isDarwin then [ agent-safehouse ] else [])
       ++ (if pkgs.stdenv.isLinux then [ pkgs.fuse-overlayfs pkgs.xdg-utils ] else []);

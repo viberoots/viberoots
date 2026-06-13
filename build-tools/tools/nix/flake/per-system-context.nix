@@ -1,6 +1,16 @@
-{ nixpkgs, buck2, gomod2nix, system, includeNodeMods ? false }:
+{ nixpkgs
+, buck2
+, gomod2nix
+, system
+, workspaceSrc
+, viberootsInput
+, version
+, releaseTag
+, includeNodeMods ? false
+}:
 let
-  repoRoot = ../../../..;
+  repoRoot = workspaceSrc;
+  viberootsRoot = viberootsInput.outPath or workspaceSrc;
   pkgs = import nixpkgs {
     inherit system;
     overlays =
@@ -15,7 +25,10 @@ let
 
   zx-wrapper = import ../lib/zx-wrapper.nix { inherit pkgs; };
 
-  devshell = import ../devshell.nix { inherit pkgs; buck2Input = buck2; };
+  devshell = import ../devshell.nix {
+    inherit pkgs viberootsRoot version releaseTag;
+    buck2Input = buck2;
+  };
 
   liveFsRoot =
     let
@@ -41,7 +54,7 @@ let
 
   uv2nixLib =
     let
-      uvPathStr = (builtins.toString repoRoot) + "/third_party/uv2nix/flake.nix";
+      uvPathStr = (builtins.toString viberootsRoot) + "/third_party/uv2nix/flake.nix";
       haveUv = builtins.pathExists uvPathStr;
       uvLocal = if haveUv then import (builtins.toPath uvPathStr) else null;
       uvOut = if haveUv && uvLocal != null then uvLocal.outputs { self = null; inherit nixpkgs; } else null;
@@ -57,8 +70,6 @@ let
     };
 in
 {
-  inherit pkgs system zx-wrapper devshell prelude uv2nixLib liveFsRoot mkNodeMods;
+  inherit pkgs system zx-wrapper devshell prelude uv2nixLib liveFsRoot mkNodeMods repoRoot viberootsRoot version releaseTag;
   buck2Input = buck2;
 } // (if includeNodeMods then { nodeMods = mkNodeMods { }; } else { })
-
-

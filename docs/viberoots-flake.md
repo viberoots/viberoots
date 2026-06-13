@@ -529,6 +529,20 @@ dev shell definitions, templates, prelude, toolchain definitions, and reusable t
 use a generic `src` parameter for this API; it is too easy to confuse the workspace source with the
 viberoots source.
 
+The compatibility root flake already exposes this API while the physical submodule split is still in
+progress. Root outputs are equivalent to:
+
+```nix
+self.lib.mkWorkspace {
+  workspaceSrc = ./.;
+  viberootsInput = self;
+  workspaceName = "viberoots";
+}
+```
+
+Generated package, app, check, and dev shell outputs use `workspaceSrc` for workspace-owned sources
+and `viberootsInput.outPath` for reusable viberoots command and helper sources.
+
 Conceptual shape:
 
 ```nix
@@ -806,6 +820,9 @@ The viberoots flake should expose machine-readable version metadata:
 or an equivalent output consumed by tooling. The value should describe the viberoots release series,
 not the consuming workspace. Local dirty/dev checkouts may report a derived value such as
 `1.4.2-dev+<short-sha>` or `unknown+dirty`.
+
+During the in-repo split migration, the compatibility flake reports `lib.version = "0.0.0-dev"` and
+`lib.releaseTag = "v0.0.0-dev"` until release automation assigns a stable tag.
 
 The dev shell should provide a command such as:
 

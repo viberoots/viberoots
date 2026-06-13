@@ -1,7 +1,17 @@
-{ pkgs, zx-wrapper, nodeMods ? null, mkNodeMods ? null, prelude, uv2nixLib, ... }:
+{ pkgs
+, zx-wrapper
+, repoRoot
+, viberootsRoot
+, nodeMods ? null
+, mkNodeMods ? null
+, prelude
+, uv2nixLib
+, version
+, releaseTag
+, ...
+}:
 let
   lib = pkgs.lib;
-  repoRoot = ../../../../..;
   resolvedNodeMods =
     if nodeMods != null then nodeMods
     else if mkNodeMods != null then mkNodeMods { }
@@ -59,8 +69,8 @@ let
   };
   remoteTools = import ./remote-worker-tools.nix { inherit pkgs zx-wrapper; };
   viberootsCommand = import ../../packages/viberoots-command.nix {
-    inherit pkgs zx-wrapper;
-    viberootsSrc = repoSnapshot;
+    inherit pkgs zx-wrapper version releaseTag;
+    viberootsSrc = viberootsRoot;
   };
 in
 {

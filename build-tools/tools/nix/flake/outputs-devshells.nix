@@ -1,6 +1,5 @@
-{ pkgs, buck2Input, ... }:
+{ devshell, ... }:
 {
-  default = (import ../devshell.nix { inherit pkgs; buck2Input = buck2Input; }).default;
+  default = devshell.default;
 }
-
 
