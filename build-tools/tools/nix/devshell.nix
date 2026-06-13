@@ -1,6 +1,7 @@
 { pkgs, buck2Input }:
 let
   zx-wrapper = import ./lib/zx-wrapper.nix { inherit pkgs; };
+  viberootsCommand = import ./packages/viberoots-command.nix { inherit pkgs zx-wrapper; };
   agent-safehouse = pkgs.stdenvNoCC.mkDerivation {
     pname = "agent-safehouse";
     version = "0.9.0";
@@ -54,11 +55,12 @@ in {
       }
 
       _vbr_apply_dev_path() {
+        local vbr_nix_bin="${viberootsCommand}/bin"
         local repo_prefix="$PWD/build-tools/tools/bin:$PWD/.direnv/bin:$PWD/node_modules/.bin"
         local nix_prefix="''${HOST_PATH:-}"
         local host_tail
         host_tail="$(_vbr_filter_host_path "$PATH")"
-        export PATH="$repo_prefix''${nix_prefix:+:$nix_prefix}''${host_tail:+:$host_tail}"
+        export PATH="$vbr_nix_bin:$repo_prefix''${nix_prefix:+:$nix_prefix}''${host_tail:+:$host_tail}"
       }
 
       link_script="$PWD/build-tools/tools/dev/devshell-link-node-modules.ts"
@@ -185,6 +187,7 @@ EOF
       cat > .nix-zsh/.zshrc <<'EOF'
 PROMPT='%F{green}[nix-shell]%f %m:%~$ '
 _vbr_update_path() {
+  local vbr_nix_bin="${viberootsCommand}/bin"
   local d="$PWD"
   while [[ "$d" != "/" ]]; do
     if [[ -f "$d/flake.nix" && -d "$d/build-tools/tools/bin" ]]; then
@@ -194,12 +197,12 @@ _vbr_update_path() {
       IFS=':'
       for entry in $PATH; do
         case "$entry" in
-          ""|/opt/homebrew/bin|/opt/homebrew/sbin|/usr/local/Homebrew/*|/usr/local/Cellar/*|"$d/build-tools/tools/bin"|"$d/.direnv/bin"|"$d/node_modules/.bin") ;;
+          ""|/opt/homebrew/bin|/opt/homebrew/sbin|/usr/local/Homebrew/*|/usr/local/Cellar/*|"$vbr_nix_bin"|"$d/build-tools/tools/bin"|"$d/.direnv/bin"|"$d/node_modules/.bin") ;;
           *) out="''${out:+$out:}$entry" ;;
         esac
       done
       IFS="$old_ifs"
-      export PATH="$d/build-tools/tools/bin:$d/.direnv/bin:$d/node_modules/.bin''${HOST_PATH:+:$HOST_PATH}''${out:+:$out}"
+      export PATH="$vbr_nix_bin:$d/build-tools/tools/bin:$d/.direnv/bin:$d/node_modules/.bin''${HOST_PATH:+:$HOST_PATH}''${out:+:$out}"
       return
     fi
     d="$(dirname "$d")"
@@ -265,7 +268,7 @@ EOF
       fi
     '';
     buildInputs = [
-      pkgs.git pkgs.buck2 pkgs.go pkgs.pnpm pkgs.nodejs_22 zx-wrapper pkgs.jq pkgs.rsync pkgs.copier pkgs.yq
+      pkgs.git pkgs.buck2 pkgs.go pkgs.pnpm pkgs.nodejs_22 zx-wrapper viberootsCommand pkgs.jq pkgs.rsync pkgs.copier pkgs.yq
       pkgs.jc pkgs.coreutils pkgs.gomod2nix pkgs.opentofu pkgs.infisical pkgs.awscli2 pkgs.dnsutils
       pkgs.openssl pkgs.postgresql_16
     ] ++ (if pkgs.stdenv.isDarwin then [ agent-safehouse ] else [])

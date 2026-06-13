@@ -38,9 +38,19 @@ env_init_paths() {
 	if [[ -n "${LIVE_ROOT}" ]]; then
 		LIVE_ROOT="$(cd "${LIVE_ROOT}" && pwd)"
 	fi
-	if [[ ! -f "${LIVE_ROOT}/build-tools/tools/dev/zx-init.mjs" ]]; then
-		export LIVE_ROOT="${REPO_ROOT}"
+	if [[ -z "${VIBEROOTS_ROOT:-}" ]]; then
+		if [[ -e "${LIVE_ROOT}/.viberoots/current" ]]; then
+			export VIBEROOTS_ROOT="$(cd "${LIVE_ROOT}/.viberoots/current" && pwd)"
+		else
+			export VIBEROOTS_ROOT="${REPO_ROOT}"
+		fi
+	elif [[ -n "${VIBEROOTS_ROOT}" ]]; then
+		export VIBEROOTS_ROOT="$(cd "${VIBEROOTS_ROOT}" && pwd)"
 	fi
+	if [[ ! -f "${VIBEROOTS_ROOT}/build-tools/tools/dev/zx-init.mjs" ]]; then
+		export VIBEROOTS_ROOT="${REPO_ROOT}"
+	fi
+	export VIBEROOTS_WORKSPACE="${LIVE_ROOT}/.viberoots/workspace"
 }
 
 tool_path() {
@@ -228,7 +238,7 @@ ensure_buck_prelude() {
 exec_in_dev_shell() {
 	local live_root="$1"; shift
 	local fastpath_enabled="${BUCK_DEV_SHELL_FASTPATH:-1}"
-	local zx_init_path="${ZX_INIT:-${live_root}/build-tools/tools/dev/zx-init.mjs}"
+	local zx_init_path="${ZX_INIT:-${VIBEROOTS_ROOT}/build-tools/tools/dev/zx-init.mjs}"
 	# zx-init resolver hook reachability is owned by the nix-built `zx-wrapper` itself, which
 	# auto-discovers zx-init.mjs via $ZX_INIT or by walking up from $PWD. Adding it to
 	# NODE_OPTIONS here would double-register the hook in every node descendant (including
@@ -284,8 +294,8 @@ node_ts() {
 	local live_root="$1"; shift
 	local target_ts="$1"; shift
 	local node_bin="${NODE_BIN:-node}"
-	# Prefer explicit ZX_INIT if provided (e.g., tests), else live_root-based path
-	local zx_init_path="${ZX_INIT:-${live_root}/build-tools/tools/dev/zx-init.mjs}"
+	# Prefer explicit ZX_INIT if provided (e.g., tests), else viberoots source path.
+	local zx_init_path="${ZX_INIT:-${VIBEROOTS_ROOT}/build-tools/tools/dev/zx-init.mjs}"
   # If zx-wrapper is available, prefer it to guarantee zx globals ($) are provided
   if command -v zx-wrapper >/dev/null 2>&1; then
     exec_in_dev_shell "$live_root" \
@@ -306,7 +316,7 @@ node_ts() {
 run_ts() {
 	# Usage: run_ts "../dev/dev-build.ts" [args...]
 	local rel_path="$1"; shift || true
-	local target_ts="${ENV_SH_DIR}/${rel_path}"
+	local target_ts="${VIBEROOTS_ROOT}/build-tools/tools/bin/${rel_path}"
 	node_ts "${LIVE_ROOT}" "${target_ts}" "$@"
 }
 

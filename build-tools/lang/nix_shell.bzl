@@ -60,6 +60,8 @@ def nix_bootstrap_env_core():
         + "(cd \"$FLK_ROOT\" 2>/dev/null && pwd -P > \"$FLK_PHYS_FILE\") || true; "
         + "FLK_PHYS=\"\"; read -r FLK_PHYS < \"$FLK_PHYS_FILE\" 2>/dev/null || true; "
         + "if [ -n \"$FLK_PHYS\" ]; then FLK_ROOT=\"$FLK_PHYS\"; fi; "
+        + "VBR_ROOT=\"${VIBEROOTS_ROOT:-}\"; if [ -z \"$VBR_ROOT\" ] || [ ! -f \"$VBR_ROOT/build-tools/tools/dev/zx-init.mjs\" ]; then if [ -f \"$WORKSPACE_ROOT/.viberoots/current/build-tools/tools/dev/zx-init.mjs\" ]; then VBR_ROOT=\"$WORKSPACE_ROOT/.viberoots/current\"; else VBR_ROOT=\"$FLK_ROOT\"; fi; fi; "
+        + "VBR_PHYS_FILE=\"$TMP/vbr-source-root.phys\"; (cd \"$VBR_ROOT\" 2>/dev/null && pwd -P > \"$VBR_PHYS_FILE\") || true; VBR_PHYS=\"\"; read -r VBR_PHYS < \"$VBR_PHYS_FILE\" 2>/dev/null || true; if [ -n \"$VBR_PHYS\" ]; then VBR_ROOT=\"$VBR_PHYS\"; fi; export VIBEROOTS_ROOT=\"$VBR_ROOT\"; "
         + "cd \"$WORKSPACE_ROOT\"; "
         + "test -f \"$FLK_ROOT/flake.nix\"; "
         + nix_cache_health_shell()
@@ -76,9 +78,9 @@ def nix_bootstrap_env_pnpm_store():
         + "if [ \"${VBR_SKIP_REQUIRE_UNIFIED_PNPM_STORE:-}\" != \"1\" ]; then "
         + "  if [ -z \"${LOCAL_PNPM_STORE:-}\" ] && [ ! -f \"$FLK_ROOT/buck-out/.unified-pnpm-store/path\" ]; then "
         + "    if command -v node >/dev/null 2>&1; then "
-        + "      (cd \"$FLK_ROOT\" && node \"$FLK_ROOT/build-tools/tools/dev/require-unified-pnpm-store.ts\" >/dev/null 2>&1 || true); "
+        + "      (cd \"$VIBEROOTS_ROOT\" && node \"$VIBEROOTS_ROOT/build-tools/tools/dev/require-unified-pnpm-store.ts\" >/dev/null 2>&1 || true); "
         + "    elif command -v nix >/dev/null 2>&1; then "
-        + "      (cd \"$FLK_ROOT\" && nix run --accept-flake-config \"path:$FLK_ROOT#zx-wrapper\" -- build-tools/tools/dev/require-unified-pnpm-store.ts >/dev/null 2>&1 || true); "
+        + "      (cd \"$VIBEROOTS_ROOT\" && nix run --accept-flake-config \"path:$VIBEROOTS_ROOT#zx-wrapper\" -- \"$VIBEROOTS_ROOT/build-tools/tools/dev/require-unified-pnpm-store.ts\" >/dev/null 2>&1 || true); "
         + "    fi; "
         + "  fi; "
         + "fi; "
@@ -89,10 +91,8 @@ def nix_bootstrap_env_pnpm_store():
         + "fi; "
     )
 
-
 def nix_bootstrap_env():
     return nix_bootstrap_env_core()
-
 
 def nix_timeout_wrapper_var(var_name = "TIMEOUT", default_sec = 600):
     tout = default_sec if type(default_sec) == "int" and default_sec > 0 else 600
@@ -241,10 +241,10 @@ def nix_calling_node_patch_requirements_preflight(importer):
         fail("nix_calling_node_patch_requirements_preflight: importer is required")
     return (
         ("VBR_NODE_PATCH_IMPORTER=\"%s\"; " % importer)
-        + "VBR_NODE_ZX_INIT=\"$WORKSPACE_ROOT/build-tools/tools/dev/zx-init.mjs\"; "
+        + "VBR_NODE_ZX_INIT=\"$VIBEROOTS_ROOT/build-tools/tools/dev/zx-init.mjs\"; "
         + "export BUCK_GRAPH_JSON=\"${BUCK_GRAPH_JSON:-$WORKSPACE_ROOT/build-tools/tools/buck/graph.json}\"; "
         + "if [ ! -f \"$BUCK_GRAPH_JSON\" ]; then "
-        + "  node --experimental-top-level-await --disable-warning=ExperimentalWarning --experimental-strip-types --import \"$VBR_NODE_ZX_INIT\" \"$WORKSPACE_ROOT/build-tools/tools/buck/export-graph.ts\" --out \"$BUCK_GRAPH_JSON\"; "
+        + "  node --experimental-top-level-await --disable-warning=ExperimentalWarning --experimental-strip-types --import \"$VBR_NODE_ZX_INIT\" \"$VIBEROOTS_ROOT/build-tools/tools/buck/export-graph.ts\" --out \"$BUCK_GRAPH_JSON\"; "
         + "fi; "
-        + "node --experimental-top-level-await --disable-warning=ExperimentalWarning --experimental-strip-types --import \"$VBR_NODE_ZX_INIT\" \"$WORKSPACE_ROOT/build-tools/tools/buck/enforce-node-patch-requirements.ts\" --check --importer \"$VBR_NODE_PATCH_IMPORTER\"; "
+        + "node --experimental-top-level-await --disable-warning=ExperimentalWarning --experimental-strip-types --import \"$VBR_NODE_ZX_INIT\" \"$VIBEROOTS_ROOT/build-tools/tools/buck/enforce-node-patch-requirements.ts\" --check --importer \"$VBR_NODE_PATCH_IMPORTER\"; "
     )

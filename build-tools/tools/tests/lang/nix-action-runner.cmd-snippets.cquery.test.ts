@@ -41,21 +41,34 @@ test("nix_action_runner helpers assemble stable cmd snippets (cquery)", async ()
 
     const idxBootstrap = out.indexOf("export WORKSPACE_ROOT=");
     assert.ok(idxBootstrap >= 0, "expected nix bootstrap fragments in cmd");
+    assert.ok(
+      out.includes("export VIBEROOTS_ROOT="),
+      "expected nix bootstrap to resolve the viberoots source root",
+    );
 
-    const idxExportGraph = out.indexOf("build-tools/tools/buck/export-graph.ts");
+    const exportGraphPath = "$VIBEROOTS_ROOT/build-tools/tools/buck/export-graph.ts";
+    const zxInitPath = "$VIBEROOTS_ROOT/build-tools/tools/dev/zx-init.mjs";
+    const buildSelectedPath = "$VIBEROOTS_ROOT/build-tools/tools/dev/build-selected.ts";
+
+    const idxExportGraph = out.indexOf(exportGraphPath);
     assert.ok(idxExportGraph > idxBootstrap, "expected export-graph snippet after bootstrap");
     assert.ok(
-      out.includes("VBR_NODE_ZX_INIT=") && out.includes("build-tools/tools/dev/zx-init.mjs"),
-      "expected export-graph snippet to export VBR_NODE_ZX_INIT",
+      out.includes(`VBR_NODE_ZX_INIT=\\"${zxInitPath}\\"`),
+      "expected export-graph snippet to import zx-init from VIBEROOTS_ROOT",
     );
     assert.ok(
       out.includes("node --experimental-top-level-await") &&
         out.includes("--experimental-strip-types") &&
-        out.includes('build-tools/tools/buck/export-graph.ts\\" --out'),
+        out.includes(`${exportGraphPath}\\" --out`),
       "expected export-graph snippet to prefer direct node execution",
     );
+    assert.ok(
+      out.includes("path:$VIBEROOTS_ROOT#zx-wrapper") &&
+        out.includes(`${exportGraphPath}\\" --out`),
+      "expected export-graph nix fallback to use the viberoots flake source",
+    );
 
-    const idxBuildSelected = out.indexOf("build-tools/tools/dev/build-selected.ts");
+    const idxBuildSelected = out.indexOf(buildSelectedPath);
     assert.ok(
       idxBuildSelected > idxExportGraph,
       "expected build-selected snippet after export-graph",
@@ -66,5 +79,21 @@ test("nix_action_runner helpers assemble stable cmd snippets (cquery)", async ()
       "expected build-selected invocation to pass --accept-flake-config",
     );
     assert.ok(out.includes("sed -E"), "expected build-selected out-path parsing to strip ANSI");
+
+    assert.equal(
+      out.includes("$WORKSPACE_ROOT/build-tools/tools/dev/zx-init.mjs"),
+      false,
+      "expected zx-init source lookup to avoid WORKSPACE_ROOT",
+    );
+    assert.equal(
+      out.includes("$WORKSPACE_ROOT/build-tools/tools/buck/export-graph.ts"),
+      false,
+      "expected export-graph source lookup to avoid WORKSPACE_ROOT",
+    );
+    assert.equal(
+      out.includes("$FLK_ROOT/build-tools/tools/dev/build-selected.ts"),
+      false,
+      "expected build-selected source lookup to avoid FLK_ROOT",
+    );
   });
 });

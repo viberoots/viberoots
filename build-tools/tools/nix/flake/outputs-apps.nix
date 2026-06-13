@@ -1,6 +1,7 @@
 { pkgs, zx-wrapper, ... }:
 let
   remoteTools = import ./packages/remote-worker-tools.nix { inherit pkgs zx-wrapper; };
+  viberoots = import ../packages/viberoots-command.nix { inherit pkgs zx-wrapper; };
   bootstrap = pkgs.writeShellScriptBin "remote-worker-bootstrap" ''
     set -euo pipefail
     helper="$PWD/build-tools/tools/remote-exec/remote-worker-bootstrap.ts"
@@ -39,6 +40,10 @@ in
         --import="$PWD/build-tools/tools/dev/zx-init.mjs" \
         "$PWD/build-tools/tools/dev/bulk-move.ts" "$@"
     ''}/bin/bulk-move";
+  };
+  viberoots = {
+    type = "app";
+    program = "${viberoots}/bin/viberoots";
   };
   remote-worker-bootstrap = {
     type = "app";

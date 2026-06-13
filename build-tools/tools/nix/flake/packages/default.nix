@@ -58,10 +58,15 @@ let
     nodeMods = resolvedNodeMods;
   };
   remoteTools = import ./remote-worker-tools.nix { inherit pkgs zx-wrapper; };
+  viberootsCommand = import ../../packages/viberoots-command.nix {
+    inherit pkgs zx-wrapper;
+    viberootsSrc = repoSnapshot;
+  };
 in
 {
   buck2-prelude = prelude.buck2-prelude;
   zx-wrapper = zx-wrapper;
+  viberoots = viberootsCommand;
 } // remoteTools // nodeModsPkgs // {
   graph-generator = graph.graphGen.all;
   graph-generator-cppTargets = graph.graphGen.cppTargetsFlat;

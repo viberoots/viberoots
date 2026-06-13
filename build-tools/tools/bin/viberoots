@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+# shell helpers
+# shellcheck source=/dev/null
+. "$(cd "$(dirname "$0")" && pwd)/_env.sh"
+
+run_ts "../dev/viberoots.ts" "$@"

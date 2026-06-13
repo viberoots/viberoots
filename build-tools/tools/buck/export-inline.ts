@@ -5,6 +5,7 @@ import { getFlagBool, getFlagList, getFlagStr } from "../lib/cli";
 import { DEFAULT_GRAPH_PATH } from "../lib/graph-const";
 import { getImporterRootsContract } from "../lib/importer-roots";
 import { normalizeTargetLabel } from "../lib/labels";
+import { resolveWorkspaceRootSync } from "../lib/repo";
 
 type InlineExportOptions = {
   workspaceRoot: string;
@@ -148,11 +149,7 @@ export async function exportInlineGraph(opts: InlineExportOptions): Promise<void
 }
 
 export async function runFromCLI(): Promise<void> {
-  const workspaceRoot = (
-    process.env.BUCK_TEST_SRC ||
-    process.env.WORKSPACE_ROOT ||
-    process.cwd()
-  ).trim();
+  const workspaceRoot = resolveWorkspaceRootSync();
   const outPath = getFlagStr("out", path.join(workspaceRoot, DEFAULT_GRAPH_PATH));
   const targetRaw = getFlagStr("target", "");
   const target = targetRaw ? normalizeTargetLabel(targetRaw) : "";

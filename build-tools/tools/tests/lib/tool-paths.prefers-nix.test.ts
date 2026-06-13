@@ -51,3 +51,26 @@ test("ensureNixStoreToolPathSync rejects host-only tool paths", async () => {
     await fsp.rm(tmp, { recursive: true, force: true });
   }
 });
+
+test("resolveToolPathSync ignores viberoots source trees and only searches PATH", async () => {
+  const tmp = await fsp.mkdtemp(path.join(os.tmpdir(), "tool-paths-"));
+  try {
+    const cellBin = path.join(tmp, "viberoots", "build-tools", "tools", "bin");
+    await fsp.mkdir(cellBin, { recursive: true });
+    const cellTool = path.join(cellBin, "demo-tool");
+    await fsp.writeFile(cellTool, "#!/bin/sh\nexit 0\n", "utf8");
+    await fsp.chmod(cellTool, 0o755);
+
+    assert.throws(
+      () =>
+        resolveToolPathSync("demo-tool", {
+          ...process.env,
+          PATH: "",
+          VIBEROOTS_ROOT: path.join(tmp, "viberoots"),
+        }),
+      /required tool not found on PATH/,
+    );
+  } finally {
+    await fsp.rm(tmp, { recursive: true, force: true });
+  }
+});

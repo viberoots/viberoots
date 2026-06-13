@@ -62,7 +62,7 @@ def _cpp_nix_build_impl(ctx):
         + "graph_export_start=$SECONDS; "
         + nix_action_export_graph_cmd(
             out_graph = "$WORKSPACE_ROOT/build-tools/tools/buck/graph.json",
-            zx_wrapper = "path:$FLK_ROOT#zx-wrapper",
+            zx_wrapper = "path:$VIBEROOTS_ROOT#zx-wrapper",
         )
         + "graph_export_secs=$((SECONDS - graph_export_start)); "
         # Require a pre-exported Buck graph for the temp workspace (fail fast if missing)
@@ -73,7 +73,7 @@ def _cpp_nix_build_impl(ctx):
         + "  exit 2; "
         + "fi; "
         + "export BUCK_GRAPH_JSON=\"$WORKSPACE_ROOT/build-tools/tools/buck/graph.json\"; "
-        + "export VBR_NODE_ZX_INIT=\"$WORKSPACE_ROOT/build-tools/tools/dev/zx-init.mjs\"; "
+        + "export VBR_NODE_ZX_INIT=\"$VIBEROOTS_ROOT/build-tools/tools/dev/zx-init.mjs\"; "
         # Build via a filtered flake snapshot instead of the live repo root so broad
         # dev builds are not poisoned by dirty/untracked workspace artifacts.
         + "export PLANNER_ONLY_CPP=1; "
@@ -84,7 +84,7 @@ def _cpp_nix_build_impl(ctx):
         + (
             "$TIMEOUT node --experimental-top-level-await --disable-warning=ExperimentalWarning "
             + "--experimental-strip-types --import \"$VBR_NODE_ZX_INIT\" "
-            + "\"$WORKSPACE_ROOT/build-tools/tools/dev/nix-build-filtered-flake.ts\" --attr "
+            + "\"$VIBEROOTS_ROOT/build-tools/tools/dev/nix-build-filtered-flake.ts\" --attr "
             + "\"graph-generator-selected\" > \"$OUT_PATHS_FILE\"; "
         )
         + "selected_build_secs=$((SECONDS - selected_build_start)); "

@@ -822,6 +822,8 @@ that reports:
 - the effective `.viberoots/current` path;
 - in local source mode, whether `.viberoots/current` points at the live `viberoots/` checkout.
 
+The command also supports `viberoots status` as an alias and `--json` for CI or activation checks.
+
 ### Compatibility Policy
 
 Viberoots should treat `lib.mkWorkspace` and the public `@viberoots//build-tools/...` load surface
