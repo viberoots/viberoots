@@ -10,6 +10,7 @@ test("devshell wires viberoots as a Nix-provided PATH command", async () => {
   assert.match(devshell, /buildInputs = \[[^\]]*\bviberootsCommand\b/s);
   assert.match(devshell, /export PATH="\$vbr_nix_bin:\$repo_prefix/);
   assert.match(devshell, /export PATH="\$vbr_nix_bin:\$d\/build-tools\/tools\/bin/);
+  assert.match(devshell, /viberoots init-workspace --shell-entry/);
 
   const built = await $({
     stdio: "pipe",

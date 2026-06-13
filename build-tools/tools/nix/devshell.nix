@@ -171,6 +171,13 @@ EOF
       fi
       _vbr_apply_dev_path
 
+      if [ -f flake.nix ]; then
+        viberoots init-workspace --shell-entry >/dev/null || {
+          echo "(devShell) viberoots workspace activation failed" >&2
+          return 1 2>/dev/null || exit 1
+        }
+      fi
+
       # Prepare zsh/bash env for completions and aliases
       mkdir -p .nix-zsh
       cat > .nix-zsh/.zshenv <<'EOF'

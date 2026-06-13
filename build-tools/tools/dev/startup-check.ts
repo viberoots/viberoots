@@ -2,6 +2,7 @@
 // build-tools/tools/dev/startup-check.ts — verifies required tools and Nix features; prints fallbacks
 import * as fsp from "node:fs/promises";
 import { isNixStorePath, resolvePreferredCmdPath } from "./startup-check/cmd-paths";
+import { validateStartupWorkspaceState } from "./startup-check/workspace-state";
 import { DEV_OVERRIDE_LANGS, devOverrideEnvNameForLang } from "../lib/dev-override-envs";
 
 async function which(cmd: string) {
@@ -212,29 +213,10 @@ async function main() {
     );
   }
 
-  // Verify Buck prelude/cell mapping exists (diagnostic only; do not write files)
   try {
-    const buckconfig = await fsp.readFile(".buckconfig", "utf8");
-    const hasPrelude = /\[repositories\][\s\S]*?^\s*prelude\s*=\s*/m.test(buckconfig);
-    const hasCellsPrelude = /\[cells\][\s\S]*?^\s*prelude\s*=\s*/m.test(buckconfig);
-    if (!hasPrelude || !hasCellsPrelude) {
-      console.error(
-        "[startup-check] invalid .buckconfig: missing prelude mapping in [repositories] or [cells]. Run 'nix develop' to provision or fix the mapping.",
-      );
-      process.exit(1);
-    }
-    try {
-      await fsp.access("prelude/prelude.bzl");
-    } catch {
-      console.error(
-        "[startup-check] invalid Buck prelude: prelude/prelude.bzl is missing. Re-enter the dev shell or run a repo wrapper so the prelude symlink can be repaired.",
-      );
-      process.exit(1);
-    }
-  } catch {
-    console.error(
-      "[startup-check] .buckconfig not found; run 'nix develop' to generate it. Exporter will fail without a valid prelude mapping.",
-    );
+    await validateStartupWorkspaceState();
+  } catch (e) {
+    console.error(e instanceof Error ? e.message : String(e));
     process.exit(1);
   }
 

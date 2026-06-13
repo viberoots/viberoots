@@ -2,8 +2,9 @@
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
-import { getFlagBool, getPositionals } from "../lib/cli";
+import { getFlagBool, getFlagStr, getPositionals } from "../lib/cli";
 import { resolveWorkspaceRootsSync } from "../lib/repo";
+import { activateWorkspace } from "../lib/workspace-activation";
 
 type VersionStatus = ReturnType<typeof buildVersionStatus>;
 
@@ -90,13 +91,34 @@ function printText(status: VersionStatus): void {
   );
 }
 
+async function initWorkspace(): Promise<void> {
+  const result = await activateWorkspace({
+    sourcePath: getFlagStr("source"),
+    shellEntry: getFlagBool("shell-entry"),
+  });
+  if (getFlagBool("json")) {
+    console.log(JSON.stringify(result, null, 2));
+    return;
+  }
+  console.log(`workspace root: ${result.workspaceRoot}`);
+  console.log(`viberoots source: ${result.sourcePath}`);
+  console.log(`current link: ${result.currentPath} -> ${result.currentTarget}`);
+  console.log(
+    `workspace data: ${path.relative(result.workspaceRoot, result.workspaceDirs[0] || "")}`,
+  );
+}
+
 function usage(): never {
-  console.error("usage: viberoots version [--json]");
+  console.error("usage: viberoots <version|status|init-workspace> [--json] [--source <path>]");
   process.exit(2);
 }
 
 async function main() {
   const [command = "version"] = getPositionals();
+  if (command === "init-workspace") {
+    await initWorkspace();
+    return;
+  }
   if (command !== "version" && command !== "status") usage();
   const status = buildVersionStatus();
   if (getFlagBool("json")) console.log(JSON.stringify(status, null, 2));

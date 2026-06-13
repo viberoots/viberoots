@@ -13,6 +13,8 @@ result
 # Local temp artifacts
 .tmp/
 .local/
+/.viberoots/current
+/.viberoots/cache/
 # Canonical project config keeps shared values tracked and individual-user
 # values in one clone-local file.
 projects/config/local.json

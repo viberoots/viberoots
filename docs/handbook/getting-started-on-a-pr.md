@@ -18,6 +18,10 @@ This guide helps a new contributor land any PR in this plan successfully, follow
   - `rm -rf .direnv && direnv allow && direnv reload`
 - Optional: run our startup check if present (prints clear hints):
   - `node build-tools/tools/dev/startup-check.ts`
+- Prepare ignored viberoots workspace state before Buck-cell dogfood or external workspace runs:
+  - `viberoots init-workspace`
+  - This creates or repairs `.viberoots/current`, `.viberoots/workspace/`, and `.viberoots/cache/`
+    without rewriting tracked product files.
 
 Note on Python lockfiles: The initial Python rollout is uv‑only. Poetry/pip‑tools are out of scope unless/until a future PR adds them. See `build-tools/docs/lang/python-design.md` (PR‑17) for details.
 Python provider sync activation in sparse/partial clones is lockfile‑driven: the presence of an `uv.lock` under `projects/apps/*` or `projects/libs/*` enables Python providers.
