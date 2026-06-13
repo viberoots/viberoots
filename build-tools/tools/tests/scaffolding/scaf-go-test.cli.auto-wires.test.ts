@@ -85,8 +85,8 @@ test(
       await $`scaf new go test extra_case --path=${testPath}`;
 
       // Skip glue refresh when provider maps are already present in the seeded repo.
-      const autoMap = path.join(tmp, "third_party/providers/auto_map.bzl");
-      const nixAttrMap = path.join(tmp, "third_party/providers/nix_attr_map.bzl");
+      const autoMap = path.join(tmp, ".viberoots/workspace/providers/auto_map.bzl");
+      const nixAttrMap = path.join(tmp, ".viberoots/workspace/providers/nix_attr_map.bzl");
       const hasAutoMap = await fsp
         .access(autoMap)
         .then(() => true)

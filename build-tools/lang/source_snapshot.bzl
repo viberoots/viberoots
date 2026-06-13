@@ -47,7 +47,7 @@ _source_snapshot = rule(
     impl = _source_snapshot_impl,
     attrs = {
         "srcs": attrs.list(attrs.source(), default = []),
-        "graph": attrs.source(default = "//build-tools/tools/buck:graph.json"),
+        "graph": attrs.source(default = "workspace_buck//:graph.json"),
         "_runner": attrs.dep(
             default = "//build-tools/tools/dev:source-snapshot-runner",
             providers = [RunInfo],
@@ -114,7 +114,7 @@ source_snapshot_zx_wrapper_tool = rule(
     },
 )
 
-def source_snapshot(name, srcs = [], graph = "//build-tools/tools/buck:graph.json"):
+def source_snapshot(name, srcs = [], graph = "workspace_buck//:graph.json"):
     if len(srcs) == 0:
         fail("source_snapshot requires explicit declared srcs")
     _source_snapshot(

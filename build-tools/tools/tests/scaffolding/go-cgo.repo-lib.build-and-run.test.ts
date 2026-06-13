@@ -41,7 +41,7 @@ test("repo_cgo_deps wires local cpp lib and runs", async () => {
 
     await $({
       cwd: tmp,
-    })`node build-tools/tools/buck/export-graph.ts --out build-tools/tools/buck/graph.json`;
+    })`node build-tools/tools/buck/export-graph.ts --out .viberoots/workspace/buck/graph.json`;
     const build = await $({
       cwd: tmp,
       stdio: "pipe",

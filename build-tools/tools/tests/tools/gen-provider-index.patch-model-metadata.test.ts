@@ -19,7 +19,7 @@ test("gen-provider-index: provider_index.json includes patch model metadata (add
     );
     await fsp.writeFile(path.join(pyImporterDir, "uv.lock"), "", "utf8");
 
-    await $`node build-tools/tools/buck/gen-provider-index.ts --out third_party/providers/provider_index.bzl`;
+    await $`node build-tools/tools/buck/gen-provider-index.ts --out .viberoots/workspace/providers/provider_index.bzl`;
 
     const jsonPath = path.join(tmp, "third_party", "providers", "provider_index.json");
     const idx = JSON.parse(await fsp.readFile(jsonPath, "utf8")) as Record<string, any>;

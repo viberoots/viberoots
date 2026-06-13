@@ -3,6 +3,7 @@ import { scanFlatPatchDirToLowercaseKeyToPatchPathMap } from "../../lib/effectiv
 import { findImporterLockfiles, listImporterPatches } from "../../lib/importers";
 import { importerScopedProviderContractForLang } from "../../lib/lang-contracts";
 import { syncImporterProviders, type ParseEffectiveSetFn } from "../../lib/provider-sync-driver";
+import { providerAutoTargetsPath } from "../../lib/workspace-state-paths";
 
 export type ImporterScopedProviderSyncOptions = {
   lang: string;
@@ -24,7 +25,7 @@ export async function syncImporterScopedProviders(
     throw new Error(`[providers] missing importer-scoped provider contract for ${opts.lang}`);
   }
 
-  const outFile = opts.outFile || `third_party/providers/TARGETS.${opts.lang}.auto`;
+  const outFile = opts.outFile || providerAutoTargetsPath(opts.lang);
   const strict = opts.strict ?? contract.providerSyncParsing.defaultStrict;
   const discoverLockfiles =
     opts.discoverLockfiles || (() => findImporterLockfiles(opts.lockfileBasenames));

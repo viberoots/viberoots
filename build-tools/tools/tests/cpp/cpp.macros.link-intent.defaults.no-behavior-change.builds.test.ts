@@ -37,7 +37,7 @@ test("nix_cpp_binary: defaults build unchanged when no link intent attrs are pro
     await $({
       cwd: tmp,
       stdio: "pipe",
-    })`node build-tools/tools/buck/export-graph.ts --out build-tools/tools/buck/graph.json`;
+    })`node build-tools/tools/buck/export-graph.ts --out .viberoots/workspace/buck/graph.json`;
     const build = await $({
       cwd: tmp,
       stdio: "pipe",

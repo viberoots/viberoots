@@ -5,10 +5,11 @@ import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
 import { withScopedEnv } from "../lib/test-helpers/scoped-env";
 import { ensureGraph } from "../../buck/glue-run";
+import { DEFAULT_GRAPH_PATH } from "../../lib/workspace-state-paths";
 
 test("ensureGraph is a no-op when BUCK_TARGET is already present in the graph", async () => {
   await runInTemp("ensure-graph-buck-target-present", async (tmp) => {
-    const graphPath = path.join(tmp, "build-tools", "tools", "buck", "graph.json");
+    const graphPath = path.join(tmp, DEFAULT_GRAPH_PATH);
     await fsp.mkdir(path.dirname(graphPath), { recursive: true });
 
     await withScopedEnv(

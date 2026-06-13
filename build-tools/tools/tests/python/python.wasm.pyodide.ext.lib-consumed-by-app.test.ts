@@ -143,7 +143,7 @@ nix_python_wasm_app(
       "utf8",
     );
 
-    await $`node build-tools/tools/buck/export-graph.ts --out build-tools/tools/buck/graph.json`;
+    await $`node build-tools/tools/buck/export-graph.ts --out .viberoots/workspace/buck/graph.json`;
     const outPath = await nixBuildSelected(tmp, $, "//projects/apps/pywasm:pyapp");
     const outDir = path.join(outPath, "site", "world");
     const entries = await fs.readdir(outDir);

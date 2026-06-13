@@ -12,7 +12,8 @@ def nix_action_workspace_setup_from_args(
         + ("FLAKE_FILE=\"%s\"; " % flake_file_arg)
         + "[ -n \"$WORKSPACE_ENV\" ] && [ -f \"$WORKSPACE_ENV\" ] && . \"$WORKSPACE_ENV\" || true; "
         + "if [ -n \"$GRAPH\" ] && [ -z \"${WORKSPACE_ROOT:-}\" ]; then "
-        + "  WR=\"${GRAPH%/build-tools/tools/buck/graph.json}\"; "
+        + "  WR=\"${GRAPH%/.viberoots/workspace/buck/graph.json}\"; "
+        + "  if [ \"$WR\" = \"$GRAPH\" ]; then WR=\"${GRAPH%/build-tools/tools/buck/graph.json}\"; fi; "
         + "  export WORKSPACE_ROOT=\"$WR\"; "
         + "fi; "
         + "export REPO_ROOT=\"${REPO_ROOT:-$WORKSPACE_ROOT}\"; "
@@ -25,14 +26,14 @@ def nix_action_workspace_setup_from_args(
 
 
 def nix_action_export_graph_cmd(
-        out_graph = "$WORKSPACE_ROOT/build-tools/tools/buck/graph.json",
+        out_graph = "$WORKSPACE_ROOT/.viberoots/workspace/buck/graph.json",
         query_roots = None,
         zx_wrapper = "path:$VIBEROOTS_ROOT#zx-wrapper"):
     if not query_roots:
         roots = WORKSPACE_IMPORTER_ROOTS if WORKSPACE_IMPORTER_ROOTS else ["apps", "libs"]
         query_roots = ",".join(roots + ["go", "cpp", "third_party"])
     return (
-        "mkdir -p \"$WORKSPACE_ROOT/build-tools/tools/buck\"; "
+        "mkdir -p \"$WORKSPACE_ROOT/.viberoots/workspace/buck\"; "
         + "VBR_NODE_ZX_INIT=\"$VIBEROOTS_ROOT/build-tools/tools/dev/zx-init.mjs\"; "
         + "if command -v node >/dev/null 2>&1; then "
         + ("  BUCK_TEST_SRC=\"$WORKSPACE_ROOT\" BUCK_QUERY_ROOTS=\"%s\" " % query_roots)

@@ -25,7 +25,7 @@ test("exporter caches go list results and second run is mostly cache hits", asyn
         srcs: ["main.go"],
       },
     ];
-    const graph = path.join(tmp, "build-tools/tools/buck/graph.json");
+    const graph = path.join(tmp, ".viberoots/workspace/buck/graph.json");
     await fs.mkdirp(path.dirname(graph));
     await fs.outputFile(graph, JSON.stringify(nodes, null, 2));
 

@@ -7,11 +7,12 @@ import { providerNameForImporter } from "../../lib/providers";
 
 test("prebuild-guard: coverage falls back to TARGETS.*.auto for Python importer providers", async () => {
   await runInTemp("prebuild-coverage-python-fallback", async (tmp, $) => {
-    const providersDir = path.join(tmp, "third_party", "providers");
+    const providersDir = path.join(tmp, ".viberoots", "workspace", "providers");
+    const buckDir = path.join(tmp, ".viberoots", "workspace", "buck");
     await fsp.mkdir(providersDir, { recursive: true });
 
     // Minimal glue outputs (graph + auto_map) present
-    await fsp.mkdir(path.join(tmp, "build-tools", "tools", "buck"), { recursive: true });
+    await fsp.mkdir(buckDir, { recursive: true });
 
     // Create a Python importer with uv.lock
     const importerDir = path.join(tmp, "apps", "pytool");
@@ -21,14 +22,14 @@ test("prebuild-guard: coverage falls back to TARGETS.*.auto for Python importer 
 
     const importer = "apps/pytool";
     const provider = providerNameForImporter(relUv, importer);
-    const fqProvider = `//third_party/providers:${provider}`;
+    const fqProvider = `workspace_providers//:${provider}`;
 
     // TARGETS.python.auto includes the expected provider rule (no provider_index.json present)
     const targetsPy = path.join(providersDir, "TARGETS.python.auto");
     await fsp.writeFile(
       targetsPy,
       [
-        'load("//third_party/providers:defs_python.bzl", "python_importer_deps")',
+        'load("@root//third_party/providers:defs_python.bzl", "python_importer_deps")',
         "",
         "python_importer_deps(",
         `    name = "${provider}",`,
@@ -59,18 +60,10 @@ test("prebuild-guard: coverage falls back to TARGETS.*.auto for Python importer 
 
     // Minimal graph pointing to the Python node with an importer-scoped lockfile label
     const graph = [{ name: nodeName, labels: [`lockfile:${relUv}#${importer}`] }];
+    await fsp.writeFile(path.join(buckDir, "graph.json"), JSON.stringify(graph), "utf8");
+    await fsp.writeFile(path.join(buckDir, "node-lock-index.json"), "{}\n", "utf8");
     await fsp.writeFile(
-      path.join(tmp, "build-tools", "tools", "buck", "graph.json"),
-      JSON.stringify(graph),
-      "utf8",
-    );
-    await fsp.writeFile(
-      path.join(tmp, "build-tools", "tools", "buck", "node-lock-index.json"),
-      "{}\n",
-      "utf8",
-    );
-    await fsp.writeFile(
-      path.join(tmp, "build-tools", "tools", "buck", "invalidation-report.txt"),
+      path.join(buckDir, "invalidation-report.txt"),
       "# invalidation-report\n",
       "utf8",
     );

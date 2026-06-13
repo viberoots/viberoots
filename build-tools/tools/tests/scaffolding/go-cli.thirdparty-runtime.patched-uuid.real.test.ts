@@ -96,9 +96,9 @@ async function scaffoldCli(sh: any, tmp: string) {
 }
 
 async function regenerateProviders(sh: any) {
-  await sh`node build-tools/tools/buck/export-graph.ts --out build-tools/tools/buck/graph.json`;
+  await sh`node build-tools/tools/buck/export-graph.ts --out .viberoots/workspace/buck/graph.json`;
   await sh`node build-tools/tools/buck/sync-providers.ts`;
-  await sh`node build-tools/tools/buck/gen-auto-map.ts --graph build-tools/tools/buck/graph.json --out third_party/providers/auto_map.bzl`;
+  await sh`node build-tools/tools/buck/gen-auto-map.ts --graph .viberoots/workspace/buck/graph.json --out .viberoots/workspace/providers/auto_map.bzl`;
 }
 
 test("go cli with local lib + third-party patched uuid runtime (prefetched real snapshot)", async () => {

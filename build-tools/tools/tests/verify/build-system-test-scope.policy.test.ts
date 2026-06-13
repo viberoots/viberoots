@@ -29,7 +29,7 @@ test("build-system path detection includes toolchain/build files and excludes pr
   assert.equal(isBuildSystemPath("build-tools/tools/tests/verify/foo.test.ts"), true);
   assert.equal(isBuildSystemPath("flake.lock"), true);
   assert.equal(isBuildSystemPath("toolchains/rust/TARGETS"), true);
-  assert.equal(isBuildSystemPath("third_party/providers/auto_map.bzl"), true);
+  assert.equal(isBuildSystemPath(".viberoots/workspace/providers/auto_map.bzl"), true);
   assert.equal(isBuildSystemPath("workspace/apps/myapp/src/index.ts"), false);
   assert.equal(isBuildSystemPath("build-tools/docs/build-system-design.md"), false);
   assert.equal(isBuildSystemPath("docs/handbook/ci.md"), false);

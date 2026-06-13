@@ -6,6 +6,7 @@ test("graph-utils: isProviderPackageNode classifies provider-package nodes corre
   const yesCases = [
     "//third_party/providers:lf_abcdef_apps_web__pnpm_lock_yaml",
     "root//third_party/providers:mod_deadbeef_tail (config//platforms:default#1234abcd)",
+    "workspace_providers//:lf_abcdef_apps_web__pnpm_lock_yaml",
   ];
   const noCases = [
     "//projects/apps/web:bundle",

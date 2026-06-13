@@ -3,12 +3,16 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
+import {
+  DEFAULT_PROVIDER_TARGETS_PATH,
+  providerAutoTargetsPath,
+} from "../../lib/workspace-state-paths";
 import { runInTemp } from "../lib/test-helpers";
 
 test("writeImporterProvidersByLang(node) writes header, load line, and AUTO_NODE section", async () => {
   await runInTemp("writer-by-lang-node", async (tmp, $) => {
     // Arrange inputs
-    const outFile = "third_party/providers/TARGETS.node.auto";
+    const outFile = providerAutoTargetsPath("node");
     const providers = [
       {
         lockfile: "apps/web/pnpm-lock.yaml",
@@ -19,8 +23,9 @@ test("writeImporterProvidersByLang(node) writes header, load line, and AUTO_NODE
     // Create a small runner so execution happens inside the temp repo env
     const runner = `#!/usr/bin/env zx-wrapper
 import { writeImporterProvidersByLang } from "./build-tools/tools/lib/provider-writer";
+import { providerAutoTargetsPath } from "./build-tools/tools/lib/workspace-state-paths";
 const lang = process.env.LANG || "node";
-const outFile = process.env.OUT_FILE || "third_party/providers/TARGETS.node.auto";
+const outFile = process.env.OUT_FILE || providerAutoTargetsPath("node");
 const providers = JSON.parse(process.env.PROVIDERS_JSON || "[]");
 await writeImporterProvidersByLang(lang, providers, { outFile });
 `;
@@ -29,10 +34,13 @@ await writeImporterProvidersByLang(lang, providers, { outFile });
     // Act: run writer inside temp repo
     await $`LANG=node OUT_FILE=${outFile} PROVIDERS_JSON=${JSON.stringify(providers)} node ${runnerPath}`;
     const txt1 = await fsp.readFile(path.join(tmp, outFile), "utf8");
-    const curated = await fsp.readFile(path.join(tmp, "third_party/providers/TARGETS"), "utf8");
+    const curated = await fsp.readFile(path.join(tmp, DEFAULT_PROVIDER_TARGETS_PATH), "utf8");
     // Assert: header and load line present
     assert.match(txt1, /# GENERATED FILE — DO NOT EDIT\./);
-    assert.match(txt1, /load\("\/\/third_party\/providers:defs_node\.bzl", "node_importer_deps"\)/);
+    assert.match(
+      txt1,
+      /load\("@root\/\/third_party\/providers:defs_node\.bzl", "node_importer_deps"\)/,
+    );
     // Assert: entry lines use node_importer_deps(...) form
     assert.match(txt1, /node_importer_deps\(name="/);
     // Assert: curated TARGETS contains AUTO_NODE block

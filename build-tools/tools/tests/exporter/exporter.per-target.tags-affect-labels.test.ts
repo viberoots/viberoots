@@ -33,7 +33,7 @@ test("per-target gotags affect tuple and labels only for tagged target", async (
     ];
 
     // Export graph with metrics
-    const graph = path.join(tmp, "build-tools/tools/buck/graph.json");
+    const graph = path.join(tmp, ".viberoots/workspace/buck/graph.json");
     const metrics = path.join(tmp, "metrics.json");
     await fs.mkdirp(path.dirname(graph));
     await fs.writeFile(graph, JSON.stringify(nodes, null, 2), "utf8");

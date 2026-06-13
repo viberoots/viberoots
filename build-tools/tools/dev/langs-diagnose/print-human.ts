@@ -1,12 +1,13 @@
 import fs from "node:fs";
 import path from "node:path";
 import type { DiagnoseOutput } from "./types";
+import { DEFAULT_AUTO_MAP_PATH } from "../../lib/workspace-state-paths";
 
 function readPatchedCppProviderAttrs(): string[] {
-  const autoMap = path.resolve("third_party/providers/auto_map.bzl");
+  const autoMap = path.resolve(DEFAULT_AUTO_MAP_PATH);
   if (!fs.existsSync(autoMap)) return [];
   const txt = fs.readFileSync(autoMap, "utf8");
-  const re = new RegExp('"//third_party/providers:nix_pkgs_([a-z0-9_]+)"', "gi");
+  const re = new RegExp('"workspace_providers//:nix_pkgs_([a-z0-9_]+)"', "gi");
   const set = new Set<string>();
   let m: RegExpExecArray | null;
   while ((m = re.exec(txt))) set.add(m[1]);

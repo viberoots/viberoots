@@ -44,7 +44,7 @@ test("cpp planner imports and detects cxx_* and lang:cpp", async () => {
       { name: "//projects/libs/demo:lib", rule_type: "custom_rule", labels: ["lang:cpp"] },
     ];
     await fs.outputFile(
-      path.join(tmp, "build-tools/tools/buck/graph.json"),
+      path.join(tmp, ".viberoots/workspace/buck/graph.json"),
       JSON.stringify(graph) + "\n",
     );
 

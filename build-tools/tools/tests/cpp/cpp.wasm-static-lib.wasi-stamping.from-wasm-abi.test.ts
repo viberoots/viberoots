@@ -51,7 +51,7 @@ test("cpp wasm static lib stamps wasm:wasi when wasm_abi is wasi", async () => {
 
     await $({
       cwd: tmp,
-    })`node build-tools/tools/buck/export-graph.ts --out build-tools/tools/buck/graph.json`;
+    })`node build-tools/tools/buck/export-graph.ts --out .viberoots/workspace/buck/graph.json`;
     const nodes = await readGraph(path.join(tmp, "build-tools", "tools", "buck", "graph.json"));
     const node = nodes.find(
       (x) => normalizeTargetLabel(String(x.name || "")) === "//projects/libs/core:core_wasm",

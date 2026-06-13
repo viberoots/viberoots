@@ -55,8 +55,8 @@ test("patch-node apply runs glue and writes provider targets deterministically",
     // Apply → write glue
     await $({ cwd: importer, env })`${cli} apply node lodash --importer ${importer}`;
 
-    const autoTargets = path.join(tmp, "third_party", "providers", "TARGETS.node.auto");
-    const autoMap = path.join(tmp, "third_party", "providers", "auto_map.bzl");
+    const autoTargets = path.join(tmp, ".viberoots", "workspace", "providers", "TARGETS.node.auto");
+    const autoMap = path.join(tmp, ".viberoots", "workspace", "providers", "auto_map.bzl");
     if (!(await fs.pathExists(autoTargets)) || !(await fs.pathExists(autoMap))) {
       console.error("missing provider outputs; glue did not run");
       process.exit(2);

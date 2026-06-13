@@ -7,6 +7,8 @@ import { getImporterRootsContract } from "../lib/importer-roots";
 import { normalizeTargetLabel } from "../lib/labels";
 import { runNodeWithZx } from "../lib/node-run";
 import { findRepoRoot } from "../lib/repo";
+import { ensureWorkspaceBuckStatePackage } from "../lib/workspace-buck-state";
+import { DEFAULT_AUTO_MAP_PATH } from "../lib/workspace-state-paths";
 
 async function buck2Present(): Promise<boolean> {
   try {
@@ -49,7 +51,7 @@ export async function ensureGraph(
     process.env.BUCK_TEST_SRC ||
     process.cwd()
   ).trim();
-  const graphPath = path.join(workspaceRoot, "build-tools", "tools", "buck", "graph.json");
+  const graphPath = path.join(workspaceRoot, DEFAULT_GRAPH_PATH);
   const forceInline = String(process.env.EXPORTER_FORCE_INLINE || "").trim() === "1";
   async function isValidJsonFile(p: string): Promise<boolean> {
     try {
@@ -65,6 +67,7 @@ export async function ensureGraph(
   try {
     console.error(`[ensureGraph] workspaceRoot=${workspaceRoot}`);
   } catch {}
+  await ensureWorkspaceBuckStatePackage(workspaceRoot);
   const wantTargetRaw = (opts.target || process.env.BUCK_TARGET || "").trim();
   const shouldRegenerate = async (): Promise<boolean> => {
     try {
@@ -217,6 +220,6 @@ export async function runGlue(): Promise<void> {
   const { runGluePipeline } = await import("../buck/glue-pipeline");
   await runGluePipeline({
     graphPath: DEFAULT_GRAPH_PATH,
-    outAutoMap: "third_party/providers/auto_map.bzl",
+    outAutoMap: DEFAULT_AUTO_MAP_PATH,
   });
 }

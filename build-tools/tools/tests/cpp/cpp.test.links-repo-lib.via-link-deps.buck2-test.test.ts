@@ -78,7 +78,7 @@ test("nix_cpp_test links an in-repo C++ lib via link_deps (buck2 test)", async (
 
     await $({
       cwd: tmp,
-    })`node build-tools/tools/buck/export-graph.ts --out build-tools/tools/buck/graph.json`;
+    })`node build-tools/tools/buck/export-graph.ts --out .viberoots/workspace/buck/graph.json`;
     await $({
       cwd: tmp,
     })`buck2 --isolation-dir ${inheritedBuckIsolation("cpp_test_link_deps")} test //projects/apps/demo:t`;

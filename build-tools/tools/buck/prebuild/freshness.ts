@@ -1,7 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import fs from "node:fs";
-import path from "node:path";
 import { logList, mtimeSafe } from "./report";
+import { DEFAULT_GRAPH_PATH, DEFAULT_NODE_LOCK_INDEX_PATH } from "../../lib/workspace-state-paths";
 
 export type Mode = "ci" | "local";
 
@@ -43,8 +43,8 @@ export function checkFreshness(
   }
 
   try {
-    const graphPath = path.join("build-tools", "tools", "buck", "graph.json");
-    const sidecarPath = path.join("build-tools", "tools", "buck", "node-lock-index.json");
+    const graphPath = DEFAULT_GRAPH_PATH;
+    const sidecarPath = DEFAULT_NODE_LOCK_INDEX_PATH;
     if (fs.existsSync(graphPath) && fs.existsSync(sidecarPath)) {
       const mg = mtimeSafe(graphPath) || 0;
       const ms = mtimeSafe(sidecarPath) || 0;

@@ -22,11 +22,11 @@ async function main() {
   // Run exporter + providers + gen-auto-map to trigger evaluation paths (zx-init loaded)
   await $({
     env,
-  })`node build-tools/tools/buck/export-graph.ts --out build-tools/tools/buck/graph.json`;
+  })`node build-tools/tools/buck/export-graph.ts --out .viberoots/workspace/buck/graph.json`;
   await $({ env })`node build-tools/tools/buck/sync-providers.ts --lang=cpp`;
   await $({
     env,
-  })`node build-tools/tools/buck/gen-auto-map.ts --graph build-tools/tools/buck/graph.json --out third_party/providers/auto_map.bzl`;
+  })`node build-tools/tools/buck/gen-auto-map.ts --graph .viberoots/workspace/buck/graph.json --out .viberoots/workspace/providers/auto_map.bzl`;
   // Success if no throw; we do not assert on stderr text here to avoid flakiness.
   console.log("OK: local override did not fail");
 }

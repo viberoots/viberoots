@@ -35,7 +35,7 @@ nix_python_wasm_app(
 `,
       "utf8",
     );
-    await $`node build-tools/tools/buck/export-graph.ts --out build-tools/tools/buck/graph.json`;
+    await $`node build-tools/tools/buck/export-graph.ts --out .viberoots/workspace/buck/graph.json`;
     const env = {
       ...process.env,
       BUCK_TARGET: "//projects/apps/pywasm:pyapp",

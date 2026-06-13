@@ -2,6 +2,10 @@
 import path from "node:path";
 import { DEFAULT_GRAPH_PATH } from "../lib/graph-const";
 import type { ReadCompositeGraphOptions } from "../lib/graph-view";
+import {
+  DEFAULT_NODE_LOCK_INDEX_PATH,
+  DEFAULT_PROVIDER_INDEX_JSON_PATH,
+} from "../lib/workspace-state-paths";
 
 export function deploymentGraphReadOptions(
   workspaceRoot: string,
@@ -10,8 +14,8 @@ export function deploymentGraphReadOptions(
   const selectedGraphPath = graphPath.trim() || DEFAULT_GRAPH_PATH;
   return {
     graphPath: resolveWorkspacePath(workspaceRoot, selectedGraphPath),
-    providerIndexPath: path.join(workspaceRoot, "third_party/providers/provider_index.json"),
-    nodeLockIndexPath: path.join(workspaceRoot, "build-tools/tools/buck/node-lock-index.json"),
+    providerIndexPath: path.join(workspaceRoot, DEFAULT_PROVIDER_INDEX_JSON_PATH),
+    nodeLockIndexPath: path.join(workspaceRoot, DEFAULT_NODE_LOCK_INDEX_PATH),
   };
 }
 

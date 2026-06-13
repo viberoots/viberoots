@@ -164,7 +164,7 @@ This keeps C++ a planner language and avoids introducing Node‑specific logic i
   - Run:
     - `node build-tools/tools/buck/export-graph.ts`
     - `node build-tools/tools/buck/sync-providers.ts --lang node` (if lockfiles exist)
-    - `node build-tools/tools/buck/gen-auto-map.ts --graph build-tools/tools/buck/graph.json --out third_party/providers/auto_map.bzl`
+    - `node build-tools/tools/buck/gen-auto-map.ts --graph .viberoots/workspace/buck/graph.json --out .viberoots/workspace/providers/auto_map.bzl`
   - Build: `buck2 build //projects/libs/{{ name }}:{{ name }}`
   - Test: `buck2 test //projects/libs/{{ name }}:{{ name }}_test`
 

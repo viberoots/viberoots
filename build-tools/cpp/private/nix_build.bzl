@@ -51,7 +51,7 @@ def _cpp_nix_build_impl(ctx):
         + "PLANNER_ONLY_CPP=1 "
         + ("BUCK_TARGET=\"%s\" " % raw)
         + "BUCK_TEST_SRC=\"$WORKSPACE_ROOT\" "
-        + "BUCK_GRAPH_JSON=\"$WORKSPACE_ROOT/build-tools/tools/buck/graph.json\" "
+        + "BUCK_GRAPH_JSON=\"$WORKSPACE_ROOT/.viberoots/workspace/buck/graph.json\" "
     )
     run_and_copy = (
         nix_action_workspace_setup_from_args()
@@ -61,18 +61,18 @@ def _cpp_nix_build_impl(ctx):
         + "cd \"$FLK_ROOT\"; "
         + "graph_export_start=$SECONDS; "
         + nix_action_export_graph_cmd(
-            out_graph = "$WORKSPACE_ROOT/build-tools/tools/buck/graph.json",
+            out_graph = "$WORKSPACE_ROOT/.viberoots/workspace/buck/graph.json",
             zx_wrapper = "path:$VIBEROOTS_ROOT#zx-wrapper",
         )
         + "graph_export_secs=$((SECONDS - graph_export_start)); "
         # Require a pre-exported Buck graph for the temp workspace (fail fast if missing)
         + "echo \"[cpp_nix_build] WR=$WORKSPACE_ROOT FLK=$FLK_ROOT\" >&2; "
-        + "ls -la \"$WORKSPACE_ROOT/build-tools/tools/buck\" >/dev/null 2>&1 || true; "
-        + "if [ ! -f \"$WORKSPACE_ROOT/build-tools/tools/buck/graph.json\" ]; then "
-        + "  echo 'cpp_nix_build: missing $WORKSPACE_ROOT/build-tools/tools/buck/graph.json; run build-tools/tools/buck/export-graph.ts first' >&2; "
+        + "ls -la \"$WORKSPACE_ROOT/.viberoots/workspace/buck\" >/dev/null 2>&1 || true; "
+        + "if [ ! -f \"$WORKSPACE_ROOT/.viberoots/workspace/buck/graph.json\" ]; then "
+        + "  echo 'cpp_nix_build: missing $WORKSPACE_ROOT/.viberoots/workspace/buck/graph.json; run build-tools/tools/buck/export-graph.ts first' >&2; "
         + "  exit 2; "
         + "fi; "
-        + "export BUCK_GRAPH_JSON=\"$WORKSPACE_ROOT/build-tools/tools/buck/graph.json\"; "
+        + "export BUCK_GRAPH_JSON=\"$WORKSPACE_ROOT/.viberoots/workspace/buck/graph.json\"; "
         + "export VBR_NODE_ZX_INIT=\"$VIBEROOTS_ROOT/build-tools/tools/dev/zx-init.mjs\"; "
         # Build via a filtered flake snapshot instead of the live repo root so broad
         # dev builds are not poisoned by dirty/untracked workspace artifacts.
@@ -138,9 +138,9 @@ def _cpp_nix_build_impl(ctx):
         "-c",
         run_and_copy,
         out.as_output(),
-        # $1: absolute path to build-tools/tools/buck/graph.json
+        # $1: absolute path to .viberoots/workspace/buck/graph.json
         graph_arg,
-        # $2: optional path to build-tools/tools/buck/workspace-root.env (may be an empty artifact in some contexts)
+        # $2: optional path to .viberoots/workspace/buck/workspace-root.env
         env_arg,
         # $3: absolute path to the repository flake.nix to pin FLK_ROOT deterministically
         ctx.attrs.flake_file if ctx.attrs.flake_file != None else "",

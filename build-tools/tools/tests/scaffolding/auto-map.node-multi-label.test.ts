@@ -10,7 +10,7 @@ test("auto-map maps only lockfile providers when both module + lockfile labels p
     await $`git init`;
 
     // Create graph with target having both module and lockfile labels
-    const graphPath = path.join(tmp, "build-tools/tools/buck/graph.json");
+    const graphPath = path.join(tmp, ".viberoots/workspace/buck/graph.json");
     const graphContent = JSON.stringify([
       {
         name: "//projects/apps/hybrid:service",
@@ -43,7 +43,7 @@ test("auto-map maps only lockfile providers when both module + lockfile labels p
     await $`node build-tools/tools/buck/sync-providers.ts --lang node --no-glue`;
 
     // Generate auto-map
-    const autoMapPath = path.join(tmp, "third_party/providers/auto_map.bzl");
+    const autoMapPath = path.join(tmp, ".viberoots/workspace/providers/auto_map.bzl");
     await $`node build-tools/tools/buck/gen-auto-map.ts --graph ${graphPath} --out ${autoMapPath}`;
 
     const autoMapContent = await fsp.readFile(autoMapPath, "utf8");

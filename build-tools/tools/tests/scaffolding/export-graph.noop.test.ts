@@ -2,9 +2,10 @@
 import path from "node:path";
 import { test } from "node:test";
 import { readGraph } from "../../lib/graph";
+import { DEFAULT_GRAPH_PATH } from "../../lib/workspace-state-paths";
 import { runInTemp } from "../lib/test-helpers";
 
-test("export-graph writes build-tools/tools/buck/graph.json and parses", async () => {
+test("export-graph writes .viberoots/workspace/buck/graph.json and parses", async () => {
   await runInTemp("export-graph", async (tmp, $) => {
     // Ensure temp repo has a valid Buck mapping to the checked-in prelude
     await $({ cwd: tmp })`bash --noprofile --norc -c ${`set -euo pipefail
@@ -39,8 +40,8 @@ EOF
       mkdir -p toolchains
       printf '[buildfile]\nname = TARGETS\n' > toolchains/.buckconfig
     `}`;
-    await $`node build-tools/tools/buck/export-graph.ts --out build-tools/tools/buck/graph.json`;
-    const p = path.join(tmp, "build-tools", "tools", "buck", "graph.json");
+    await $`node build-tools/tools/buck/export-graph.ts --out ${DEFAULT_GRAPH_PATH}`;
+    const p = path.join(tmp, DEFAULT_GRAPH_PATH);
     const nodes = await readGraph(p);
     if (!Array.isArray(nodes)) {
       console.error("expected nodes array in graph.json");

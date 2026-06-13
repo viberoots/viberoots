@@ -16,7 +16,7 @@ await runInTemp("exporter-adapters-inactive", async (tmp, $) => {
     { name: "//projects/apps/go:svc", rule_type: "go_binary", labels: ["lang:go"] },
     { name: "//projects/apps/cpp:tool", rule_type: "cxx_binary", labels: [] },
   ];
-  const graph = path.join(tmp, "build-tools/tools/buck/graph.json");
+  const graph = path.join(tmp, ".viberoots/workspace/buck/graph.json");
   await fs.outputFile(graph, JSON.stringify(nodes) + "\n", "utf8");
 
   // Run exporter in simulate mode from the temp repo

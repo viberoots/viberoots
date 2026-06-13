@@ -10,7 +10,7 @@ test("auto-map skips targets without lockfile labels", async () => {
     await $`git init`;
 
     // Create graph with targets that have NO lockfile labels
-    const graphPath = path.join(tmp, "build-tools/tools/buck/graph.json");
+    const graphPath = path.join(tmp, ".viberoots/workspace/buck/graph.json");
     const graphContent = JSON.stringify([
       {
         name: "//projects/apps/go-only:service",
@@ -52,7 +52,7 @@ test("auto-map skips targets without lockfile labels", async () => {
     await $`node build-tools/tools/buck/sync-providers.ts --lang node --no-glue`;
 
     // Generate auto-map
-    const autoMapPath = path.join(tmp, "third_party/providers/auto_map.bzl");
+    const autoMapPath = path.join(tmp, ".viberoots/workspace/providers/auto_map.bzl");
     await $`node build-tools/tools/buck/gen-auto-map.ts --graph ${graphPath} --out ${autoMapPath}`;
 
     const autoMapContent = await fsp.readFile(autoMapPath, "utf8");

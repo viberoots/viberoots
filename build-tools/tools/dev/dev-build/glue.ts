@@ -99,7 +99,7 @@ async function ensureNonEmptyGraphOrExit(root: string, graphPath: string): Promi
           return;
         }
         console.error(
-          "[dev-build] ERROR: build-tools/tools/buck/graph.json is empty even after bootstrap; export failed or found no nodes.",
+          "[dev-build] ERROR: .viberoots/workspace/buck/graph.json is empty even after bootstrap; export failed or found no nodes.",
         );
         process.exit(2);
       } catch (e3) {
@@ -113,7 +113,7 @@ async function ensureNonEmptyGraphOrExit(root: string, graphPath: string): Promi
   }
 
   console.error(
-    "[dev-build] ERROR: build-tools/tools/buck/graph.json is empty. Export failed or found no nodes.",
+    "[dev-build] ERROR: .viberoots/workspace/buck/graph.json is empty. Export failed or found no nodes.",
   );
   process.exit(2);
 }

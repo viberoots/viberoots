@@ -138,7 +138,7 @@ test("repo bootstrap dry-run reads resolver config from workspace root from nest
       path.join(nested, "projects/config/shared.json"),
       resolverConfig("infisical-nested", "nested"),
     );
-    await writeJson(path.join(dir, "build-tools/tools/buck/graph.json"), {
+    await writeJson(path.join(dir, ".viberoots/workspace/buck/graph.json"), {
       nodes: [{ name: "//deployments/app:build" }],
     });
     const sink = await resolveCredentialSinkSelection({

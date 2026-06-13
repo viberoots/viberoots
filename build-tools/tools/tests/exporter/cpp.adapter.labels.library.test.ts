@@ -7,7 +7,7 @@ import { runInTemp } from "../lib/test-helpers";
 
 await runInTemp("exp-cpp-lib-labels", async (tmp, $) => {
   const nodes = [{ name: "//projects/libs/demo:demo", rule_type: "cxx_library", labels: [] }];
-  const out = path.join(tmp, "build-tools/tools/buck/graph.json");
+  const out = path.join(tmp, ".viberoots/workspace/buck/graph.json");
   await fs.outputFile(out, JSON.stringify(nodes) + "\n");
 
   await $({ cwd: tmp })`build-tools/tools/buck/export-graph.ts --simulate ${out} --out ${out}`;

@@ -1,5 +1,6 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
+import { DEFAULT_GRAPH_PATH, WORKSPACE_BUCK_STATE_DIR } from "../../../lib/workspace-state-paths";
 import "./worker-init";
 
 let cachedPreludePath: Promise<string> | null = null;
@@ -76,6 +77,8 @@ export async function ensureBuckConfigForTempRepo(tmp: string, $: any): Promise<
     "config = ./prelude",
     "fbsource = ./prelude/third-party/fbsource_stub",
     "fbcode = ./prelude/third-party/fbcode_stub",
+    "workspace_providers = ./.viberoots/workspace/providers",
+    "workspace_buck = ./.viberoots/workspace/buck",
     "",
     "[cells]",
     "root = .",
@@ -85,6 +88,8 @@ export async function ensureBuckConfigForTempRepo(tmp: string, $: any): Promise<
     "config = ./prelude",
     "fbsource = ./prelude/third-party/fbsource_stub",
     "fbcode = ./prelude/third-party/fbcode_stub",
+    "workspace_providers = ./.viberoots/workspace/providers",
+    "workspace_buck = ./.viberoots/workspace/buck",
     "",
     "[build]",
     "prelude = prelude",
@@ -92,6 +97,24 @@ export async function ensureBuckConfigForTempRepo(tmp: string, $: any): Promise<
     "user_platform = //:no_cgo",
     "target_platforms = //:no_cgo",
     "action_env = SDKROOT,CPATH,LIBRARY_PATH,CGO_CFLAGS,CGO_CPPFLAGS,CGO_ENABLED,WORKSPACE_ROOT,BUCK_TEST_SRC,BUCK_GRAPH_JSON,BUCK_ISOLATION_DIR,BUCK_NESTED_ISO,REPO_ROOT",
+    "EOF",
+    "mkdir -p .viberoots/workspace/buck",
+    "printf '[buildfile]\\nname = TARGETS\\n' > .viberoots/workspace/buck/.buckconfig",
+    "printf '[]\\n' > .viberoots/workspace/buck/graph.json",
+    "printf 'WORKSPACE_ROOT=%s\\n' \"$PWD\" > .viberoots/workspace/buck/workspace-root.env",
+    "cat > .viberoots/workspace/buck/TARGETS <<'EOF'",
+    'load("@prelude//:rules.bzl", "export_file")',
+    "",
+    'export_file(name = "graph.json", src = "graph.json", visibility = ["PUBLIC"])',
+    'export_file(name = "workspace-root.env", src = "workspace-root.env", visibility = ["PUBLIC"])',
+    "EOF",
+    "mkdir -p .viberoots/workspace/providers",
+    "printf '[buildfile]\\nname = TARGETS\\n' > .viberoots/workspace/providers/.buckconfig",
+    "cat > .viberoots/workspace/providers/auto_map.bzl <<'EOF'",
+    "MODULE_PROVIDERS = {}",
+    "EOF",
+    "cat > .viberoots/workspace/providers/TARGETS <<'EOF'",
+    "# generated workspace provider package placeholder",
     "EOF",
     "mkdir -p toolchains",
     "printf '[buildfile]\\nname = TARGETS\\n' > toolchains/.buckconfig",
@@ -206,14 +229,14 @@ export async function ensureBuckConfigForTempRepo(tmp: string, $: any): Promise<
 
 export async function ensureWorkspaceRootEnvFile(tmp: string): Promise<void> {
   try {
-    const buckToolsDir = path.join(tmp, "build-tools", "tools", "buck");
+    const buckToolsDir = path.join(tmp, WORKSPACE_BUCK_STATE_DIR);
     await fsp.mkdir(buckToolsDir, { recursive: true });
     await fsp.writeFile(
       path.join(buckToolsDir, "workspace-root.env"),
       `WORKSPACE_ROOT=${tmp}\n`,
       "utf8",
     );
-    const graphPath = path.join(buckToolsDir, "graph.json");
+    const graphPath = path.join(tmp, DEFAULT_GRAPH_PATH);
     try {
       await fsp.access(graphPath);
     } catch {

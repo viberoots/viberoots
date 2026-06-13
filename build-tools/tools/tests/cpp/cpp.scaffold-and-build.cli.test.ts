@@ -71,7 +71,7 @@ test("cpp cli scaffold builds via planner (binary exists)", async () => {
         srcs: ["projects/apps/demo/src/main.cpp"],
       },
     ];
-    const graphPath = path.join(tmp, "build-tools/tools/buck/graph.json");
+    const graphPath = path.join(tmp, ".viberoots/workspace/buck/graph.json");
     await fs.mkdirp(path.dirname(graphPath));
     await fs.writeFile(graphPath, JSON.stringify(graphNodes, null, 2) + "\n", "utf8");
 

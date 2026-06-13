@@ -3,6 +3,11 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import path from "node:path";
 import * as fsp from "node:fs/promises";
+import {
+  DEFAULT_AUTO_MAP_PATH,
+  DEFAULT_PROVIDER_TARGETS_PATH,
+  workspaceProviderLabel,
+} from "../../lib/workspace-state-paths";
 import { runInTemp } from "../lib/test-helpers";
 
 function firstCqueryNode<T>(json: unknown): T | null {
@@ -26,14 +31,14 @@ test("go macros: nix_go_binary auto-wires *_pkg and *_test targets with standard
   await runInTemp("go-bin-auto-wired-targets-exist-and-wired", async (tmp, $) => {
     await $({
       cwd: tmp,
-    })`bash --noprofile --norc -c 'mkdir -p third_party/providers && cat > third_party/providers/TARGETS <<'\''EOF'\''
+    })`bash --noprofile --norc -c 'mkdir -p .viberoots/workspace/providers && cat > ${DEFAULT_PROVIDER_TARGETS_PATH} <<'\''EOF'\''
 genrule(name="prov", out="prov.stamp", cmd=": > $OUT", visibility=["PUBLIC"])
 EOF'`;
     await $({
       cwd: tmp,
-    })`bash --noprofile --norc -c 'cat > third_party/providers/auto_map.bzl <<'\''EOF'\''
+    })`bash --noprofile --norc -c 'cat > ${DEFAULT_AUTO_MAP_PATH} <<'\''EOF'\''
 MODULE_PROVIDERS = {
-  "//projects/apps/demo:demo_pkg": ["//third_party/providers:prov"],
+  "//projects/apps/demo:demo_pkg": ["workspace_providers//:prov"],
 }
 EOF'`;
 
@@ -84,7 +89,7 @@ EOF'`;
     );
     const pkgDeps = pkg?.deps || [];
     const provCount = pkgDeps.filter(
-      (d) => typeof d === "string" && d.includes("//third_party/providers:prov"),
+      (d) => typeof d === "string" && d.includes(workspaceProviderLabel("prov")),
     ).length;
     assert.equal(provCount, 1, "expected provider edge present exactly once in *_pkg deps");
     assert.ok(

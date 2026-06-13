@@ -85,8 +85,8 @@ await runInTemp("export-graph-attach-modules-local-replace", async (tmp, $) => {
     },
   ];
   await fs.outputFile(path.join(tmp, "sim.json"), JSON.stringify(nodes));
-  await $`node build-tools/tools/buck/export-graph.ts --simulate sim.json --out build-tools/tools/buck/graph.json`;
-  const graph = await readGraph(path.join(tmp, "build-tools/tools/buck/graph.json"));
+  await $`node build-tools/tools/buck/export-graph.ts --simulate sim.json --out .viberoots/workspace/buck/graph.json`;
+  const graph = await readGraph(path.join(tmp, ".viberoots/workspace/buck/graph.json"));
 
   // Find nodes and assert module labels only on test target
   const find = (name: string) => graph.find((n: any) => n.name.endsWith(name));

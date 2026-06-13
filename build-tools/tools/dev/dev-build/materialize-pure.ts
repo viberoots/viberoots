@@ -183,7 +183,7 @@ export async function materializePureGraphIfEnabled(opts: {
       .pop() || "";
   if (!purePath) {
     console.warn(
-      "[dev-build] WARNING: pure graph evaluation returned no out path. If your manifest is empty, ensure buck graph export succeeded and glue exists (third_party/providers/auto_map.bzl, TARGETS.auto).",
+      "[dev-build] WARNING: pure graph evaluation returned no out path. If your manifest is empty, ensure buck graph export succeeded and glue exists (.viberoots/workspace/providers/auto_map.bzl, TARGETS.auto).",
     );
   } else {
     await $({ stdio: "inherit", cwd: opts.root })`ln -sfn ${purePath} ${linkName}`;

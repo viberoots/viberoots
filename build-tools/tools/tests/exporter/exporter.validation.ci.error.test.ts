@@ -13,7 +13,7 @@ test("CI forces error severity regardless of --validation=warn", async () => {
     const nodes = [
       { name: "//build-tools/go/app:bin", srcs: ["build-tools/go/app/main.go"], labels: [] },
     ];
-    const graph = path.join(tmp, "build-tools/tools/buck/graph.json");
+    const graph = path.join(tmp, ".viberoots/workspace/buck/graph.json");
     await fs.mkdirp(path.dirname(graph));
     await fs.outputFile(graph, JSON.stringify(nodes, null, 2));
 

@@ -48,7 +48,7 @@ test("uv2nix env drvPath depends only on uv.lock (not importer source files)", a
       "utf8",
     );
     await $`git add -A`;
-    await $`git ls-files --error-unmatch build-tools/tools/buck/graph.json`;
+    await $`git ls-files --error-unmatch .viberoots/workspace/buck/graph.json`;
     await $`git -c user.name=tmp -c user.email=tmp@example.com commit -m "test: add graph"`;
 
     const flakeAttr = "graph-generator-selected.passthru.uv2nixEnv.drvPath";

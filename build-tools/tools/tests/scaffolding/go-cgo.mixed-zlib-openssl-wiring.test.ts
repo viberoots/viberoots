@@ -15,7 +15,7 @@ EOF'`;
     // Map the demo target to both providers via MODULE_PROVIDERS (auto_map)
     await $({
       cwd: tmp,
-    })`bash --noprofile --norc -c 'cat > third_party/providers/auto_map.bzl <<'\''EOF'\''
+    })`bash --noprofile --norc -c 'cat > .viberoots/workspace/providers/auto_map.bzl <<'\''EOF'\''
 # GENERATED for test
 MODULE_PROVIDERS = {
     "//projects/apps/demo-cli:demo": [

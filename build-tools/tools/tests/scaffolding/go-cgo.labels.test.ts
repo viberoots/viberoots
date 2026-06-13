@@ -9,7 +9,7 @@ test("nix_go_library stamps cgo:enabled and nixpkg labels when nixpkg_deps set",
     // and the test becomes a provider-wiring test instead of a label-stamping test.)
     await $({
       cwd: tmp,
-    })`bash --noprofile --norc -c 'cat > third_party/providers/auto_map.bzl <<'\''EOF'\''
+    })`bash --noprofile --norc -c 'cat > .viberoots/workspace/providers/auto_map.bzl <<'\''EOF'\''
 # GENERATED for test (mapping can be empty for this label-only check)
 MODULE_PROVIDERS = {
 }

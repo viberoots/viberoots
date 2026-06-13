@@ -4,6 +4,7 @@ import { syncAllProviders } from "./providers/index";
 import { DEFAULT_GRAPH_PATH } from "../lib/graph-const";
 import { getFlagBool, getFlagStr, hasFlag } from "../lib/cli";
 import { runGluePipeline } from "./glue-pipeline";
+import { DEFAULT_AUTO_MAP_PATH, providerAutoTargetsPath } from "../lib/workspace-state-paths";
 
 function dbgEnabled(): boolean {
   try {
@@ -22,7 +23,7 @@ function dbg(...args: any[]) {
 // Preserve presence detection behavior for defaults that depend on explicit flags
 const flagProvided = hasFlag;
 
-const OUT_FILE = getFlagStr("out", "third_party/providers/TARGETS.auto");
+const OUT_FILE = getFlagStr("out", providerAutoTargetsPath("node"));
 const STRICT = getFlagBool("strict");
 const LANG = getFlagStr("lang", "");
 const EMIT_INDEX = getFlagBool("emit-index") || getFlagBool("emitIndex");
@@ -37,21 +38,21 @@ async function main() {
     try {
       const { stdout } = await $({
         stdio: "pipe",
-      })`bash --noprofile --norc -c 'ls -la third_party/providers 2>/dev/null || true'`;
-      dbg("before (third_party/providers):\n" + String(stdout || "").trim());
+      })`bash --noprofile --norc -c 'ls -la .viberoots/workspace/providers 2>/dev/null || true'`;
+      dbg("before (workspace providers):\n" + String(stdout || "").trim());
     } catch {}
   }
   await syncAllProviders({ outFile: maybeOut as any, strict: STRICT, lang: targetLang });
   if (targetLangRequested(targetLang) && !NO_GLUE) {
     // When a specific language is requested, also ensure downstream glue is present so
-    // Buck macros load provider mappings via //build-tools/lang:auto_map.bzl (re-export of third_party/providers/auto_map.bzl).
+    // Buck macros load provider mappings via //build-tools/lang:auto_map.bzl (re-export of workspace_providers//:auto_map.bzl).
     //
     // Delegate to the centralized glue pipeline for the shared post-sync steps
     // (ensureGraph → optional provider_index → auto_map).
     await runGluePipeline({
       skipProviderSync: true,
       graphPath: DEFAULT_GRAPH_PATH,
-      outAutoMap: "third_party/providers/auto_map.bzl",
+      outAutoMap: DEFAULT_AUTO_MAP_PATH,
       providerIndex: emitIndexRequested() ? "required" : "best-effort",
       autoMap: "required",
     });
@@ -59,8 +60,8 @@ async function main() {
       try {
         const { stdout } = await $({
           stdio: "pipe",
-        })`bash --noprofile --norc -c 'ls -la third_party/providers 2>/dev/null || true'`;
-        dbg("after (third_party/providers):\n" + String(stdout || "").trim());
+        })`bash --noprofile --norc -c 'ls -la .viberoots/workspace/providers 2>/dev/null || true'`;
+        dbg("after (workspace providers):\n" + String(stdout || "").trim());
       } catch {}
     }
   } else if (emitIndexRequested() && !NO_GLUE) {

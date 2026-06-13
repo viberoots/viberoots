@@ -7,7 +7,7 @@ let
   graphGen =
     let
       envGraph = builtins.getEnv "BUCK_GRAPH_JSON";
-      graphPath = if envGraph != "" then envGraph else (repoRoot + "/build-tools/tools/buck/graph.json");
+      graphPath = if envGraph != "" then envGraph else (repoRoot + "/.viberoots/workspace/buck/graph.json");
       graphArg =
         if (builtins.pathExists graphPath) then (builtins.path { path = graphPath; name = "graph.json"; }) else null;
     in
@@ -56,5 +56,4 @@ in
 {
   inherit graphGen buckGraph graphGenPure;
 }
-
 

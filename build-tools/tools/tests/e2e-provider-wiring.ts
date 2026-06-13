@@ -30,7 +30,7 @@ test("provider wiring: Go module labels do not map to providers (Node-only mappi
     // No provider syncing for Go modules; mapping is Node-only in provider-migration.
 
     // Build graph.json directly with module label only on test target
-    const graphPath = path.join(tmp, "build-tools/tools/buck/graph.json");
+    const graphPath = path.join(tmp, ".viberoots/workspace/buck/graph.json");
     await fs.mkdirp(path.dirname(graphPath));
     const nodes = [
       { name: "//goproj:bin", rule_type: "go_binary", labels: ["lang:go"], srcs: ["main.go"] },
@@ -44,10 +44,13 @@ test("provider wiring: Go module labels do not map to providers (Node-only mappi
     await fs.outputFile(graphPath, JSON.stringify(nodes, null, 2), "utf8");
     await $({
       cwd: tmp,
-    })`build-tools/tools/buck/gen-auto-map.ts --graph ${graphPath} --out third_party/providers/auto_map.bzl`;
+    })`build-tools/tools/buck/gen-auto-map.ts --graph ${graphPath} --out .viberoots/workspace/providers/auto_map.bzl`;
 
     // Inspect auto_map: expect no providers for Go module labels on any target
-    const amap = await fs.readFile(path.join(tmp, "third_party/providers/auto_map.bzl"), "utf8");
+    const amap = await fs.readFile(
+      path.join(tmp, ".viberoots/workspace/providers/auto_map.bzl"),
+      "utf8",
+    );
     function blockFor(target: string): string {
       const key = `"${target}":`;
       const idx = amap.indexOf(key);

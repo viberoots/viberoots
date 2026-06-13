@@ -96,7 +96,7 @@ Canonical shared Starlark helpers for this contract live under `//build-tools/la
 - `merge_link_intent_deps(deps, link_deps, header_deps)`
 - `validate_link_closure_overrides(link_deps, link_closure_overrides)`
 
-The Buck graph exporter must include these intent fields in `build-tools/tools/buck/graph.json` so planners can consume them without rule-type-specific fallbacks:
+The Buck graph exporter must include these intent fields in `.viberoots/workspace/buck/graph.json` so planners can consume them without rule-type-specific fallbacks:
 
 - `link_deps`
 - `header_deps`
@@ -246,7 +246,7 @@ let
   lib = pkgs.lib;
   # Language templates live in a separate module to keep planner small:
   T = import ./build-tools/tools/nix/lang-templates.nix { inherit pkgs; };
-  nodes = builtins.fromJSON (builtins.readFile ./build-tools/tools/buck/graph.json);
+  nodes = builtins.fromJSON (builtins.readFile ./.viberoots/workspace/buck/graph.json);
   get = attrs: k: attrs.${k} or null;
 
   # Dispatch: simple prefix + optional mapping.nix (see below)
@@ -378,11 +378,11 @@ We export the **configured** Buck graph as JSON with a short zx script. This scr
 #!/usr/bin/env zx-wrapper
 /**
  * export-graph.ts — minimal zx exporter
- * Writes a configured graph to build-tools/tools/buck/graph.json (or path via --out)
+ * Writes a configured graph to .viberoots/workspace/buck/graph.json (or path via --out)
  */
 // We enumerate configured targets with a shallow deps() to avoid dumping the entire graph JSON.
 const query = "deps(//..., 1, exec_deps())";
-const out = (argv.out as string) || "build-tools/tools/buck/graph.json";
+const out = (argv.out as string) || ".viberoots/workspace/buck/graph.json";
 
 const attrs = [
   "name",
@@ -415,7 +415,7 @@ Inline fallback (buck2 cquery):
 - `build-tools/tools/patch/glue.ts` calls this module from `ensureGraph()` when forced via `EXPORTER_FORCE_INLINE=1` or as the final fallback if the Node exporter and nix-run delegation are unavailable.
 - The module preserves the existing behavior and wiring (roots, optional `--target`, isolation dir, and optional target platform flag).
 
-> Consumption note: downstream tools should not read `graph.json` directly. Use the Composite Graph API instead — library `build-tools/tools/lib/graph-view.ts` or CLI `node build-tools/tools/buck/graph-view.ts`. Glue emits the Node sidecar index at `build-tools/tools/buck/node-lock-index.json` (via `build-tools/tools/buck/gen-provider-index.ts`) and both files include `$schema` and `version` fields.
+> Consumption note: downstream tools should not read `graph.json` directly. Use the Composite Graph API instead — library `build-tools/tools/lib/graph-view.ts` or CLI `node build-tools/tools/buck/graph-view.ts`. Glue emits the Node sidecar index at `.viberoots/workspace/buck/node-lock-index.json` (via `build-tools/tools/buck/gen-provider-index.ts`) and both files include `$schema` and `version` fields.
 
 When one TypeScript tooling script needs to invoke another, do not hand-roll Node flags. Use the shared helper `build-tools/tools/lib/node-run.ts:runNodeWithZx` so `zx-init` loading and Node flags stay consistent across callsites.
 
@@ -573,13 +573,13 @@ node build-tools/tools/buck/sync-providers.ts --emit-index
 - Or generate directly:
 
 ```
-node build-tools/tools/buck/gen-provider-index.ts --out third_party/providers/provider_index.bzl
+node build-tools/tools/buck/gen-provider-index.ts --out .viberoots/workspace/providers/provider_index.bzl
 ```
 
 The index contains entries like:
 
 ```
-"//third_party/providers:<name>": { "kind": "go|node|cpp", "key": "module:<path>@<ver>|lockfile:<path>#<importer>|nixpkg:<attr>" }
+"workspace_providers//:<name>": { "kind": "go|node|cpp", "key": "module:<path>@<ver>|lockfile:<path>#<importer>|nixpkg:<attr>" }
 ```
 
 This file is optional and excluded from builds; it exists for introspection and tests.
@@ -599,7 +599,7 @@ sequenceDiagram
 
   Dev->>Buck: buck2 build //<target>
   Buck->>ZX: cquery configured graph → JSON
-  ZX->>GG: write build-tools/tools/buck/graph.json
+  ZX->>GG: write .viberoots/workspace/buck/graph.json
   GG->>Nix: instantiate dynamic derivations
   Nix->>Go: build (apply patches/overrides)
   Go-->>Dev: artifacts (bin / lib)
@@ -741,7 +741,7 @@ changes that do not touch build-system paths.
   - otherwise (`no-template-impact` + no build-system changes), run `project-impact`
 - `project-impact` graph resolution:
   - map changed paths to owning projects under `projects/apps/<name>` and `projects/libs/<name>`
-  - resolve reverse dependencies across `build-tools/tools/buck/graph.json` using one traversal per
+  - resolve reverse dependencies across `.viberoots/workspace/buck/graph.json` using one traversal per
     verify run
   - include changed projects plus full recursive downstream dependents
   - output stable, deduplicated project scopes (`//projects/.../<name>/...`)
@@ -887,7 +887,7 @@ nix_go_binary(
 )
 ```
 
-**Acceptance check:** When you change any of these attrs and re‑run the exporter, the target’s `labels` in `build-tools/tools/buck/graph.json` should update accordingly (different `module:` set if imports change). Patch edits under `<pkg>/patches/go` should invalidate only the affected targets.
+**Acceptance check:** When you change any of these attrs and re‑run the exporter, the target’s `labels` in `.viberoots/workspace/buck/graph.json` should update accordingly (different `module:` set if imports change). Patch edits under `<pkg>/patches/go` should invalidate only the affected targets.
 
 - [ ] Land `//build-tools/go/defs.bzl` with the **generic macro** (`nix_go_binary` / `nix_go_library` / `nix_go_test`) that wraps the underlying `go_*` rules and includes package‑local patch files in `srcs` for precise invalidation.
 - [ ] Convert **one small target** to the macro (leave the rest untouched).
@@ -905,7 +905,7 @@ nix_go_binary(
 | `replace github.com/foo/bar => ../bar`                          | `github.com/foo/bar@<pseudo or none>` | `module:github.com/foo/bar@v0.0.0-<pseudo>` |
 | `replace github.com/foo/bar v1.2.3 => github.com/me/bar v1.2.4` | `github.com/me/bar@v1.2.4`            | `module:github.com/me/bar@v1.2.4`           |
 
-- [ ] Implement `build-tools/tools/buck/export-graph.ts` to run **after codegen** and emit `build-tools/tools/buck/graph.json` with **authoritative** `module:<path>@<version>` labels using `go list`:
+- [ ] Implement `build-tools/tools/buck/export-graph.ts` to run **after codegen** and emit `.viberoots/workspace/buck/graph.json` with **authoritative** `module:<path>@<version>` labels using `go list`:
   - Batch targets by **config tuple**: `(toolchain hash, module root, GOOS, GOARCH, CGO_ENABLED, sorted build tags, GOFLAGS)`.
   - For each batch, run exactly **one**:
     ```bash
@@ -935,7 +935,7 @@ nix_go_binary(
 - [ ] Ensure `build-tools/tools/buck/gen-auto-map.ts` maps targets → providers using:
   - `lockfile:<path>#<importer>` → PNPM importer‑scoped providers (Node)
   - `nixpkg:<attr>` → nixpkgs providers (for CGO in Go and for C++)
-- [ ] Emit `third_party/providers/auto_map.bzl` (GENERATED).
+- [ ] Emit `.viberoots/workspace/providers/auto_map.bzl` (GENERATED).
 - [ ] Macros default to **AUTO** (look up providers from `MODULE_PROVIDERS`) with manual override for emergencies.
 - Verification:
   - [ ] With a Node importer and a matching lockfile label, `auto_map.bzl` lists the importer provider for that target.
@@ -955,7 +955,7 @@ nix_go_binary(
 ### Phase 7 — CI Stages (kept separate for caching)
 
 - [ ] Add stages to Jenkins (exact order):
-  1. **Export Graph** → writes `build-tools/tools/buck/graph.json`
+  1. **Export Graph** → writes `.viberoots/workspace/buck/graph.json`
   2. **Sync Providers** → updates `TARGETS*.auto`
   3. **Generate auto_map** → writes `auto_map.bzl`
   4. **Build & Test** (Buck)
@@ -1017,16 +1017,16 @@ nix_go_binary(
 > **Additional notes:**
 >
 > - Add a **Codegen** stage (if applicable) **before** “Export Graph” to ensure generated Go sources exist.
-> - Add a **Pre-build guard** stage right after “Generate auto_map” that fails fast if `build-tools/tools/buck/graph.json` or `third_party/providers/auto_map.bzl` are missing, or if no `TARGETS*.auto` files exist when patches/lockfiles are present.
+> - Add a **Pre-build guard** stage right after “Generate auto_map” that fails fast if `.viberoots/workspace/buck/graph.json` or `.viberoots/workspace/providers/auto_map.bzl` are missing, or if no `TARGETS*.auto` files exist when patches/lockfiles are present.
 >
 >   Diagnostics:
 >   - Default: minimal, no noise beyond errors/warnings.
 >   - Verbose (opt-in): set `PREBUILD_GUARD_VERBOSE=1` or pass `--verbose`. Shows newest inputs and oldest outputs, capped by `--verbose-limit N` (default 10). Missing outputs are also listed.
 >   - JSON (opt-in): pass `--json` to emit structured diagnostics with keys `inputsNewest`, `outputsOldest`, `missingOutputs`, and `summary`.
 
-> Provider coverage behavior: the guard prefers `third_party/providers/provider_index.json` as the primary source. When that index is absent or stale, it falls back to scanning all generated provider files matching `third_party/providers/TARGETS.*.auto` (including Python and Node) to verify the presence of expected `lf_*` provider rules. This avoids false “missing provider” reports when autos are up-to-date but the index lags.
+> Provider coverage behavior: the guard prefers `.viberoots/workspace/providers/provider_index.json` as the primary source. When that index is absent or stale, it falls back to scanning all generated provider files matching `.viberoots/workspace/providers/TARGETS.*.auto` (including Python and Node) to verify the presence of expected `lf_*` provider rules. This avoids false “missing provider” reports when autos are up-to-date but the index lags.
 
-> **Decision (glue generation):** Glue files (`build-tools/tools/buck/graph.json`, `third_party/providers/TARGETS*.auto`, `third_party/providers/auto_map.bzl`) are **generated by plain Node zx scripts**, invoked directly by `patch-pkg apply` and CI **without** Nix-run wrappers, and are **not committed to VCS**.
+> **Decision (glue generation):** Glue files (`.viberoots/workspace/buck/graph.json`, `.viberoots/workspace/providers/TARGETS*.auto`, `.viberoots/workspace/providers/auto_map.bzl`) are **generated by plain Node zx scripts**, invoked directly by `patch-pkg apply` and CI **without** Nix-run wrappers, and are **not committed to VCS**.
 
 > **Shared glue pipeline:** Orchestration is centralized in `build-tools/tools/buck/glue-pipeline.ts` and is invoked by both local flows (e.g., `patch-pkg`/install) and CI stages to avoid drift. Behavior and outputs remain identical; only the callsite is unified.
 
@@ -1040,7 +1040,7 @@ nix_go_binary(
 >
 > - **Export Graph:** hash of Buck config & Starlark inputs (e.g., `buck2 --version`, `.buckconfig`, `**/*.bzl`, `**/TARGETS`).
 > - **Sync Providers:** hash of `patches/**` (per-language) and lockfiles (`**/pnpm-lock.yaml`).
-> - **Auto Map:** hash of `build-tools/tools/buck/graph.json` + generated provider files.
+> - **Auto Map:** hash of `.viberoots/workspace/buck/graph.json` + generated provider files.
 
 **Example Jenkinsfile (illustrative):**
 
@@ -1061,7 +1061,7 @@ pipeline {
             steps { sh 'node build-tools/tools/codegen.ts || true' }
           }
           stage('Export Graph') {
-            steps { sh 'node build-tools/tools/buck/export-graph.ts --out build-tools/tools/buck/graph.json' }
+            steps { sh 'node build-tools/tools/buck/export-graph.ts --out .viberoots/workspace/buck/graph.json' }
           }
           stage('Sync Providers') {
             steps { sh 'node build-tools/tools/buck/sync-providers.ts' }
@@ -1073,7 +1073,7 @@ pipeline {
             steps { sh 'node build-tools/tools/buck/sync-providers.ts --lang node --no-glue' }
           }
           stage('Generate auto_map') {
-            steps { sh 'node build-tools/tools/buck/gen-auto-map.ts --graph build-tools/tools/buck/graph.json --out third_party/providers/auto_map.bzl' }
+            steps { sh 'node build-tools/tools/buck/gen-auto-map.ts --graph .viberoots/workspace/buck/graph.json --out .viberoots/workspace/providers/auto_map.bzl' }
           }
           stage('Pre-build guard') {
             steps { sh 'node build-tools/tools/buck/prebuild-guard.ts' }
@@ -1127,20 +1127,20 @@ When adding **new** Go targets (libs or apps):
 
 ---
 
-#### `//third_party/providers/auto_map.bzl` (generated file)
+#### `.viberoots/workspace/providers/auto_map.bzl` (generated file)
 
 > **Purpose:** Map targets to provider rules so that only targets that actually consume a patched module (or a lockfile provider) get invalidated.
 
-This file is generated by `build-tools/tools/buck/gen-auto-map.ts`. Buck macros should load `MODULE_PROVIDERS` via the canonical re-export `//build-tools/lang:auto_map.bzl` (do not load `//third_party/providers/auto_map.bzl` directly). Do not edit by hand.
+This file is generated by `build-tools/tools/buck/gen-auto-map.ts`. Buck macros should load `MODULE_PROVIDERS` via the canonical re-export `//build-tools/lang:auto_map.bzl` (do not load `@workspace_providers//:auto_map.bzl` directly). Do not edit by hand.
 
 #### Generator Script `build-tools/tools/buck/gen-auto-map.ts` (zx/TypeScript)
 
-- Reads `build-tools/tools/buck/graph.json` (exported Buck graph).
+- Reads `.viberoots/workspace/buck/graph.json` (exported Buck graph).
 - Collects labels from each node and maps only:
   - `lockfile:<path>#<importer>` (Node, PNPM importer-scoped)
   - `nixpkg:<attr>` (nixpkgs providers used by Go CGO/C++)
 - Emits a dict mapping **target → provider labels**. Go `module:` labels are diagnostic only and are not mapped.
-- Provider-package nodes (`//third_party/providers:*`) are intentionally excluded from `MODULE_PROVIDERS` keys to avoid self-mappings and reduce noise during diagnostics. Prefer the centralized helper `build-tools/tools/lib/graph-utils.ts:isProviderPackageNode(...)` rather than ad‑hoc string checks.
+- Provider-package nodes (`workspace_providers//:*`) are intentionally excluded from `MODULE_PROVIDERS` keys to avoid self-mappings and reduce noise during diagnostics. Prefer the centralized helper `build-tools/tools/lib/graph-utils.ts:isProviderPackageNode(...)` rather than ad‑hoc string checks.
 
 ```ts
 #!/usr/bin/env zx-wrapper
@@ -1168,7 +1168,7 @@ function getArg(name: string, def: string): string {
 }
 
 const graphPath = getArg("graph", "");
-const outPath = getArg("out", "third_party/providers/auto_map.bzl");
+const outPath = getArg("out", ".viberoots/workspace/providers/auto_map.bzl");
 
 async function main() {
   await maybeAssumeUnchanged(outPath);
@@ -1184,7 +1184,7 @@ async function main() {
   const body = keys
     .map((k) => `    "${k}": [\n${mapping[k].map((p) => `        "${p}",`).join("\n")}\n    ],`)
     .join("\n\n");
-  const header = `# //third_party/providers/auto_map.bzl\n# GENERATED FILE — DO NOT EDIT.\n\nMODULE_PROVIDERS = {\n`;
+  const header = `# @workspace_providers//:auto_map.bzl\n# GENERATED FILE — DO NOT EDIT.\n\nMODULE_PROVIDERS = {\n`;
   const footer = `\n}\n`;
   const data = header + body + footer;
   await writeIfChanged(outPath, data);
@@ -1571,7 +1571,7 @@ function modProviderFromKey(key: string): string {
   const h = shortHash(k);
   const [imp, ver] = k.split("@");
   const tail = (imp.split("/").slice(-2).join("_") + "_" + ver.replace(/[.@]/g, "_")).toLowerCase();
-  return `//third_party/providers:mod_${h}_${tail}`;
+  return `workspace_providers//:mod_${h}_${tail}`;
 }
 
 function lockProviderFrom(lf?: string, importer?: string): string | null {
@@ -1580,7 +1580,7 @@ function lockProviderFrom(lf?: string, importer?: string): string | null {
   }
   const h = shortHash(`${lf}#${importer}`);
   const suffix = `${importer.replace(/[^\w]+/g, "_")}__${lf.replace(/[^\w]+/g, "_")}`.toLowerCase();
-  return `//third_party/providers:lf_${h}_${suffix}`;
+  return `workspace_providers//:lf_${h}_${suffix}`;
 }
 
 async function cqueryDeps(target: string): Promise<string[]> {
@@ -1755,7 +1755,7 @@ main().catch((e) => {
 
 ### `build-tools/tools/buck/prebuild-guard.ts` (zx)
 
-> Optional: extend this guard to **fail** if `build-tools/tools/buck/graph.json` is **older** (mtime) than any `TARGETS` or `*.bzl` file, catching stale graphs early.
+> Optional: extend this guard to **fail** if `.viberoots/workspace/buck/graph.json` is **older** (mtime) than any `TARGETS` or `*.bzl` file, catching stale graphs early.
 
 ```ts
 #!/usr/bin/env zx-wrapper
@@ -1769,20 +1769,21 @@ const error = (msg: string) => {
   missing = 1;
 };
 
-if (!fs.existsSync("build-tools/tools/buck/graph.json")) {
-  error("ERROR: build-tools/tools/buck/graph.json missing — run export-graph stage first.");
+if (!fs.existsSync(".viberoots/workspace/buck/graph.json")) {
+  error("ERROR: .viberoots/workspace/buck/graph.json missing — run export-graph stage first.");
 }
-if (!fs.existsSync("third_party/providers/auto_map.bzl")) {
-  error("ERROR: third_party/providers/auto_map.bzl missing — run gen-auto-map stage.");
+if (!fs.existsSync(".viberoots/workspace/providers/auto_map.bzl")) {
+  error("ERROR: .viberoots/workspace/providers/auto_map.bzl missing — run gen-auto-map stage.");
 }
 
 // If patches or lockfiles exist, ensure at least one auto provider file exists
 const matches = await globby(["patches/**/*.patch", "**/pnpm-lock.yaml"], { gitignore: true });
 const patchesPresent = matches.length > 0;
 if (patchesPresent) {
-  const exists = fs.existsSync("third_party/providers");
+  const exists = fs.existsSync(".viberoots/workspace/providers");
   const hasAuto =
-    exists && fs.readdirSync("third_party/providers").some((f) => /^TARGETS.*\.auto$/.test(f));
+    exists &&
+    fs.readdirSync(".viberoots/workspace/providers").some((f) => /^TARGETS.*\.auto$/.test(f));
   if (!hasAuto) {
     error("ERROR: provider files (TARGETS*.auto) missing — run sync-providers stages.");
   }

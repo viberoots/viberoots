@@ -15,7 +15,7 @@ test("go cli: scaffold and build", async () => {
     await $({
       cwd: _tmp,
       stdio: "inherit",
-    })`node build-tools/tools/buck/export-graph.ts --out build-tools/tools/buck/graph.json`;
+    })`node build-tools/tools/buck/export-graph.ts --out .viberoots/workspace/buck/graph.json`;
     // Generate glue and build via Nix graph-generator on the temp repo
     await $({
       env: { ...process.env, INSTALL_DEPS_SKIP_GO_TIDY: "1" },

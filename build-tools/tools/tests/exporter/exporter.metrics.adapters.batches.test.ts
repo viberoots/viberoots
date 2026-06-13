@@ -16,7 +16,7 @@ await runInTemp("exporter-metrics-adapters", async (tmp, $) => {
     { name: "//projects/libs/go:lib", rule_type: "go_library", labels: ["lang:go"] },
     { name: "//projects/apps/cpp:tool", rule_type: "cxx_binary", labels: [] },
   ];
-  const graph = path.join(tmp, "build-tools/tools/buck/graph.json");
+  const graph = path.join(tmp, ".viberoots/workspace/buck/graph.json");
   await fs.outputFile(graph, JSON.stringify(nodes) + "\n", "utf8");
 
   const metrics = path.join(tmp, "build-tools/tools/buck/export-metrics.json");

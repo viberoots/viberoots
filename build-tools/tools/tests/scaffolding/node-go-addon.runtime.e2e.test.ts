@@ -18,7 +18,7 @@ test("node go-addon: scaffold, build addon via Buck planner, run and observe Go-
     // Export Buck graph for the temp repo (exercise exporter path; not strictly required to build)
     await $({
       env: { ...process.env, BUCK_QUERY_ROOTS: "projects/apps,projects/libs,go,cpp,third_party" },
-    })`node --experimental-strip-types --import ./build-tools/tools/dev/zx-init.mjs ./build-tools/tools/buck/export-graph.ts --out build-tools/tools/buck/graph.json`;
+    })`node --experimental-strip-types --import ./build-tools/tools/dev/zx-init.mjs ./build-tools/tools/buck/export-graph.ts --out .viberoots/workspace/buck/graph.json`;
 
     // Build via Buck2 to exercise macro -> planner -> Nix through the normal user path
     const res = await $({

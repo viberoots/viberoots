@@ -63,9 +63,9 @@ test("node lib: nix_node_test target passes when no tests present", async () => 
     // Avoid pre-warming pnpm-store/node-modules here; nix_node_test will build what it needs.
 
     // Glue and provider mapping (export graph → providers → auto_map)
-    await $`node build-tools/tools/buck/export-graph.ts --out build-tools/tools/buck/graph.json`;
+    await $`node build-tools/tools/buck/export-graph.ts --out .viberoots/workspace/buck/graph.json`;
     await $`node build-tools/tools/buck/sync-providers.ts --lang node --no-glue`;
-    await $`node build-tools/tools/buck/gen-auto-map.ts --graph build-tools/tools/buck/graph.json --out third_party/providers/auto_map.bzl`;
+    await $`node build-tools/tools/buck/gen-auto-map.ts --graph .viberoots/workspace/buck/graph.json --out .viberoots/workspace/providers/auto_map.bzl`;
 
     // Target should exist and test should pass (no tests matched → success)
     await $({

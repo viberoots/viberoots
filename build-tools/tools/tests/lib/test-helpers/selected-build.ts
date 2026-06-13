@@ -1,11 +1,12 @@
 import path from "node:path";
+import { DEFAULT_GRAPH_PATH } from "../../../lib/workspace-state-paths";
 import { timeAsync } from "./timing";
 
 type ZxShell = any;
 type ZxResult = any;
 
 function graphJsonPath(tmp: string): string {
-  return path.join(tmp, "build-tools", "tools", "buck", "graph.json");
+  return path.join(tmp, DEFAULT_GRAPH_PATH);
 }
 
 function selectedBuildEnv(args: {
@@ -36,7 +37,7 @@ export async function exportGraphInTemp(args: {
       cwd: tmp,
       stdio,
       env: selectedBuildEnv({ tmp, env }),
-    })`${process.execPath} --experimental-top-level-await --disable-warning=ExperimentalWarning --experimental-strip-types --import ./build-tools/tools/dev/zx-init.mjs build-tools/tools/buck/export-graph.ts --out build-tools/tools/buck/graph.json`;
+    })`${process.execPath} --experimental-top-level-await --disable-warning=ExperimentalWarning --experimental-strip-types --import ./build-tools/tools/dev/zx-init.mjs build-tools/tools/buck/export-graph.ts --out ${DEFAULT_GRAPH_PATH}`;
   });
 }
 

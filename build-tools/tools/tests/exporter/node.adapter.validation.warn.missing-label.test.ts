@@ -6,7 +6,7 @@ import { runInTemp } from "../lib/test-helpers";
 
 test("node adapter warns when lockfile label is missing (warn mode)", async () => {
   await runInTemp("exp-node-warn-missing", async (tmp, $) => {
-    const out = path.join(tmp, "build-tools/tools/buck/graph.json");
+    const out = path.join(tmp, ".viberoots/workspace/buck/graph.json");
     await fs.mkdirp(path.dirname(out));
     // The temp workspace is a copy of this repo and includes a root pnpm-lock.yaml.
     // Remove it so "nearest lockfile" discovery returns null and the adapter emits a warning.

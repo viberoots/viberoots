@@ -220,7 +220,7 @@ def remote_ready_evidence(
         "remote_profile_compatibility": True,
         "source_snapshot": {
             "declared_root": str(source_snapshot),
-            "graph_path": "build-tools/tools/buck/graph.json",
+            "graph_path": ".viberoots/workspace/buck/graph.json",
             "manifest": str(source_snapshot_manifest),
         },
         "tool_closure": {"path": str(tool_closure)},

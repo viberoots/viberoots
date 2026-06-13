@@ -6,6 +6,7 @@ import path from "node:path";
 import { ensureGraph, runGlue } from "../buck/glue-run";
 import { getFlagStr } from "../lib/cli";
 import { DEFAULT_GRAPH_PATH } from "../lib/graph-const";
+import { DEFAULT_AUTO_MAP_PATH } from "../lib/workspace-state-paths";
 import { runNodeWithZx } from "../lib/node-run";
 import { runCiBuckTestStage } from "./buck-test-stage";
 import { runWheelhousePreload } from "./wheelhouse-preload";
@@ -103,12 +104,7 @@ async function main() {
         if (!any) break;
       }
       const target = path.resolve("build-tools/tools/buck/gen-auto-map.ts");
-      await runTool(target, [
-        "--graph",
-        DEFAULT_GRAPH_PATH,
-        "--out",
-        "third_party/providers/auto_map.bzl",
-      ]);
+      await runTool(target, ["--graph", DEFAULT_GRAPH_PATH, "--out", DEFAULT_AUTO_MAP_PATH]);
       break;
     }
     case "nix-gaps-policy": {

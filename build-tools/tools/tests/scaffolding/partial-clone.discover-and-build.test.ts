@@ -132,13 +132,13 @@ chmod +x ${stubPath}
     // Run glue explicitly to ensure discovery works in sparse context
     await $`build-tools/tools/dev/install-deps.ts --glue-only`;
     // Keep the explicit export and mapping to mirror user flow closely
-    await $`node build-tools/tools/buck/export-graph.ts --out build-tools/tools/buck/graph.json`;
+    await $`node build-tools/tools/buck/export-graph.ts --out .viberoots/workspace/buck/graph.json`;
     await $`node build-tools/tools/buck/sync-providers.ts`;
-    await $`node build-tools/tools/buck/gen-auto-map.ts --graph build-tools/tools/buck/graph.json --out third_party/providers/auto_map.bzl`;
+    await $`node build-tools/tools/buck/gen-auto-map.ts --graph .viberoots/workspace/buck/graph.json --out .viberoots/workspace/providers/auto_map.bzl`;
 
     // Smoke assertions
-    await $`test -f third_party/providers/auto_map.bzl`;
-    await $`test -f build-tools/tools/buck/graph.json`;
+    await $`test -f .viberoots/workspace/providers/auto_map.bzl`;
+    await $`test -f .viberoots/workspace/buck/graph.json`;
     // Presence of graph outputs is enough; we no longer rely on Buck-only targets here.
   });
 });

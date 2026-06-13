@@ -22,7 +22,7 @@ const EXCLUDES = [
   "tmp",
   "result",
 ];
-const GRAPH_PATH_IN_SNAPSHOT = ["build-tools", "tools", "buck", "graph.json"].join("/");
+const GRAPH_PATH_IN_SNAPSHOT = [".viberoots", "workspace", "buck", "graph.json"].join("/");
 
 type FileArg = { rel: string; src: string };
 

@@ -50,6 +50,9 @@ let
     (lib.hasPrefix "run." base && lib.hasSuffix ".out" base) ||
     (lib.hasPrefix "v." base && lib.hasSuffix ".out" base);
   isExcludedPath = rel:
+    rel == ".viberoots/workspace/buck/graph.json" ||
+    rel == ".viberoots/workspace/providers/nix_attr_map.bzl" ||
+    (lib.hasPrefix ".viberoots/workspace/providers/TARGETS" rel && lib.hasSuffix ".auto" rel) ||
     rel == "build-tools/tools/buck/graph.json" ||
     rel == "third_party/providers/nix_attr_map.bzl" ||
     (lib.hasPrefix "third_party/providers/TARGETS" rel && lib.hasSuffix ".auto" rel) ||

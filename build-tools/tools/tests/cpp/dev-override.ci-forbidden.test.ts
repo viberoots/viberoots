@@ -10,12 +10,12 @@ async function main() {
   try {
     await $({
       env,
-    })`node build-tools/tools/buck/export-graph.ts --out build-tools/tools/buck/graph.json`;
+    })`node build-tools/tools/buck/export-graph.ts --out .viberoots/workspace/buck/graph.json`;
     // Attempt a trivial build to force template evaluation
     await $({ env })`node build-tools/tools/buck/sync-providers.ts --lang=cpp`;
     await $({
       env,
-    })`node build-tools/tools/buck/gen-auto-map.ts --graph build-tools/tools/buck/graph.json --out third_party/providers/auto_map.bzl`;
+    })`node build-tools/tools/buck/gen-auto-map.ts --graph .viberoots/workspace/buck/graph.json --out .viberoots/workspace/providers/auto_map.bzl`;
   } catch {
     failed = true;
   }

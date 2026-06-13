@@ -13,7 +13,7 @@ test("auto-map includes importer-scoped provider for a temp projects/apps/exampl
       "set -euo pipefail",
       "mkdir -p projects/apps/example third_party/providers build-tools/tools/buck",
       // Provide a minimal stub so Buck can load macros before glue is generated.
-      "cat > third_party/providers/auto_map.bzl <<'BXL'",
+      "cat > .viberoots/workspace/providers/auto_map.bzl <<'BXL'",
       "# GENERATED (stub for tests) — will be replaced by gen-auto-map",
       "MODULE_PROVIDERS = {}",
       "BXL",
@@ -53,7 +53,7 @@ test("auto-map includes importer-scoped provider for a temp projects/apps/exampl
       "ST",
     ].join("\n")}`;
 
-    const graph = "build-tools/tools/buck/graph.json";
+    const graph = ".viberoots/workspace/buck/graph.json";
     const NODE = "node";
     const ZX = path.resolve("build-tools/tools/dev/zx-init.mjs");
     const nodeFlags = [
@@ -84,14 +84,17 @@ test("auto-map includes importer-scoped provider for a temp projects/apps/exampl
     // Generate Node providers from the lockfile
     await $`${NODE} ${nodeFlags} build-tools/tools/buck/sync-providers.ts --lang node --no-glue`;
     // Generate auto_map mapping lockfile label -> provider
-    await $`${NODE} ${nodeFlags} build-tools/tools/buck/gen-auto-map.ts --graph ${graph} --out third_party/providers/auto_map.bzl`;
+    await $`${NODE} ${nodeFlags} build-tools/tools/buck/gen-auto-map.ts --graph ${graph} --out .viberoots/workspace/providers/auto_map.bzl`;
 
     const expected = `//third_party/providers:${providerNameForImporter(
       "projects/apps/example/pnpm-lock.yaml",
       "projects/apps/example",
     )}`;
 
-    const autoMap = await fs.readFile(path.join(tmp, "third_party/providers/auto_map.bzl"), "utf8");
+    const autoMap = await fs.readFile(
+      path.join(tmp, ".viberoots/workspace/providers/auto_map.bzl"),
+      "utf8",
+    );
     // Look for mapping on the temp smoke_test target; allow config suffixes
     const hasSmokeTest =
       /".*projects\/apps\/example:smoke_test(?: \(config\/\/platforms:[^)]*\))?"/m.test(autoMap);

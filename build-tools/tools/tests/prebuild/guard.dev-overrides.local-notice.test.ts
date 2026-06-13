@@ -2,35 +2,37 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
+import {
+  DEFAULT_AUTO_MAP_PATH,
+  DEFAULT_GRAPH_PATH,
+  DEFAULT_INVALIDATION_REPORT_PATH,
+  DEFAULT_NIX_ATTR_MAP_PATH,
+  DEFAULT_NODE_LOCK_INDEX_PATH,
+  providerAutoTargetsPath,
+} from "../../lib/workspace-state-paths";
 import { runInTemp } from "../lib/test-helpers";
 
 test("prebuild-guard: prints local dev-override notice and exits 0", async () => {
   await runInTemp("prebuild-dev-overrides", async (tmp, $) => {
-    await fsp.mkdir(path.join(tmp, "third_party", "providers"), { recursive: true });
-    await fsp.mkdir(path.join(tmp, "build-tools", "tools", "buck"), { recursive: true });
-    await fsp.writeFile(path.join(tmp, "build-tools", "tools", "buck", "graph.json"), "[]", "utf8");
+    const envWithoutCi = { ...process.env };
+    delete envWithoutCi.CI;
+    await fsp.mkdir(path.dirname(path.join(tmp, DEFAULT_AUTO_MAP_PATH)), { recursive: true });
+    await fsp.mkdir(path.dirname(path.join(tmp, DEFAULT_GRAPH_PATH)), { recursive: true });
+    await fsp.writeFile(path.join(tmp, DEFAULT_GRAPH_PATH), "[]", "utf8");
+    await fsp.writeFile(path.join(tmp, DEFAULT_NODE_LOCK_INDEX_PATH), "{}\n", "utf8");
     await fsp.writeFile(
-      path.join(tmp, "build-tools", "tools", "buck", "node-lock-index.json"),
-      "{}\n",
-      "utf8",
-    );
-    await fsp.writeFile(
-      path.join(tmp, "build-tools", "tools", "buck", "invalidation-report.txt"),
+      path.join(tmp, DEFAULT_INVALIDATION_REPORT_PATH),
       "# invalidation-report\n",
       "utf8",
     );
     await fsp.writeFile(
-      path.join(tmp, "third_party", "providers", "auto_map.bzl"),
+      path.join(tmp, DEFAULT_AUTO_MAP_PATH),
       "# generated\nMODULE_PROVIDERS = {}\n",
       "utf8",
     );
+    await fsp.writeFile(path.join(tmp, providerAutoTargetsPath("node")), "# generated\n", "utf8");
     await fsp.writeFile(
-      path.join(tmp, "third_party", "providers", "TARGETS.auto"),
-      "# generated\n",
-      "utf8",
-    );
-    await fsp.writeFile(
-      path.join(tmp, "third_party", "providers", "nix_attr_map.bzl"),
+      path.join(tmp, DEFAULT_NIX_ATTR_MAP_PATH),
       "# generated\nNIX_ATTR_MAP = {}\n",
       "utf8",
     );
@@ -39,8 +41,7 @@ test("prebuild-guard: prints local dev-override notice and exits 0", async () =>
       cwd: tmp,
       stdio: "pipe",
       env: {
-        ...process.env,
-        CI: "", // ensure local mode
+        ...envWithoutCi,
         NIX_GO_DEV_OVERRIDE_JSON: '{"example.com/mod@v1.2.3":"/tmp/dev"}',
       },
     })`node --experimental-strip-types --import ./build-tools/tools/dev/zx-init.mjs build-tools/tools/buck/prebuild-guard.ts`.nothrow();

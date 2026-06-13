@@ -5,6 +5,8 @@ import process from "node:process";
 import { printSkip } from "../../lib/errors";
 import { nodeFlagsWithZx } from "../../lib/node-run";
 import { findRepoRoot } from "../../lib/repo";
+import { ensureWorkspaceProvidersPackage } from "../../lib/workspace-providers-package";
+import { DEFAULT_AUTO_MAP_PATH } from "../../lib/workspace-state-paths";
 import { applyNixCacheHealthPolicy } from "../verify/nix-cache-health";
 import { discoverImportersWithLock } from "./importers";
 
@@ -64,7 +66,8 @@ async function ensurePreludeSymlinkIfMissing() {
 
 async function ensureAutoMapStubIfMissing() {
   const wsRoot = await workspaceRoot();
-  const outPath = path.join(wsRoot, "third_party", "providers", "auto_map.bzl");
+  await ensureWorkspaceProvidersPackage(wsRoot);
+  const outPath = path.join(wsRoot, DEFAULT_AUTO_MAP_PATH);
   try {
     await fsp.access(outPath);
     return;
@@ -73,7 +76,7 @@ async function ensureAutoMapStubIfMissing() {
   await fsp.writeFile(
     outPath,
     [
-      "# //third_party/providers/auto_map.bzl",
+      "# @workspace_providers//:auto_map.bzl",
       "# GENERATED FILE — DO NOT EDIT.",
       "",
       "MODULE_PROVIDERS = {",

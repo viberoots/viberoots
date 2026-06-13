@@ -8,7 +8,7 @@ await runInTemp("cpp-include-pkg-local-patches", async (tmp, $) => {
   // Minimal provider mapping to satisfy loads in macros where needed
   await fs.mkdirp(path.join(tmp, "third_party/providers"));
   await fs.writeFile(
-    path.join(tmp, "third_party/providers/auto_map.bzl"),
+    path.join(tmp, ".viberoots/workspace/providers/auto_map.bzl"),
     "MODULE_PROVIDERS = {}\n",
     "utf8",
   );

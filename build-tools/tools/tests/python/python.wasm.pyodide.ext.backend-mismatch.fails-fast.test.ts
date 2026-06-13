@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import * as fs from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
+import { DEFAULT_GRAPH_PATH } from "../../lib/workspace-state-paths";
 import { runInTemp } from "../lib/test-helpers";
 
 test("python wasm (pyodide): backend mismatch fails fast", async () => {
@@ -71,7 +72,8 @@ nix_python_wasm_app(
       "utf8",
     );
 
-    await $`node build-tools/tools/buck/export-graph.ts --out build-tools/tools/buck/graph.json`;
+    const graphPath = path.join(tmp, DEFAULT_GRAPH_PATH);
+    await $`node build-tools/tools/buck/export-graph.ts --out ${DEFAULT_GRAPH_PATH}`;
     const res = await $({
       cwd: tmp,
       stdio: "pipe",
@@ -82,6 +84,7 @@ nix_python_wasm_app(
         BUCK_TARGET: "//projects/apps/pywasm:pyapp",
         WORKSPACE_ROOT: tmp,
         BUCK_TEST_SRC: tmp,
+        BUCK_GRAPH_JSON: graphPath,
         PY_WASM_BACKEND: "pyodide",
         NIX_PY_TEST_RESOLVE_JSON: JSON.stringify({
           hello: { version: "1.0.0", originPath: "projects/apps/pywasm/vendor/hello" },

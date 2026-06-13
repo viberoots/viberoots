@@ -5,6 +5,12 @@ import path from "node:path";
 import { isProviderPackageNode } from "../../lib/graph-utils";
 import { readCompositeGraph } from "../../lib/graph-view";
 import { providersForLabels } from "../../lib/labels";
+import {
+  DEFAULT_AUTO_MAP_PATH,
+  LEGACY_AUTO_MAP_PATH,
+  LEGACY_PROVIDER_DIR,
+  WORKSPACE_PROVIDER_DIR,
+} from "../../lib/workspace-state-paths";
 
 export type CoverageMiss =
   | { kind: "provider"; node: string; provider: string }
@@ -39,16 +45,18 @@ function parseModuleProviders(txt: string): Record<string, string[]> {
 
 async function readAllAutoFilesCombined(): Promise<string> {
   try {
-    const dir = path.join("third_party", "providers");
-    if (!fs.existsSync(dir)) return "";
-    const names = fs.readdirSync(dir);
-    const autoFiles = names.filter((n) => /^TARGETS\..*\.auto$/.test(n));
+    const dirs = [WORKSPACE_PROVIDER_DIR, LEGACY_PROVIDER_DIR].filter((dir) => fs.existsSync(dir));
+    const autoFiles = dirs.flatMap((dir) =>
+      fs
+        .readdirSync(dir)
+        .filter((n) => /^TARGETS\..*\.auto$/.test(n))
+        .map((n) => path.join(dir, n)),
+    );
     if (!autoFiles.length) return "";
     const texts: string[] = [];
     for (const f of autoFiles) {
       try {
-        const p = path.join(dir, f);
-        const t = await fsp.readFile(p, "utf8").catch(() => "");
+        const t = await fsp.readFile(f, "utf8").catch(() => "");
         if (t) texts.push(t);
       } catch {}
     }
@@ -64,7 +72,9 @@ function providerExistsFactory(
 ): (fq: string) => boolean {
   const escapeRegExp = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   return (fq: string): boolean => {
-    if (!fq || !fq.startsWith("//third_party/providers:")) return false;
+    const okPrefix =
+      fq.startsWith("//third_party/providers:") || fq.startsWith("workspace_providers//:");
+    if (!fq || !okPrefix) return false;
     if (providerIndex[fq]) return true;
     const tail = fq.split(":")[1] || "";
     if (tail.startsWith("lf_")) {
@@ -74,7 +84,7 @@ function providerExistsFactory(
       return re.test(autosCombinedText);
     }
     if (tail.startsWith("nix_")) {
-      const stamp = path.join("third_party", "providers", "stamps", `${tail}.stamp`);
+      const stamp = path.join(LEGACY_PROVIDER_DIR, "stamps", `${tail}.stamp`);
       return fs.existsSync(stamp);
     }
     return false;
@@ -84,7 +94,9 @@ function providerExistsFactory(
 export async function computeCoverageMissing(): Promise<CoverageMiss[]> {
   const coverageMissing: CoverageMiss[] = [];
   try {
-    const autoMapPath = path.join("third_party", "providers", "auto_map.bzl");
+    const autoMapPath = fs.existsSync(DEFAULT_AUTO_MAP_PATH)
+      ? DEFAULT_AUTO_MAP_PATH
+      : LEGACY_AUTO_MAP_PATH;
     let autoMapText = "";
     try {
       autoMapText = await fsp.readFile(autoMapPath, "utf8");

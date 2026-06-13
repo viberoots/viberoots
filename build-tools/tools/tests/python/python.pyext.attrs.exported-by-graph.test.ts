@@ -12,7 +12,7 @@ function normalizeLabelList(xs: unknown): string[] {
   return raw.map((x) => normalizeTargetLabel(String(x))).filter(Boolean);
 }
 
-test("exporter: python pyext nodes include module + link intent attrs in build-tools/tools/buck/graph.json", async () => {
+test("exporter: python pyext nodes include module + link intent attrs in .viberoots/workspace/buck/graph.json", async () => {
   await runInTemp("python-pyext-exported-attrs", async (tmp, $) => {
     const appRel = path.join("projects", "apps", "pyext_export");
     const app = path.join(tmp, appRel);

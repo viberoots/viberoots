@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
+import { providerAutoTargetsPath } from "../../../lib/workspace-state-paths";
 import { runInTemp, exists } from "../../lib/test-helpers";
 
 test("providers: Python activation via uv.lock in sparse clone (no --lang)", async () => {
@@ -33,14 +34,14 @@ await syncAllProviders();
     await fsp.writeFile(runnerPath, runner, "utf8");
     await $`node ${runnerPath}`;
 
-    const outFile = path.join(tmp, "third_party", "providers", "TARGETS.python.auto");
+    const outFile = path.join(tmp, providerAutoTargetsPath("python"));
     assert.equal(await exists(outFile), true, "expected TARGETS.python.auto to be generated");
     const txt = await fsp.readFile(outFile, "utf8");
     // Header + load line present
     assert.match(txt, /# GENERATED FILE — DO NOT EDIT\./);
     assert.match(
       txt,
-      /load\("\/\/third_party\/providers:defs_python\.bzl", "python_importer_deps"\)/,
+      /load\("@root\/\/third_party\/providers:defs_python\.bzl", "python_importer_deps"\)/,
     );
     // Provider entry present for projects/libs/api importer
     assert.match(txt, /python_importer_deps\(name="/);

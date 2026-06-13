@@ -4,10 +4,15 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { runNodeWithZx } from "../../lib/node-run";
 import { runGlue } from "../glue-run";
+import {
+  DEFAULT_GRAPH_PATH,
+  DEFAULT_PROVIDER_INDEX_JSON_PATH,
+  DEFAULT_PROVIDER_INDEX_PATH,
+} from "../../lib/workspace-state-paths";
 
 async function ensureProviderIndexArtifacts(): Promise<void> {
-  const idxPath = path.join(process.cwd(), "third_party", "providers", "provider_index.bzl");
-  const jsonPath = path.join(process.cwd(), "third_party", "providers", "provider_index.json");
+  const idxPath = path.join(process.cwd(), DEFAULT_PROVIDER_INDEX_PATH);
+  const jsonPath = path.join(process.cwd(), DEFAULT_PROVIDER_INDEX_JSON_PATH);
   const ensureDir = async () => {
     try {
       await fsp.mkdir(path.dirname(idxPath), { recursive: true });
@@ -72,6 +77,8 @@ async function ensureLocalPreludeMapping() {
       "fbsource = ./prelude/third-party/fbsource_stub",
       "fbcode = ./prelude/third-party/fbcode_stub",
       "config = ./prelude",
+      "workspace_providers = ./.viberoots/workspace/providers",
+      "workspace_buck = ./.viberoots/workspace/buck",
       "",
       "[cells]",
       "root = .",
@@ -81,6 +88,8 @@ async function ensureLocalPreludeMapping() {
       "fbsource = ./prelude/third-party/fbsource_stub",
       "fbcode = ./prelude/third-party/fbcode_stub",
       "config = ./prelude",
+      "workspace_providers = ./.viberoots/workspace/providers",
+      "workspace_buck = ./.viberoots/workspace/buck",
       "",
       "[build]",
       "prelude = prelude",
@@ -134,7 +143,7 @@ async function ensureLocalPreludeMapping() {
 }
 
 async function removeInvalidGraphJsonIfPresent() {
-  const graphPath = path.join(process.cwd(), "build-tools", "tools", "buck", "graph.json");
+  const graphPath = path.join(process.cwd(), DEFAULT_GRAPH_PATH);
   try {
     const txt = await fsp.readFile(graphPath, "utf8");
     try {
@@ -147,7 +156,7 @@ async function removeInvalidGraphJsonIfPresent() {
 }
 
 async function shouldRunInstallDeps(): Promise<boolean> {
-  const graphPath = path.join(process.cwd(), "build-tools", "tools", "buck", "graph.json");
+  const graphPath = path.join(process.cwd(), DEFAULT_GRAPH_PATH);
   const toolchainPaths = path.join(process.cwd(), "toolchains", "toolchain_paths.bzl");
   try {
     await fsp.access(toolchainPaths);

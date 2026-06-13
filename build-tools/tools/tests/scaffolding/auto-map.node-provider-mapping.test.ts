@@ -10,7 +10,7 @@ test("gen-auto-map correctly maps lockfile labels to Node providers", async () =
     await $`git init`;
 
     // Create synthetic graph.json with Node targets
-    const graphPath = path.join(tmp, "build-tools/tools/buck/graph.json");
+    const graphPath = path.join(tmp, ".viberoots/workspace/buck/graph.json");
     const graphContent = JSON.stringify([
       {
         name: "//projects/apps/web:bundle",
@@ -62,7 +62,7 @@ test("gen-auto-map correctly maps lockfile labels to Node providers", async () =
     await $`node build-tools/tools/buck/sync-providers.ts --lang node --no-glue`;
 
     // Generate auto-map
-    const autoMapPath = path.join(tmp, "third_party/providers/auto_map.bzl");
+    const autoMapPath = path.join(tmp, ".viberoots/workspace/providers/auto_map.bzl");
     await $`node build-tools/tools/buck/gen-auto-map.ts --graph ${graphPath} --out ${autoMapPath}`;
 
     const autoMapContent = await fsp.readFile(autoMapPath, "utf8");

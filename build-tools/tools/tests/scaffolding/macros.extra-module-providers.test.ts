@@ -14,7 +14,7 @@ genrule(name="dup", out="dup.stamp", cmd=": > $OUT", visibility=["PUBLIC"])
 EOF'`;
     await $({
       cwd: tmp,
-    })`bash --noprofile --norc -c 'cat > third_party/providers/auto_map.bzl <<\'EOF'
+    })`bash --noprofile --norc -c 'cat > .viberoots/workspace/providers/auto_map.bzl <<\'EOF'
 MODULE_PROVIDERS = {
   "//tmp:lib": ["//third_party/providers:mod_auto"],
 }
@@ -72,7 +72,7 @@ genrule(name="dup", out="dup.stamp", cmd=": > $OUT", visibility=["PUBLIC"])
 EOF'`;
     await $({
       cwd: tmp,
-    })`bash --noprofile --norc -c 'cat > third_party/providers/auto_map.bzl <<\'EOF'
+    })`bash --noprofile --norc -c 'cat > .viberoots/workspace/providers/auto_map.bzl <<\'EOF'
 MODULE_PROVIDERS = {}
 EOF'`;
     await $({ cwd: tmp })`bash --noprofile --norc -c 'mkdir -p tmp && cat > tmp/TARGETS <<\'EOF'

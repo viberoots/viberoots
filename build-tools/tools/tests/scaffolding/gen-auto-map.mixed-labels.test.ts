@@ -14,18 +14,13 @@ test("gen-auto-map: mixed module+lockfile labels map only lockfile provider (Nod
         "lockfile:projects/apps/web/pnpm-lock.yaml#projects/apps/web",
       ],
     };
-    await fsp.mkdir(path.join(tmp, "build-tools", "tools", "buck"), { recursive: true });
-    await fsp.writeFile(
-      path.join(tmp, "build-tools", "tools", "buck", "graph.json"),
-      JSON.stringify([node]),
-      "utf8",
-    );
-    await $`node build-tools/tools/buck/gen-auto-map.ts --graph build-tools/tools/buck/graph.json --out third_party/providers/auto_map.bzl`;
-    const out = await fsp.readFile(
-      path.join(tmp, "third_party", "providers", "auto_map.bzl"),
-      "utf8",
-    );
-    const lf = `//third_party/providers:${providerNameForImporter(
+    const graphPath = path.join(tmp, ".viberoots", "workspace", "buck", "graph.json");
+    const outPath = path.join(tmp, ".viberoots", "workspace", "providers", "auto_map.bzl");
+    await fsp.mkdir(path.dirname(graphPath), { recursive: true });
+    await fsp.writeFile(graphPath, JSON.stringify([node]), "utf8");
+    await $`node build-tools/tools/buck/gen-auto-map.ts --graph ${graphPath} --out ${outPath}`;
+    const out = await fsp.readFile(outPath, "utf8");
+    const lf = `workspace_providers//:${providerNameForImporter(
       "projects/apps/web/pnpm-lock.yaml",
       "projects/apps/web",
     )}`;
@@ -33,7 +28,7 @@ test("gen-auto-map: mixed module+lockfile labels map only lockfile provider (Nod
       console.error("missing expected lockfile provider in mapping");
       process.exit(2);
     }
-    if (out.includes("//third_party/providers:mod_")) {
+    if (out.includes("workspace_providers//:mod_")) {
       console.error("did not expect module provider in mixed mapping");
       process.exit(2);
     }

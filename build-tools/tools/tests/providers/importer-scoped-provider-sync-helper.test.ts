@@ -7,6 +7,7 @@ import { syncImporterScopedProviders } from "../../buck/providers/importer-scope
 import { computeImporterLabel } from "../../lib/importers";
 import { decodeNameVersionFromPatch } from "../../lib/providers";
 import { parseUvLockKeys } from "../../lib/uv-lock";
+import { providerAutoTargetsPath } from "../../lib/workspace-state-paths";
 import { runInTemp } from "../lib/test-helpers";
 
 function expectIncludes(haystack: string, needle: string) {
@@ -25,8 +26,6 @@ test("importer-scoped provider sync helper wires node and python configs", async
       process.env.WORKSPACE_ROOT = tmp;
       process.chdir(tmp);
       await $`git init`;
-
-      await fsp.mkdir(path.join(tmp, "third_party/providers"), { recursive: true });
 
       const nodeImporter = "projects/apps/web";
       const nodeLockfile = path.join(tmp, nodeImporter, "pnpm-lock.yaml");
@@ -74,12 +73,9 @@ test("importer-scoped provider sync helper wires node and python configs", async
         decodePatchKey: decodeNameVersionFromPatch,
       });
 
-      const nodeOut = await fsp.readFile(
-        path.join(tmp, "third_party/providers/TARGETS.node.auto"),
-        "utf8",
-      );
+      const nodeOut = await fsp.readFile(path.join(tmp, providerAutoTargetsPath("node")), "utf8");
       const pythonOut = await fsp.readFile(
-        path.join(tmp, "third_party/providers/TARGETS.python.auto"),
+        path.join(tmp, providerAutoTargetsPath("python")),
         "utf8",
       );
 

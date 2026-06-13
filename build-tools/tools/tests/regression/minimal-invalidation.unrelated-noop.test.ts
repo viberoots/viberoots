@@ -6,8 +6,8 @@ import { runInTemp } from "../lib/test-helpers";
 
 test("unrelated patch change does not alter provider mapping for target", async () => {
   await runInTemp("minimal-invalidation-unrelated", async (tmp, $) => {
-    const graphPath = path.join(tmp, "build-tools/tools/buck/graph.json");
-    const outPath = path.join(tmp, "third_party/providers/auto_map.bzl");
+    const graphPath = path.join(tmp, ".viberoots/workspace/buck/graph.json");
+    const outPath = path.join(tmp, ".viberoots/workspace/providers/auto_map.bzl");
     await fs.mkdirp(path.dirname(graphPath));
     await fs.mkdirp(path.dirname(outPath));
 

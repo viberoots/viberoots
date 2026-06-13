@@ -4,6 +4,7 @@ import { renderTargetsFile, writeIfChanged, maybeAssumeUnchanged } from "./fs-he
 import { ensureAutoSection } from "./auto-section";
 import { providerNameForImporter } from "./providers";
 import { providersHeaderFor, providersLoadFor } from "./providers-headers";
+import { DEFAULT_PROVIDER_TARGETS_PATH, providerAutoTargetsPath } from "./workspace-state-paths";
 
 export type ImporterProvider = {
   lockfile: string; // POSIX relative path, e.g. apps/web/pnpm-lock.yaml
@@ -95,7 +96,7 @@ export async function writeImporterProviders(
 
   // Synchronize managed section in curated TARGETS
   if (opts.autoSection) {
-    const file = resolveInWorkspace(opts.autoSection.file || "third_party/providers/TARGETS");
+    const file = resolveInWorkspace(opts.autoSection.file || DEFAULT_PROVIDER_TARGETS_PATH);
     await ensureAutoSection({
       file,
       begin: opts.autoSection.begin,
@@ -115,9 +116,9 @@ export default writeImporterProviders;
  *
  * Supported:
  * - node   → rule: node_importer_deps,  sentinels: AUTO_NODE,
- *             out: third_party/providers/TARGETS.node.auto
+ *             out: .viberoots/workspace/providers/TARGETS.node.auto
  * - python → rule: python_importer_deps, sentinels: AUTO_PYTHON,
- *             out: third_party/providers/TARGETS.python.auto
+ *             out: .viberoots/workspace/providers/TARGETS.python.auto
  */
 export async function writeImporterProvidersByLang(
   lang: string,
@@ -138,13 +139,13 @@ export async function writeImporterProvidersByLang(
       ruleName: "node_importer_deps",
       begin: "# BEGIN AUTO_NODE",
       end: "# END AUTO_NODE",
-      defaultOut: "third_party/providers/TARGETS.node.auto",
+      defaultOut: providerAutoTargetsPath("node"),
     },
     python: {
       ruleName: "python_importer_deps",
       begin: "# BEGIN AUTO_PYTHON",
       end: "# END AUTO_PYTHON",
-      defaultOut: "third_party/providers/TARGETS.python.auto",
+      defaultOut: providerAutoTargetsPath("python"),
     },
   };
   const entry = REGISTRY[id];

@@ -63,7 +63,7 @@ test("planner selected outputs resolve for go/cpp/python targets", async () => {
       let
         pkgs = import <nixpkgs> {};
         lib = pkgs.lib;
-        nodes = builtins.fromJSON (builtins.readFile ./build-tools/tools/buck/graph.json);
+        nodes = builtins.fromJSON (builtins.readFile ./.viberoots/workspace/buck/graph.json);
         get = attrs: k: if builtins.hasAttr k attrs then attrs.\${k} else null;
         ctx = {
           inherit lib get nodes;

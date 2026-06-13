@@ -12,7 +12,7 @@ function normalizeLabelList(xs: unknown): string[] {
   return raw.map((x) => normalizeTargetLabel(String(x))).filter(Boolean);
 }
 
-test("cpp wasm static lib preserves link intent attrs in build-tools/tools/buck/graph.json", async () => {
+test("cpp wasm static lib preserves link intent attrs in .viberoots/workspace/buck/graph.json", async () => {
   await runInTemp("cpp-wasm-static-lib-link-intent-exported", async (tmp, $) => {
     await fs.outputFile(
       path.join(tmp, "build-tools", "tools", "nix", "langs.json"),
@@ -100,7 +100,7 @@ test("cpp wasm static lib preserves link intent attrs in build-tools/tools/buck/
 
     await $({
       cwd: tmp,
-    })`node build-tools/tools/buck/export-graph.ts --out build-tools/tools/buck/graph.json`;
+    })`node build-tools/tools/buck/export-graph.ts --out .viberoots/workspace/buck/graph.json`;
     const nodes = await readGraph(path.join(tmp, "build-tools", "tools", "buck", "graph.json"));
     const node = nodes.find(
       (x) => normalizeTargetLabel(String(x.name || "")) === "//projects/libs/core:core_wasm",

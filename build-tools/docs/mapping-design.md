@@ -109,9 +109,9 @@ This matches how `graph-generator.nix` consumes the mapping today. No other keys
 1. Create `build-tools/tools/nix/mapping.nix` with an empty `dispatch = {}`.
 2. For each custom rule type you already use, add a single line mapping to `template = "go"` and `kind`.
 3. Run glue stages locally:
-   - `node build-tools/tools/buck/export-graph.ts --out build-tools/tools/buck/graph.json`
+   - `node build-tools/tools/buck/export-graph.ts --out .viberoots/workspace/buck/graph.json`
    - `node build-tools/tools/buck/sync-providers.ts`
-   - `node build-tools/tools/buck/gen-auto-map.ts --graph build-tools/tools/buck/graph.json --out third_party/providers/auto_map.bzl`
+   - `node build-tools/tools/buck/gen-auto-map.ts --graph .viberoots/workspace/buck/graph.json --out .viberoots/workspace/providers/auto_map.bzl`
 4. Build a representative target and confirm no behavior change.
 
 ### Rollback

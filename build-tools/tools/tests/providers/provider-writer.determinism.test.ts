@@ -61,7 +61,10 @@ test("provider-writer: deterministic output and managed section sync", async () 
         process.exit(2);
       }
 
-      const curated = await fsp.readFile(path.join(tmp, "third_party/providers/TARGETS"), "utf8");
+      const curated = await fsp.readFile(
+        path.join(tmp, ".viberoots/workspace/providers/TARGETS"),
+        "utf8",
+      );
       if (!curated.includes("# BEGIN AUTO_TEST") || !curated.includes("# END AUTO_TEST")) {
         console.error("expected managed section markers in curated TARGETS");
         process.exit(2);

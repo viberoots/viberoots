@@ -2,6 +2,7 @@
 import fs from "fs-extra";
 import path from "node:path";
 import { test } from "node:test";
+import { DEFAULT_GRAPH_PATH } from "../../lib/workspace-state-paths";
 import { runInTemp } from "../lib/test-helpers";
 
 test("python runtime: BUILD-INFO includes uv2nix version/rev", async () => {
@@ -24,7 +25,8 @@ test("python runtime: BUILD-INFO includes uv2nix version/rev", async () => {
     await fs.mkdirp(path.join(origin, "mydep"));
     await fs.writeFile(path.join(origin, "mydep", "__init__.py"), "x=1\n", "utf8");
     // Graph
-    const graphDir = path.join(tmp, "build-tools", "tools", "buck");
+    const graphPath = path.join(tmp, DEFAULT_GRAPH_PATH);
+    const graphDir = path.dirname(graphPath);
     await fs.mkdirp(graphDir);
     const node = {
       name: "//projects/apps/demo_pyapp:demo_pyapp",
@@ -32,11 +34,7 @@ test("python runtime: BUILD-INFO includes uv2nix version/rev", async () => {
       labels: ["lang:python", "kind:bin"],
       srcs: ["projects/apps/demo_pyapp/bin/__main__.py"],
     };
-    await fs.writeFile(
-      path.join(graphDir, "graph.json"),
-      JSON.stringify([node], null, 2) + "\n",
-      "utf8",
-    );
+    await fs.writeFile(graphPath, JSON.stringify([node], null, 2) + "\n", "utf8");
     const build = await $({
       cwd: tmp,
       env: {
@@ -44,6 +42,7 @@ test("python runtime: BUILD-INFO includes uv2nix version/rev", async () => {
         BUCK_TARGET: "//projects/apps/demo_pyapp:demo_pyapp",
         BUCK_TEST_SRC: tmp,
         WORKSPACE_ROOT: tmp,
+        BUCK_GRAPH_JSON: graphPath,
         NIX_PY_TEST_RESOLVE_JSON: JSON.stringify({
           mydep: {
             version: "1.0.0",

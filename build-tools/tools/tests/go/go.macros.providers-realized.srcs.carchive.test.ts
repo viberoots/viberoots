@@ -3,6 +3,11 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import {
+  DEFAULT_AUTO_MAP_PATH,
+  DEFAULT_PROVIDER_TARGETS_PATH,
+  workspaceProviderLabel,
+} from "../../lib/workspace-state-paths";
 import { runInTemp } from "../lib/test-helpers";
 
 test("go macros: provider edges realized into deps for nix_go_carchive", async () => {
@@ -10,14 +15,14 @@ test("go macros: provider edges realized into deps for nix_go_carchive", async (
     // Minimal provider and auto_map mapping
     await $({
       cwd: tmp,
-    })`bash --noprofile --norc -c 'mkdir -p third_party/providers && cat > third_party/providers/TARGETS <<'\''EOF'\''
+    })`bash --noprofile --norc -c 'mkdir -p .viberoots/workspace/providers && cat > ${DEFAULT_PROVIDER_TARGETS_PATH} <<'\''EOF'\''
 genrule(name="prov", out="prov.stamp", cmd=": > $OUT", visibility=["PUBLIC"])
 EOF'`;
     await $({
       cwd: tmp,
-    })`bash --noprofile --norc -c 'cat > third_party/providers/auto_map.bzl <<'\''EOF'\''
+    })`bash --noprofile --norc -c 'cat > ${DEFAULT_AUTO_MAP_PATH} <<'\''EOF'\''
 MODULE_PROVIDERS = {
-  "//projects/apps/demo:arc": ["//third_party/providers:prov"],
+  "//projects/apps/demo:arc": ["workspace_providers//:prov"],
 }
 EOF'`;
 
@@ -61,7 +66,7 @@ EOF'`;
     if (probe.exitCode !== 0) return;
     const out = String(probe.stdout || "");
     assert.ok(
-      out.includes("//third_party/providers:prov"),
+      out.includes(workspaceProviderLabel("prov")),
       "expected provider target present in deps for nix_go_carchive",
     );
 

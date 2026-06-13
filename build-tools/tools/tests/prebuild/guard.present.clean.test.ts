@@ -6,28 +6,24 @@ import { runInTemp } from "../lib/test-helpers";
 
 test("prebuild-guard: clean present outputs passes locally", async () => {
   await runInTemp("prebuild-clean", async (tmp, $) => {
-    await fsp.mkdir(path.join(tmp, "third_party", "providers"), { recursive: true });
-    await fsp.writeFile(path.join(tmp, "build-tools", "tools", "buck", "graph.json"), "[]", "utf8");
+    const providersDir = path.join(tmp, ".viberoots", "workspace", "providers");
+    const buckDir = path.join(tmp, ".viberoots", "workspace", "buck");
+    await fsp.mkdir(providersDir, { recursive: true });
+    await fsp.mkdir(buckDir, { recursive: true });
+    await fsp.writeFile(path.join(buckDir, "graph.json"), "[]", "utf8");
+    await fsp.writeFile(path.join(buckDir, "node-lock-index.json"), "{}\n", "utf8");
     await fsp.writeFile(
-      path.join(tmp, "build-tools", "tools", "buck", "node-lock-index.json"),
-      "{}\n",
-      "utf8",
-    );
-    await fsp.writeFile(
-      path.join(tmp, "build-tools", "tools", "buck", "invalidation-report.txt"),
+      path.join(buckDir, "invalidation-report.txt"),
       "# invalidation-report\n",
       "utf8",
     );
     await fsp.writeFile(
-      path.join(tmp, "third_party", "providers", "auto_map.bzl"),
+      path.join(providersDir, "auto_map.bzl"),
       "# generated\nMODULE_PROVIDERS = {}\n",
       "utf8",
     );
-    await fsp.writeFile(
-      path.join(tmp, "third_party", "providers", "TARGETS.auto"),
-      "# generated\n",
-      "utf8",
-    );
+    await fsp.writeFile(path.join(providersDir, "TARGETS.auto"), "# generated\n", "utf8");
+    await fsp.writeFile(path.join(providersDir, "nix_attr_map.bzl"), "NIX_ATTR_MAP = {}\n", "utf8");
     // Ensure Buck mapping exists in temp repo
     await $({ cwd: tmp })`bash --noprofile --norc -c ${`set -euo pipefail
       printf '.\n' > .buckroot

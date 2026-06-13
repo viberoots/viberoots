@@ -15,6 +15,7 @@ import { targetPackageFromLabel } from "./build-selected-helpers";
 import { parseSelectedBuildOutPath, selectedNixBuildArgs } from "./build-selected-nix-command";
 import { makeFilteredFlakeRef } from "./filtered-flake";
 import { resolveSelectedTargetLabel } from "./target-label-resolver";
+import { DEFAULT_GRAPH_PATH } from "../lib/workspace-state-paths";
 function parseSourceMode(argv: string[]): {
   sourceMode: "auto" | "git" | "path";
   sourceError?: string;
@@ -125,7 +126,7 @@ async function main() {
     process.exit(2);
   }
   const target = await resolveSelectedTargetLabel(workspaceRoot, targetRaw, { baseDir: cwd });
-  const graphPath = path.join(workspaceRoot, "build-tools", "tools", "buck", "graph.json");
+  const graphPath = path.join(workspaceRoot, DEFAULT_GRAPH_PATH);
   const importerRoots = getImporterRootsContract().workspaceRoots;
   const defaultRoots = Array.from(new Set([...importerRoots, "go", "cpp", "third_party"])).join(
     ",",
@@ -218,7 +219,7 @@ async function main() {
   if (exitCode !== 0) {
     console.error(
       "[build-selected] nix build failed.\n" +
-        "Ensure build-tools/tools/buck/graph.json includes the requested target and re-run glue export.",
+        `Ensure ${DEFAULT_GRAPH_PATH} includes the requested target and re-run glue export.`,
     );
     process.exit(exitCode || 1);
   }

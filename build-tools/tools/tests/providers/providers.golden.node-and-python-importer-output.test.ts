@@ -50,13 +50,13 @@ packages:
     await $`git add projects/apps/web/pnpm-lock.yaml`;
 
     await $`node build-tools/tools/buck/sync-providers.ts --lang node --no-glue`;
-    const out = await readText(path.join(tmp, "third_party/providers/TARGETS.node.auto"));
+    const out = await readText(path.join(tmp, ".viberoots/workspace/providers/TARGETS.node.auto"));
 
     const { providerNameForImporter } = await import("../../lib/providers");
     const name = providerNameForImporter("projects/apps/web/pnpm-lock.yaml", "projects/apps/web");
     const expected = [
       "# GENERATED FILE — DO NOT EDIT.",
-      'load("//third_party/providers:defs_node.bzl", "node_importer_deps")',
+      'load("@root//third_party/providers:defs_node.bzl", "node_importer_deps")',
       "",
       `node_importer_deps(name="${name}", lockfile="projects/apps/web/pnpm-lock.yaml", importer="projects/apps/web", patch_paths=["projects/apps/web/patches/node/aaa@1.0.0.patch", "projects/apps/web/patches/node/zzz@9.9.9.patch"])`,
       "",
@@ -96,13 +96,15 @@ test("golden: Python importer provider TARGETS.python.auto is stable for represe
     await fsp.writeFile(lockfilePath, uvLock, "utf8");
 
     await $`node build-tools/tools/buck/sync-providers.ts --lang python`;
-    const out = await readText(path.join(tmp, "third_party/providers/TARGETS.python.auto"));
+    const out = await readText(
+      path.join(tmp, ".viberoots/workspace/providers/TARGETS.python.auto"),
+    );
 
     const { providerNameForImporter } = await import("../../lib/providers");
     const name = providerNameForImporter("projects/libs/api/uv.lock", "projects/libs/api");
     const expected = [
       "# GENERATED FILE — DO NOT EDIT.",
-      'load("//third_party/providers:defs_python.bzl", "python_importer_deps")',
+      'load("@root//third_party/providers:defs_python.bzl", "python_importer_deps")',
       "",
       `python_importer_deps(name="${name}", lockfile="projects/libs/api/uv.lock", importer="projects/libs/api", patch_paths=["projects/libs/api/patches/python/requests@2.32.3.patch"])`,
       "",

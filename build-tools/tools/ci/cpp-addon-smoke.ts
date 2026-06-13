@@ -10,6 +10,8 @@
  * This is a build-only smoke check (no behavior change, no providers required).
  */
 import { runInTemp } from "../tests/lib/test-helpers";
+import { DEFAULT_GRAPH_PATH } from "../lib/graph-const";
+import { DEFAULT_AUTO_MAP_PATH } from "../lib/workspace-state-paths";
 
 function scrubRemoteBuckEnv(): void {
   for (const key of Object.keys(process.env)) {
@@ -71,10 +73,10 @@ async function main() {
     }
 
     // Run glue steps and Buck test for the scaffolded unit test
-    await $`node build-tools/tools/buck/export-graph.ts --out build-tools/tools/buck/graph.json`;
+    await $`node build-tools/tools/buck/export-graph.ts --out ${DEFAULT_GRAPH_PATH}`;
     // Node providers sync (no-op if no pnpm lockfiles)
     await $`node build-tools/tools/buck/sync-providers.ts --lang node`.nothrow();
-    await $`node build-tools/tools/buck/gen-auto-map.ts --graph build-tools/tools/buck/graph.json --out third_party/providers/auto_map.bzl`;
+    await $`node build-tools/tools/buck/gen-auto-map.ts --graph ${DEFAULT_GRAPH_PATH} --out ${DEFAULT_AUTO_MAP_PATH}`;
     await $`node build-tools/tools/buck/prebuild-guard.ts`;
     await $`buck2 test //projects/libs/demo:unit`;
   });

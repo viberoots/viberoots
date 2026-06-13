@@ -14,7 +14,7 @@ genrule(name="prov", out="prov.stamp", cmd=": > $OUT", visibility=["PUBLIC"])
 EOF'`;
     await $({
       cwd: tmp,
-    })`bash --noprofile --norc -c 'cat > third_party/providers/auto_map.bzl <<'\''EOF'\''
+    })`bash --noprofile --norc -c 'cat > .viberoots/workspace/providers/auto_map.bzl <<'\''EOF'\''
 MODULE_PROVIDERS = {
   "//projects/libs/demo:demo_headers": ["//third_party/providers:prov"],
 }

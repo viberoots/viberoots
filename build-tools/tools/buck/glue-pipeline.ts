@@ -4,6 +4,12 @@ import path from "node:path";
 import process from "node:process";
 import { DEFAULT_GRAPH_PATH } from "../lib/graph-const";
 import { runNodeWithZx } from "../lib/node-run";
+import { ensureWorkspaceBuckStatePackage } from "../lib/workspace-buck-state";
+import { ensureWorkspaceProvidersPackage } from "../lib/workspace-providers-package";
+import {
+  DEFAULT_AUTO_MAP_PATH,
+  DEFAULT_INVALIDATION_REPORT_PATH,
+} from "../lib/workspace-state-paths";
 
 type RunGluePipelineOptions = {
   graphPath?: string;
@@ -35,14 +41,16 @@ export async function runGluePipeline(opts: RunGluePipelineOptions = {}): Promis
   const repoRoot = repoRootFromCwd();
   const zxInit = opts.zxInitPath || zxInitDefault(repoRoot);
   const graphPath = opts.graphPath || DEFAULT_GRAPH_PATH;
-  const outAutoMap = opts.outAutoMap || "third_party/providers/auto_map.bzl";
-  const outInvalidationReport =
-    opts.outInvalidationReport || "build-tools/tools/buck/invalidation-report.txt";
+  const outAutoMap = opts.outAutoMap || DEFAULT_AUTO_MAP_PATH;
+  const outInvalidationReport = opts.outInvalidationReport || DEFAULT_INVALIDATION_REPORT_PATH;
   const verbose = !!opts.verbose;
   const skipProviderSync = !!opts.skipProviderSync;
   const providerIndexMode = opts.providerIndex || "required";
   const autoMapMode = opts.autoMap || "required";
   const invalidationReportMode = opts.invalidationReport || "required";
+
+  await ensureWorkspaceBuckStatePackage(repoRoot);
+  await ensureWorkspaceProvidersPackage(repoRoot);
 
   // Step 0: ensure importer roots Starlark view is up-to-date (deterministic, idempotent)
   {

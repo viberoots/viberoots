@@ -23,7 +23,7 @@ def prepare_importer_nix_calling_genrule_wiring(
         patch_key_prefix = PATCH_INPUTS_KEY_PREFIX,
         provider_key_prefix = PROVIDER_EDGES_KEY_PREFIX,
         inject_workspace_root_env = False,
-        workspace_root_env_src = "root//build-tools/tools/buck:workspace-root.env",
+        workspace_root_env_src = "workspace_buck//:workspace-root.env",
         global_inputs_into = "srcs",
         global_inputs_stamp = True,
         global_inputs_key_prefix = GLOBAL_NIX_INPUTS_KEY_PREFIX):

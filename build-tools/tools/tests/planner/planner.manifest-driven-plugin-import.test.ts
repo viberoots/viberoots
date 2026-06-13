@@ -56,7 +56,7 @@ test("planner imports plugins listed in langs.json when present", async () => {
     await $({
       cwd: tmp,
       stdio: "pipe",
-    })`git add build-tools/tools/nix/langs.json build-tools/tools/nix/planner/toy.nix build-tools/tools/buck/graph.json`;
+    })`git add build-tools/tools/nix/langs.json build-tools/tools/nix/planner/toy.nix .viberoots/workspace/buck/graph.json`;
 
     // Eval-only check against planner/langs.nix so we avoid graph-generator/full-flake work.
     const manifestBase = JSON.stringify(path.join(tmp, "build-tools/tools/nix"));

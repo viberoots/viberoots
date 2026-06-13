@@ -49,11 +49,16 @@ let
         in if parts == [] then "" else lib.removePrefix "module " (lib.head parts)
       ) else "";
 
-  # Prefer explicit graphJsonPath; otherwise fall back to BUCK_TEST_SRC/build-tools/tools/buck/graph.json
+  # Prefer explicit graphJsonPath; otherwise fall back to the workspace-generated Buck graph.
   # so test sandboxes can provide a live graph without requiring flake to import it.
   graphPath = if graphJsonPath != null then builtins.toPath graphJsonPath else (
-    let cand = builtins.toPath (repoRootStr + "/build-tools/tools/buck/graph.json"); in
-      if builtins.pathExists cand then cand else builtins.throw "graphJsonPath not provided and repoRoot/build-tools/tools/buck/graph.json missing — run build-tools/tools/buck/export-graph.ts first." 
+    let
+      cand = builtins.toPath (repoRootStr + "/.viberoots/workspace/buck/graph.json");
+      legacy = builtins.toPath (repoRootStr + "/build-tools/tools/buck/graph.json");
+    in
+      if builtins.pathExists cand then cand
+      else if builtins.pathExists legacy then legacy
+      else builtins.throw "graphJsonPath not provided and workspace Buck graph missing — run build-tools/tools/buck/export-graph.ts first."
   );
   nodesRaw = if builtins.pathExists graphPath
     then (
@@ -537,4 +542,3 @@ in
   inherit cppTargets cppTargetsFlat all selected;
   inherit selectedWasm;
 }
-

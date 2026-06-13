@@ -27,7 +27,7 @@ test("exporter attaches test-only deps only to test targets", async () => {
       { name: "//m:lib_test", rule_type: "go_test", labels: ["lang:go"], srcs: ["lib_test.go"] },
     ];
     const nodesPath = path.join(tmp, "nodes.json");
-    const graphPath = path.join(tmp, "build-tools/tools/buck/graph.json");
+    const graphPath = path.join(tmp, ".viberoots/workspace/buck/graph.json");
     await fs.mkdirp(path.dirname(graphPath));
     await fs.outputFile(nodesPath, JSON.stringify(nodesSim, null, 2), "utf8");
     await $({

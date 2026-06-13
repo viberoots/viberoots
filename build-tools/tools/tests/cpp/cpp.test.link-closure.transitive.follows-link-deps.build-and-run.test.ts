@@ -121,7 +121,7 @@ test("nix_cpp_test follows transitive link_deps with link_closure=transitive", a
 
     await $({
       cwd: tmp,
-    })`node build-tools/tools/buck/export-graph.ts --out build-tools/tools/buck/graph.json`;
+    })`node build-tools/tools/buck/export-graph.ts --out .viberoots/workspace/buck/graph.json`;
     await $({
       cwd: tmp,
     })`buck2 --isolation-dir ${inheritedBuckIsolation("cpp_test_link_closure")} test //projects/apps/demo:t`;

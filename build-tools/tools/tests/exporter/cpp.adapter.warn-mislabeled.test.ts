@@ -14,7 +14,7 @@ test("cpp adapter emit warning for C++-looking srcs missing cxx_* and lang:cpp",
     const nodes = [
       { name: "//build-tools/cpp/app:bin", srcs: ["build-tools/cpp/app/main.cpp"], labels: [] },
     ];
-    const graph = path.join(tmp, "build-tools/tools/buck/graph.json");
+    const graph = path.join(tmp, ".viberoots/workspace/buck/graph.json");
     await fs.mkdirp(path.dirname(graph));
     await fs.outputFile(graph, JSON.stringify(nodes, null, 2));
 

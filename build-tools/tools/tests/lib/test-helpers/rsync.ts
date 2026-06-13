@@ -47,7 +47,7 @@ export async function rsyncRepoTo(tmp: string) {
       "/.clinic",
       "/.direnv",
       "/result",
-      "/build-tools/tools/buck/graph.json",
+      "/.viberoots/workspace",
       "/build-tools/tools/buck/.export-cache",
       "/build-tools/tools/buck/invalidation-report.txt",
       "/build-tools/tools/buck/node-lock-index.json",
@@ -75,11 +75,7 @@ export async function rsyncRepoTo(tmp: string) {
         "/build-tools/tools/nix/templates/cpp.nix",
       );
     }
-    excludes.push(
-      "/third_party/providers/TARGETS.auto",
-      "/third_party/providers/TARGETS.*.auto",
-      "/third_party/providers/nix_attr_map.bzl",
-    );
+    excludes.push("/third_party/providers/TARGETS.auto", "/third_party/providers/TARGETS.*.auto");
     // Volatile patch-session temp files may appear/disappear during a test run.
     // These are not part of the repo and should not make temp-repo seeding flaky.
     excludes.push("/.patch-sessions.json.tmp");

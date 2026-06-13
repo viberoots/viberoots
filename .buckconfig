@@ -9,6 +9,8 @@ repo_toolchains = ./toolchains
 fbsource = ./prelude/third-party/fbsource_stub
 fbcode = ./prelude/third-party/fbcode_stub
 config = ./prelude
+workspace_providers = ./.viberoots/workspace/providers
+workspace_buck = ./.viberoots/workspace/buck
 
 [cells]
 root = .
@@ -18,6 +20,8 @@ repo_toolchains = ./toolchains
 fbsource = ./prelude/third-party/fbsource_stub
 fbcode = ./prelude/third-party/fbcode_stub
 config = ./prelude
+workspace_providers = ./.viberoots/workspace/providers
+workspace_buck = ./.viberoots/workspace/buck
 
 [build]
 prelude = prelude

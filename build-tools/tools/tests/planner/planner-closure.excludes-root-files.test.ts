@@ -61,7 +61,7 @@ test("planner: root-only files are excluded from materialized outputs", async ()
         GOSUMDB: "off",
       },
     })`build-tools/tools/dev/install-deps.ts --glue-only`;
-    await $`node build-tools/tools/buck/export-graph.ts --out build-tools/tools/buck/graph.json`;
+    await $`node build-tools/tools/buck/export-graph.ts --out .viberoots/workspace/buck/graph.json`;
     const { stdout } = await $({
       cwd: tmp,
       stdio: "pipe",

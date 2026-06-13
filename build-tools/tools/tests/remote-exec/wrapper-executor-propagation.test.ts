@@ -186,7 +186,7 @@ test("remote-ready wrapper command providers carry declared input handles in gen
       tmp,
       "build-tools/tools/tests/remote-exec/wrapper-fixtures/TARGETS",
     );
-    await fs.writeFile(path.join(tmp, "build-tools/tools/buck/graph.json"), "[]\n", "utf8");
+    await fs.writeFile(path.join(tmp, ".viberoots/workspace/buck/graph.json"), "[]\n", "utf8");
     await fs.writeFile(path.join(tmp, "build-tools/tools/buck/workspace-root.env"), "\n", "utf8");
     let text = await fs.readFile(targetsPath, "utf8");
     text = text.replaceAll(

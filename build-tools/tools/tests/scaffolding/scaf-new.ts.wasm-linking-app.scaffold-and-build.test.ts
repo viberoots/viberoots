@@ -149,7 +149,7 @@ test("scaf: new ts wasm-linking-app; build tinygo wasm; callAdd2() returns 5", a
     await $({
       cwd: tmp,
       stdio: "inherit",
-    })`node build-tools/tools/buck/export-graph.ts --out build-tools/tools/buck/graph.json`;
+    })`node build-tools/tools/buck/export-graph.ts --out .viberoots/workspace/buck/graph.json`;
 
     const webappOut = await buckOutPath({
       tmp,

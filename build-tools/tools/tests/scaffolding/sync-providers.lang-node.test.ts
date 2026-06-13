@@ -23,7 +23,7 @@ test("sync-providers with --lang node syncs only Node providers", async () => {
     await $`node build-tools/tools/buck/sync-providers.ts --lang node`;
 
     // Node provider file should exist
-    const nodeProviderPath = path.join(tmp, "third_party/providers/TARGETS.node.auto");
+    const nodeProviderPath = path.join(tmp, ".viberoots/workspace/providers/TARGETS.node.auto");
     if (!(await exists(nodeProviderPath))) {
       console.error("Expected TARGETS.node.auto to be created");
       process.exit(2);
@@ -37,8 +37,8 @@ test("sync-providers with --lang node syncs only Node providers", async () => {
 
     // Go and C++ provider files should NOT be created/modified by --lang node
     // (They may exist from prior runs, but their mtime shouldn't be recent)
-    const goProviderPath = path.join(tmp, "third_party/providers/TARGETS.auto");
-    const cppProviderPath = path.join(tmp, "third_party/providers/TARGETS.cpp.auto");
+    const goProviderPath = path.join(tmp, ".viberoots/workspace/providers/TARGETS.auto");
+    const cppProviderPath = path.join(tmp, ".viberoots/workspace/providers/TARGETS.cpp.auto");
 
     // Get mtime of node file
     const nodeStat = await fsp.stat(nodeProviderPath);

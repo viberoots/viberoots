@@ -16,7 +16,7 @@ test("providersForLabels maps nixpkg:<attr> to canonical nix provider target lab
 
   const got = providersForLabels(labels);
 
-  assert.ok(got.includes("//third_party/providers:nix_pkgs_zlib"));
-  assert.ok(got.includes("//third_party/providers:nix_pkgs_googletest"));
-  assert.ok(got.includes("//third_party/providers:nix_pkgs_gnome_glib"));
+  assert.ok(got.includes("workspace_providers//:nix_pkgs_zlib"));
+  assert.ok(got.includes("workspace_providers//:nix_pkgs_googletest"));
+  assert.ok(got.includes("workspace_providers//:nix_pkgs_gnome_glib"));
 });

@@ -6,12 +6,15 @@ import { runInTemp } from "../lib/test-helpers";
 test("sync-providers: empty repo still generates minimal Node providers file when requested", async () => {
   await runInTemp("sync-empty", async (tmp, $) => {
     await $`node build-tools/tools/buck/sync-providers.ts --lang node`;
-    const txt = await fsp.readFile(`${tmp}/third_party/providers/TARGETS.node.auto`, "utf8");
+    const txt = await fsp.readFile(
+      `${tmp}/.viberoots/workspace/providers/TARGETS.node.auto`,
+      "utf8",
+    );
     if (!txt.includes("GENERATED FILE — DO NOT EDIT.")) {
       console.error("missing header");
       process.exit(2);
     }
-    if (!txt.includes('load("//third_party/providers:defs_node.bzl", "node_importer_deps")')) {
+    if (!txt.includes('load("@root//third_party/providers:defs_node.bzl", "node_importer_deps")')) {
       console.error("missing node load line");
       process.exit(2);
     }

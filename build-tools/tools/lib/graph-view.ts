@@ -3,6 +3,12 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { readGraph, type GraphNode } from "./graph";
 import { DEFAULT_GRAPH_PATH } from "./graph-const";
+import {
+  DEFAULT_NODE_LOCK_INDEX_PATH,
+  DEFAULT_PROVIDER_INDEX_JSON_PATH,
+  LEGACY_NODE_LOCK_INDEX_PATH,
+  LEGACY_PROVIDER_INDEX_JSON_PATH,
+} from "./workspace-state-paths";
 
 export type ProviderIndexEntry = { kind: string; key: string };
 
@@ -30,14 +36,21 @@ async function readJsonIfExists<T = any>(p: string): Promise<T | {}> {
   }
 }
 
+function firstExisting(primary: string, legacy: string): string {
+  if (fs.existsSync(primary)) return primary;
+  return legacy;
+}
+
 export async function readCompositeGraph(
   opts: ReadCompositeGraphOptions = {},
 ): Promise<CompositeGraphView> {
   const graphPath = opts.graphPath || DEFAULT_GRAPH_PATH;
   const providerIndexPath =
-    opts.providerIndexPath || path.resolve("third_party/providers/provider_index.json");
+    opts.providerIndexPath ||
+    path.resolve(firstExisting(DEFAULT_PROVIDER_INDEX_JSON_PATH, LEGACY_PROVIDER_INDEX_JSON_PATH));
   const nodeLockIndexPath =
-    opts.nodeLockIndexPath || path.resolve("build-tools/tools/buck/node-lock-index.json");
+    opts.nodeLockIndexPath ||
+    path.resolve(firstExisting(DEFAULT_NODE_LOCK_INDEX_PATH, LEGACY_NODE_LOCK_INDEX_PATH));
 
   const nodes = await readGraph(graphPath);
   const providerIndex = (await readJsonIfExists<Record<string, ProviderIndexEntry>>(

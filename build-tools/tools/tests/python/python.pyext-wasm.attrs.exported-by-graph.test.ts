@@ -6,7 +6,7 @@ import { test } from "node:test";
 import { readGraph } from "../../lib/graph";
 import { runInTemp } from "../lib/test-helpers";
 
-test("exporter: python pyext_wasm nodes include module attrs in build-tools/tools/buck/graph.json", async () => {
+test("exporter: python pyext_wasm nodes include module attrs in .viberoots/workspace/buck/graph.json", async () => {
   await runInTemp("python-pyext-wasm-exported-attrs", async (tmp, $) => {
     const appRel = path.join("projects", "apps", "pyext_wasm_export");
     const app = path.join(tmp, appRel);

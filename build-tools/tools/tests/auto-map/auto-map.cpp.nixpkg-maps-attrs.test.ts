@@ -19,7 +19,7 @@ test("auto-map: C++ nixpkg labels map to providers", async () => {
     ];
     await fs.writeFile(graphPath, JSON.stringify(nodes) + "\n", "utf8");
 
-    const outPath = path.join(tmp, "third_party/providers/auto_map.bzl");
+    const outPath = path.join(tmp, ".viberoots/workspace/providers/auto_map.bzl");
     await $({
       cwd: tmp,
     })`node build-tools/tools/buck/gen-auto-map.ts --graph ${graphPath} --out ${outPath}`;

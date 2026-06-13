@@ -3,11 +3,13 @@ import fs from "fs-extra";
 import assert from "node:assert/strict";
 import path from "node:path";
 import { test } from "node:test";
+import { DEFAULT_GRAPH_PATH } from "../../lib/workspace-state-paths";
 import { runInTemp } from "../lib/test-helpers";
 
 test("planner builds selected go lib and bin", async () => {
   await runInTemp("planner-go-lib-bin", async (tmp, $) => {
-    const graphDir = path.join(tmp, "build-tools/tools/buck");
+    const graphPath = path.join(tmp, DEFAULT_GRAPH_PATH);
+    const graphDir = path.dirname(graphPath);
     await fs.mkdirp(graphDir);
 
     const appDir = path.join(tmp, "projects/apps/demo-cli");
@@ -49,13 +51,13 @@ test("planner builds selected go lib and bin", async () => {
         srcs: ["projects/libs/demo-lib/lib.go"],
       },
     ];
-    await fs.writeFile(path.join(graphDir, "graph.json"), JSON.stringify(nodes), "utf8");
+    await fs.writeFile(graphPath, JSON.stringify(nodes), "utf8");
 
     const targets = ["//projects/apps/demo-cli:demo-cli", "//projects/libs/demo-lib:lib"];
     for (const BUCK_TARGET of targets) {
       const { stdout } = await $({
         cwd: tmp,
-        env: { ...process.env, BUCK_TARGET, BUCK_TEST_SRC: tmp },
+        env: { ...process.env, BUCK_TARGET, BUCK_TEST_SRC: tmp, BUCK_GRAPH_JSON: graphPath },
       })`nix build --impure -L ${`path:${tmp}#graph-generator-selected`} --accept-flake-config --no-link --print-out-paths`;
       const outPath =
         String(stdout || "")

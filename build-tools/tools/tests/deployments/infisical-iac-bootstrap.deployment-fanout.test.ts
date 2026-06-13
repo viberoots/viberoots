@@ -132,7 +132,7 @@ test("confirmed repo bootstrap performs repo setup before deployment fan-out pro
   await writeRepoOnlyResolver(dir);
   await fs.mkdir(path.join(dir, "build-tools/tools/buck"), { recursive: true });
   await fs.writeFile(
-    path.join(dir, "build-tools/tools/buck/graph.json"),
+    path.join(dir, ".viberoots/workspace/buck/graph.json"),
     `${JSON.stringify({ nodes: [promptOnlyFanOutNode(staging)] }, null, 2)}\n`,
   );
   const output = await withInteractiveIo(["Y\n", "n\n"], async () => {
@@ -163,7 +163,7 @@ test("repo dry-run reports non-empty deployment fan-out targets read-only", asyn
   try {
     await fs.mkdir("build-tools/tools/buck", { recursive: true });
     await fs.writeFile(
-      "build-tools/tools/buck/graph.json",
+      ".viberoots/workspace/buck/graph.json",
       `${JSON.stringify({ nodes: [fanOutOnlyNode(staging)] }, null, 2)}\n`,
     );
     const output = await captureConsole(() =>

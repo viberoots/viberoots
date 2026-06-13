@@ -2,6 +2,7 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
+import { providerAutoTargetsPath } from "../../../lib/workspace-state-paths";
 import { runInTemp } from "../../lib/test-helpers";
 
 test("sync-providers-node normalizes importer '.' to lockfile dirname", async () => {
@@ -30,7 +31,7 @@ packages:
 
     await $`node build-tools/tools/buck/sync-providers.ts --lang node --no-glue`;
 
-    const outPath = path.join(tmp, "third_party/providers/TARGETS.node.auto");
+    const outPath = path.join(tmp, providerAutoTargetsPath("node"));
     const output = await fsp.readFile(outPath, "utf8");
 
     if (!output.includes('importer="projects/apps/example"')) {

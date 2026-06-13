@@ -27,7 +27,7 @@ test("exporter: identical batch reuses cached go-list JSON without rewrite", asy
     const sim = path.join(tmp, "nodes.json");
     await fs.outputFile(sim, JSON.stringify(nodes, null, 2), "utf8");
 
-    const graph = path.join(tmp, "build-tools/tools/buck/graph.json");
+    const graph = path.join(tmp, ".viberoots/workspace/buck/graph.json");
     const metrics1 = path.join(tmp, "metrics1.json");
     const metrics2 = path.join(tmp, "metrics2.json");
     const cacheDir = path.join(tmp, ".export-cache");

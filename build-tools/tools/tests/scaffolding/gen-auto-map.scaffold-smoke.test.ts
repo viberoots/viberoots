@@ -10,9 +10,9 @@ test("auto_map generated for scaffolded repo (may be empty)", async () => {
     await $`scaf new go lib demo-lib --yes`;
     // Avoid full-repo build; just scaffold and generate glue
     // Ensure glue is generated deterministically in the temp repo
-    await $`node build-tools/tools/buck/export-graph.ts --out build-tools/tools/buck/graph.json`;
-    await $`node build-tools/tools/buck/gen-auto-map.ts --graph build-tools/tools/buck/graph.json --out third_party/providers/auto_map.bzl`;
-    const p = path.join(process.cwd(), "third_party", "providers", "auto_map.bzl");
+    await $`node build-tools/tools/buck/export-graph.ts --out .viberoots/workspace/buck/graph.json`;
+    await $`node build-tools/tools/buck/gen-auto-map.ts --graph .viberoots/workspace/buck/graph.json --out .viberoots/workspace/providers/auto_map.bzl`;
+    const p = path.join(process.cwd(), ".viberoots", "workspace", "providers", "auto_map.bzl");
     if (!(await exists(p))) {
       console.error("auto_map.bzl missing after build");
       process.exit(2);

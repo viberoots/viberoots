@@ -57,8 +57,8 @@ await runInTemp("export-graph-attach-modules-test-only", async (tmp, $) => {
     { name: "//pkg:x_test", rule_type: "filegroup", labels: ["lang:go"], srcs: ["x_test.go"] },
   ];
   await fs.outputFile(path.join(tmp, "sim.json"), JSON.stringify(nodes));
-  await $`node build-tools/tools/buck/export-graph.ts --simulate sim.json --out build-tools/tools/buck/graph.json`;
-  const graph = await readGraph(path.join(tmp, "build-tools/tools/buck/graph.json"));
+  await $`node build-tools/tools/buck/export-graph.ts --simulate sim.json --out .viberoots/workspace/buck/graph.json`;
+  const graph = await readGraph(path.join(tmp, ".viberoots/workspace/buck/graph.json"));
   const find = (name: string) => graph.find((n: any) => n.name.endsWith(name));
   const lib = find(":x_lib");
   const tst = find(":x_test");

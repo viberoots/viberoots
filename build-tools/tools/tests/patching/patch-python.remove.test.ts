@@ -39,7 +39,7 @@ test("patch-python remove drops patch and refreshes glue deterministically", asy
       process.exit(2);
     }
 
-    const auto = path.join(tmp, "third_party", "providers", "TARGETS.python.auto");
+    const auto = path.join(tmp, ".viberoots", "workspace", "providers", "TARGETS.python.auto");
     if (!(await fs.pathExists(auto))) {
       console.error("expected providers auto file missing:", auto);
       process.exit(2);
@@ -57,7 +57,7 @@ test("patch-python remove drops patch and refreshes glue deterministically", asy
       process.exit(2);
     }
 
-    const autoMap = path.join(tmp, "third_party", "providers", "auto_map.bzl");
+    const autoMap = path.join(tmp, ".viberoots", "workspace", "providers", "auto_map.bzl");
     const beforeMap = (await fs.pathExists(autoMap)) ? await fs.readFile(autoMap, "utf8") : "";
     const beforeTargets = await fs.readFile(auto, "utf8");
 

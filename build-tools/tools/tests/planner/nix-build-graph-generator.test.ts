@@ -7,7 +7,7 @@ import { runInTemp } from "../lib/test-helpers";
 test("nix builds graph-generator", async () => {
   await runInTemp("nix-build-graph-generator", async (tmp, $) => {
     await fs.mkdirp(path.join(tmp, "build-tools/tools/buck"));
-    await fs.writeFile(path.join(tmp, "build-tools/tools/buck/graph.json"), "[]\n", "utf8");
+    await fs.writeFile(path.join(tmp, ".viberoots/workspace/buck/graph.json"), "[]\n", "utf8");
     const { stdout } = await $({
       cwd: tmp,
       stdio: "pipe",

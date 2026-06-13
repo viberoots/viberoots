@@ -13,6 +13,8 @@ test("prebuild-guard auto-fixes when stale and passes thereafter", async () => {
       // Ensure temp repo defines a local platform that disables CGO and sets it as default
       await $`bash --noprofile --norc -c ${`set -euo pipefail
       cat > TARGETS <<'EOF'
+load("@prelude//:rules.bzl", "export_file")
+
 platform(
     name = "no_cgo",
     constraint_values = [
@@ -20,6 +22,12 @@ platform(
         "config//go/constraints:asan_false",
         "config//go/constraints:race_false",
     ],
+    visibility = ["PUBLIC"],
+)
+
+export_file(
+    name = "flake.lock",
+    src = "flake.lock",
     visibility = ["PUBLIC"],
 )
 EOF

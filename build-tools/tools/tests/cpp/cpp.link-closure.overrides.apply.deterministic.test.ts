@@ -141,7 +141,7 @@ test("cpp: link_closure_overrides apply deterministically (ordering locked by bu
 
     await $({
       cwd: tmp,
-    })`node build-tools/tools/buck/export-graph.ts --out build-tools/tools/buck/graph.json`;
+    })`node build-tools/tools/buck/export-graph.ts --out .viberoots/workspace/buck/graph.json`;
     const build1 = await $({
       cwd: tmp,
       stdio: "pipe",

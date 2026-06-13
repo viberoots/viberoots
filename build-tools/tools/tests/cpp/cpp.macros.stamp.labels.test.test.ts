@@ -31,7 +31,7 @@ await runInTemp("cpp-macro-stamp-test", async (tmp, $) => {
     "utf8",
   );
 
-  const graph = path.join(tmp, "build-tools/tools/buck/graph.json");
+  const graph = path.join(tmp, ".viberoots/workspace/buck/graph.json");
   const nodesSim = [{ name: "//projects/apps/demo:demo_test", rule_type: "cxx_test", labels: [] }];
   await fs.mkdirp(path.dirname(graph));
   await fs.outputFile(graph, JSON.stringify(nodesSim) + "\n", "utf8");

@@ -69,7 +69,7 @@ test("exporter exports link intent attrs when present on a target", async () => 
       "utf8",
     );
 
-    const graphPath = path.join(tmp, "build-tools/tools/buck/graph.json");
+    const graphPath = path.join(tmp, ".viberoots/workspace/buck/graph.json");
     await fs.mkdirp(path.dirname(graphPath));
 
     const res = await $({

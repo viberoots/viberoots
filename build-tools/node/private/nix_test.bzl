@@ -155,10 +155,10 @@ _NODE_NIX_TEST_ATTRS = {
         "remote_ready_runner": attrs.option(attrs.source(), default = None),
         "_inject_test_env": attrs.default_only(attrs.dep(default = "prelude//test/tools:inject_test_env")),
         "_command_heartbeat": attrs.source(default = "//build-tools/tools/dev:command-heartbeat.ts"),
-        "_graph_json": attrs.source(default = "//build-tools/tools/buck:graph.json"),
+        "_graph_json": attrs.source(default = "workspace_buck//:graph.json"),
         "_nix_build_filtered_flake": attrs.source(default = "//build-tools/tools/dev:nix-build-filtered-flake.ts"),
         "_prepare_exact_pnpm_store": attrs.source(default = "//build-tools/tools/dev:prepare-exact-pnpm-store.ts"),
-        "_workspace_root_env": attrs.source(default = "//build-tools/tools/buck:workspace-root.env"),
+        "_workspace_root_env": attrs.source(default = "workspace_buck//:workspace-root.env"),
         "_zx_init": attrs.source(default = "//build-tools/tools/dev:zx-init.mjs"),
     }
 _NODE_NIX_TEST_ATTRS.update(_remote_test_attrs())

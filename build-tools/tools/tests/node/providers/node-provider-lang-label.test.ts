@@ -27,7 +27,7 @@ test("node providers carry lang:node label", async () => {
     const cq = await $({
       cwd: tmp,
       stdio: "pipe",
-    })`buck2 cquery --target-platforms prelude//platforms:default //third_party/providers:${provider} --json --output-attribute labels`;
+    })`buck2 cquery --target-platforms prelude//platforms:default workspace_providers//:${provider} --json --output-attribute labels`;
     const parsed = JSON.parse(String(cq.stdout || ""));
     let labs: string[] = [];
     if (Array.isArray(parsed)) {

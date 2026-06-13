@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
+import { providerAutoTargetsPath } from "../../../lib/workspace-state-paths";
 import { exists, runInTemp } from "../../lib/test-helpers";
 
 test("providers: Node activation via pnpm-lock.yaml in sparse clone (no --lang)", async () => {
@@ -27,7 +28,7 @@ await syncAllProviders();
     await fsp.writeFile(runnerPath, runner, "utf8");
     await $`node ${runnerPath}`;
 
-    const outFile = path.join(tmp, "third_party", "providers", "TARGETS.node.auto");
+    const outFile = path.join(tmp, providerAutoTargetsPath("node"));
     assert.equal(await exists(outFile), true, "expected TARGETS.node.auto to be generated");
     const txt = await fsp.readFile(outFile, "utf8");
     // Header + load line present

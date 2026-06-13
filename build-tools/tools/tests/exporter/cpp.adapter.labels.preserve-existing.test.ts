@@ -13,7 +13,7 @@ await runInTemp("exp-cpp-preserve", async (tmp, $) => {
       labels: ["custom:x", "lang:cpp", "kind:bin"],
     },
   ];
-  const out = path.join(tmp, "build-tools/tools/buck/graph.json");
+  const out = path.join(tmp, ".viberoots/workspace/buck/graph.json");
   await fs.outputFile(out, JSON.stringify(nodes) + "\n");
 
   await $({ cwd: tmp })`build-tools/tools/buck/export-graph.ts --simulate ${out} --out ${out}`;

@@ -13,7 +13,7 @@ test("providersForLabels parses lockfile/nixpkg labels (module labels ignored)",
   const out = providersForLabels(labels);
   // should be fully qualified provider labels
   for (const p of out) {
-    if (!p.startsWith("//third_party/providers:")) {
+    if (!p.startsWith("workspace_providers//:")) {
       console.error("bad provider fq label:", p);
       process.exit(2);
     }

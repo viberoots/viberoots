@@ -2,6 +2,7 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
+import { providerAutoTargetsPath } from "../../lib/workspace-state-paths";
 import { runInTemp } from "../lib/test-helpers";
 
 test("sync-providers-node graceful skip when yaml package unavailable", async () => {
@@ -53,7 +54,7 @@ packages:
         process.exit(2);
       }
 
-      const outPath = path.join(tmp, "third_party/providers/TARGETS.node.auto");
+      const outPath = path.join(tmp, providerAutoTargetsPath("node"));
       const output = await fsp.readFile(outPath, "utf8");
 
       // Should have header but no actual providers (or just pass through if yaml was available)

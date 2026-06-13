@@ -10,6 +10,7 @@ import { getFlagStr } from "../lib/cli";
 import { ensureGraph } from "./glue-run";
 import { isProviderPackageNode } from "../lib/graph-utils";
 import { isSupportedImporterLabel } from "../lib/importers";
+import { DEFAULT_AUTO_MAP_PATH } from "../lib/workspace-state-paths";
 // no path import needed when not checking provider existence
 
 type Node = {
@@ -19,7 +20,7 @@ type Node = {
 };
 
 const graphPath = getFlagStr("graph", "");
-const outPath = getFlagStr("out", "third_party/providers/auto_map.bzl");
+const outPath = getFlagStr("out", DEFAULT_AUTO_MAP_PATH);
 
 // writeIfChanged now imported from ../lib/fs-helpers
 
@@ -74,7 +75,7 @@ async function main() {
   const body = keys
     .map((k) => `    "${k}": [\n${mapping[k].map((p) => `        "${p}",`).join("\n")}\n    ],`)
     .join("\n\n");
-  const header = `# //third_party/providers/auto_map.bzl\n# GENERATED FILE — DO NOT EDIT.\n\nMODULE_PROVIDERS = {\n`;
+  const header = `# @workspace_providers//:auto_map.bzl\n# GENERATED FILE — DO NOT EDIT.\n\nMODULE_PROVIDERS = {\n`;
   const footer = `\n}\n`;
   const data = header + body + footer;
   await writeIfChanged(outPath, data);

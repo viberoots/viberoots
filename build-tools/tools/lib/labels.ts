@@ -2,9 +2,10 @@
 import path from "node:path";
 import { isSupportedImporterLabel } from "./importers";
 import { normalizeNixAttr, providerNameForImporter, providerNameForNixAttr } from "./providers";
+import { workspaceProviderLabel } from "./workspace-state-paths";
 
 function fqProviderLabel(name: string): string {
-  return `//third_party/providers:${name}`;
+  return workspaceProviderLabel(name);
 }
 
 export type LockfileLabelInspection =

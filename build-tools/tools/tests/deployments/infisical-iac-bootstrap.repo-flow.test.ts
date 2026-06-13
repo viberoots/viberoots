@@ -60,7 +60,7 @@ test("repo bootstrap applies first-bootstrap metadata, resumes fan-out, and runs
 async function writeRepoInputs(dir: string) {
   await fs.mkdir(path.join(dir, "build-tools/tools/buck"), { recursive: true });
   await fs.writeFile(
-    path.join(dir, "build-tools/tools/buck/graph.json"),
+    path.join(dir, ".viberoots/workspace/buck/graph.json"),
     `${JSON.stringify({ nodes: [deploymentNode()] }, null, 2)}\n`,
   );
   await fs.mkdir(path.join(dir, "projects/config"), { recursive: true });

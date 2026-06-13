@@ -18,6 +18,7 @@ import {
 import { autoFixGlue } from "./repair";
 import { collectDiagnostics, logList, mtimeSafe } from "./report";
 import { listInputs, listOutputs } from "./scan";
+import { DEFAULT_INVALIDATION_REPORT_PATH } from "../../lib/workspace-state-paths";
 
 type Mode = "ci" | "local";
 
@@ -48,12 +49,7 @@ export async function run(): Promise<void> {
 
   const inputs = await listInputs();
   const outputs = listOutputs();
-  const invalidationReportPath = path.join(
-    "build-tools",
-    "tools",
-    "buck",
-    "invalidation-report.txt",
-  );
+  const invalidationReportPath = DEFAULT_INVALIDATION_REPORT_PATH;
 
   const outPresence = await computeMissingOutputs(outputs);
   const presentOutputs = outputs.filter((o) => fs.existsSync(o));

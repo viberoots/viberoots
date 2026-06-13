@@ -1,5 +1,6 @@
 #!/usr/bin/env zx-wrapper
 import { patchInvalidationStrategyForLang } from "../../lib/lang-contracts";
+import { DEFAULT_INVALIDATION_REPORT_PATH } from "../../lib/workspace-state-paths";
 
 async function gitLsFiles(glob: string): Promise<string[]> {
   try {
@@ -39,7 +40,7 @@ export async function maybePrintPatchInvalidationNotes(): Promise<void> {
     }
     if (importerLocalDetected) {
       console.warn(
-        "[prebuild] importer-local patches: see build-tools/tools/buck/invalidation-report.txt for per-target action inputs",
+        `[prebuild] importer-local patches: see ${DEFAULT_INVALIDATION_REPORT_PATH} for per-target action inputs`,
       );
     }
     if (goPatches.length > 0) {

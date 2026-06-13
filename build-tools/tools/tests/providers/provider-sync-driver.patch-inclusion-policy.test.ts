@@ -5,6 +5,7 @@ import { test } from "node:test";
 import { listImporterPatches } from "../../lib/importers";
 import { runImporterProviderSync } from "../../lib/provider-sync-driver";
 import { decodeNameVersionFromPatch } from "../../lib/providers";
+import { providerAutoTargetsPath } from "../../lib/workspace-state-paths";
 import { runInTemp } from "../lib/test-helpers";
 
 function extractPatchPathsFromTargetsAuto(output: string): string[] {
@@ -30,8 +31,6 @@ test("provider-sync-driver patch inclusion policy: Node includes all importer-lo
       process.env.WORKSPACE_ROOT = tmp;
       process.chdir(tmp);
       await $`git init`;
-
-      await fsp.mkdir(path.join(tmp, "third_party/providers"), { recursive: true });
 
       const importer = "projects/apps/demo";
       const onlyEffective = "aaa@1.0.0.patch";
@@ -60,7 +59,7 @@ test("provider-sync-driver patch inclusion policy: Node includes all importer-lo
         lang: "node",
         listImporterPatchesFor: async (imp: string) => listImporterPatches(imp, "node"),
         importerPatchInclusionPolicy: "all",
-        outFile: "third_party/providers/TARGETS.node.auto",
+        outFile: providerAutoTargetsPath("node"),
       });
 
       await runImporterProviderSync({
@@ -68,15 +67,12 @@ test("provider-sync-driver patch inclusion policy: Node includes all importer-lo
         lang: "python",
         listImporterPatchesFor: async (imp: string) => listImporterPatches(imp, "python"),
         importerPatchInclusionPolicy: "effective-set-only",
-        outFile: "third_party/providers/TARGETS.python.auto",
+        outFile: providerAutoTargetsPath("python"),
       });
 
-      const nodeOut = await fsp.readFile(
-        path.join(tmp, "third_party/providers/TARGETS.node.auto"),
-        "utf8",
-      );
+      const nodeOut = await fsp.readFile(path.join(tmp, providerAutoTargetsPath("node")), "utf8");
       const pythonOut = await fsp.readFile(
-        path.join(tmp, "third_party/providers/TARGETS.python.auto"),
+        path.join(tmp, providerAutoTargetsPath("python")),
         "utf8",
       );
 

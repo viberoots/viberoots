@@ -3,6 +3,7 @@ import fs from "fs-extra";
 import path from "node:path";
 import { test } from "node:test";
 import { sanitizeName } from "../../lib/sanitize";
+import { DEFAULT_GRAPH_PATH } from "../../lib/workspace-state-paths";
 import { runInTemp } from "../lib/test-helpers";
 
 test("planner builds python test and runs via selected target", async () => {
@@ -54,7 +55,8 @@ test("planner builds python test and runs via selected target", async () => {
       "utf8",
     );
 
-    const graphDir = path.join(tmp, "build-tools", "tools", "buck");
+    const graphPath = path.join(tmp, DEFAULT_GRAPH_PATH);
+    const graphDir = path.dirname(graphPath);
     await fs.mkdirp(graphDir);
     const target = "//projects/apps/pytester:pytester_tests";
     const node = {
@@ -67,11 +69,7 @@ test("planner builds python test and runs via selected target", async () => {
         "projects/apps/pytester/bin/__main__.py",
       ],
     };
-    await fs.writeFile(
-      path.join(graphDir, "graph.json"),
-      JSON.stringify([node], null, 2) + "\n",
-      "utf8",
-    );
+    await fs.writeFile(graphPath, JSON.stringify([node], null, 2) + "\n", "utf8");
 
     const { stdout, stderr, exitCode } = await $({
       cwd: tmp,
@@ -80,6 +78,7 @@ test("planner builds python test and runs via selected target", async () => {
       env: {
         ...process.env,
         BUCK_TEST_SRC: tmp,
+        BUCK_GRAPH_JSON: graphPath,
         BUCK_TARGET: target,
       },
     })`nix build --impure -L ${`path:${tmp}#graph-generator-selected`} --accept-flake-config --no-link --print-out-paths`;

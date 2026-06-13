@@ -16,7 +16,7 @@ test("planner BUCK_TARGET selection accepts cell-prefixed and config-suffixed la
       },
     ];
     await fsp.writeFile(
-      path.join(tmp, "build-tools/tools/buck/graph.json"),
+      path.join(tmp, ".viberoots/workspace/buck/graph.json"),
       JSON.stringify(graph) + "\n",
       "utf8",
     );
@@ -27,7 +27,7 @@ test("planner BUCK_TARGET selection accepts cell-prefixed and config-suffixed la
         G = import ./build-tools/tools/nix/graph-generator.nix {
           inherit pkgs;
           src = ./.;
-          graphJsonPath = ./build-tools/tools/buck/graph.json;
+          graphJsonPath = ./.viberoots/workspace/buck/graph.json;
         };
       in (builtins.match "^missing-" (G.selected.name or "")) != null
     `;

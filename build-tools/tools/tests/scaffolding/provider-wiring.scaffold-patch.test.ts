@@ -62,6 +62,6 @@ test("provider wiring present only on affected target after patch", async () => 
         .split("\n")
         .filter(Boolean)
         .pop() || "";
-    await $`test -f third_party/providers/auto_map.bzl`;
+    await $`test -f .viberoots/workspace/providers/auto_map.bzl`;
   });
 });

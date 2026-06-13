@@ -57,7 +57,7 @@ test("cpp mkApp/mkLib delegate to T.cpp* via stub template", async () => {
       { name: "//projects/libs/math:math", rule_type: "cxx_library", labels: [] },
     ];
     await fs.outputFile(
-      path.join(tmp, "build-tools/tools/buck/graph.json"),
+      path.join(tmp, ".viberoots/workspace/buck/graph.json"),
       JSON.stringify(graph) + "\n",
     );
 
@@ -65,7 +65,7 @@ test("cpp mkApp/mkLib delegate to T.cpp* via stub template", async () => {
     const flake = path.join(process.cwd(), "build-tools/tools/nix/graph-generator.nix");
     const res = await $({
       cwd: tmp,
-    })`nix build --accept-flake-config -f ${flake} --arg pkgs 'import <nixpkgs> {}' --arg src ./. --argstr system ${process.platform === "darwin" ? "aarch64-darwin" : "x86_64-linux"} --arg graphJsonPath ./build-tools/tools/buck/graph.json --no-link --print-out-paths`.nothrow();
+    })`nix build --accept-flake-config -f ${flake} --arg pkgs 'import <nixpkgs> {}' --arg src ./. --argstr system ${process.platform === "darwin" ? "aarch64-darwin" : "x86_64-linux"} --arg graphJsonPath ./.viberoots/workspace/buck/graph.json --no-link --print-out-paths`.nothrow();
     // Ensure build produced an out dir; smoke-check success
     // (We don't assert exact files due to platform variance; success is sufficient.)
     assert.ok(true);

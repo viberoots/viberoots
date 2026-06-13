@@ -6,21 +6,15 @@ import { exists, runInTemp } from "../lib/test-helpers";
 
 test("prebuild-guard: flags missing Node importer providers and auto-fixes locally", async () => {
   await runInTemp("prebuild-node-importers", async (tmp, $) => {
-    const providersDir = path.join(tmp, "third_party", "providers");
+    const providersDir = path.join(tmp, ".viberoots", "workspace", "providers");
+    const buckDir = path.join(tmp, ".viberoots", "workspace", "buck");
     await fsp.mkdir(providersDir, { recursive: true });
+    await fsp.mkdir(buckDir, { recursive: true });
     // Minimal glue outputs (graph + auto_map) present
+    await fsp.writeFile(path.join(buckDir, "graph.json"), "[]\n", "utf8");
+    await fsp.writeFile(path.join(buckDir, "node-lock-index.json"), "{}\n", "utf8");
     await fsp.writeFile(
-      path.join(tmp, "build-tools", "tools", "buck", "graph.json"),
-      "[]\n",
-      "utf8",
-    );
-    await fsp.writeFile(
-      path.join(tmp, "build-tools", "tools", "buck", "node-lock-index.json"),
-      "{}\n",
-      "utf8",
-    );
-    await fsp.writeFile(
-      path.join(tmp, "build-tools", "tools", "buck", "invalidation-report.txt"),
+      path.join(buckDir, "invalidation-report.txt"),
       "# invalidation-report\n",
       "utf8",
     );

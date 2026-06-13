@@ -13,7 +13,7 @@ genrule(name="mod_extra", out="mod_extra.stamp", cmd=": > $OUT", visibility=["PU
 EOF'`;
     await $({
       cwd: tmp,
-    })`bash --noprofile --norc -c 'cat > third_party/providers/auto_map.bzl <<\'EOF'
+    })`bash --noprofile --norc -c 'cat > .viberoots/workspace/providers/auto_map.bzl <<\'EOF'
 MODULE_PROVIDERS = {
   "//tmp:lib": ["//third_party/providers:mod_auto"],
 }

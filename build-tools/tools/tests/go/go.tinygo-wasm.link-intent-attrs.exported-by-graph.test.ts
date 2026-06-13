@@ -12,7 +12,7 @@ function normalizeLabelList(xs: unknown): string[] {
   return raw.map((x) => normalizeTargetLabel(String(x))).filter(Boolean);
 }
 
-test("exporter: nix_go_tiny_wasm_lib preserves link intent attrs in build-tools/tools/buck/graph.json", async () => {
+test("exporter: nix_go_tiny_wasm_lib preserves link intent attrs in .viberoots/workspace/buck/graph.json", async () => {
   await runInTemp("go-tinygo-wasm-link-intent-exported-attrs", async (tmp, $) => {
     // Avoid coupling to workspace-generated provider mappings
     await fs.mkdirp(path.join(tmp, "third_party", "providers"));

@@ -344,7 +344,7 @@ test("go cli (no local replaces) + patched uuid runtime -> zero UUID", async () 
     await applyPatchPkg($, _tmp, origin, goEnv);
     // Regenerate providers and auto_map after writing patch
     await $`node build-tools/tools/buck/sync-providers.ts`;
-    await $`node build-tools/tools/buck/gen-auto-map.ts --graph build-tools/tools/buck/graph.json --out third_party/providers/auto_map.bzl`;
+    await $`node build-tools/tools/buck/gen-auto-map.ts --graph .viberoots/workspace/buck/graph.json --out .viberoots/workspace/providers/auto_map.bzl`;
 
     // Vendor dependencies and inject patched uuid into vendor tree
     await $({

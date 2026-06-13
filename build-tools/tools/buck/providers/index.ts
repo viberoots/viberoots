@@ -2,6 +2,8 @@
 import { findImporterLockfiles } from "../../lib/importers";
 import type { LanguageProviderSync } from "../../lib/lang-contracts";
 import { detectEnabledLanguages } from "../../lib/langs";
+import { ensureWorkspaceProvidersPackage } from "../../lib/workspace-providers-package";
+import { providerAutoTargetsPath } from "../../lib/workspace-state-paths";
 
 export type SyncOptions = {
   outFile?: string;
@@ -30,7 +32,7 @@ const REGISTRY: Record<string, () => Promise<LanguageProviderSync>> = {
       lang: "node",
       sync: async (opts) =>
         syncNodeProviders({
-          outFile: opts?.outFile || "third_party/providers/TARGETS.node.auto",
+          outFile: opts?.outFile || providerAutoTargetsPath("node"),
           patchDir: opts?.patchDir,
         }),
     };
@@ -41,7 +43,7 @@ const REGISTRY: Record<string, () => Promise<LanguageProviderSync>> = {
       lang: "python",
       sync: async (opts) =>
         syncPythonProviders({
-          outFile: opts?.outFile || "third_party/providers/TARGETS.python.auto",
+          outFile: opts?.outFile || providerAutoTargetsPath("python"),
           strict: opts?.strict,
         }),
     };
@@ -53,7 +55,7 @@ const REGISTRY: Record<string, () => Promise<LanguageProviderSync>> = {
         lang: "rust",
         sync: async (opts) =>
           syncRustProviders({
-            outFile: opts?.outFile || "third_party/providers/TARGETS.rust.auto",
+            outFile: opts?.outFile || providerAutoTargetsPath("rust"),
             patchDir: opts?.patchDir || "patches/rust",
             strict: opts?.strict,
           }),
@@ -99,6 +101,7 @@ export async function buildHandlers(narrow?: string): Promise<LanguageProviderSy
 }
 
 export async function syncAllProviders(opts?: SyncOptions) {
+  await ensureWorkspaceProvidersPackage();
   const handlers = await buildHandlers(opts?.lang);
   for (const h of handlers) {
     await h.sync({ outFile: opts?.outFile, patchDir: opts?.patchDir, strict: opts?.strict });

@@ -143,7 +143,9 @@ def strip_provider_targets(deps, provider_prefix = "//third_party/providers:"):
             # Buck often renders labels with a cell prefix in query output; call sites should not
             # need to account for that when asking to strip provider targets.
             parts = d.split("//", 1)
-            if len(parts) == 2 and parts[1].startswith(suffix):
+            if len(parts) == 2 and (
+                    parts[1].startswith(suffix) or
+                    (d.startswith("workspace_providers//:") and parts[1].startswith(":"))):
                 continue
             out.append(d)
             continue
@@ -168,5 +170,3 @@ def strip_provider_targets_probe(name, items, provider_prefix = "//third_party/p
         cmd = "cat > $OUT <<'EOF'\n%s\nEOF" % "\n".join(lines),
         labels = ["kind:probe"],
     )
-
-

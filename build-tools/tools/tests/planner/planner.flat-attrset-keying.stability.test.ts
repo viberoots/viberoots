@@ -27,7 +27,7 @@ test("planner flat attrset keying (cppTargetsFlat) stays stable", async () => {
     ];
     await fsp.mkdir(path.join(tmp, "build-tools", "tools", "buck"), { recursive: true });
     await fsp.writeFile(
-      path.join(tmp, "build-tools/tools/buck/graph.json"),
+      path.join(tmp, ".viberoots/workspace/buck/graph.json"),
       JSON.stringify(graph) + "\n",
       "utf8",
     );
@@ -40,7 +40,7 @@ test("planner flat attrset keying (cppTargetsFlat) stays stable", async () => {
         G = import ./build-tools/tools/nix/graph-generator.nix {
           inherit pkgs;
           src = ./.;
-          graphJsonPath = ./build-tools/tools/buck/graph.json;
+          graphJsonPath = ./.viberoots/workspace/buck/graph.json;
         };
       in builtins.sort builtins.lessThan (builtins.attrNames G.cppTargetsFlat)
     `;

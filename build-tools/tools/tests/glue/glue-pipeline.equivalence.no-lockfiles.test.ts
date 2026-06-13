@@ -53,8 +53,8 @@ test("glue-pipeline: outputs identical to manual steps (no lockfiles present)", 
 
     // Baseline: run the three manual steps in sequence
     await $`node build-tools/tools/buck/sync-providers.ts`;
-    await $`node build-tools/tools/buck/gen-provider-index.ts --out third_party/providers/provider_index.bzl`;
-    await $`node build-tools/tools/buck/gen-auto-map.ts --graph build-tools/tools/buck/graph.json --out third_party/providers/auto_map.bzl`;
+    await $`node build-tools/tools/buck/gen-provider-index.ts --out .viberoots/workspace/providers/provider_index.bzl`;
+    await $`node build-tools/tools/buck/gen-auto-map.ts --graph .viberoots/workspace/buck/graph.json --out .viberoots/workspace/providers/auto_map.bzl`;
     await $`node build-tools/tools/node/gen-workspace-map.ts`;
     await $`node build-tools/tools/buck/invalidation-report.ts --out build-tools/tools/buck/invalidation-report.txt`;
 

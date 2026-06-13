@@ -2,6 +2,10 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
+import {
+  DEFAULT_PROVIDER_TARGETS_PATH,
+  providerAutoTargetsPath,
+} from "../../lib/workspace-state-paths";
 import { runInTemp } from "../lib/test-helpers";
 
 test("sync-providers-python: deterministic generation and idempotency with patch filter", async () => {
@@ -32,7 +36,7 @@ test("sync-providers-python: deterministic generation and idempotency with patch
 
     // Run orchestrator for python
     await $`node build-tools/tools/buck/sync-providers.ts --lang python`;
-    const outPath = path.join(tmp, "third_party", "providers", "TARGETS.python.auto");
+    const outPath = path.join(tmp, providerAutoTargetsPath("python"));
     const text1 = await fsp.readFile(outPath, "utf8");
 
     // Expectations:
@@ -67,10 +71,7 @@ test("sync-providers-python: deterministic generation and idempotency with patch
     }
 
     // Ensure the curated TARGETS file gained the AUTO_PYTHON section
-    const curated = await fsp.readFile(
-      path.join(tmp, "third_party", "providers", "TARGETS"),
-      "utf8",
-    );
+    const curated = await fsp.readFile(path.join(tmp, DEFAULT_PROVIDER_TARGETS_PATH), "utf8");
     if (!curated.includes("# BEGIN AUTO_PYTHON") || !curated.includes("# END AUTO_PYTHON")) {
       console.error("expected AUTO_PYTHON managed section not found in curated TARGETS");
       process.exit(2);

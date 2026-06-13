@@ -8,7 +8,7 @@ import { runInTemp } from "../lib/test-helpers";
 
 test("exporter writes metrics when --metrics-out is provided", async () => {
   await runInTemp("exporter-metrics", async (tmp, $) => {
-    const out = path.join(tmp, "build-tools/tools/buck/graph.json");
+    const out = path.join(tmp, ".viberoots/workspace/buck/graph.json");
     const metrics = path.join(tmp, "build-tools/tools/buck/export-metrics.json");
 
     await fs.mkdirp(path.dirname(out));

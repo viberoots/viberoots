@@ -8,7 +8,7 @@ import { runInTemp } from "./lib/test-helpers";
 test("auto-map: with no Go patches, module: labels are ignored", async () => {
   await runInTemp("auto-map-go-no-patch", async (tmp, $) => {
     // Synthesize a tiny graph with a module label that would map if a provider existed
-    const graph = path.join(tmp, "build-tools/tools/buck/graph.json");
+    const graph = path.join(tmp, ".viberoots/workspace/buck/graph.json");
     await fs.outputFile(
       graph,
       JSON.stringify([
@@ -21,7 +21,7 @@ test("auto-map: with no Go patches, module: labels are ignored", async () => {
       "utf8",
     );
 
-    const out = path.join(tmp, "third_party/providers/auto_map.bzl");
+    const out = path.join(tmp, ".viberoots/workspace/providers/auto_map.bzl");
     await $`node build-tools/tools/buck/gen-auto-map.ts --graph ${graph} --out ${out}`;
     const txt = await fs.readFile(out, "utf8");
     assert.ok(

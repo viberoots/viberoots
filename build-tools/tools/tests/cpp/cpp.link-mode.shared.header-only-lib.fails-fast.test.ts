@@ -40,7 +40,7 @@ test("cpp link_mode=shared rejects header-only targets", async () => {
       stdio: "pipe",
       reject: false,
       nothrow: true,
-    })`node build-tools/tools/buck/export-graph.ts --out build-tools/tools/buck/graph.json`;
+    })`node build-tools/tools/buck/export-graph.ts --out .viberoots/workspace/buck/graph.json`;
     if (exportRes.exitCode !== 0) {
       const err = String(exportRes.stderr || exportRes.stdout || "");
       assert.ok(

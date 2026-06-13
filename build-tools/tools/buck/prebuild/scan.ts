@@ -2,6 +2,13 @@
 import fs from "node:fs";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
+import {
+  DEFAULT_AUTO_MAP_PATH,
+  DEFAULT_GRAPH_PATH,
+  DEFAULT_INVALIDATION_REPORT_PATH,
+  DEFAULT_NODE_LOCK_INDEX_PATH,
+  WORKSPACE_PROVIDER_DIR,
+} from "../../lib/workspace-state-paths";
 
 export function mtimeSafe(p: string): number | null {
   try {
@@ -23,6 +30,7 @@ export async function listInputs(): Promise<string[]> {
     "coverage",
     ".clinic",
     ".direnv",
+    ".viberoots",
     ".pnpm-store",
     "result",
   ]);
@@ -67,10 +75,10 @@ export async function listInputs(): Promise<string[]> {
 }
 
 export function listOutputs(): string[] {
-  const graphOut = path.join("build-tools", "tools", "buck", "graph.json");
-  const nodeLockIdx = path.join("build-tools", "tools", "buck", "node-lock-index.json");
-  const invalidationReport = path.join("build-tools", "tools", "buck", "invalidation-report.txt");
-  const autoMap = path.join("third_party", "providers", "auto_map.bzl");
+  const graphOut = DEFAULT_GRAPH_PATH;
+  const nodeLockIdx = DEFAULT_NODE_LOCK_INDEX_PATH;
+  const invalidationReport = DEFAULT_INVALIDATION_REPORT_PATH;
+  const autoMap = DEFAULT_AUTO_MAP_PATH;
   const outs = [
     graphOut,
     nodeLockIdx,
@@ -79,7 +87,7 @@ export function listOutputs(): string[] {
     // C++ no longer requires provider→attr mapping; keep only auto_map for Node.
   ];
   try {
-    const dir = "third_party/providers";
+    const dir = WORKSPACE_PROVIDER_DIR;
     for (const f of fs.existsSync(dir) ? fs.readdirSync(dir) : []) {
       if (/^TARGETS.*\.auto$/.test(f)) outs.push(path.join(dir, f));
     }
@@ -98,7 +106,7 @@ export function hasPatchesOrLocks(inputs: string[]): boolean {
 
 export function missingProviderAutos(): boolean {
   try {
-    const dir = "third_party/providers";
+    const dir = WORKSPACE_PROVIDER_DIR;
     if (!fs.existsSync(dir)) return true;
     return !fs.readdirSync(dir).some((f) => /^TARGETS.*\.auto$/.test(f));
   } catch {

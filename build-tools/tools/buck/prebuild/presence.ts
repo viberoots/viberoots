@@ -6,13 +6,21 @@ import { getImporterRootsContract } from "../../lib/importer-roots";
 import { parseLockfileLabel } from "../../lib/labels";
 import { findUvLockfiles } from "../../lib/lockfiles";
 import { providerNameForImporter } from "../../lib/providers";
+import {
+  DEFAULT_NODE_LOCK_INDEX_PATH,
+  LEGACY_NODE_LOCK_INDEX_PATH,
+  WORKSPACE_PROVIDER_DIR,
+  providerAutoTargetsPath,
+} from "../../lib/workspace-state-paths";
 
 type NodeLockIndexSidecar = Partial<{
   index: Record<string, string>;
 }>;
 
 async function readNodeLockIndexLabels(): Promise<string[]> {
-  const rel = path.join("build-tools", "tools", "buck", "node-lock-index.json");
+  const rel = fs.existsSync(DEFAULT_NODE_LOCK_INDEX_PATH)
+    ? DEFAULT_NODE_LOCK_INDEX_PATH
+    : LEGACY_NODE_LOCK_INDEX_PATH;
   let txt = "";
   try {
     txt = await fsp.readFile(rel, "utf8");
@@ -60,7 +68,7 @@ export async function computeMissingOutputs(outputs: string[]): Promise<string[]
     const { workspaceRoots } = getImporterRootsContract();
     const uvLocks = await findUvLockfiles({ roots: workspaceRoots });
     if (uvLocks.length > 0) {
-      const pyAuto = "third_party/providers/TARGETS.python.auto";
+      const pyAuto = providerAutoTargetsPath("python");
       if (!fs.existsSync(pyAuto)) outPresence.push(pyAuto);
     }
   }
@@ -69,14 +77,14 @@ export async function computeMissingOutputs(outputs: string[]): Promise<string[]
   {
     const labels = await readNodeLockIndexLabels();
     if (labels.length > 0) {
-      const nodeAuto = "third_party/providers/TARGETS.node.auto";
+      const nodeAuto = providerAutoTargetsPath("node");
       if (!fs.existsSync(nodeAuto)) outPresence.push(nodeAuto);
     }
   }
 
   // If any provider autos exist, require nix_attr_map.bzl (needed for provider index consumers)
   try {
-    const provDir = "third_party/providers";
+    const provDir = WORKSPACE_PROVIDER_DIR;
     const autosPresent =
       fs.existsSync(provDir) && fs.readdirSync(provDir).some((f) => /^TARGETS.*\.auto$/.test(f));
     const nixMap = path.join(provDir, "nix_attr_map.bzl");
@@ -129,7 +137,7 @@ export async function findMissingNodeImporterProviders(): Promise<
   const labels = await readNodeLockIndexLabels();
   if (!labels.length) return missing;
 
-  const targetsNodeAuto = "third_party/providers/TARGETS.node.auto";
+  const targetsNodeAuto = providerAutoTargetsPath("node");
   const targetsNodeText = fs.existsSync(targetsNodeAuto)
     ? await fsp.readFile(targetsNodeAuto, "utf8").catch(() => "")
     : "";
@@ -156,7 +164,7 @@ export async function findMissingPythonImporterProviders(): Promise<
     const lockfiles = await findUvLockfiles();
     if (!lockfiles.length) return missing;
 
-    const targetsPyAuto = "third_party/providers/TARGETS.python.auto";
+    const targetsPyAuto = providerAutoTargetsPath("python");
     const targetsPyText = fs.existsSync(targetsPyAuto)
       ? await fsp.readFile(targetsPyAuto, "utf8").catch(() => "")
       : "";

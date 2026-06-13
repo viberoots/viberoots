@@ -8,6 +8,7 @@ import net from "node:net";
 import path from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
 import { formatRunnableLine, inferRunnableFromOutPath } from "../../../lib/runnables";
+import { DEFAULT_GRAPH_PATH } from "../../../lib/workspace-state-paths";
 import { terminateChildTree } from "../../lib/process-tree";
 import {
   DEFAULT_TEMP_REPO_GLUE_STAGE_PATHS,
@@ -64,7 +65,7 @@ export async function scaffoldAndPrepareWorkspace(
   name: string,
 ): Promise<void> {
   const appRel = path.join("projects", "apps", name).replace(/\\/g, "/");
-  const graphJsonAbs = path.join(tmp, "build-tools", "tools", "buck", "graph.json");
+  const graphJsonAbs = path.join(tmp, DEFAULT_GRAPH_PATH);
   const appLabel = `//${appRel}:app`;
   const $ = _$({ cwd: tmp, stdio: "inherit" });
   await $`scaf new ts ${template} ${name} --yes --no-tests --skip-lockfile-gen`;
@@ -99,7 +100,7 @@ export async function buildSelectedSsr(
   label: string,
   framework: "express" | "next" | "vite",
 ): Promise<{ outPath: string; importer: string }> {
-  const graphJson = path.join(tmp, "build-tools", "tools", "buck", "graph.json");
+  const graphJson = path.join(tmp, DEFAULT_GRAPH_PATH);
   const built = await _$({
     cwd: tmp,
     stdio: "pipe",

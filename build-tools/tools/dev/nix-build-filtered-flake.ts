@@ -12,6 +12,7 @@ import {
   selectedCppSnapshotRsyncSources,
   selectedCppSnapshotRelPaths,
 } from "./nix-build-filtered-flake-lib";
+import { DEFAULT_GRAPH_PATH } from "../lib/workspace-state-paths";
 
 async function pathExists(filePath: string): Promise<boolean> {
   try {
@@ -46,9 +47,7 @@ async function readSelectedCppSnapshotSources(
   const onlyCpp = String(process.env.PLANNER_ONLY_CPP || "").trim() !== "";
   if (!onlyCpp || !target) return null;
   const graphPath = path.resolve(
-    String(
-      process.env.BUCK_GRAPH_JSON || path.join(root, "build-tools", "tools", "buck", "graph.json"),
-    ),
+    String(process.env.BUCK_GRAPH_JSON || path.join(root, DEFAULT_GRAPH_PATH)),
   );
   if (!(await pathExists(graphPath))) return null;
   let rawGraph: unknown;
@@ -172,7 +171,7 @@ async function main(): Promise<void> {
         ? {
             ...process.env,
             VBR_FILTERED_FLAKE_SNAPSHOT: "1",
-            BUCK_GRAPH_JSON: path.join(snapDir, "build-tools", "tools", "buck", "graph.json"),
+            BUCK_GRAPH_JSON: path.join(snapDir, DEFAULT_GRAPH_PATH),
             BUCK_TEST_SRC: snapDir,
           }
         : {

@@ -28,7 +28,7 @@ test("node lib scaffold: TARGETS includes lockfile label and auto_map wires prov
       ],
       { spaces: 2 },
     );
-    await $`node build-tools/tools/buck/gen-auto-map.ts --graph build-tools/tools/buck/graph.json --out third_party/providers/auto_map.bzl`;
+    await $`node build-tools/tools/buck/gen-auto-map.ts --graph .viberoots/workspace/buck/graph.json --out .viberoots/workspace/providers/auto_map.bzl`;
     const autoMap = await fs.readFile(
       path.join(tmp, "third_party", "providers", "auto_map.bzl"),
       "utf8",

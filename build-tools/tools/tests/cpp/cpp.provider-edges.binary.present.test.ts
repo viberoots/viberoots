@@ -15,7 +15,7 @@ EOF'`;
     // Map the demo binary to the provider
     await $({
       cwd: tmp,
-    })`bash --noprofile --norc -c 'cat > third_party/providers/auto_map.bzl <<\'EOF'
+    })`bash --noprofile --norc -c 'cat > .viberoots/workspace/providers/auto_map.bzl <<\'EOF'
 MODULE_PROVIDERS = {
   "//projects/apps/demo:demo": ["//third_party/providers:prov"],
 }

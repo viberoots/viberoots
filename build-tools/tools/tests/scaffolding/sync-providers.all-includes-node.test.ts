@@ -23,8 +23,8 @@ test("sync-providers without lang flag includes Node providers", async () => {
     await $`node build-tools/tools/buck/sync-providers.ts`;
 
     // All provider files should be created
-    const nodeProviderPath = path.join(tmp, "third_party/providers/TARGETS.node.auto");
-    const cppProviderPath = path.join(tmp, "third_party/providers/TARGETS.cpp.auto");
+    const nodeProviderPath = path.join(tmp, ".viberoots/workspace/providers/TARGETS.node.auto");
+    const cppProviderPath = path.join(tmp, ".viberoots/workspace/providers/TARGETS.cpp.auto");
 
     // Node provider must exist
     if (!(await exists(nodeProviderPath))) {

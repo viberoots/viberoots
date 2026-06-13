@@ -24,9 +24,9 @@ test("node macro: providers are auto-wired from auto_map", async () => {
     await fs.writeJSON(path.join(graphDir, "graph.json"), nodes, { spaces: 2 });
 
     // Run auto-map generation over the synthesized graph
-    await $`node build-tools/tools/buck/gen-auto-map.ts --graph build-tools/tools/buck/graph.json --out third_party/providers/auto_map.bzl`;
+    await $`node build-tools/tools/buck/gen-auto-map.ts --graph .viberoots/workspace/buck/graph.json --out .viberoots/workspace/providers/auto_map.bzl`;
 
-    const autoMapPath = path.join(tmp, "third_party/providers/auto_map.bzl");
+    const autoMapPath = path.join(tmp, ".viberoots/workspace/providers/auto_map.bzl");
     const content = await fs.readFile(autoMapPath, "utf8");
     const key = '"//projects/apps/example:smoke_test"';
     const start = content.indexOf(key);

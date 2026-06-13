@@ -4,6 +4,7 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
+import { DEFAULT_GRAPH_PATH } from "../../lib/workspace-state-paths";
 import { inheritedBuckIsolation, runInTemp } from "../lib/test-helpers";
 
 async function write(file: string, content: string): Promise<void> {
@@ -31,7 +32,7 @@ test("source snapshot includes declared source and excludes mutable local direct
   await write(path.join(root, "flake.lock"), "{}\n");
   await write(path.join(root, "TARGETS"), "filegroup(name='all')\n");
   await write(path.join(root, "build-tools", "lang", "defs.bzl"), "X = 1\n");
-  await write(path.join(root, "build-tools", "tools", "buck", "graph.json"), "[]\n");
+  await write(path.join(root, DEFAULT_GRAPH_PATH), "[]\n");
   await write(path.join(root, "projects", "apps", "demo", "index.ts"), "export {}\n");
   for (const rel of [
     ".git/config",
@@ -45,14 +46,14 @@ test("source snapshot includes declared source and excludes mutable local direct
 
   await $({
     stdio: "pipe",
-  })`zx-wrapper build-tools/tools/dev/source-snapshot.ts --workspace-root ${root} --out ${out} --manifest ${manifest} --graph ${path.join(root, "build-tools/tools/buck/graph.json")}`;
+  })`zx-wrapper build-tools/tools/dev/source-snapshot.ts --workspace-root ${root} --out ${out} --manifest ${manifest} --graph ${path.join(root, DEFAULT_GRAPH_PATH)}`;
 
   for (const rel of [
     "flake.nix",
     "flake.lock",
     "TARGETS",
     "build-tools/lang/defs.bzl",
-    "build-tools/tools/buck/graph.json",
+    DEFAULT_GRAPH_PATH,
   ]) {
     assert.equal(await fs.readFile(path.join(out, rel), "utf8").then(Boolean), true, rel);
   }
@@ -69,7 +70,7 @@ test("source snapshot includes declared source and excludes mutable local direct
   assert.equal(data.schemaVersion, "viberoots.source-snapshot.v1");
   assert.equal(data.ambientWorkspaceRoot, root);
   assert.equal(data.declaredSnapshotRoot, out);
-  assert.equal(data.graphPathInSnapshot, "build-tools/tools/buck/graph.json");
+  assert.equal(data.graphPathInSnapshot, DEFAULT_GRAPH_PATH);
 });
 
 test("source_snapshot rule builds a declared Buck snapshot artifact", async () => {

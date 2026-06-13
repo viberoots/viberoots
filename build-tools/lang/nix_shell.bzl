@@ -10,6 +10,7 @@ def nix_bootstrap_env_core():
         + "WS_ENV=\"\"; "
         + "CAND_WS=\"$PWD\"; "
         + "while [ \"$CAND_WS\" != \"/\" ]; do "
+        + "  if [ -f \"$CAND_WS/.viberoots/workspace/buck/workspace-root.env\" ]; then WS_ENV=\"$CAND_WS/.viberoots/workspace/buck/workspace-root.env\"; break; fi; "
         + "  if [ -f \"$CAND_WS/build-tools/tools/buck/workspace-root.env\" ]; then WS_ENV=\"$CAND_WS/build-tools/tools/buck/workspace-root.env\"; break; fi; "
         + "  CAND_WS=\"${CAND_WS%/*}\"; "
         + "  if [ -z \"$CAND_WS\" ]; then CAND_WS=\"/\"; fi; "
@@ -18,12 +19,12 @@ def nix_bootstrap_env_core():
         + "export WORKSPACE_ROOT=\"${WORKSPACE_ROOT:-}\"; "
         + "if [ -z \"${WORKSPACE_ROOT:-}\" ] && [ -n \"${BUCK_TEST_SRC:-}\" ]; then export WORKSPACE_ROOT=\"$BUCK_TEST_SRC\"; fi; "
         + "if [ -z \"${WORKSPACE_ROOT:-}\" ]; then "
-        + "  if [ -f \"$PWD/build-tools/tools/buck/graph.json\" ]; then "
+        + "  if [ -f \"$PWD/.viberoots/workspace/buck/graph.json\" ] || [ -f \"$PWD/build-tools/tools/buck/graph.json\" ]; then "
         + "    export WORKSPACE_ROOT=\"$PWD\"; "
         + "  else "
         + "    CAND=\"$PWD\"; "
         + "    while [ \"$CAND\" != \"/\" ]; do "
-        + "      if [ -f \"$CAND/build-tools/tools/buck/graph.json\" ]; then export WORKSPACE_ROOT=\"$CAND\"; break; fi; "
+        + "      if [ -f \"$CAND/.viberoots/workspace/buck/graph.json\" ] || [ -f \"$CAND/build-tools/tools/buck/graph.json\" ]; then export WORKSPACE_ROOT=\"$CAND\"; break; fi; "
         + "      CAND=\"${CAND%/*}\"; "
         + "      if [ -z \"$CAND\" ]; then CAND=\"/\"; fi; "
         + "    done; "
@@ -211,8 +212,7 @@ def nix_build_out_path_cmd(flake_attr, timeout_var = "TIMEOUT", impure = False, 
         + "test -n \"$outPath\"; "
     )
 
-
-def nix_calling_env_export_buck_graph_json(graph_json_path = "$WORKSPACE_ROOT/build-tools/tools/buck/graph.json"):
+def nix_calling_env_export_buck_graph_json(graph_json_path = "$WORKSPACE_ROOT/.viberoots/workspace/buck/graph.json"):
     return ("export BUCK_GRAPH_JSON=\"%s\"; " % graph_json_path)
 
 def nix_calling_env_export_source_snapshot(snapshot_root = "${1:-}", manifest_path = "${2:-}"):
@@ -221,7 +221,7 @@ def nix_calling_env_export_source_snapshot(snapshot_root = "${1:-}", manifest_pa
         + "if [ -n \"$SOURCE_SNAPSHOT_ARG\" ]; then "
         + "export DECLARED_SOURCE_SNAPSHOT_ROOT=\"$SOURCE_SNAPSHOT_ARG\"; "
         + ("export DECLARED_SOURCE_SNAPSHOT_MANIFEST=\"%s\"; " % manifest_path)
-        + "export DECLARED_SOURCE_SNAPSHOT_GRAPH_JSON=\"$SOURCE_SNAPSHOT_ARG/build-tools/tools/buck/graph.json\"; "
+        + "export DECLARED_SOURCE_SNAPSHOT_GRAPH_JSON=\"$SOURCE_SNAPSHOT_ARG/.viberoots/workspace/buck/graph.json\"; "
         + "export SOURCE_SNAPSHOT_ROOT=\"$DECLARED_SOURCE_SNAPSHOT_ROOT\"; "
         + "export SOURCE_SNAPSHOT_MANIFEST=\"$DECLARED_SOURCE_SNAPSHOT_MANIFEST\"; "
         + "export BUCK_GRAPH_JSON=\"$DECLARED_SOURCE_SNAPSHOT_GRAPH_JSON\"; "
@@ -242,7 +242,7 @@ def nix_calling_node_patch_requirements_preflight(importer):
     return (
         ("VBR_NODE_PATCH_IMPORTER=\"%s\"; " % importer)
         + "VBR_NODE_ZX_INIT=\"$VIBEROOTS_ROOT/build-tools/tools/dev/zx-init.mjs\"; "
-        + "export BUCK_GRAPH_JSON=\"${BUCK_GRAPH_JSON:-$WORKSPACE_ROOT/build-tools/tools/buck/graph.json}\"; "
+        + "export BUCK_GRAPH_JSON=\"${BUCK_GRAPH_JSON:-$WORKSPACE_ROOT/.viberoots/workspace/buck/graph.json}\"; "
         + "if [ ! -f \"$BUCK_GRAPH_JSON\" ]; then "
         + "  node --experimental-top-level-await --disable-warning=ExperimentalWarning --experimental-strip-types --import \"$VBR_NODE_ZX_INIT\" \"$VIBEROOTS_ROOT/build-tools/tools/buck/export-graph.ts\" --out \"$BUCK_GRAPH_JSON\"; "
         + "fi; "

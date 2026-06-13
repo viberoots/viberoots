@@ -79,7 +79,7 @@ test("cpp lib scaffold builds via planner (archive exists)", async () => {
         srcs: ["projects/libs/demo/src/demo.cpp"],
       },
     ];
-    const graphPath = path.join(tmp, "build-tools/tools/buck/graph.json");
+    const graphPath = path.join(tmp, ".viberoots/workspace/buck/graph.json");
     await fs.mkdirp(path.dirname(graphPath));
     await fs.writeFile(graphPath, JSON.stringify(graphNodes, null, 2) + "\n", "utf8");
 

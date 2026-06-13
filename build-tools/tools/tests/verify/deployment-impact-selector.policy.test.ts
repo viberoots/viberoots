@@ -90,7 +90,7 @@ test("deployment-impact: shared helpers and reviewed loader/root paths broaden t
       "build-tools/tools/tests/defs.bzl",
       "toolchains/TARGETS",
       "build-tools/tools/dev/verify/run-verify.ts",
-      "third_party/providers/auto_map.bzl",
+      ".viberoots/workspace/providers/auto_map.bzl",
       "flake.nix",
     ],
     { deploymentTargetLabels },
@@ -102,7 +102,7 @@ test("deployment-impact: shared helpers and reviewed loader/root paths broaden t
     "build-tools/tools/tests/defs.bzl",
     "build-tools/tools/tests/deployment_conventions.bzl",
     "flake.nix",
-    "third_party/providers/auto_map.bzl",
+    ".viberoots/workspace/providers/auto_map.bzl",
     "toolchains/TARGETS",
   ]);
   assert.deepEqual(result.diagnostics.unknownBuildSystemPaths, []);

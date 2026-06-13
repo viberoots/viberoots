@@ -41,7 +41,7 @@ let
   # Per-subdirectory snapshots. Each snapshot only walks its own subtree, so a
   # change to build-tools/ does not force go/ or cpp/ to be re-hashed, and vice versa.
   # seedPred uses repoRoot as its root context, so repo-root-relative exclusions
-  # (e.g. build-tools/tools/buck/graph.json) apply correctly inside each subtree.
+  # (e.g. .viberoots/workspace/buck/graph.json) apply correctly inside each subtree.
   # The subdirectory root entry is always included so builtins.path recurses into
   # the directory even when goOnly/excludeCppReqs would exclude all its contents
   # (which produces an empty snap — harmless when copied into the output tree).

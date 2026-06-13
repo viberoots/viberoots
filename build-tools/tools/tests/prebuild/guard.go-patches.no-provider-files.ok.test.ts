@@ -29,7 +29,7 @@ test("prebuild-guard: Go patches present but no Go provider/index files — ok",
       "utf8",
     );
     await fsp.writeFile(
-      path.join(tmp, "third_party/providers/auto_map.bzl"),
+      path.join(tmp, ".viberoots/workspace/providers/auto_map.bzl"),
       "# generated\nMODULE_PROVIDERS = {}\n",
       "utf8",
     );

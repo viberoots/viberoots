@@ -114,8 +114,8 @@ _PYTHON_NIX_TEST_ATTRS = {
         "test_rule_timeout_ms": attrs.option(attrs.int(), default = None),
         "_inject_test_env": attrs.default_only(attrs.dep(default = "prelude//test/tools:inject_test_env")),
         "_build_selected": attrs.source(default = "//build-tools/tools/dev:build-selected.ts"),
-        "_graph_json": attrs.source(default = "//build-tools/tools/buck:graph.json"),
-        "_workspace_root_env": attrs.source(default = "//build-tools/tools/buck:workspace-root.env"),
+        "_graph_json": attrs.source(default = "workspace_buck//:graph.json"),
+        "_workspace_root_env": attrs.source(default = "workspace_buck//:workspace-root.env"),
         "_zx_init": attrs.source(default = "//build-tools/tools/dev:zx-init.mjs"),
     }
 _PYTHON_NIX_TEST_ATTRS.update(_remote_test_attrs())

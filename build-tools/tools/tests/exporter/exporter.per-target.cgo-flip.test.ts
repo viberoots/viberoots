@@ -26,7 +26,7 @@ test("per-target cgo_enabled flips only the tuple cgo segment", async () => {
         srcs: ["pkg/main.go"],
       },
     ];
-    const graph = path.join(tmp, "build-tools/tools/buck/graph.json");
+    const graph = path.join(tmp, ".viberoots/workspace/buck/graph.json");
     const m1 = path.join(tmp, "m1.json");
     await fs.mkdirp(path.dirname(graph));
     await fs.writeFile(graph, JSON.stringify(nodes1, null, 2), "utf8");

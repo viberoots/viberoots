@@ -2,7 +2,14 @@ import { normalizeTargetLabel, packagePathFromLabel } from "../lib/labels";
 
 type GraphNodeRecord = Record<string, unknown>;
 
-const SHARED_CPP_SNAPSHOT_ROOTS = ["build-tools", "prelude", "third_party", "toolchains", "types"];
+const SHARED_CPP_SNAPSHOT_ROOTS = [
+  ".viberoots",
+  "build-tools",
+  "prelude",
+  "third_party",
+  "toolchains",
+  "types",
+];
 
 const SHARED_CPP_SNAPSHOT_ROOT_FILES = [
   ".npmrc",

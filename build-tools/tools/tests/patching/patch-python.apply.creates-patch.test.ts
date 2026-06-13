@@ -46,7 +46,7 @@ test("patch-python apply writes canonical patch and refreshes glue", async () =>
       process.exit(2);
     }
     // Glue refresh should create TARGETS.python.auto with importer entry and our patch
-    const auto = path.join(tmp, "third_party", "providers", "TARGETS.python.auto");
+    const auto = path.join(tmp, ".viberoots", "workspace", "providers", "TARGETS.python.auto");
     const ok = await fs.pathExists(auto);
     if (!ok) {
       console.error("expected providers auto file missing:", auto);

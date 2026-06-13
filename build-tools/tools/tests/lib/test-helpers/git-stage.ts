@@ -1,5 +1,18 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
+import {
+  DEFAULT_AUTO_MAP_PATH,
+  DEFAULT_GRAPH_PATH,
+  DEFAULT_INVALIDATION_REPORT_PATH,
+  DEFAULT_NIX_ATTR_MAP_PATH,
+  DEFAULT_NODE_LOCK_INDEX_PATH,
+  DEFAULT_PROVIDER_INDEX_JSON_PATH,
+  DEFAULT_PROVIDER_INDEX_PATH,
+  DEFAULT_PROVIDER_TARGETS_PATH,
+  WORKSPACE_BUCK_STATE_DIR,
+  WORKSPACE_PROVIDER_DIR,
+  providerAutoTargetsPath,
+} from "../../../lib/workspace-state-paths";
 
 const EXCLUDED_DIR_NAMES = new Set([
   ".cache",
@@ -18,21 +31,27 @@ const EXCLUDED_DIR_NAMES = new Set([
 export const DEFAULT_TEMP_REPO_GLUE_STAGE_PATHS = [
   "build-tools/lang/importer_roots.bzl",
   "build-tools/lang/nix_attr_aliases.bzl",
-  "build-tools/tools/buck/graph.json",
+  path.join(WORKSPACE_BUCK_STATE_DIR, ".buckconfig"),
+  path.join(WORKSPACE_BUCK_STATE_DIR, "TARGETS"),
+  path.join(WORKSPACE_BUCK_STATE_DIR, "workspace-root.env"),
+  DEFAULT_GRAPH_PATH,
+  DEFAULT_INVALIDATION_REPORT_PATH,
+  DEFAULT_NODE_LOCK_INDEX_PATH,
+  path.join(WORKSPACE_PROVIDER_DIR, ".buckconfig"),
+  DEFAULT_PROVIDER_TARGETS_PATH,
+  providerAutoTargetsPath("cpp"),
+  providerAutoTargetsPath("node"),
+  providerAutoTargetsPath("python"),
+  providerAutoTargetsPath("rust"),
+  DEFAULT_AUTO_MAP_PATH,
+  DEFAULT_NIX_ATTR_MAP_PATH,
+  DEFAULT_PROVIDER_INDEX_PATH,
+  DEFAULT_PROVIDER_INDEX_JSON_PATH,
   "build-tools/tools/buck/invalidation-report.txt",
   "build-tools/tools/buck/node-lock-index.json",
   "build-tools/tools/node/workspace-map.json",
   "build-tools/tools/nix/langs.nix",
   "build-tools/tools/nix/node-modules.hashes.json",
-  "third_party/providers/TARGETS.auto",
-  "third_party/providers/TARGETS.cpp.auto",
-  "third_party/providers/TARGETS.node.auto",
-  "third_party/providers/TARGETS.python.auto",
-  "third_party/providers/TARGETS.rust.auto",
-  "third_party/providers/auto_map.bzl",
-  "third_party/providers/nix_attr_map.bzl",
-  "third_party/providers/provider_index.bzl",
-  "third_party/providers/provider_index.json",
 ] as const;
 
 function normalizeRelPath(relPath: string): string {
@@ -111,6 +130,6 @@ export async function stageTempRepoPaths(opts: {
     await opts._$({
       cwd: opts.tmp,
       stdio: "pipe",
-    })`git add -- ${chunk}`;
+    })`git add -f -- ${chunk}`;
   }
 }

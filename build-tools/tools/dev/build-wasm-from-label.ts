@@ -6,6 +6,7 @@ import { findRepoRoot } from "../lib/repo";
 import { runManagedCommand } from "../lib/managed-command";
 import { runNodeWithZx } from "../lib/node-run";
 import { sanitizeName } from "../lib/sanitize";
+import { DEFAULT_GRAPH_PATH } from "../lib/workspace-state-paths";
 
 async function sleep(ms: number): Promise<void> {
   await new Promise((resolve) => setTimeout(resolve, ms));
@@ -48,7 +49,7 @@ function parseBuckShowOutput(stdout: string, label: string): string {
 }
 
 async function refreshGraphForTarget(root: string, label: string): Promise<void> {
-  const graphPath = path.join(root, "build-tools", "tools", "buck", "graph.json");
+  const graphPath = path.join(root, DEFAULT_GRAPH_PATH);
   const exportScript = path.join(root, "build-tools", "tools", "buck", "export-graph.ts");
   const zxInit = path.join(root, "build-tools", "tools", "dev", "zx-init.mjs");
   try {

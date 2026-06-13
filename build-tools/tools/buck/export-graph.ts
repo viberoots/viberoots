@@ -1,5 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import { resolveWorkspaceRootSync } from "../lib/repo";
+import { ensureWorkspaceBuckStatePackage } from "../lib/workspace-buck-state";
+import { ensureWorkspaceProvidersPackage } from "../lib/workspace-providers-package";
 import { run } from "./exporter/main";
 
 async function main() {
@@ -8,6 +10,8 @@ async function main() {
   try {
     process.chdir(resolveWorkspaceRootSync());
   } catch {}
+  await ensureWorkspaceBuckStatePackage(process.cwd());
+  await ensureWorkspaceProvidersPackage(process.cwd());
   await run();
 }
 

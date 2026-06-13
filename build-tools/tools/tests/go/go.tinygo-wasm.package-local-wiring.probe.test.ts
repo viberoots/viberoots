@@ -9,7 +9,7 @@ test("nix_go_tiny_wasm_lib: stamps wasm + patch_scope and includes package-local
   await runInTemp("go-tinygo-wasm-package-local-wiring", async (tmp, $) => {
     await $({
       cwd: tmp,
-    })`bash --noprofile --norc -c 'mkdir -p third_party/providers && cat > third_party/providers/auto_map.bzl <<'\''EOF'\''
+    })`bash --noprofile --norc -c 'mkdir -p third_party/providers && cat > .viberoots/workspace/providers/auto_map.bzl <<'\''EOF'\''
 MODULE_PROVIDERS = {}
 EOF'`;
 

@@ -4,11 +4,16 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
 import { providerNameForImporter } from "../lib/providers";
+import {
+  DEFAULT_AUTO_MAP_PATH,
+  DEFAULT_GRAPH_PATH,
+  workspaceProviderLabel,
+} from "../lib/workspace-state-paths";
 import { runInTemp } from "./lib/test-helpers";
 
 test("gen-auto-map: Python two importers map to distinct providers", async () => {
   await runInTemp("auto-map-python-multi", async (tmp, $) => {
-    const graphPath = path.join(tmp, "build-tools", "tools", "buck", "graph.json");
+    const graphPath = path.join(tmp, DEFAULT_GRAPH_PATH);
     await fsp.mkdir(path.dirname(graphPath), { recursive: true });
 
     // Two python targets, each labeled with its own importer-scoped uv.lock
@@ -36,7 +41,7 @@ test("gen-auto-map: Python two importers map to distinct providers", async () =>
     };
     await fsp.writeFile(graphPath, JSON.stringify([t1, t2], null, 2), "utf8");
 
-    const outPath = path.join(tmp, "third_party", "providers", "auto_map.bzl");
+    const outPath = path.join(tmp, DEFAULT_AUTO_MAP_PATH);
     await $`node build-tools/tools/buck/gen-auto-map.ts --graph ${graphPath} --out ${outPath}`;
     const out = await fsp.readFile(outPath, "utf8");
 
@@ -47,14 +52,12 @@ test("gen-auto-map: Python two importers map to distinct providers", async () =>
     assert.ok(key2.test(out), "expected mapping for //projects/apps/pytool2:lib");
 
     // Providers present and distinct
-    const p1 = `//third_party/providers:${providerNameForImporter(
-      "projects/apps/pytool1/uv.lock",
-      "projects/apps/pytool1",
-    )}`;
-    const p2 = `//third_party/providers:${providerNameForImporter(
-      "projects/apps/pytool2/uv.lock",
-      "projects/apps/pytool2",
-    )}`;
+    const p1 = workspaceProviderLabel(
+      providerNameForImporter("projects/apps/pytool1/uv.lock", "projects/apps/pytool1"),
+    );
+    const p2 = workspaceProviderLabel(
+      providerNameForImporter("projects/apps/pytool2/uv.lock", "projects/apps/pytool2"),
+    );
     assert.ok(out.includes(p1), `expected provider ${p1}`);
     assert.ok(out.includes(p2), `expected provider ${p2}`);
     assert.notEqual(p1, p2, "providers for distinct importers must differ");

@@ -192,7 +192,7 @@ test("go cli with local lib + third-party runtime", async () => {
     // 5) Validate provider wiring only; skip export-graph to avoid invoking Go tooling
     await $`node build-tools/tools/buck/sync-providers.ts`;
     // Synthesize a minimal graph for auto-map to consume
-    const graphPath = path.join(_tmp, "build-tools", "tools", "buck", "graph.json");
+    const graphPath = path.join(_tmp, ".viberoots", "workspace", "buck", "graph.json");
     await fsp.mkdir(path.dirname(graphPath), { recursive: true });
     await fsp.writeFile(
       graphPath,
@@ -204,14 +204,20 @@ test("go cli with local lib + third-party runtime", async () => {
       ]),
       "utf8",
     );
-    await $`node build-tools/tools/buck/gen-auto-map.ts --graph ${graphPath} --out third_party/providers/auto_map.bzl`;
-    const providersTargetsPath = path.join(_tmp, "third_party", "providers", "TARGETS.node.auto");
-    const autoMapPath = path.join(_tmp, "third_party", "providers", "auto_map.bzl");
+    await $`node build-tools/tools/buck/gen-auto-map.ts --graph ${graphPath} --out .viberoots/workspace/providers/auto_map.bzl`;
+    const providersTargetsPath = path.join(
+      _tmp,
+      ".viberoots",
+      "workspace",
+      "providers",
+      "TARGETS.node.auto",
+    );
+    const autoMapPath = path.join(_tmp, ".viberoots", "workspace", "providers", "auto_map.bzl");
     if (!(await fsp.stat(providersTargetsPath).catch(() => null))) {
-      throw new Error("expected providers/TARGETS.node.auto to be generated");
+      throw new Error("expected .viberoots/workspace/providers/TARGETS.node.auto to be generated");
     }
     if (!(await fsp.stat(autoMapPath).catch(() => null))) {
-      throw new Error("expected providers/auto_map.bzl to be generated");
+      throw new Error("expected .viberoots/workspace/providers/auto_map.bzl to be generated");
     }
   });
 });

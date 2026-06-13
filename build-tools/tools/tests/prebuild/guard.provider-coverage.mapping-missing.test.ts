@@ -7,25 +7,18 @@ import { runInTemp } from "../lib/test-helpers";
 test("prebuild-guard: flags missing MODULE_PROVIDERS mapping for nixpkg-labeled node", async () => {
   await runInTemp("prebuild-coverage-mapping-missing", async (tmp, $) => {
     // Providers directory with an existing nix provider stamp (simulates generated provider)
-    const providersDir = path.join(tmp, "third_party", "providers");
+    const providersDir = path.join(tmp, ".viberoots", "workspace", "providers");
+    const buckDir = path.join(tmp, ".viberoots", "workspace", "buck");
     await fsp.mkdir(path.join(providersDir, "stamps"), { recursive: true });
     await fsp.writeFile(path.join(providersDir, "stamps", "nix_pkgs_zlib.stamp"), "ok\n", "utf8");
 
     // Minimal graph.json with a node that carries a nixpkg label
-    await fsp.mkdir(path.join(tmp, "build-tools", "tools", "buck"), { recursive: true });
+    await fsp.mkdir(buckDir, { recursive: true });
     const graph = [{ name: "//projects/apps/a:bin", labels: ["nixpkg:pkgs.zlib"] }];
+    await fsp.writeFile(path.join(buckDir, "graph.json"), JSON.stringify(graph), "utf8");
+    await fsp.writeFile(path.join(buckDir, "node-lock-index.json"), "{}\n", "utf8");
     await fsp.writeFile(
-      path.join(tmp, "build-tools", "tools", "buck", "graph.json"),
-      JSON.stringify(graph),
-      "utf8",
-    );
-    await fsp.writeFile(
-      path.join(tmp, "build-tools", "tools", "buck", "node-lock-index.json"),
-      "{}\n",
-      "utf8",
-    );
-    await fsp.writeFile(
-      path.join(tmp, "build-tools", "tools", "buck", "invalidation-report.txt"),
+      path.join(buckDir, "invalidation-report.txt"),
       "# invalidation-report\n",
       "utf8",
     );
@@ -46,6 +39,7 @@ name = TARGETS
 
 [repositories]
 root = .
+workspace_providers = ./.viberoots/workspace/providers
 prelude = ./prelude
 toolchains = ./toolchains
 repo_toolchains = ./toolchains
@@ -55,6 +49,7 @@ config = ./prelude
 
 [cells]
 root = .
+workspace_providers = ./.viberoots/workspace/providers
 prelude = ./prelude
 toolchains = ./toolchains
 repo_toolchains = ./toolchains
@@ -96,7 +91,7 @@ EOF
         "# gen",
         "MODULE_PROVIDERS = {",
         '  "//projects/apps/a:bin": [',
-        '    "//third_party/providers:nix_pkgs_zlib",',
+        '    "workspace_providers//:nix_pkgs_zlib",',
         "  ],",
         "}",
         "",
@@ -104,16 +99,12 @@ EOF
       "utf8",
     );
     // Ensure no stale sidecar is present and refresh graph.json so outputs are fresh vs inputs
-    const nodeLockSidecar = path.join(tmp, "build-tools", "tools", "buck", "node-lock-index.json");
-    await fsp.writeFile(
-      path.join(tmp, "build-tools", "tools", "buck", "graph.json"),
-      JSON.stringify(graph),
-      "utf8",
-    );
+    const nodeLockSidecar = path.join(buckDir, "node-lock-index.json");
+    await fsp.writeFile(path.join(buckDir, "graph.json"), JSON.stringify(graph), "utf8");
     // Create a fresh, minimal sidecar so presence/freshness checks pass in CI
     await fsp.writeFile(nodeLockSidecar, JSON.stringify({ index: {} }), "utf8");
     await fsp.writeFile(
-      path.join(tmp, "build-tools", "tools", "buck", "invalidation-report.txt"),
+      path.join(buckDir, "invalidation-report.txt"),
       "# invalidation-report\n",
       "utf8",
     );

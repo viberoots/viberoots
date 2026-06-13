@@ -5,7 +5,7 @@ import { providersForLabels } from "../../lib/labels";
 import { providerNameForImporter } from "../../lib/providers";
 
 function fqImporterProvider(lockfile: string, importer: string): string {
-  return `//third_party/providers:${providerNameForImporter(lockfile, importer)}`;
+  return `workspace_providers//:${providerNameForImporter(lockfile, importer)}`;
 }
 
 test("providersForLabels ignores lockfile labels with unsupported importer roots", () => {

@@ -2,12 +2,20 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
+import {
+  DEFAULT_AUTO_MAP_PATH,
+  DEFAULT_GRAPH_PATH,
+  DEFAULT_INVALIDATION_REPORT_PATH,
+  DEFAULT_NODE_LOCK_INDEX_PATH,
+  DEFAULT_PROVIDER_INDEX_JSON_PATH,
+  workspaceProviderLabel,
+} from "../../lib/workspace-state-paths";
 import { runInTemp } from "../lib/test-helpers";
 
 test("invalidation-report: stable ordering, patch scope classification, and global nix input expectation (fixture)", async () => {
   await runInTemp("invalidation-report-fixture", async (tmp, $) => {
-    await fsp.mkdir(path.join(tmp, "build-tools", "tools", "buck"), { recursive: true });
-    await fsp.mkdir(path.join(tmp, "third_party", "providers"), { recursive: true });
+    await fsp.mkdir(path.dirname(path.join(tmp, DEFAULT_GRAPH_PATH)), { recursive: true });
+    await fsp.mkdir(path.dirname(path.join(tmp, DEFAULT_AUTO_MAP_PATH)), { recursive: true });
 
     const graph = {
       $schema: "https://example.com/schemas/buck-graph.schema.json",
@@ -62,7 +70,7 @@ test("invalidation-report: stable ordering, patch scope classification, and glob
           srcs: ["projects/libs/go/lib.go", "projects/libs/go/patches/go/demo@0.0.0.patch"],
         },
         {
-          name: "//third_party/providers:lf_demo",
+          name: workspaceProviderLabel("lf_demo"),
           rule_type: "genrule",
           labels: ["lang:node"],
         },
@@ -70,7 +78,7 @@ test("invalidation-report: stable ordering, patch scope classification, and glob
     };
 
     await fsp.writeFile(
-      path.join(tmp, "build-tools", "tools", "buck", "graph.json"),
+      path.join(tmp, DEFAULT_GRAPH_PATH),
       JSON.stringify(graph, null, 2) + "\n",
       "utf8",
     );
@@ -84,32 +92,32 @@ test("invalidation-report: stable ordering, patch scope classification, and glob
       },
     };
     await fsp.writeFile(
-      path.join(tmp, "build-tools", "tools", "buck", "node-lock-index.json"),
+      path.join(tmp, DEFAULT_NODE_LOCK_INDEX_PATH),
       JSON.stringify(nodeLockIndex, null, 2) + "\n",
       "utf8",
     );
 
     const providerIndex = {
-      "//third_party/providers:lf_demo": {
+      [workspaceProviderLabel("lf_demo")]: {
         kind: "node",
         key: "lockfile:projects/apps/web/pnpm-lock.yaml#projects/apps/web",
         patch_scope: "importer-local",
       },
     };
     await fsp.writeFile(
-      path.join(tmp, "third_party", "providers", "provider_index.json"),
+      path.join(tmp, DEFAULT_PROVIDER_INDEX_JSON_PATH),
       JSON.stringify(providerIndex, null, 2) + "\n",
       "utf8",
     );
 
     await fsp.writeFile(
-      path.join(tmp, "third_party", "providers", "auto_map.bzl"),
+      path.join(tmp, DEFAULT_AUTO_MAP_PATH),
       [
         "# GENERATED FILE — DO NOT EDIT.",
         "",
         "MODULE_PROVIDERS = {",
         '    "//projects/apps/web:bundle": [',
-        '        "//third_party/providers:lf_demo",',
+        `        "${workspaceProviderLabel("lf_demo")}",`,
         "    ],",
         "}",
         "",
@@ -122,7 +130,7 @@ test("invalidation-report: stable ordering, patch scope classification, and glob
       stdio: "pipe",
     })`node --experimental-strip-types --import ./build-tools/tools/dev/zx-init.mjs build-tools/tools/buck/invalidation-report.ts`;
 
-    const reportPath = path.join(tmp, "build-tools", "tools", "buck", "invalidation-report.txt");
+    const reportPath = path.join(tmp, DEFAULT_INVALIDATION_REPORT_PATH);
     const txt = await fsp.readFile(reportPath, "utf8");
 
     // Stable ordering: targets are sorted lexicographically by normalized label.
@@ -149,7 +157,7 @@ test("invalidation-report: stable ordering, patch scope classification, and glob
       "global_nix_inputs_labels_stamped=true",
       "importer_local_patches_action_inputs_expected=true",
       "importer_local_patches_action_inputs_observed_in=srcs(dict)/__patch_inputs__",
-      "module_providers=[//third_party/providers:lf_demo kind=node key=lockfile:projects/apps/web/pnpm-lock.yaml#projects/apps/web patch_scope=importer-local]",
+      `module_providers=[${workspaceProviderLabel("lf_demo")} kind=node key=lockfile:projects/apps/web/pnpm-lock.yaml#projects/apps/web patch_scope=importer-local]`,
     ];
     for (const part of wantNodeParts) {
       if (!txt.includes(part)) {

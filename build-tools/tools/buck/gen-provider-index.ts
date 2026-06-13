@@ -8,15 +8,20 @@ import { parseLockfileLabel } from "../lib/labels";
 import { isSupportedImporterLabel } from "../lib/importers";
 import { normalizeNixAttr } from "../lib/providers";
 import { readImporterProviderIndexEntriesForSingleImporterLockfileBasenames } from "../lib/provider-index";
+import { ensureWorkspaceProvidersPackage } from "../lib/workspace-providers-package";
+import {
+  DEFAULT_NIX_ATTR_MAP_PATH,
+  DEFAULT_NODE_LOCK_INDEX_PATH,
+  DEFAULT_PROVIDER_INDEX_JSON_PATH,
+  DEFAULT_PROVIDER_INDEX_PATH,
+  DEFAULT_PROVIDER_TARGETS_PATH,
+  workspaceProviderLabel,
+} from "../lib/workspace-state-paths";
 
 type PatchScope = "package-local" | "importer-local";
 
 type PatchInputsExpectedIn = {
-  // True when patch invalidation is expected to come from real action inputs (e.g., srcs/resources)
-  // attached by macros and/or shared wiring helpers.
   macroActionInputs: boolean;
-  // "diagnostic": the provider records patch paths for visibility, but they are not action inputs.
-  // "none": provider has no patch-path surface.
   providerPatchPaths: "none" | "diagnostic";
 };
 
@@ -30,10 +35,10 @@ type IndexEntry = {
 };
 
 function fq(labelTail: string): string {
-  return `//third_party/providers:${labelTail}`;
+  return workspaceProviderLabel(labelTail);
 }
 
-async function generateNodeLockIndex(outFile = "build-tools/tools/buck/node-lock-index.json") {
+async function generateNodeLockIndex(outFile = DEFAULT_NODE_LOCK_INDEX_PATH) {
   const SIDE_SCHEMA = "https://example.com/schemas/node-lock-index.schema.json";
   const SCHEMA_VERSION = 1;
 
@@ -59,7 +64,6 @@ async function generateNodeLockIndex(outFile = "build-tools/tools/buck/node-lock
     if (!isSupportedImporterLabel(parsed.importer)) continue;
     idx[name] = locks[0].toLowerCase();
   }
-  // Deterministic order
   const ordered: Record<string, string> = {};
   for (const k of Object.keys(idx).sort((a, b) => a.localeCompare(b))) {
     ordered[k] = idx[k];
@@ -106,18 +110,21 @@ async function parseNixProvidersFromTargetsFile(
 }
 
 async function generateNixAttrMap(
-  outFile = "third_party/providers/nix_attr_map.bzl",
+  outFile = DEFAULT_NIX_ATTR_MAP_PATH,
 ): Promise<Record<string, string>> {
-  const sources = ["third_party/providers/TARGETS", "third_party/providers/TARGETS.cpp.auto"];
+  const sources = [
+    DEFAULT_PROVIDER_TARGETS_PATH,
+    "third_party/providers/TARGETS",
+    "third_party/providers/TARGETS.cpp.auto",
+  ];
   const entries: Array<{ provider: string; nixpkg: string }> = [];
   for (const src of sources) {
     for (const { name, attr } of await parseNixProvidersFromTargetsFile(src)) {
-      const provider = `//third_party/providers:${name}`;
+      const provider = workspaceProviderLabel(name);
       const nixpkg = `nixpkg:${normalizeNixAttr(attr)}`;
       entries.push({ provider, nixpkg });
     }
   }
-  // Deterministic order, first-wins.
   const map: Record<string, string> = {};
   for (const e of entries.sort((a, b) => a.provider.localeCompare(b.provider))) {
     if (!map[e.provider]) map[e.provider] = e.nixpkg;
@@ -190,8 +197,13 @@ async function readPythonIndexEntries(): Promise<Record<string, IndexEntry>> {
 }
 
 export async function generateProviderIndex(opts?: { outFile?: string; jsonOutFile?: string }) {
-  const OUT = opts?.outFile || "third_party/providers/provider_index.bzl";
-  const OUT_JSON = opts?.jsonOutFile || "third_party/providers/provider_index.json";
+  await ensureWorkspaceProvidersPackage();
+  const OUT = opts?.outFile || DEFAULT_PROVIDER_INDEX_PATH;
+  const OUT_JSON =
+    opts?.jsonOutFile ||
+    (opts?.outFile
+      ? path.join(path.dirname(opts.outFile), "provider_index.json")
+      : DEFAULT_PROVIDER_INDEX_JSON_PATH);
 
   const maps: Record<string, IndexEntry>[] = await Promise.all([
     readNodeIndexEntries(),
@@ -218,19 +230,17 @@ export async function generateProviderIndex(opts?: { outFile?: string; jsonOutFi
   const text = [...header, ...(body.length ? ["", ...body] : []), ...footer].join("\n");
   await writeIfChanged(OUT, text);
 
-  // Also emit a JSON sidecar for machine consumption
   const jsonObj: Record<string, IndexEntry> = {};
   for (const [k, v] of entries) {
     jsonObj[k] = v;
   }
   await writeIfChanged(OUT_JSON, JSON.stringify(jsonObj, null, 2) + "\n");
 
-  // Emit Node lockfile sidecar from the current graph (kept adapter-agnostic)
   await generateNodeLockIndex();
 }
 
 async function main() {
-  const OUT = getFlagStr("out", "third_party/providers/provider_index.bzl");
+  const OUT = getFlagStr("out", DEFAULT_PROVIDER_INDEX_PATH);
   await generateProviderIndex({ outFile: OUT });
 }
 

@@ -2,6 +2,7 @@
 import fs from "fs-extra";
 import path from "node:path";
 import { test } from "node:test";
+import { DEFAULT_GRAPH_PATH } from "../../lib/workspace-state-paths";
 import { runInTemp } from "../lib/test-helpers";
 
 test("python runtime e2e: app output changes after patch apply", async () => {
@@ -57,7 +58,8 @@ test("python runtime e2e: app output changes after patch apply", async () => {
     await fs.writeFile(path.join(origin, "mydep", "__init__.py"), mydepInit, "utf8");
 
     // Write a minimal Buck graph for the planner to consume
-    const graphDir = path.join(tmp, "build-tools", "tools", "buck");
+    const graphPath = path.join(tmp, DEFAULT_GRAPH_PATH);
+    const graphDir = path.dirname(graphPath);
     await fs.mkdirp(graphDir);
     const node = {
       name: `//projects/apps/${appName}:${appName}`,
@@ -68,11 +70,7 @@ test("python runtime e2e: app output changes after patch apply", async () => {
         `projects/apps/${appName}/src/${appName}/__init__.py`,
       ],
     };
-    await fs.writeFile(
-      path.join(graphDir, "graph.json"),
-      JSON.stringify([node], null, 2) + "\n",
-      "utf8",
-    );
+    await fs.writeFile(graphPath, JSON.stringify([node], null, 2) + "\n", "utf8");
 
     // Helper to build and run the selected target via Nix
     async function runApp(expect: string, extraEnv: Record<string, string> = {}) {
@@ -83,6 +81,8 @@ test("python runtime e2e: app output changes after patch apply", async () => {
           ...process.env,
           BUCK_TARGET: `//projects/apps/${appName}:${appName}`,
           BUCK_TEST_SRC: tmp,
+          WORKSPACE_ROOT: tmp,
+          BUCK_GRAPH_JSON: graphPath,
           NIX_PY_TEST_RESOLVE_JSON: JSON.stringify({
             mydep: { version: "1.0.0", originPath: originRel },
           }),

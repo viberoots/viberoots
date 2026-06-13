@@ -46,7 +46,7 @@ policy_probe(
     name = "remote_ready",
     mode = "remote-ready",
     evidence = {
-        "source_snapshot": {"declared_root": "snapshot", "manifest": "snapshot.manifest.json", "graph_path": "snapshot/build-tools/tools/buck/graph.json"},
+        "source_snapshot": {"declared_root": "snapshot", "manifest": "snapshot.manifest.json", "graph_path": "snapshot/.viberoots/workspace/buck/graph.json"},
         "materialization_manifest": {"path": "materialization-manifest.json"},
         "artifact_contract": {"path": "artifact-contract.json"},
         "builder_policy": "inherit_config",
@@ -73,7 +73,7 @@ test("remote action policy rejects remote-ready and hybrid actions without evide
     );
     await fs.writeFile(
       path.join(hybridDir, "TARGETS"),
-      'load("//tmp/policy_defs:defs.bzl", "policy_probe")\npolicy_probe(name = "t", mode = "hybrid", evidence = {"source_snapshot": {"declared_root": "snapshot", "manifest": "snapshot.manifest.json", "graph_path": "snapshot/build-tools/tools/buck/graph.json"}, "materialization_manifest": {"path": "materialization-manifest.json"}, "artifact_contract": {"path": "artifact-contract.json"}, "builder_policy": "inherit_config", "remote_builder_smoke": {"builder_policy": "inherit_config", "path": "remote-builder-smoke.json"}, "tool_closure": {"path": "tool-closure.json"}, "remote_profile_compatibility": True})\n',
+      'load("//tmp/policy_defs:defs.bzl", "policy_probe")\npolicy_probe(name = "t", mode = "hybrid", evidence = {"source_snapshot": {"declared_root": "snapshot", "manifest": "snapshot.manifest.json", "graph_path": "snapshot/.viberoots/workspace/buck/graph.json"}, "materialization_manifest": {"path": "materialization-manifest.json"}, "artifact_contract": {"path": "artifact-contract.json"}, "builder_policy": "inherit_config", "remote_builder_smoke": {"builder_policy": "inherit_config", "path": "remote-builder-smoke.json"}, "tool_closure": {"path": "tool-closure.json"}, "remote_profile_compatibility": True})\n',
       "utf8",
     );
     await fs.writeFile(path.join(valid, "TARGETS"), validTargets, "utf8");
@@ -114,7 +114,7 @@ test("remote action policy rejects local-only Nix builder evidence", async () =>
     await fs.writeFile(path.join(defs, "TARGETS"), "", "utf8");
     await fs.writeFile(
       path.join(dir, "TARGETS"),
-      'load("//tmp/policy_defs:defs.bzl", "policy_probe")\npolicy_probe(name = "t", mode = "remote-ready", evidence = {"source_snapshot": {"declared_root": "snapshot", "manifest": "snapshot.manifest.json", "graph_path": "snapshot/build-tools/tools/buck/graph.json"}, "materialization_manifest": {"path": "materialization-manifest.json"}, "artifact_contract": {"path": "artifact-contract.json"}, "builder_policy": "local_only", "remote_builder_smoke": {"builder_policy": "inherit_config", "path": "remote-builder-smoke.json"}, "tool_closure": {"path": "tool-closure.json"}, "remote_profile_compatibility": True})\n',
+      'load("//tmp/policy_defs:defs.bzl", "policy_probe")\npolicy_probe(name = "t", mode = "remote-ready", evidence = {"source_snapshot": {"declared_root": "snapshot", "manifest": "snapshot.manifest.json", "graph_path": "snapshot/.viberoots/workspace/buck/graph.json"}, "materialization_manifest": {"path": "materialization-manifest.json"}, "artifact_contract": {"path": "artifact-contract.json"}, "builder_policy": "local_only", "remote_builder_smoke": {"builder_policy": "inherit_config", "path": "remote-builder-smoke.json"}, "tool_closure": {"path": "tool-closure.json"}, "remote_profile_compatibility": True})\n',
       "utf8",
     );
 
@@ -138,7 +138,7 @@ test("remote action policy requires builder smoke to match selected policy", asy
     await fs.writeFile(path.join(defs, "TARGETS"), "", "utf8");
     await fs.writeFile(
       path.join(dir, "TARGETS"),
-      'load("//tmp/policy_defs:defs.bzl", "policy_probe")\npolicy_probe(name = "t", mode = "remote-ready", evidence = {"source_snapshot": {"declared_root": "snapshot", "manifest": "snapshot.manifest.json", "graph_path": "snapshot/build-tools/tools/buck/graph.json"}, "materialization_manifest": {"path": "materialization-manifest.json"}, "artifact_contract": {"path": "artifact-contract.json"}, "builder_policy": "inherit_config", "remote_builder_smoke": {"builder_policy": "force_builders_file", "path": "remote-builder-smoke.json"}, "tool_closure": {"path": "tool-closure.json"}, "remote_profile_compatibility": True})\n',
+      'load("//tmp/policy_defs:defs.bzl", "policy_probe")\npolicy_probe(name = "t", mode = "remote-ready", evidence = {"source_snapshot": {"declared_root": "snapshot", "manifest": "snapshot.manifest.json", "graph_path": "snapshot/.viberoots/workspace/buck/graph.json"}, "materialization_manifest": {"path": "materialization-manifest.json"}, "artifact_contract": {"path": "artifact-contract.json"}, "builder_policy": "inherit_config", "remote_builder_smoke": {"builder_policy": "force_builders_file", "path": "remote-builder-smoke.json"}, "tool_closure": {"path": "tool-closure.json"}, "remote_profile_compatibility": True})\n',
       "utf8",
     );
 

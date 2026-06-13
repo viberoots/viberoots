@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
+import { providerAutoTargetsPath } from "../../lib/workspace-state-paths";
 import { runInTemp } from "../lib/test-helpers";
 
 test("providers registry: node sync generates importer-scoped provider from pnpm-lock.yaml", async () => {
@@ -33,7 +34,7 @@ test("providers registry: node sync generates importer-scoped provider from pnpm
       stdio: "inherit",
     })`node build-tools/tools/buck/sync-providers.ts --lang node`;
 
-    const out = path.join(tmp, "third_party", "providers", "TARGETS.node.auto");
+    const out = path.join(tmp, providerAutoTargetsPath("node"));
     const txt = await fsp.readFile(out, "utf8");
     assert.ok(
       /node_importer_deps\s*\(/.test(txt),
