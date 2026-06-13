@@ -28,7 +28,7 @@ If the language can support C interop, I must provide a documented and tested pa
 Use the canonical helper surface from `//build-tools/lang:defs_common.bzl` and `//build-tools/lang:language_wiring.bzl`. Macro call sites should not re‑implement wiring or load provider maps directly.
 
 - Preferred macro entrypoint: `prepare_language_wiring(...)` (non‑mutating), with `wiring=` for `genrule`, `nix_calling_genrule`, `non_genrule`, or `srcsless_rule`.
-- Provider wiring: load `MODULE_PROVIDERS` from `//build-tools/lang:auto_map.bzl` and use `providers_for`/`realize_provider_edges` for deterministic provider edges.
+- Provider wiring: load `MODULE_PROVIDERS` from `@workspace_providers//:auto_map.bzl` and use `providers_for`/`realize_provider_edges` for deterministic provider edges.
 - Lockfile labels (importer‑scoped languages): `lockfile:<path>#<importer>` with supported importer roots `.` and `projects/apps/*`/`projects/libs/*`; importer‑scoped macros must live in the importer package so importer‑local patch globs are valid action inputs.
 - Patch model contract: `build-tools/lang/lang_contracts.bzl` and `build-tools/tools/lib/lang-contracts.ts` define `patch_scope:*` stamping and whether glue runs on patch apply/remove.
 - Global Nix inputs: for Nix‑calling macros, use `wire_global_nix_inputs(...)` so `global_nix_inputs()` are real action inputs; labels are observability only.
@@ -125,7 +125,7 @@ Default path mirrors Node (importer‑scoped): use the existing orchestrator `bu
 - File: `csharp/defs.bzl`.
 - **Macros**: `nix_csharp_library`, `nix_csharp_binary`, `nix_csharp_test`.
   - Stamp labels: `lang:dotnet` and `kind:<lib|bin|test>`.
-- Append providers from `//build-tools/lang:auto_map.bzl` via the same `MODULE_PROVIDERS` pattern as Go.
+- Append providers from `@workspace_providers//:auto_map.bzl` via the same `MODULE_PROVIDERS` pattern as Go.
   - Under the hood: call Buck’s `csharp_*` rules if available; otherwise wrap `genrule` placeholders that produce a minimal artifact (for initial bring‑up), while real builds are performed via Nix derivations exposed by the planner. The macros’ key role is labels and provider deps.
 
 ### Patching workflow (outer CLI)
@@ -134,7 +134,7 @@ Default path mirrors Node (importer‑scoped): use the existing orchestrator `bu
 - **start** `<id>`: materialize the package source for the exact version present in the current project set (using `nuget-deps.nix` mapping); unpack into a temp dir; set `NIX_CSHARP_DEV_OVERRIDE_JSON["id@ver"] = /abs/tmp`; if `$PATCH_EDITOR` is set, open it.
 - **apply** `<id>`: produce a unified diff between the canonical extracted source and the temp dir and write to a package‑ or importer‑local patch directory (recommended), or `patches/csharp/<id>@<ver>.patch` when shared. For importer‑scoped flows, then run:
   - `node build-tools/tools/buck/sync-providers.ts`
-  - `node build-tools/tools/buck/gen-auto-map.ts --graph build-tools/tools/buck/graph.json --out third_party/providers/auto_map.bzl`
+  - `node build-tools/tools/buck/gen-auto-map.ts --graph build-tools/tools/buck/graph.json --out .viberoots/workspace/providers/auto_map.bzl`
   - remove dev override and delete temp dir.
 - **reset** `<id>`: remove override and delete temp dir.
 - **session** `<id>`: long‑running edit session; Ctrl‑D applies; Ctrl‑C resets.

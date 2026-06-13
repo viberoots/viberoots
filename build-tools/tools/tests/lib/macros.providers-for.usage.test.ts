@@ -22,11 +22,11 @@ test("macros use realize_provider_edges() and avoid direct provider labels", asy
     const txt = await read(f);
     assert(
       !txt.includes('load("//third_party/providers:auto_map.bzl"'),
-      `${f} must not load //third_party/providers:auto_map.bzl directly; use //build-tools/lang:auto_map.bzl`,
+      `${f} must not load //third_party/providers:auto_map.bzl directly; use @workspace_providers//:auto_map.bzl`,
     );
     assert(
-      txt.includes('load("//build-tools/lang:auto_map.bzl"'),
-      `${f} must load MODULE_PROVIDERS via //build-tools/lang:auto_map.bzl`,
+      txt.includes('load("@workspace_providers//:auto_map.bzl"'),
+      `${f} must load MODULE_PROVIDERS via @workspace_providers//:auto_map.bzl`,
     );
     // Must use shared provider-edge wiring helpers (direct, via importer wiring, or via planner-visible stub wiring)
     assert(
@@ -47,7 +47,7 @@ test("macros use realize_provider_edges() and avoid direct provider labels", asy
     const lines = txt.split(/\r?\n/).filter((l) => l.includes("//third_party/providers:"));
     const offenders = lines.filter(
       (l) =>
-        !l.includes('load("//build-tools/lang:auto_map.bzl"') &&
+        !l.includes('load("@workspace_providers//:auto_map.bzl"') &&
         // Allow filtering checks that explicitly avoid wiring provider deps.
         !l.includes('.startswith("//third_party/providers:")'),
     );

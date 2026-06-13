@@ -1,5 +1,5 @@
 # Buck2 targets
-load("//build-tools/tools/tests:defs.bzl", "auto_zx_tests")
+load("@viberoots//build-tools/tools/tests:defs.bzl", "auto_zx_tests")
 load("@prelude//:rules.bzl", "export_file")
 
 # Auto-generate one zx_test per matching test file.

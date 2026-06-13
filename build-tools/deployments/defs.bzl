@@ -1,5 +1,5 @@
 load(
-    "//build-tools/deployments:metadata_rules.bzl",
+    "@viberoots//build-tools/deployments:metadata_rules.bzl",
     _deployment_admission_policy = "deployment_admission_policy",
     _deployment_defaults = "deployment_defaults",
     _deployment_lane_governance = "deployment_lane_governance",
@@ -8,19 +8,19 @@ load(
     _deployment_target = "deployment_target",
     _deployment_target_exception = "deployment_target_exception",
 )
-load("//build-tools/deployments:github_app_requirements.bzl", _github_app_requirements = "github_app_requirements")
-load("//build-tools/deployments:migration_bundle_rules.bzl", _migration_bundle = "migration_bundle")
-load("//build-tools/deployments:opentofu_defs.bzl", _opentofu_foundation_deployment = "opentofu_foundation_deployment")
+load("@viberoots//build-tools/deployments:github_app_requirements.bzl", _github_app_requirements = "github_app_requirements")
+load("@viberoots//build-tools/deployments:migration_bundle_rules.bzl", _migration_bundle = "migration_bundle")
+load("@viberoots//build-tools/deployments:opentofu_defs.bzl", _opentofu_foundation_deployment = "opentofu_foundation_deployment")
 load(
-    "//build-tools/deployments:nixos_shared_host_defs.bzl",
+    "@viberoots//build-tools/deployments:nixos_shared_host_defs.bzl",
     _nixos_shared_host_multi_static_webapp_deployment = "nixos_shared_host_multi_static_webapp_deployment",
     _nixos_shared_host_ssr_webapp_deployment = "nixos_shared_host_ssr_webapp_deployment",
     _nixos_shared_host_static_webapp_deployment = "nixos_shared_host_static_webapp_deployment",
     _require_shared_policy = "require_shared_policy",
 )
-load("//build-tools/deployments:s3_defs.bzl", _s3_static_webapp_deployment = "s3_static_webapp_deployment")
-load("//build-tools/deployments:vercel_defs.bzl", _vercel_next_webapp_deployment = "vercel_next_webapp_deployment")
-load("//build-tools/deployments:kubernetes_defs.bzl", _kubernetes_service_deployment = "kubernetes_service_deployment")
+load("@viberoots//build-tools/deployments:s3_defs.bzl", _s3_static_webapp_deployment = "s3_static_webapp_deployment")
+load("@viberoots//build-tools/deployments:vercel_defs.bzl", _vercel_next_webapp_deployment = "vercel_next_webapp_deployment")
+load("@viberoots//build-tools/deployments:kubernetes_defs.bzl", _kubernetes_service_deployment = "kubernetes_service_deployment")
 
 deployment_admission_policy = _deployment_admission_policy
 deployment_defaults = _deployment_defaults

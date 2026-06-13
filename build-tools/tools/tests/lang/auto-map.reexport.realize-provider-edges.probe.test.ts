@@ -30,9 +30,9 @@ function readLines(txt: string): string[] {
     .filter(Boolean);
 }
 
-test("build-tools/lang/auto_map.bzl re-export: realize_provider_edges uses MODULE_PROVIDERS unchanged (probe)", async () => {
-  await runInTemp("lang-auto-map-reexport-probe", async (tmp, $) => {
-    const providersDir = path.join(tmp, "third_party", "providers");
+test("workspace provider auto-map: realize_provider_edges uses MODULE_PROVIDERS unchanged (probe)", async () => {
+  await runInTemp("lang-workspace-provider-auto-map-probe", async (tmp, $) => {
+    const providersDir = path.join(tmp, ".viberoots", "workspace", "providers");
     await fsp.mkdir(providersDir, { recursive: true });
     await fsp.writeFile(
       path.join(providersDir, "auto_map.bzl"),
@@ -50,7 +50,7 @@ test("build-tools/lang/auto_map.bzl re-export: realize_provider_edges uses MODUL
     await fsp.writeFile(
       path.join(appDir, "TARGETS"),
       [
-        'load("//build-tools/lang:auto_map.bzl", "MODULE_PROVIDERS")',
+        'load("@workspace_providers//:auto_map.bzl", "MODULE_PROVIDERS")',
         'load("//build-tools/lang:defs_common.bzl", "realize_provider_edges")',
         'load("//build-tools/lang:labels_file.bzl", "labels_file")',
         "",

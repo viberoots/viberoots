@@ -1,22 +1,22 @@
-load("//build-tools/lang:dict_inputs.bzl", "GLOBAL_NIX_INPUTS_KEY_PREFIX", "PATCH_INPUTS_KEY_PREFIX", "PROVIDER_EDGES_KEY_PREFIX")
+load("@viberoots//build-tools/lang:dict_inputs.bzl", "GLOBAL_NIX_INPUTS_KEY_PREFIX", "PATCH_INPUTS_KEY_PREFIX", "PROVIDER_EDGES_KEY_PREFIX")
 load(
-    "//build-tools/lang/internal:importer_wiring.bzl",
+    "@viberoots//build-tools/lang/internal:importer_wiring.bzl",
     "prepare_importer_genrule_kwargs",
     "prepare_importer_non_genrule_wiring",
     "prepare_importer_srcsless_rule_wiring",
 )
 load(
-    "//build-tools/lang/internal:importer_wiring_nix_calling.bzl",
+    "@viberoots//build-tools/lang/internal:importer_wiring_nix_calling.bzl",
     "prepare_importer_non_genrule_nix_calling_wiring",
 )
-load("//build-tools/lang:lang_contracts.bzl", "patch_invalidation_strategy_for_lang")
-load("//build-tools/lang:remote_action_policy.bzl", "stamp_remote_readiness_labels")
+load("@viberoots//build-tools/lang:lang_contracts.bzl", "patch_invalidation_strategy_for_lang")
+load("@viberoots//build-tools/lang:remote_action_policy.bzl", "stamp_remote_readiness_labels")
 load(
-    "//build-tools/lang/internal:nix_calling_importer_genrule_wiring.bzl",
+    "@viberoots//build-tools/lang/internal:nix_calling_importer_genrule_wiring.bzl",
     "prepare_importer_nix_calling_genrule_wiring",
 )
-load("//build-tools/lang/internal:package_local_wiring.bzl", "prepare_package_local_wiring")
-load("//build-tools/lang:wasm_package_local_wiring.bzl", "prepare_package_local_wasm_wiring")
+load("@viberoots//build-tools/lang/internal:package_local_wiring.bzl", "prepare_package_local_wiring")
+load("@viberoots//build-tools/lang:wasm_package_local_wiring.bzl", "prepare_package_local_wasm_wiring")
 
 def _clone_labels(labels):
     if labels == None:

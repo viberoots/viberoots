@@ -1,12 +1,12 @@
-load("//build-tools/lang:defs_common.bzl", "normalize_labels", "prepare_language_wiring")
-load("//build-tools/lang:global_inputs.bzl", "global_nix_inputs")
-load("//build-tools/lang:auto_map.bzl", "MODULE_PROVIDERS")
-load("//build-tools/go/private:nix_build_carchive.bzl", "go_nix_build_carchive")
-load("//build-tools/go/private:nix_build.bzl", "go_nix_build")
-load("//build-tools/go/private:nix_test.bzl", "go_nix_test")
-load("//build-tools/go/private:cgo_wiring.bzl", "apply_go_rule_stable_defaults", "apply_go_tuple_labels", "configure_cgo_kwargs")
-load("//build-tools/go/private:auto_tests.bzl", "maybe_autowire_go_binary_test", "maybe_autowire_go_library_test")
-load("//build-tools/go:defs_wasm.bzl", _nix_go_tiny_wasm_lib = "nix_go_tiny_wasm_lib")
+load("@viberoots//build-tools/lang:defs_common.bzl", "normalize_labels", "prepare_language_wiring")
+load("@viberoots//build-tools/lang:global_inputs.bzl", "global_nix_inputs")
+load("@workspace_providers//:auto_map.bzl", "MODULE_PROVIDERS")
+load("@viberoots//build-tools/go/private:nix_build_carchive.bzl", "go_nix_build_carchive")
+load("@viberoots//build-tools/go/private:nix_build.bzl", "go_nix_build")
+load("@viberoots//build-tools/go/private:nix_test.bzl", "go_nix_test")
+load("@viberoots//build-tools/go/private:cgo_wiring.bzl", "apply_go_rule_stable_defaults", "apply_go_tuple_labels", "configure_cgo_kwargs")
+load("@viberoots//build-tools/go/private:auto_tests.bzl", "maybe_autowire_go_binary_test", "maybe_autowire_go_library_test")
+load("@viberoots//build-tools/go:defs_wasm.bzl", _nix_go_tiny_wasm_lib = "nix_go_tiny_wasm_lib")
 
 
 def _apply_go_nix_rule_attrs(attrs, prepared):

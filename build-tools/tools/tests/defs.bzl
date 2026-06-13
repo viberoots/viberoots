@@ -1,21 +1,21 @@
-load("//build-tools/lang:defs_common.bzl", "dedupe_preserve")
-load("//build-tools/tools/buck:zx_test.bzl", "zx_test")
+load("@viberoots//build-tools/lang:defs_common.bzl", "dedupe_preserve")
+load("@viberoots//build-tools/tools/buck:zx_test.bzl", "zx_test")
 load(
-    "//build-tools/tools/tests:deployment_conventions.bzl",
+    "@viberoots//build-tools/tools/tests:deployment_conventions.bzl",
     "deployment_convention_for_script",
     "validate_deployment_convention",
 )
 load(
-    "//build-tools/tools/tests:isolated_test_conventions.bzl",
+    "@viberoots//build-tools/tools/tests:isolated_test_conventions.bzl",
     "isolated_test_convention_for_script",
 )
 load(
-    "//build-tools/tools/tests:resource_limited_conventions.bzl",
+    "@viberoots//build-tools/tools/tests:resource_limited_conventions.bzl",
     "resource_limited_convention_for_script",
     "validate_resource_limited_convention",
 )
 load(
-    "//build-tools/tools/tests:template_conventions.bzl",
+    "@viberoots//build-tools/tools/tests:template_conventions.bzl",
     "template_convention_for_script",
     "validate_template_convention",
 )

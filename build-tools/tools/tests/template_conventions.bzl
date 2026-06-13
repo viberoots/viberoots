@@ -1,6 +1,6 @@
-load("//build-tools/lang:defs_common.bzl", "dedupe_preserve")
+load("@viberoots//build-tools/lang:defs_common.bzl", "dedupe_preserve")
 load(
-    "//build-tools/tools/tests:template_taxonomy_adapter.bzl",
+    "@viberoots//build-tools/tools/tests:template_taxonomy_adapter.bzl",
     "CANONICAL_TEMPLATE_ID_SET",
     "canonical_template_id",
 )

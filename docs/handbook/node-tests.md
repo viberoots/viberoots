@@ -61,7 +61,7 @@ This repo provides a hermetic Node test runner integrated with Buck2 via a Nix d
 - Add a test target in your importer `TARGETS` using the macro (scaffolding generates this by default):
 
 ```starlark
-load("//build-tools/node:defs.bzl", "nix_node_test")
+load("@viberoots//build-tools/node:defs.bzl", "nix_node_test")
 
 nix_node_test(
     name = "unit",
@@ -103,4 +103,4 @@ Coverage artifacts are emitted under the derivation output.
 - Lockfile/provider glue: re-run glue stages if lockfiles change:
   - `node build-tools/tools/buck/export-graph.ts`
   - `node build-tools/tools/buck/sync-providers.ts --lang node --no-glue`
-  - `node build-tools/tools/buck/gen-auto-map.ts --graph build-tools/tools/buck/graph.json --out third_party/providers/auto_map.bzl`
+  - `node build-tools/tools/buck/gen-auto-map.ts --graph build-tools/tools/buck/graph.json --out .viberoots/workspace/providers/auto_map.bzl`

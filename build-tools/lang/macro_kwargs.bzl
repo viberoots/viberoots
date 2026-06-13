@@ -1,6 +1,6 @@
-load("//build-tools/lang:labels_file.bzl", "labels_file")
-load("//build-tools/lang:patch_inputs.bzl", "default_package_patch_dirs")
-load("//build-tools/lang:nixpkg_labels.bzl", "append_nixpkg_labels")
+load("@viberoots//build-tools/lang:labels_file.bzl", "labels_file")
+load("@viberoots//build-tools/lang:patch_inputs.bzl", "default_package_patch_dirs")
+load("@viberoots//build-tools/lang:nixpkg_labels.bzl", "append_nixpkg_labels")
 
 def pop_local_patch_dirs(kwargs, lang):
     """

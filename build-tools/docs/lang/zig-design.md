@@ -29,7 +29,7 @@ If the language can support C interop, I must provide a documented and tested pa
 Use the canonical helper surface from `//build-tools/lang:defs_common.bzl` and `//build-tools/lang:language_wiring.bzl`. Macro call sites should not re‑implement wiring or load provider maps directly.
 
 - Preferred macro entrypoint: `prepare_language_wiring(...)` (non‑mutating), with `wiring=` for `genrule`, `nix_calling_genrule`, `non_genrule`, or `srcsless_rule`.
-- Provider wiring: load `MODULE_PROVIDERS` from `//build-tools/lang:auto_map.bzl` and use `providers_for`/`realize_provider_edges` for deterministic provider edges.
+- Provider wiring: load `MODULE_PROVIDERS` from `@workspace_providers//:auto_map.bzl` and use `providers_for`/`realize_provider_edges` for deterministic provider edges.
 - Lockfile labels (importer‑scoped languages): `lockfile:<path>#<importer>` with supported importer roots `.` and `projects/apps/*`/`projects/libs/*`; importer‑scoped macros must live in the importer package so importer‑local patch globs are valid action inputs.
 - Patch model contract: `build-tools/lang/lang_contracts.bzl` and `build-tools/tools/lib/lang-contracts.ts` define `patch_scope:*` stamping and whether glue runs on patch apply/remove.
 - Global Nix inputs: for Nix‑calling macros, use `wire_global_nix_inputs(...)` so `global_nix_inputs()` are real action inputs; labels are observability only.
@@ -74,7 +74,7 @@ policy enforcement current:
 - Nix templates (`build-tools/tools/nix/templates/zig.nix`, re-exported via `build-tools/tools/nix/lang-templates.nix`): build Zig projects hermetically; use shared Nix helpers from `build-tools/tools/nix/lib/lang-helpers.nix` (`patchesMapFromDir`, `readDevOverrides`, `guardNoDevOverridesInCI`) so patch decoding and override policy stay consistent with other languages.
 - Providers: `third_party/providers/defs_zig.bzl` + generated `TARGETS.zig.auto`.
 - Auto-map (`build-tools/tools/buck/gen-auto-map.ts`): maps `module:` labels to provider names; no code changes needed (existing module label path reused).
-- Macros (`zig/defs.bzl`): stamp `lang:zig` labels, `kind:*` labels, and append providers from `//build-tools/lang:auto_map.bzl`.
+- Macros (`zig/defs.bzl`): stamp `lang:zig` labels, `kind:*` labels, and append providers from `@workspace_providers//:auto_map.bzl`.
 - Patching CLI (`build-tools/tools/patch/patch-zig.ts` delegated by `patch-pkg`): implements start/reset/apply/session with idempotency and glue steps.
 
 ### Path Invariants
@@ -181,7 +181,7 @@ Thin macros mirroring Go’s approach:
 Behavior:
 
 - Stamp `lang:zig` and `kind:lib|bin|test` labels.
-- Append providers from `//build-tools/lang:auto_map.bzl` by reading `MODULE_PROVIDERS["//pkg:name"]`.
+- Append providers from `@workspace_providers//:auto_map.bzl` by reading `MODULE_PROVIDERS["//pkg:name"]`.
 - Underlying rule can be a `genrule`-based shell to copy Nix-built artifacts into Buck outputs, or a future `zig_*` rule if available. The initial version may rely on `genrule` for artifact exposure while validation/invalidation relies on provider wiring.
 
 ---
@@ -250,7 +250,7 @@ Idempotency & CI guardrails mirror Go’s.
 - Glue scripts are zx TypeScript and not committed; they run locally and in CI stages:
   1. Export Graph → `build-tools/tools/buck/graph.json` (includes Zig nodes/labels).
   2. Sync Providers → writes `TARGETS.zig.auto` (and other languages).
-  3. Generate auto_map → `third_party/providers/auto_map.bzl`.
+  3. Generate auto_map → `.viberoots/workspace/providers/auto_map.bzl`.
   4. Pre-build guard → fail if glue missing/stale.
   5. Build & Test → Buck builds; Nix `graph-generator` may be built as an artifact check.
 

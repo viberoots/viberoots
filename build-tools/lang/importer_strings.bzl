@@ -1,4 +1,4 @@
-load("//build-tools/lang:sanitize.bzl", "sanitize_name")
+load("@viberoots//build-tools/lang:sanitize.bzl", "sanitize_name")
 
 def sanitize_importer_for_nix_attr(importer: str) -> str:
     return sanitize_name(importer)

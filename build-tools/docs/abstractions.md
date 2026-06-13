@@ -437,8 +437,9 @@ Providers are how we attach “shared dependency state” to build targets witho
 
 ### Contract
 
-- `third_party/providers/auto_map.bzl` is generated and provides `MODULE_PROVIDERS`.
-- Language macros load providers through the stable re-export `build-tools/lang/auto_map.bzl`.
+- `.viberoots/workspace/providers/auto_map.bzl` is generated and exposed to Buck through the
+  `workspace_providers` cell.
+- Language macros load providers from `@workspace_providers//:auto_map.bzl`.
 - Macros realize provider edges deterministically using shared helpers. They do not hand-roll mapping logic.
   Direct calls to `realize_provider_edges(...)` are reserved for lower-level helpers and probes, not macro wiring.
 
@@ -463,7 +464,8 @@ Providers are how we attach “shared dependency state” to build targets witho
 
 These are the usual ways this leaks:
 
-- A macro loads `third_party/providers/auto_map.bzl` directly instead of using `build-tools/lang/auto_map.bzl`.
+- A macro loads provider mappings through root-cell paths or `@viberoots//build-tools/lang:auto_map.bzl`
+  instead of `@workspace_providers//:auto_map.bzl`.
 - A macro merges provider edges by concatenating lists without stable dedupe, so order changes unexpectedly.
 - A planner-visible stub depends on provider targets, and hits visibility or graph-shape constraints. Prefer `wire_*planner_visible*_stub(...)` helpers, which **strip provider targets from planner-visible `deps` by default**; only opt out when a stub explicitly needs provider deps.
 

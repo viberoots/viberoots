@@ -40,7 +40,7 @@ If the language can support C interop, I must provide a documented and tested pa
 Use the canonical helper surface from `//build-tools/lang:defs_common.bzl` and `//build-tools/lang:language_wiring.bzl`. Macro call sites should not re‑implement wiring or load provider maps directly.
 
 - Preferred macro entrypoint: `prepare_language_wiring(...)` (non‑mutating), with `wiring=` for `genrule`, `nix_calling_genrule`, `non_genrule`, or `srcsless_rule`.
-- Provider wiring: load `MODULE_PROVIDERS` from `//build-tools/lang:auto_map.bzl` and use `providers_for`/`realize_provider_edges` for deterministic provider edges.
+- Provider wiring: load `MODULE_PROVIDERS` from `@workspace_providers//:auto_map.bzl` and use `providers_for`/`realize_provider_edges` for deterministic provider edges.
 - Lockfile labels (importer‑scoped languages): `lockfile:<path>#<importer>` with supported importer roots `.` and `projects/apps/*`/`projects/libs/*`; importer‑scoped macros must live in the importer package so importer‑local patch globs are valid action inputs.
 - Patch model contract: `build-tools/lang/lang_contracts.bzl` and `build-tools/tools/lib/lang-contracts.ts` define `patch_scope:*` stamping and whether glue runs on patch apply/remove.
 - Global Nix inputs: for Nix‑calling macros, use `wire_global_nix_inputs(...)` so `global_nix_inputs()` are real action inputs; labels are observability only.
@@ -83,7 +83,7 @@ enforcement up to date:
 
 - Patches live in `<importer>/patches/python/` (importer‑local, flat directory, no subdirectories). Filenames: `<distribution-name>@<version>.patch` (case‑insensitive keys in logic).
 - Python Nix templates live in `build-tools/tools/nix/templates/python.nix`, imported by `build-tools/tools/nix/lang-templates.nix`.
-- Buck macros live under `build-tools/python/defs.bzl` and use `//build-tools/lang:auto_map.bzl`.
+- Buck macros live under `build-tools/python/defs.bzl` and use `@workspace_providers//:auto_map.bzl`.
 - Generated provider outputs live under `.viberoots/workspace/providers/**` and are generated, not hand-edited; reusable provider rule definitions remain source-owned code.
 - Dev overrides via `NIX_PY_DEV_OVERRIDE_JSON` (JSON: `{ "name@ver": "/abs/local/src" }`). CI forbids overrides.
 - Reuse common utilities:
@@ -257,14 +257,14 @@ Patch invalidation is handled by Python macros that include importer‑local pat
 Thin wrappers around `python_*` rules that:
 
 - Stamp labels (`lang:python`, `kind:*`).
-- Append providers from `//build-tools/lang:auto_map.bzl` using `MODULE_PROVIDERS["//pkg:name"]`.
+- Append providers from `@workspace_providers//:auto_map.bzl` using `MODULE_PROVIDERS["//pkg:name"]`.
 
 ```starlark
 load("@prelude//build-tools/python:defs.bzl", "python_binary", "python_library", "python_test")
 
 def _providers_for(name):
     MODULE_PROVIDERS = {}
-    load("//build-tools/lang:auto_map.bzl", "MODULE_PROVIDERS")
+    load("@workspace_providers//:auto_map.bzl", "MODULE_PROVIDERS")
     pkg = native.package_name()
     key = "//%s:%s" % (pkg, name)
     return MODULE_PROVIDERS.get(key, [])
@@ -293,11 +293,11 @@ Current implementation note: `build-tools/python/defs.bzl` routes Python wrapper
 
 ```starlark
 load("@prelude//build-tools/python:defs.bzl", "python_binary", "python_library", "python_test")
-load("//build-tools/lang:defs_common.bzl", "stamp_labels", "ensure_single_lockfile_label", "append_nixpkg_labels", "providers_for")
+load("@viberoots//build-tools/lang:defs_common.bzl", "stamp_labels", "ensure_single_lockfile_label", "append_nixpkg_labels", "providers_for")
 
 def _providers_for(name):
     MODULE_PROVIDERS = {}
-    load("//build-tools/lang:auto_map.bzl", "MODULE_PROVIDERS")
+    load("@workspace_providers//:auto_map.bzl", "MODULE_PROVIDERS")
     return providers_for(MODULE_PROVIDERS, name)
 
 def nix_python_library(name, lockfile_label = None, deps = [], **kwargs):

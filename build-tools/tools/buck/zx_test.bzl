@@ -3,10 +3,10 @@ load("@prelude//:build_mode.bzl", "BuildModeInfo")
 load("@prelude//:rules.bzl", "clone_rule")
 load("@prelude//decls:re_test_common.bzl", "re_test_common")
 load("@prelude//tests:re_utils.bzl", "get_re_executors_from_props")
-load("//build-tools/lang:nix_cache_health.bzl", "nix_cache_health_shell")
-load("//build-tools/lang:nix_shell.bzl", "nix_calling_env_export_source_snapshot")
-load("//build-tools/lang:remote_action_policy.bzl", "external_runner_command", "remote_ready_evidence", "run_nix_action", "stamp_remote_readiness_labels")
-load("//build-tools/lang:source_snapshot.bzl", "SourceSnapshotInfo")
+load("@viberoots//build-tools/lang:nix_cache_health.bzl", "nix_cache_health_shell")
+load("@viberoots//build-tools/lang:nix_shell.bzl", "nix_calling_env_export_source_snapshot")
+load("@viberoots//build-tools/lang:remote_action_policy.bzl", "external_runner_command", "remote_ready_evidence", "run_nix_action", "stamp_remote_readiness_labels")
+load("@viberoots//build-tools/lang:source_snapshot.bzl", "SourceSnapshotInfo")
 def _zx_test_impl(ctx):
     script = ctx.attrs.script
     timeout_ms = ctx.attrs.test_rule_timeout_ms if ctx.attrs.test_rule_timeout_ms != None else 20 * 60 * 1000
@@ -43,20 +43,19 @@ def _zx_test_impl(ctx):
             + "  if [ -z \"$PRELUDE_PATH\" ]; then PRE_OUT=$(nix build \"$WORKSPACE_ROOT\"#buck2-prelude --no-link --accept-flake-config --print-out-paths 2>/dev/null | tail -1); fi; "
             + "  if [ -z \"$PRELUDE_PATH\" ] && [ -n \"$PRE_OUT\" ]; then PRELUDE_PATH=\"$PRE_OUT/prelude\"; fi; "
             + "  printf '.\\n' > \"$WORKSPACE_ROOT/.buckroot\"; "
+            + "  mkdir -p \"$WORKSPACE_ROOT/.viberoots\"; [ -e \"$WORKSPACE_ROOT/.viberoots/current\" ] || ln -s .. \"$WORKSPACE_ROOT/.viberoots/current\"; "
             + "  if [ -n \"$PRELUDE_PATH\" ] && [ ! -e \"$WORKSPACE_ROOT/prelude\" ]; then ln -s \"$PRELUDE_PATH\" \"$WORKSPACE_ROOT/prelude\"; fi; "
             + "  cat > \"$WORKSPACE_ROOT/.buckconfig\" <<'EOF'\n"
             + "[buildfile]\n"
             + "name = TARGETS\n\n"
-            + "[repositories]\n"
-            + "root = .\n"
+            + "[repositories]\nroot = .\nviberoots = ./.viberoots/current\n"
             + "prelude = ./prelude\n"
             + "toolchains = ./toolchains\n"
             + "repo_toolchains = ./toolchains\n"
             + "fbsource = ./prelude/third-party/fbsource_stub\n"
             + "fbcode = ./prelude/third-party/fbcode_stub\n"
             + "config = ./prelude\n\n"
-            + "[cells]\n"
-            + "root = .\n"
+            + "[cells]\nroot = .\nviberoots = ./.viberoots/current\n"
             + "prelude = ./prelude\n"
             + "toolchains = ./toolchains\n"
             + "repo_toolchains = ./toolchains\n"
@@ -242,9 +241,9 @@ zx_test = clone_rule(
             providers = [BuildModeInfo],
             default = "repo_toolchains//:remote_profile_conversion_action_key",
         ),
-        "_command_heartbeat": attrs.source(default = "//build-tools/tools/dev:command-heartbeat.ts"),
-        "_node_modules_build": attrs.source(default = "//build-tools/tools/dev:node-modules-build.ts"),
-        "_zx_init": attrs.source(default = "//build-tools/tools/dev:zx-init.mjs"),
+        "_command_heartbeat": attrs.source(default = "@viberoots//build-tools/tools/dev:command-heartbeat.ts"),
+        "_node_modules_build": attrs.source(default = "@viberoots//build-tools/tools/dev:node-modules-build.ts"),
+        "_zx_init": attrs.source(default = "@viberoots//build-tools/tools/dev:zx-init.mjs"),
     },
     impl_override = _zx_test_impl,
 )

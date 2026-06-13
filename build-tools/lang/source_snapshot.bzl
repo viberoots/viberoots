@@ -1,4 +1,4 @@
-load("//build-tools/lang:remote_action_policy.bzl", "run_nix_action")
+load("@viberoots//build-tools/lang:remote_action_policy.bzl", "run_nix_action")
 load("@repo_toolchains//:toolchain_paths.bzl", "NIX_ZX_WRAPPER_BIN")
 
 SourceSnapshotInfo = provider(fields = [
@@ -49,7 +49,7 @@ _source_snapshot = rule(
         "srcs": attrs.list(attrs.source(), default = []),
         "graph": attrs.source(default = "workspace_buck//:graph.json"),
         "_runner": attrs.dep(
-            default = "//build-tools/tools/dev:source-snapshot-runner",
+            default = "@viberoots//build-tools/tools/dev:source-snapshot-runner",
             providers = [RunInfo],
         ),
     },
@@ -84,12 +84,12 @@ def _source_snapshot_runner_impl(ctx):
 source_snapshot_runner = rule(
     impl = _source_snapshot_runner_impl,
     attrs = {
-        "dev_runtime": attrs.dep(default = "//build-tools/tools/dev:runtime_ts"),
-        "generator": attrs.source(default = "//build-tools/tools/dev:source-snapshot.ts"),
-        "lib_runtime": attrs.dep(default = "//build-tools/tools/lib:runtime_ts"),
-        "zx_init": attrs.source(default = "//build-tools/tools/dev:zx-init.mjs"),
+        "dev_runtime": attrs.dep(default = "@viberoots//build-tools/tools/dev:runtime_ts"),
+        "generator": attrs.source(default = "@viberoots//build-tools/tools/dev:source-snapshot.ts"),
+        "lib_runtime": attrs.dep(default = "@viberoots//build-tools/tools/lib:runtime_ts"),
+        "zx_init": attrs.source(default = "@viberoots//build-tools/tools/dev:zx-init.mjs"),
         "zx_wrapper_tool": attrs.dep(
-            default = "//build-tools/tools/dev:source-snapshot-zx-wrapper",
+            default = "@viberoots//build-tools/tools/dev:source-snapshot-zx-wrapper",
             providers = [RunInfo],
         ),
     },

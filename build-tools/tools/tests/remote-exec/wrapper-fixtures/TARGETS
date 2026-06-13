@@ -1,9 +1,9 @@
-load("//build-tools/cpp/private:nix_test.bzl", "cpp_nix_test")
-load("//build-tools/go/private:nix_test.bzl", "go_nix_test")
-load("//build-tools/node/private:nix_test.bzl", "node_nix_test")
-load("//build-tools/python/private:nix_test.bzl", "python_nix_test")
-load("//build-tools/lang:source_snapshot.bzl", "source_snapshot")
-load("//build-tools/tools/buck:zx_test.bzl", "zx_test")
+load("@viberoots//build-tools/cpp/private:nix_test.bzl", "cpp_nix_test")
+load("@viberoots//build-tools/go/private:nix_test.bzl", "go_nix_test")
+load("@viberoots//build-tools/node/private:nix_test.bzl", "node_nix_test")
+load("@viberoots//build-tools/python/private:nix_test.bzl", "python_nix_test")
+load("@viberoots//build-tools/lang:source_snapshot.bzl", "source_snapshot")
+load("@viberoots//build-tools/tools/buck:zx_test.bzl", "zx_test")
 load("@prelude//:rules.bzl", "export_file")
 
 export_file(
@@ -78,7 +78,7 @@ go_nix_test(
     name = "go_local",
     labels = ["fixture:local", "existing:label", "lang:go", "patch_scope:package-local", "verify:manual"],
     out = "go_local.stamp",
-    self_label = "//build-tools/tools/tests/remote-exec/wrapper-fixtures:go_local",
+    self_label = "@viberoots//build-tools/tools/tests/remote-exec/wrapper-fixtures:go_local",
 )
 
 go_nix_test(
@@ -86,7 +86,7 @@ go_nix_test(
     labels = ["fixture:remote", "existing:label", "lang:go", "patch_scope:package-local", "verify:manual"],
     out = "go_remote.stamp",
     remote_execution = "linux-x86_64-default",
-    self_label = "//build-tools/tools/tests/remote-exec/wrapper-fixtures:go_remote",
+    self_label = "@viberoots//build-tools/tools/tests/remote-exec/wrapper-fixtures:go_remote",
 )
 
 go_nix_test(
@@ -95,14 +95,14 @@ go_nix_test(
     nix_inputs = ["fixture.txt"],
     out = "go_ready_handles.stamp",
     remote_ready_runner = "remote-ready-runner.sh",
-    self_label = "//build-tools/tools/tests/remote-exec/wrapper-fixtures:go_ready_handles",
+    self_label = "@viberoots//build-tools/tools/tests/remote-exec/wrapper-fixtures:go_ready_handles",
 )
 
 python_nix_test(
     name = "python_local",
     labels = ["fixture:local", "existing:label", "verify:manual"],
     out = "python_local.stamp",
-    self_label = "//build-tools/tools/tests/remote-exec/wrapper-fixtures:python_local",
+    self_label = "@viberoots//build-tools/tools/tests/remote-exec/wrapper-fixtures:python_local",
 )
 
 python_nix_test(
@@ -110,7 +110,7 @@ python_nix_test(
     labels = ["fixture:remote", "existing:label", "verify:manual"],
     out = "python_remote.stamp",
     remote_execution = "linux-x86_64-default",
-    self_label = "//build-tools/tools/tests/remote-exec/wrapper-fixtures:python_remote",
+    self_label = "@viberoots//build-tools/tools/tests/remote-exec/wrapper-fixtures:python_remote",
 )
 
 python_nix_test(
@@ -119,7 +119,7 @@ python_nix_test(
     nix_inputs = ["fixture.txt"],
     out = "python_ready_handles.stamp",
     remote_ready_runner = "remote-ready-runner.sh",
-    self_label = "//build-tools/tools/tests/remote-exec/wrapper-fixtures:python_ready_handles",
+    self_label = "@viberoots//build-tools/tools/tests/remote-exec/wrapper-fixtures:python_ready_handles",
 )
 
 cpp_nix_test(
@@ -127,7 +127,7 @@ cpp_nix_test(
     labels = ["fixture:local", "existing:label", "verify:manual"],
     out = "cpp_local.stamp",
     planner = ":cpp_planner",
-    planner_label = "//build-tools/tools/tests/remote-exec/wrapper-fixtures:cpp_local__planner",
+    planner_label = "@viberoots//build-tools/tools/tests/remote-exec/wrapper-fixtures:cpp_local__planner",
 )
 
 cpp_nix_test(
@@ -135,7 +135,7 @@ cpp_nix_test(
     labels = ["fixture:remote", "existing:label", "verify:manual"],
     out = "cpp_remote.stamp",
     planner = ":cpp_planner",
-    planner_label = "//build-tools/tools/tests/remote-exec/wrapper-fixtures:cpp_remote__planner",
+    planner_label = "@viberoots//build-tools/tools/tests/remote-exec/wrapper-fixtures:cpp_remote__planner",
     remote_execution = "linux-x86_64-default",
 )
 
@@ -145,6 +145,6 @@ cpp_nix_test(
     nix_inputs = ["fixture.txt"],
     out = "cpp_ready_handles.stamp",
     planner = ":cpp_planner",
-    planner_label = "//build-tools/tools/tests/remote-exec/wrapper-fixtures:cpp_ready_handles__planner",
+    planner_label = "@viberoots//build-tools/tools/tests/remote-exec/wrapper-fixtures:cpp_ready_handles__planner",
     remote_ready_runner = "remote-ready-runner.sh",
 )

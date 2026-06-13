@@ -1,11 +1,11 @@
-load("//build-tools/lang:collections.bzl", "dedupe_preserve")
-load("//build-tools/lang:global_inputs.bzl", "global_nix_inputs")
+load("@viberoots//build-tools/lang:collections.bzl", "dedupe_preserve")
+load("@viberoots//build-tools/lang:global_inputs.bzl", "global_nix_inputs")
 
 _CPP_RUNTIME_NIX_INPUTS = [
-    "//build-tools/tools/buck:runtime_ts",
-    "//build-tools/tools/dev:runtime_ts",
-    "//build-tools/tools/lib:runtime_ts",
-    "//build-tools/tools/nix:runtime_nix",
+    "@viberoots//build-tools/tools/buck:runtime_ts",
+    "@viberoots//build-tools/tools/dev:runtime_ts",
+    "@viberoots//build-tools/tools/lib:runtime_ts",
+    "@viberoots//build-tools/tools/nix:runtime_nix",
 ]
 
 def cpp_runtime_nix_inputs():

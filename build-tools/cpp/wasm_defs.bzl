@@ -1,14 +1,14 @@
 load(
-    "//build-tools/lang:defs_common.bzl",
+    "@viberoots//build-tools/lang:defs_common.bzl",
     "dedupe_preserve",
     "merge_link_intent_deps",
     "prepare_language_wiring",
 )
-load("//build-tools/lang:sanitize.bzl", "sanitize_name")
-load("//build-tools/lang:module_surface.bzl", "module_surface")
-load("//build-tools/cpp/private:nix_build.bzl", "cpp_nix_build")
-load("//build-tools/cpp/private:runtime_inputs.bzl", "cpp_runtime_nix_inputs")
-load("//build-tools/lang:auto_map.bzl", "MODULE_PROVIDERS")
+load("@viberoots//build-tools/lang:sanitize.bzl", "sanitize_name")
+load("@viberoots//build-tools/lang:module_surface.bzl", "module_surface")
+load("@viberoots//build-tools/cpp/private:nix_build.bzl", "cpp_nix_build")
+load("@viberoots//build-tools/cpp/private:runtime_inputs.bzl", "cpp_runtime_nix_inputs")
+load("@workspace_providers//:auto_map.bzl", "MODULE_PROVIDERS")
 
 def _wasm_target_for_abi(wasm_abi):
     if wasm_abi == "wasi":

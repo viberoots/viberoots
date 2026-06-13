@@ -1,5 +1,5 @@
 load("@prelude//:rules.bzl", "genrule")
-load("//build-tools/cpp:defs.bzl", "nix_cpp_wasm_emscripten_lib")
+load("@viberoots//build-tools/cpp:defs.bzl", "nix_cpp_wasm_emscripten_lib")
 
 nix_cpp_wasm_emscripten_lib(
     name = "cpp_emscripten",
@@ -13,14 +13,14 @@ genrule(
     srcs = [
         ":cpp_emscripten",
         "src/add.c",
-        "//build-tools/tools/wasm:export-wasm-from-nix",
+        "@viberoots//build-tools/tools/wasm:export-wasm-from-nix",
     ],
     out = "cpp_emscripten.wasm",
     cmd = "WASM_TARGET=//projects/libs/{{ name }}-cpp-wasm:cpp_emscripten "
           + "WASM_DIR=lib "
           + "WASM_EXTS=.wasm "
           + "OUT_PATH=\"$OUT\" "
-          + "zx-wrapper \"$(location //build-tools/tools/wasm:export-wasm-from-nix)\"",
+          + "zx-wrapper \"$(location @viberoots//build-tools/tools/wasm:export-wasm-from-nix)\"",
     labels = ["lang:cpp", "kind:wasm"],
     visibility = ["PUBLIC"],
 )

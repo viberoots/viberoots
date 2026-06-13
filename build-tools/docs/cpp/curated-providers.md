@@ -8,7 +8,7 @@ generated provider wiring and the Nix templates resolve include and link flags.
 
 ```starlark
 # projects/apps/demo/TARGETS
-load("//build-tools/cpp:defs.bzl", "nix_cpp_binary", "nix_cpp_test")
+load("@viberoots//build-tools/cpp:defs.bzl", "nix_cpp_binary", "nix_cpp_test")
 
 nix_cpp_binary(
     name = "demo",
@@ -39,7 +39,7 @@ TEST(Demo, ZlibSmoke) {
 
 ```starlark
 # projects/apps/demo/TARGETS
-load("//build-tools/cpp:defs.bzl", "nix_cpp_binary", "nix_cpp_test")
+load("@viberoots//build-tools/cpp:defs.bzl", "nix_cpp_binary", "nix_cpp_test")
 
 nix_cpp_binary(
     name = "demo",

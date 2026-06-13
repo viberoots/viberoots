@@ -1,4 +1,4 @@
-load("//build-tools/lang:nix_cache_health.bzl", "nix_cache_health_shell")
+load("@viberoots//build-tools/lang:nix_cache_health.bzl", "nix_cache_health_shell")
 def nix_bootstrap_env_core():
     return (
         "set -euo pipefail; "

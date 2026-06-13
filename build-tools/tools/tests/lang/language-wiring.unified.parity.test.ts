@@ -32,7 +32,7 @@ async function buildOutPath(tmp: string, $: any, target: string): Promise<string
 
 test("prepare_language_wiring matches per-model helpers and stays non-mutating", async () => {
   await runInTemp("language-wiring-parity", async (tmp, $) => {
-    const providersDir = path.join(tmp, "third_party", "providers");
+    const providersDir = path.join(tmp, ".viberoots", "workspace", "providers");
     await fsp.mkdir(providersDir, { recursive: true });
     await fsp.writeFile(
       path.join(providersDir, "auto_map.bzl"),
@@ -45,8 +45,9 @@ test("prepare_language_wiring matches per-model helpers and stays non-mutating",
       ].join("\n"),
       "utf8",
     );
+    await fsp.mkdir(path.join(tmp, "third_party", "providers"), { recursive: true });
     await fsp.writeFile(
-      path.join(providersDir, "TARGETS"),
+      path.join(tmp, "third_party", "providers", "TARGETS"),
       ['genrule(name="prov", out="prov.stamp", cmd=": > $OUT", visibility=["PUBLIC"])', ""].join(
         "\n",
       ),
@@ -59,7 +60,7 @@ test("prepare_language_wiring matches per-model helpers and stays non-mutating",
     await fsp.writeFile(
       path.join(pkg, "TARGETS"),
       [
-        'load("//build-tools/lang:auto_map.bzl", "MODULE_PROVIDERS")',
+        'load("@workspace_providers//:auto_map.bzl", "MODULE_PROVIDERS")',
         'load("//build-tools/lang:defs_common.bzl", "prepare_language_wiring")',
         'load("//build-tools/lang/internal:package_local_wiring.bzl", "prepare_package_local_wiring")',
         'load("//build-tools/lang:labels_file.bzl", "labels_file")',
@@ -121,7 +122,7 @@ test("prepare_language_wiring matches per-model helpers and stays non-mutating",
     await fsp.writeFile(
       path.join(appDir, "TARGETS"),
       [
-        'load("//build-tools/lang:auto_map.bzl", "MODULE_PROVIDERS")',
+        'load("@workspace_providers//:auto_map.bzl", "MODULE_PROVIDERS")',
         'load("//build-tools/lang:defs_common.bzl", "prepare_language_wiring")',
         'load("//build-tools/lang/internal:importer_wiring.bzl", "prepare_importer_non_genrule_wiring")',
         'load("//build-tools/lang:labels_file.bzl", "labels_file")',

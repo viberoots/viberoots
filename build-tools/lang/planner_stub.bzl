@@ -47,7 +47,7 @@ planner_stub = rule(
     },
 )
 
-load("//build-tools/lang:patch_inputs.bzl", "include_package_local_patches")
+load("@viberoots//build-tools/lang:patch_inputs.bzl", "include_package_local_patches")
 
 def planner_stub_with_package_local_patches(
         name,

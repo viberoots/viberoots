@@ -1,8 +1,8 @@
-load("//build-tools/lang:planner_stub.bzl", "planner_stub", "planner_stub_with_package_local_patches")
-load("//build-tools/lang:macro_kwargs.bzl", "extract_package_local_patch_dirs_and_nixpkg_deps")
-load("//build-tools/lang:label_stamping.bzl", "stamp_labels", "stamp_patch_scope_for_lang")
-load("//build-tools/lang:provider_edges.bzl", "merge_provider_edges", "strip_provider_targets")
-load("//build-tools/lang:dict_inputs.bzl", "PROVIDER_EDGES_KEY_PREFIX")
+load("@viberoots//build-tools/lang:planner_stub.bzl", "planner_stub", "planner_stub_with_package_local_patches")
+load("@viberoots//build-tools/lang:macro_kwargs.bzl", "extract_package_local_patch_dirs_and_nixpkg_deps")
+load("@viberoots//build-tools/lang:label_stamping.bzl", "stamp_labels", "stamp_patch_scope_for_lang")
+load("@viberoots//build-tools/lang:provider_edges.bzl", "merge_provider_edges", "strip_provider_targets")
+load("@viberoots//build-tools/lang:dict_inputs.bzl", "PROVIDER_EDGES_KEY_PREFIX")
 
 def wire_planner_visible_inputs(
         name,

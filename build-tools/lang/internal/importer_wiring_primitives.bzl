@@ -1,12 +1,12 @@
-load("//build-tools/lang:lockfile_labels.bzl", "ensure_single_lockfile_label", "importer_from_labels")
-load("//build-tools/lang:label_stamping.bzl", "stamp_labels", "stamp_patch_scope_for_lang")
-load("//build-tools/lang:importer_package_boundary.bzl", "require_importer_package_boundary")
+load("@viberoots//build-tools/lang:lockfile_labels.bzl", "ensure_single_lockfile_label", "importer_from_labels")
+load("@viberoots//build-tools/lang:label_stamping.bzl", "stamp_labels", "stamp_patch_scope_for_lang")
+load("@viberoots//build-tools/lang:importer_package_boundary.bzl", "require_importer_package_boundary")
 load(
-    "//build-tools/lang:patch_inputs.bzl",
+    "@viberoots//build-tools/lang:patch_inputs.bzl",
     "include_importer_patches_from_labels",
     "include_importer_patches_from_labels_dict_safe",
 )
-load("//build-tools/lang:dict_inputs.bzl", "PATCH_INPUTS_KEY_PREFIX")
+load("@viberoots//build-tools/lang:dict_inputs.bzl", "PATCH_INPUTS_KEY_PREFIX")
 
 def require_single_importer_lockfile_label(kwargs, lockfile_label):
     """
@@ -14,7 +14,7 @@ def require_single_importer_lockfile_label(kwargs, lockfile_label):
       lockfile:<path>#<importer>
 
     This preserves the stable error text and label de-dupe behavior from
-    //build-tools/lang:lockfile_labels.bzl.
+    @viberoots//build-tools/lang:lockfile_labels.bzl.
     """
     ensure_single_lockfile_label(kwargs, lockfile_label)
 

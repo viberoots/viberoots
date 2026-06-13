@@ -1,7 +1,7 @@
-load("//build-tools/lang:auto_map.bzl", "MODULE_PROVIDERS")
-load("//build-tools/lang:defs_common.bzl", "normalize_labels", "prepare_language_wiring")
-load("//build-tools/lang:global_inputs.bzl", "global_nix_inputs")
-load("//build-tools/rust/private:nix_build.bzl", "rust_nix_build")
+load("@workspace_providers//:auto_map.bzl", "MODULE_PROVIDERS")
+load("@viberoots//build-tools/lang:defs_common.bzl", "normalize_labels", "prepare_language_wiring")
+load("@viberoots//build-tools/lang:global_inputs.bzl", "global_nix_inputs")
+load("@viberoots//build-tools/rust/private:nix_build.bzl", "rust_nix_build")
 
 def _rust_nix_target(name, kind, out, kwargs):
     kw = dict(kwargs)

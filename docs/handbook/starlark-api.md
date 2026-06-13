@@ -4,13 +4,13 @@ This reference is a public interface guide for macros used in `TARGETS`. I keep 
 
 ## Index
 
-- `//build-tools/go:defs.bzl`
+- `@viberoots//build-tools/go:defs.bzl`
   - `nix_go_library`
   - `nix_go_binary`
   - `nix_go_test`
   - `nix_go_carchive`
   - `nix_go_tiny_wasm_lib`
-- `//build-tools/cpp:defs.bzl`
+- `@viberoots//build-tools/cpp:defs.bzl`
   - `nix_cpp_library`
   - `nix_cpp_binary`
   - `nix_cpp_headers`
@@ -19,7 +19,7 @@ This reference is a public interface guide for macros used in `TARGETS`. I keep 
   - `nix_cpp_wasm_static_lib`
   - `nix_cpp_wasm_emscripten_lib`
   - `cpp_sanitize_probe`
-- `//build-tools/node:defs.bzl`
+- `@viberoots//build-tools/node:defs.bzl`
   - `nix_node_gen`
   - `nix_node_test`
   - `nix_node_lib`
@@ -29,7 +29,7 @@ This reference is a public interface guide for macros used in `TARGETS`. I keep 
   - `nix_node_cli_bin`
   - `node_asset_stage`
   - `node_wasm_inline_module`
-- `//build-tools/python:defs.bzl`
+- `@viberoots//build-tools/python:defs.bzl`
   - `nix_python_library`
   - `nix_python_binary`
   - `nix_python_test`
@@ -37,7 +37,7 @@ This reference is a public interface guide for macros used in `TARGETS`. I keep 
   - `nix_python_wasm_extension_module`
   - `nix_python_wasm_app`
   - `nix_python_wasm_lib`
-- `//build-tools/rust:defs.bzl`
+- `@viberoots//build-tools/rust:defs.bzl`
   - `rust_library`
   - `rust_binary`
 
@@ -117,7 +117,7 @@ nix_go_binary(
 
 ## Go macros
 
-Load from `//build-tools/go:defs.bzl`.
+Load from `@viberoots//build-tools/go:defs.bzl`.
 
 ### `nix_go_library(name, **kwargs)`
 
@@ -301,7 +301,7 @@ Public args:
 
 ## C++ macros
 
-Load from `//build-tools/cpp:defs.bzl`.
+Load from `@viberoots//build-tools/cpp:defs.bzl`.
 
 ### `nix_cpp_library(name, **kwargs)`
 
@@ -634,7 +634,7 @@ Public args:
 
 ## Node macros
 
-Load from `//build-tools/node:defs.bzl`.
+Load from `@viberoots//build-tools/node:defs.bzl`.
 
 ### `nix_node_gen(name, srcs = [], out = None, cmd = None, deps = [], labels = [], lockfile_label = None, patch_options = None, kind = "gen", **kwargs)`
 
@@ -985,8 +985,8 @@ Use these patterns to add runtime wasm/ts wiring incrementally.
 
 ```python
 # TARGETS (in a scaffolded app package)
-load("//build-tools/node:defs.bzl", "node_asset_stage", "node_wasm_inline_module", "node_webapp")
-load("//build-tools/python:defs.bzl", "nix_python_wasm_lib")
+load("@viberoots//build-tools/node:defs.bzl", "node_asset_stage", "node_wasm_inline_module", "node_webapp")
+load("@viberoots//build-tools/python:defs.bzl", "nix_python_wasm_lib")
 
 nix_python_wasm_lib(
     name = "py_wasm",
@@ -1015,7 +1015,7 @@ node_asset_stage(
 
 ```python
 # TARGETS (in a scaffolded app package)
-load("//build-tools/node:defs.bzl", "node_asset_stage", "node_webapp")
+load("@viberoots//build-tools/node:defs.bzl", "node_asset_stage", "node_webapp")
 
 node_webapp(
     name = "app_raw",
@@ -1038,7 +1038,7 @@ node_asset_stage(
 
 ```python
 # TARGETS (in a scaffolded app package)
-load("//build-tools/node:defs.bzl", "node_asset_stage", "node_wasm_inline_module", "node_webapp")
+load("@viberoots//build-tools/node:defs.bzl", "node_asset_stage", "node_wasm_inline_module", "node_webapp")
 
 node_webapp(name = "app_raw")
 
@@ -1060,7 +1060,7 @@ node_asset_stage(
 
 ```python
 # static webapp: top.wasm + wasm-inline module in dist/
-load("//build-tools/node:defs.bzl", "node_asset_stage", "node_wasm_inline_module", "node_webapp")
+load("@viberoots//build-tools/node:defs.bzl", "node_asset_stage", "node_wasm_inline_module", "node_webapp")
 
 node_webapp(
     name = "app_raw",
@@ -1087,8 +1087,8 @@ node_asset_stage(
 ```python
 # Vite webapp + Python wasm library:
 # normalize Python producer output to canonical runtime contract paths
-load("//build-tools/node:defs.bzl", "node_asset_stage", "node_wasm_inline_module", "node_webapp")
-load("//build-tools/python:defs.bzl", "nix_python_wasm_lib")
+load("@viberoots//build-tools/node:defs.bzl", "node_asset_stage", "node_wasm_inline_module", "node_webapp")
+load("@viberoots//build-tools/python:defs.bzl", "nix_python_wasm_lib")
 
 nix_python_wasm_lib(
     name = "py_wasm",
@@ -1120,7 +1120,7 @@ node_asset_stage(
 
 ```python
 # SSR express webapp: client + server contract paths
-load("//build-tools/node:defs.bzl", "node_asset_stage", "node_wasm_inline_module", "node_webapp")
+load("@viberoots//build-tools/node:defs.bzl", "node_asset_stage", "node_wasm_inline_module", "node_webapp")
 
 node_webapp(
     name = "app_raw",
@@ -1146,7 +1146,7 @@ node_asset_stage(
 
 ```python
 # SSR next webapp: client/public + server contract paths
-load("//build-tools/node:defs.bzl", "node_asset_stage", "node_wasm_inline_module", "node_webapp")
+load("@viberoots//build-tools/node:defs.bzl", "node_asset_stage", "node_wasm_inline_module", "node_webapp")
 
 node_webapp(
     name = "app_raw",
@@ -1222,7 +1222,7 @@ export async function callInlineAdd(a: number, b: number): Promise<number> {
 
 ## Python macros
 
-Load from `//build-tools/python:defs.bzl`.
+Load from `@viberoots//build-tools/python:defs.bzl`.
 
 ### `nix_python_library(name, lockfile_label = None, deps = [], **kwargs)`
 
@@ -1487,7 +1487,7 @@ Public args:
 
 ## Rust macros
 
-Load from `//build-tools/rust:defs.bzl`.
+Load from `@viberoots//build-tools/rust:defs.bzl`.
 
 ### `rust_library(name, **kwargs)`
 

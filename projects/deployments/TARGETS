@@ -1,4 +1,4 @@
-load("//build-tools/deployments:defs.bzl", "deployment_defaults")
+load("@viberoots//build-tools/deployments:defs.bzl", "deployment_defaults")
 
 deployment_defaults(
     name = "defaults",

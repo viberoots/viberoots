@@ -1,5 +1,5 @@
-load("//build-tools/lang:collections.bzl", "dedupe_preserve")
-load("//build-tools/lang:dict_inputs.bzl", "GLOBAL_NIX_INPUTS_KEY_PREFIX", "attach_items_dict_safe")
+load("@viberoots//build-tools/lang:collections.bzl", "dedupe_preserve")
+load("@viberoots//build-tools/lang:dict_inputs.bzl", "GLOBAL_NIX_INPUTS_KEY_PREFIX", "attach_items_dict_safe")
 
 def global_nix_inputs():
     """

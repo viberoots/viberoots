@@ -33,7 +33,7 @@ If the language can support C interop, I must provide a documented and tested pa
 Use the canonical helper surface from `//build-tools/lang:defs_common.bzl` and `//build-tools/lang:language_wiring.bzl`. Macro call sites should not re‑implement wiring or load provider maps directly.
 
 - Preferred macro entrypoint: `prepare_language_wiring(...)` (non‑mutating), with `wiring=` for `genrule`, `nix_calling_genrule`, `non_genrule`, or `srcsless_rule`.
-- Provider wiring: load `MODULE_PROVIDERS` from `//build-tools/lang:auto_map.bzl` and use `providers_for`/`realize_provider_edges` for deterministic provider edges.
+- Provider wiring: load `MODULE_PROVIDERS` from `@workspace_providers//:auto_map.bzl` and use `providers_for`/`realize_provider_edges` for deterministic provider edges.
 - Lockfile labels (importer‑scoped languages): `lockfile:<path>#<importer>` with supported importer roots `.` and `projects/apps/*`/`projects/libs/*`; importer‑scoped macros must live in the importer package so importer‑local patch globs are valid action inputs.
 - Patch model contract: `build-tools/lang/lang_contracts.bzl` and `build-tools/tools/lib/lang-contracts.ts` define `patch_scope:*` stamping and whether glue runs on patch apply/remove.
 - Global Nix inputs: for Nix‑calling macros, use `wire_global_nix_inputs(...)` so `global_nix_inputs()` are real action inputs; labels are observability only.
@@ -65,7 +65,7 @@ policy enforcement current:
 - **Patches**: `patches/erlang/` (flat directory; one file per `pkg@version`), no subdirectories.
 - **Nix templates**: `build-tools/tools/nix/templates/erlang.nix` (exposed by `build-tools/tools/nix/lang-templates.nix`).
 - **Planner integration**: `build-tools/tools/nix/planner/erlang.nix` or a small addition in `graph-generator.nix` registry that imports planner helpers if present.
-- **Buck macros**: `build-tools/erlang/defs.bzl` using `build-tools/lang/defs_common.bzl` helpers; macros inject providers from `//build-tools/lang:auto_map.bzl`.
+- **Buck macros**: `build-tools/erlang/defs.bzl` using `build-tools/lang/defs_common.bzl` helpers; macros inject providers from `@workspace_providers//:auto_map.bzl`.
 - **Provider rules**: `//third_party/providers/defs_erlang.bzl` with `erlang_lockfile_deps(...)` (tiny genrule stamp), and an auto‑generated `third_party/providers/TARGETS.erlang.auto`.
 - **Provider driver**: `build-tools/tools/buck/providers/erlang.ts`; orchestrated by `build-tools/tools/buck/sync-providers.ts` alongside Go/Node.
 - **Capability gating**: Add `erlang` entry to `build-tools/tools/nix/langs.json` (requiredPaths include the files above) so sparse checkouts cleanly disable Erlang glue.
@@ -157,7 +157,7 @@ policy enforcement current:
   - `nix_erlang_test(name, ... kind:test ...)` (optional, may wrap `ct` or `eunit` via genrule)
 - Behavior:
   - Stamp `labels` including `lockfile:<path>#<importer>`, `lang:erlang`, and `kind:*`.
-  - Append providers from `//build-tools/lang:auto_map.bzl` using `MODULE_PROVIDERS["//pkg:name"]`.
+  - Append providers from `@workspace_providers//:auto_map.bzl` using `MODULE_PROVIDERS["//pkg:name"]`.
   - Under the hood, start with `genrule` + `rebar3` invocation inside a hermetic Nix env (acceptance: parity with direct `rebar3 compile`).
 - Notes:
   - Keep macro interfaces stable so we can transparently swap the implementation to native `erlang_*` rules later.

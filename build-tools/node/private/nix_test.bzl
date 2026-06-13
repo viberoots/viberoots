@@ -1,6 +1,6 @@
-load("//build-tools/lang:sanitize.bzl", "sanitize_name")
-load("//build-tools/lang:nix_shell.bzl", "nix_bootstrap_env_core", "nix_bootstrap_env_pnpm_store", "nix_calling_env_export_source_snapshot", "nix_timeout_wrapper_var")
-load("//build-tools/lang:remote_action_policy.bzl", "external_runner_command", "run_nix_action", "stamp_remote_readiness_labels")
+load("@viberoots//build-tools/lang:sanitize.bzl", "sanitize_name")
+load("@viberoots//build-tools/lang:nix_shell.bzl", "nix_bootstrap_env_core", "nix_bootstrap_env_pnpm_store", "nix_calling_env_export_source_snapshot", "nix_timeout_wrapper_var")
+load("@viberoots//build-tools/lang:remote_action_policy.bzl", "external_runner_command", "run_nix_action", "stamp_remote_readiness_labels")
 load("@prelude//:build_mode.bzl", "BuildModeInfo")
 load("@prelude//decls:re_test_common.bzl", "re_test_common")
 load("@prelude//test:inject_test_run_info.bzl", "inject_test_run_info")
@@ -154,12 +154,12 @@ _NODE_NIX_TEST_ATTRS = {
         "out": attrs.string(default = "node_nix_test.stamp"),
         "remote_ready_runner": attrs.option(attrs.source(), default = None),
         "_inject_test_env": attrs.default_only(attrs.dep(default = "prelude//test/tools:inject_test_env")),
-        "_command_heartbeat": attrs.source(default = "//build-tools/tools/dev:command-heartbeat.ts"),
+        "_command_heartbeat": attrs.source(default = "@viberoots//build-tools/tools/dev:command-heartbeat.ts"),
         "_graph_json": attrs.source(default = "workspace_buck//:graph.json"),
-        "_nix_build_filtered_flake": attrs.source(default = "//build-tools/tools/dev:nix-build-filtered-flake.ts"),
-        "_prepare_exact_pnpm_store": attrs.source(default = "//build-tools/tools/dev:prepare-exact-pnpm-store.ts"),
+        "_nix_build_filtered_flake": attrs.source(default = "@viberoots//build-tools/tools/dev:nix-build-filtered-flake.ts"),
+        "_prepare_exact_pnpm_store": attrs.source(default = "@viberoots//build-tools/tools/dev:prepare-exact-pnpm-store.ts"),
         "_workspace_root_env": attrs.source(default = "workspace_buck//:workspace-root.env"),
-        "_zx_init": attrs.source(default = "//build-tools/tools/dev:zx-init.mjs"),
+        "_zx_init": attrs.source(default = "@viberoots//build-tools/tools/dev:zx-init.mjs"),
     }
 _NODE_NIX_TEST_ATTRS.update(_remote_test_attrs())
 

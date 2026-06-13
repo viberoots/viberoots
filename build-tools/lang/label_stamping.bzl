@@ -1,7 +1,7 @@
-load("//build-tools/lang:collections.bzl", "dedupe_preserve")
-load("//build-tools/lang:global_inputs.bzl", "global_nix_inputs")
-load("//build-tools/lang:lang_contracts.bzl", "patch_invalidation_strategy_for_lang")
-load("//build-tools/lang:labels_file.bzl", "labels_file")
+load("@viberoots//build-tools/lang:collections.bzl", "dedupe_preserve")
+load("@viberoots//build-tools/lang:global_inputs.bzl", "global_nix_inputs")
+load("@viberoots//build-tools/lang:lang_contracts.bzl", "patch_invalidation_strategy_for_lang")
+load("@viberoots//build-tools/lang:labels_file.bzl", "labels_file")
 
 def normalize_labels(pkg, labels):
     if labels == None:

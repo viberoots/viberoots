@@ -1,6 +1,6 @@
 def _internal_only(name):
     fail(
-        "%s is internal-only. Use //build-tools/lang:language_wiring.bzl:prepare_language_wiring(...) at macro sites."
+        "%s is internal-only. Use @viberoots//build-tools/lang:language_wiring.bzl:prepare_language_wiring(...) at macro sites."
         % name
     )
 

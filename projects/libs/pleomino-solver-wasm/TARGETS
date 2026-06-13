@@ -1,5 +1,5 @@
 load("@prelude//:rules.bzl", "genrule")
-load("//build-tools/cpp:defs.bzl", "nix_cpp_wasm_emscripten_lib")
+load("@viberoots//build-tools/cpp:defs.bzl", "nix_cpp_wasm_emscripten_lib")
 
 nix_cpp_wasm_emscripten_lib(
     name = "solver_emscripten",
@@ -19,14 +19,14 @@ genrule(
         "src/solver-search.cc",
         "src/solver-search.h",
         "src/solver.cc",
-        "//build-tools/tools/wasm:export-wasm-from-nix",
+        "@viberoots//build-tools/tools/wasm:export-wasm-from-nix",
     ],
     out = "solver.wasm",
     cmd = "WASM_TARGET=//projects/libs/pleomino-solver-wasm:solver_emscripten "
           + "WASM_DIR=lib "
           + "WASM_EXTS=.wasm "
           + "OUT_PATH=\"$OUT\" "
-          + "zx-wrapper \"$(location //build-tools/tools/wasm:export-wasm-from-nix)\"",
+          + "zx-wrapper \"$(location @viberoots//build-tools/tools/wasm:export-wasm-from-nix)\"",
     labels = ["lang:cpp", "kind:wasm", "patch_scope:package-local"],
     visibility = ["PUBLIC"],
 )

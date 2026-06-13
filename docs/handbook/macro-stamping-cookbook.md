@@ -22,7 +22,7 @@ Stamping ensures exporter preconditions via consistent labels applied in macros.
   - Example (list-shaped `srcs`):
 
 ```starlark
-load("//build-tools/lang:defs_common.bzl", "wire_global_nix_inputs")
+load("@viberoots//build-tools/lang:defs_common.bzl", "wire_global_nix_inputs")
 
 kw = dict(kwargs) if kwargs != None else {}
 kw["srcs"] = list(kw.get("srcs", []) or [])
@@ -32,7 +32,7 @@ wire_global_nix_inputs(kw, into = "srcs", stamp = True)
 - Example (dict-shaped `srcs`, for stable paths inside the action):
 
 ```starlark
-load("//build-tools/lang:defs_common.bzl", "wire_global_nix_inputs")
+load("@viberoots//build-tools/lang:defs_common.bzl", "wire_global_nix_inputs")
 
 kw = dict(kwargs) if kwargs != None else {}
 kw["srcs"] = {
@@ -44,7 +44,7 @@ wire_global_nix_inputs(kw, into = "srcs", stamp = True)
 - Example (attach without stamping, when the macro contract intentionally avoids exporter noise):
 
 ```starlark
-load("//build-tools/lang:defs_common.bzl", "wire_global_nix_inputs")
+load("@viberoots//build-tools/lang:defs_common.bzl", "wire_global_nix_inputs")
 
 wire_global_nix_inputs(kw, into = "srcs", stamp = False)
 ```

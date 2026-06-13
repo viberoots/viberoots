@@ -34,7 +34,7 @@ Steps
     - `build-tools/tools/lib/provider-index.ts:readImporterProviderIndexEntriesForSingleImporterLockfileBasenames` (deterministic provider-index enumeration with supported-importer filtering and optional required-module gating)
 
 - **Auto-map wiring**
-  - If your exporter emits labels (e.g., `module:…`), `build-tools/tools/buck/gen-auto-map.ts` will map target → provider name; macros read providers from `MODULE_PROVIDERS` loaded via the stable `//build-tools/lang:auto_map.bzl` re-export.
+  - If your exporter emits labels (e.g., `module:…`), `build-tools/tools/buck/gen-auto-map.ts` will map target → provider name; macros read providers from `MODULE_PROVIDERS` loaded via the workspace provider cell `@workspace_providers//:auto_map.bzl`.
 
 - **Macros (Starlark wiring)**
   - Use `//build-tools/lang:defs_common.bzl:prepare_language_wiring(...)` as the default macro entrypoint (non-mutating).

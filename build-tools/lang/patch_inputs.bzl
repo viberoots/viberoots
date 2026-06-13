@@ -1,9 +1,9 @@
-load("//build-tools/lang:collections.bzl", "dedupe_preserve")
-load("//build-tools/lang:labels_file.bzl", "labels_file")
-load("//build-tools/lang:lockfile_labels.bzl", "importer_from_labels", "ensure_single_lockfile_label")
-load("//build-tools/lang:dict_inputs.bzl", "PATCH_INPUTS_KEY_PREFIX", "attach_items_dict_safe")
-load("//build-tools/lang:sanitize.bzl", "sanitize_name")
-load("//build-tools/lang:importer_package_boundary.bzl", "require_importer_package_boundary")
+load("@viberoots//build-tools/lang:collections.bzl", "dedupe_preserve")
+load("@viberoots//build-tools/lang:labels_file.bzl", "labels_file")
+load("@viberoots//build-tools/lang:lockfile_labels.bzl", "importer_from_labels", "ensure_single_lockfile_label")
+load("@viberoots//build-tools/lang:dict_inputs.bzl", "PATCH_INPUTS_KEY_PREFIX", "attach_items_dict_safe")
+load("@viberoots//build-tools/lang:sanitize.bzl", "sanitize_name")
+load("@viberoots//build-tools/lang:importer_package_boundary.bzl", "require_importer_package_boundary")
 
 def append_patch_inputs(kwargs, dirs, into = "srcs"):
     if kwargs == None:

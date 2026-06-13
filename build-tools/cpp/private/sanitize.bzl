@@ -1,4 +1,4 @@
-load("//build-tools/lang:sanitize.bzl", "sanitize_name")
+load("@viberoots//build-tools/lang:sanitize.bzl", "sanitize_name")
 
 
 def _sanitize_probe_impl(ctx):

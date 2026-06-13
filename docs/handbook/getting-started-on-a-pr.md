@@ -85,7 +85,7 @@ When adding or materially editing scaffold command guidance:
   - Sync Node providers only (no graph/auto_map): `node build-tools/tools/buck/sync-providers.ts --lang node --no-glue`
   - Sync Python providers only (no graph/auto_map): `node build-tools/tools/buck/sync-providers.ts --lang python --no-glue`
   - Sync specific language: `node build-tools/tools/buck/sync-providers.ts --lang node`
-  - Generate auto_map (building block; prefer the pipeline): `node build-tools/tools/buck/gen-auto-map.ts --graph build-tools/tools/buck/graph.json --out third_party/providers/auto_map.bzl`
+  - Generate auto_map (building block; prefer the pipeline): `node build-tools/tools/buck/gen-auto-map.ts --graph build-tools/tools/buck/graph.json --out .viberoots/workspace/providers/auto_map.bzl`
   - Prebuild guard (freshness/presence): `node build-tools/tools/buck/prebuild-guard.ts [--verbose|--json]`
   - Note: touching any `pnpm-lock.yaml` requires re-running provider sync + auto_map; the guard will fail in CI if importer entries are missing and auto-fix locally unless `PREBUILD_GUARD_NO_FIX=1`.
 - Template test selection (PR-2):

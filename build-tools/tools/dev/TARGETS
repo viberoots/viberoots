@@ -1,6 +1,6 @@
 load("@prelude//:rules.bzl", "export_file", "filegroup")
 load(
-    "//build-tools/lang:source_snapshot.bzl",
+    "@viberoots//build-tools/lang:source_snapshot.bzl",
     "source_snapshot_runner",
     "source_snapshot_zx_wrapper_tool",
 )

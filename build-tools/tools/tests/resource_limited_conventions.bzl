@@ -1,4 +1,4 @@
-load("//build-tools/tools/tests:resource_limited_taxonomy.bzl", "RESOURCE_LIMITED_TESTS")
+load("@viberoots//build-tools/tools/tests:resource_limited_taxonomy.bzl", "RESOURCE_LIMITED_TESTS")
 
 VERIFY_RESOURCE_LIMITED_LABEL = "verify:resource-limited"
 

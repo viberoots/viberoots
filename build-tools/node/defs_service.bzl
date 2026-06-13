@@ -1,23 +1,23 @@
 load("@prelude//:rules.bzl", "genrule")
-load("//build-tools/lang:importer_strings.bzl", "sanitize_importer_for_nix_attr")
+load("@viberoots//build-tools/lang:importer_strings.bzl", "sanitize_importer_for_nix_attr")
 load(
-    "//build-tools/lang:nix_shell.bzl",
+    "@viberoots//build-tools/lang:nix_shell.bzl",
     "nix_calling_env_export_buck_graph_json",
     "nix_calling_env_export_nix_pnpm_fetch_timeout",
     "nix_calling_genrule_bootstrap",
     "nix_calling_node_patch_requirements_preflight",
 )
 load(
-    "//build-tools/node:defs_nix_helpers.bzl",
+    "@viberoots//build-tools/node:defs_nix_helpers.bzl",
     "apply_default_lockfile_label",
     "prepare_node_importer_nix_calling_genrule_kwargs",
     "validate_optional_importer_arg_matches_wiring",
 )
-load("//build-tools/lang:remote_action_policy.bzl", "stamp_local_only_genrule_labels")
-load("//build-tools/node/private:wasm_source_resolver.bzl", "sh_quote")
+load("@viberoots//build-tools/lang:remote_action_policy.bzl", "stamp_local_only_genrule_labels")
+load("@viberoots//build-tools/node/private:wasm_source_resolver.bzl", "sh_quote")
 
 MODULE_PROVIDERS = {}
-load("//build-tools/lang:auto_map.bzl", "MODULE_PROVIDERS")
+load("@workspace_providers//:auto_map.bzl", "MODULE_PROVIDERS")
 
 def _validate_contract_path(runtime_contract):
     if not isinstance(runtime_contract, str) or runtime_contract == "":

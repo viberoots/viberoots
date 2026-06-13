@@ -26,7 +26,7 @@ I keep these constraints in mind because they are enforced by the planner:
 
 ```python
 # apps/demo-cli/TARGETS
-load("//build-tools/go:defs.bzl", "nix_go_binary")
+load("@viberoots//build-tools/go:defs.bzl", "nix_go_binary")
 
 nix_go_binary(
     name = "demo",

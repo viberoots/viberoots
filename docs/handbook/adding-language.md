@@ -91,8 +91,8 @@ For importer-scoped ecosystems, we try hard to keep “how we find lockfiles” 
 
 ```python
 load("@prelude//:rules.bzl", "genrule")
-load("//build-tools/lang:auto_map.bzl", "MODULE_PROVIDERS")
-load("//build-tools/lang:defs_common.bzl", "prepare_language_wiring")
+load("@workspace_providers//:auto_map.bzl", "MODULE_PROVIDERS")
+load("@viberoots//build-tools/lang:defs_common.bzl", "prepare_language_wiring")
 
 def my_pkg_local_rule(name, **kwargs):
     deps = kwargs.pop("deps", [])
@@ -172,7 +172,7 @@ Minimal example (dict-shaped `srcs`):
 
 ```python
 load("@prelude//:rules.bzl", "genrule")
-load("//build-tools/lang:defs_common.bzl", "prepare_language_wiring")
+load("@viberoots//build-tools/lang:defs_common.bzl", "prepare_language_wiring")
 
 def my_importer_nix_genrule(name, lockfile_label = None):
     # Dict-shaped srcs: preserve caller mapping, and allow shared helper to attach
@@ -210,7 +210,7 @@ Importer-local patch attachment uses `native.glob(...)`, which cannot reach acro
   attach importer-local patches from `<importer>/patches/<lang>/`; languages may additionally opt
   into an effective-set-gated repo-root `patches/<lang>/` directory when the contract supports it.
 - Nix templates live under `build-tools/tools/nix/templates/<lang>.nix` and are imported by `build-tools/tools/nix/lang-templates.nix`.
-- Language macros live under `<lang>/defs.bzl` and load provider mappings via the stable `//build-tools/lang:auto_map.bzl` re-export.
+- Language macros live under `<lang>/defs.bzl` and load provider mappings via the workspace provider cell `@workspace_providers//:auto_map.bzl`.
 - Provider rules live under `//third_party/providers/**` and are generated, not hand-edited.
 
 ## Step-by-step
@@ -257,7 +257,7 @@ Importer-local patch attachment uses `native.glob(...)`, which cannot reach acro
 - Add `<lang>/defs.bzl` using `build-tools/lang/defs_common.bzl` helpers to:
   - Stamp labels (`lang:<id>`, `kind:<bin|lib|test>`) on primary targets
   - Auto-wire tests per your language conventions
-  - Append providers from `MODULE_PROVIDERS` loaded via `//build-tools/lang:auto_map.bzl` (do not load `//third_party/providers:auto_map.bzl` directly)
+  - Append providers from `MODULE_PROVIDERS` loaded via `@workspace_providers//:auto_map.bzl` (do not load `//:auto_map.bzl` directly)
 
 Stamping belongs in the macro. If your macro synthesizes helper targets (for example `*_test`), keep stamping in the macro implementation rather than repeating `labels = ["lang:<id>", "kind:<kind>"]` at call sites.
 

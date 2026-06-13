@@ -1,6 +1,6 @@
-load("//build-tools/lang:collections.bzl", "dedupe_preserve")
-load("//build-tools/lang:dict_inputs.bzl", "PROVIDER_EDGES_KEY_PREFIX", "attach_items_dict_safe")
-load("//build-tools/lang:auto_map.bzl", _DEFAULT_MODULE_PROVIDERS = "MODULE_PROVIDERS")
+load("@viberoots//build-tools/lang:collections.bzl", "dedupe_preserve")
+load("@viberoots//build-tools/lang:dict_inputs.bzl", "PROVIDER_EDGES_KEY_PREFIX", "attach_items_dict_safe")
+load("@workspace_providers//:auto_map.bzl", _DEFAULT_MODULE_PROVIDERS = "MODULE_PROVIDERS")
 load("@prelude//:rules.bzl", "genrule")
 
 def target_key_for_current_package(name):

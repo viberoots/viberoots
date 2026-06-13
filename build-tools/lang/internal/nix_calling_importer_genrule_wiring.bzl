@@ -1,7 +1,7 @@
-load("//build-tools/lang:lockfile_labels.bzl", "importer_from_labels")
-load("//build-tools/lang:nix_calling_macros.bzl", "wire_global_nix_inputs")
-load("//build-tools/lang:dict_inputs.bzl", "GLOBAL_NIX_INPUTS_KEY_PREFIX", "PATCH_INPUTS_KEY_PREFIX", "PROVIDER_EDGES_KEY_PREFIX")
-load("//build-tools/lang/internal:importer_wiring.bzl", "prepare_importer_genrule_kwargs")
+load("@viberoots//build-tools/lang:lockfile_labels.bzl", "importer_from_labels")
+load("@viberoots//build-tools/lang:nix_calling_macros.bzl", "wire_global_nix_inputs")
+load("@viberoots//build-tools/lang:dict_inputs.bzl", "GLOBAL_NIX_INPUTS_KEY_PREFIX", "PATCH_INPUTS_KEY_PREFIX", "PROVIDER_EDGES_KEY_PREFIX")
+load("@viberoots//build-tools/lang/internal:importer_wiring.bzl", "prepare_importer_genrule_kwargs")
 
 def _clone_container_or_none(v):
     if isinstance(v, dict):

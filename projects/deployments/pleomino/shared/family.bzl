@@ -1,5 +1,5 @@
-load("//build-tools/deployments:defs.bzl", "cloudflare_pages_static_webapp_deployment", "nixos_shared_host_static_webapp_deployment")
-load("//build-tools/deployments:family_defs.bzl", "compose_deployment_family_kwargs", "deployment_family_defaults", "deployment_stage_delta")
+load("@viberoots//build-tools/deployments:defs.bzl", "cloudflare_pages_static_webapp_deployment", "nixos_shared_host_static_webapp_deployment")
+load("@viberoots//build-tools/deployments:family_defs.bzl", "compose_deployment_family_kwargs", "deployment_family_defaults", "deployment_stage_delta")
 
 _ACCOUNT_ID = "1b911846f80a89272c0dbaf44f5c810f"
 _ZONE_ID = "9411ac5903acb1c2e29b3d4c04ef7e6f"

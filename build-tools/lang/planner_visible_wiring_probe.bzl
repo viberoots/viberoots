@@ -1,7 +1,7 @@
-load("//build-tools/lang:dict_inputs.bzl", "PROVIDER_EDGES_KEY_PREFIX")
-load("//build-tools/lang:labels_file.bzl", "labels_file")
-load("//build-tools/lang:planner_visible_wiring.bzl", "wire_planner_visible_inputs")
-load("//build-tools/lang:provider_edges.bzl", "target_key_for_current_package")
+load("@viberoots//build-tools/lang:dict_inputs.bzl", "PROVIDER_EDGES_KEY_PREFIX")
+load("@viberoots//build-tools/lang:labels_file.bzl", "labels_file")
+load("@viberoots//build-tools/lang:planner_visible_wiring.bzl", "wire_planner_visible_inputs")
+load("@viberoots//build-tools/lang:provider_edges.bzl", "target_key_for_current_package")
 
 def planner_visible_inputs_probe(
         name,

@@ -11,6 +11,7 @@ import {
   parseNixGapsInventory,
   parseNodeClassificationTableMacros,
   parseNonBuildInventoryMacros,
+  publicNodeDefsBzlPath,
   parseStarlarkIndexMacros,
   parseStarlarkIndexMacrosByModule,
   type ArtifactRouteAllowlistEntry,
@@ -39,7 +40,8 @@ async function main() {
 
   const starlarkMacros = parseStarlarkIndexMacros(starlarkTxt);
   const starlarkByModule = parseStarlarkIndexMacrosByModule(starlarkTxt);
-  const nodePublicMacros = starlarkByModule[nodeDefsBzlPath] || [];
+  const nodePublicMacros =
+    starlarkByModule[publicNodeDefsBzlPath] || starlarkByModule[nodeDefsBzlPath] || [];
   const inventoryMacros = parseNixGapsInventory(inventoryTxt);
   const nodeClassificationMacros = parseNodeClassificationTableMacros(inventoryTxt);
   const nonBuildInventoryMacros = parseNonBuildInventoryMacros(inventoryTxt);
@@ -84,7 +86,7 @@ async function main() {
   }
   if (nodePublicMacros.length === 0) {
     console.error(
-      `No Node public macros parsed from ${starlarkPath} (${nodeDefsBzlPath} in Index).`,
+      `No Node public macros parsed from ${starlarkPath} (${publicNodeDefsBzlPath} in Index).`,
     );
     process.exit(1);
   }

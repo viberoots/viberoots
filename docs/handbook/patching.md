@@ -134,7 +134,7 @@ Node and Python only (Go/C++ don’t require glue for patch invalidation). Local
 - Sync providers: `node build-tools/tools/buck/sync-providers.ts`
 - Generate provider index (and Node lockfile sidecar for Node): `node build-tools/tools/buck/gen-provider-index.ts`
   - Emits `third_party/providers/provider_index.bzl` and `build-tools/tools/buck/node-lock-index.json` (Node only)
-- Generate auto_map: `node build-tools/tools/buck/gen-auto-map.ts --graph build-tools/tools/buck/graph.json --out third_party/providers/auto_map.bzl`
+- Generate auto_map: `node build-tools/tools/buck/gen-auto-map.ts --graph build-tools/tools/buck/graph.json --out .viberoots/workspace/providers/auto_map.bzl`
 
 Running `node build-tools/tools/dev/install-deps.ts` in the dev shell runs the full sequence automatically. CI runs the same as separate stages.
 

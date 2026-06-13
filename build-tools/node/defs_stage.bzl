@@ -1,10 +1,10 @@
 load("@prelude//:rules.bzl", "genrule")
-load("//build-tools/lang:defs_common.bzl", "default_lockfile_label_from_package", "default_lockfile_path_from_package", "ensure_default_lockfile_exists", "extract_lockfile_labels", "prepare_language_wiring")
-load("//build-tools/lang:nix_shell.bzl", "nix_build_out_path_cmd", "nix_calling_env_export_buck_graph_json", "nix_calling_genrule_bootstrap", "nix_calling_node_patch_requirements_preflight")
-load("//build-tools/lang:remote_action_policy.bzl", "stamp_local_only_genrule_labels")
-load("//build-tools/node/private:wasm_source_resolver.bzl", "asset_with_selector", "sh_quote", "validate_wasm_selector_args", "wasm_source_resolver_shell")
+load("@viberoots//build-tools/lang:defs_common.bzl", "default_lockfile_label_from_package", "default_lockfile_path_from_package", "ensure_default_lockfile_exists", "extract_lockfile_labels", "prepare_language_wiring")
+load("@viberoots//build-tools/lang:nix_shell.bzl", "nix_build_out_path_cmd", "nix_calling_env_export_buck_graph_json", "nix_calling_genrule_bootstrap", "nix_calling_node_patch_requirements_preflight")
+load("@viberoots//build-tools/lang:remote_action_policy.bzl", "stamp_local_only_genrule_labels")
+load("@viberoots//build-tools/node/private:wasm_source_resolver.bzl", "asset_with_selector", "sh_quote", "validate_wasm_selector_args", "wasm_source_resolver_shell")
 MODULE_PROVIDERS = {}
-load("//build-tools/lang:auto_map.bzl", "MODULE_PROVIDERS")
+load("@workspace_providers//:auto_map.bzl", "MODULE_PROVIDERS")
 def _is_label_ref(v):
     return isinstance(v, str) and (v.startswith("//") or v.startswith(":"))
 def _to_abs_label(v):

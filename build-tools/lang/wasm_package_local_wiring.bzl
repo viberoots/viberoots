@@ -1,7 +1,7 @@
-load("//build-tools/lang:label_stamping.bzl", "stamp_patch_scope_for_lang", "stamp_wasm_variant")
-load("//build-tools/lang:macro_kwargs.bzl", "extract_package_local_patch_dirs_and_nixpkg_deps")
-load("//build-tools/lang:patch_inputs.bzl", "include_package_local_patches")
-load("//build-tools/lang:planner_visible_wiring.bzl", "wire_package_local_planner_visible_stub", "wire_planner_visible_inputs")
+load("@viberoots//build-tools/lang:label_stamping.bzl", "stamp_patch_scope_for_lang", "stamp_wasm_variant")
+load("@viberoots//build-tools/lang:macro_kwargs.bzl", "extract_package_local_patch_dirs_and_nixpkg_deps")
+load("@viberoots//build-tools/lang:patch_inputs.bzl", "include_package_local_patches")
+load("@viberoots//build-tools/lang:planner_visible_wiring.bzl", "wire_package_local_planner_visible_stub", "wire_planner_visible_inputs")
 load("@prelude//:rules.bzl", "genrule")
 
 def prepare_package_local_wasm_wiring(

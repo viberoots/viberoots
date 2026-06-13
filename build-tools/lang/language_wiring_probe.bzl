@@ -1,5 +1,5 @@
 load("@prelude//:rules.bzl", "genrule")
-load("//build-tools/lang:language_wiring.bzl", "prepare_language_wiring")
+load("@viberoots//build-tools/lang:language_wiring.bzl", "prepare_language_wiring")
 
 def language_wiring_mutation_probe(name, lang, kind, lockfile_label = None):
     """

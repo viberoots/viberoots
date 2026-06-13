@@ -71,6 +71,7 @@ async function ensureLocalPreludeMapping() {
       "",
       "[repositories]",
       "root = .",
+      "viberoots = ./.viberoots/current",
       "prelude = ./prelude",
       "toolchains = ./toolchains",
       "repo_toolchains = ./toolchains",
@@ -82,6 +83,7 @@ async function ensureLocalPreludeMapping() {
       "",
       "[cells]",
       "root = .",
+      "viberoots = ./.viberoots/current",
       "prelude = ./prelude",
       "toolchains = ./toolchains",
       "repo_toolchains = ./toolchains",
@@ -104,6 +106,11 @@ async function ensureLocalPreludeMapping() {
       try {
         await fsp.writeFile(path.join(process.cwd(), ".buckroot"), ".\n");
       } catch {}
+      await fsp.mkdir(path.join(process.cwd(), ".viberoots"), { recursive: true });
+      const current = path.join(process.cwd(), ".viberoots/current");
+      if (!fs.existsSync(current)) {
+        await fsp.symlink("..", current);
+      }
       await fsp.writeFile(cfgPath, cfgTxt, "utf8");
       return;
     }

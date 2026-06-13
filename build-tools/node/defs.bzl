@@ -1,12 +1,12 @@
-load("//build-tools/node:defs_core.bzl", _nix_node_gen = "nix_node_gen", _nix_node_test = "nix_node_test", _nix_node_lib = "nix_node_lib", _nix_node_bin = "nix_node_bin")
-load("//build-tools/node:defs_nix.bzl", _node_webapp = "node_webapp", _nix_node_cli_bin = "nix_node_cli_bin")
-load("//build-tools/node:defs_service.bzl", _node_service_artifact = "node_service_artifact")
-load("//build-tools/node:defs_vercel.bzl", _node_vercel_next_artifact = "node_vercel_next_artifact")
-load("//build-tools/lang:collections.bzl", "dedupe_preserve")
-load("//build-tools/lang:label_stamping.bzl", "normalize_labels")
-load("//build-tools/lang:module_surface.bzl", "module_surface")
+load("@viberoots//build-tools/node:defs_core.bzl", _nix_node_gen = "nix_node_gen", _nix_node_test = "nix_node_test", _nix_node_lib = "nix_node_lib", _nix_node_bin = "nix_node_bin")
+load("@viberoots//build-tools/node:defs_nix.bzl", _node_webapp = "node_webapp", _nix_node_cli_bin = "nix_node_cli_bin")
+load("@viberoots//build-tools/node:defs_service.bzl", _node_service_artifact = "node_service_artifact")
+load("@viberoots//build-tools/node:defs_vercel.bzl", _node_vercel_next_artifact = "node_vercel_next_artifact")
+load("@viberoots//build-tools/lang:collections.bzl", "dedupe_preserve")
+load("@viberoots//build-tools/lang:label_stamping.bzl", "normalize_labels")
+load("@viberoots//build-tools/lang:module_surface.bzl", "module_surface")
 load(
-    "//build-tools/node:defs_stage.bzl",
+    "@viberoots//build-tools/node:defs_stage.bzl",
     _node_asset_stage = "node_asset_stage",
     _node_wasm_inline_module = "node_wasm_inline_module",
 )

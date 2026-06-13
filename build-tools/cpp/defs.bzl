@@ -1,6 +1,6 @@
 load("@prelude//:rules.bzl", "cxx_library", "cxx_binary", "cxx_test")
 load(
-    "//build-tools/lang:defs_common.bzl",
+    "@viberoots//build-tools/lang:defs_common.bzl",
     "dedupe_preserve",
     "merge_link_intent_deps",
     "normalize_labels",
@@ -9,14 +9,14 @@ load(
     "wire_package_local_planner_visible_stub",
     "wire_package_local_wasm_planner_visible_stub",
 )
-load("//build-tools/cpp/private:sanitize.bzl", _cpp_sanitize_probe="cpp_sanitize_probe")
-load("//build-tools/lang:sanitize.bzl", "sanitize_name")
-load("//build-tools/cpp/private:nix_test.bzl", "cpp_nix_test")
-load("//build-tools/cpp/private:nix_build.bzl", "cpp_nix_build")
-load("//build-tools/cpp/private:runtime_inputs.bzl", "cpp_runtime_nix_inputs")
-load("//build-tools/lang:auto_map.bzl", "MODULE_PROVIDERS")
+load("@viberoots//build-tools/cpp/private:sanitize.bzl", _cpp_sanitize_probe="cpp_sanitize_probe")
+load("@viberoots//build-tools/lang:sanitize.bzl", "sanitize_name")
+load("@viberoots//build-tools/cpp/private:nix_test.bzl", "cpp_nix_test")
+load("@viberoots//build-tools/cpp/private:nix_build.bzl", "cpp_nix_build")
+load("@viberoots//build-tools/cpp/private:runtime_inputs.bzl", "cpp_runtime_nix_inputs")
+load("@workspace_providers//:auto_map.bzl", "MODULE_PROVIDERS")
 load(
-    "//build-tools/cpp:wasm_defs.bzl",
+    "@viberoots//build-tools/cpp:wasm_defs.bzl",
     _nix_cpp_wasm_static_lib = "nix_cpp_wasm_static_lib",
     _nix_cpp_wasm_emscripten_lib = "nix_cpp_wasm_emscripten_lib",
 )

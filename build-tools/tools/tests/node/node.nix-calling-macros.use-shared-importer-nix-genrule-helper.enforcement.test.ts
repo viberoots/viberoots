@@ -19,8 +19,8 @@ test("node Nix-calling macros route through unified wiring helper", async () => 
   );
 
   assert(
-    txt.includes('load("//build-tools/lang:auto_map.bzl", "MODULE_PROVIDERS")'),
-    `${file} must load MODULE_PROVIDERS via //build-tools/lang:auto_map.bzl so provider edges are realized consistently`,
+    txt.includes('load("@workspace_providers//:auto_map.bzl", "MODULE_PROVIDERS")'),
+    `${file} must load MODULE_PROVIDERS via @workspace_providers//:auto_map.bzl so provider edges are realized consistently`,
   );
   assert(
     helperTxt.includes("MODULE_PROVIDERS = MODULE_PROVIDERS"),

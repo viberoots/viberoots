@@ -1,7 +1,7 @@
-load("//build-tools/lang:collections.bzl", _dedupe_preserve = "dedupe_preserve")
-load("//build-tools/lang:label_stamping.bzl", _normalize_labels = "normalize_labels", _stamp_global_nix_inputs = "stamp_global_nix_inputs", _stamp_labels = "stamp_labels", _stamp_wasm_variant = "stamp_wasm_variant", _wasm_labels_probe = "wasm_labels_probe")
+load("@viberoots//build-tools/lang:collections.bzl", _dedupe_preserve = "dedupe_preserve")
+load("@viberoots//build-tools/lang:label_stamping.bzl", _normalize_labels = "normalize_labels", _stamp_global_nix_inputs = "stamp_global_nix_inputs", _stamp_labels = "stamp_labels", _stamp_wasm_variant = "stamp_wasm_variant", _wasm_labels_probe = "wasm_labels_probe")
 load(
-    "//build-tools/lang:lockfile_labels.bzl",
+    "@viberoots//build-tools/lang:lockfile_labels.bzl",
     _default_lockfile_label_from_package = "default_lockfile_label_from_package",
     _default_lockfile_path_from_package = "default_lockfile_path_from_package",
     _ensure_default_lockfile_exists = "ensure_default_lockfile_exists",
@@ -12,9 +12,9 @@ load(
     _lockfile_label_parse_probe = "lockfile_label_parse_probe",
     _supported_importer_label_probe = "supported_importer_label_probe",
 )
-load("//build-tools/lang:nixpkg_labels.bzl", _append_nixpkg_labels = "append_nixpkg_labels", _normalize_nix_attr = "normalize_nix_attr", _normalize_nix_attr_probe = "normalize_nix_attr_probe")
+load("@viberoots//build-tools/lang:nixpkg_labels.bzl", _append_nixpkg_labels = "append_nixpkg_labels", _normalize_nix_attr = "normalize_nix_attr", _normalize_nix_attr_probe = "normalize_nix_attr_probe")
 load(
-    "//build-tools/lang:macro_kwargs.bzl",
+    "@viberoots//build-tools/lang:macro_kwargs.bzl",
     _macro_kwargs_probe = "macro_kwargs_probe",
     _extract_package_local_patch_dirs_and_nixpkg_deps = "extract_package_local_patch_dirs_and_nixpkg_deps",
     _pop_local_patch_dirs = "pop_local_patch_dirs",
@@ -22,7 +22,7 @@ load(
     _pop_package_local_patch_dirs_and_nixpkg_deps = "pop_package_local_patch_dirs_and_nixpkg_deps",
 )
 load(
-    "//build-tools/lang:patch_inputs.bzl",
+    "@viberoots//build-tools/lang:patch_inputs.bzl",
     _append_importer_patches = "append_importer_patches",
     _append_patch_inputs = "append_patch_inputs",
     _append_patch_inputs_dict_safe = "append_patch_inputs_dict_safe",
@@ -39,7 +39,7 @@ load(
     _synthetic_dep_for_importer_patches_from_labels_probe = "synthetic_dep_for_importer_patches_from_labels_probe",
 )
 load(
-    "//build-tools/lang:provider_edges.bzl",
+    "@viberoots//build-tools/lang:provider_edges.bzl",
     _merge_provider_edges_dict_safe_probe = "merge_provider_edges_dict_safe_probe",
     _merge_provider_edges_list_probe = "merge_provider_edges_list_probe",
     _merge_provider_edges = "merge_provider_edges",
@@ -51,7 +51,7 @@ load(
     _target_key_for_current_package = "target_key_for_current_package",
 )
 load(
-    "//build-tools/lang:dict_inputs.bzl",
+    "@viberoots//build-tools/lang:dict_inputs.bzl",
     _GLOBAL_NIX_INPUTS_KEY_PREFIX = "GLOBAL_NIX_INPUTS_KEY_PREFIX",
     _PATCH_INPUTS_KEY_PREFIX = "PATCH_INPUTS_KEY_PREFIX",
     _PROVIDER_EDGES_KEY_PREFIX = "PROVIDER_EDGES_KEY_PREFIX",
@@ -59,34 +59,34 @@ load(
     _dict_items_probe = "dict_items_probe",
 )
 load(
-    "//build-tools/lang:language_wiring.bzl",
+    "@viberoots//build-tools/lang:language_wiring.bzl",
     _prepare_language_wiring = "prepare_language_wiring",
 )
 load(
-    "//build-tools/lang:language_wiring_probe.bzl",
+    "@viberoots//build-tools/lang:language_wiring_probe.bzl",
     _language_wiring_mutation_probe = "language_wiring_mutation_probe",
 )
-load("//build-tools/lang:nix_calling_macros.bzl", _wire_global_nix_inputs = "wire_global_nix_inputs")
+load("@viberoots//build-tools/lang:nix_calling_macros.bzl", _wire_global_nix_inputs = "wire_global_nix_inputs")
 load(
-    "//build-tools/lang:kind_vocabulary.bzl",
+    "@viberoots//build-tools/lang:kind_vocabulary.bzl",
     _allowed_kind_values = "ALLOWED_KIND_VALUES",
     _is_allowed_kind_value = "is_allowed_kind_value",
     _kind_vocabulary_probe = "kind_vocabulary_probe",
 )
 load(
-    "//build-tools/lang:planner_visible_wiring.bzl",
+    "@viberoots//build-tools/lang:planner_visible_wiring.bzl",
     _wire_planner_visible_inputs = "wire_planner_visible_inputs",
     _wire_planner_visible_stub = "wire_planner_visible_stub",
     _wire_package_local_planner_visible_stub = "wire_package_local_planner_visible_stub",
 )
 load(
-    "//build-tools/lang:wasm_package_local_wiring.bzl",
+    "@viberoots//build-tools/lang:wasm_package_local_wiring.bzl",
     _prepare_package_local_wasm_wiring = "prepare_package_local_wasm_wiring",
     _package_local_wasm_wiring_mutation_probe = "package_local_wasm_wiring_mutation_probe",
     _wire_package_local_wasm_planner_visible_stub = "wire_package_local_wasm_planner_visible_stub",
 )
 load(
-    "//build-tools/lang:link_intent.bzl",
+    "@viberoots//build-tools/lang:link_intent.bzl",
     _merge_link_intent_deps = "merge_link_intent_deps",
     _validate_link_closure_overrides = "validate_link_closure_overrides",
 )

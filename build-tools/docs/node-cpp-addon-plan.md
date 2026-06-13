@@ -42,7 +42,7 @@ Introduce a Nix template that builds a `.node` shared library implementing a Nod
 
 Implement.
 
-## PR‑2: Add `nix_cpp_node_addon` macro in `//build-tools/cpp:defs.bzl`
+## PR‑2: Add `nix_cpp_node_addon` macro in `@viberoots//build-tools/cpp:defs.bzl`
 
 ### Description
 

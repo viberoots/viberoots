@@ -1,4 +1,4 @@
-load("//build-tools/lang:collections.bzl", "dedupe_preserve")
+load("@viberoots//build-tools/lang:collections.bzl", "dedupe_preserve")
 
 def merge_link_intent_deps(deps, link_deps, header_deps):
     """

@@ -1,4 +1,4 @@
-load("//build-tools/cpp:defs.bzl", "cpp_sanitize_probe")
+load("@viberoots//build-tools/cpp:defs.bzl", "cpp_sanitize_probe")
 
 # One test target per case; zx test will query outputs
 cpp_sanitize_probe(name = "case1", label = "//projects/apps/foo:bin")

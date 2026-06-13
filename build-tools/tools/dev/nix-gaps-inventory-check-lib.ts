@@ -1,5 +1,6 @@
 export const macroNamePattern = /^[a-z][a-z0-9_]+$/;
 export const nodeDefsBzlPath = "//build-tools/node:defs.bzl";
+export const publicNodeDefsBzlPath = "@viberoots//build-tools/node:defs.bzl";
 export const requiredLegendTerms = [
   "Buck build",
   "Stub (artifact expected)",
@@ -78,7 +79,9 @@ export function parseStarlarkIndexMacrosByModule(text: string): Record<string, s
     const moduleMatch = line.match(/^- `([^`]+)`$/);
     const moduleValue = moduleMatch ? moduleMatch[1].trim() : "";
     const isModulePath =
-      moduleValue.startsWith("//") && moduleValue.includes(":") && moduleValue.endsWith(".bzl");
+      (moduleValue.startsWith("//") || moduleValue.startsWith("@viberoots//")) &&
+      moduleValue.includes(":") &&
+      moduleValue.endsWith(".bzl");
     if (moduleMatch && isModulePath) {
       currentModule = moduleValue;
       if (!byModule[currentModule]) byModule[currentModule] = [];

@@ -1,9 +1,9 @@
 load(
-    "//build-tools/tools/tests/deployments:deployment_domain_taxonomy.bzl",
+    "@viberoots//build-tools/tools/tests/deployments:deployment_domain_taxonomy.bzl",
     "REVIEWED_DEPLOYMENT_TEST_OWNERSHIP",
 )
 load(
-    "//build-tools/tools/tests/deployments:deployment_resource_limited_taxonomy.bzl",
+    "@viberoots//build-tools/tools/tests/deployments:deployment_resource_limited_taxonomy.bzl",
     "RESOURCE_LIMITED_DEPLOYMENT_TEST_EXEMPTIONS",
     "RESOURCE_LIMITED_DEPLOYMENT_TESTS",
 )
@@ -13,7 +13,7 @@ VERIFY_RESOURCE_LIMITED_LABEL = "verify:resource-limited"
 REVIEWED_DEPLOYMENT_TEST_AREA = "build-tools/tools/tests/deployments/"
 
 DEPLOYMENT_DOMAIN_TAXONOMY_FILE = (
-    "//build-tools/tools/tests/deployments:deployment_domain_taxonomy.bzl"
+    "@viberoots//build-tools/tools/tests/deployments:deployment_domain_taxonomy.bzl"
 )
 
 def _classification_error(path):

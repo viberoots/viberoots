@@ -1,4 +1,4 @@
-load("//build-tools/lang:link_intent.bzl", "merge_link_intent_deps", "validate_link_closure_overrides")
+load("@viberoots//build-tools/lang:link_intent.bzl", "merge_link_intent_deps", "validate_link_closure_overrides")
 
 def _link_intent_probe_impl(ctx):
     out = ctx.actions.declare_output(ctx.attrs.out)

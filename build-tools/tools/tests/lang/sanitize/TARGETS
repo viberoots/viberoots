@@ -1,4 +1,4 @@
-load("//build-tools/lang:sanitize.bzl", "sanitize_name_probe")
+load("@viberoots//build-tools/lang:sanitize.bzl", "sanitize_name_probe")
 
 # One test target per case; zx test will query outputs
 sanitize_name_probe(name = "case1", value = "//projects/apps/foo:bin")

@@ -1,1 +1,1 @@
-# Package marker for shared deployment target macros loaded from //build-tools/deployments:defs.bzl.
+# Package marker for shared deployment target macros loaded from @viberoots//build-tools/deployments:defs.bzl.

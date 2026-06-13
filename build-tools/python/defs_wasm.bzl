@@ -1,13 +1,13 @@
 load(
-    "//build-tools/lang:defs_common.bzl",
+    "@viberoots//build-tools/lang:defs_common.bzl",
     "append_nixpkg_labels",
     "prepare_language_wiring",
     "stamp_wasm_variant",
 )
-load("//build-tools/lang:module_surface.bzl", "module_surface")
-load("//build-tools/lang:auto_map.bzl", "MODULE_PROVIDERS")
-load("//build-tools/python:defs_lockfile.bzl", "apply_default_lockfile_label")
-load("//build-tools/python/private:nix_build.bzl", "python_nix_wasm_build")
+load("@viberoots//build-tools/lang:module_surface.bzl", "module_surface")
+load("@workspace_providers//:auto_map.bzl", "MODULE_PROVIDERS")
+load("@viberoots//build-tools/python:defs_lockfile.bzl", "apply_default_lockfile_label")
+load("@viberoots//build-tools/python/private:nix_build.bzl", "python_nix_wasm_build")
 
 # WASM (WASI) convenience macros — stamp kind:wasm so planner routes to pyWasm* templates
 def nix_python_wasm_app(name, lockfile_label = None, deps = [], labels = [], **kwargs):

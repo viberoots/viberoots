@@ -1,5 +1,5 @@
-load("//build-tools/lang:nix_shell.bzl", "nix_bootstrap_env_core")
-load("//build-tools/lang:importer_roots.bzl", "WORKSPACE_IMPORTER_ROOTS")
+load("@viberoots//build-tools/lang:nix_shell.bzl", "nix_bootstrap_env_core")
+load("@viberoots//build-tools/lang:importer_roots.bzl", "WORKSPACE_IMPORTER_ROOTS")
 
 
 def nix_action_workspace_setup_from_args(

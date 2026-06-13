@@ -1,8 +1,8 @@
-load("//build-tools/lang:defs_common.bzl", "merge_link_intent_deps", "normalize_labels", "prepare_language_wiring", "validate_link_closure_overrides")
-load("//build-tools/lang:global_inputs.bzl", "global_nix_inputs")
-load("//build-tools/lang:auto_map.bzl", "MODULE_PROVIDERS")
-load("//build-tools/lang:module_surface.bzl", "module_surface")
-load("//build-tools/go/private:nix_build_wasm.bzl", "go_nix_build_wasm")
+load("@viberoots//build-tools/lang:defs_common.bzl", "merge_link_intent_deps", "normalize_labels", "prepare_language_wiring", "validate_link_closure_overrides")
+load("@viberoots//build-tools/lang:global_inputs.bzl", "global_nix_inputs")
+load("@workspace_providers//:auto_map.bzl", "MODULE_PROVIDERS")
+load("@viberoots//build-tools/lang:module_surface.bzl", "module_surface")
+load("@viberoots//build-tools/go/private:nix_build_wasm.bzl", "go_nix_build_wasm")
 
 def nix_go_tiny_wasm_lib(name, **kwargs):
     pkg = native.package_name()

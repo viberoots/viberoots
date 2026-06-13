@@ -11,7 +11,7 @@
 - Run locally:
   - `node build-tools/tools/buck/export-graph.ts --out build-tools/tools/buck/graph.json`
   - `node build-tools/tools/buck/sync-providers.ts` (unified orchestrator; Node sync runs automatically when PNPM lockfiles are present)
-  - `node build-tools/tools/buck/gen-auto-map.ts --graph build-tools/tools/buck/graph.json --out third_party/providers/auto_map.bzl`
+  - `node build-tools/tools/buck/gen-auto-map.ts --graph build-tools/tools/buck/graph.json --out .viberoots/workspace/providers/auto_map.bzl`
   - Or: `node build-tools/tools/dev/install-deps.ts --glue-only`
 - In CI, run dedicated stages before build/test:
   - `build-tools/tools/ci/run-stage.ts --stage export-graph`
@@ -24,7 +24,7 @@
 - Symptom: prebuild guard or Buck errors referencing a missing `node_importer_deps(...)` for a given `pnpm-lock.yaml#importer`.
 - Fix (local):
   - `node build-tools/tools/buck/sync-providers.ts` (unified orchestrator regenerates `third_party/providers/TARGETS.node.auto`)
-  - `node build-tools/tools/buck/gen-auto-map.ts --graph build-tools/tools/buck/graph.json --out third_party/providers/auto_map.bzl`
+  - `node build-tools/tools/buck/gen-auto-map.ts --graph build-tools/tools/buck/graph.json --out .viberoots/workspace/providers/auto_map.bzl`
   - Ensure the Node target carries a lockfile label like `lockfile:projects/apps/web/pnpm-lock.yaml#projects/apps/web`.
 - Fix (CI): run the dedicated stages before build/test as above.
 
@@ -214,7 +214,7 @@ When I’m debugging “why did this rebuild?” or “why didn’t this rebuild
 The prebuild guard verifies that generated glue files exist and are fresh relative to their inputs.
 
 - What it checks
-  - Presence: `build-tools/tools/buck/graph.json`, `third_party/providers/auto_map.bzl`, and any `third_party/providers/TARGETS*.auto` files (when patches or lockfiles exist).
+  - Presence: `build-tools/tools/buck/graph.json`, `.viberoots/workspace/providers/auto_map.bzl`, and any `third_party/providers/TARGETS*.auto` files (when patches or lockfiles exist).
   - Freshness: compares newest input (any `TARGETS`, `*.bzl`, `patches/**/*.patch`, or `**/pnpm-lock.yaml`) against the oldest glue output, with an allowed skew.
 
 - Local behavior
@@ -263,7 +263,7 @@ Validate patch filenames and directory shape to prevent cache/key churn and misa
 - Local sequence (not committed): export-graph → sync-providers → gen-auto-map.
   - Run `node build-tools/tools/buck/export-graph.ts --out build-tools/tools/buck/graph.json`
   - Run `node build-tools/tools/buck/sync-providers.ts`
-  - Run `node build-tools/tools/buck/gen-auto-map.ts --graph build-tools/tools/buck/graph.json --out third_party/providers/auto_map.bzl`
+  - Run `node build-tools/tools/buck/gen-auto-map.ts --graph build-tools/tools/buck/graph.json --out .viberoots/workspace/providers/auto_map.bzl`
   - Or run `node build-tools/tools/dev/install-deps.ts` (dev shell) which chains them for you.
 - CI sequence: the same steps as separate stages before build/test.
 

@@ -1,4 +1,4 @@
-load("//build-tools/node:defs.bzl", "node_asset_stage", "node_webapp", "nix_node_test")
+load("@viberoots//build-tools/node:defs.bzl", "node_asset_stage", "node_webapp", "nix_node_test")
 
 node_webapp(
     name = "app_raw",

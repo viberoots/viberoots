@@ -1,7 +1,7 @@
-load("//build-tools/lang:sanitize.bzl", "sanitize_name")
-load("//build-tools/lang:nix_shell.bzl", "nix_bootstrap_env_core", "nix_calling_env_export_source_snapshot", "nix_timeout_wrapper_var")
-load("//build-tools/lang:nix_action_runner.bzl", "nix_action_build_selected_out_path_cmd")
-load("//build-tools/lang:remote_action_policy.bzl", "external_runner_command", "run_nix_action", "stamp_remote_readiness_labels")
+load("@viberoots//build-tools/lang:sanitize.bzl", "sanitize_name")
+load("@viberoots//build-tools/lang:nix_shell.bzl", "nix_bootstrap_env_core", "nix_calling_env_export_source_snapshot", "nix_timeout_wrapper_var")
+load("@viberoots//build-tools/lang:nix_action_runner.bzl", "nix_action_build_selected_out_path_cmd")
+load("@viberoots//build-tools/lang:remote_action_policy.bzl", "external_runner_command", "run_nix_action", "stamp_remote_readiness_labels")
 load("@prelude//:build_mode.bzl", "BuildModeInfo")
 load("@prelude//decls:re_test_common.bzl", "re_test_common")
 load("@prelude//test:inject_test_run_info.bzl", "inject_test_run_info")
@@ -114,10 +114,10 @@ _GO_NIX_TEST_ATTRS = {
         "remote_ready_runner": attrs.option(attrs.source(), default = None),
         "test_rule_timeout_ms": attrs.option(attrs.int(), default = None),
         "_inject_test_env": attrs.default_only(attrs.dep(default = "prelude//test/tools:inject_test_env")),
-        "_build_selected": attrs.source(default = "//build-tools/tools/dev:build-selected.ts"),
+        "_build_selected": attrs.source(default = "@viberoots//build-tools/tools/dev:build-selected.ts"),
         "_graph_json": attrs.source(default = "workspace_buck//:graph.json"),
         "_workspace_root_env": attrs.source(default = "workspace_buck//:workspace-root.env"),
-        "_zx_init": attrs.source(default = "//build-tools/tools/dev:zx-init.mjs"),
+        "_zx_init": attrs.source(default = "@viberoots//build-tools/tools/dev:zx-init.mjs"),
         "override_cgo_enabled": attrs.bool(default = False),
         "asan": attrs.bool(default = False),
         "race": attrs.bool(default = False),

@@ -1,6 +1,6 @@
-load("//build-tools/lang:collections.bzl", "dedupe_preserve")
-load("//build-tools/lang:importer_roots.bzl", "ALLOW_DOT_IMPORTER", "WORKSPACE_IMPORTER_ROOTS")
-load("//build-tools/lang:lockfile_contracts.bzl", "default_lockfile_basename_for_lang")
+load("@viberoots//build-tools/lang:collections.bzl", "dedupe_preserve")
+load("@viberoots//build-tools/lang:importer_roots.bzl", "ALLOW_DOT_IMPORTER", "WORKSPACE_IMPORTER_ROOTS")
+load("@viberoots//build-tools/lang:lockfile_contracts.bzl", "default_lockfile_basename_for_lang")
 
 def extract_lockfile_labels(labels):
     if labels == None:

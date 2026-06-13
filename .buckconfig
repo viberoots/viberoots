@@ -3,6 +3,7 @@ name = TARGETS
 
 [repositories]
 root = .
+viberoots = ./.viberoots/current
 prelude = ./prelude
 toolchains = ./toolchains
 repo_toolchains = ./toolchains
@@ -14,6 +15,7 @@ workspace_buck = ./.viberoots/workspace/buck
 
 [cells]
 root = .
+viberoots = ./.viberoots/current
 prelude = ./prelude
 toolchains = ./toolchains
 repo_toolchains = ./toolchains

@@ -1,4 +1,4 @@
-load("//build-tools/lang:collections.bzl", "dedupe_preserve")
+load("@viberoots//build-tools/lang:collections.bzl", "dedupe_preserve")
 
 _REQUIRED_PREFIX = "node_patch_required:"
 _OPTIONAL_PREFIX = "node_patch_optional:"

@@ -1,6 +1,6 @@
-load("//build-tools/lang:collections.bzl", "dedupe_preserve")
-load("//build-tools/lang:sanitize.bzl", "sanitize_name")
-load("//build-tools/lang:labels_file.bzl", "labels_file")
+load("@viberoots//build-tools/lang:collections.bzl", "dedupe_preserve")
+load("@viberoots//build-tools/lang:sanitize.bzl", "sanitize_name")
+load("@viberoots//build-tools/lang:labels_file.bzl", "labels_file")
 
 PATCH_INPUTS_KEY_PREFIX = "__patch_inputs__"
 PROVIDER_EDGES_KEY_PREFIX = "__provider_edges__"

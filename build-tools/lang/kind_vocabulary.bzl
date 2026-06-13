@@ -6,7 +6,7 @@ This is a shared cross-language contract surface. Keep it in parity with:
 - `build-tools/tools/tests/lang/kind-vocabulary.parity.test.ts`
 """
 
-load("//build-tools/lang:labels_file.bzl", "labels_file")
+load("@viberoots//build-tools/lang:labels_file.bzl", "labels_file")
 
 ALLOWED_KIND_VALUES = [
     "addon",

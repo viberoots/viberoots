@@ -1,5 +1,5 @@
 load(
-    "//build-tools/lang:defs_common.bzl",
+    "@viberoots//build-tools/lang:defs_common.bzl",
     "default_lockfile_label_from_package",
     "default_lockfile_path_from_package",
     "ensure_default_lockfile_exists",

@@ -1,7 +1,7 @@
-load("//build-tools/lang:sanitize.bzl", "sanitize_name")
-load("//build-tools/lang:nix_shell.bzl", "nix_cmd_prefix")
-load("//build-tools/lang:nix_action_runner.bzl", "nix_action_export_graph_cmd", "nix_action_workspace_setup_from_args")
-load("//build-tools/lang:remote_action_policy.bzl", "run_nix_action")
+load("@viberoots//build-tools/lang:sanitize.bzl", "sanitize_name")
+load("@viberoots//build-tools/lang:nix_shell.bzl", "nix_cmd_prefix")
+load("@viberoots//build-tools/lang:nix_action_runner.bzl", "nix_action_export_graph_cmd", "nix_action_workspace_setup_from_args")
+load("@viberoots//build-tools/lang:remote_action_policy.bzl", "run_nix_action")
 
 
 def _cpp_nix_build_impl(ctx):

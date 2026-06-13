@@ -43,7 +43,7 @@ Example call site:
 
 ```python
 # projects/libs/greeter/TARGETS
-load("//build-tools/cpp:defs.bzl", "nix_cpp_library")
+load("@viberoots//build-tools/cpp:defs.bzl", "nix_cpp_library")
 
 nix_cpp_library(
     name = "greeter",
@@ -57,7 +57,7 @@ nix_cpp_library(
 
 ```python
 # projects/apps/demo-cli/TARGETS
-load("//build-tools/go:defs.bzl", "nix_go_binary")
+load("@viberoots//build-tools/go:defs.bzl", "nix_go_binary")
 
 nix_go_binary(
     name = "demo",
@@ -223,7 +223,7 @@ These examples assume the deterministic union rule above:
 
 ```python
 # projects/libs/math/TARGETS
-load("//build-tools/cpp:defs.bzl", "nix_cpp_library")
+load("@viberoots//build-tools/cpp:defs.bzl", "nix_cpp_library")
 
 nix_cpp_library(
     name = "math_core",
@@ -234,7 +234,7 @@ nix_cpp_library(
 
 ```python
 # projects/apps/calc/TARGETS
-load("//build-tools/cpp:defs.bzl", "nix_cpp_binary")
+load("@viberoots//build-tools/cpp:defs.bzl", "nix_cpp_binary")
 
 nix_cpp_binary(
     name = "calc",
@@ -248,7 +248,7 @@ nix_cpp_binary(
 
 ```python
 # projects/libs/support/TARGETS
-load("//build-tools/cpp:defs.bzl", "nix_cpp_library")
+load("@viberoots//build-tools/cpp:defs.bzl", "nix_cpp_library")
 
 nix_cpp_library(
     name = "support",
@@ -259,7 +259,7 @@ nix_cpp_library(
 
 ```python
 # projects/libs/math/TARGETS
-load("//build-tools/cpp:defs.bzl", "nix_cpp_library")
+load("@viberoots//build-tools/cpp:defs.bzl", "nix_cpp_library")
 
 nix_cpp_library(
     name = "math_core",
@@ -275,7 +275,7 @@ nix_cpp_library(
 
 ```python
 # projects/apps/calc/TARGETS
-load("//build-tools/cpp:defs.bzl", "nix_cpp_binary")
+load("@viberoots//build-tools/cpp:defs.bzl", "nix_cpp_binary")
 
 nix_cpp_binary(
     name = "calc",
@@ -289,7 +289,7 @@ nix_cpp_binary(
 
 ```python
 # projects/libs/api-headers/TARGETS
-load("//build-tools/cpp:defs.bzl", "nix_cpp_headers")
+load("@viberoots//build-tools/cpp:defs.bzl", "nix_cpp_headers")
 
 nix_cpp_headers(
     name = "api_headers",
@@ -300,7 +300,7 @@ nix_cpp_headers(
 
 ```python
 # projects/apps/uses-headers/TARGETS
-load("//build-tools/cpp:defs.bzl", "nix_cpp_binary")
+load("@viberoots//build-tools/cpp:defs.bzl", "nix_cpp_binary")
 
 nix_cpp_binary(
     name = "uses_headers",
@@ -315,7 +315,7 @@ Example shape: declare function prototypes yourself (C ABI) or only use opaque h
 
 ```python
 # projects/apps/link-only/TARGETS
-load("//build-tools/cpp:defs.bzl", "nix_cpp_binary")
+load("@viberoots//build-tools/cpp:defs.bzl", "nix_cpp_binary")
 
 nix_cpp_binary(
     name = "link_only",
@@ -328,7 +328,7 @@ nix_cpp_binary(
 
 ```python
 # projects/libs/addon-native/TARGETS
-load("//build-tools/cpp:defs.bzl", "nix_cpp_node_addon")
+load("@viberoots//build-tools/cpp:defs.bzl", "nix_cpp_node_addon")
 
 nix_cpp_node_addon(
     name = "napi_addon",
@@ -347,7 +347,7 @@ nix_cpp_node_addon(
 
 ```python
 # projects/libs/math/TARGETS
-load("//build-tools/cpp:defs.bzl", "nix_cpp_test")
+load("@viberoots//build-tools/cpp:defs.bzl", "nix_cpp_test")
 
 nix_cpp_test(
     name = "math_gtest",
@@ -367,7 +367,7 @@ and that runtime loading is handled (rpath or packaging) as described later in t
 
 ```python
 # projects/libs/runtime/TARGETS
-load("//build-tools/cpp:defs.bzl", "nix_cpp_shared_library")
+load("@viberoots//build-tools/cpp:defs.bzl", "nix_cpp_shared_library")
 
 nix_cpp_shared_library(
     name = "runtime",
@@ -378,7 +378,7 @@ nix_cpp_shared_library(
 
 ```python
 # projects/apps/uses-shared/TARGETS
-load("//build-tools/cpp:defs.bzl", "nix_cpp_binary")
+load("@viberoots//build-tools/cpp:defs.bzl", "nix_cpp_binary")
 
 nix_cpp_binary(
     name = "uses_shared",
@@ -395,7 +395,7 @@ can resolve shared libs without `DYLD_LIBRARY_PATH`/`LD_LIBRARY_PATH`.
 
 ```python
 # projects/libs/runtime/TARGETS
-load("//build-tools/cpp:defs.bzl", "nix_cpp_library")
+load("@viberoots//build-tools/cpp:defs.bzl", "nix_cpp_library")
 
 nix_cpp_library(
     name = "runtime",
@@ -407,7 +407,7 @@ nix_cpp_library(
 
 ```python
 # projects/libs/addon-native/TARGETS
-load("//build-tools/cpp:defs.bzl", "nix_cpp_node_addon")
+load("@viberoots//build-tools/cpp:defs.bzl", "nix_cpp_node_addon")
 
 nix_cpp_node_addon(
     name = "napi_addon",
@@ -553,7 +553,7 @@ Constraints:
 Example call site:
 
 ```python
-load("//build-tools/cpp:defs.bzl", "nix_cpp_binary")
+load("@viberoots//build-tools/cpp:defs.bzl", "nix_cpp_binary")
 
 nix_cpp_binary(
     name = "app",

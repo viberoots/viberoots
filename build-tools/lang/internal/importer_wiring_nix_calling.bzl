@@ -1,9 +1,9 @@
 load(
-    "//build-tools/lang/internal:importer_wiring.bzl",
+    "@viberoots//build-tools/lang/internal:importer_wiring.bzl",
     "prepare_importer_non_genrule_wiring",
 )
-load("//build-tools/lang:nix_calling_macros.bzl", "wire_global_nix_inputs")
-load("//build-tools/lang:dict_inputs.bzl", "GLOBAL_NIX_INPUTS_KEY_PREFIX", "PATCH_INPUTS_KEY_PREFIX", "PROVIDER_EDGES_KEY_PREFIX")
+load("@viberoots//build-tools/lang:nix_calling_macros.bzl", "wire_global_nix_inputs")
+load("@viberoots//build-tools/lang:dict_inputs.bzl", "GLOBAL_NIX_INPUTS_KEY_PREFIX", "PATCH_INPUTS_KEY_PREFIX", "PROVIDER_EDGES_KEY_PREFIX")
 
 def prepare_importer_non_genrule_nix_calling_wiring(
         name,

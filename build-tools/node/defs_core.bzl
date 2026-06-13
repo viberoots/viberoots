@@ -1,26 +1,26 @@
 load("@prelude//:rules.bzl", "genrule")
 load(
-    "//build-tools/lang:defs_common.bzl",
+    "@viberoots//build-tools/lang:defs_common.bzl",
     "default_lockfile_label_from_package",
     "default_lockfile_path_from_package",
     "ensure_default_lockfile_exists",
     "extract_lockfile_labels",
     "prepare_language_wiring",
 )
-load("//build-tools/node/private:patch_requirements.bzl", "apply_node_patch_requirement_labels")
-load("//build-tools/lang:remote_action_policy.bzl", "stamp_local_only_genrule_labels")
+load("@viberoots//build-tools/node/private:patch_requirements.bzl", "apply_node_patch_requirement_labels")
+load("@viberoots//build-tools/lang:remote_action_policy.bzl", "stamp_local_only_genrule_labels")
 load(
-    "//build-tools/lang:nix_shell.bzl",
+    "@viberoots//build-tools/lang:nix_shell.bzl",
     "nix_build_out_path_cmd",
     "nix_calling_env_export_buck_graph_json",
     "nix_calling_genrule_bootstrap",
     "nix_calling_node_patch_requirements_preflight",
 )
-load("//build-tools/node/private:nix_test.bzl", "node_nix_test")
+load("@viberoots//build-tools/node/private:nix_test.bzl", "node_nix_test")
 
 # NOTE: Prebuild guard ensures this load is valid before builds/tests run.
 MODULE_PROVIDERS = {}
-load("//build-tools/lang:auto_map.bzl", "MODULE_PROVIDERS")
+load("@workspace_providers//:auto_map.bzl", "MODULE_PROVIDERS")
 
 def nix_node_gen(name, srcs = [], out = None, cmd = None, deps = [], labels = [], lockfile_label = None, patch_options = None, kind = "gen", planner_only = False, **kwargs):
     if (lockfile_label == None or lockfile_label == "") and len(extract_lockfile_labels(labels or [])) == 0:

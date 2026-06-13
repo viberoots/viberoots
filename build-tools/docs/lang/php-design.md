@@ -37,7 +37,7 @@ If the language can support C interop, I must provide a documented and tested pa
 Use the canonical helper surface from `//build-tools/lang:defs_common.bzl` and `//build-tools/lang:language_wiring.bzl`. Macro call sites should not re‑implement wiring or load provider maps directly.
 
 - Preferred macro entrypoint: `prepare_language_wiring(...)` (non‑mutating), with `wiring=` for `genrule`, `nix_calling_genrule`, `non_genrule`, or `srcsless_rule`.
-- Provider wiring: load `MODULE_PROVIDERS` from `//build-tools/lang:auto_map.bzl` and use `providers_for`/`realize_provider_edges` for deterministic provider edges.
+- Provider wiring: load `MODULE_PROVIDERS` from `@workspace_providers//:auto_map.bzl` and use `providers_for`/`realize_provider_edges` for deterministic provider edges.
 - Lockfile labels (importer‑scoped languages): `lockfile:<path>#<importer>` with supported importer roots `.` and `projects/apps/*`/`projects/libs/*`; importer‑scoped macros must live in the importer package so importer‑local patch globs are valid action inputs.
 - Patch model contract: `build-tools/lang/lang_contracts.bzl` and `build-tools/tools/lib/lang-contracts.ts` define `patch_scope:*` stamping and whether glue runs on patch apply/remove.
 - Global Nix inputs: for Nix‑calling macros, use `wire_global_nix_inputs(...)` so `global_nix_inputs()` are real action inputs; labels are observability only.
@@ -68,7 +68,7 @@ policy enforcement current:
 
 - Patches: `patches/php/*.patch` (flat; one patch per `package@version`).
 - Nix templates: `build-tools/tools/nix/templates/php.nix` imported by `build-tools/tools/nix/lang-templates.nix`.
-- Macros: `php/defs.bzl` using `build-tools/lang/defs_common.bzl` helpers and `//build-tools/lang:auto_map.bzl`.
+- Macros: `php/defs.bzl` using `build-tools/lang/defs_common.bzl` helpers and `@workspace_providers//:auto_map.bzl`.
 - Providers: generated files under `third_party/providers/` (e.g., `TARGETS.php.auto`).
 - Glue scripts: zx TypeScript under `build-tools/tools/buck/**`, `build-tools/tools/patch/**`.
 
@@ -223,7 +223,7 @@ Behavior:
 
 - Stamp `lang:php` and `kind:<lib|bin|test>` labels.
 - Require/derive one lockfile label `lockfile:<path>#<importer>`.
-- Append providers from `//build-tools/lang:auto_map.bzl` by key `"//pkg:name"`.
+- Append providers from `@workspace_providers//:auto_map.bzl` by key `"//pkg:name"`.
 
 Example TARGETS entries:
 
@@ -276,7 +276,7 @@ Source resolution for `start`:
 Post-apply glue (same turn):
 
 - `node build-tools/tools/buck/sync-providers-php.ts`
-- `node build-tools/tools/buck/gen-auto-map.ts --graph build-tools/tools/buck/graph.json --out third_party/providers/auto_map.bzl`
+- `node build-tools/tools/buck/gen-auto-map.ts --graph build-tools/tools/buck/graph.json --out .viberoots/workspace/providers/auto_map.bzl`
 
 ### Exporter Adapter (optional initial phase)
 

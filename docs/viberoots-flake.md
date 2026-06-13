@@ -427,7 +427,7 @@ load("//third_party/providers:auto_map.bzl", "PROVIDER_MAP")
 Inside the viberoots cell, self-loads should become explicit cell-local loads:
 
 ```python
-load("@viberoots//build-tools/lang:auto_map.bzl", "MODULE_PROVIDERS")
+load("@viberoots//build-tools/lang:defs_common.bzl", "prepare_language_wiring")
 ```
 
 Project-generated providers are different. They must resolve from the workspace-owned provider

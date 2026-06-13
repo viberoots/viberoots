@@ -28,7 +28,7 @@ Implementation detail: the helper-target synthesis lives in `build-tools/go/priv
 
 ```python
 # projects/libs/greeter/TARGETS
-load("//build-tools/cpp:defs.bzl", "nix_cpp_library")
+load("@viberoots//build-tools/cpp:defs.bzl", "nix_cpp_library")
 
 nix_cpp_library(
     name = "greeter",
@@ -42,7 +42,7 @@ nix_cpp_library(
 
 ```python
 # projects/apps/demo-cli/TARGETS
-load("//build-tools/go:defs.bzl", "nix_go_binary")
+load("@viberoots//build-tools/go:defs.bzl", "nix_go_binary")
 
 nix_go_binary(
     name = "demo",
@@ -74,7 +74,7 @@ Implementation notes
     No TARGETS edits are required when adding/removing C sources.
 - Implementation detail: the CGO decision and toolchain defaults are centralized in `build-tools/go/private/cgo_wiring.bzl`, shared by `nix_go_library`, `nix_go_binary`, and `nix_go_test`.
 - Implementation detail: shared behavior for `nix_cpp_library`, `nix_cpp_binary`, and `nix_cpp_node_addon` is centralized in `_cpp_common` in `build-tools/cpp/defs.bzl`. Public macro surfaces are unchanged; wasm macros stay separate.
-- Macro wiring note: macro implementations should route through the shared wiring surface (`prepare_language_wiring(...)`) and load provider mappings via `//build-tools/lang:auto_map.bzl` rather than `//third_party/providers/auto_map.bzl`.
+- Macro wiring note: macro implementations should route through the shared wiring surface (`prepare_language_wiring(...)`) and load provider mappings via `@workspace_providers//:auto_map.bzl` rather than `//.viberoots/workspace/providers/auto_map.bzl`.
 - The Go Nix templates set `CGO_ENABLED=1` only for those targets and ensure CC/CXX/AR come from Nix.
 - If `pkg-config` metadata is missing, templates synthesize `CGO_CFLAGS`/`CGO_LDFLAGS` from provided packages.
 - Planner wiring passes nixpkgs attributes and in-repo C/C++ libs so builds are hermetic and deterministic.
@@ -89,7 +89,7 @@ To call Go from C/C++, build your Go package as a c-archive and link it into a C
 
 ```python
 # projects/libs/greetgo/TARGETS
-load("//build-tools/go:defs.bzl", "nix_go_carchive")
+load("@viberoots//build-tools/go:defs.bzl", "nix_go_carchive")
 
 nix_go_carchive(
     name = "greetgo",
@@ -116,7 +116,7 @@ func GoGreet() *C.char { return C.CString("hello from go") }
 
 ```python
 # projects/apps/caller/TARGETS
-load("//build-tools/cpp:defs.bzl", "nix_cpp_binary")
+load("@viberoots//build-tools/cpp:defs.bzl", "nix_cpp_binary")
 
 nix_cpp_binary(
     name = "caller",

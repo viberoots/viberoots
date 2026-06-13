@@ -55,6 +55,8 @@ export async function ensureBuckPreludeConfig(root: string): Promise<void> {
 
     await $({ cwd: root })`bash --noprofile --norc -c ${`set -euo pipefail
       printf '.\n' > .buckroot
+      mkdir -p .viberoots
+      [ -e .viberoots/current ] || ln -s .. .viberoots/current
       rm -rf prelude && ln -s "${preludePath}" prelude
       cat > .buckconfig <<'EOF'
 [buildfile]
@@ -62,6 +64,7 @@ name = TARGETS
 
 [repositories]
 root = .
+viberoots = ./.viberoots/current
 prelude = ./prelude
 toolchains = ./toolchains
 repo_toolchains = ./toolchains
@@ -71,6 +74,7 @@ config = ./prelude
 
 [cells]
 root = .
+viberoots = ./.viberoots/current
 prelude = ./prelude
 toolchains = ./toolchains
 repo_toolchains = ./toolchains

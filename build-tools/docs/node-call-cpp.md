@@ -117,7 +117,7 @@ Rationale: separating Node and C++ into sibling packages preserves clear boundar
 
 ### New macro: `nix_cpp_node_addon`
 
-Add a small macro in `//build-tools/cpp:defs.bzl`:
+Add a small macro in `@viberoots//build-tools/cpp:defs.bzl`:
 
 - Signature sketch: `nix_cpp_node_addon(name, srcs = [], headers = [], addon_name = None, local_patch_dirs = ["patches/cpp"], nixpkg_deps = [], labels = [], ...)`
 - Behavior:
@@ -175,7 +175,7 @@ No new glue stages are required; prebuild guard continues to check for graph and
 Phase 0 — Nix + macro substrate
 
 - Add `build-tools/tools/nix/templates/cpp-node-addon.nix` that produces a `.node` shared library for macOS and Linux given a set of sources/headers and an `addon_name`.
-- Extend `//build-tools/cpp/private:nix_build.bzl` and/or add `nix_cpp_node_addon` in `//build-tools/cpp:defs.bzl` selecting the addon template.
+- Extend `//build-tools/cpp/private:nix_build.bzl` and/or add `nix_cpp_node_addon` in `@viberoots//build-tools/cpp:defs.bzl` selecting the addon template.
 - Acceptance:
   - A tiny hand-built sample addon compiles via `buck2 build` and produces `*.node` on Darwin/Linux (CI matrix).
 

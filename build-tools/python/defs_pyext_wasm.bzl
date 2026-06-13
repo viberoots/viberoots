@@ -1,12 +1,12 @@
 load(
-    "//build-tools/lang:defs_common.bzl",
+    "@viberoots//build-tools/lang:defs_common.bzl",
     "merge_link_intent_deps",
     "prepare_language_wiring",
     "validate_link_closure_overrides",
 )
-load("//build-tools/lang:auto_map.bzl", "MODULE_PROVIDERS")
-load("//build-tools/python:defs_lockfile.bzl", "apply_default_lockfile_label")
-load("//build-tools/python/private:nix_build.bzl", "python_nix_pyext_build")
+load("@workspace_providers//:auto_map.bzl", "MODULE_PROVIDERS")
+load("@viberoots//build-tools/python:defs_lockfile.bzl", "apply_default_lockfile_label")
+load("@viberoots//build-tools/python/private:nix_build.bzl", "python_nix_pyext_build")
 
 _BACKEND_LABELS = ["backend:wasi", "backend:pyodide"]
 

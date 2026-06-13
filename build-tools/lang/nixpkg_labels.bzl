@@ -1,5 +1,5 @@
-load("//build-tools/lang:collections.bzl", "dedupe_preserve")
-load("//build-tools/lang:nix_attr_aliases.bzl", "NIX_ATTR_ALIASES")
+load("@viberoots//build-tools/lang:collections.bzl", "dedupe_preserve")
+load("@viberoots//build-tools/lang:nix_attr_aliases.bzl", "NIX_ATTR_ALIASES")
 
 def normalize_nix_attr(attr):
     if not isinstance(attr, str):
