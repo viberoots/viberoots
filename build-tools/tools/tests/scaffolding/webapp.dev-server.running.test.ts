@@ -2,13 +2,13 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { once } from "node:events";
-import * as fsp from "node:fs/promises";
 import http from "node:http";
 import net from "node:net";
 import path from "node:path";
 import { after, test } from "node:test";
 import { setTimeout as sleep } from "node:timers/promises";
 import { runInTemp } from "../lib/test-helpers";
+import { ensureNodeModulesForDevApp } from "./lib/dev-node-modules";
 
 const TEST_TIMEOUT_MS =
   Number(process.env.TEST_NIX_TIMEOUT_SECS || process.env.VERIFY_TIMEOUT_SECS || "1200") * 1000;
@@ -49,56 +49,13 @@ test("node webapp: dev server runs and serves index", { timeout: TEST_TIMEOUT_MS
     let chosenPort: number | undefined;
 
     await _$`scaf new ts webapp-static ${name} --yes --skip-lockfile-gen`;
-    // runInTemp initializes a git repo; stage generated files so Nix git-flake evaluation sees them.
-    try {
-      await _$({ cwd: tmp, stdio: "pipe" })`git add -A ${appDir}`;
-    } catch {}
-    // Ensure any pre-existing symlinked node_modules in the importer is removed
-    try {
-      const nmPath = path.join(appAbs, "node_modules");
-      const st = await fsp.lstat(nmPath);
-      if (st.isSymbolicLink()) {
-        await fsp.unlink(nmPath);
-      }
-    } catch {}
-    // Do not perform online pnpm install here. Rely on Nix FOD with
-    // NIX_PNPM_ALLOW_GENERATE=1 to generate or use/export a lockfile hermetically.
-    const outPathRaw = await _$({
-      cwd: appAbs,
-      stdio: "pipe",
-    })`zx-wrapper ../../../build-tools/tools/dev/node-modules-build.ts`;
-    try {
-      await _$({ cwd: tmp, stdio: "pipe" })`git add -A ${appDir}`;
-    } catch {}
-    const outPath = String(outPathRaw.stdout || "").trim();
-    if (!outPath) throw new Error("failed to resolve node_modules derivation path");
-    await _$({
-      cwd: appAbs,
-      stdio: "inherit",
-    })`rm -rf node_modules && ln -s ${outPath}/node_modules node_modules`;
-
-    // Avoid duplicate node_modules rebuilds; one derivation link is sufficient for the dev server
-
-    // Restore node_modules-based vite path
-    // Resolve esbuild native binary path (postinstall scripts are disabled in Nix build)
-    const esPkg = (() => {
-      const plat = process.platform;
-      const arch = process.arch;
-      if (plat === "darwin")
-        return arch === "arm64" ? "@esbuild/darwin-arm64" : "@esbuild/darwin-x64";
-      if (plat === "linux") return arch === "arm64" ? "@esbuild/linux-arm64" : "@esbuild/linux-x64";
-      if (plat === "win32") return arch === "arm64" ? "@esbuild/win32-arm64" : "@esbuild/win32-x64";
-      return "";
-    })();
-    const esbuildBin = esPkg
-      ? path.join(
-          appAbs,
-          "node_modules",
-          esPkg,
-          "bin",
-          process.platform === "win32" ? "esbuild.exe" : "esbuild",
-        )
-      : "";
+    const { esbuildBin } = await ensureNodeModulesForDevApp({
+      tmp,
+      appAbs,
+      appRel: appDir,
+      $: _$,
+      _$,
+    });
 
     // Smoke-check vite can execute and report a version (fast failure if resolution is broken)
     try {

@@ -35,9 +35,9 @@ export async function prewarmUnifiedPnpmStore(opts: {
   } catch (e: any) {
     const msg = e?.message ? String(e.message) : String(e);
     const lockPath = path.join(opts.repoRoot, "buck-out", ".unified-pnpm-store", "require.lock");
-    console.warn(
+    throw new Error(
       [
-        `[install-deps] unified pnpm prewarm skipped: ${msg}`,
+        `[install-deps] unified pnpm prewarm failed: ${msg}`,
         "[install-deps] To recover:",
         `  1) remove stale lock if present: rm -f "${lockPath}"`,
         "  2) rerun: i",

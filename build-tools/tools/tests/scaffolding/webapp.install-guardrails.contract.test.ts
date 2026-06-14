@@ -81,6 +81,15 @@ const LIGHTWEIGHT_LOCAL_RUNTIME_EXPECTATIONS: InstallGuardrailExpectation[] = [
 
 const HEAVY_RUNTIME_EXPECTATIONS: InstallGuardrailExpectation[] = [
   {
+    file: "build-tools/tools/tests/scaffolding/webapp.dev-server.running.test.ts",
+    required: [
+      "--skip-lockfile-gen",
+      'import { ensureNodeModulesForDevApp } from "./lib/dev-node-modules";',
+      "ensureNodeModulesForDevApp({",
+    ],
+    forbidden: ["--frozen-lockfile"],
+  },
+  {
     file: "build-tools/tools/tests/scaffolding/webapp-ssr-vite.dev-reload.wasm-producer.test.ts",
     required: [
       "--skip-lockfile-gen",

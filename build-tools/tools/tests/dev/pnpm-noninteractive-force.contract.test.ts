@@ -57,8 +57,18 @@ const EXPECTATIONS: Array<{
   {
     path: "build-tools/tools/nix/node-modules/store.nix",
     fragments: [
-      "pnpm install --force --frozen-lockfile --ignore-scripts --prod=false",
-      "mkPnpmStoreUnfixed: pnpm install --force --frozen-lockfile",
+      "pnpm install --offline --force --frozen-lockfile --ignore-scripts --prod=false",
+      "mkPnpmStoreUnfixed: pnpm install (offline exact-store)",
+      "Run 'i' to refresh pnpm hashes and prewarm exact pnpm stores.",
+    ],
+    checks: [
+      (source, file) => {
+        assert.doesNotMatch(
+          source,
+          /pnpm install --force --frozen-lockfile/,
+          `${file} locked pnpm install paths must be offline-only`,
+        );
+      },
     ],
   },
 ];

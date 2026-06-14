@@ -31,6 +31,16 @@ Non-goals:
 - no hidden copy of viberoots for local submodule mode; local mode must use the live checkout
 - no provider dependency on Buck for installing command-line tools
 - no external project template before the in-repo dogfood workspace passes its de-risking gates
+- no compatibility shims, legacy migration paths, or support for the pre-split monorepo
+  build-system layout after the viberoots split. There are no external users yet, so PRs 8-10
+  should make the repository clean before users exist rather than preserving old root-cell paths.
+- This does not remove supported viberoots source modes. The clean design must keep supporting a
+  local top-level `viberoots/` directory, `viberoots/` as a Git submodule, and a remote
+  flake/source-store viberoots source for external consumers.
+- The unsupported legacy layout is root `build-tools/`, root `prelude/`, root `toolchains/`, root
+  `third_party/providers/`, `//build-tools` loads, `//third_party/providers` labels, shims that
+  forward old paths or labels to the new cells, and provider generation that writes both old and new
+  provider locations.
 
 Turbo-mode policy for this plan:
 
@@ -58,10 +68,17 @@ Turbo-mode policy for this plan:
   a direct assertion of the same contract. Fixture drift should be fixed by making the fixture match
   the current intended workspace shape, not by dropping the behavior under test.
 - From PR-7 onward, temporary repos used in tests should mirror the target workspace shape unless a
-  test is explicitly about a legacy migration path: root-level product code under `projects/`, a
+  test is explicitly about invalid legacy input: root-level product code under `projects/`, a
   root-level `viberoots/` source checkout or fixture, `.viberoots/current` pointing at
   `../viberoots` for local-mode temp repos where root layout matters, and generated Buck/provider
   state under `.viberoots/workspace/**`.
+- After the extraction boundary, active project/root Buck loads must use
+  `@viberoots//build-tools/...`; generated providers must live only under
+  `.viberoots/workspace/providers` and be addressed as `workspace_providers//...`; generated Buck
+  state under `.viberoots/workspace/buck` is part of the clean external workspace contract.
+- Root `build-tools/`, root `third_party/providers/`, and root `prelude/` or `toolchains/`
+  compatibility surfaces must not remain after the extraction boundary unless they are test-only
+  fixtures explicitly modeling invalid legacy input.
 
 De-risking checkpoints:
 
@@ -93,10 +110,11 @@ Turbo validation cadence:
   Review touched temp-repo fixtures for current workspace shape and assertion strength before
   closing the checkpoint.
 - PR-8: focused root-flake and status validation.
-- PR-9 / Checkpoint D: mandatory full `i && b && ALL_TESTS=1 v` because physical extraction and
-  submodule setup are high risk. Include a fixture-shape review proving temp repos use top-level
-  `projects/`, top-level `viberoots/`, and the same `.viberoots/current -> ../viberoots` local-mode
-  contract expected from consuming workspaces.
+- PR-9 / Checkpoint D: mandatory full `i && b && ALL_TESTS=1 v` because physical extraction,
+  submodule setup, and hard legacy cleanup are high risk. Include a fixture-shape review proving
+  temp repos use top-level `projects/`, top-level `viberoots/`, the same
+  `.viberoots/current -> ../viberoots` local-mode contract expected from consuming workspaces, and
+  no active old-layout root compatibility surfaces.
 - PR-10 / Final checkpoint: targeted remote-fixture validation, targeted reruns for touched
   subsystems, integration debt review, and plan assessment. Run a third full suite only if PR-10
   changes shared Buck/Nix/build logic beyond the fixture/template surface.
@@ -108,7 +126,8 @@ Combined PR decisions:
 - PR-3 combines activation and `.viberoots/current` handling because Buck cell paths are not useful
   without a deterministic activation path.
 - PR-4 combines provider relocation and generated Buck-state relocation because both are
-  workspace-generated state moves and share migration/compatibility logic.
+  workspace-generated state moves. Any temporary dual-read behavior introduced before extraction is
+  a PR-9 cleanup blocker, not a supported migration contract.
 - PR-6 combines `mkWorkspace` and version metadata because remote/local version reporting depends on
   the flake API shape.
 - PR-10 combines remote fixture, release pinning, and final reconciliation because the remote
@@ -367,12 +386,13 @@ Move generated provider and Buck workspace state out of top-level `third_party/p
 - Update provider generation scripts to emit labels like:
   - `workspace_providers//:nix_pkgs_googletest`
   - `workspace_providers//:lf_<hash>_<importer>`
-- Update provider edge helpers and graph utilities to recognize both old and new provider labels
-  during migration.
+- Update provider edge helpers and graph utilities for the `workspace_providers` labels.
 - Move workspace-generated Buck state such as graph exports, node lock indexes, invalidation
   reports, and workspace-root env files to `.viberoots/workspace/buck/` or another reviewed
   workspace-owned path.
-- Provide temporary compatibility shims or dual-read behavior for old paths if needed.
+- Do not add new provider generation that writes both old and new provider locations. Any remaining
+  old-path reads are temporary implementation debt that PR-9 must delete or confine to invalid
+  legacy-input tests.
 
 ### 3. External prerequisites
 
@@ -381,7 +401,7 @@ Move generated provider and Buck workspace state out of top-level `third_party/p
 ### 4. Tests to be added
 
 - Provider generation tests for Node, Python, C++, and any active generated provider families.
-- Graph utility tests for old and new labels during migration.
+- Graph utility tests for `workspace_providers` labels.
 - Prebuild guard tests using `.viberoots/workspace/providers`.
 - Tests proving generated provider state never writes inside `viberoots/`.
 
@@ -404,11 +424,11 @@ Move generated provider and Buck workspace state out of top-level `third_party/p
 ### 7. Risks
 
 - Provider label changes can break graph invalidation, planner filtering, or macro wiring.
-- Some docs/tests may assert exact `//third_party/providers` labels.
+- Some docs/tests may still assert exact `//third_party/providers` labels.
 
 ### 8. Mitigations
 
-- Keep a temporary compatibility window with old label recognition.
+- Track any remaining old label recognition as a PR-9 blocker, not a long-term migration path.
 - Run checkpoint B after this PR with focused language/provider validation and one full validation
   milestone if the PR touches shared graph logic broadly.
 
@@ -421,12 +441,13 @@ unclean.
 
 It changes many generated paths and labels at once, increasing migration risk.
 
-## PR-5: Buck cell load conversion and root shims
+## PR-5: Buck cell load conversion and temporary root shims
 
 ### 1. Intent
 
 Make viberoots-owned Starlark loadable from the `viberoots` cell while keeping project builds
-working during migration.
+working during the pre-extraction dogfood phase. Any root shims left after this PR are temporary
+and must be removed by PR-9.
 
 ### 2. Scope of changes
 
@@ -434,7 +455,7 @@ working during migration.
   `@viberoots//build-tools/...`.
 - Update viberoots-owned provider-map loads to use `@workspace_providers//:auto_map.bzl`.
 - Add temporary root forwarding shims only where needed for project `TARGETS` or templates not yet
-  converted.
+  converted, with explicit PR-9 deletion ownership.
 - Update project targets and scaffolding templates that can safely switch to public
   `@viberoots//...` loads in this PR.
 - Preserve named `prelude`, `toolchains`, `repo_toolchains`, `config`, `fbsource`, and `fbcode`
@@ -465,7 +486,7 @@ working during migration.
 
 - `buck2 targets viberoots//build-tools/...` works.
 - `buck2 targets //projects/...` works.
-- Root shims are documented and have removal criteria.
+- Root shims are documented as temporary and have PR-9 removal criteria.
 
 ### 7. Risks
 
@@ -475,7 +496,7 @@ working during migration.
 ### 8. Mitigations
 
 - Add lint checks that distinguish `.bzl` `@cell//...` loads from target `cell//...` labels.
-- Track shim references and remove them in a later cleanup PR.
+- Track shim references and remove them at the PR-9 extraction boundary.
 
 ### 9. Consequences of not implementing this PR
 
@@ -560,7 +581,8 @@ viberoots into a separate repository.
   dogfood.
 - Update `.buckconfig` to use `.viberoots/current` for `viberoots`, `prelude`, `toolchains`,
   `repo_toolchains`, `config`, `fbsource`, and `fbcode`.
-- Keep root compatibility shims for any remaining root `//build-tools` loads.
+- Keep only the temporary root compatibility shims needed to finish the PR-7 dogfood checkpoint;
+  remaining root `//build-tools` loads are blockers for PR-9, not supported migration debt.
 - Verify `workspace_providers` is active.
 - Ensure local viberoots edits are visible immediately to Buck/Nix workflows.
 
@@ -585,8 +607,9 @@ viberoots into a separate repository.
 Checkpoint C targeted results for PR-7:
 
 - `.viberoots/current` is configured as the in-repo dogfood source (`..` from `.viberoots/`).
-- Buck parses `//projects/...`, the active `workspace_providers` cell, and remaining root
-  `//build-tools` compatibility packages through the `.viberoots/current` cell layout.
+- Buck parses `//projects/...`, the active `workspace_providers` cell, and any temporary remaining
+  root `//build-tools` compatibility packages through the `.viberoots/current` cell layout. Those
+  packages are not part of the final split contract and must be gone by PR-9.
 - Provider generation/consumption, local live-edit visibility through `.viberoots/current`, Nix
   devshell tool availability, scaffolding/provider tests, and representative `projects/` builds
   passed in the PR-7 targeted evidence listed in the integration debt ledger.
@@ -722,12 +745,20 @@ using the local source.
 ### 2. Scope of changes
 
 - Replace root flake internals with:
-  - `inputs.viberoots.url = "path:./viberoots"` or the transitional local equivalent;
+  - `inputs.viberoots.url = "path:./viberoots"` for local dogfood mode;
   - `inputs.viberoots.lib.mkWorkspace { workspaceSrc = ./.; ... }`.
 - Ensure `nix develop` runs activation or validates activation state.
 - Ensure `viberoots version` reports local source mode, live checkout path, revision, and dirty
   state.
 - Add CI validation that local dogfood mode uses the local path input and live `.viberoots/current`.
+- Add strict startup/status checks that report old-layout paths as PR-9 blockers before extraction:
+  - root `build-tools/`;
+  - root `third_party/providers/`;
+  - root `prelude/`;
+  - root `toolchains/`;
+  - active `//build-tools` loads;
+  - active `//third_party/providers` labels.
+- Ensure root flake delegation to the local viberoots source does not introduce compatibility shims.
 
 ### 3. External prerequisites
 
@@ -740,6 +771,10 @@ using the local source.
 - Nix eval/build tests for root flake delegation.
 - `nix develop` smoke test or equivalent devshell evaluation.
 - Version/status tests for local mode.
+- Status/startup tests proving old-layout root paths, `//build-tools` loads, and
+  `//third_party/providers` labels are reported as PR-9 blockers before extraction.
+- Tests proving root flake delegation uses the local `path:./viberoots` viberoots source without
+  creating root-cell compatibility shims.
 
 ### 5. Docs to be added or updated
 
@@ -755,6 +790,8 @@ using the local source.
 - Root `nix develop` still provides all tools.
 - Root flake delegates to viberoots.
 - Local source mode uses live local source.
+- Startup/status checks are strict for the unsupported pre-split monorepo layout.
+- Root flake delegation uses local `viberoots/` and leaves no new compatibility shim surface.
 
 ### 7. Risks
 
@@ -799,6 +836,19 @@ workspace as a submodule.
   - `.viberoots/workspace/**`
   - project docs/config
 - Ensure `.viberoots/current -> ../viberoots`.
+- Delete or prove nonexistence of root compatibility surfaces:
+  - root `build-tools/`;
+  - root `third_party/providers/`;
+  - root `prelude/`;
+  - root `toolchains/`;
+  - forwarding packages for `//build-tools` loads;
+  - forwarding packages or generated outputs for `//third_party/providers`.
+- Enforce that active Buck files, templates, and generated outputs do not use
+  `load("//build-tools...")` or `//third_party/providers`.
+- Replace any root `prelude` validation with `.viberoots/current/prelude` validation.
+- Add startup/status diagnostics for missing `viberoots/` submodule, uninitialized submodule, dirty
+  submodule, checked-out submodule not matching the parent gitlink, root `flake.lock` not aligned
+  with `path:./viberoots`, and stale or wrong `.viberoots/current`.
 
 ### 3. External prerequisites
 
@@ -812,6 +862,14 @@ workspace as a submodule.
 - Live-edit test proving a change inside `viberoots/` affects project workflows immediately after
   normal Buck/Nix cache invalidation.
 - Root `nix develop` and representative Buck/project validation.
+- Enforcement tests proving active Buck files, templates, and generated outputs do not contain
+  `load("//build-tools...")` or `//third_party/providers`.
+- Startup/status diagnostic tests for missing, uninitialized, dirty, or gitlink-mismatched
+  submodules; misaligned root `flake.lock`; and stale or wrong `.viberoots/current`.
+- Tests proving root prelude/toolchain paths are reached through `.viberoots/current`, not root
+  `prelude/` or `toolchains/` compatibility directories.
+- Tests proving root compatibility surfaces are absent except for test fixtures that explicitly
+  model invalid legacy input.
 
 ### 5. Docs to be added or updated
 
@@ -829,6 +887,13 @@ workspace as a submodule.
 - Parent workspace no longer tracks viberoots-owned implementation files outside the submodule.
 - CI initializes submodules before validation.
 - Root workflows still pass.
+- Active project/root Buck loads use `@viberoots//build-tools/...`.
+- Generated providers live only under `.viberoots/workspace/providers` and are addressed as
+  `workspace_providers//...`.
+- Generated Buck state lives under `.viberoots/workspace/buck`.
+- Root `build-tools/`, root `third_party/providers/`, and root `prelude/` or `toolchains/`
+  compatibility surfaces do not remain, except test-only fixtures explicitly modeling invalid
+  legacy input.
 - Full `i && b && ALL_TESTS=1 v` passes after extraction.
 
 ### 7. Risks
@@ -836,12 +901,17 @@ workspace as a submodule.
 - Large file moves can obscure regressions.
 - Submodule setup may be unfamiliar to contributors.
 - Dirty submodule state can be missed during parent commits.
+- Remaining active `//build-tools` or `//third_party/providers` references are blockers for PR-9,
+  not migration debt.
+- Root `prelude/` or `toolchains/` assumptions are blockers for PR-9.
 
 ### 8. Mitigations
 
 - Keep this PR mostly mechanical after earlier behavior changes land.
 - Run checkpoint D with full validation and scope review.
 - Add startup checks for missing `viberoots/flake.nix`.
+- Add hard failure diagnostics for old-layout root paths and stale split state before running broad
+  build work.
 
 ### 9. Consequences of not implementing this PR
 
@@ -865,12 +935,20 @@ vendoring viberoots source.
   - explicit remote viberoots version reference such as `github:OWNER/viberoots/v1.4.2`;
   - committed `flake.lock`;
   - `.buckconfig` using `.viberoots/current`;
+  - root `projects/`;
   - `.viberoots/workspace/providers`;
+  - `.viberoots/workspace/buck`;
+  - per-cell `.buckconfig` files where Buck needs them;
+  - provider targets with public visibility;
   - minimal `projects/apps/*` or `projects/libs/*` target.
 - Make activation materialize `.viberoots/current` from the locked flake source.
-- Add `viberoots version` output for remote mode: requested ref, locked revision, and effective
-  source path.
-- Close temporary shims that are no longer needed or record follow-up cleanup if removal is unsafe.
+- Add `viberoots version` output for remote mode: requested ref, locked revision, effective source
+  path, and whether `.viberoots/current` matches the locked source.
+- Define the remote activation contract: either refresh `.viberoots/current` on every
+  `nix develop`/`init-workspace`, or create an explicit GC root and refresh when `flake.lock`
+  changes.
+- Reject hidden copies of viberoots, dual provider layouts, and root-cell legacy shims in the
+  external fixture.
 - Close the integration debt ledger.
 
 ### 3. External prerequisites
@@ -880,8 +958,13 @@ vendoring viberoots source.
 ### 4. Tests to be added
 
 - External fixture `nix develop`/evaluation test.
-- External fixture Buck parse/build test.
+- External fixture Nix eval or `nix develop` smoke test.
+- External fixture Buck parse/cquery/build test for one representative `projects/` target.
 - Remote-mode activation and status tests.
+- Remote activation tests proving the chosen refresh or GC-root strategy keeps `.viberoots/current`
+  aligned with `flake.lock`.
+- Tests proving generated providers exist only under `.viberoots/workspace/providers`, generated
+  Buck state uses `.viberoots/workspace/buck`, and provider targets have public visibility.
 - Targeted provider, Buck, Nix, and scaffolding selectors touched by the plan.
 - Full `i && b && ALL_TESTS=1 v` only if this PR changes shared Buck/Nix/build logic beyond the
   fixture/template surface.
@@ -901,7 +984,12 @@ vendoring viberoots source.
 
 - External fixture consumes remote viberoots without vendoring `build-tools`, `prelude`, or
   `toolchains`.
-- Remote version and locked revision are clear.
+- External fixture has root `projects/`, `.viberoots/current`, `.viberoots/workspace/providers`,
+  `.viberoots/workspace/buck`, required per-cell Buck config, public provider targets, and one
+  representative `projects/` target that parses, cqueries, and builds.
+- Remote status output shows requested ref, locked revision, effective source path, and whether
+  `.viberoots/current` matches the locked source.
+- Remote activation has an explicit refresh or GC-root contract.
 - Targeted remote fixture validation and plan assessment pass.
 - The integration debt ledger is closed. If PR-10 touched shared build logic, a final full
   `i && b && ALL_TESTS=1 v` also passes.
@@ -910,10 +998,14 @@ vendoring viberoots source.
 
 - Remote flake source materialization may interact poorly with Nix GC.
 - A fixture may still miss real-project behavior.
+- Missing `.viberoots/workspace/buck` in the external fixture is a PR-10 blocker.
+- Remaining active `//build-tools` or `//third_party/providers` references are blockers for PR-10,
+  not migration debt.
 
 ### 8. Mitigations
 
-- Use an explicit GC-root or refresh strategy for `.viberoots/current`.
+- Keep remote Nix GC/source refresh as the highest PR-10 operational risk and use an explicit
+  GC-root or refresh strategy for `.viberoots/current`.
 - Keep the fixture representative enough to exercise Nix, Buck, providers, and one project target.
 
 ### 9. Consequences of not implementing this PR

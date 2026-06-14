@@ -7,7 +7,13 @@ import { after, test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
 import { ensureNodeModulesForDevApp } from "./lib/dev-node-modules";
 import { assertSingleQueueInvariant, producerByteLength, waitForValue } from "./lib/wasm-watch";
-import { httpGet, pickFreePort, stopServer, waitForHttpOk } from "./lib/webapp-static-hmr";
+import {
+  GENERATED_DEV_READY_TIMEOUT_MS,
+  httpGet,
+  pickFreePort,
+  stopServer,
+  waitForChildHttpOk,
+} from "./lib/webapp-static-hmr";
 
 const TEST_TIMEOUT_MS =
   Number(process.env.TEST_NIX_TIMEOUT_SECS || process.env.VERIFY_TIMEOUT_SECS || "1200") * 1000;
@@ -96,7 +102,11 @@ test(
       });
 
       try {
-        await waitForHttpOk(`http://127.0.0.1:${port}/`);
+        await waitForChildHttpOk(
+          devServer,
+          `http://127.0.0.1:${port}/`,
+          GENERATED_DEV_READY_TIMEOUT_MS,
+        );
         const expectedA = producerByteLength("phase2-a");
         const initialClientLen = await waitForValue(readClientWasmLength, (v) => v === expectedA);
         assert.equal(initialClientLen, expectedA);

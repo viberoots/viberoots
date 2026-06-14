@@ -3,6 +3,7 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
 import { nixBuilderPolicyShellArgs } from "../lib/nix-builder-policy";
+import { sharedExactPnpmStateRootPath } from "../lib/pnpm-state-paths";
 import { resolveToolPathSync } from "../lib/tool-paths";
 import { findNearestImporterLock, nodeModulesAttr } from "./install/common";
 import {
@@ -145,56 +146,51 @@ async function hasFreshVerifiedMarker(lockfileRel: string): Promise<boolean> {
   );
 }
 
-async function ensurePnpmStoreHash(lockfileRel: string): Promise<void> {
+function runInstallDiagnostic(lockfileRel: string, reason: string): string {
+  return [
+    `node-modules-build: pnpm-store state for ${lockfileRel} is ${reason}.`,
+    "node-modules-build: run `i` to refresh pnpm hashes and prewarm exact pnpm stores, then rerun `b`.",
+  ].join("\n");
+}
+
+async function requireFreshPnpmStoreState(lockfileRel: string): Promise<void> {
   const current = await readHashForLock(lockfileRel);
-  if (current && current !== placeholderDigest) {
-    if (await hasFreshVerifiedMarker(lockfileRel)) return;
-  }
-  const update = await runPnpmHashUpdater(lockfileRel);
-  if (update.exitCode !== 0) {
-    console.error("node-modules-build: pnpm-store hash update failed");
-    if (update.stdout) console.error(String(update.stdout).trim());
-    if (update.stderr) console.error(String(update.stderr).trim());
+  if (!current || current === placeholderDigest) {
+    console.error(runInstallDiagnostic(lockfileRel, "missing or placeholder-hashed"));
     process.exit(2);
   }
-  const next = await readHashForLock(lockfileRel);
-  if (!next || next === placeholderDigest) {
-    console.error(
-      `node-modules-build: pnpm-store hash still placeholder after update for ${lockfileRel}`,
-    );
+  if (!(await hasFreshVerifiedMarker(lockfileRel))) {
+    console.error(runInstallDiagnostic(lockfileRel, "stale or unverified"));
     process.exit(2);
   }
-  await stageNodeModulesHashesJson();
 }
 
-async function runPnpmHashUpdater(lockfileRel: string, force = false) {
-  const updater = path.join(flakeRoot, "build-tools/tools/dev/update-pnpm-hash.ts");
-  return await $({
-    cwd: flakeRoot,
-  })`zx-wrapper ${updater} --lockfile ${lockfileRel} ${force ? "--force" : ""}`.nothrow();
-}
-
-async function forceRefreshPnpmStoreHash(lockfileRel: string): Promise<void> {
-  const update = await runPnpmHashUpdater(lockfileRel, true);
-  if (update.exitCode !== 0) {
-    console.error("node-modules-build: forced pnpm-store hash update failed");
-    if (update.stdout) console.error(String(update.stdout).trim());
-    if (update.stderr) console.error(String(update.stderr).trim());
-    process.exit(2);
-  }
-  await stageNodeModulesHashesJson();
-}
-
-async function stageNodeModulesHashesJson(): Promise<void> {
-  const hashFile = path.join(flakeRoot, "build-tools", "tools", "nix", "node-modules.hashes.json");
+async function preparedExactStoreEnv(lockfileRel: string): Promise<NodeJS.ProcessEnv | null> {
+  const lockHash = await sha256File(path.join(repoRoot, lockfileRel));
+  if (!lockHash) return null;
+  const cacheDir = sharedExactPnpmStateRootPath(lockHash);
+  const markerPath = path.join(cacheDir, "ready.json");
   try {
-    await fsp.access(hashFile);
-    await $({ cwd: flakeRoot })`git add ${hashFile}`.nothrow();
-  } catch {}
+    const raw = await fsp.readFile(markerPath, "utf8");
+    const marker = JSON.parse(raw) as {
+      version?: number;
+      lockHash?: string;
+      nixStorePath?: string;
+    };
+    const nixStorePath = String(marker.nixStorePath || "").trim();
+    if (marker.lockHash !== lockHash || !nixStorePath.startsWith("/nix/store/")) return null;
+    await fsp.access(nixStorePath);
+    return {
+      ...process.env,
+      NIX_PNPM_EXACT_STORE: nixStorePath,
+    };
+  } catch {
+    return null;
+  }
 }
 // Fast path: if output is already realized in the store, prefer path-info
 let outPath = "";
-await ensurePnpmStoreHash(relLock);
+await requireFreshPnpmStoreState(relLock);
 try {
   const pi = await $`nix path-info ${flakeRef}#${fullAttr} --accept-flake-config`;
   const cand =
@@ -210,7 +206,7 @@ try {
     } catch {}
   }
 } catch {}
-async function tryBuild(): Promise<string> {
+async function tryBuild(extraEnv: NodeJS.ProcessEnv): Promise<string> {
   const timeoutPath = resolveToolPathSync("timeout");
   const cmd = [
     "set -euo pipefail;",
@@ -224,8 +220,9 @@ async function tryBuild(): Promise<string> {
     'CORES_FLAG=""; if [ -n "$CR" ] && [ "$CR" != "0" ]; then CORES_FLAG="--option cores $CR"; fi;',
     `"$TIMEOUT_PATH" -k 10s "\${TS}s" nix build "\${FLAKE_REF}#\${FULL_ATTR}" --no-link --accept-flake-config ${nixBuilderPolicyShellArgs("local_only")} --print-out-paths $JOBS_FLAG $CORES_FLAG`,
   ].join(" ");
-  const built =
-    await $`bash --noprofile --norc -c ${cmd} -- ${timeoutPath} ${flakeRef} ${fullAttr}`.nothrow();
+  const built = await $({
+    env: extraEnv,
+  })`bash --noprofile --norc -c ${cmd} -- ${timeoutPath} ${flakeRef} ${fullAttr}`.nothrow();
   const txt = String(built.stdout || "").trim();
   if (built.exitCode === 0 && txt) {
     return txt.split("\n").filter(Boolean).pop() || "";
@@ -234,12 +231,12 @@ async function tryBuild(): Promise<string> {
 }
 
 if (!outPath) {
-  outPath = await tryBuild();
-}
-
-if (!outPath) {
-  await forceRefreshPnpmStoreHash(relLock);
-  outPath = await tryBuild();
+  const extraEnv = await preparedExactStoreEnv(relLock);
+  if (!extraEnv) {
+    console.error(runInstallDiagnostic(relLock, "missing prepared exact store"));
+    process.exit(2);
+  }
+  outPath = await tryBuild(extraEnv);
 }
 if (!outPath) {
   console.error("node-modules-build: nix build produced no output path");

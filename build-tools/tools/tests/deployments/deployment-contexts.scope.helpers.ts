@@ -2,6 +2,7 @@
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
+import { $ } from "zx";
 import type { GraphNode } from "../../lib/graph";
 import {
   cloudflarePagesAdmissionPolicyNodeFixture,
@@ -89,6 +90,11 @@ export async function withProjectConfig(shared: Record<string, unknown>, run: ()
       schemaVersion: "viberoots-project-config@1",
       ...shared,
     });
+    await $({ cwd: dir, stdio: "pipe" })`git init --initial-branch=main`;
+    await $({ cwd: dir, stdio: "pipe" })`git config user.email test@example.invalid`;
+    await $({ cwd: dir, stdio: "pipe" })`git config user.name "Viberoots Test"`;
+    await $({ cwd: dir, stdio: "pipe" })`git add projects/config/shared.json`;
+    await $({ cwd: dir, stdio: "pipe" })`git commit -m "project config fixture"`;
     await run();
   } finally {
     process.chdir(oldCwd);

@@ -14,9 +14,11 @@ export async function makeFilteredFlakeRef(opts: {
   attr: string;
 }): Promise<{ flakeRef: string; cleanup: () => Promise<void> }> {
   const tmpBase = process.env.TMPDIR || "/tmp";
-  const workDir = await fsp.mkdtemp(path.join(tmpBase, "scaf-flake-"));
+  const workDirRaw = await fsp.mkdtemp(path.join(tmpBase, "scaf-flake-"));
+  const workDir = await fsp.realpath(workDirRaw).catch(() => workDirRaw);
   const snapDir = path.join(workDir, "src");
   await fsp.mkdir(snapDir, { recursive: true });
+  const snapDirReal = await fsp.realpath(snapDir).catch(() => snapDir);
   const src = path.resolve(opts.repoRoot);
   if (filteredFlakeDiagnosticsEnabled()) {
     const dirty = await readDirtyGitStats(src);
@@ -32,9 +34,9 @@ export async function makeFilteredFlakeRef(opts: {
   const rsyncExcludes = filteredFlakeRsyncExcludeArgs();
   await $({
     stdio: "pipe",
-  })`rsync -a --delete ${rsyncExcludes} ${src}/ ${snapDir}/`;
+  })`rsync -a --delete ${rsyncExcludes} ${src}/ ${snapDirReal}/`;
   if (filteredFlakeDiagnosticsEnabled()) {
-    const stats = await readSnapshotStats(snapDir);
+    const stats = await readSnapshotStats(snapDirReal);
     const elapsedMs = Date.now() - snapshotStart;
     emitTimingDetail("filteredFlake updatePnpmHashSnapshotRsync", elapsedMs);
     console.warn(
@@ -42,7 +44,7 @@ export async function makeFilteredFlakeRef(opts: {
     );
   }
   return {
-    flakeRef: `path:${snapDir}#${opts.attr}`,
+    flakeRef: `path:${snapDirReal}#${opts.attr}`,
     cleanup: async () => {
       await fsp.rm(workDir, { recursive: true, force: true }).catch(() => {});
     },

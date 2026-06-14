@@ -44,6 +44,15 @@ test("fixed pnpm-store builds use exact prefetched stores for offline validation
   if (!lockfile.includes("withExactPrefetchedStore")) {
     throw new Error("lockfile.ts must continue exporting the exact-store helper");
   }
+  const pnpmStatePaths = await fsp.readFile("build-tools/tools/lib/pnpm-state-paths.ts", "utf8");
+  if (
+    !pnpmStatePaths.includes("sharedExactPnpmStateRootPath") ||
+    !pnpmStatePaths.includes("export async function sharedExactPnpmStateRoot")
+  ) {
+    throw new Error(
+      "pnpm-state-paths.ts must expose both read-only and provisioning exact-store path helpers",
+    );
+  }
   if (
     !exactStore.includes("runExactStoreCommand") ||
     !exactStoreCommand.includes("withHeartbeat")
@@ -112,6 +121,16 @@ test("fixed pnpm-store builds use exact prefetched stores for offline validation
     throw new Error(
       "require-unified-pnpm-store.ts must not rebuild fixed pnpm-store attrs during prewarm",
     );
+  }
+  const installPrewarm = await fsp.readFile(
+    "build-tools/tools/dev/install/unified-pnpm-prewarm.ts",
+    "utf8",
+  );
+  if (!installPrewarm.includes("[install-deps] unified pnpm prewarm failed")) {
+    throw new Error("install-deps unified pnpm prewarm must be required in non-dry-run mode");
+  }
+  if (installPrewarm.includes("[install-deps] unified pnpm prewarm skipped:")) {
+    throw new Error("install-deps must not silently skip failed unified pnpm prewarm");
   }
 
   const nixConfig = await fsp.readFile("build-tools/tools/nix/flake/nix-config.nix", "utf8");

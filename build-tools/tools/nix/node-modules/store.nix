@@ -170,9 +170,8 @@ in {
           timeout "$IT"s env PNPM_HOME="$PNPM_HOME" pnpm install --offline --force --frozen-lockfile --ignore-scripts --prod=false --lockfile-dir "." --dir "."
           echo "[nix] mkPnpmStore: exact prefetched store validated"
         else
-          pnpm config set store-dir "$out/store"
-          echo "[nix] pnpm install (timeout) --force --frozen-lockfile --ignore-scripts --prod=false --lockfile-dir . --dir . (IT=${installTimeoutVal}s, FT=${ftVal}s)"
-          timeout "$IT"s env PNPM_HOME="$PNPM_HOME" pnpm install --force --frozen-lockfile --ignore-scripts --prod=false --lockfile-dir "." --dir "."
+          echo "[nix] mkPnpmStore: missing exact prefetched store for locked offline build. Run 'i' to refresh pnpm hashes and prewarm exact pnpm stores." >&2
+          exit 5
         fi
         echo "[nix] mkPnpmStore: install complete"
         # Normalize store timestamps and scrub volatile JSON fields to stabilize FOD output
@@ -354,8 +353,8 @@ in {
           chmod -R u+rwX "$out/store" || true
           echo "[nix] mkPnpmStoreUnfixed: exact prefetched store validated"
         else
-          echo "[nix] mkPnpmStoreUnfixed: pnpm install --force --frozen-lockfile --ignore-scripts --prod=false --lockfile-dir . --dir ."
-          timeout "$IT"s env PNPM_HOME="$PNPM_HOME" pnpm install --force --frozen-lockfile --ignore-scripts --prod=false --lockfile-dir "." --dir "."
+          echo "[nix] mkPnpmStoreUnfixed: missing exact prefetched store for locked offline build. Run 'i' to refresh pnpm hashes and prewarm exact pnpm stores." >&2
+          exit 5
         fi
         echo "[nix] mkPnpmStoreUnfixed: install complete"
         # Normalize store timestamps and scrub volatile JSON fields to stabilize output hashing

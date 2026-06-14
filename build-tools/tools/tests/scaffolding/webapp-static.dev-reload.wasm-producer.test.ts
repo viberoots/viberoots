@@ -7,7 +7,13 @@ import { setTimeout as sleep } from "node:timers/promises";
 import { after, test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
 import { ensureNodeModulesForDevApp } from "./lib/dev-node-modules";
-import { httpGet, pickFreePort, stopServer } from "./lib/webapp-static-hmr";
+import {
+  GENERATED_DEV_READY_TIMEOUT_MS,
+  httpGet,
+  pickFreePort,
+  stopServer,
+  waitForChildHttpOk,
+} from "./lib/webapp-static-hmr";
 import {
   assertSingleQueueInvariant,
   captureHmrMutationEventsDuring,
@@ -65,31 +71,21 @@ test(
       });
 
       try {
-        const startedAt = Date.now();
-        while (Date.now() - startedAt < 45000) {
-          try {
-            const res = await httpGet(`http://127.0.0.1:${port}/`);
-            if (res.status === 200) break;
-          } catch {}
-          await sleep(300);
-        }
-        {
-          const probe = await httpGet(`http://127.0.0.1:${port}/`).catch(() => ({
-            status: 0,
-            body: "",
-          }));
-          if (probe.status !== 200) {
-            const tailOut = serverStdout.join("").slice(-6000);
-            const tailErr = serverStderr.join("").slice(-6000);
-            throw new Error(
-              [
-                "server did not become ready within 45000ms",
-                `vite stdout tail:\n${tailOut}`,
-                `vite stderr tail:\n${tailErr}`,
-              ].join("\n\n"),
-            );
-          }
-        }
+        await waitForChildHttpOk(
+          devServer,
+          `http://127.0.0.1:${port}/`,
+          GENERATED_DEV_READY_TIMEOUT_MS,
+        ).catch((error) => {
+          const tailOut = serverStdout.join("").slice(-6000);
+          const tailErr = serverStderr.join("").slice(-6000);
+          throw new Error(
+            [
+              error instanceof Error ? error.message : String(error),
+              `vite stdout tail:\n${tailOut}`,
+              `vite stderr tail:\n${tailErr}`,
+            ].join("\n\n"),
+          );
+        });
         hmrWs = new WebSocket(`ws://127.0.0.1:${port}`, "vite-hmr");
         await waitForHmrConnected(hmrWs, 10000);
         const wasmUrl = `http://127.0.0.1:${port}/src/wasm-contract/top.wasm`;

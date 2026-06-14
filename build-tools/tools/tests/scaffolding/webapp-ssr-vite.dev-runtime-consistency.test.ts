@@ -7,6 +7,7 @@ import { runInTemp } from "../lib/test-helpers";
 import { producerByteLength, waitForValue, writeAndBumpMtime } from "./lib/wasm-watch";
 import {
   evaluateRenderedAppText,
+  GENERATED_DEV_READY_TIMEOUT_MS,
   httpGet,
   pickFreePort,
   stopServer,
@@ -102,7 +103,11 @@ test(
       });
 
       try {
-        await waitForChildHttpOk(devServer, `http://127.0.0.1:${port}/`, 90_000);
+        await waitForChildHttpOk(
+          devServer,
+          `http://127.0.0.1:${port}/`,
+          GENERATED_DEV_READY_TIMEOUT_MS,
+        );
 
         const serverPid = devServer.pid;
         assert.ok(serverPid && serverPid > 0, "dev server pid must be available");

@@ -8,6 +8,7 @@ import {
   evaluateRenderedAppText,
   extractImportedUrl,
   httpGet,
+  GENERATED_DEV_READY_TIMEOUT_MS,
   moduleUrlResolvesToFile,
   pickFreePort,
   stopServer,
@@ -161,7 +162,7 @@ export async function runWebappLocalTsDependencyTest(options: {
           return serverLogs();
         },
         (logs) => /\bready in\b|Local:/i.test(logs),
-        60000,
+        GENERATED_DEV_READY_TIMEOUT_MS,
       );
       await waitForHttpOk(`http://127.0.0.1:${port}/`);
       const mainModuleUrl = `http://127.0.0.1:${port}/src/main.ts`;

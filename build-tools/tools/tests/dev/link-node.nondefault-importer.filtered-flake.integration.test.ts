@@ -39,4 +39,12 @@ test("link-node builds non-default importers from stable workspace flake ref", a
       "update-pnpm-hash filtered flake must expose dirty-tree and snapshot-size diagnostics",
     );
   }
+  if (
+    !filteredCompat.includes("fsp.realpath(workDirRaw)") ||
+    !filteredCompat.includes("snapDirReal")
+  ) {
+    throw new Error(
+      "update-pnpm-hash filtered flake snapshots must canonicalize temp paths before passing them to Nix",
+    );
+  }
 });

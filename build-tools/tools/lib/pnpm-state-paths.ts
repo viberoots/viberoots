@@ -22,8 +22,12 @@ function stablePnpmStateBase(): string {
   return path.join(tmpBase, `viberoots-pnpm${suffix}`);
 }
 
+export function sharedExactPnpmStateRootPath(lockHash: string): string {
+  return path.join(stablePnpmStateBase(), "exact", sanitizeFragment(lockHash));
+}
+
 export async function sharedExactPnpmStateRoot(lockHash: string): Promise<string> {
-  const rootDir = path.join(stablePnpmStateBase(), "exact", sanitizeFragment(lockHash));
+  const rootDir = sharedExactPnpmStateRootPath(lockHash);
   await fsp.mkdir(rootDir, { recursive: true });
   return rootDir;
 }

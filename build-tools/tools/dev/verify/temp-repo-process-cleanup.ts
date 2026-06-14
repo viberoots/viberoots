@@ -80,6 +80,12 @@ async function pgrepScopedProcessLines(roots: string[]): Promise<string[]> {
     const pattern = root.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     const next = await new Promise<string[]>((resolve) => {
       let child;
+      let settled = false;
+      const finish = (value: string[]) => {
+        if (settled) return;
+        settled = true;
+        resolve(value);
+      };
       try {
         child = spawn(pgrepPath, ["-afil", pattern], {
           stdio: ["ignore", "pipe", "ignore"],
@@ -91,9 +97,9 @@ async function pgrepScopedProcessLines(roots: string[]): Promise<string[]> {
       let buf = "";
       child.stdout.setEncoding("utf8");
       child.stdout.on("data", (d) => (buf += d));
-      child.on("error", () => resolve([]));
+      child.on("error", () => finish([]));
       child.on("close", () => {
-        resolve(
+        finish(
           String(buf || "")
             .split(/\r?\n/)
             .map((l) => l.trim())
@@ -110,6 +116,13 @@ async function pgrepScopedProcessLines(roots: string[]): Promise<string[]> {
             }),
         );
       });
+      const timer = setTimeout(() => {
+        try {
+          child.kill("SIGKILL");
+        } catch {}
+        finish([]);
+      }, 2000);
+      child.on("close", () => clearTimeout(timer));
     });
     lines.push(...next);
   }

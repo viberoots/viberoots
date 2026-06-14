@@ -1,4 +1,3 @@
-#!/usr/bin/env zx-wrapper
 import { type ChildProcess } from "node:child_process";
 import { once } from "node:events";
 import * as fsp from "node:fs/promises";
@@ -7,6 +6,10 @@ import net from "node:net";
 import path from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
 import { terminateChildTree } from "../../lib/process-tree";
+export const GENERATED_DEV_READY_TIMEOUT_MS = Math.max(
+  120_000,
+  Number(process.env.TEST_DEV_WITH_WASM_READY_TIMEOUT_MS || "0"),
+);
 
 export async function pickFreePort(): Promise<number> {
   const server = net.createServer();
@@ -44,7 +47,10 @@ export async function httpGet(
   });
 }
 
-export async function waitForHttpOk(url: string, timeoutMs = 45000): Promise<void> {
+export async function waitForHttpOk(
+  url: string,
+  timeoutMs = GENERATED_DEV_READY_TIMEOUT_MS,
+): Promise<void> {
   const start = Date.now();
   while (Date.now() - start < timeoutMs) {
     try {
@@ -60,7 +66,7 @@ export async function waitForHttpOk(url: string, timeoutMs = 45000): Promise<voi
 export async function waitForChildHttpOk(
   child: ChildProcess,
   url: string,
-  timeoutMs = 45000,
+  timeoutMs = GENERATED_DEV_READY_TIMEOUT_MS,
 ): Promise<void> {
   const start = Date.now();
   while (Date.now() - start < timeoutMs) {

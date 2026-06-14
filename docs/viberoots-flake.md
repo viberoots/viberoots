@@ -22,6 +22,19 @@ The central API decision is that viberoots must treat the consuming workspace ro
 viberoots source root as different locations. `projects/` lives in the consuming workspace, not
 inside the viberoots flake or submodule.
 
+There are no external users yet, so the split should not preserve compatibility shims, legacy
+migration paths, or support for the pre-split monorepo build-system layout after the viberoots
+split. The clean design still supports all intended viberoots source modes:
+
+1. a local top-level `viberoots/` directory;
+2. `viberoots/` as a Git submodule;
+3. a remote flake/source-store viberoots source for external consumers.
+
+The compatibility we do not want is support for the old root layout: root `build-tools/`, root
+`prelude/`, root `toolchains/`, root `third_party/providers/`, `//build-tools` loads,
+`//third_party/providers` labels, shims that forward those paths to the new cells, hidden copies of
+viberoots, or provider generation that writes both old and new locations.
+
 ## Target Repository Shapes
 
 ### Directory Naming
@@ -51,10 +64,12 @@ In other words:
 Avoid introducing new `third_party` directories in the split layout. Use clearer names:
 
 - `.viberoots/workspace/providers` for workspace-generated provider glue;
+- `.viberoots/workspace/buck` for workspace-generated Buck state;
 - `viberoots/vendor/<name>` for reusable vendored inputs owned by viberoots.
 
-The active dogfood layout keeps `fbsource` and `fbcode` as repo-owned compatibility stub cells under `config/`, reached through `.viberoots/current`.
-Those are part of the imported prelude layout and are not the workspace dependency boundary.
+The active dogfood layout reaches imported prelude support cells such as `fbsource` and `fbcode`
+through `.viberoots/current`. Those are part of the viberoots/prelude support layout and are not a
+root compatibility surface.
 
 ### Recommended Stage 1: Same Checkout With Viberoots Submodule
 
@@ -210,6 +225,7 @@ my-project/
     current -> /nix/store/...-source
     workspace/
       providers/
+      buck/
       go/
 ```
 
@@ -248,6 +264,7 @@ example:
 my-project/
   .viberoots/current -> /nix/store/...-source
   .viberoots/workspace/providers/
+  .viberoots/workspace/buck/
 ```
 
 Then `.buckconfig` can remain static:
@@ -378,42 +395,16 @@ from the root `projects/` directory except through explicit integration-test fix
 
 ### Public Load Surface
 
-There are two possible public Starlark surfaces.
-
-Preferred final surface:
+The public Starlark surface is explicit viberoots-cell loads:
 
 ```python
 load("@viberoots//build-tools/node:defs.bzl", "node_webapp")
 load("@viberoots//build-tools/deployments:defs.bzl", "vercel_next_webapp_deployment")
 ```
 
-Compatibility surface:
-
-```python
-load("//build-tools/node:defs.bzl", "node_webapp")
-```
-
-The final surface is cleaner because it makes ownership explicit. The compatibility surface reduces
-initial churn but requires forwarding shims in the root cell:
-
-```text
-repo-root/
-  build-tools/
-    node/
-      defs.bzl
-```
-
-with contents like:
-
-```python
-load("@viberoots//build-tools/node:defs.bzl", _node_webapp = "node_webapp")
-
-node_webapp = _node_webapp
-```
-
-The migration should support compatibility shims initially only if changing all project `TARGETS`
-files and tests at once is too risky. New templates should move directly to `@viberoots//...` loads
-once the cell is available.
+After the PR-9 extraction boundary, active root/project Buck files, templates, and generated
+outputs must not use `load("//build-tools...", ...)`. Root-cell forwarding shims for old
+`//build-tools` loads are not part of the supported design.
 
 ### Internal Viberoots Loads
 
@@ -451,10 +442,10 @@ workspace_providers//:nix_pkgs_googletest
 workspace_providers//:lf_<hash>_<importer>
 ```
 
-If Buck load syntax or local conventions require the current `//third_party/...` labels during
-migration, the root workspace can temporarily provide forwarding shims. The important final contract
-is that generated providers are workspace-owned and exposed through a stable workspace provider
-cell, not stored in viberoots-owned source.
+Generated providers must live only under `.viberoots/workspace/providers` and be addressed as
+`workspace_providers//...` target labels or `@workspace_providers//...` loads. Root
+`third_party/providers`, `//third_party/providers` labels, and dual old/new provider layouts are not
+part of the supported design after PR-9.
 
 ### Toolchain Cells
 
@@ -490,9 +481,11 @@ The root cell should contain only product and workspace glue:
 
 - root `TARGETS`;
 - `projects/**/TARGETS`;
-- optional compatibility forwarding shims for generated providers;
-- optional compatibility forwarding shims for legacy `//build-tools/...` loads;
 - optional workspace-local test fixtures.
+
+Root `build-tools/`, root `third_party/providers/`, and root `prelude/` or `toolchains/`
+compatibility surfaces must not remain after the extraction boundary unless they are test-only
+fixtures explicitly modeling invalid legacy input.
 
 Root `TARGETS` should continue exporting workspace files that Buck actions need from the project
 root, such as `flake.lock`, if those remain part of the build graph.
@@ -529,8 +522,8 @@ dev shell definitions, templates, prelude, toolchain definitions, and reusable t
 use a generic `src` parameter for this API; it is too easy to confuse the workspace source with the
 viberoots source.
 
-The compatibility root flake already exposes this API while the physical submodule split is still in
-progress. Root outputs are equivalent to:
+During local dogfood before physical extraction, the root flake exposes this API without adding
+legacy path shims. Root outputs are equivalent to:
 
 ```nix
 self.lib.mkWorkspace {
@@ -796,6 +789,8 @@ Consequences:
 - Workspace activation points `.viberoots/current` at the resolved flake source path.
 - Updates are explicit: change the ref or run an intentional flake update for the `viberoots` input,
   then run validation and commit the `flake.lock` change.
+- Activation must either refresh `.viberoots/current` on every `nix develop` or
+  `viberoots init-workspace`, or create an explicit GC root and refresh when `flake.lock` changes.
 
 Recommended status command output:
 
@@ -804,6 +799,7 @@ viberoots source: remote
 viberoots ref:    v1.4.2
 viberoots rev:    <locked git sha>
 viberoots path:   /workspace/.viberoots/current -> /nix/store/...-source
+viberoots locked: matches .viberoots/current
 ```
 
 ### Viberoots Version Metadata
@@ -821,7 +817,7 @@ or an equivalent output consumed by tooling. The value should describe the viber
 not the consuming workspace. Local dirty/dev checkouts may report a derived value such as
 `1.4.2-dev+<short-sha>` or `unknown+dirty`.
 
-During the in-repo split migration, the compatibility flake reports `lib.version = "0.0.0-dev"` and
+During the in-repo split work, the development flake reports `lib.version = "0.0.0-dev"` and
 `lib.releaseTag = "v0.0.0-dev"` until release automation assigns a stable tag.
 
 The dev shell should provide a command such as:
@@ -849,6 +845,12 @@ guide.
 
 The parent workspace should state the supported viberoots version range only if it needs one. Most
 workspaces can rely on their `flake.lock` as the pin and update deliberately.
+
+This compatibility policy applies to supported viberoots source modes and public APIs, not to the
+pre-split monorepo build-system layout. Root `build-tools/`, root `prelude/`, root `toolchains/`,
+root `third_party/providers/`, `//build-tools` loads, `//third_party/providers` labels, hidden
+copies of viberoots, and dual provider output layouts are cleanup blockers before external users
+exist.
 
 ## Provider Generation Boundary
 
@@ -887,15 +889,21 @@ documentation and should be treated as design constraints:
 - Remote viberoots consumption is compatible with Buck's static-cell requirement because activation
   can point `.viberoots/current` at the resolved flake source path.
 
-Validated migration blockers:
+Validated cleanup blockers:
 
-- Current Starlark has many root-cell `//build-tools/...` loads. Those must become
-  `@viberoots//...` loads, or temporary root forwarding shims must exist during migration.
+- Current Starlark has many root-cell `//build-tools/...` loads. Active project/root Buck loads
+  must become `@viberoots//build-tools/...` before PR-9 is complete.
 - Current provider code and generated labels assume `//third_party/providers`. Those must move to
-  the `workspace_providers` cell or be temporarily shimmed.
+  the `workspace_providers` cell, and generated providers must live only under
+  `.viberoots/workspace/providers`.
 - Current scripts often assume the tool source lives under `WORKSPACE_ROOT/build-tools` or
   `$FLK_ROOT/build-tools`. The implementation must introduce and consistently use `VIBEROOTS_ROOT`
   for tool source while keeping `WORKSPACE_ROOT` for product source.
+- Current root `prelude/` and `toolchains/` assumptions must be replaced with
+  `.viberoots/current/prelude` and `.viberoots/current/toolchains` validation before PR-9 is
+  complete.
+- External fixtures must include `.viberoots/workspace/buck`; missing generated Buck state is a
+  PR-10 blocker.
 - A symlink to a Nix store source is not by itself a durable garbage-collection root. Activation
   should refresh `.viberoots/current` on shell entry or create an explicit GC root/result link for
   remote-flake mode.
@@ -922,7 +930,8 @@ Exit criteria:
 
 - a checked ownership map exists;
 - generated files are identified;
-- root-cell compatibility shims are either approved or explicitly rejected.
+- root-cell compatibility shims are explicitly rejected for the final split, except test-only
+  fixtures that model invalid legacy input.
 
 ### Phase 1: Extract Viberoots Repository And Add Submodule
 
@@ -965,14 +974,16 @@ fbcode
 workspace_providers
 ```
 
-At this phase, compatibility shims may keep existing project loads working.
+At this phase, temporary shims may exist only as pre-PR-9 implementation debt. They are not a
+supported source mode or external contract.
 
 Exit criteria:
 
 - `buck2 targets viberoots//build-tools/...` works;
 - `buck2 targets //projects/...` still works;
 - workspace provider targets resolve from `workspace_providers//...`, while `.bzl` loads use
-  `@workspace_providers//...`.
+  `@workspace_providers//...`;
+- root `third_party/providers` is not used as a generated provider destination.
 
 ### Phase 4: Convert Starlark Loads
 
@@ -982,7 +993,7 @@ project templates and examples to load public macros from `@viberoots//...`.
 Exit criteria:
 
 - viberoots-owned code no longer depends on root `//build-tools/...` labels;
-- project targets either use `@viberoots//...` directly or rely on intentional root shims;
+- project targets use `@viberoots//build-tools/...` directly;
 - new scaffolds generate the chosen public load style.
 
 ### Phase 5: Parameterize Tool Scripts By Workspace Root
@@ -1020,6 +1031,7 @@ Exit criteria:
   actual viberoots revision;
 - `viberoots version` or an equivalent status command reports local source mode, checked-out
   revision, dirty state, and `.viberoots/current`;
+- startup/status checks report old-layout root paths and loads as PR-9 blockers before extraction;
 - current local workflows still work from the repository root.
 
 ### Phase 7: External Fixture
@@ -1033,39 +1045,37 @@ Exit criteria:
 - fixture Buck config points at a materialized viberoots source path;
 - fixture uses an explicit remote viberoots version reference and commits the resulting
   `flake.lock`;
-- fixture status output reports remote source mode, requested ref, locked revision, and effective
-  `.viberoots/current`;
+- fixture status output reports remote source mode, requested ref, locked revision, effective
+  `.viberoots/current`, and whether it matches the locked source;
+- fixture contains root `projects/`, `.viberoots/current`, `.viberoots/workspace/providers`,
+  `.viberoots/workspace/buck`, per-cell `.buckconfig` where Buck needs it, and provider targets
+  with public visibility;
+- fixture activation either refreshes `.viberoots/current` on every `nix develop` or
+  `init-workspace`, or creates a GC root and refreshes when `flake.lock` changes;
 - fixture can build and test a small `//projects/apps/*` target;
 - fixture can generate and consume project-owned provider glue.
 
 ## Compatibility Strategy
 
-The migration can use forwarding shims to reduce blast radius, but those shims should be treated as
-a compatibility layer, not the final architecture.
+The supported compatibility surface is source-mode compatibility: a workspace may use a local
+top-level `viberoots/` directory, a `viberoots/` Git submodule, or a remote flake/source-store
+viberoots source. All three modes share the same clean workspace contract:
 
-Acceptable temporary shims:
+- product code under root `projects/`;
+- reusable tooling reached through `.viberoots/current`;
+- generated providers under `.viberoots/workspace/providers`;
+- generated Buck state under `.viberoots/workspace/buck`;
+- Buck loads use `@viberoots//build-tools/...`;
+- provider labels use `workspace_providers//...`.
 
-```text
-build-tools/** -> forwards loads to @viberoots//build-tools/**
-toolchains/**  -> avoid if possible; prefer named cells
-prelude/**     -> avoid; prefer named prelude cell
-fbsource/fbcode -> avoid; prefer named cells
-```
-
-Avoid forwarding generated provider paths long term. Generated providers are workspace-owned and
-should be exposed through the `workspace_providers` cell.
-
-Each shim should have a planned deletion path:
-
-- update templates first;
-- update product `TARGETS`;
-- update tests;
-- remove shim once no load references remain.
+The unsupported compatibility surface is the pre-split monorepo layout. The final split must not
+keep root `build-tools/`, root `prelude/`, root `toolchains/`, root `third_party/providers/`,
+`//build-tools` loads, `//third_party/providers` labels, forwarding shims, hidden copies of
+viberoots, or dual provider outputs. Test-only fixtures may model those paths only when asserting
+that invalid legacy input fails clearly.
 
 ## Open Questions
 
-- Should root project `TARGETS` files load viberoots macros directly, or should the root workspace
-  keep stable forwarding shims for ergonomics?
 - Should `viberoots init-workspace` create missing committed bootstrap files, or only validate them
   after project creation?
 - Which root JavaScript/TypeScript package files are viberoots-tooling files versus workspace files?
@@ -1077,11 +1087,17 @@ Each shim should have a planned deletion path:
 ## Risks
 
 - Buck load paths may be more deeply root-cell-coupled than expected. Mitigation: migrate loads in
-  phases and keep temporary forwarding shims.
+  phases before PR-9, then fail startup/status checks on remaining active `//build-tools` loads.
 - Tool scripts may assume `build-tools/` exists under `process.cwd()`. Mitigation: introduce
   `WORKSPACE_ROOT` and `VIBEROOTS_ROOT` early, then audit script entrypoints.
 - Provider generation may accidentally write into the viberoots source tree. Mitigation: require all
   generator output paths to be under `WORKSPACE_ROOT`.
+- Provider generation may accidentally keep dual old/new outputs. Mitigation: make active
+  `//third_party/providers` references and root `third_party/providers` output blockers for PR-9
+  and PR-10.
+- Root `prelude/` or `toolchains/` assumptions may remain hidden. Mitigation: replace root prelude
+  validation with `.viberoots/current/prelude` validation and make root directories fail status
+  checks after PR-9.
 - Submodule state may be stale or uninitialized in local checkouts and CI. Mitigation: document
   `git submodule update --init --recursive`, make CI initialize submodules, and make startup checks
   fail with a targeted message when `viberoots/flake.nix` is missing.
@@ -1090,10 +1106,12 @@ Each shim should have a planned deletion path:
   workspace.
 - Remote consumers may accidentally use floating viberoots branches. Mitigation: recommend release
   tags for remote mode and make status output show both requested ref and locked revision.
-- External consumers may get stale `.viberoots/current` symlinks. Mitigation: activation verifies
-  the symlink target against the flake lock and refreshes it idempotently.
+- External consumers may get stale `.viberoots/current` symlinks or GC-collected remote sources.
+  This is the highest PR-10 operational risk. Mitigation: activation verifies the symlink target
+  against the flake lock and either refreshes it idempotently or maintains an explicit GC root.
 - The same-repo dogfood layout can hide external-consumer bugs. Mitigation: add a minimal external
-  fixture before declaring the interface stable.
+  fixture with `.viberoots/workspace/buck`, public provider targets, and representative
+  `projects/` Buck parse/cquery/build coverage before declaring the interface stable.
 
 ## Success Criteria
 
@@ -1105,9 +1123,12 @@ The design is complete when all of the following are true:
 - product targets can load public macros from `@viberoots//...`;
 - project-owned provider targets are generated under `.viberoots/workspace/` and consumed through
   the `workspace_providers` cell;
+- generated Buck state lives under `.viberoots/workspace/buck`;
+- root `build-tools/`, root `third_party/providers/`, and root `prelude/` or `toolchains/`
+  compatibility surfaces are absent except test-only invalid legacy fixtures;
 - root flake delegates workspace construction to the `./viberoots` submodule;
 - local mode always uses the local viberoots checkout, while remote mode displays an explicit
-  requested version and locked revision;
+  requested version, locked revision, effective source path, and `.viberoots/current` match status;
 - parent CI initializes and validates the `viberoots` submodule before running build gates;
 - a separate project fixture can consume viberoots without vendoring `build-tools`, `prelude`, or
   `toolchains`.
