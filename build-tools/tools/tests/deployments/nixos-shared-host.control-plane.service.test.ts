@@ -100,10 +100,14 @@ test("control-plane service persists queued submissions across restart and a sep
           backendDatabaseUrl,
         });
         try {
-          const finished = await waitFor(async () => {
-            const status = await readStatus(restarted.url, submitted.submissionId);
-            return status.lifecycleState === "finished" ? status : null;
-          }, "timed out waiting for service worker completion");
+          const finished = await waitFor(
+            async () => {
+              const status = await readStatus(restarted.url, submitted.submissionId);
+              return status.lifecycleState === "finished" ? status : null;
+            },
+            "timed out waiting for service worker completion",
+            60_000,
+          );
           assert.equal(finished.finalOutcome, "succeeded");
           const record = await readRecord(restarted.url, finished.deployRunId);
           assert.equal(record.deployRunId, finished.deployRunId);

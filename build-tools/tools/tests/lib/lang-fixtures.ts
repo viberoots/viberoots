@@ -1,6 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import * as fsp from "node:fs/promises";
 import path from "node:path";
+import { ensureBuckConfigForTempRepo } from "./test-helpers/buck-config";
 
 export type TestCtx = { tmp: string; $: any };
 
@@ -71,6 +72,7 @@ EOF
       mkdir -p toolchains
       printf '[buildfile]\nname = TARGETS\n' > toolchains/.buckconfig
     `}`;
+  await ensureBuckConfigForTempRepo(t, $);
   await $`scaf new go lib ${name} --yes --path=projects/libs/${name}`;
   // Seed gomod2nix deterministically via local stub to avoid network
   const stubDir = path.join(t, "bin");
@@ -177,6 +179,7 @@ EOF
       mkdir -p toolchains
       printf '[buildfile]\nname = TARGETS\n' > toolchains/.buckconfig
     `}`;
+  await ensureBuckConfigForTempRepo(t, $);
   await $`scaf new go cli ${name} --yes --path=projects/apps/${name}`;
   // Seed gomod2nix deterministically via local stub (no network)
   const stubDir = path.join(t, "bin");

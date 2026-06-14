@@ -20,8 +20,8 @@ test("build-tools/node/defs_nix.bzl must not reintroduce local importer normaliz
   );
 
   assert(
-    txt.includes('load("//build-tools/lang:importer_strings.bzl",'),
-    `${file} must load //build-tools/lang:importer_strings.bzl`,
+    txt.includes('load("@viberoots//build-tools/lang:importer_strings.bzl",'),
+    `${file} must load @viberoots//build-tools/lang:importer_strings.bzl`,
   );
   assert(
     txt.includes("sanitize_importer_for_nix_attr("),

@@ -89,6 +89,15 @@ export function isPidAlive(pid: number): boolean {
   }
 }
 
+export function parentIsMatchingBuckDaemon(lines: string[], pid: number, iso: string): boolean {
+  if (!Number.isFinite(pid) || pid <= 1) return false;
+  const prefix = `${pid} `;
+  const daemonNeedle = ` --isolation-dir ${iso}`;
+  return lines.some(
+    (line) => line.startsWith(prefix) && line.includes("buck2d[") && line.includes(daemonNeedle),
+  );
+}
+
 export function ownerPidFromEphemeralIsolation(iso: string): number | null {
   const s = String(iso || "").trim();
   const match = s.match(/^v-(\d+)-\d+$/) || s.match(/^verify-nested-(\d+)-[a-f0-9]{12}$/);

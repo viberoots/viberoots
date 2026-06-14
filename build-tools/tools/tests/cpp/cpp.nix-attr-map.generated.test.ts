@@ -2,6 +2,7 @@
 import fs from "fs-extra";
 import path from "node:path";
 import { test } from "node:test";
+import { DEFAULT_GRAPH_PATH } from "../../lib/workspace-state-paths";
 import { runInTemp } from "../lib/test-helpers";
 
 test("inspect-cpp-attrs lists nixpkg attrs from graph nodes", async () => {
@@ -12,7 +13,7 @@ test("inspect-cpp-attrs lists nixpkg attrs from graph nodes", async () => {
       { name: "//projects/apps/b:test", labels: ["lang:cpp", "nixpkg:pkgs.gtest"] },
     ];
     await fs.outputFile(
-      path.join(tmp, "build-tools", "tools", "buck", "graph.json"),
+      path.join(tmp, DEFAULT_GRAPH_PATH),
       JSON.stringify(graph),
       "utf8",
     );
@@ -33,4 +34,3 @@ test("inspect-cpp-attrs lists nixpkg attrs from graph nodes", async () => {
     }
   });
 });
-

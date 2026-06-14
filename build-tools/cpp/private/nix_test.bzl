@@ -37,10 +37,16 @@ def _cpp_nix_test_impl(ctx):
             raw_var = "OUT_RAW",
             status_var = "NIX_STATUS",
             log_file = "/tmp/cpp_nix_test_build.log",
-            zx_wrapper = "path:$VIBEROOTS_ROOT#zx-wrapper",
+            zx_wrapper = "path:$FLK_ROOT#zx-wrapper",
         )
         + "echo \"[cpp_nix_test] OUT_PATH=$OUT_PATH\" >&2; "
-        + "if [ \"$NIX_STATUS\" -ne 0 ] || [ -z \"$OUT_PATH\" ]; then echo '[cpp_nix_test] build-selected failed' >&2; cat /tmp/cpp_nix_test_build.log >&2 || true; exit ${NIX_STATUS:-2}; fi; "
+        + "if [ \"$NIX_STATUS\" -ne 0 ] || [ -z \"$OUT_PATH\" ]; then "
+        + "  echo '[cpp_nix_test] build-selected failed' >&2; "
+        + "  cat /tmp/cpp_nix_test_build.log >&2 || true; "
+        + "  if [ \"$NIX_STATUS\" -ne 0 ]; then exit \"$NIX_STATUS\"; fi; "
+        + "  echo '[cpp_nix_test] build-selected produced no output path' >&2; "
+        + "  exit 2; "
+        + "fi; "
         + ("BIN='%s'; " % expected_bin)
         + "CAND=\"$OUT_PATH/bin/$BIN\"; "
         + "if [ ! -x \"$CAND\" ]; then "

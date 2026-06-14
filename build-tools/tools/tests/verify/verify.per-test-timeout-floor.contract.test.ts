@@ -23,6 +23,12 @@ test("verify forwards a minimum 20 minute pnpm and test timeout budget", async (
       throw new Error(`verify buck2 runner must forward ${fragment}`);
     }
   }
+  if (
+    !buck2TestTxt.includes('"--timeout",') ||
+    !buck2TestTxt.includes("String(testNixTimeoutSecs)")
+  ) {
+    throw new Error("verify must forward its per-test timeout to Buck's test executor");
+  }
   if (!buck2TestTxt.includes("Math.max(tsec, testNixTimeoutSecs + 5 * 60)")) {
     throw new Error(
       "verify must ensure the overall buck2 timeout does not undercut per-test timeouts",

@@ -4,6 +4,7 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
 import { normalizeTargetLabel } from "../../lib/labels";
+import { DEFAULT_AUTO_MAP_PATH } from "../../lib/workspace-state-paths";
 import { runInTemp } from "../lib/test-helpers";
 
 function parseCqueryOne(stdout: string): any | null {
@@ -30,10 +31,10 @@ test("rust macros realize provider edges in deps deterministically (cquery)", as
     await fsp.mkdir(rustDir, { recursive: true });
     await fsp.writeFile(path.join(rustDir, "defs.bzl"), rustDefs, "utf8");
 
-    const providersDir = path.join(tmp, "third_party", "providers");
-    await fsp.mkdir(providersDir, { recursive: true });
+    const providerMapPath = path.join(tmp, DEFAULT_AUTO_MAP_PATH);
+    await fsp.mkdir(path.dirname(providerMapPath), { recursive: true });
     await fsp.writeFile(
-      path.join(providersDir, "auto_map.bzl"),
+      providerMapPath,
       [
         "MODULE_PROVIDERS = {",
         '  "//projects/apps/rustdemo:lib": [',

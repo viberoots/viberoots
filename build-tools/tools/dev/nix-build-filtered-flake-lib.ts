@@ -38,9 +38,18 @@ export const FILTERED_FLAKE_RSYNC_EXCLUDES = [
   ".wasm-producer",
   "pnpm-workspace.yaml",
   ".node_modules.lockfile-guard.*",
+  ".*.tmp",
+  ".*.ts.??????",
+  ".*.tsx.??????",
+  ".*.js.??????",
+  ".*.mjs.??????",
   "result",
   "result-*",
 ];
+
+export function filteredFlakeRsyncExcludeArgs(): string[] {
+  return FILTERED_FLAKE_RSYNC_EXCLUDES.map((entry) => ["--exclude", entry]).flat();
+}
 
 function isRecord(value: unknown): value is GraphNodeRecord {
   return !!value && typeof value === "object" && !Array.isArray(value);

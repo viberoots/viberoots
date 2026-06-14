@@ -3,6 +3,7 @@ import {
   isPidAlive,
   isTempRepoRoot,
   liveOwnerPidFromEphemeralIsolation,
+  parentIsMatchingBuckDaemon,
   parsePsLine,
   pathExists,
   psLines,
@@ -100,7 +101,7 @@ export async function cleanupOrphanBuckDaemons(opts: {
         process.kill(f.pid, "SIGKILL");
       } catch {}
     }
-    if (f.ppid > 1 && isPidAlive(f.ppid)) {
+    if (parentIsMatchingBuckDaemon(lines, f.ppid, iso) && isPidAlive(f.ppid)) {
       try {
         process.kill(f.ppid, "SIGKILL");
       } catch {}
@@ -151,7 +152,7 @@ export async function cleanupOrphanBuckDaemons(opts: {
       process.kill(d.pid, "SIGKILL");
     } catch {}
     for (const fork of matchingForkservers) {
-      if (fork.ppid > 1 && isPidAlive(fork.ppid)) continue;
+      if (parentIsMatchingBuckDaemon(lines, fork.ppid, d.iso) && isPidAlive(fork.ppid)) continue;
       if (!isPidAlive(fork.pid)) continue;
       try {
         process.kill(fork.pid, "SIGKILL");

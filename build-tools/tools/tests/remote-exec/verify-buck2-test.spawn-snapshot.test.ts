@@ -99,10 +99,13 @@ function spawnSnapshot(mode: "local" | RemoteMode, extraEnv: NodeJS.ProcessEnv =
   Object.assign(process.env, {
     BUCK_LOG: "warn,buck2_event_log::writer=off,buck2_execute=trace",
     NODE_V8_COVERAGE: path.join(tmp, "coverage", "raw"),
+    NIX_CONFIG:
+      "experimental-features = nix-command flakes\nwarn-dirty = false\nbuilders = \nbuild-hook = \nmax-jobs = auto\n",
     NIX_PATH: "",
     NIX_DAEMON_SOCKET_PATH: "/var/run/nix-daemon.socket",
     NIX_SSL_CERT_FILE: "/nix/store/cacert/etc/ssl/certs/ca-bundle.crt",
     RUST_LOG: "info,buck2_event_log::writer=off,buck2_client_ctx=debug",
+    TEST_NIX_TIMEOUT_SECS: "",
     VBR_BUCK_REAPER_STATE_FILE: "",
     VBR_SHARED_PRELUDE_PATH: "",
     VBR_TEST_SEED_KEY: "",

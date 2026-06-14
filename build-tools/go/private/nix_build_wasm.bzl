@@ -25,7 +25,8 @@ def _go_nix_build_wasm_impl(ctx):
         + "mkdir -p \"$(dirname \"$BUILD_SELECTED_LOG\")\"; "
     )
     run_and_copy = (
-        nix_cmd_prefix(timeout_var = "TIMEOUT", timeout_sec = 600, include_pnpm_store = False, escape_cmd_subst = True)
+        "DEST=\"$0\"; case \"$DEST\" in /*) ;; *) DEST=\"$PWD/$DEST\" ;; esac; "
+        + nix_cmd_prefix(timeout_var = "TIMEOUT", timeout_sec = 600, include_pnpm_store = False, escape_cmd_subst = True)
         + safe_log_path_prefix
         + "if [ \"${USE_SELECTED_WASM:-0}\" = \"1\" ]; then "
         + nix_build_out_path_cmd(
@@ -45,7 +46,9 @@ def _go_nix_build_wasm_impl(ctx):
         )
         + "if [ \"$NIX_STATUS\" -ne 0 ] || [ -z \"$outPath\" ]; then "
         + "  if [ -f \"$BUILD_SELECTED_LOG\" ]; then cat \"$BUILD_SELECTED_LOG\" >&2; fi; "
-        + "  exit ${NIX_STATUS:-2}; "
+        + "  if [ \"$NIX_STATUS\" -ne 0 ]; then exit \"$NIX_STATUS\"; fi; "
+        + "  echo \"go_nix_build_wasm (%s): build-selected produced no output path\" >&2; " % raw
+        + "  exit 2; "
         + "fi; "
         + "fi; "
         + "test -n \"$outPath\"; "
@@ -59,7 +62,7 @@ def _go_nix_build_wasm_impl(ctx):
                 + "fi; "
             ) % (expected_rel, raw, expected_rel)
         )
-        + "DEST=\"$0\"; cp -f \"$outPath/%s\" \"$DEST\"; " % expected_rel
+        + "cp -f \"$outPath/%s\" \"$DEST\"; " % expected_rel
     )
     out = ctx.actions.declare_output(ctx.attrs.out)
     cmd = cmd_args([

@@ -8,7 +8,7 @@ Fill in source-ref policies, trusted check reporters, and production approval gr
 generated policies for protected or shared environments.
 `,
     TARGETS: `load(
-    "//build-tools/deployments:defs.bzl",
+    "@viberoots//build-tools/deployments:defs.bzl",
     "deployment_admission_policy",
     "deployment_lane_governance",
     "deployment_lane_policy",
@@ -80,7 +80,7 @@ This package publishes an admitted prebuilt Next.js artifact to Vercel.
 Replace placeholder contract IDs with reviewed secret and runtime config contracts before promoting
 the deployment outside local fixtures.
 `,
-    TARGETS: `load("//build-tools/deployments:defs.bzl", "vercel_next_webapp_deployment")
+    TARGETS: `load("@viberoots//build-tools/deployments:defs.bzl", "vercel_next_webapp_deployment")
 
 vercel_next_webapp_deployment(
     name = "deploy",
@@ -133,7 +133,7 @@ This package deploys a reviewed service artifact through the Kubernetes provider
 Keep \`helm/values.yaml\` as provider config only. Artifact identity, secret requirements, runtime
 config requirements, and smoke posture remain authoritative in \`TARGETS\`.
 `,
-    TARGETS: `load("//build-tools/deployments:defs.bzl", "kubernetes_service_deployment")
+    TARGETS: `load("@viberoots//build-tools/deployments:defs.bzl", "kubernetes_service_deployment")
 
 kubernetes_service_deployment(
     name = "deploy",
@@ -183,7 +183,7 @@ ingress:
 This package declares an \`opentofu-stack\` provisioner. Admission evidence must bind the reviewed
 plan fingerprint before protected or shared mutation proceeds.
 `,
-    TARGETS: `load("//build-tools/deployments:defs.bzl", "kubernetes_service_deployment")
+    TARGETS: `load("@viberoots//build-tools/deployments:defs.bzl", "kubernetes_service_deployment")
 
 kubernetes_service_deployment(
     name = "deploy",

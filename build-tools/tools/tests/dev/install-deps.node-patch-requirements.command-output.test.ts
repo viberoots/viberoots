@@ -2,6 +2,7 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
+import { DEFAULT_GRAPH_PATH } from "../../lib/workspace-state-paths";
 import { runInTemp } from "../lib/test-helpers";
 
 test("install node patch warning surfaces importer-specific remediation command", async () => {
@@ -9,7 +10,7 @@ test("install node patch warning surfaces importer-specific remediation command"
     const importer = path.join(tmp, "projects", "apps", "web");
     await fsp.mkdir(importer, { recursive: true });
     await fsp.writeFile(path.join(importer, "pnpm-lock.yaml"), "lockfileVersion: 9\n", "utf8");
-    const graphPath = path.join(tmp, "build-tools", "tools", "buck", "graph.json");
+    const graphPath = path.join(tmp, DEFAULT_GRAPH_PATH);
     await fsp.mkdir(path.dirname(graphPath), { recursive: true });
     await fsp.writeFile(
       graphPath,

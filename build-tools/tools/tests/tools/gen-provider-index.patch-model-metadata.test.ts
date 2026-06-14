@@ -3,6 +3,11 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
 import { providerNameForImporter } from "../../lib/providers";
+import {
+  DEFAULT_NIX_ATTR_MAP_PATH,
+  DEFAULT_PROVIDER_INDEX_JSON_PATH,
+  workspaceProviderLabel,
+} from "../../lib/workspace-state-paths";
 import { runInTemp } from "../lib/test-helpers";
 
 test("gen-provider-index: provider_index.json includes patch model metadata (additive)", async () => {
@@ -21,14 +26,14 @@ test("gen-provider-index: provider_index.json includes patch model metadata (add
 
     await $`node build-tools/tools/buck/gen-provider-index.ts --out .viberoots/workspace/providers/provider_index.bzl`;
 
-    const jsonPath = path.join(tmp, "third_party", "providers", "provider_index.json");
+    const jsonPath = path.join(tmp, DEFAULT_PROVIDER_INDEX_JSON_PATH);
     const idx = JSON.parse(await fsp.readFile(jsonPath, "utf8")) as Record<string, any>;
 
     const nodeProvider = providerNameForImporter(
       "projects/apps/web/pnpm-lock.yaml",
       "projects/apps/web",
     );
-    const nodeFq = `//third_party/providers:${nodeProvider}`;
+    const nodeFq = workspaceProviderLabel(nodeProvider);
     const nodeEntry = idx[nodeFq];
     if (!nodeEntry) {
       throw new Error(`expected Node provider entry in provider_index.json: ${nodeFq}`);
@@ -50,7 +55,7 @@ test("gen-provider-index: provider_index.json includes patch model metadata (add
       "projects/apps/pytool/uv.lock",
       "projects/apps/pytool",
     );
-    const pyFq = `//third_party/providers:${pyProvider}`;
+    const pyFq = workspaceProviderLabel(pyProvider);
     const pyEntry = idx[pyFq];
     if (!pyEntry) {
       throw new Error(`expected Python provider entry in provider_index.json: ${pyFq}`);
@@ -80,7 +85,7 @@ test("gen-provider-index: provider_index.json includes patch model metadata (add
     }
 
     // Mapping file is required by CI-mode prebuild checks; ensure it is present after generation.
-    const nixMap = path.join(tmp, "third_party", "providers", "nix_attr_map.bzl");
+    const nixMap = path.join(tmp, DEFAULT_NIX_ATTR_MAP_PATH);
     const nixMapTxt = await fsp.readFile(nixMap, "utf8").catch(() => "");
     if (!nixMapTxt.includes("NIX_ATTR_MAP")) {
       throw new Error("expected nix_attr_map.bzl to be generated and include NIX_ATTR_MAP");

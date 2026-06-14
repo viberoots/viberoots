@@ -32,7 +32,7 @@ def prepare_importer_nix_calling_genrule_wiring(
 
     This composes:
     - importer-scoped wiring (lockfile label enforcement, label stamping, importer patches, provider edges)
-    - optional build-tools/tools/buck/workspace-root.env injection for dict-shaped `srcs`
+    - optional .viberoots/workspace/buck/workspace-root.env injection for dict-shaped `srcs`
     - global Nix inputs as real action inputs (optional label stamping)
     """
     kw = dict(kwargs) if kwargs != None else {}
@@ -46,8 +46,8 @@ def prepare_importer_nix_calling_genrule_wiring(
         current = srcs2 or {}
         if not isinstance(current, dict):
             current = {}
-        if "build-tools/tools/buck/workspace-root.env" not in current:
-            current["build-tools/tools/buck/workspace-root.env"] = workspace_root_env_src
+        if ".viberoots/workspace/buck/workspace-root.env" not in current:
+            current[".viberoots/workspace/buck/workspace-root.env"] = workspace_root_env_src
         srcs2 = current
 
     prepared = prepare_importer_genrule_kwargs(

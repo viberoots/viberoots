@@ -54,10 +54,17 @@ let
   graphPath = if graphJsonPath != null then builtins.toPath graphJsonPath else (
     let
       cand = builtins.toPath (repoRootStr + "/.viberoots/workspace/buck/graph.json");
-      legacy = builtins.toPath (repoRootStr + "/build-tools/tools/buck/graph.json");
+      testOverride = builtins.toPath (repoRootStr + "/build-tools/tools/buck/graph.json");
+      candExists = builtins.pathExists cand;
+      testOverrideExists = builtins.pathExists testOverride;
+      hasSelectedTarget = p:
+        selectedTargetName != ""
+        && builtins.pathExists p
+        && lib.hasInfix selectedTargetName (builtins.readFile p);
     in
-      if builtins.pathExists cand then cand
-      else if builtins.pathExists legacy then legacy
+      if selectedTargetName != "" && testOverrideExists && (!candExists || (!(hasSelectedTarget cand) && hasSelectedTarget testOverride)) then testOverride
+      else if candExists then cand
+      else if testOverrideExists then testOverride
       else builtins.throw "graphJsonPath not provided and workspace Buck graph missing — run build-tools/tools/buck/export-graph.ts first."
   );
   nodesRaw = if builtins.pathExists graphPath

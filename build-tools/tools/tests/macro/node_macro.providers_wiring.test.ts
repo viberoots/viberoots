@@ -3,12 +3,13 @@ import fs from "fs-extra";
 import assert from "node:assert/strict";
 import path from "node:path";
 import { test } from "node:test";
+import { DEFAULT_AUTO_MAP_PATH, DEFAULT_GRAPH_PATH } from "../../lib/workspace-state-paths";
 import { runInTemp } from "../lib/test-helpers";
 
 test("node macro: providers are auto-wired from auto_map", async () => {
   await runInTemp("node-macro-providers-wiring", async (tmp, $) => {
     // Synthesize a minimal graph.json with a Node target and lockfile label
-    const graphDir = path.join(tmp, "build-tools", "tools", "buck");
+    const graphDir = path.dirname(path.join(tmp, DEFAULT_GRAPH_PATH));
     await fs.mkdirp(graphDir);
     const nodes = [
       {
@@ -21,12 +22,12 @@ test("node macro: providers are auto-wired from auto_map", async () => {
         ],
       },
     ];
-    await fs.writeJSON(path.join(graphDir, "graph.json"), nodes, { spaces: 2 });
+    await fs.writeJSON(path.join(tmp, DEFAULT_GRAPH_PATH), nodes, { spaces: 2 });
 
     // Run auto-map generation over the synthesized graph
-    await $`node build-tools/tools/buck/gen-auto-map.ts --graph .viberoots/workspace/buck/graph.json --out .viberoots/workspace/providers/auto_map.bzl`;
+    await $`node build-tools/tools/buck/gen-auto-map.ts --graph ${DEFAULT_GRAPH_PATH} --out ${DEFAULT_AUTO_MAP_PATH}`;
 
-    const autoMapPath = path.join(tmp, ".viberoots/workspace/providers/auto_map.bzl");
+    const autoMapPath = path.join(tmp, DEFAULT_AUTO_MAP_PATH);
     const content = await fs.readFile(autoMapPath, "utf8");
     const key = '"//projects/apps/example:smoke_test"';
     const start = content.indexOf(key);

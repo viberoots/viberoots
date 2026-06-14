@@ -322,6 +322,49 @@ async function createTempBuck2Shim(tmp: string, iso: string): Promise<string> {
   return shimDir;
 }
 
+async function createTempNixShim(shimDir: string): Promise<void> {
+  const realNix = resolveToolPathSync("nix");
+  const shimPath = path.join(shimDir, "nix");
+  await fsp.writeFile(
+    shimPath,
+    [
+      "#!/usr/bin/env bash",
+      "set -euo pipefail",
+      `real_nix=${JSON.stringify(realNix)}`,
+      `repo_root=${JSON.stringify(process.cwd())}`,
+      'if [[ "${1:-}" == "store" && "${2:-}" == "gc" ]]; then',
+      '  exec "$real_nix" "$@"',
+      "fi",
+      "wait_for_gc(){",
+      '  node --experimental-strip-types --import "$repo_root/build-tools/tools/dev/zx-init.mjs" "$repo_root/build-tools/tools/lib/nix-gc-lock.ts" wait-for-no-active-gc',
+      "}",
+      'transient_store_error(){ grep -Eq "path .*/nix/store/.*\\.drv. is not valid|database is locked" "$1" "$2"; }',
+      "attempt=0",
+      'max_attempts="${NIX_TRANSIENT_RETRY_ATTEMPTS:-5}"',
+      "while true; do",
+      "  wait_for_gc || true",
+      '  out="$(mktemp "${TMPDIR:-/tmp}/vbr-nix-shim-out.XXXXXX")"',
+      '  err="$(mktemp "${TMPDIR:-/tmp}/vbr-nix-shim-err.XXXXXX")"',
+      "  set +e",
+      '  "$real_nix" "$@" >"$out" 2>"$err"',
+      "  code=$?",
+      "  set -e",
+      '  cat "$out"',
+      '  cat "$err" >&2',
+      '  if [[ "$code" == "0" ]]; then rm -f "$out" "$err"; exit 0; fi',
+      '  if (( attempt >= max_attempts )) || ! transient_store_error "$out" "$err"; then rm -f "$out" "$err"; exit "$code"; fi',
+      "  attempt=$((attempt + 1))",
+      '  echo "[nix-shim] transient nix store error; retrying ${attempt}/${max_attempts}" >&2',
+      '  rm -f "$out" "$err"',
+      "  sleep 1",
+      "done",
+      "",
+    ].join("\n"),
+    "utf8",
+  );
+  await fsp.chmod(shimPath, 0o755);
+}
+
 function prependPath(env: Record<string, string>, dir: string): void {
   env.PATH = [dir, env.PATH || process.env.PATH || ""].filter(Boolean).join(path.delimiter);
 }
@@ -415,6 +458,7 @@ export async function runInTemp<T>(
     "runInTemp createTempBuck2Shim",
     async () => await createTempBuck2Shim(tmp, tempNestedIso),
   );
+  await timeAsync("runInTemp createTempNixShim", async () => await createTempNixShim(buck2ShimDir));
   const tempSetupEnv = {
     ...process.env,
     WORKSPACE_ROOT: tmp,

@@ -48,7 +48,9 @@ test("node nix runner: minimal importer with no tests passes", async () => {
     await fsp.writeFile(path.join(app, "TARGETS"), targets, "utf8");
     // Update pnpm-store FOD hash mapping for this importer lockfile
     await $`zx-wrapper build-tools/tools/dev/update-pnpm-hash.ts --lockfile projects/apps/mini/pnpm-lock.yaml`;
-    // Execute the test target; with no test files present, the derivation should succeed
+    await $`buck2 cquery --target-platforms prelude//platforms:default "kind(nix_node_test, //projects/apps/mini:node_tests)"`;
     await $`buck2 test --target-platforms prelude//platforms:default //projects/apps/mini:node_tests`;
+    // Supplemental no-link policy coverage for the Nix runner attr invoked by nix_node_test.
+    await $`nix build --no-link --print-out-paths --impure --accept-flake-config ${`path:${tmp}#node-test.projects-apps-mini`} -L`;
   });
 });

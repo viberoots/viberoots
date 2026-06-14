@@ -89,12 +89,14 @@ test("remote worker bootstrap app is a thin zx-wrapper launcher", async () => {
     "build-tools/tools/remote-exec/remote-worker-bootstrap.ts",
     "utf8",
   );
+  const bootstrapBlock = app.match(/bootstrap = pkgs\.writeShellScriptBin[\s\S]*?'';/)?.[0] || "";
 
   assert.match(helper, /^#!\/usr\/bin\/env zx-wrapper/);
-  assert.match(app, /exec \$\{remoteTools\.remote-worker-tools\}\/bin\/zx-wrapper/);
-  assert.match(app, /--remote-worker-tools "\$\{remoteTools\.remote-worker-tools\}"/);
-  assert.doesNotMatch(app, /for bin in/);
-  assert.doesNotMatch(app, /command -v/);
+  assert.match(bootstrapBlock, /exec \$\{remoteTools\.remote-worker-tools\}\/bin\/zx-wrapper/);
+  assert.match(bootstrapBlock, /--remote-worker-tools "\$\{remoteTools\.remote-worker-tools\}"/);
+  assert.doesNotMatch(bootstrapBlock, /zx-init\.mjs/);
+  assert.doesNotMatch(bootstrapBlock, /for bin in/);
+  assert.doesNotMatch(bootstrapBlock, /command -v/);
   assert.match(helper, /requiredWorkerBins/);
   assert.match(helper, /scheduler registration is disabled/);
 });

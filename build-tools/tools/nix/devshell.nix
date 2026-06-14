@@ -175,8 +175,14 @@ EOF
       _vbr_apply_dev_path
 
       if [ -f flake.nix ]; then
-        export VIBEROOTS_ROOT="${viberootsRoot}"
-        viberoots init-workspace --shell-entry --source "${viberootsRoot}" >/dev/null || {
+        vbr_source="${viberootsRoot}"
+        if [ -f "$PWD/viberoots/flake.nix" ]; then
+          vbr_source="$PWD/viberoots"
+        elif [ -f "$PWD/build-tools/tools/dev/viberoots.ts" ]; then
+          vbr_source="$PWD"
+        fi
+        export VIBEROOTS_ROOT="$vbr_source"
+        viberoots init-workspace --shell-entry --source "$vbr_source" >/dev/null || {
           echo "(devShell) viberoots workspace activation failed" >&2
           return 1 2>/dev/null || exit 1
         }

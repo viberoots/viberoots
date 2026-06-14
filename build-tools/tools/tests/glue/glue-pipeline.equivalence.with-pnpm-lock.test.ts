@@ -2,6 +2,15 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
+import {
+  DEFAULT_AUTO_MAP_PATH,
+  DEFAULT_GRAPH_PATH,
+  DEFAULT_INVALIDATION_REPORT_PATH,
+  DEFAULT_NODE_LOCK_INDEX_PATH,
+  DEFAULT_PROVIDER_INDEX_PATH,
+  WORKSPACE_PROVIDER_DIR,
+  providerAutoTargetsPath,
+} from "../../lib/workspace-state-paths";
 import { runInTemp, exists } from "../lib/test-helpers";
 
 async function readOrEmpty(p: string): Promise<string> {
@@ -46,7 +55,7 @@ test("glue-pipeline: outputs identical to manual steps (with pnpm lockfile prese
     await fsp.writeFile(path.join(impDir, "pnpm-lock.yaml"), lockTxt, "utf8");
 
     // Synthesize a minimal graph that references the importer lockfile label
-    const graphPath = path.join(tmp, "build-tools", "tools", "buck", "graph.json");
+    const graphPath = path.join(tmp, DEFAULT_GRAPH_PATH);
     await fsp.mkdir(path.dirname(graphPath), { recursive: true });
     const nodes = [
       {
@@ -59,26 +68,24 @@ test("glue-pipeline: outputs identical to manual steps (with pnpm lockfile prese
     // Baseline: manual steps
     await $`node build-tools/tools/buck/sync-providers.ts`;
     await $`node build-tools/tools/buck/gen-provider-index.ts --out .viberoots/workspace/providers/provider_index.bzl`;
-    await $`node build-tools/tools/buck/gen-auto-map.ts --graph .viberoots/workspace/buck/graph.json --out .viberoots/workspace/providers/auto_map.bzl`;
+    await $`node build-tools/tools/buck/gen-auto-map.ts --graph ${DEFAULT_GRAPH_PATH} --out ${DEFAULT_AUTO_MAP_PATH}`;
     await $`node build-tools/tools/node/gen-workspace-map.ts`;
-    await $`node build-tools/tools/buck/invalidation-report.ts --out build-tools/tools/buck/invalidation-report.txt`;
+    await $`node build-tools/tools/buck/invalidation-report.ts --out ${DEFAULT_INVALIDATION_REPORT_PATH}`;
 
-    const provDir = path.join(tmp, "third_party", "providers");
-    const baseNodeTargets = await readOrEmpty(path.join(provDir, "TARGETS.node.auto"));
-    const basePyTargets = await readOrEmpty(path.join(provDir, "TARGETS.python.auto"));
-    const baseIndex = await readOrEmpty(path.join(provDir, "provider_index.bzl"));
-    const baseMap = await readOrEmpty(path.join(provDir, "auto_map.bzl"));
+    const provDir = path.join(tmp, WORKSPACE_PROVIDER_DIR);
+    const baseNodeTargets = await readOrEmpty(path.join(tmp, providerAutoTargetsPath("node")));
+    const basePyTargets = await readOrEmpty(path.join(tmp, providerAutoTargetsPath("python")));
+    const baseIndex = await readOrEmpty(path.join(tmp, DEFAULT_PROVIDER_INDEX_PATH));
+    const baseMap = await readOrEmpty(path.join(tmp, DEFAULT_AUTO_MAP_PATH));
     const baseWorkspaceMap = await readOrEmpty(
       path.join(tmp, "build-tools", "tools", "node", "workspace-map.json"),
     );
-    const baseReport = await readOrEmpty(
-      path.join(tmp, "build-tools", "tools", "buck", "invalidation-report.txt"),
-    );
+    const baseReport = await readOrEmpty(path.join(tmp, DEFAULT_INVALIDATION_REPORT_PATH));
 
     // Clean outputs and rerun via pipeline
     await removeGeneratedProviderOutputs(provDir);
     try {
-      await fsp.rm(path.join(tmp, "build-tools", "tools", "buck", "node-lock-index.json"), {
+      await fsp.rm(path.join(tmp, DEFAULT_NODE_LOCK_INDEX_PATH), {
         force: true,
       });
     } catch {}
@@ -88,22 +95,20 @@ test("glue-pipeline: outputs identical to manual steps (with pnpm lockfile prese
       });
     } catch {}
     try {
-      await fsp.rm(path.join(tmp, "build-tools", "tools", "buck", "invalidation-report.txt"), {
+      await fsp.rm(path.join(tmp, DEFAULT_INVALIDATION_REPORT_PATH), {
         force: true,
       });
     } catch {}
     await $`node build-tools/tools/buck/glue-pipeline.ts`;
 
-    const pipeNodeTargets = await readOrEmpty(path.join(provDir, "TARGETS.node.auto"));
-    const pipePyTargets = await readOrEmpty(path.join(provDir, "TARGETS.python.auto"));
-    const pipeIndex = await readOrEmpty(path.join(provDir, "provider_index.bzl"));
-    const pipeMap = await readOrEmpty(path.join(provDir, "auto_map.bzl"));
+    const pipeNodeTargets = await readOrEmpty(path.join(tmp, providerAutoTargetsPath("node")));
+    const pipePyTargets = await readOrEmpty(path.join(tmp, providerAutoTargetsPath("python")));
+    const pipeIndex = await readOrEmpty(path.join(tmp, DEFAULT_PROVIDER_INDEX_PATH));
+    const pipeMap = await readOrEmpty(path.join(tmp, DEFAULT_AUTO_MAP_PATH));
     const pipeWorkspaceMap = await readOrEmpty(
       path.join(tmp, "build-tools", "tools", "node", "workspace-map.json"),
     );
-    const pipeReport = await readOrEmpty(
-      path.join(tmp, "build-tools", "tools", "buck", "invalidation-report.txt"),
-    );
+    const pipeReport = await readOrEmpty(path.join(tmp, DEFAULT_INVALIDATION_REPORT_PATH));
 
     function assertEqual(a: string, b: string, label: string) {
       if (a !== b) {
@@ -131,9 +136,7 @@ test("glue-pipeline: outputs identical to manual steps (with pnpm lockfile prese
         process.exit(2);
       }
     }
-    if (
-      !(await exists(path.join(tmp, "build-tools", "tools", "buck", "invalidation-report.txt")))
-    ) {
+    if (!(await exists(path.join(tmp, DEFAULT_INVALIDATION_REPORT_PATH)))) {
       console.error("expected file missing: invalidation-report.txt");
       process.exit(2);
     }

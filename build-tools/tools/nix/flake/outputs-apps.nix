@@ -13,7 +13,6 @@ let
       exit 1
     fi
     exec ${remoteTools.remote-worker-tools}/bin/zx-wrapper \
-      --import "${viberootsRoot}/build-tools/tools/dev/zx-init.mjs" \
       "$helper" \
       --remote-worker-tools "${remoteTools.remote-worker-tools}" \
       "$@"

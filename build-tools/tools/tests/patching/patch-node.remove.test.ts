@@ -2,15 +2,16 @@
 import fs from "fs-extra";
 import path from "node:path";
 import { test } from "node:test";
+import { DEFAULT_AUTO_MAP_PATH, providerAutoTargetsPath } from "../../lib/workspace-state-paths";
 import { runInTemp } from "../lib/test-helpers";
 
 test("patch-node remove drops patch and refreshes glue deterministically", async () => {
   await runInTemp("patch-node-remove", async (tmp, $) => {
-    const importer = path.join(tmp, "apps", "example");
+    const importer = path.join(tmp, "projects", "apps", "example");
     await fs.mkdirp(importer);
     await fs.outputFile(
       path.join(importer, "pnpm-lock.yaml"),
-      "importers:\n  apps/example:\n    dependencies:\n      lodash: 4.17.21\npackages:\n  /lodash/4.17.21: {}\n",
+      "importers:\n  projects/apps/example:\n    dependencies:\n      lodash: 4.17.21\npackages:\n  /lodash/4.17.21: {}\n",
       "utf8",
     );
     await fs.outputFile(path.join(importer, ".npmrc"), "patches-dir=patches/node\n", "utf8");
@@ -43,8 +44,8 @@ test("patch-node remove drops patch and refreshes glue deterministically", async
     await $({ cwd: importer, env })`${cli} start node lodash --importer ${importer}`;
     await $({ cwd: importer, env })`${cli} apply node lodash --importer ${importer}`;
 
-    const autoTargets = path.join(tmp, "third_party", "providers", "TARGETS.node.auto");
-    const autoMap = path.join(tmp, "third_party", "providers", "auto_map.bzl");
+    const autoTargets = path.join(tmp, providerAutoTargetsPath("node"));
+    const autoMap = path.join(tmp, DEFAULT_AUTO_MAP_PATH);
     const beforeTargets = (await fs.pathExists(autoTargets))
       ? await fs.readFile(autoTargets, "utf8")
       : "";

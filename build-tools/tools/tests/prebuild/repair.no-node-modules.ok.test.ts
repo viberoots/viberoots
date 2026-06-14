@@ -3,6 +3,13 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
+import {
+  DEFAULT_AUTO_MAP_PATH,
+  DEFAULT_GRAPH_PATH,
+  DEFAULT_INVALIDATION_REPORT_PATH,
+  DEFAULT_PROVIDER_INDEX_PATH,
+  WORKSPACE_BUCK_STATE_DIR,
+} from "../../lib/workspace-state-paths";
 
 test("prebuild/repair runs without node_modules and generates glue", async () => {
   await runInTemp("prebuild-repair-no-node-mods", async (tmp, $) => {
@@ -16,6 +23,9 @@ name = TARGETS
 [repositories]
 root = .
 prelude = ./prelude
+viberoots = .
+workspace_buck = ./.viberoots/workspace/buck
+workspace_providers = ./.viberoots/workspace/providers
 toolchains = ./toolchains
 repo_toolchains = ./toolchains
 fbsource = ./prelude/third-party/fbsource_stub
@@ -25,6 +35,9 @@ config = ./prelude
 [cells]
 root = .
 prelude = ./prelude
+viberoots = .
+workspace_buck = ./.viberoots/workspace/buck
+workspace_providers = ./.viberoots/workspace/providers
 toolchains = ./toolchains
 repo_toolchains = ./toolchains
 fbsource = ./prelude/third-party/fbsource_stub
@@ -41,10 +54,10 @@ EOF
     `}`;
 
     // Seed a minimal non-empty graph so ensureGraph() is a no-op (avoids buck/nix)
-    const graphDir = path.join(tmp, "build-tools", "tools", "buck");
+    const graphDir = path.join(tmp, WORKSPACE_BUCK_STATE_DIR);
     await fsp.mkdir(graphDir, { recursive: true });
     await fsp.writeFile(
-      path.join(graphDir, "graph.json"),
+      path.join(tmp, DEFAULT_GRAPH_PATH),
       JSON.stringify({ $schema: "x", version: 1, nodes: [] }, null, 2) + "\n",
       "utf8",
     );
@@ -67,15 +80,9 @@ EOF
     })`node --experimental-strip-types --import ./build-tools/tools/dev/zx-init.mjs build-tools/tools/buck/prebuild/repair.ts`;
 
     // Verify glue outputs were generated
-    const autoMap = path.join(tmp, "third_party", "providers", "auto_map.bzl");
-    const providerIdx = path.join(tmp, "third_party", "providers", "provider_index.bzl");
-    const invalidationReport = path.join(
-      tmp,
-      "build-tools",
-      "tools",
-      "buck",
-      "invalidation-report.txt",
-    );
+    const autoMap = path.join(tmp, DEFAULT_AUTO_MAP_PATH);
+    const providerIdx = path.join(tmp, DEFAULT_PROVIDER_INDEX_PATH);
+    const invalidationReport = path.join(tmp, DEFAULT_INVALIDATION_REPORT_PATH);
     const autoMapTxt = await fsp.readFile(autoMap, "utf8").catch(() => "");
     const providerIdxTxt = await fsp.readFile(providerIdx, "utf8").catch(() => "");
     const reportTxt = await fsp.readFile(invalidationReport, "utf8").catch(() => "");

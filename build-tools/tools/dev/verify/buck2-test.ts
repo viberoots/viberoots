@@ -82,10 +82,10 @@ export function spawnVerifyBuck2Tests(opts: {
     ...targetPlatformArgsForPolicy(opts.executionPolicy),
     ...opts.targets,
     "--",
+    ...["--timeout", String(testNixTimeoutSecs)],
     ...testEnvArgs,
   ];
   const buckCommandForDiagnostics = [buck2Path, ...buckArgs];
-
   const startS = Math.floor(Date.now() / 1000);
   const buckEnv = buildBuckProcessEnvForPolicy(opts.executionPolicy);
   const buckLogEnv = buckLogEnvForExecutionPolicy(opts.executionPolicy);

@@ -71,6 +71,12 @@ test("verify contract: TMPDIR policy + coverage gating + disk gate strings prese
       verifyPasses.includes("killBuckIsolation(opts.root, spawned.nestedIso)"),
     "expected verify passes to kill child Buck nested isolations after each pass",
   );
+  assert.ok(
+    verifyPasses.includes("aggregateStatus") &&
+      verifyPasses.includes("return aggregateStatus") &&
+      !verifyPasses.includes("return status;\n    }\n  }\n\n  return 0;"),
+    "expected verify pass scheduling to run later pass groups after earlier pass failures",
+  );
 });
 
 test("verify macOS temp roots opt generated output trees out of metadata indexing", async () => {
@@ -79,10 +85,14 @@ test("verify macOS temp roots opt generated output trees out of metadata indexin
   const user = os.userInfo().username || "";
   const suffix = user ? `-${user}` : "";
   const systemTmpRoot = path.join(root, "system-tmp");
-  const expectedTmpdir = path.join(systemTmpRoot, `viberoots-verify${suffix}.noindex`, "tmpdir");
+  const expectedTmpdirLogical = path.join(
+    systemTmpRoot,
+    `viberoots-verify${suffix}.noindex`,
+    "tmpdir",
+  );
 
   try {
-    const staleSystemFile = path.join(expectedTmpdir, "stale-temp-repo", "file.txt");
+    const staleSystemFile = path.join(expectedTmpdirLogical, "stale-temp-repo", "file.txt");
     const staleFile = path.join(
       root,
       "buck-out",
@@ -107,6 +117,7 @@ test("verify macOS temp roots opt generated output trees out of metadata indexin
     await fsp.writeFile(staleOldTmpdirFile, "legacy", "utf8");
 
     await ensureRepoLocalTmpRoot(root, { env, platform: "darwin", systemTmpRoot });
+    const expectedTmpdir = await fsp.realpath(expectedTmpdirLogical);
 
     assert.equal(env.TEST_TMP_IN_REPO, undefined);
     assert.equal(env.TMPDIR, expectedTmpdir);

@@ -16,6 +16,7 @@ type StatusLike = { phases: Record<string, any> };
 test("aws-account identity config refs do not enter bootstrap categories", async () => {
   await runInTemp("aws-account-identity-bootstrap-guard", async (tmp) => {
     await writeInfisicalBootstrapConfig(tmp);
+    await writeLocalValues(tmp, "unused", undefined);
     await writeStackConfig(tmp, { awsAccountId: { ref: ACCOUNT_REF, category: "bootstrap" } });
     const { status, out } = await runBlockedCheck(tmp);
     const phase = status.phases["check-aws-login"];
@@ -30,7 +31,6 @@ test("aws-account identity config refs do not enter bootstrap categories", async
     assert.match((await readInputs(tmp)).inputErrors.awsAccountId, /project config values/);
   });
 });
-
 test("aws-account identity local redirects ignore bootstrap categories", async () => {
   await runInTemp("aws-account-identity-local-bootstrap-guard", async (tmp) => {
     await writeInfisicalBootstrapConfig(tmp);
@@ -60,10 +60,10 @@ test("aws-account identity local redirects ignore bootstrap categories", async (
     assert.equal(inputs.inputSources.awsOrganizationId.redirectRef, ACCOUNT_REF);
   });
 });
-
 test("aws-account identity config refs do not resolve through non-Infisical bootstrap category", async () => {
   await runInTemp("aws-account-identity-bootstrap-local-file", async (tmp) => {
     await writeLocalFileBootstrapConfig(tmp, { [ACCOUNT_REF]: "123456789012", [ORG_REF]: "o-ok" });
+    await writeLocalValues(tmp, "unused", undefined);
     await writeStackConfig(tmp, {
       awsAccountId: { ref: ACCOUNT_REF, category: "bootstrap" },
       awsOrganizationId: { ref: ORG_REF, category: "bootstrap" },
@@ -76,7 +76,6 @@ test("aws-account identity config refs do not resolve through non-Infisical boot
     assert.equal(inputs.inputSources.awsAccountId.valuePrinted, true);
   });
 });
-
 test("aws-account organization id reports unresolved local values as non-secret", async () => {
   await runInTemp("aws-account-org-local-missing", async (tmp) => {
     await writeStackConfig(tmp, { awsOrganizationId: { ref: ORG_REF } });
@@ -91,10 +90,10 @@ test("aws-account organization id reports unresolved local values as non-secret"
     assert.equal(status.phases["check-aws-login"].state, "blocked");
   });
 });
-
 test("aws-account organization id reports unresolved shared project config refs as non-secret", async () => {
   await runInTemp("aws-account-org-shared-missing", async (tmp) => {
     await writeControlLocalFileConfig(tmp, {});
+    await writeLocalValues(tmp, "unused", undefined);
     await writeStackConfig(tmp, { awsOrganizationId: { ref: ORG_REF, category: "control" } });
     const { status } = await runBlockedCheck(tmp);
     assertMissingField(status, "awsOrganizationId", {

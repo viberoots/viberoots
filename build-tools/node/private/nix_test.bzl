@@ -61,7 +61,8 @@ def _node_nix_test_impl(ctx):
         + "export VBR_STREAM_NIX_BUILD_LOGS=\"${VBR_STREAM_NIX_BUILD_LOGS:-1}\"; "
         + nix_bootstrap_env_pnpm_store()
         + ("echo '[node_nix_test] phase=prepare-exact-store target=%s importer=%s' >&2; " % (target_label, imp))
-        + ("EXACT_PNPM_STORE=$(cd \"$FLK_ROOT\" && node --experimental-top-level-await --disable-warning=ExperimentalWarning --experimental-strip-types --import \"$FLK_ROOT/build-tools/tools/dev/zx-init.mjs\" \"$FLK_ROOT/build-tools/tools/dev/prepare-exact-pnpm-store.ts\" --importer \"%s\"); " % imp)
+        + ("EXACT_PNPM_STORE_RAW=$(cd \"$FLK_ROOT\" && node --experimental-top-level-await --disable-warning=ExperimentalWarning --experimental-strip-types --import \"$FLK_ROOT/build-tools/tools/dev/zx-init.mjs\" \"$FLK_ROOT/build-tools/tools/dev/prepare-exact-pnpm-store.ts\" --importer \"%s\"); " % imp)
+        + "EXACT_PNPM_STORE=$(printf '%s\\n' \"$EXACT_PNPM_STORE_RAW\" | awk '/^\\/nix\\/store\\// { found=$0 } END { print found }'); "
         + "export NIX_PNPM_EXACT_STORE=\"$EXACT_PNPM_STORE\"; "
         + "echo '[node_nix_test] exact-store='$NIX_PNPM_EXACT_STORE >&2; "
         + "case \"$NIX_PNPM_EXACT_STORE\" in /nix/store/*) ;; *) echo '[node_nix_test] exact-store must be a /nix/store path' >&2; exit 2 ;; esac; "
@@ -89,6 +90,8 @@ def _node_nix_test_impl(ctx):
     if ctx.attrs.source_snapshot != None and ctx.attrs.source_snapshot_manifest != None:
         snapshot_labels = ["source-snapshot:declared-root", "source-snapshot:manifest", "source-snapshot:graph"]
     labels = stamp_remote_readiness_labels(ctx.attrs.labels + snapshot_labels)
+    if "remote:ready" not in labels and "re_ignore_force_run_as_bundle" not in labels:
+        labels.append("re_ignore_force_run_as_bundle")
     remote_command = [ctx.attrs.remote_ready_runner] + snapshot_inputs if ctx.attrs.remote_ready_runner != None else None
     declared_inputs = ctx.attrs.srcs + snapshot_inputs + ([] if ctx.attrs.remote_ready_runner == None else [ctx.attrs.remote_ready_runner]) + [
         ctx.attrs._command_heartbeat,
@@ -115,7 +118,7 @@ def _node_nix_test_impl(ctx):
     )
 
     return inject_test_run_info(ctx, ExternalRunnerTestInfo(
-            type = "custom",
+            type = "node",
             command = command,
             labels = labels,
             contacts = [],

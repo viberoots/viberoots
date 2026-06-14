@@ -134,6 +134,8 @@ export function localArgvSnapshot(): string[] {
     "prelude//platforms:default",
     "//:target",
     "--",
+    "--timeout",
+    "1800",
     ...commonTestEnvArgs(),
   ];
 }
@@ -184,6 +186,8 @@ export function remoteArgvSnapshot(opts: {
     "prelude//platforms:default",
     "//:target",
     "--",
+    "--timeout",
+    "1800",
     ...remoteTestEnvArgs(),
   ];
 }

@@ -40,7 +40,9 @@ def _go_nix_test_impl(ctx):
         )
         + "if [ \"$NIX_STATUS\" -ne 0 ] || [ -z \"$OUT_PATH\" ]; then "
         + "  if [ -f \"$BUILD_SELECTED_LOG\" ]; then cat \"$BUILD_SELECTED_LOG\" >&2; fi; "
-        + "  exit ${NIX_STATUS:-2}; "
+        + "  if [ \"$NIX_STATUS\" -ne 0 ]; then exit \"$NIX_STATUS\"; fi; "
+        + "  echo '[go_nix_test] build-selected produced no output path' >&2; "
+        + "  exit 2; "
         + "fi; "
         + ("BIN=\"$OUT_PATH/bin/%s\"; " % expected_bin)
         + "if [ ! -x \"$BIN\" ]; then "
@@ -68,6 +70,8 @@ def _go_nix_test_impl(ctx):
     if ctx.attrs.source_snapshot != None and ctx.attrs.source_snapshot_manifest != None:
         snapshot_labels = ["source-snapshot:declared-root", "source-snapshot:manifest", "source-snapshot:graph"]
     labels = stamp_remote_readiness_labels(ctx.attrs.labels + snapshot_labels)
+    if "remote:ready" not in labels and "re_ignore_force_run_as_bundle" not in labels:
+        labels.append("re_ignore_force_run_as_bundle")
     remote_command = [ctx.attrs.remote_ready_runner] + snapshot_inputs if ctx.attrs.remote_ready_runner != None else None
     declared_inputs = ctx.attrs.srcs + ctx.attrs.nix_inputs + snapshot_inputs + ([] if ctx.attrs.remote_ready_runner == None else [ctx.attrs.remote_ready_runner]) + [
         ctx.attrs._build_selected,
@@ -89,7 +93,7 @@ def _go_nix_test_impl(ctx):
         ] + snapshot_inputs,
     )
     return inject_test_run_info(ctx, ExternalRunnerTestInfo(
-            type = "custom",
+            type = "go",
             command = command,
             labels = labels,
             contacts = [],

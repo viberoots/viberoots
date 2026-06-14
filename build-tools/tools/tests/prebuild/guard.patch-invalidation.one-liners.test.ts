@@ -70,7 +70,7 @@ test("prebuild-guard: prints patch invalidation one-liners with canonical vocabu
     const expectLines = [
       "[prebuild] node patch_scope:importer-local — patch invalidation is driven by macro action inputs under <importer>/patches/node",
       "[prebuild] python patch_scope:importer-local — patch invalidation is driven by macro action inputs under <importer>/patches/python",
-      "[prebuild] importer-local patches: see build-tools/tools/buck/invalidation-report.txt for per-target action inputs",
+      "[prebuild] importer-local patches: see .viberoots/workspace/buck/invalidation-report.txt for per-target action inputs",
       "[prebuild] go patch_scope:package-local — patch invalidation is driven by <pkg>/patches/go included as action inputs",
       "[prebuild] cpp patch_scope:package-local — patch invalidation is driven by <pkg>/patches/cpp included as action inputs",
     ];

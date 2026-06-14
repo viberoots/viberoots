@@ -2,9 +2,7 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { DEFAULT_GRAPH_PATH, WORKSPACE_BUCK_STATE_DIR } from "../../../lib/workspace-state-paths";
 import "./worker-init";
-
 let cachedPreludePath: Promise<string> | null = null;
-
 async function resolvePreludePath(tmp: string, $: any): Promise<string> {
   const sharedPrelude = String(process.env.VBR_SHARED_PRELUDE_PATH || "").trim();
   if (sharedPrelude) {
@@ -53,7 +51,6 @@ async function resolvePreludePath(tmp: string, $: any): Promise<string> {
       return "";
     })();
   }
-
   return await cachedPreludePath;
 }
 
@@ -64,7 +61,10 @@ export async function ensureBuckConfigForTempRepo(tmp: string, $: any): Promise<
   const setupScript = [
     "set -euo pipefail",
     "printf '.\\n' > .buckroot",
-    `[ -e prelude ] || ln -s "${preludePath}" prelude`,
+    "mkdir -p viberoots",
+    `[ -e viberoots/prelude ] || ln -s "${preludePath}" viberoots/prelude`,
+    "[ -e viberoots/build-tools ] || ln -s ../build-tools viberoots/build-tools",
+    "printf '[buildfile]\\nname = TARGETS\\n\\n[repositories]\\nroot = ..\\nviberoots = .\\nprelude = ./prelude\\ntoolchains = ./toolchains\\nrepo_toolchains = ./toolchains\\nconfig = ./prelude\\nfbsource = ./config/fbsource_stub\\nfbcode = ./config/fbcode_stub\\n\\n[cells]\\nroot = ..\\nviberoots = .\\nprelude = ./prelude\\ntoolchains = ./toolchains\\nrepo_toolchains = ./toolchains\\nconfig = ./prelude\\nfbsource = ./config/fbsource_stub\\nfbcode = ./config/fbcode_stub\\n\\n[build]\\nprelude = prelude\\n' > viberoots/.buckconfig",
     "cat > .buckconfig <<'EOF'",
     "[buildfile]",
     "name = TARGETS",
@@ -72,24 +72,24 @@ export async function ensureBuckConfigForTempRepo(tmp: string, $: any): Promise<
     "[repositories]",
     "root = .",
     "viberoots = ./.viberoots/current",
-    "prelude = ./prelude",
-    "toolchains = ./toolchains",
-    "repo_toolchains = ./toolchains",
-    "config = ./prelude",
-    "fbsource = ./prelude/third-party/fbsource_stub",
-    "fbcode = ./prelude/third-party/fbcode_stub",
+    "prelude = ./.viberoots/current/prelude",
+    "toolchains = ./.viberoots/current/toolchains",
+    "repo_toolchains = ./.viberoots/current/toolchains",
+    "config = ./.viberoots/current/prelude",
+    "fbsource = ./.viberoots/current/config/fbsource_stub",
+    "fbcode = ./.viberoots/current/config/fbcode_stub",
     "workspace_providers = ./.viberoots/workspace/providers",
     "workspace_buck = ./.viberoots/workspace/buck",
     "",
     "[cells]",
     "root = .",
     "viberoots = ./.viberoots/current",
-    "prelude = ./prelude",
-    "toolchains = ./toolchains",
-    "repo_toolchains = ./toolchains",
-    "config = ./prelude",
-    "fbsource = ./prelude/third-party/fbsource_stub",
-    "fbcode = ./prelude/third-party/fbcode_stub",
+    "prelude = ./.viberoots/current/prelude",
+    "toolchains = ./.viberoots/current/toolchains",
+    "repo_toolchains = ./.viberoots/current/toolchains",
+    "config = ./.viberoots/current/prelude",
+    "fbsource = ./.viberoots/current/config/fbsource_stub",
+    "fbcode = ./.viberoots/current/config/fbcode_stub",
     "workspace_providers = ./.viberoots/workspace/providers",
     "workspace_buck = ./.viberoots/workspace/buck",
     "",
@@ -101,14 +101,14 @@ export async function ensureBuckConfigForTempRepo(tmp: string, $: any): Promise<
     "action_env = SDKROOT,CPATH,LIBRARY_PATH,CGO_CFLAGS,CGO_CPPFLAGS,CGO_ENABLED,WORKSPACE_ROOT,BUCK_TEST_SRC,BUCK_GRAPH_JSON,BUCK_ISOLATION_DIR,BUCK_NESTED_ISO,REPO_ROOT",
     "EOF",
     "mkdir -p .viberoots",
-    "[ -e .viberoots/current ] || ln -s .. .viberoots/current",
+    "[ -e .viberoots/current ] || ln -s ../viberoots .viberoots/current",
+    'for base in viberoots/config config; do for cell in fbsource_stub fbcode_stub; do mkdir -p "$base/$cell"; printf "[buildfile]\\nname = TARGETS\\n" > "$base/$cell/.buckconfig"; printf "# stub %s cell for temp repositories\\n" "$cell" > "$base/$cell/TARGETS"; done; done',
     "mkdir -p .viberoots/workspace/buck",
     "printf '[buildfile]\\nname = TARGETS\\n' > .viberoots/workspace/buck/.buckconfig",
     "printf '[]\\n' > .viberoots/workspace/buck/graph.json",
     "printf 'WORKSPACE_ROOT=%s\\n' \"$PWD\" > .viberoots/workspace/buck/workspace-root.env",
     "cat > .viberoots/workspace/buck/TARGETS <<'EOF'",
     'load("@prelude//:rules.bzl", "export_file")',
-    "",
     'export_file(name = "graph.json", src = "graph.json", visibility = ["PUBLIC"])',
     'export_file(name = "workspace-root.env", src = "workspace-root.env", visibility = ["PUBLIC"])',
     "EOF",
@@ -121,6 +121,7 @@ export async function ensureBuckConfigForTempRepo(tmp: string, $: any): Promise<
     "# generated workspace provider package placeholder",
     "EOF",
     "mkdir -p toolchains",
+    "[ -e viberoots/toolchains ] || ln -s ../toolchains viberoots/toolchains",
     "printf '[buildfile]\\nname = TARGETS\\n' > toolchains/.buckconfig",
     "cat > toolchains/remote_profile_conversion_fixture.bzl <<'EOF'",
     'load("@prelude//:build_mode.bzl", "BuildModeInfo")',
@@ -223,12 +224,6 @@ export async function ensureBuckConfigForTempRepo(tmp: string, $: any): Promise<
     "EOF",
   ].join("\n");
   await $({ cwd: tmp })`bash --noprofile --norc -c ${setupScript}`;
-
-  try {
-    await $({
-      cwd: tmp,
-    })`bash -c 'echo ==== .buckconfig ====; sed -n 1,200p .buckconfig || true; echo ==== toolchains/TARGETS ====; sed -n 1,200p toolchains/TARGETS || true'`;
-  } catch {}
 }
 
 export async function ensureWorkspaceRootEnvFile(tmp: string): Promise<void> {

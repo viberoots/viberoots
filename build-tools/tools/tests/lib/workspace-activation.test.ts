@@ -85,6 +85,27 @@ test("activateWorkspace is idempotent on an already activated workspace", async 
   }
 });
 
+test("activateWorkspace tolerates concurrent current-link activation", async () => {
+  const root = await workspace("vbr-activate-concurrent");
+  try {
+    await makeSource(root);
+
+    await Promise.all(
+      Array.from({ length: 8 }, () =>
+        activateWorkspace({ start: root, env: { WORKSPACE_ROOT: root } }),
+      ),
+    );
+
+    assert.equal(await readlink(root), "../viberoots");
+    assert.equal(
+      await fsp.realpath(path.join(root, ".viberoots/current")),
+      path.join(root, "viberoots"),
+    );
+  } finally {
+    await fsp.rm(root, { recursive: true, force: true });
+  }
+});
+
 test("activateWorkspace rejects stale local current symlink", async () => {
   const root = await workspace("vbr-activate-stale-local");
   try {

@@ -40,7 +40,9 @@ def _python_nix_test_impl(ctx):
         )
         + "if [ \"$NIX_STATUS\" -ne 0 ] || [ -z \"$OUT_PATH\" ]; then "
         + "  if [ -f \"$BUILD_SELECTED_LOG\" ]; then cat \"$BUILD_SELECTED_LOG\" >&2; fi; "
-        + "  exit ${NIX_STATUS:-2}; "
+        + "  if [ \"$NIX_STATUS\" -ne 0 ]; then exit \"$NIX_STATUS\"; fi; "
+        + "  echo '[python_nix_test] build-selected produced no output path' >&2; "
+        + "  exit 2; "
         + "fi; "
         + ("BIN=\"$OUT_PATH/bin/%s\"; " % expected_bin)
         + "if [ ! -x \"$BIN\" ]; then "

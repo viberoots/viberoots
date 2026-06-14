@@ -24,7 +24,7 @@ test("sync-providers-node: synthetic lockfile providers are opt-in", async () =>
 
     // Default behavior: no provider for non-existent lockfiles
     await $`node build-tools/tools/buck/sync-providers.ts --lang node --no-glue`;
-    const outPath = path.join(tmp, "third_party", "providers", "TARGETS.node.auto");
+    const outPath = path.join(tmp, ".viberoots", "workspace", "providers", "TARGETS.node.auto");
     const outDefault = await fsp.readFile(outPath, "utf8");
     assert.ok(!outDefault.includes("node_importer_deps("), "expected no node providers by default");
     assert.ok(

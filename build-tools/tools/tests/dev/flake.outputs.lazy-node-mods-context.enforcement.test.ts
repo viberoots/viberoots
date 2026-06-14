@@ -3,7 +3,7 @@ import * as fsp from "node:fs/promises";
 import { test } from "node:test";
 
 test("flake outputs split light and heavy per-system contexts", async () => {
-  const outputsFile = "build-tools/tools/nix/flake/outputs.nix";
+  const outputsFile = "build-tools/tools/nix/flake/workspace.nix";
   const sysFile = "build-tools/tools/nix/flake/for-all-systems.nix";
   const ctxFile = "build-tools/tools/nix/flake/per-system-context.nix";
 

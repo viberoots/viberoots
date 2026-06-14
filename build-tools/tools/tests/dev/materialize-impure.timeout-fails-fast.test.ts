@@ -4,11 +4,12 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
 import { maybePrintImpureMaterializedBins } from "../../dev/dev-build/materialize-impure";
+import { DEFAULT_GRAPH_PATH } from "../../lib/workspace-state-paths";
 import { runInTemp } from "../lib/test-helpers";
 
 test("materialize impure fails fast when nix build exceeds timeout", async () => {
   await runInTemp("materialize-impure-timeout", async (tmp) => {
-    const graphPath = path.join(tmp, "build-tools", "tools", "buck", "graph.json");
+    const graphPath = path.join(tmp, DEFAULT_GRAPH_PATH);
     await fsp.mkdir(path.dirname(graphPath), { recursive: true });
     await fsp.writeFile(
       graphPath,

@@ -4,6 +4,7 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
 import { maybePrintImpureMaterializedBins } from "../../dev/dev-build/materialize-impure";
+import { DEFAULT_GRAPH_PATH } from "../../lib/workspace-state-paths";
 import { runInTemp } from "../lib/test-helpers";
 
 test("materialize impure skips full graph summary for non-specific target sets", async () => {
@@ -19,9 +20,9 @@ test("materialize impure skips full graph summary for non-specific target sets",
       "utf8",
     );
     await fsp.chmod(stubNix, 0o755);
-    await fsp.mkdir(path.join(tmp, "build-tools", "tools", "buck"), { recursive: true });
+    await fsp.mkdir(path.dirname(path.join(tmp, DEFAULT_GRAPH_PATH)), { recursive: true });
     await fsp.writeFile(
-      path.join(tmp, "build-tools", "tools", "buck", "graph.json"),
+      path.join(tmp, DEFAULT_GRAPH_PATH),
       JSON.stringify(
         {
           nodes: [

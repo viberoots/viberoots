@@ -5,10 +5,10 @@ import {
   loadVerifyTargetLabels,
   planVerifyTargetPasses,
   summarizeVerifyTargetPlan,
+  VERIFY_BROAD_RESOURCE_LIMITED_THREADS,
   VERIFY_ISOLATED_LABEL,
   VERIFY_MANUAL_LABEL,
   VERIFY_RESOURCE_LIMITED_LABEL,
-  VERIFY_RESOURCE_LIMITED_THREADS,
 } from "../../dev/verify/target-passes";
 import { parseVerifyExecutionPolicy } from "../../dev/verify/remote-policy";
 import { inheritedBuckIsolation } from "../lib/test-helpers";
@@ -125,7 +125,7 @@ test("verify target pass loading keeps wildcard scope broad while isolating labe
     resourceLimitedPass?.targets.every((target) => !isolatedPass.targets.includes(target)),
     "expected isolated targets to stay out of the resource-limited pass",
   );
-  assert.equal(resourceLimitedPass?.threadsOverride, VERIFY_RESOURCE_LIMITED_THREADS);
+  assert.equal(resourceLimitedPass?.threadsOverride, VERIFY_BROAD_RESOURCE_LIMITED_THREADS);
   const resourceLimitedLabels = targets.find(
     (entry) => entry.target === "//:deployments_nixos_shared_host_reuse_e2e",
   )?.labels;

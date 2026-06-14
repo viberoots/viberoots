@@ -16,7 +16,8 @@ def _go_nix_build_impl(ctx):
         + "mkdir -p \"$(dirname \"$BUILD_SELECTED_LOG\")\"; "
     )
     run_and_copy = (
-        nix_cmd_prefix(timeout_var = "TIMEOUT", timeout_sec = 600, include_pnpm_store = False, escape_cmd_subst = True)
+        "DEST=\"$0\"; case \"$DEST\" in /*) ;; *) DEST=\"$PWD/$DEST\" ;; esac; "
+        + nix_cmd_prefix(timeout_var = "TIMEOUT", timeout_sec = 600, include_pnpm_store = False, escape_cmd_subst = True)
         + safe_log_path_prefix
         + nix_action_build_selected_out_path_cmd(
             target_label = raw,
@@ -28,9 +29,11 @@ def _go_nix_build_impl(ctx):
         )
         + "if [ \"$NIX_STATUS\" -ne 0 ] || [ -z \"$outPath\" ]; then "
         + "  if [ -f \"$BUILD_SELECTED_LOG\" ]; then cat \"$BUILD_SELECTED_LOG\" >&2; fi; "
-        + "  exit ${NIX_STATUS:-2}; "
+        + "  if [ \"$NIX_STATUS\" -ne 0 ]; then exit \"$NIX_STATUS\"; fi; "
+        + "  echo \"go_nix_build (%s): build-selected produced no output path\" >&2; " % raw
+        + "  exit 2; "
         + "fi; "
-        + "if [ \"%s\" = \"lib\" ]; then : > \"$0\"; exit 0; fi; " % kind
+        + "if [ \"%s\" = \"lib\" ]; then : > \"$DEST\"; exit 0; fi; " % kind
         + ("TARGET_NAME=\"%s\"; " % target_name)
         + ("SANITIZED=\"%s\"; " % sanitized)
         + "CAND=\"\"; "
@@ -43,7 +46,7 @@ def _go_nix_build_impl(ctx):
         + "  if [ -d \"$outPath/bin\" ]; then ls -la \"$outPath/bin\" >&2; fi; "
         + "  exit 2; "
         + "fi; "
-        + "DEST=\"$0\"; cp -f \"$CAND\" \"$DEST\"; "
+        + "cp -f \"$CAND\" \"$DEST\"; "
     )
     out = ctx.actions.declare_output(ctx.attrs.out)
     cmd = cmd_args(

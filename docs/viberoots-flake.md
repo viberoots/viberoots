@@ -53,7 +53,7 @@ Avoid introducing new `third_party` directories in the split layout. Use clearer
 - `.viberoots/workspace/providers` for workspace-generated provider glue;
 - `viberoots/vendor/<name>` for reusable vendored inputs owned by viberoots.
 
-The existing prelude may still contain upstream paths such as `prelude/third-party/fbsource_stub`.
+The active dogfood layout keeps `fbsource` and `fbcode` as repo-owned compatibility stub cells under `config/`, reached through `.viberoots/current`.
 Those are part of the imported prelude layout and are not the workspace dependency boundary.
 
 ### Recommended Stage 1: Same Checkout With Viberoots Submodule
@@ -152,8 +152,8 @@ config = ./.viberoots/current/prelude
 toolchains = ./.viberoots/current/toolchains
 repo_toolchains = ./.viberoots/current/toolchains
 workspace_providers = ./.viberoots/workspace/providers
-fbsource = ./.viberoots/current/prelude/third-party/fbsource_stub
-fbcode = ./.viberoots/current/prelude/third-party/fbcode_stub
+fbsource = ./.viberoots/current/config/fbsource_stub
+fbcode = ./.viberoots/current/config/fbcode_stub
 
 [repositories]
 root = .
@@ -163,8 +163,8 @@ config = ./.viberoots/current/prelude
 toolchains = ./.viberoots/current/toolchains
 repo_toolchains = ./.viberoots/current/toolchains
 workspace_providers = ./.viberoots/workspace/providers
-fbsource = ./.viberoots/current/prelude/third-party/fbsource_stub
-fbcode = ./.viberoots/current/prelude/third-party/fbcode_stub
+fbsource = ./.viberoots/current/config/fbsource_stub
+fbcode = ./.viberoots/current/config/fbcode_stub
 
 [build]
 prelude = prelude
@@ -261,8 +261,8 @@ config = ./.viberoots/current/prelude
 toolchains = ./.viberoots/current/toolchains
 repo_toolchains = ./.viberoots/current/toolchains
 workspace_providers = ./.viberoots/workspace/providers
-fbsource = ./.viberoots/current/prelude/third-party/fbsource_stub
-fbcode = ./.viberoots/current/prelude/third-party/fbcode_stub
+fbsource = ./.viberoots/current/config/fbsource_stub
+fbcode = ./.viberoots/current/config/fbcode_stub
 ```
 
 If the active Buck version still expects both `[cells]` and `[repositories]`, the workspace should
@@ -467,8 +467,8 @@ prelude = ./.viberoots/current/prelude
 toolchains = ./.viberoots/current/toolchains
 repo_toolchains = ./.viberoots/current/toolchains
 config = ./.viberoots/current/prelude
-fbsource = ./.viberoots/current/prelude/third-party/fbsource_stub
-fbcode = ./.viberoots/current/prelude/third-party/fbcode_stub
+fbsource = ./.viberoots/current/config/fbsource_stub
+fbcode = ./.viberoots/current/config/fbcode_stub
 ```
 
 For an external consumer, these point at the materialized viberoots source path:
@@ -478,8 +478,8 @@ prelude = ./.viberoots/current/prelude
 toolchains = ./.viberoots/current/toolchains
 repo_toolchains = ./.viberoots/current/toolchains
 config = ./.viberoots/current/prelude
-fbsource = ./.viberoots/current/prelude/third-party/fbsource_stub
-fbcode = ./.viberoots/current/prelude/third-party/fbcode_stub
+fbsource = ./.viberoots/current/config/fbsource_stub
+fbcode = ./.viberoots/current/config/fbcode_stub
 ```
 
 The root workspace should not own copies of these directories.

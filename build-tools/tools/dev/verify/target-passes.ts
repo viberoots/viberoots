@@ -10,6 +10,8 @@ export const VERIFY_ISOLATED_LABEL = "verify:isolated";
 export const VERIFY_MANUAL_LABEL = "verify:manual";
 export const VERIFY_RESOURCE_LIMITED_LABEL = "verify:resource-limited";
 export const VERIFY_RESOURCE_LIMITED_THREADS = 4;
+export const VERIFY_BROAD_RESOURCE_LIMITED_THREADS = 2;
+export const VERIFY_BROAD_RESOURCE_LIMITED_TARGET_MIN = 50;
 
 export type VerifyTargetLabels = {
   target: string;
@@ -42,8 +44,13 @@ type CqueryTargetInfo = {
   labels?: string[];
 };
 
-function buildCqueryQuery(targets: readonly string[]): string {
-  return targets.length === 1 ? targets[0]! : `(${targets.map((t) => `${t}`).join(" + ")})`;
+function cqueryLiteral(target: string): string {
+  return JSON.stringify(String(target || ""));
+}
+
+export function buildCqueryQuery(targets: readonly string[]): string {
+  if (targets.length === 1) return cqueryLiteral(targets[0]!);
+  return `set(${targets.map(cqueryLiteral).join(" ")})`;
 }
 
 function isPatternVerifyTarget(target: string): boolean {
@@ -104,7 +111,10 @@ export function planVerifyTargetPasses(
     passes.push({
       name: "resource-limited",
       targets: resourceLimitedTargets,
-      threadsOverride: VERIFY_RESOURCE_LIMITED_THREADS,
+      threadsOverride:
+        resourceLimitedTargets.length >= VERIFY_BROAD_RESOURCE_LIMITED_TARGET_MIN
+          ? VERIFY_BROAD_RESOURCE_LIMITED_THREADS
+          : VERIFY_RESOURCE_LIMITED_THREADS,
     });
   }
   if (sharedTargets.length > 0) {

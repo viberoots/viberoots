@@ -130,7 +130,7 @@ test("interactive deployment fan-out can be declined after repo setup", async ()
 test("confirmed repo bootstrap performs repo setup before deployment fan-out prompt", async () => {
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), "infisical-repo-fanout-"));
   await writeRepoOnlyResolver(dir);
-  await fs.mkdir(path.join(dir, "build-tools/tools/buck"), { recursive: true });
+  await fs.mkdir(path.join(dir, ".viberoots/workspace/buck"), { recursive: true });
   await fs.writeFile(
     path.join(dir, ".viberoots/workspace/buck/graph.json"),
     `${JSON.stringify({ nodes: [promptOnlyFanOutNode(staging)] }, null, 2)}\n`,
@@ -161,7 +161,7 @@ test("repo dry-run reports non-empty deployment fan-out targets read-only", asyn
   process.env.WORKSPACE_ROOT = dir;
   process.env.LIVE_ROOT = dir;
   try {
-    await fs.mkdir("build-tools/tools/buck", { recursive: true });
+    await fs.mkdir(".viberoots/workspace/buck", { recursive: true });
     await fs.writeFile(
       ".viberoots/workspace/buck/graph.json",
       `${JSON.stringify({ nodes: [fanOutOnlyNode(staging)] }, null, 2)}\n`,

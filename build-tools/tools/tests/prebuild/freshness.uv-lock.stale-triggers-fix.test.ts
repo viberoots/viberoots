@@ -2,31 +2,31 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
+import {
+  DEFAULT_AUTO_MAP_PATH,
+  DEFAULT_GRAPH_PATH,
+  DEFAULT_INVALIDATION_REPORT_PATH,
+  DEFAULT_NODE_LOCK_INDEX_PATH,
+  providerAutoTargetsPath,
+  WORKSPACE_PROVIDER_DIR,
+} from "../../lib/workspace-state-paths";
 import { exists, runInTemp } from "../lib/test-helpers";
 
 test("prebuild-guard: touching uv.lock marks stale and auto-fixes locally", async () => {
   await runInTemp("prebuild-uv-freshness", async (tmp, $) => {
-    const providersDir = path.join(tmp, "third_party", "providers");
+    const providersDir = path.join(tmp, WORKSPACE_PROVIDER_DIR);
     await fsp.mkdir(providersDir, { recursive: true });
     // Minimal glue outputs (graph + auto_map) present
+    await fsp.writeFile(path.join(tmp, DEFAULT_GRAPH_PATH), "[]\n", "utf8");
+    await fsp.writeFile(path.join(tmp, DEFAULT_NODE_LOCK_INDEX_PATH), "{}\n", "utf8");
     await fsp.writeFile(
-      path.join(tmp, "build-tools", "tools", "buck", "graph.json"),
-      "[]\n",
-      "utf8",
-    );
-    await fsp.writeFile(
-      path.join(tmp, "build-tools", "tools", "buck", "node-lock-index.json"),
-      "{}\n",
-      "utf8",
-    );
-    await fsp.writeFile(
-      path.join(tmp, "build-tools", "tools", "buck", "invalidation-report.txt"),
+      path.join(tmp, DEFAULT_INVALIDATION_REPORT_PATH),
       "# invalidation-report\n",
       "utf8",
     );
-    const targetsPy = path.join(providersDir, "TARGETS.python.auto");
+    const targetsPy = path.join(tmp, providerAutoTargetsPath("python"));
     await fsp.writeFile(
-      path.join(providersDir, "auto_map.bzl"),
+      path.join(tmp, DEFAULT_AUTO_MAP_PATH),
       "# gen\nMODULE_PROVIDERS = {}\n",
       "utf8",
     );

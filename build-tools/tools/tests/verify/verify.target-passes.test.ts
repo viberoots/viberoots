@@ -2,7 +2,10 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
+  buildCqueryQuery,
   planVerifyTargetPasses,
+  VERIFY_BROAD_RESOURCE_LIMITED_TARGET_MIN,
+  VERIFY_BROAD_RESOURCE_LIMITED_THREADS,
   VERIFY_ISOLATED_LABEL,
   VERIFY_RESOURCE_LIMITED_LABEL,
   VERIFY_RESOURCE_LIMITED_THREADS,
@@ -12,6 +15,14 @@ import {
   resourceLimitedStartDelaySeconds,
   verifyPassIsolationDir,
 } from "../../dev/verify/verify-pass-scheduling";
+
+test("verify target cquery quotes explicit labels with operator characters", () => {
+  assert.equal(
+    buildCqueryQuery(["//:providers_registry_build_handlers_node+python_detected"]),
+    '"//:providers_registry_build_handlers_node+python_detected"',
+  );
+  assert.equal(buildCqueryQuery(["//:one", "//:two+three"]), 'set("//:one" "//:two+three")');
+});
 
 test("verify target passes batch isolated targets ahead of the shared batch", () => {
   const passes = planVerifyTargetPasses([
@@ -101,6 +112,21 @@ test("verify target pass execution serializes isolated, resource-limited, and sh
   assert.deepEqual(
     groupVerifyPassesForExecution(passes).map((group) => group.map((pass) => pass.name)),
     [["isolated"], ["resource-limited"], ["shared"]],
+  );
+});
+
+test("broad resource-limited passes lower concurrency for deployment fanout", () => {
+  const passes = planVerifyTargetPasses([
+    ...Array.from({ length: VERIFY_BROAD_RESOURCE_LIMITED_TARGET_MIN }, (_, index) => ({
+      target: `//:deployments_resource_heavy_${index}`,
+      labels: [VERIFY_RESOURCE_LIMITED_LABEL],
+    })),
+    { target: "//:ordinary", labels: ["kind:test"] },
+  ]);
+
+  assert.equal(
+    passes.find((pass) => pass.name === "resource-limited")?.threadsOverride,
+    VERIFY_BROAD_RESOURCE_LIMITED_THREADS,
   );
 });
 

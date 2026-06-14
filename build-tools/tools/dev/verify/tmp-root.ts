@@ -44,7 +44,6 @@ export async function ensureRepoLocalTmpRoot(
   } else {
     env.TEST_TMP_IN_REPO = "1";
   }
-  env.TMPDIR = tmpdir;
   if (env.VERIFY_ALLOW_CONCURRENT !== "1") {
     await Promise.all([
       repoLocalTmpdir || platform === "darwin"
@@ -59,12 +58,13 @@ export async function ensureRepoLocalTmpRoot(
     ]);
   }
   await fsp.mkdir(tmpdir, { recursive: true }).catch(() => {});
+  env.TMPDIR = await fsp.realpath(tmpdir).catch(() => tmpdir);
   if (platform === "darwin") {
     await Promise.all([
       writeMacosMetadataNeverIndexMarker(path.join(liveRoot, "buck-out")),
       writeMacosMetadataNeverIndexMarker(path.join(liveRoot, "buck-out", "tmp")),
-      writeMacosMetadataNeverIndexMarker(path.dirname(tmpdir)),
-      writeMacosMetadataNeverIndexMarker(tmpdir),
+      writeMacosMetadataNeverIndexMarker(path.dirname(env.TMPDIR)),
+      writeMacosMetadataNeverIndexMarker(env.TMPDIR),
     ]);
   }
 }

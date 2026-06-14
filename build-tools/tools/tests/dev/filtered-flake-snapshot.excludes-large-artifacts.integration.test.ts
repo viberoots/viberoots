@@ -8,6 +8,7 @@ test("filtered flake snapshot excludes large generated artifacts", async () => {
     "build-tools/tools/dev/update-pnpm-hash/filtered-flake.ts",
     "utf8",
   );
+  const selectedHelper = await fsp.readFile("build-tools/tools/dev/filtered-flake.ts", "utf8");
   const helper = await fsp.readFile("build-tools/tools/dev/nix-build-filtered-flake.ts", "utf8");
   const required = [
     "coverage",
@@ -16,15 +17,24 @@ test("filtered flake snapshot excludes large generated artifacts", async () => {
     ".cache",
     "pnpm-workspace.yaml",
     ".node_modules.lockfile-guard.*",
+    ".*.tmp",
+    ".*.ts.??????",
     "result-*",
   ];
 
   for (const token of required) {
-    if (!updaterHelper.includes(`--exclude ${token}`)) {
-      throw new Error(`update-pnpm-hash filtered snapshot must include --exclude ${token}`);
-    }
     if (!FILTERED_FLAKE_RSYNC_EXCLUDES.includes(token)) {
       throw new Error(`nix-build-filtered-flake snapshot must include ${token}`);
+    }
+  }
+
+  for (const [name, source] of [
+    ["update-pnpm-hash filtered snapshot", updaterHelper],
+    ["selected-build filtered snapshot", selectedHelper],
+    ["nix-build-filtered-flake snapshot", helper],
+  ] as const) {
+    if (!source.includes("filteredFlakeRsyncExcludeArgs")) {
+      throw new Error(`${name} must use the shared filtered-flake rsync excludes`);
     }
   }
 

@@ -4,24 +4,24 @@ name = TARGETS
 [repositories]
 root = .
 viberoots = ./.viberoots/current
-prelude = ./prelude
-toolchains = ./toolchains
-repo_toolchains = ./toolchains
-fbsource = ./prelude/third-party/fbsource_stub
-fbcode = ./prelude/third-party/fbcode_stub
-config = ./prelude
+prelude = ./.viberoots/current/prelude
+toolchains = ./.viberoots/current/toolchains
+repo_toolchains = ./.viberoots/current/toolchains
+fbsource = ./.viberoots/current/config/fbsource_stub
+fbcode = ./.viberoots/current/config/fbcode_stub
+config = ./.viberoots/current/prelude
 workspace_providers = ./.viberoots/workspace/providers
 workspace_buck = ./.viberoots/workspace/buck
 
 [cells]
 root = .
 viberoots = ./.viberoots/current
-prelude = ./prelude
-toolchains = ./toolchains
-repo_toolchains = ./toolchains
-fbsource = ./prelude/third-party/fbsource_stub
-fbcode = ./prelude/third-party/fbcode_stub
-config = ./prelude
+prelude = ./.viberoots/current/prelude
+toolchains = ./.viberoots/current/toolchains
+repo_toolchains = ./.viberoots/current/toolchains
+fbsource = ./.viberoots/current/config/fbsource_stub
+fbcode = ./.viberoots/current/config/fbcode_stub
+config = ./.viberoots/current/prelude
 workspace_providers = ./.viberoots/workspace/providers
 workspace_buck = ./.viberoots/workspace/buck
 

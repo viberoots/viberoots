@@ -9,7 +9,7 @@ import type { DeploymentArtifactChallengeRequest, DeploymentArtifactChallengeRes
 import type { DeploymentAuthLoginRequest, DeploymentAuthLoginResponse, DeploymentAuthSessionStatus } from "./deployment-auth-session-types";
 
 const ACTIVE_LIFECYCLE_STATES = new Set(["queued", "waiting_for_lock", "running", "cancelling"]);
-const CONTROL_PLANE_REQUEST_TIMEOUT_MS = 15_000;
+const CONTROL_PLANE_REQUEST_TIMEOUT_MS = 60_000;
 export const CONTROL_PLANE_SUBMISSION_TIMEOUT_MS = 10 * 60 * 1000;
 
 function authHeaders(token?: string) {

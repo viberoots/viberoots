@@ -2,13 +2,14 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
+import { DEFAULT_GRAPH_PATH } from "../../lib/workspace-state-paths";
 import { runInTemp } from "../lib/test-helpers";
 import { withScopedEnv } from "../lib/test-helpers/scoped-env";
 import { ensureGraph } from "../../buck/glue-run";
 
 test("ensureGraph writes once; second call is a no-op", async () => {
   await runInTemp("ensure-graph-idempotent", async (tmp) => {
-    const graph = path.join(tmp, "build-tools/tools/buck", "graph.json");
+    const graph = path.join(tmp, DEFAULT_GRAPH_PATH);
     // Direct ensureGraph to operate on the temp workspace
     await withScopedEnv(
       {

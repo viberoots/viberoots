@@ -14,6 +14,10 @@ import {
   shouldComputeLocalZxTestNodeModules,
   targetPlatformArgsForPolicy,
 } from "../../dev/verify/remote-policy";
+import {
+  planVerifyTargetPasses,
+  VERIFY_RESOURCE_LIMITED_LABEL,
+} from "../../dev/verify/target-passes";
 
 const remoteEnv = {
   VBR_REMOTE_EXEC_MODE: "hybrid",
@@ -208,7 +212,13 @@ test("verify remote policy does not emit local zx node_modules env when unavaila
 });
 
 test("verify remote policy keeps threads independent from remote mode", async () => {
-  const source = await fs.readFile("build-tools/tools/dev/verify/target-passes.ts", "utf8");
-  assert.match(source, /VERIFY_RESOURCE_LIMITED_THREADS = 4/);
-  assert.doesNotMatch(source, /VBR_REMOTE_EXEC_MODE/);
+  const local = parseVerifyExecutionPolicy({ env: {} });
+  const remote = parseVerifyExecutionPolicy({ env: await activationEnv() });
+  const targets = [{ target: "//:resource-heavy", labels: [VERIFY_RESOURCE_LIMITED_LABEL] }];
+  const localPasses = planVerifyTargetPasses(targets);
+  const remotePasses = planVerifyTargetPasses(targets);
+
+  assert.deepEqual(localPasses, remotePasses);
+  assert.equal(local.mode, "local");
+  assert.equal(remote.mode, "hybrid");
 });

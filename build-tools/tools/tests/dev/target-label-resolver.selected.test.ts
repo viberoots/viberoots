@@ -4,14 +4,15 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
 import { resolveSelectedTargetLabel } from "../../dev/target-label-resolver";
+import { DEFAULT_GRAPH_PATH } from "../../lib/workspace-state-paths";
 import { runInTemp } from "../lib/test-helpers";
 
 test("resolveSelectedTargetLabel supports label, relative, absolute, and dot inputs", async () => {
   await runInTemp("target-label-resolver-selected", async (tmp) => {
-    const graphDir = path.join(tmp, "build-tools", "tools", "buck");
+    const graphDir = path.dirname(path.join(tmp, DEFAULT_GRAPH_PATH));
     await fsp.mkdir(graphDir, { recursive: true });
     await fsp.writeFile(
-      path.join(graphDir, "graph.json"),
+      path.join(tmp, DEFAULT_GRAPH_PATH),
       JSON.stringify(
         [
           {
@@ -51,10 +52,10 @@ test("resolveSelectedTargetLabel supports label, relative, absolute, and dot inp
 
 test("resolveSelectedTargetLabel fails fast on ambiguous package selectors", async () => {
   await runInTemp("target-label-resolver-ambiguous", async (tmp) => {
-    const graphDir = path.join(tmp, "build-tools", "tools", "buck");
+    const graphDir = path.dirname(path.join(tmp, DEFAULT_GRAPH_PATH));
     await fsp.mkdir(graphDir, { recursive: true });
     await fsp.writeFile(
-      path.join(graphDir, "graph.json"),
+      path.join(tmp, DEFAULT_GRAPH_PATH),
       JSON.stringify(
         [
           { name: "//projects/apps/ambig:one", labels: ["lang:go", "kind:lib"] },

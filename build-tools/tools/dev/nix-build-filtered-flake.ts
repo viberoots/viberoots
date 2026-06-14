@@ -7,7 +7,7 @@ import { getFlagBool, getFlagStr } from "../lib/cli";
 import { resolveToolPathSync } from "../lib/tool-paths";
 import {
   computeSelectedCppPackageClosure,
-  FILTERED_FLAKE_RSYNC_EXCLUDES,
+  filteredFlakeRsyncExcludeArgs,
   graphNodesFromJson,
   selectedCppSnapshotRsyncSources,
   selectedCppSnapshotRelPaths,
@@ -124,7 +124,7 @@ async function main(): Promise<void> {
   };
   try {
     await fsp.mkdir(snapDir, { recursive: true });
-    const rsyncExcludes = FILTERED_FLAKE_RSYNC_EXCLUDES.map((entry) => ["--exclude", entry]).flat();
+    const rsyncExcludes = filteredFlakeRsyncExcludeArgs();
     const selectedCppSources = await readSelectedCppSnapshotSources(root);
     const snapshotStart = Date.now();
     if (selectedCppSources != null) {

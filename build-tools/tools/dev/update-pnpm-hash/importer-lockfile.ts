@@ -1,7 +1,12 @@
 import fs from "node:fs";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import { activeNixGcPids, gcWaitConfig, waitForNoActiveNixGc } from "../../lib/nix-gc-lock";
+import {
+  activeNixGcPids,
+  gcWaitConfig,
+  nixGcLockMessage,
+  waitForNoActiveNixGc,
+} from "../../lib/nix-gc-lock";
 import { importerLockfileNeedsRegen } from "../../lib/pnpm-importer-lockfile";
 import { externalPnpmStateDirs, removeLegacyImporterPnpmState } from "../../lib/pnpm-state-paths";
 import { withHiddenNodeModules } from "../../lib/pnpm-node-modules-guard";
@@ -15,6 +20,8 @@ import {
   pnpmFlakeRef,
   preferredPnpmStoreDir,
 } from "./lockfile-shared";
+import { findWorkspacePackageDirs } from "./importer-workspace-packages";
+import { runPnpmCommandWithRetry } from "./pnpm-command-retry";
 
 async function runLockfileCommandsWithGcRetry(opts: {
   importerAbs: string;
@@ -38,36 +45,54 @@ async function runLockfileCommandsWithGcRetry(opts: {
     })`nix run --accept-flake-config ${opts.flakeRef} -- ${args}`;
 
   const runCommands = async () => {
-    await runPnpm(
+    const cfg = gcWaitConfig();
+    const gcPids = await waitForNoActiveNixGc({
+      timeoutMs: cfg.timeoutMs,
+      pollMs: cfg.pollMs,
+    });
+    if (gcPids.length > 0) {
+      throw new Error(nixGcLockMessage("lockfile generation", gcPids));
+    }
+    await runPnpmCommandWithRetry(
       "install",
-      "--force",
-      "--lockfile-only",
-      "--prefer-offline",
-      "--prod=false",
-      "--ignore-scripts",
-      "--lockfile-dir",
-      ".",
-      "--dir",
-      ".",
-      "--store-dir",
-      opts.storeDir,
-      "--ignore-workspace-root-check",
-      "--color",
-      "never",
+      () =>
+        runPnpm(
+          "install",
+          "--force",
+          "--lockfile-only",
+          "--prefer-offline",
+          "--prod=false",
+          "--ignore-scripts",
+          "--lockfile-dir",
+          ".",
+          "--dir",
+          ".",
+          "--store-dir",
+          opts.storeDir,
+          "--ignore-workspace-root-check",
+          "--color",
+          "never",
+        ),
+      { log: console.warn },
     );
-    await runPnpm(
+    await runPnpmCommandWithRetry(
       "fetch",
-      "--force",
-      "--prefer-offline",
-      "--prod=false",
-      "--lockfile-dir",
-      ".",
-      "--dir",
-      ".",
-      "--store-dir",
-      opts.storeDir,
-      "--color",
-      "never",
+      () =>
+        runPnpm(
+          "fetch",
+          "--force",
+          "--prefer-offline",
+          "--prod=false",
+          "--lockfile-dir",
+          ".",
+          "--dir",
+          ".",
+          "--store-dir",
+          opts.storeDir,
+          "--color",
+          "never",
+        ),
+      { log: console.warn },
     );
   };
 
@@ -105,81 +130,6 @@ async function seedImporterLockfileFromRootIfNeeded(opts: {
       await fsp.copyFile(rootLock, importerLockfileAbs);
     }
   } catch {}
-}
-
-function packageJsonWorkspaceDeps(pkg: any): string[] {
-  const out = new Set<string>();
-  for (const section of [
-    "dependencies",
-    "devDependencies",
-    "peerDependencies",
-    "optionalDependencies",
-  ]) {
-    const deps = pkg?.[section];
-    if (!deps || typeof deps !== "object") continue;
-    for (const [name, version] of Object.entries(deps)) {
-      if (String(version).startsWith("workspace:")) out.add(name);
-    }
-  }
-  return Array.from(out).sort();
-}
-
-async function findWorkspacePackageDirs(opts: {
-  repoRoot: string;
-  importerAbs: string;
-}): Promise<string[]> {
-  const pkgPath = path.join(opts.importerAbs, "package.json");
-  let wanted: string[] = [];
-  try {
-    wanted = packageJsonWorkspaceDeps(JSON.parse(await fsp.readFile(pkgPath, "utf8")));
-  } catch {
-    return [];
-  }
-  if (wanted.length === 0) return [];
-  const remaining = new Set(wanted);
-  const found: string[] = [];
-  const skipDirs = new Set([
-    ".cache",
-    ".direnv",
-    ".git",
-    ".next",
-    ".pnpm-store",
-    ".turbo",
-    ".vite",
-    "buck-out",
-    "coverage",
-    "dist",
-    "node_modules",
-    "result",
-  ]);
-
-  async function walk(dir: string): Promise<void> {
-    if (remaining.size === 0) return;
-    let entries: fs.Dirent[] = [];
-    try {
-      entries = await fsp.readdir(dir, { withFileTypes: true });
-    } catch {
-      return;
-    }
-    for (const entry of entries) {
-      if (remaining.size === 0) return;
-      if (!entry.isDirectory()) continue;
-      if (skipDirs.has(entry.name) || entry.name.startsWith("result-")) continue;
-      const child = path.join(dir, entry.name);
-      const childPkgPath = path.join(child, "package.json");
-      try {
-        const childPkg = JSON.parse(await fsp.readFile(childPkgPath, "utf8"));
-        const childName = String(childPkg?.name || "").trim();
-        if (remaining.delete(childName)) {
-          found.push(path.relative(opts.importerAbs, child) || ".");
-        }
-      } catch {}
-      await walk(child);
-    }
-  }
-
-  await walk(opts.repoRoot);
-  return found.map((value) => value.split(path.sep).join(path.posix.sep)).sort();
 }
 
 export async function generateImporterLockfile(opts: { repoRoot: string; importer: string }) {

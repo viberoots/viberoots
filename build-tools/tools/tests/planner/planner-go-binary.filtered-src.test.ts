@@ -50,7 +50,11 @@ test("planner builds go_binary with filtered srcRoot", async () => {
     const { stdout } = await $({
       cwd: tmp,
       stdio: "pipe",
-      env: { ...process.env, BUCK_TEST_SRC: tmp },
+      env: {
+        ...process.env,
+        BUCK_TEST_SRC: tmp,
+        BUCK_GRAPH_JSON: path.join(graphDir, "graph.json"),
+      },
     })`nix build --impure ${`path:${tmp}#graph-generator`} --no-link --accept-flake-config --print-out-paths`;
     const outPath =
       String(stdout || "")

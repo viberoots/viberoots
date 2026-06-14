@@ -39,6 +39,7 @@ describe("pre-commit hook (lint-staged with Prettier + ESLint)", () => {
       // Speed: avoid running pre-commit across the entire temp repo during the
       // initial commit. Configure hooks after the first commit so the test only
       // exercises the hook on the targeted commit(s) below.
+      await $`git add .buckroot .buckconfig .viberoots viberoots config toolchains`;
       await $`git commit --allow-empty -m "chore: init"`;
       await $`git config core.hooksPath .husky`;
 

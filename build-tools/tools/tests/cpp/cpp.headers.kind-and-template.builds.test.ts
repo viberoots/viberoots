@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { sanitizeAttrNameFromLabel } from "../../lib/labels";
+import { DEFAULT_GRAPH_PATH } from "../../lib/workspace-state-paths";
 import { runInTemp } from "../lib/test-helpers";
 
 function parseOutPath(stdout: unknown): string {
@@ -28,11 +29,11 @@ await runInTemp("cpp-headers-builds", async (tmp, $) => {
     "utf8",
   );
 
-  await fsp.mkdir(path.join(tmp, "build-tools", "tools", "buck"), { recursive: true });
+  await fsp.mkdir(path.dirname(path.join(tmp, DEFAULT_GRAPH_PATH)), { recursive: true });
   const label = "//projects/libs/demo:demo_headers";
   const attrSuffix = sanitizeAttrNameFromLabel(label);
   await fsp.writeFile(
-    path.join(tmp, "build-tools", "tools", "buck", "graph.json"),
+    path.join(tmp, DEFAULT_GRAPH_PATH),
     JSON.stringify(
       [
         {

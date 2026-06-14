@@ -1,3 +1,4 @@
+import { pathToFileURL } from "node:url";
 import { processTableLines } from "./process-inspection";
 
 function isExactTokenOrNixBin(token: string, binName: "nix" | "nix-store"): boolean {
@@ -54,7 +55,7 @@ function parsePositiveInt(raw: string | undefined, fallback: number): number {
 }
 
 export function gcWaitConfig(): { timeoutMs: number; pollMs: number } {
-  const timeoutSec = parsePositiveInt(process.env.NIX_GC_WAIT_TIMEOUT_SECS, 180);
+  const timeoutSec = parsePositiveInt(process.env.NIX_GC_WAIT_TIMEOUT_SECS, 900);
   const pollSec = parsePositiveInt(process.env.NIX_GC_WAIT_POLL_SECS, 2);
   return {
     timeoutMs: timeoutSec * 1000,
@@ -85,4 +86,32 @@ export async function waitForNoActiveNixGc(opts?: {
 
 export function nixGcLockMessage(context: string, pids: number[]): string {
   return `${context}: blocked by active 'nix store gc' process(es): ${pids.join(", ")}. Stop GC and retry.`;
+}
+
+async function main(): Promise<void> {
+  const command = process.argv[2] || "";
+  if (command !== "wait-for-no-active-gc") {
+    throw new Error("usage: nix-gc-lock.ts wait-for-no-active-gc");
+  }
+  const remaining = await waitForNoActiveNixGc({
+    onWait: (pids, elapsedMs, timeoutMs) => {
+      if (elapsedMs === 0) {
+        console.error(
+          `[nix-gc-lock] waiting for active nix store gc process(es): ${pids.join(", ")} ` +
+            `(timeout ${Math.ceil(timeoutMs / 1000)}s)`,
+        );
+      }
+    },
+  });
+  if (remaining.length > 0) {
+    console.error(nixGcLockMessage("[nix-gc-lock]", remaining));
+    process.exitCode = 1;
+  }
+}
+
+if (process.argv[1] && pathToFileURL(process.argv[1]).href === import.meta.url) {
+  main().catch((err) => {
+    console.error(err instanceof Error ? err.message : String(err));
+    process.exitCode = 1;
+  });
 }

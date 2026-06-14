@@ -70,16 +70,36 @@ function validateBuckconfigCells(workspaceRoot: string): void {
 }
 
 async function replaceCurrentSymlink(currentPath: string, target: string): Promise<void> {
+  const targetAbs = path.resolve(path.dirname(currentPath), target);
+  const currentMatchesTarget = async (): Promise<boolean> => {
+    try {
+      const stat = await fsp.lstat(currentPath);
+      if (!stat.isSymbolicLink()) return false;
+      if ((await fsp.readlink(currentPath)) === target) return true;
+      return (await fsp.realpath(currentPath)) === (await fsp.realpath(targetAbs));
+    } catch {
+      return false;
+    }
+  };
+  if (await currentMatchesTarget()) return;
   try {
     const stat = await fsp.lstat(currentPath);
     if (!stat.isSymbolicLink()) {
       throw new Error(`${currentPath} exists and is not a symlink`);
     }
-    await fsp.unlink(currentPath);
   } catch (e) {
     if ((e as NodeJS.ErrnoException).code !== "ENOENT") throw e;
   }
-  await fsp.symlink(target, currentPath);
+  const tmpPath = path.join(
+    path.dirname(currentPath),
+    `.current-${process.pid}-${Math.random().toString(16).slice(2)}.tmp`,
+  );
+  try {
+    await fsp.symlink(target, tmpPath);
+    await fsp.rename(tmpPath, currentPath);
+  } finally {
+    await fsp.unlink(tmpPath).catch(() => {});
+  }
 }
 
 async function rejectStaleLocalCurrent(currentPath: string, sourcePath: string): Promise<void> {

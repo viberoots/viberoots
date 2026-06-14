@@ -56,13 +56,20 @@ def nix_action_build_selected_out_path_cmd(
         log_file = "/tmp/build-selected.log",
         zx_wrapper = "path:$VIBEROOTS_ROOT#zx-wrapper"):
     return (
-        "set +e; "
-        + (
-            "%s=$(BUCK_TEST_SRC=\"$WORKSPACE_ROOT\" BUCK_TARGET=\"%s\" "
-            % (raw_var, target_label)
-        )
-        + ("nix run --accept-flake-config \"%s\" -- " % zx_wrapper)
-        + ("\"$VIBEROOTS_ROOT/build-tools/tools/dev/build-selected.ts\" 2> \"%s\"); " % log_file)
+        "ZX_WRAPPER_REF=\"%s\"; " % zx_wrapper
+        + "VBR_NODE_ZX_INIT=\"$VIBEROOTS_ROOT/build-tools/tools/dev/zx-init.mjs\"; "
+        + "BUCK_TEST_SRC=\"$WORKSPACE_ROOT\"; "
+        + ("BUCK_TARGET=\"%s\"; " % target_label)
+        + "export BUCK_TEST_SRC BUCK_TARGET; "
+        + "set +e; "
+        + ("%s=$(if command -v node >/dev/null 2>&1; then " % raw_var)
+        + "node --experimental-top-level-await --disable-warning=ExperimentalWarning "
+        + "--experimental-strip-types --import \"$VBR_NODE_ZX_INIT\" "
+        + "\"$VIBEROOTS_ROOT/build-tools/tools/dev/build-selected.ts\"; "
+        + "else "
+        + "${TIMEOUT:+$TIMEOUT }nix run --accept-flake-config \"$ZX_WRAPPER_REF\" -- "
+        + "\"$VIBEROOTS_ROOT/build-tools/tools/dev/build-selected.ts\"; "
+        + ("fi 2> \"%s\"); " % log_file)
         + ("%s=$?; set -e; " % status_var)
         + (
             "%s=$(printf %s \"$%s\" | sed -E 's/\\x1B\\[[0-9;]*[A-Za-z]//g' | tr -d '\\r'); "

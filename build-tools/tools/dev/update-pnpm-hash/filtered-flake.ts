@@ -6,6 +6,7 @@ import {
   readDirtyGitStats,
   readSnapshotStats,
 } from "../filtered-flake-diagnostics";
+import { filteredFlakeRsyncExcludeArgs } from "../nix-build-filtered-flake-lib";
 import { emitTimingDetail } from "../../lib/timing-detail";
 
 export async function makeFilteredFlakeRef(opts: {
@@ -28,9 +29,10 @@ export async function makeFilteredFlakeRef(opts: {
     }
   }
   const snapshotStart = Date.now();
+  const rsyncExcludes = filteredFlakeRsyncExcludeArgs();
   await $({
     stdio: "pipe",
-  })`rsync -a --delete --exclude .git --exclude node_modules --exclude buck-out --exclude .direnv --exclude .pnpm-store --exclude .pnpm-home --exclude coverage --exclude .clinic --exclude .turbo --exclude .cache --exclude dist --exclude build --exclude .vite --exclude .next --exclude .wasm-producer --exclude pnpm-workspace.yaml --exclude .node_modules.lockfile-guard.* --exclude result --exclude result-* ${src}/ ${snapDir}/`;
+  })`rsync -a --delete ${rsyncExcludes} ${src}/ ${snapDir}/`;
   if (filteredFlakeDiagnosticsEnabled()) {
     const stats = await readSnapshotStats(snapDir);
     const elapsedMs = Date.now() - snapshotStart;

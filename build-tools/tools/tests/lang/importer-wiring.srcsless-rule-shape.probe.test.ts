@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
+import { DEFAULT_AUTO_MAP_PATH, workspaceProviderLabel } from "../../lib/workspace-state-paths";
 import { runInTemp } from "../lib/test-helpers";
 
 function readLines(txt: string): string[] {
@@ -32,13 +33,13 @@ async function buildOutPath(tmp: string, $: any, target: string): Promise<string
 
 test("importer_wiring exposes srcs-less rule shape wiring via synthetic dep helper (probe)", async () => {
   await runInTemp("importer-wiring-srcsless-probe", async (tmp, $) => {
-    const providersDir = path.join(tmp, "third_party", "providers");
-    await fsp.mkdir(providersDir, { recursive: true });
+    const autoMapPath = path.join(tmp, DEFAULT_AUTO_MAP_PATH);
+    await fsp.mkdir(path.dirname(autoMapPath), { recursive: true });
     await fsp.writeFile(
-      path.join(providersDir, "auto_map.bzl"),
+      autoMapPath,
       [
         "MODULE_PROVIDERS = {",
-        '  "//projects/apps/demo:bin": ["//third_party/providers:prov_a"],',
+        `  "//projects/apps/demo:bin": ["${workspaceProviderLabel("prov_a")}"],`,
         "}",
         "",
       ].join("\n"),
@@ -95,7 +96,7 @@ test("importer_wiring exposes srcs-less rule shape wiring via synthetic dep help
 
     const depsLines = readLines(await fsp.readFile(depsOut, "utf8"));
     assert.ok(
-      depsLines.includes("//third_party/providers:prov_a"),
+      depsLines.includes(workspaceProviderLabel("prov_a")),
       "expected provider edge present in merged deps output",
     );
     assert.ok(

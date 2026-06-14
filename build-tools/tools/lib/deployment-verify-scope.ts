@@ -33,6 +33,8 @@ export const REVIEWED_SHARED_BUILD_SYSTEM_PREFIXES = [
   "build-tools/lang/",
   "toolchains/",
   "third_party/providers/",
+  ".viberoots/workspace/buck/",
+  ".viberoots/workspace/providers/",
   "prelude/",
 ] as const;
 

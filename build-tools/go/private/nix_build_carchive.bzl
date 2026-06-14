@@ -12,7 +12,8 @@ def _go_nix_build_carchive_impl(ctx):
         + "mkdir -p \"$(dirname \"$BUILD_SELECTED_LOG\")\"; "
     )
     run_and_copy = (
-        nix_cmd_prefix(timeout_var = "TIMEOUT", timeout_sec = 600, include_pnpm_store = False, escape_cmd_subst = True)
+        "DEST=\"$0\"; case \"$DEST\" in /*) ;; *) DEST=\"$PWD/$DEST\" ;; esac; "
+        + nix_cmd_prefix(timeout_var = "TIMEOUT", timeout_sec = 600, include_pnpm_store = False, escape_cmd_subst = True)
         + safe_log_path_prefix
         + nix_action_build_selected_out_path_cmd(
             target_label = raw,
@@ -24,7 +25,9 @@ def _go_nix_build_carchive_impl(ctx):
         )
         + "if [ \"$NIX_STATUS\" -ne 0 ] || [ -z \"$outPath\" ]; then "
         + "  if [ -f \"$BUILD_SELECTED_LOG\" ]; then cat \"$BUILD_SELECTED_LOG\" >&2; fi; "
-        + "  exit ${NIX_STATUS:-2}; "
+        + "  if [ \"$NIX_STATUS\" -ne 0 ]; then exit \"$NIX_STATUS\"; fi; "
+        + "  echo \"go_nix_build_carchive (%s): build-selected produced no output path\" >&2; " % raw
+        + "  exit 2; "
         + "fi; "
         + "if [ ! -d \"$outPath/lib\" ] || [ ! -d \"$outPath/include\" ]; then "
         + "  echo \"go_nix_build_carchive (%s): expected lib/ and include/ in Nix output\" >&2; " % raw
@@ -41,7 +44,7 @@ def _go_nix_build_carchive_impl(ctx):
         + "  ls -la \"$outPath/include\" >&2; "
         + "  exit 2; "
         + "fi; "
-        + "DEST=\"$0\"; rm -rf \"$DEST\"; mkdir -p \"$DEST\"; "
+        + "rm -rf \"$DEST\"; mkdir -p \"$DEST\"; "
         + "cp -R \"$outPath/lib\" \"$DEST/\"; "
         + "cp -R \"$outPath/include\" \"$DEST/\"; "
     )

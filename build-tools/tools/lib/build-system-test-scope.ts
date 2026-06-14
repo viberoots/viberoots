@@ -51,6 +51,12 @@ export function isBuildSystemPath(relPath: string): boolean {
   if (p.startsWith("third_party/providers/")) {
     return true;
   }
+  if (p.startsWith(".viberoots/workspace/buck/")) {
+    return true;
+  }
+  if (p.startsWith(".viberoots/workspace/providers/")) {
+    return true;
+  }
   if (p === "prelude" || p.startsWith("prelude/")) {
     return true;
   }

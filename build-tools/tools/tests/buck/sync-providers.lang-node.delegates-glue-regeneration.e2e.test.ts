@@ -3,6 +3,12 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
+import {
+  DEFAULT_AUTO_MAP_PATH,
+  DEFAULT_GRAPH_PATH,
+  DEFAULT_PROVIDER_INDEX_PATH,
+  providerAutoTargetsPath,
+} from "../../lib/workspace-state-paths";
 import { exists, runInTemp } from "../lib/test-helpers";
 
 test("sync-providers --lang node regenerates downstream glue via the centralized pipeline", async () => {
@@ -23,13 +29,11 @@ test("sync-providers --lang node regenerates downstream glue via the centralized
 
     await $`node build-tools/tools/buck/sync-providers.ts --lang node`;
 
-    assert.equal(await exists(path.join(tmp, "build-tools", "tools", "buck", "graph.json")), true);
-    assert.equal(await exists(path.join(tmp, "third_party", "providers", "auto_map.bzl")), true);
+    assert.equal(await exists(path.join(tmp, DEFAULT_GRAPH_PATH)), true);
+    assert.equal(await exists(path.join(tmp, DEFAULT_AUTO_MAP_PATH)), true);
+    assert.equal(await exists(path.join(tmp, providerAutoTargetsPath("node"))), true);
 
     await $`node build-tools/tools/buck/sync-providers.ts --lang node --emit-index`;
-    assert.equal(
-      await exists(path.join(tmp, "third_party", "providers", "provider_index.bzl")),
-      true,
-    );
+    assert.equal(await exists(path.join(tmp, DEFAULT_PROVIDER_INDEX_PATH)), true);
   });
 });

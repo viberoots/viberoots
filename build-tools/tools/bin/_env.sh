@@ -143,7 +143,22 @@ env_apply_nix_cache_health() {
 		seen="${seen}${substituter} "
 		case "${substituter}" in
 			http://*|https://*)
-				if nix store info --store "${substituter}" --option connect-timeout 3 >/dev/null 2>&1; then
+				local cache_info_url="${substituter%/}/nix-cache-info"
+				local probe_status=0
+				if command -v curl >/dev/null 2>&1; then
+					if curl -fsS --connect-timeout 3 --max-time 5 "${cache_info_url}" >/dev/null 2>&1; then
+						probe_status=0
+					else
+						probe_status="$?"
+					fi
+				else
+					if nix store info --store "${substituter}" --option connect-timeout 3 >/dev/null 2>&1; then
+						probe_status=0
+					else
+						probe_status="$?"
+					fi
+				fi
+				if [[ "${probe_status}" -eq 0 ]]; then
 					available+=("${substituter}")
 				else
 					removed+=("${substituter}")

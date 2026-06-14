@@ -3,6 +3,8 @@
 // surface when concurrent nix invocations contend for the local store; a short pause and
 // retry absorbs the transient state without masking real build failures.
 
+import { gcWaitConfig, waitForNoActiveNixGc } from "../lib/nix-gc-lock";
+
 const TRANSIENT_NIX_PATTERNS = [/path '[^']+\.drv' is not valid/, /database is locked/];
 
 export async function runNixBuildWithTransientRetry(opts: {
@@ -11,7 +13,7 @@ export async function runNixBuildWithTransientRetry(opts: {
   maxRetries?: number;
 }): Promise<{ stdout: unknown; stderr: unknown; exitCode: unknown }> {
   const delay = Math.max(0, opts.retryDelayMs ?? 750);
-  const maxRetries = Math.max(0, opts.maxRetries ?? 3);
+  const maxRetries = Math.max(0, opts.maxRetries ?? 5);
   let attempt = await opts.runOnce();
   for (let retry = 1; retry <= maxRetries; retry += 1) {
     if (Number(attempt.exitCode || 0) === 0) return attempt;
@@ -21,6 +23,8 @@ export async function runNixBuildWithTransientRetry(opts: {
     console.error(
       `[build-selected] transient nix store error; retrying ${retry}/${maxRetries} after ${delay}ms`,
     );
+    const cfg = gcWaitConfig();
+    await waitForNoActiveNixGc({ timeoutMs: cfg.timeoutMs, pollMs: cfg.pollMs });
     await new Promise((resolve) => setTimeout(resolve, delay));
     attempt = await opts.runOnce();
   }

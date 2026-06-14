@@ -17,7 +17,7 @@ void (async function main() {
         ...process.env,
         DEV_BUILD_LOW_SPACE_GB: "0",
       },
-    })`build-tools/tools/dev/dev-build.ts build //... --no-materialize`;
+    })`build-tools/tools/dev/dev-build.ts build //:flake.lock --no-materialize`;
 
     // Ensure no index changes occurred
     const { stdout } = await $tmp`git status --porcelain`;

@@ -135,6 +135,11 @@ b        # build the default repo scope
 v        # run impacted tests and verification checks
 ```
 
+Shell entry also prepares ignored viberoots workspace state. In this in-repo dogfood checkout,
+`.viberoots/current` points at the live repository root so Buck cells and Nix-backed commands see
+local build-tool edits immediately. Generated provider and Buck graph state stays under
+`.viberoots/workspace/`.
+
 The usual local check is:
 
 ```bash

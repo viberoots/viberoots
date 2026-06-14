@@ -3,6 +3,11 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
+import {
+  DEFAULT_AUTO_MAP_PATH,
+  WORKSPACE_BUCK_STATE_DIR,
+  workspaceProviderLabel,
+} from "../../lib/workspace-state-paths";
 import { runInTemp } from "../lib/test-helpers";
 
 function readLines(txt: string): string[] {
@@ -32,13 +37,13 @@ async function buildOutPath(tmp: string, $: any, target: string): Promise<string
 
 test("prepare_importer_nix_calling_genrule_wiring composes patches, provider edges, global inputs, and workspace-root.env injection (probe)", async () => {
   await runInTemp("importer-nix-calling-genrule-wiring-probe", async (tmp, $) => {
-    const providersDir = path.join(tmp, "third_party", "providers");
-    await fsp.mkdir(providersDir, { recursive: true });
+    const providerMapPath = path.join(tmp, DEFAULT_AUTO_MAP_PATH);
+    await fsp.mkdir(path.dirname(providerMapPath), { recursive: true });
     await fsp.writeFile(
-      path.join(providersDir, "auto_map.bzl"),
+      providerMapPath,
       [
         "MODULE_PROVIDERS = {",
-        '  "//projects/apps/web:bin": ["//third_party/providers:prov_a"],',
+        `  "//projects/apps/web:bin": ["${workspaceProviderLabel("prov_a")}"],`,
         "}",
         "",
       ].join("\n"),
@@ -109,7 +114,7 @@ test("prepare_importer_nix_calling_genrule_wiring composes patches, provider edg
       "expected importer patch path present in list-shaped srcs",
     );
     assert.ok(
-      listLines.includes("//third_party/providers:prov_a"),
+      listLines.includes(workspaceProviderLabel("prov_a")),
       "expected provider edge present in list-shaped srcs",
     );
     assert.ok(
@@ -123,7 +128,7 @@ test("prepare_importer_nix_calling_genrule_wiring composes patches, provider edg
       "expected caller mapping preserved in dict-shaped srcs",
     );
     assert.ok(
-      dictKeys.includes("build-tools/tools/buck/workspace-root.env"),
+      dictKeys.includes(path.join(WORKSPACE_BUCK_STATE_DIR, "workspace-root.env")),
       "expected workspace-root.env injected into dict-shaped srcs",
     );
     assert.ok(

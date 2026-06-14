@@ -182,6 +182,9 @@ test("nix cache readiness redacts query and userinfo from recorded substituter i
 });
 
 test("nix cache health runs before dev-build and install nix entrypoints", async () => {
+  const runVerify = await fsp.readFile("build-tools/tools/dev/verify/run-verify.ts", "utf8");
+  assertOrder(runVerify, "await deps.applyNixCacheHealthPolicy(root)", "prepareVerifySeed");
+
   const devBuild = await fsp.readFile("build-tools/tools/dev/dev-build/run-dev-build.ts", "utf8");
   assertOrder(devBuild, "await applyNixCacheHealthPolicy(root)", "await runStartupCheck(root)");
 
@@ -207,13 +210,23 @@ test("nix cache health runs before dev-build and install nix entrypoints", async
   const buck = await fsp.readFile("build-tools/lang/nix_cache_health.bzl", "utf8");
   assert.match(buck, /VBR_NIX_CACHE_HEALTH_APPLIED/);
   assert.match(buck, /printf -v NIX_CONFIG '%s\\nsubstituters =%s\\nextra-substituters =%s/);
-  assert.match(buck, /nix store info --store/);
+  assert.match(buck, /nix-cache-info/);
+  assert.match(buck, /curl -fsS --connect-timeout 3 --max-time 5/);
+  assert.match(buck, /if curl -fsS --connect-timeout 3 --max-time 5/);
+  assert.match(buck, /if nix store info --store/);
+  assert.doesNotMatch(
+    buck,
+    /curl -fsS --connect-timeout 3 --max-time 5[^;]+; NIX_CACHE_PROBE_STATUS/,
+  );
+  assert.doesNotMatch(buck, /nix store info --store[^;]+; NIX_CACHE_PROBE_STATUS/);
   assert.doesNotMatch(buck, /\$\(cat/);
   assert.doesNotMatch(buck, /\$\(printf/);
   assert.doesNotMatch(buck, /export NIX_CONFIG="[^"]*\\\\n/);
 
-  assert.match(env, /nix store info --store/);
-  assert.doesNotMatch(env, /curl -fsSI/);
+  assert.match(env, /nix-cache-info/);
+  assert.match(env, /curl -fsS --connect-timeout 3 --max-time 5/);
+  assert.match(env, /if curl -fsS --connect-timeout 3 --max-time 5 "\$\{cache_info_url\}"/);
+  assert.match(env, /if nix store info --store "\$\{substituter\}" --option connect-timeout 3/);
 
   const zxTest = await fsp.readFile("build-tools/tools/buck/zx_test.bzl", "utf8");
   assertOrder(zxTest, "nix_cache_health_shell()", "PRELUDE_PATH");

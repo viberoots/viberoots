@@ -98,11 +98,11 @@ test("deployment-impact: shared helpers and reviewed loader/root paths broaden t
 
   assert.equal(result.mode, "mixed-build-system");
   assert.deepEqual(result.diagnostics.sharedBuildSystemPaths, [
+    ".viberoots/workspace/providers/auto_map.bzl",
     "build-tools/tools/dev/verify/run-verify.ts",
     "build-tools/tools/tests/defs.bzl",
     "build-tools/tools/tests/deployment_conventions.bzl",
     "flake.nix",
-    ".viberoots/workspace/providers/auto_map.bzl",
     "toolchains/TARGETS",
   ]);
   assert.deepEqual(result.diagnostics.unknownBuildSystemPaths, []);

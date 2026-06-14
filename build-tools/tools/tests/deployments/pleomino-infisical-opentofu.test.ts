@@ -9,12 +9,16 @@ const moduleDir = path.join("projects", "deployments", "pleomino", "infisical", 
 
 async function validateModuleWithProvider() {
   const workDir = await fsp.mkdtemp(path.join(os.tmpdir(), "pleomino-infisical-tofu-"));
-  await fsp.copyFile(path.join(moduleDir, "main.tf"), path.join(workDir, "main.tf"));
-  await $({ cwd: workDir })`tofu init -backend=false -input=false`.quiet();
-  const validate = await $({ cwd: workDir })`tofu validate -json`.quiet();
-  const result = JSON.parse(String(validate.stdout || "{}"));
-  assert.equal(result.valid, true);
-  assert.equal(result.error_count, 0);
+  try {
+    await fsp.copyFile(path.join(moduleDir, "main.tf"), path.join(workDir, "main.tf"));
+    await $({ cwd: workDir })`tofu init -backend=false -input=false`.quiet();
+    const validate = await $({ cwd: workDir })`tofu validate -json`.quiet();
+    const result = JSON.parse(String(validate.stdout || "{}"));
+    assert.equal(result.valid, true);
+    assert.equal(result.error_count, 0);
+  } finally {
+    await fsp.rm(workDir, { recursive: true, force: true });
+  }
 }
 
 test("Pleomino Infisical OpenTofu module stays local, formatted, and non-secret", async () => {
@@ -22,6 +26,8 @@ test("Pleomino Infisical OpenTofu module stays local, formatted, and non-secret"
   await validateModuleWithProvider();
   const main = await fsp.readFile(path.join(moduleDir, "main.tf"), "utf8");
   for (const expected of [
+    'source  = "infisical/infisical"',
+    'provider "infisical"',
     'default = "https://app.infisical.com"',
     'default = "pleomino-deployments"',
     'default = ["staging", "prod"]',
@@ -29,7 +35,7 @@ test("Pleomino Infisical OpenTofu module stays local, formatted, and non-secret"
     "infisical_identity_universal_auth",
     "cloudflare_secret_metadata_reconciliation",
     "value_wo",
-    "deployment_runtime_metadata",
+    'output "deployment_runtime_metadata"',
   ]) {
     assert.match(main, new RegExp(expected.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
   }
@@ -40,10 +46,11 @@ test("Pleomino Infisical OpenTofu module stays local, formatted, and non-secret"
 
 test("Pleomino Infisical OpenTofu rendered plan emits reviewed site URL", async () => {
   const workDir = await fsp.mkdtemp(path.join(os.tmpdir(), "pleomino-infisical-render-"));
-  await fsp.copyFile(path.join(moduleDir, "main.tf"), path.join(workDir, "main.tf"));
-  await fsp.writeFile(
-    path.join(workDir, "site-url.tftest.hcl"),
-    `
+  try {
+    await fsp.copyFile(path.join(moduleDir, "main.tf"), path.join(workDir, "main.tf"));
+    await fsp.writeFile(
+      path.join(workDir, "site-url.tftest.hcl"),
+      `
 mock_provider "infisical" {}
 
 run "reviewed_site_url" {
@@ -64,11 +71,14 @@ run "reviewed_site_url" {
   }
 }
 `.trimStart(),
-  );
-  await $({ cwd: workDir })`tofu init -backend=false -input=false`.quiet();
-  const rendered = await $({ cwd: workDir })`tofu test -verbose`.quiet();
-  const stdout = String(rendered.stdout || "");
-  assert.match(stdout, /deployment_runtime_metadata/);
-  assert.match(stdout, /site_url\s+= "https:\/\/app\.infisical\.com"/);
-  assert.doesNotMatch(stdout, /https:\/\/us\.infisical\.com/);
+    );
+    await $({ cwd: workDir })`tofu init -backend=false -input=false`.quiet();
+    const rendered = await $({ cwd: workDir })`tofu test -verbose`.quiet();
+    const stdout = String(rendered.stdout || "");
+    assert.match(stdout, /deployment_runtime_metadata/);
+    assert.match(stdout, /site_url\s+= "https:\/\/app\.infisical\.com"/);
+    assert.doesNotMatch(stdout, /https:\/\/us\.infisical\.com/);
+  } finally {
+    await fsp.rm(workDir, { recursive: true, force: true });
+  }
 });

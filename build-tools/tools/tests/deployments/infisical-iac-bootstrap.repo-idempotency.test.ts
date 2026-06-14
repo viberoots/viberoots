@@ -75,7 +75,7 @@ function statusesByStage(statuses: Array<[string, string]>) {
 }
 
 async function writeInputs(dir: string) {
-  await fs.mkdir(path.join(dir, "build-tools/tools/buck"), { recursive: true });
+  await fs.mkdir(path.join(dir, ".viberoots/workspace/buck"), { recursive: true });
   await fs.writeFile(
     path.join(dir, ".viberoots/workspace/buck/graph.json"),
     `${JSON.stringify({ nodes: ["staging", "prod"].map(node) })}\n`,

@@ -33,7 +33,10 @@ await syncAllProviders();
     const txt = await fsp.readFile(outFile, "utf8");
     // Header + load line present
     assert.match(txt, /# GENERATED FILE — DO NOT EDIT\./);
-    assert.match(txt, /load\("\/\/third_party\/providers:defs_node\.bzl", "node_importer_deps"\)/);
+    assert.match(
+      txt,
+      /load\("@root\/\/third_party\/providers:defs_node\.bzl", "node_importer_deps"\)/,
+    );
     // Provider entry present for projects/apps/web importer
     assert.match(txt, /node_importer_deps\(name="/);
     assert.match(txt, /lockfile="projects\/apps\/web\/pnpm-lock\.yaml"/);

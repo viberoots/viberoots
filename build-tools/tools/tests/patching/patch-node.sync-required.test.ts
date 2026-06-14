@@ -2,6 +2,7 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
+import { DEFAULT_GRAPH_PATH } from "../../lib/workspace-state-paths";
 import { runInTemp } from "../lib/test-helpers";
 
 test("patch-node sync-required enforces required transitive patches and can write placeholders", async () => {
@@ -16,7 +17,7 @@ test("patch-node sync-required enforces required transitive patches and can writ
     await fsp.mkdir(path.join(importerTwo, "patches", "node"), { recursive: true });
     await fsp.writeFile(path.join(importerTwo, "pnpm-lock.yaml"), "lockfileVersion: 9\n", "utf8");
 
-    const graphPath = path.join(tmp, "build-tools", "tools", "buck", "graph.json");
+    const graphPath = path.join(tmp, DEFAULT_GRAPH_PATH);
     await fsp.mkdir(path.dirname(graphPath), { recursive: true });
     await fsp.writeFile(
       graphPath,

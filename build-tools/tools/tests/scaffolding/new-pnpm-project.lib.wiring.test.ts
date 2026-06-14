@@ -2,6 +2,7 @@
 import fs from "fs-extra";
 import path from "node:path";
 import { test } from "node:test";
+import { DEFAULT_AUTO_MAP_PATH, DEFAULT_GRAPH_PATH } from "../../lib/workspace-state-paths";
 import { runInTemp } from "../lib/test-helpers";
 
 test("node lib scaffold: TARGETS includes lockfile label and auto_map wires provider", async () => {
@@ -18,7 +19,7 @@ test("node lib scaffold: TARGETS includes lockfile label and auto_map wires prov
     }
 
     await fs.outputJson(
-      path.join(tmp, "build-tools", "tools", "buck", "graph.json"),
+      path.join(tmp, DEFAULT_GRAPH_PATH),
       [
         {
           name: "//projects/libs/demo:demo",
@@ -28,11 +29,8 @@ test("node lib scaffold: TARGETS includes lockfile label and auto_map wires prov
       ],
       { spaces: 2 },
     );
-    await $`node build-tools/tools/buck/gen-auto-map.ts --graph .viberoots/workspace/buck/graph.json --out .viberoots/workspace/providers/auto_map.bzl`;
-    const autoMap = await fs.readFile(
-      path.join(tmp, "third_party", "providers", "auto_map.bzl"),
-      "utf8",
-    );
+    await $`node build-tools/tools/buck/gen-auto-map.ts --graph ${DEFAULT_GRAPH_PATH} --out ${DEFAULT_AUTO_MAP_PATH}`;
+    const autoMap = await fs.readFile(path.join(tmp, DEFAULT_AUTO_MAP_PATH), "utf8");
     if (!autoMap.includes("//projects/libs/demo:demo"))
       throw new Error("auto_map missing provider mapping for demo");
   });

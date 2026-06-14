@@ -28,7 +28,9 @@ def _rust_nix_build_impl(ctx):
         )
         + "if [ \"$NIX_STATUS\" -ne 0 ] || [ -z \"$outPath\" ]; then "
         + "  if [ -f \"$BUILD_SELECTED_LOG\" ]; then cat \"$BUILD_SELECTED_LOG\" >&2; fi; "
-        + "  exit ${NIX_STATUS:-2}; "
+        + "  if [ \"$NIX_STATUS\" -ne 0 ]; then exit \"$NIX_STATUS\"; fi; "
+        + "  echo \"rust_nix_build (%s): build-selected produced no output path\" >&2; " % raw
+        + "  exit 2; "
         + "fi; "
         + "if [ \"%s\" = \"lib\" ]; then : > \"$0\"; exit 0; fi; " % kind
         + ("TARGET_NAME=\"%s\"; " % target_name)

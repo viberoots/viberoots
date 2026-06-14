@@ -7,7 +7,19 @@ let
   graphGen =
     let
       envGraph = builtins.getEnv "BUCK_GRAPH_JSON";
-      graphPath = if envGraph != "" then envGraph else (repoRoot + "/.viberoots/workspace/buck/graph.json");
+      selectedTargetName = builtins.getEnv "BUCK_TARGET";
+      workspaceGraph = repoRoot + "/.viberoots/workspace/buck/graph.json";
+      testOverrideGraph = repoRoot + "/build-tools/tools/buck/graph.json";
+      workspaceGraphExists = builtins.pathExists workspaceGraph;
+      testOverrideGraphExists = builtins.pathExists testOverrideGraph;
+      graphHasSelectedTarget = p:
+        selectedTargetName != ""
+        && builtins.pathExists p
+        && pkgs.lib.hasInfix selectedTargetName (builtins.readFile p);
+      graphPath =
+        if envGraph != "" then envGraph
+        else if selectedTargetName != "" && testOverrideGraphExists && (!workspaceGraphExists || (!(graphHasSelectedTarget workspaceGraph) && graphHasSelectedTarget testOverrideGraph)) then testOverrideGraph
+        else workspaceGraph;
       graphArg =
         if (builtins.pathExists graphPath) then (builtins.path { path = graphPath; name = "graph.json"; }) else null;
     in
@@ -56,4 +68,3 @@ in
 {
   inherit graphGen buckGraph graphGenPure;
 }
-

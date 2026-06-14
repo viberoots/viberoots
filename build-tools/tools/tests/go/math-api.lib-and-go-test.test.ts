@@ -62,9 +62,12 @@ chmod +x ${stubPath}
       "gomod2nix.toml",
     )}`;
 
+    await $`build-tools/tools/dev/install-deps.ts --glue-only`;
+
     // Build the stack and run the auto-wired go test for math-api
     // Build ensures acceptance: //projects/libs/math-api:lib builds
     await $`buck2 build --target-platforms //:no_cgo //projects/libs/math-api:lib`;
+    await $`buck2 cquery --target-platforms //:no_cgo "kind(go_nix_test, //projects/libs/math-api:lib_test)"`;
     await $`buck2 test --target-platforms //:no_cgo //projects/libs/math-api:lib_test`;
   });
 });

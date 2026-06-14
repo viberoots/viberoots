@@ -10,10 +10,20 @@ const EXPECTATIONS: Array<{
 }> = [
   {
     path: "build-tools/tools/dev/update-pnpm-hash/importer-lockfile.ts",
-    fragments: [
-      "withHiddenNodeModules(importerAbs",
-      '"install",\n      "--force",',
-      '"fetch",\n      "--force",',
+    fragments: ["withHiddenNodeModules(importerAbs"],
+    checks: [
+      (source, file) => {
+        assert.match(
+          source,
+          /["']install["'],\s*["']--force["'],\s*["']--lockfile-only["']/,
+          `${file} must keep importer lockfile install non-interactive and forceful`,
+        );
+        assert.match(
+          source,
+          /["']fetch["'],\s*["']--force["'],\s*["']--prefer-offline["']/,
+          `${file} must keep importer lockfile fetch non-interactive and forceful`,
+        );
+      },
     ],
   },
   {

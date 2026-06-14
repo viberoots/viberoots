@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
+import { DEFAULT_AUTO_MAP_PATH, workspaceProviderLabel } from "../../lib/workspace-state-paths";
 import { runInTemp } from "../lib/test-helpers";
 
 function readLines(txt: string): string[] {
@@ -32,13 +33,13 @@ async function buildOutPath(tmp: string, $: any, target: string): Promise<string
 
 test("importer_wiring attaches importer patches and merges provider edges for list+dict shapes (probe)", async () => {
   await runInTemp("importer-wiring-attach-and-merge-probe", async (tmp, $) => {
-    const providersDir = path.join(tmp, "third_party", "providers");
-    await fsp.mkdir(providersDir, { recursive: true });
+    const providerMapPath = path.join(tmp, DEFAULT_AUTO_MAP_PATH);
+    await fsp.mkdir(path.dirname(providerMapPath), { recursive: true });
     await fsp.writeFile(
-      path.join(providersDir, "auto_map.bzl"),
+      providerMapPath,
       [
         "MODULE_PROVIDERS = {",
-        '  "//projects/apps/web:bin": ["//third_party/providers:prov_a"],',
+        `  "//projects/apps/web:bin": ["${workspaceProviderLabel("prov_a")}"],`,
         "}",
         "",
       ].join("\n"),
@@ -110,7 +111,7 @@ test("importer_wiring attaches importer patches and merges provider edges for li
       "expected importer patch path present in merged list output",
     );
     assert.ok(
-      listLines.includes("//third_party/providers:prov_a"),
+      listLines.includes(workspaceProviderLabel("prov_a")),
       "expected provider edge present in merged list output",
     );
 

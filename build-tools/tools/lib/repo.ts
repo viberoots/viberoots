@@ -116,12 +116,13 @@ export function resolveWorkspaceRootsSync(opts?: {
     : currentExists
       ? canonicalPath(viberootsCurrent)
       : workspaceRoot;
-  const liveCheckout = path.join(workspaceRoot, "viberoots");
-  const liveCheckoutExists = fs.existsSync(liveCheckout);
+  const nestedLiveCheckout = path.join(workspaceRoot, "viberoots");
+  const liveCheckouts = [workspaceRoot, nestedLiveCheckout].filter((p) => fs.existsSync(p));
   const currentPointsToLiveCheckout =
     currentExists &&
-    liveCheckoutExists &&
-    canonicalPath(viberootsCurrent) === canonicalPath(liveCheckout);
+    liveCheckouts.some(
+      (liveCheckout) => canonicalPath(viberootsCurrent) === canonicalPath(liveCheckout),
+    );
 
   return {
     workspaceRoot,

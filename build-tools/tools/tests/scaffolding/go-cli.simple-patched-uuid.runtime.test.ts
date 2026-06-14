@@ -5,6 +5,7 @@ import process from "node:process";
 import { test } from "node:test";
 import { resolvePinnedTestToolPath } from "../lib/test-helpers/pinned-tool";
 import { runInTemp } from "../lib/test-helpers";
+import { ensureBuckConfigForTempRepo } from "../lib/test-helpers/buck-config";
 const DEBUG = String(process.env.GO_SIMPLE_PATCHED_UUID_DEBUG || "") === "1";
 function dbg(...args: any[]) {
   if (!DEBUG) return;
@@ -19,41 +20,6 @@ process.env.PATH = `${path.dirname(process.execPath)}:${process.env.PATH || ""}`
 async function writeFileAbs(p: string, content: string) {
   await fsp.mkdir(path.dirname(p), { recursive: true });
   await fsp.writeFile(p, content, "utf8");
-}
-
-async function writeBuckConfig($: any) {
-  await $`bash --noprofile --norc -c ${`set -euo pipefail
-    printf '.\n' > .buckroot
-    cat > .buckconfig <<'EOF'
-[buildfile]
-name = TARGETS
-
-[repositories]
-root = .
-prelude = ./prelude
-toolchains = ./toolchains
-repo_toolchains = ./toolchains
-fbsource = ./prelude/third-party/fbsource_stub
-fbcode = ./prelude/third-party/fbcode_stub
-config = ./prelude
-
-[cells]
-root = .
-prelude = ./prelude
-toolchains = ./toolchains
-repo_toolchains = ./toolchains
-fbsource = ./prelude/third-party/fbsource_stub
-fbcode = ./prelude/third-party/fbcode_stub
-config = ./prelude
-
-[build]
-prelude = prelude
-user_platform = prelude//platforms:default
-target_platforms = prelude//platforms:default
-EOF
-    mkdir -p toolchains
-    printf '[buildfile]\nname = TARGETS\n' > toolchains/.buckconfig
-  `}`;
 }
 
 async function ensureNodeOnPath(tmp: string): Promise<string> {
@@ -250,7 +216,7 @@ async function readPinnedNixpkgsUrl(tmpRepoRoot: string): Promise<string> {
 test("go cli (no local replaces) + patched uuid runtime -> zero UUID", async () => {
   await runInTemp("go-cli-simple-patched-uuid", async (_tmp, _$) => {
     const $ = _$({ stdio: "pipe" });
-    await writeBuckConfig($);
+    await ensureBuckConfigForTempRepo(_tmp, $);
 
     // Scaffold a CLI app that directly imports github.com/google/uuid
     await $`scaf new go cli demo-cli --yes --path=projects/apps/demo-cli`;

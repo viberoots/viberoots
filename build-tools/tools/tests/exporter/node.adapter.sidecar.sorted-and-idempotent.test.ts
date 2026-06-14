@@ -3,12 +3,12 @@ import fs from "fs-extra";
 import assert from "node:assert/strict";
 import path from "node:path";
 import { test } from "node:test";
+import { DEFAULT_GRAPH_PATH, DEFAULT_NODE_LOCK_INDEX_PATH } from "../../lib/workspace-state-paths";
 import { runInTemp } from "../lib/test-helpers";
 
 test("generator emits node-lock-index with sorted keys and no rewrite on second run", async () => {
   await runInTemp("exp-node-sidecar-sorted", async (tmp, $) => {
-    const sidecar = path.join(tmp, "build-tools/tools/buck/node-lock-index.json");
-    await fs.mkdirp(path.dirname(sidecar));
+    const sidecar = path.join(tmp, DEFAULT_NODE_LOCK_INDEX_PATH);
     await fs.mkdirp(path.dirname(sidecar));
 
     // Simulate two Node targets in reverse order to ensure exporter sorts output keys
@@ -32,7 +32,7 @@ test("generator emits node-lock-index with sorted keys and no rewrite on second 
         ],
       },
     ];
-    const sim = path.join(tmp, "build-tools/tools/buck/simulated.json");
+    const sim = path.join(tmp, path.dirname(DEFAULT_GRAPH_PATH), "simulated.json");
     await fs.outputFile(sim, JSON.stringify(nodes) + "\n");
 
     // First run

@@ -3,12 +3,13 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
+import { DEFAULT_GRAPH_PATH } from "../../lib/workspace-state-paths";
 import { runInTemp } from "../lib/test-helpers";
 
 test("p resolves package label to runnable target label", async () => {
   await runInTemp("runnable-package-label-resolution", async (tmp, $) => {
-    const graphDir = path.join(tmp, "build-tools", "tools", "buck");
-    const graphPath = path.join(graphDir, "graph.json");
+    const graphPath = path.join(tmp, DEFAULT_GRAPH_PATH);
+    const graphDir = path.dirname(graphPath);
     await fsp.mkdir(graphDir, { recursive: true });
     await fsp.writeFile(
       graphPath,
@@ -75,8 +76,8 @@ test("p resolves package label to runnable target label", async () => {
 
 test("p resolves relative and absolute directory paths to runnable target label", async () => {
   await runInTemp("runnable-path-label-resolution", async (tmp, $) => {
-    const graphDir = path.join(tmp, "build-tools", "tools", "buck");
-    const graphPath = path.join(graphDir, "graph.json");
+    const graphPath = path.join(tmp, DEFAULT_GRAPH_PATH);
+    const graphDir = path.dirname(graphPath);
     await fsp.mkdir(graphDir, { recursive: true });
     await fsp.writeFile(
       graphPath,
@@ -154,10 +155,10 @@ test("p resolves relative and absolute directory paths to runnable target label"
 
 test("d resolves current directory path (.) from package cwd", async () => {
   await runInTemp("runnable-dot-cwd-resolution", async (tmp, $) => {
-    const graphDir = path.join(tmp, "build-tools", "tools", "buck");
+    const graphDir = path.dirname(path.join(tmp, DEFAULT_GRAPH_PATH));
     await fsp.mkdir(graphDir, { recursive: true });
     await fsp.writeFile(
-      path.join(graphDir, "graph.json"),
+      path.join(tmp, DEFAULT_GRAPH_PATH),
       JSON.stringify(
         [
           {

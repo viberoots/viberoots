@@ -39,6 +39,9 @@ name = TARGETS
 [repositories]
 root = .
 prelude = ./prelude
+viberoots = ./.viberoots/current
+workspace_buck = ./.viberoots/workspace/buck
+workspace_providers = ./.viberoots/workspace/providers
 toolchains = ./toolchains
 repo_toolchains = ./toolchains
 fbsource = ./prelude/third-party/fbsource_stub
@@ -48,6 +51,9 @@ config = ./prelude
 [cells]
 root = .
 prelude = ./prelude
+viberoots = ./.viberoots/current
+workspace_buck = ./.viberoots/workspace/buck
+workspace_providers = ./.viberoots/workspace/providers
 toolchains = ./toolchains
 repo_toolchains = ./toolchains
 fbsource = ./prelude/third-party/fbsource_stub
@@ -60,8 +66,11 @@ default_platform = //:no_cgo
 user_platform = //:no_cgo
 target_platforms = //:no_cgo
 EOF
-      mkdir -p toolchains
+      mkdir -p toolchains .viberoots/workspace/buck .viberoots/workspace/providers
+      ln -sfn .. .viberoots/current
       printf '[buildfile]\nname = TARGETS\n' > toolchains/.buckconfig
+      printf '[buildfile]\nname = TARGETS\n' > .viberoots/workspace/buck/.buckconfig
+      printf '[buildfile]\nname = TARGETS\n' > .viberoots/workspace/providers/.buckconfig
     `}`;
 
     // The test harness already rsyncs a minimal repo (excludes libs), writes .buckconfig and prelude.
@@ -87,7 +96,6 @@ EOF
     await ensureFile("build-tools/tools/dev/zx-init.mjs");
     await ensureFile("build-tools/tools/lib/providers.ts");
     await ensureFile("build-tools/tools/lib/fs-helpers.ts");
-    await ensureDir("third_party/providers");
     await ensureFile("TARGETS");
     await ensureFile("flake.lock");
 

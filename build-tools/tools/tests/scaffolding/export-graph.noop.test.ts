@@ -4,42 +4,11 @@ import { test } from "node:test";
 import { readGraph } from "../../lib/graph";
 import { DEFAULT_GRAPH_PATH } from "../../lib/workspace-state-paths";
 import { runInTemp } from "../lib/test-helpers";
+import { ensureBuckConfigForTempRepo } from "../lib/test-helpers/buck-config";
 
 test("export-graph writes .viberoots/workspace/buck/graph.json and parses", async () => {
   await runInTemp("export-graph", async (tmp, $) => {
-    // Ensure temp repo has a valid Buck mapping to the checked-in prelude
-    await $({ cwd: tmp })`bash --noprofile --norc -c ${`set -euo pipefail
-      printf '.\n' > .buckroot
-      cat > .buckconfig <<'EOF'
-[buildfile]
-name = TARGETS
-
-[repositories]
-root = .
-prelude = ./prelude
-toolchains = ./toolchains
-repo_toolchains = ./toolchains
-fbsource = ./prelude/third-party/fbsource_stub
-fbcode = ./prelude/third-party/fbcode_stub
-config = ./prelude
-
-[cells]
-root = .
-prelude = ./prelude
-toolchains = ./toolchains
-repo_toolchains = ./toolchains
-fbsource = ./prelude/third-party/fbsource_stub
-fbcode = ./prelude/third-party/fbcode_stub
-config = ./prelude
-
-[build]
-prelude = prelude
-user_platform = prelude//platforms:default
-target_platforms = prelude//platforms:default
-EOF
-      mkdir -p toolchains
-      printf '[buildfile]\nname = TARGETS\n' > toolchains/.buckconfig
-    `}`;
+    await ensureBuckConfigForTempRepo(tmp, $);
     await $`node build-tools/tools/buck/export-graph.ts --out ${DEFAULT_GRAPH_PATH}`;
     const p = path.join(tmp, DEFAULT_GRAPH_PATH);
     const nodes = await readGraph(p);

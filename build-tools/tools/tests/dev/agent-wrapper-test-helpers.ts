@@ -45,7 +45,7 @@ if [ "$1" = "-C" ]; then
   fi
   if [ "$1" = "status" ]; then
     if [ -e "$workdir/AUTOGEN_ONLY" ]; then
-      printf ' M third_party/providers/TARGETS\\0 M .viberoots/workspace/providers/auto_map.bzl\\0'
+      printf ' M .viberoots/workspace/providers/TARGETS.node.auto\\0 M .viberoots/workspace/providers/auto_map.bzl\\0'
     elif [ -e "$workdir/REAL_DIRTY" ]; then
       printf ' M README.md\\0'
     fi

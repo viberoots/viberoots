@@ -3,13 +3,14 @@ import { test } from "node:test";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { runInTemp, exists } from "../lib/test-helpers";
+import { WORKSPACE_PROVIDER_DIR, providerAutoTargetsPath } from "../../lib/workspace-state-paths";
 
 test("sync-providers exports renamed helpers and they behave as expected (dry-run)", async () => {
   await runInTemp("sync-providers-renamed-helpers", async (tmp, $) => {
     // Ensure providers dir exists so any minimal writes succeed deterministically
-    await fsp.mkdir(path.join(tmp, "third_party", "providers"), { recursive: true });
+    await fsp.mkdir(path.join(tmp, WORKSPACE_PROVIDER_DIR), { recursive: true });
     // Write a tiny harness that imports the module and calls the helpers.
-    const outFile = path.join(tmp, "third_party", "providers", "_sync_providers_helpers_out.json");
+    const outFile = path.join(tmp, WORKSPACE_PROVIDER_DIR, "_sync_providers_helpers_out.json");
     const harness = [
       "#!/usr/bin/env zx-wrapper",
       "import fs from 'fs-extra';",
@@ -48,7 +49,7 @@ test("sync-providers exports renamed helpers and they behave as expected (dry-ru
     }
 
     // Verify minimal glue write occurred deterministically when no lockfiles exist
-    const autoTargets = path.join(tmp, "third_party", "providers", "TARGETS.node.auto");
+    const autoTargets = path.join(tmp, providerAutoTargetsPath("node"));
     if (!(await exists(autoTargets))) {
       console.error("expected TARGETS.node.auto to be present after import (minimal header)");
       process.exit(2);

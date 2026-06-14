@@ -6,6 +6,7 @@ import * as path from "node:path";
 import { test } from "node:test";
 import { runInfisicalIacBootstrap } from "../../deployments/infisical-iac-bootstrap";
 import { DEFAULT_BOOTSTRAP_ARGS } from "../../deployments/infisical-iac-bootstrap-config";
+import { DEFAULT_GRAPH_PATH } from "../../lib/workspace-state-paths";
 import {
   createCredentialSink,
   resolveCredentialSinkSelection,
@@ -51,7 +52,7 @@ test("repo bootstrap auto credential sink creates starter resolver config only w
     assert.match(shared, /"backend": "local-file"/);
     assert.doesNotMatch(shared, /"file": ".local\/infisical\/bootstrap\/credentials.json"/);
     assert.doesNotMatch(shared, /clientSecret":/);
-    const local = await fs.readFile(localConfigPath(), "utf8");
+    const local = await fs.readFile(path.join(projectConfigDir(), "local.json"), "utf8");
     assert.match(local, /"file": ".local\/infisical\/bootstrap\/credentials.json"/);
   });
 });
@@ -194,7 +195,6 @@ async function tmp() {
 
 const projectConfigDir = () => path.join("projects", "config");
 const sharedConfigPath = () => path.join(projectConfigDir(), "shared.json");
-const localConfigPath = () => path.join(projectConfigDir(), "local.json");
 
 async function withCwdAndEnv(dir: string, run: () => Promise<void>) {
   const cwd = process.cwd();
@@ -246,5 +246,5 @@ async function writeJson(file: string, value: unknown) {
   await fs.writeFile(file, `${JSON.stringify(value, null, 2)}\n`);
 }
 async function writeGraph(nodes: unknown[]) {
-  await writeJson(path.join("build-tools", "tools", "buck", "graph.json"), { nodes });
+  await writeJson(DEFAULT_GRAPH_PATH, { nodes });
 }

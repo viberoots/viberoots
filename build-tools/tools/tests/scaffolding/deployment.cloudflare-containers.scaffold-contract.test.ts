@@ -81,7 +81,7 @@ test("deployment/cloudflare-containers scaffold renders Worker config and metada
     await $`nix shell nixpkgs#buildifier -c buildifier --mode=check ${targetsPath}`;
     assert.equal(
       targets,
-      `load("//build-tools/deployments:defs.bzl", "cloudflare_containers_deployment")
+      `load("@viberoots//build-tools/deployments:defs.bzl", "cloudflare_containers_deployment")
 
 cloudflare_containers_deployment(
     name = "deploy",

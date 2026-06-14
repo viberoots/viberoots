@@ -73,10 +73,13 @@ test("AWS foundation OpenTofu variable split preserves interface and methodology
     .filter(({ lines }) => lines > 250);
   assert.deepEqual(oversizeFiles, []);
 
-  const variableNames = [...moduleSource().matchAll(/^variable "([^"]+)"/gm)].map(
-    ([, name]) => name,
-  );
+  const variableNames = [...moduleSource().matchAll(/^variable "([^"]+)"/gm)].map((m) => m[1]);
   assert.deepEqual(variableNames.sort(), [...expectedVariableNames].sort());
+
+  const undeclaredRefs = [...moduleSource().matchAll(/\bvar\.([A-Za-z0-9_]+)/g)].flatMap((m) =>
+    variableNames.includes(m[1]) ? [] : [m[1]],
+  );
+  assert.deepEqual([...new Set(undeclaredRefs)].sort(), []);
 });
 
 test("AWS foundation OpenTofu module validates after variable split", async () => {
@@ -232,11 +235,8 @@ test("foundation profile carries and live inspection checks S3 VPC endpoint iden
 });
 
 function moduleSource(): string {
-  return fs
-    .readdirSync(moduleDir)
-    .filter((file) => file.endsWith(".tf"))
-    .map((file) => fs.readFileSync(path.join(moduleDir, file), "utf8"))
-    .join("\n");
+  const tfFiles = fs.readdirSync(moduleDir).filter((file) => file.endsWith(".tf"));
+  return tfFiles.map((file) => fs.readFileSync(path.join(moduleDir, file), "utf8")).join("\n");
 }
 
 function escapeRegExp(value: string): string {

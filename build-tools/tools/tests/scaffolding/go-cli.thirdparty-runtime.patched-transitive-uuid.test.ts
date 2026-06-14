@@ -5,6 +5,7 @@ import process from "node:process";
 import { test } from "node:test";
 import { resolvePinnedTestToolPath } from "../lib/test-helpers/pinned-tool";
 import { runInTemp } from "../lib/test-helpers";
+import { ensureBuckConfigForTempRepo } from "../lib/test-helpers/buck-config";
 
 // Ensure Node is on PATH inside zx_test sandboxes that may not have dev shell
 process.env.PATH = `${path.dirname(process.execPath)}:${process.env.PATH || ""}`;
@@ -12,41 +13,6 @@ process.env.PATH = `${path.dirname(process.execPath)}:${process.env.PATH || ""}`
 async function writeFileAbs(p: string, content: string) {
   await fsp.mkdir(path.dirname(p), { recursive: true });
   await fsp.writeFile(p, content, "utf8");
-}
-
-async function writeBuckConfig(sh: any) {
-  await sh`bash --noprofile --norc -c ${`set -euo pipefail
-    printf '.\n' > .buckroot
-    cat > .buckconfig <<'EOF'
-[buildfile]
-name = TARGETS
-
-[repositories]
-root = .
-prelude = ./prelude
-toolchains = ./toolchains
-repo_toolchains = ./toolchains
-fbsource = ./prelude/third-party/fbsource_stub
-fbcode = ./prelude/third-party/fbcode_stub
-config = ./prelude
-
-[cells]
-root = .
-prelude = ./prelude
-toolchains = ./toolchains
-repo_toolchains = ./toolchains
-fbsource = ./prelude/third-party/fbsource_stub
-fbcode = ./prelude/third-party/fbcode_stub
-config = ./prelude
-
-[build]
-prelude = prelude
-user_platform = prelude//platforms:default
-target_platforms = prelude//platforms:default
-EOF
-    mkdir -p toolchains
-    printf '[buildfile]\nname = TARGETS\n' > toolchains/.buckconfig
-  `}`;
 }
 
 async function ensureNodeOnPath(tmp: string): Promise<string> {
@@ -501,7 +467,7 @@ test("go cli with transitive third-party patched uuid runtime", async () => {
     const $ = _$({ stdio: "pipe" });
     // Initialize git so patch-pkg can create and apply patches
     await $`git init`;
-    await writeBuckConfig($);
+    await ensureBuckConfigForTempRepo(_tmp, $);
 
     const moduleCache = path.join(_tmp, ".gomodcache");
     const { proxyRoot, gomodcache } = await seedUuidModuleCache(_tmp, $, moduleCache);

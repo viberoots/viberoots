@@ -2,6 +2,7 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
+import { workspaceProviderLabel } from "../../lib/workspace-state-paths";
 import { runInTemp } from "../lib/test-helpers";
 
 test("gen-auto-map correctly maps lockfile labels to Node providers", async () => {
@@ -85,7 +86,7 @@ test("gen-auto-map correctly maps lockfile labels to Node providers", async () =
     }
 
     // Verify provider labels are fully qualified
-    if (!autoMapContent.includes("//third_party/providers:lf_")) {
+    if (!autoMapContent.includes(workspaceProviderLabel("lf_"))) {
       console.error("Expected fully qualified provider labels");
       process.exit(2);
     }

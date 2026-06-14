@@ -4,14 +4,15 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
 import { normalizeDevBuildTargetArgs } from "../../dev/dev-build/target-args";
+import { DEFAULT_GRAPH_PATH } from "../../lib/workspace-state-paths";
 import { runInTemp } from "../lib/test-helpers";
 
 test("dev-build normalizes path-like target args for build/test/run", async () => {
   await runInTemp("dev-build-target-args-normalize", async (tmp) => {
-    const graphDir = path.join(tmp, "build-tools", "tools", "buck");
+    const graphDir = path.dirname(path.join(tmp, DEFAULT_GRAPH_PATH));
     await fsp.mkdir(graphDir, { recursive: true });
     await fsp.writeFile(
-      path.join(graphDir, "graph.json"),
+      path.join(tmp, DEFAULT_GRAPH_PATH),
       JSON.stringify(
         [{ name: "//projects/apps/demo:app", labels: ["lang:node", "kind:app"] }],
         null,
@@ -50,9 +51,9 @@ test("dev-build normalizes path-like target args for build/test/run", async () =
 
 test("dev-build keeps query expressions and passthrough args untouched", async () => {
   await runInTemp("dev-build-target-args-safe", async (tmp) => {
-    const graphDir = path.join(tmp, "build-tools", "tools", "buck");
+    const graphDir = path.dirname(path.join(tmp, DEFAULT_GRAPH_PATH));
     await fsp.mkdir(graphDir, { recursive: true });
-    await fsp.writeFile(path.join(graphDir, "graph.json"), "[]\n", "utf8");
+    await fsp.writeFile(path.join(tmp, DEFAULT_GRAPH_PATH), "[]\n", "utf8");
 
     const queryArgs = await normalizeDevBuildTargetArgs({
       workspaceRoot: tmp,
@@ -86,9 +87,9 @@ test("dev-build keeps query expressions and passthrough args untouched", async (
 
 test("dev-build drops missing optional patch recursive scopes", async () => {
   await runInTemp("dev-build-target-args-missing-patches", async (tmp) => {
-    const graphDir = path.join(tmp, "build-tools", "tools", "buck");
+    const graphDir = path.dirname(path.join(tmp, DEFAULT_GRAPH_PATH));
     await fsp.mkdir(graphDir, { recursive: true });
-    await fsp.writeFile(path.join(graphDir, "graph.json"), "[]\n", "utf8");
+    await fsp.writeFile(path.join(tmp, DEFAULT_GRAPH_PATH), "[]\n", "utf8");
 
     const missingPatchScope = await normalizeDevBuildTargetArgs({
       workspaceRoot: tmp,

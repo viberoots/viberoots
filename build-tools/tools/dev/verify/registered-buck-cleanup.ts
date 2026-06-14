@@ -86,18 +86,24 @@ export function registeredIsolationProcessPidsFromLines(
   const stateDirs = macosPathVariants(path.join(repoRoot, "buck-out", entry.iso, "forkserver"));
   const daemonNeedle = ` --isolation-dir ${entry.iso}`;
   const forkserverSuffix = `/buck-out/${entry.iso}/forkserver`;
-  const pids: number[] = [];
-  for (const line of lines) {
+  const rows = lines.flatMap((line) => {
     const parsed = parsePsLine(line);
-    if (!parsed) continue;
+    return parsed ? [{ ...parsed, line }] : [];
+  });
+  const commandByPid = new Map(rows.map((row) => [row.pid, row.line]));
+  const pids: number[] = [];
+  for (const row of rows) {
     const isForkserver =
-      line.includes("(buck2-forkserver)") &&
-      (stateDirs.some((stateDir) => line.includes(`--state-dir ${stateDir}`)) ||
-        line.includes(forkserverSuffix));
-    const isDaemon = line.includes("buck2d[") && line.includes(daemonNeedle);
+      row.line.includes("(buck2-forkserver)") &&
+      (stateDirs.some((stateDir) => row.line.includes(`--state-dir ${stateDir}`)) ||
+        row.line.includes(forkserverSuffix));
+    const isDaemon = row.line.includes("buck2d[") && row.line.includes(daemonNeedle);
     if (!isForkserver && !isDaemon) continue;
-    pids.push(parsed.pid);
-    if (parsed.ppid > 1) pids.push(parsed.ppid);
+    pids.push(row.pid);
+    const parentCommand = commandByPid.get(row.ppid) || "";
+    if (isForkserver && parentCommand.includes("buck2d[") && parentCommand.includes(daemonNeedle)) {
+      pids.push(row.ppid);
+    }
   }
   return Array.from(new Set(pids)).filter((pid) => pid > 1);
 }

@@ -21,7 +21,7 @@ test("nix_action_runner helpers assemble stable cmd snippets (cquery)", async ()
         "  cmd = escape_buck_cmd_subst(",
         "    nix_action_shell_prefix_core()",
         "    + nix_action_export_graph_cmd()",
-        '    + nix_action_build_selected_out_path_cmd("//projects/apps/probe:probe")',
+        '    + nix_action_build_selected_out_path_cmd("//projects/apps/probe:probe", zx_wrapper = "path:$FLK_ROOT#zx-wrapper")',
         '    + "echo ok > $OUT"',
         "  ),",
         ")",
@@ -76,7 +76,23 @@ test("nix_action_runner helpers assemble stable cmd snippets (cquery)", async ()
 
     assert.ok(
       out.includes("--accept-flake-config"),
-      "expected build-selected invocation to pass --accept-flake-config",
+      "expected build-selected fallback invocation to pass --accept-flake-config",
+    );
+    assert.ok(
+      out.includes(`VBR_NODE_ZX_INIT=\\"${zxInitPath}\\"`) &&
+        out.includes("node --experimental-top-level-await") &&
+        out.includes(`${buildSelectedPath}\\"; else`),
+      "expected build-selected snippet to prefer direct node execution from VIBEROOTS_ROOT",
+    );
+    assert.ok(
+      out.includes("ZX_WRAPPER_REF=") &&
+        out.includes('ZX_WRAPPER_REF=\\"path:$FLK_ROOT#zx-wrapper\\"') &&
+        !out.includes('if [ -f \\"$VIBEROOTS_ROOT/flake.nix\\" ]'),
+      "expected build-selected nix fallback to honor the caller-provided flake ref",
+    );
+    assert.ok(
+      out.includes('${TIMEOUT:+$TIMEOUT }nix run --accept-flake-config \\"$ZX_WRAPPER_REF\\"'),
+      "expected build-selected nix fallback to use the resolved wrapper flake",
     );
     assert.ok(out.includes("sed -E"), "expected build-selected out-path parsing to strip ANSI");
 

@@ -406,11 +406,28 @@ test("verify cleanup: registered buck isolation matching accepts macOS /tmp alia
     createdAtMs: 1,
   };
   const pids = registeredIsolationProcessPidsFromLines(entry, [
+    "49 1 00:00 buck2d[viberoots-run-in-temp-example] --isolation-dir zxtest-shared-abcdef1234 daemon {}",
     "50 49 00:00 (buck2-forkserver) forkserver --fd 23 --state-dir /private/tmp/viberoots-run-in-temp-example/buck-out/zxtest-shared-abcdef1234/forkserver",
     "51 49 00:00 (buck2-forkserver) forkserver --fd 23 --state-dir /private/tmp/viberoots-run-in-temp-example/buck-out/foreign/forkserver",
   ]);
 
-  assert.deepEqual(pids, [50, 49]);
+  assert.deepEqual(pids, [49, 50]);
+});
+
+test("verify cleanup: registered buck isolation matching does not trust unproven forkserver PPIDs", () => {
+  const entry = {
+    iso: "zxtest-shared-abcdef1234",
+    repoRoot: "/tmp/viberoots-run-in-temp-example",
+    ownerPid: 1234,
+    kind: "run-in-temp-zxtest",
+    createdAtMs: 1,
+  };
+  const pids = registeredIsolationProcessPidsFromLines(entry, [
+    "50 49 00:00 (buck2-forkserver) forkserver --fd 23 --state-dir /private/tmp/viberoots-run-in-temp-example/buck-out/zxtest-shared-abcdef1234/forkserver",
+    "49 1 00:00 /Users/example/repo/build-tools/tools/bin/tail-log --status -w 2",
+  ]);
+
+  assert.deepEqual(pids, [50]);
 });
 
 test("verify cleanup: registered buck isolation matching uses exact isolation when buck root drifts", () => {
@@ -427,7 +444,7 @@ test("verify cleanup: registered buck isolation matching uses exact isolation wh
     "52 51 00:00 buck2d[viberoots] --isolation-dir zxtest-shared-other daemon {}",
   ]);
 
-  assert.deepEqual(pids, [50, 49, 51]);
+  assert.deepEqual(pids, [50, 51]);
 });
 
 test("verify cleanup: temp root path matching accepts macOS /tmp aliases", () => {

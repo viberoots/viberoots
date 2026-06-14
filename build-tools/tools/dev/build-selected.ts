@@ -9,6 +9,7 @@ import { sanitizeAttrNameFromLabel } from "../lib/labels";
 import { runNodeWithZx } from "../lib/node-run";
 import { findRepoRoot, pathExists } from "../lib/repo";
 import { getArgvTokens } from "../lib/cli";
+import { runMain } from "../lib/cli-wrap";
 import { withScopedEnv } from "../lib/scoped-env";
 import { untrackedRequiresImpureForTargets } from "./dev-build/untracked";
 import { targetPackageFromLabel } from "./build-selected-helpers";
@@ -51,6 +52,7 @@ async function chooseFlakeRef(opts: {
     workspaceAbs.startsWith("/tmp/") ||
     workspaceAbs.startsWith("/private/tmp/") ||
     workspaceAbs.startsWith("/private/var/folders/") ||
+    workspaceAbs.includes(`${path.sep}viberoots-verify-`) ||
     workspaceAbs.includes(`${path.sep}buck-out${path.sep}tmp${path.sep}tmpdir${path.sep}`);
   if (opts.sourceMode === "auto" && isLikelyTempWorkspace) {
     const filtered = await makeFilteredFlakeRef({
@@ -233,9 +235,4 @@ async function main() {
   process.stdout.write(outPath + "\n");
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
-  main().catch((e) => {
-    console.error(e);
-    process.exit(1);
-  });
-}
+runMain(main);

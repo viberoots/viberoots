@@ -4,6 +4,7 @@ import assert from "node:assert/strict";
 import path from "node:path";
 import { test } from "node:test";
 import { providerNameForImporter } from "../lib/providers";
+import { workspaceProviderLabel } from "../lib/workspace-state-paths";
 import { runInTemp } from "./lib/test-helpers";
 
 test("auto-map includes importer-scoped provider for a temp projects/apps/example importer", async () => {
@@ -11,7 +12,7 @@ test("auto-map includes importer-scoped provider for a temp projects/apps/exampl
     // Create a minimal projects/apps/example importer with lockfile and a Buck target that carries the lockfile label.
     await $`bash --noprofile --norc -c ${[
       "set -euo pipefail",
-      "mkdir -p projects/apps/example third_party/providers build-tools/tools/buck",
+      "mkdir -p projects/apps/example .viberoots/workspace/providers .viberoots/workspace/buck",
       // Provide a minimal stub so Buck can load macros before glue is generated.
       "cat > .viberoots/workspace/providers/auto_map.bzl <<'BXL'",
       "# GENERATED (stub for tests) — will be replaced by gen-auto-map",
@@ -86,10 +87,9 @@ test("auto-map includes importer-scoped provider for a temp projects/apps/exampl
     // Generate auto_map mapping lockfile label -> provider
     await $`${NODE} ${nodeFlags} build-tools/tools/buck/gen-auto-map.ts --graph ${graph} --out .viberoots/workspace/providers/auto_map.bzl`;
 
-    const expected = `//third_party/providers:${providerNameForImporter(
-      "projects/apps/example/pnpm-lock.yaml",
-      "projects/apps/example",
-    )}`;
+    const expected = workspaceProviderLabel(
+      providerNameForImporter("projects/apps/example/pnpm-lock.yaml", "projects/apps/example"),
+    );
 
     const autoMap = await fs.readFile(
       path.join(tmp, ".viberoots/workspace/providers/auto_map.bzl"),

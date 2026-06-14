@@ -14,7 +14,7 @@ test("build-tools/node/defs_nix.bzl runs node patch requirement preflight for al
     .length;
   assert(preflightCalls === 3, `${file} must run preflight in webapp and both cli routes`);
   assert(
-    txt.includes('"//build-tools/lang:nix_shell.bzl"') &&
+    txt.includes('"@viberoots//build-tools/lang:nix_shell.bzl"') &&
       txt.includes('"nix_calling_node_patch_requirements_preflight"'),
     `${file} must load shared node patch preflight helper from nix_shell.bzl`,
   );

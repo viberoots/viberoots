@@ -17,8 +17,8 @@ test("build-tools/node/defs_stage.bzl runs node patch requirement preflight for 
     `${file} must run preflight in node_asset_stage and node_wasm_inline_module`,
   );
   assert(
-    txt.includes('"//build-tools/lang:nix_shell.bzl"') &&
+    txt.includes('"@viberoots//build-tools/lang:nix_shell.bzl"') &&
       txt.includes('"nix_calling_node_patch_requirements_preflight"'),
-    `${file} must load shared node patch preflight helper from nix_shell.bzl`,
+    `${file} must load shared node patch preflight helper from the viberoots cell`,
   );
 });

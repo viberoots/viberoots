@@ -6,6 +6,11 @@ import * as path from "node:path";
 import { test } from "node:test";
 import type { GraphNode } from "../../lib/graph";
 import {
+  DEFAULT_GRAPH_PATH,
+  DEFAULT_NODE_LOCK_INDEX_PATH,
+  DEFAULT_PROVIDER_INDEX_JSON_PATH,
+} from "../../lib/workspace-state-paths";
+import {
   extractCloudflarePagesDeployments,
   extractKubernetesDeployments,
 } from "../../deployments/contract";
@@ -101,9 +106,9 @@ test("remote profile lookup keeps explicit workspace-root behavior", async () =>
 test("read-only graph options resolve default inputs from workspace root", async () => {
   await withWorkspace(async ({ root }) => {
     assert.deepEqual(deploymentGraphReadOptions(root), {
-      graphPath: path.join(root, "build-tools", "tools", "buck", "graph.json"),
-      providerIndexPath: path.join(root, "third_party", "providers", "provider_index.json"),
-      nodeLockIndexPath: path.join(root, "build-tools", "tools", "buck", "node-lock-index.json"),
+      graphPath: path.join(root, DEFAULT_GRAPH_PATH),
+      providerIndexPath: path.join(root, DEFAULT_PROVIDER_INDEX_JSON_PATH),
+      nodeLockIndexPath: path.join(root, DEFAULT_NODE_LOCK_INDEX_PATH),
     });
     assert.equal(
       deploymentGraphReadOptions(root, "custom/graph.json").graphPath,

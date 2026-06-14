@@ -146,6 +146,7 @@ export async function runVerifyBuckPasses(opts: {
     };
   };
 
+  let aggregateStatus = 0;
   for (const group of groupVerifyPassesForExecution(passes)) {
     const groupStartMs = Date.now();
     const useDedicatedPassIsolation = group.length > 1;
@@ -172,9 +173,6 @@ export async function runVerifyBuckPasses(opts: {
       const status = run.wait().then((value) => {
         if (value !== 0 && firstFailure === 0) {
           firstFailure = value;
-          for (const other of running) {
-            if (other.pgid !== run.pgid) terminatePassProcessGroup(other.pgid);
-          }
         }
         return value;
       });
@@ -196,25 +194,24 @@ export async function runVerifyBuckPasses(opts: {
     }
     if (delayedPasses.length > 0) {
       await new Promise((resolve) => setTimeout(resolve, resourceLimitedDelayS * 1000));
-      if (firstFailure === 0) {
-        for (const run of await Promise.all(
-          delayedPasses.map((pass) =>
-            startPass(
-              pass,
-              verifyPassIsolationDir({
-                baseIso: opts.iso,
-                passName: pass.name,
-                dedicated: useDedicatedPassIsolation,
-              }),
-            ),
+      for (const run of await Promise.all(
+        delayedPasses.map((pass) =>
+          startPass(
+            pass,
+            verifyPassIsolationDir({
+              baseIso: opts.iso,
+              passName: pass.name,
+              dedicated: useDedicatedPassIsolation,
+            }),
           ),
-        )) {
-          trackRun(run);
-        }
+        ),
+      )) {
+        trackRun(run);
       }
     }
     const statuses = await Promise.all(running.map(async (run) => await run.status));
     const status = firstFailure || statuses.find((value) => value !== 0) || 0;
+    if (status !== 0 && aggregateStatus === 0) aggregateStatus = status;
     if (group.length > 1) {
       await appendVerifyPassLog(
         opts.logFile,
@@ -223,9 +220,8 @@ export async function runVerifyBuckPasses(opts: {
     }
     if (status !== 0) {
       for (const run of running) terminatePassProcessGroup(run.pgid);
-      return status;
     }
   }
 
-  return 0;
+  return aggregateStatus;
 }

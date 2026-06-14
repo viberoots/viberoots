@@ -22,6 +22,12 @@ test("build-selected runs node patch requirement preflight", async () => {
   if (!txt.includes("untrackedRequiresImpureForTargets")) {
     throw new Error(`${file} should reuse untracked impurity policy helper`);
   }
+  if (!txt.includes("runMain(main)")) {
+    throw new Error(`${file} must use the shared runMain entrypoint`);
+  }
+  if (txt.includes("import.meta.url === `file://${process.argv[1]}`")) {
+    throw new Error(`${file} must not use a symlink-sensitive import.meta/process.argv guard`);
+  }
   if (
     !txt.includes(
       "workspaceAbs.includes(`${path.sep}buck-out${path.sep}tmp${path.sep}tmpdir${path.sep}`)",

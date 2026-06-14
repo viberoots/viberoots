@@ -2,14 +2,20 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
+import {
+  DEFAULT_GRAPH_PATH,
+  DEFAULT_NODE_LOCK_INDEX_PATH,
+  DEFAULT_PROVIDER_INDEX_JSON_PATH,
+  workspaceProviderLabel,
+} from "../../lib/workspace-state-paths";
 import { runInTemp } from "../lib/test-helpers";
 
 test("graph-view CLI prints composite view with nodes and indexes", async () => {
   await runInTemp("graph-view-cli", async (tmp, $) => {
-    const graphDir = path.join(tmp, "build-tools", "tools", "buck");
-    const provDir = path.join(tmp, "third_party", "providers");
-    await fsp.mkdir(graphDir, { recursive: true });
-    await fsp.mkdir(provDir, { recursive: true });
+    await fsp.mkdir(path.dirname(path.join(tmp, DEFAULT_GRAPH_PATH)), { recursive: true });
+    await fsp.mkdir(path.dirname(path.join(tmp, DEFAULT_PROVIDER_INDEX_JSON_PATH)), {
+      recursive: true,
+    });
 
     // Minimal graph with one Node and one non-Node entry
     const nodes = [
@@ -28,17 +34,17 @@ test("graph-view CLI prints composite view with nodes and indexes", async () => 
         labels: ["lang:go", "kind:lib"],
       },
     ];
-    await fsp.writeFile(path.join(graphDir, "graph.json"), JSON.stringify(nodes, null, 2));
+    await fsp.writeFile(path.join(tmp, DEFAULT_GRAPH_PATH), JSON.stringify(nodes, null, 2));
 
     // Provider index (JSON sidecar)
     const providerIndex = {
-      "//third_party/providers:lf_deadbeef_projects_apps_web__projects_apps_web_pnpm_lock_yaml": {
+      [workspaceProviderLabel("lf_deadbeef_projects_apps_web__projects_apps_web_pnpm_lock_yaml")]: {
         kind: "node",
         key: "lockfile:projects/apps/web/pnpm-lock.yaml#projects/apps/web",
       },
     };
     await fsp.writeFile(
-      path.join(provDir, "provider_index.json"),
+      path.join(tmp, DEFAULT_PROVIDER_INDEX_JSON_PATH),
       JSON.stringify(providerIndex, null, 2) + "\n",
       "utf8",
     );
@@ -48,7 +54,7 @@ test("graph-view CLI prints composite view with nodes and indexes", async () => 
       "//projects/apps/web:bundle": "lockfile:projects/apps/web/pnpm-lock.yaml#projects/apps/web",
     };
     await fsp.writeFile(
-      path.join(graphDir, "node-lock-index.json"),
+      path.join(tmp, DEFAULT_NODE_LOCK_INDEX_PATH),
       JSON.stringify(nodeLockIndex, null, 2) + "\n",
       "utf8",
     );

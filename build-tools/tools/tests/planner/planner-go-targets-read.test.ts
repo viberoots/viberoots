@@ -3,11 +3,12 @@ import fs from "fs-extra";
 import assert from "node:assert/strict";
 import path from "node:path";
 import { test } from "node:test";
+import { DEFAULT_GRAPH_PATH } from "../../lib/workspace-state-paths";
 import { runInTemp } from "../lib/test-helpers";
 
 test("planner selected outputs resolve for go/cpp/python targets", async () => {
   await runInTemp("planner-go-targets", async (tmp, $) => {
-    const graphDir = path.join(tmp, "build-tools/tools/buck");
+    const graphDir = path.dirname(path.join(tmp, DEFAULT_GRAPH_PATH));
     await fs.mkdirp(graphDir);
     await fs.outputFile(
       path.join(tmp, "projects", "apps", "goapp", "cmd", "goapp", "main.go"),
@@ -57,13 +58,14 @@ test("planner selected outputs resolve for go/cpp/python targets", async () => {
         srcs: ["projects/apps/pyapp/src/main.py"],
       },
     ];
-    await fs.writeFile(path.join(graphDir, "graph.json"), JSON.stringify(nodes), "utf8");
+    await fs.writeFile(path.join(tmp, DEFAULT_GRAPH_PATH), JSON.stringify({ nodes }), "utf8");
 
     const kindExpr = `
       let
         pkgs = import <nixpkgs> {};
         lib = pkgs.lib;
-        nodes = builtins.fromJSON (builtins.readFile ./.viberoots/workspace/buck/graph.json);
+        graph = builtins.fromJSON (builtins.readFile ./.viberoots/workspace/buck/graph.json);
+        nodes = if builtins.isList graph then graph else graph.nodes or [];
         get = attrs: k: if builtins.hasAttr k attrs then attrs.\${k} else null;
         ctx = {
           inherit lib get nodes;

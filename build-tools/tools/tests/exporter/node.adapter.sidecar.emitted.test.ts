@@ -3,11 +3,12 @@ import fs from "fs-extra";
 import assert from "node:assert/strict";
 import path from "node:path";
 import { test } from "node:test";
+import { DEFAULT_GRAPH_PATH, DEFAULT_NODE_LOCK_INDEX_PATH } from "../../lib/workspace-state-paths";
 import { runInTemp } from "../lib/test-helpers";
 
 test("glue/generator emits node-lock-index.json deterministically", async () => {
   await runInTemp("exp-node-sidecar", async (tmp, $) => {
-    const sidecar = path.join(tmp, "build-tools/tools/buck/node-lock-index.json");
+    const sidecar = path.join(tmp, DEFAULT_NODE_LOCK_INDEX_PATH);
     await fs.mkdirp(path.dirname(sidecar));
     const nodes = [
       {
@@ -25,7 +26,7 @@ test("glue/generator emits node-lock-index.json deterministically", async () => 
         labels: ["lang:go"],
       },
     ];
-    const sim = path.join(tmp, "build-tools/tools/buck/simulated.json");
+    const sim = path.join(tmp, path.dirname(DEFAULT_GRAPH_PATH), "simulated.json");
     await fs.outputFile(sim, JSON.stringify(nodes) + "\n");
 
     // First run

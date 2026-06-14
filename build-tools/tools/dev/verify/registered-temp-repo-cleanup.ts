@@ -5,6 +5,7 @@ import {
   existingPathVariant,
   isPidAlive,
   listIsolationDirs,
+  parentIsMatchingBuckDaemon,
   parsePsLine,
   pathStartsWithRootVariant,
   pathExists,
@@ -157,7 +158,8 @@ export async function cleanupRegisteredTempRepos(opts: {
   }
   const skippedRoots = Math.max(0, allRoots.length - uniqueRoots.length);
 
-  let forks = parseForkservers(await psLines(2000));
+  let processLines = await psLines(2000);
+  let forks = parseForkservers(processLines);
   let killed = 0;
   const maxKills = Math.max(0, opts.maxKills ?? 200);
   for (const root of uniqueRoots) {
@@ -189,7 +191,7 @@ export async function cleanupRegisteredTempRepos(opts: {
           process.kill(f.pid, "SIGKILL");
         } catch {}
       }
-      if (f.ppid > 1 && isPidAlive(f.ppid)) {
+      if (parentIsMatchingBuckDaemon(processLines, f.ppid, iso) && isPidAlive(f.ppid)) {
         try {
           process.kill(f.ppid, "SIGKILL");
         } catch {}
@@ -202,7 +204,8 @@ export async function cleanupRegisteredTempRepos(opts: {
       }
     }
     if (matchedThisPass === 0) break;
-    forks = parseForkservers(await psLines(2000));
+    processLines = await psLines(2000);
+    forks = parseForkservers(processLines);
   }
 
   const lines2 = await psLines(2000);

@@ -2,7 +2,7 @@
 import type { DeploymentCurrentStageState } from "./deployment-current-stage-state";
 import type { DeploymentStageStateAuditEvent } from "./deployment-stage-state-audit";
 
-const CONTROL_PLANE_REQUEST_TIMEOUT_MS = 15_000;
+const CONTROL_PLANE_REQUEST_TIMEOUT_MS = 60_000;
 
 function authHeaders(token?: string) {
   return token ? { authorization: `Bearer ${token}` } : {};
