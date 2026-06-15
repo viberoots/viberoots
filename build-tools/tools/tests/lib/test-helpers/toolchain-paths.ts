@@ -16,6 +16,21 @@ function resolveSourceRoot(): string {
   return envRoot || repoRoot();
 }
 
+async function resolveToolSourceRoot(root: string): Promise<string> {
+  const localTool = path.join(root, "build-tools", "tools", "dev", "gen-toolchain-paths.ts");
+  if (await pathExists(localTool)) return root;
+  const submoduleRoot = path.join(root, "viberoots");
+  const submoduleTool = path.join(
+    submoduleRoot,
+    "build-tools",
+    "tools",
+    "dev",
+    "gen-toolchain-paths.ts",
+  );
+  if (await pathExists(submoduleTool)) return submoduleRoot;
+  return root;
+}
+
 async function hasValidGeneratedToolchainPaths(
   bzlPath: string,
   jsonPath: string,
@@ -122,8 +137,16 @@ async function ensureSourceFiles($: any): Promise<{ bzl: string; json: string }>
   if (!cachedSource) {
     cachedSource = (async () => {
       const root = resolveSourceRoot();
-      const bzl = path.join(root, "toolchains", "toolchain_paths.bzl");
-      const json = path.join(root, "build-tools", "tools", "dev", "toolchain-paths.json");
+      const toolSourceRoot = await resolveToolSourceRoot(root);
+      const bzl = path.join(toolSourceRoot, "toolchains", "toolchain_paths.bzl");
+      const json = path.join(toolSourceRoot, "build-tools", "tools", "dev", "toolchain-paths.json");
+      const generator = path.join(
+        toolSourceRoot,
+        "build-tools",
+        "tools",
+        "dev",
+        "gen-toolchain-paths.ts",
+      );
 
       if (await hasValidGeneratedToolchainPaths(bzl, json)) return { bzl, json };
 
@@ -133,9 +156,9 @@ async function ensureSourceFiles($: any): Promise<{ bzl: string; json: string }>
         fn: async () => {
           if (await hasValidGeneratedToolchainPaths(bzl, json)) return;
           await $({
-            cwd: root,
+            cwd: toolSourceRoot,
             stdio: "pipe",
-          })`zx-wrapper build-tools/tools/dev/gen-toolchain-paths.ts`;
+          })`zx-wrapper ${generator}`;
         },
       });
 
