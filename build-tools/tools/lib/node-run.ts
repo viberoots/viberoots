@@ -22,13 +22,40 @@ export function nodeFlagsWithZx(zxInitPath: string): string[] {
   ];
 }
 
+function nodeOptionsWithoutZxInit(value: string | undefined): string {
+  if (!value) return "";
+  const tokens = value.match(/(?:[^\s"']+|"[^"]*"|'[^']*')+/g) || [];
+  const kept: string[] = [];
+  for (let i = 0; i < tokens.length; i++) {
+    const token = tokens[i] || "";
+    const unquoted = token.replace(/^(['"])(.*)\1$/, "$2");
+    if (unquoted === "--import") {
+      const next = tokens[i + 1] || "";
+      const nextUnquoted = next.replace(/^(['"])(.*)\1$/, "$2");
+      if (nextUnquoted.endsWith("build-tools/tools/dev/zx-init.mjs")) {
+        i++;
+        continue;
+      }
+    }
+    if (
+      unquoted.startsWith("--import=") &&
+      unquoted.slice("--import=".length).endsWith("build-tools/tools/dev/zx-init.mjs")
+    ) {
+      continue;
+    }
+    kept.push(token);
+  }
+  return kept.join(" ");
+}
+
 export async function runNodeWithZx(opts: RunNodeWithZxOptions): Promise<{
   stdout: string;
   stderr: string;
 }> {
   const nodeBin = opts.nodeBin || process.execPath;
   const cwd = opts.cwd || process.cwd();
-  const env = opts.env || process.env;
+  const env = { ...(opts.env || process.env) };
+  env.NODE_OPTIONS = nodeOptionsWithoutZxInit(env.NODE_OPTIONS);
   const args = opts.args || [];
   const stdio = opts.stdio || "inherit";
   const timeoutMs = Number.isFinite(opts.timeoutMs) ? Math.max(0, opts.timeoutMs || 0) : 0;

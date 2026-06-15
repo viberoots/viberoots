@@ -32,7 +32,17 @@ test("node-run loads zx-init, forwards args, and propagates exit codes", async (
       zxInitPath: path.join(tmp, "build-tools/tools/dev/zx-init.mjs"),
       script: okScript,
       args: ["a", "b"],
-      env: { ...process.env, NODE_RUN_OUT: outPath },
+      env: {
+        ...process.env,
+        NODE_RUN_OUT: outPath,
+        NODE_OPTIONS: [
+          "--max-old-space-size=128",
+          `--import ${path.join(tmp, "missing/build-tools/tools/dev/zx-init.mjs")}`,
+          process.env.NODE_OPTIONS || "",
+        ]
+          .filter(Boolean)
+          .join(" "),
+      },
       stdio: "pipe",
     });
 

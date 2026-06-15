@@ -31,6 +31,8 @@ export function nodeBin(): string {
 export function buildToolsRoot(root: string): string {
   const direct = path.resolve(root, "build-tools");
   if (fs.existsSync(path.join(direct, "tools", "dev", "zx-init.mjs"))) return direct;
+  const extracted = path.resolve(root, "viberoots", "build-tools");
+  if (fs.existsSync(path.join(extracted, "tools", "dev", "zx-init.mjs"))) return extracted;
   return path.resolve(root, ".viberoots/current/build-tools");
 }
 
