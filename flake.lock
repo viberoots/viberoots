@@ -114,8 +114,7 @@
       "inputs": {
         "buck2": "buck2",
         "gomod2nix": "gomod2nix",
-        "nixpkgs": "nixpkgs_2",
-        "viberoots": "viberoots"
+        "nixpkgs": "nixpkgs_2"
       }
     },
     "rust-overlay": {
@@ -168,28 +167,6 @@
         "repo": "default",
         "type": "github"
       }
-    },
-    "viberoots": {
-      "inputs": {
-        "buck2": [
-          "buck2"
-        ],
-        "gomod2nix": [
-          "gomod2nix"
-        ],
-        "nixpkgs": [
-          "nixpkgs"
-        ]
-      },
-      "locked": {
-        "path": "./viberoots",
-        "type": "path"
-      },
-      "original": {
-        "path": "./viberoots",
-        "type": "path"
-      },
-      "parent": []
     }
   },
   "root": "root",

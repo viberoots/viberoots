@@ -15,7 +15,7 @@ test("flake exposes viberoots version metadata and mkWorkspace", async () => {
 
   const mkWorkspace = await $({
     stdio: "pipe",
-  })`nix eval --no-write-lock-file --accept-flake-config ./viberoots#lib.mkWorkspace`;
+  })`nix eval --no-write-lock-file --accept-flake-config .#lib.mkWorkspace`;
   assert.match(String(mkWorkspace.stdout || ""), /lambda mkWorkspace/);
 });
 

@@ -1,5 +1,6 @@
+# viberoots reusable build tooling
 {
-  description = "viberoots dogfood workspace";
+  description = "viberoots reusable build tooling";
 
   nixConfig = {
     allowed-impure-env-vars = [
@@ -29,16 +30,8 @@
     buck2.url = "github:facebook/buck2/201beb86106fecdc84e30260b0f1abb5bf576988";
     gomod2nix.url = "github:nix-community/gomod2nix";
     gomod2nix.inputs.nixpkgs.follows = "nixpkgs";
-    viberoots.url = "path:./viberoots";
-    viberoots.inputs.nixpkgs.follows = "nixpkgs";
-    viberoots.inputs.buck2.follows = "buck2";
-    viberoots.inputs.gomod2nix.follows = "gomod2nix";
   };
 
-  outputs = inputs:
-    inputs.viberoots.lib.mkWorkspace {
-      workspaceSrc = ./.;
-      viberootsInput = inputs.viberoots;
-      workspaceName = "viberoots";
-    };
+  outputs = { self, nixpkgs, buck2, gomod2nix }:
+    import ./build-tools/tools/nix/flake/outputs.nix { inherit self nixpkgs buck2 gomod2nix; };
 }
