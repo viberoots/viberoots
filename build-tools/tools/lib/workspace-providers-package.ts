@@ -13,6 +13,57 @@ const CXX_PROVIDER_TARGETS = [
   "",
 ].join("\n");
 
+const DEFS_CPP = [
+  'load("@prelude//:rules.bzl", "genrule")',
+  "",
+  "def nix_cxx_provider(name, attr):",
+  "    genrule(",
+  "        name = name,",
+  "        srcs = [],",
+  '        out = name + ".stamp",',
+  '        cmd = "echo cpp_provider:${attr} > $OUT",',
+  '        labels = ["lang:cpp", "nixpkg:%s" % attr],',
+  '        visibility = ["//visibility:public"],',
+  "    )",
+  "",
+  "def nix_cxx_library(name, attr, headers_subdir = None, static = True, shared = False):",
+  "    nix_cxx_provider(name = name, attr = attr)",
+  "",
+  "def nix_cxx_gtest_providers():",
+  '    nix_cxx_provider(name = "nix_pkgs_googletest", attr = "pkgs.googletest")',
+  "",
+].join("\n");
+
+const DEFS_NODE = [
+  'load("@prelude//:rules.bzl", "genrule")',
+  "",
+  "def node_importer_deps(name, lockfile, importer, patch_paths = []):",
+  "    genrule(",
+  "        name = name,",
+  "        srcs = [],",
+  '        out = name + ".stamp",',
+  '        cmd = "echo node_importer:${importer} ${lockfile} > $OUT",',
+  '        labels = ["lang:node"],',
+  '        visibility = ["PUBLIC"],',
+  "    )",
+  "",
+].join("\n");
+
+const DEFS_PYTHON = [
+  'load("@prelude//:rules.bzl", "genrule")',
+  "",
+  "def python_importer_deps(name, lockfile, importer, patch_paths = []):",
+  "    genrule(",
+  "        name = name,",
+  "        srcs = [],",
+  '        out = name + ".stamp",',
+  '        cmd = "echo python_importer:${importer} ${lockfile} > $OUT",',
+  '        labels = ["lang:python"],',
+  '        visibility = ["PUBLIC"],',
+  "    )",
+  "",
+].join("\n");
+
 async function writeIfMissing(file: string, text: string): Promise<void> {
   try {
     await fsp.access(file);
@@ -60,6 +111,9 @@ export async function ensureWorkspaceProvidersPackage(
     path.join(path.dirname(targetsPath), ".buckconfig"),
     "[buildfile]\nname = TARGETS\n",
   );
+  await writeIfMissing(path.join(path.dirname(targetsPath), "defs_cpp.bzl"), DEFS_CPP);
+  await writeIfMissing(path.join(path.dirname(targetsPath), "defs_node.bzl"), DEFS_NODE);
+  await writeIfMissing(path.join(path.dirname(targetsPath), "defs_python.bzl"), DEFS_PYTHON);
   await ensureCuratedTargets(workspaceRoot);
   await writeIfMissing(autoMapPath, "MODULE_PROVIDERS = {}\n");
 }
