@@ -4,11 +4,29 @@ let
   sanitizeName = s:
     (import ../templates-common.nix { inherit pkgs; }).sanitizeName s;
 
-  # Read mapping of lockfile path (relative) -> sha256 for FODs
-  hashMap =
-    if builtins.pathExists hashesPath
-    then builtins.fromJSON (builtins.readFile hashesPath)
+  readHashMap = p:
+    if builtins.pathExists p
+    then builtins.fromJSON (builtins.readFile p)
     else {};
+
+  liveHashMap =
+    let
+      wr = builtins.getEnv "WORKSPACE_ROOT";
+      candidates =
+        if wr == "" then []
+        else [
+          (builtins.toPath (wr + "/build-tools/tools/nix/node-modules.hashes.json"))
+          (builtins.toPath (wr + "/viberoots/build-tools/tools/nix/node-modules.hashes.json"))
+          (builtins.toPath (wr + "/.viberoots/current/build-tools/tools/nix/node-modules.hashes.json"))
+        ];
+    in
+      lib.foldl' (acc: p: acc // (readHashMap p)) {} candidates;
+
+  # Read mapping of lockfile path (relative) -> sha256 for FODs.
+  # Live temp workspaces may generate importer hashes after the locked viberoots
+  # input was evaluated, so allow WORKSPACE_ROOT-local maps to override the
+  # committed tool input map.
+  hashMap = (readHashMap hashesPath) // liveHashMap;
 
   # Valid base64 placeholder digest (will be replaced by update-pnpm-hash.ts on first real build)
   placeholderDigest = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
