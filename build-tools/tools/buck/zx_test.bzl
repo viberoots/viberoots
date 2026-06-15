@@ -34,6 +34,7 @@ def _zx_test_impl(ctx):
             + "  if [ -f \"$WORKSPACE_ROOT/.viberoots/current/build-tools/tools/dev/zx-init.mjs\" ]; then VBR_ROOT=\"$WORKSPACE_ROOT/.viberoots/current\"; else VBR_ROOT=\"$WORKSPACE_ROOT\"; fi; "
             + "fi; "
             + "export VIBEROOTS_ROOT=\"$VBR_ROOT\"; "
+            + "export VIBEROOTS_SOURCE_ROOT=\"${VIBEROOTS_SOURCE_ROOT:-$VBR_ROOT}\"; "
             + "VBR_ZX_INIT=\"$VBR_ROOT/build-tools/tools/dev/zx-init.mjs\"; "
             + "VBR_NODE_MODULES_BUILD=\"$VBR_ROOT/build-tools/tools/dev/node-modules-build.ts\"; "
             + "VBR_HEARTBEAT_RUNNER=\"$VBR_ROOT/build-tools/tools/dev/command-heartbeat.ts\"; "

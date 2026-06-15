@@ -2,8 +2,23 @@
 // Compute workspace root from this file's location (repo/build-tools/tools/dev/zx-init.mjs)
 const urlMod = await import("node:url");
 const pathMod = await import("node:path");
+const fsMod = await import("node:fs");
 const here = urlMod.fileURLToPath(import.meta.url);
-const WORKSPACE_ROOT_FIXED = pathMod.resolve(pathMod.dirname(here), "../../..");
+const SELF_ROOT = pathMod.resolve(pathMod.dirname(here), "../../..");
+const SOURCE_ROOT_ENV = String(process.env.VIBEROOTS_SOURCE_ROOT || "").trim();
+function rootWithZxInit(root) {
+  if (!root) return "";
+  const abs = pathMod.resolve(root);
+  const init = pathMod.join(abs, "build-tools", "tools", "dev", "zx-init.mjs");
+  if (!fsMod.existsSync(init)) return "";
+  try {
+    return fsMod.realpathSync.native(abs);
+  } catch {
+    return abs;
+  }
+}
+const WORKSPACE_ROOT_FIXED =
+  rootWithZxInit(SOURCE_ROOT_ENV) || rootWithZxInit(SELF_ROOT) || SELF_ROOT;
 // Ensure zx globals are available as early as possible via bare import using NODE_PATH
 // This covers cases where workspace/node_modules is not present in sandboxes but NODE_PATH points
 // to a host workspace node_modules. Fail silently if not available; other strategies follow.
