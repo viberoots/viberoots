@@ -8,7 +8,7 @@ test("providers-headers: python header snapshot", () => {
   const header = providersHeaderFor({ lang: "python", load, rule: "python_importer_deps" });
   const expected =
     "# GENERATED FILE — DO NOT EDIT.\n" +
-    'load("@root//third_party/providers:defs_python.bzl", "python_importer_deps")\n' +
+    'load("@workspace_providers//:defs_python.bzl", "python_importer_deps")\n' +
     "\n";
   assert.equal(header, expected);
 });

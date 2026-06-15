@@ -35,7 +35,7 @@ await writeImporterProvidersByLang(lang, providers, { outFile });
     assert.match(txt1, /# GENERATED FILE — DO NOT EDIT\./);
     assert.match(
       txt1,
-      /load\("@root\/\/third_party\/providers:defs_python\.bzl", "python_importer_deps"\)/,
+      /load\("@workspace_providers\/\/:defs_python\.bzl", "python_importer_deps"\)/,
     );
     assert.match(txt1, /python_importer_deps\(name="/);
     assert.match(curated, /# BEGIN AUTO_PYTHON/);

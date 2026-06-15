@@ -5,7 +5,7 @@ import { writeIfChanged } from "./fs-helpers";
 import { DEFAULT_AUTO_MAP_PATH, DEFAULT_PROVIDER_TARGETS_PATH } from "./workspace-state-paths";
 
 const CXX_PROVIDER_TARGETS = [
-  'load("@root//third_party/providers:defs_cpp.bzl", "nix_cxx_library")',
+  'load("@workspace_providers//:defs_cpp.bzl", "nix_cxx_library")',
   "",
   'nix_cxx_library(name = "nix_pkgs_googletest", attr = "pkgs.googletest")',
   'nix_cxx_library(name = "nix_pkgs_zlib", attr = "pkgs.zlib")',

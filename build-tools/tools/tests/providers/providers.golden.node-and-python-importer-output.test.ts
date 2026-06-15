@@ -17,6 +17,7 @@ test("golden: Node importer provider TARGETS.node.auto is stable for representat
     // The workspace copy may include a repo-root pnpm-lock.yaml used for tooling;
     // remove it here so the golden output remains stable and minimal.
     await fsp.rm(path.join(tmp, "pnpm-lock.yaml"), { force: true });
+    await fsp.rm(path.join(tmp, "projects/apps/pleomino"), { recursive: true, force: true });
 
     const importerDir = path.join(tmp, "projects/apps/web");
     await fsp.mkdir(path.join(importerDir, "patches", "node"), { recursive: true });
@@ -56,7 +57,7 @@ packages:
     const name = providerNameForImporter("projects/apps/web/pnpm-lock.yaml", "projects/apps/web");
     const expected = [
       "# GENERATED FILE — DO NOT EDIT.",
-      'load("@root//third_party/providers:defs_node.bzl", "node_importer_deps")',
+      'load("@workspace_providers//:defs_node.bzl", "node_importer_deps")',
       "",
       `node_importer_deps(name="${name}", lockfile="projects/apps/web/pnpm-lock.yaml", importer="projects/apps/web", patch_paths=["projects/apps/web/patches/node/aaa@1.0.0.patch", "projects/apps/web/patches/node/zzz@9.9.9.patch"])`,
       "",
@@ -104,7 +105,7 @@ test("golden: Python importer provider TARGETS.python.auto is stable for represe
     const name = providerNameForImporter("projects/libs/api/uv.lock", "projects/libs/api");
     const expected = [
       "# GENERATED FILE — DO NOT EDIT.",
-      'load("@root//third_party/providers:defs_python.bzl", "python_importer_deps")',
+      'load("@workspace_providers//:defs_python.bzl", "python_importer_deps")',
       "",
       `python_importer_deps(name="${name}", lockfile="projects/libs/api/uv.lock", importer="projects/libs/api", patch_paths=["projects/libs/api/patches/python/requests@2.32.3.patch"])`,
       "",

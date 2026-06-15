@@ -14,7 +14,7 @@ export type ImporterProvider = {
 
 export type ImporterWriterOptions = {
   outFile: string;
-  ruleLoad: string; // e.g. 'load("//third_party/providers:defs_node.bzl", "node_importer_deps")'
+  ruleLoad: string; // e.g. 'load("@workspace_providers//:defs_node.bzl", "node_importer_deps")'
   ruleName: string; // e.g. "node_importer_deps"
   /**
    * Optional full file header (banner + load lines). If provided, takes precedence

@@ -29,7 +29,7 @@ test("prebuild-guard: coverage falls back to TARGETS.*.auto for Python importer 
     await fsp.writeFile(
       targetsPy,
       [
-        'load("@root//third_party/providers:defs_python.bzl", "python_importer_deps")',
+        'load("@workspace_providers//:defs_python.bzl", "python_importer_deps")',
         "",
         "python_importer_deps(",
         `    name = "${provider}",`,

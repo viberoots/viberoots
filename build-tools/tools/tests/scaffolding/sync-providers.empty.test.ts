@@ -14,7 +14,7 @@ test("sync-providers: empty repo still generates minimal Node providers file whe
       console.error("missing header");
       process.exit(2);
     }
-    if (!txt.includes('load("@root//third_party/providers:defs_node.bzl", "node_importer_deps")')) {
+    if (!txt.includes('load("@workspace_providers//:defs_node.bzl", "node_importer_deps")')) {
       console.error("missing node load line");
       process.exit(2);
     }

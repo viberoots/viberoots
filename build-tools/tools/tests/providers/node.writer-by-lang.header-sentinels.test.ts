@@ -37,10 +37,7 @@ await writeImporterProvidersByLang(lang, providers, { outFile });
     const curated = await fsp.readFile(path.join(tmp, DEFAULT_PROVIDER_TARGETS_PATH), "utf8");
     // Assert: header and load line present
     assert.match(txt1, /# GENERATED FILE — DO NOT EDIT\./);
-    assert.match(
-      txt1,
-      /load\("@root\/\/third_party\/providers:defs_node\.bzl", "node_importer_deps"\)/,
-    );
+    assert.match(txt1, /load\("@workspace_providers\/\/:defs_node\.bzl", "node_importer_deps"\)/);
     // Assert: entry lines use node_importer_deps(...) form
     assert.match(txt1, /node_importer_deps\(name="/);
     // Assert: curated TARGETS contains AUTO_NODE block

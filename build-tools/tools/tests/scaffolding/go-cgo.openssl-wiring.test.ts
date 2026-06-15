@@ -6,8 +6,12 @@ test("nixpkg_deps wires provider dep for openssl", async () => {
   await runInTemp("go-cgo-openssl-wiring", async (tmp, $) => {
     await $({
       cwd: tmp,
-    })`bash --noprofile --norc -c 'mkdir -p third_party/providers && cat > third_party/providers/TARGETS <<'\''EOF'\''
-load("//third_party/providers:defs_cpp.bzl", "nix_cxx_library")
+    })`bash --noprofile --norc -c 'cat > .viberoots/workspace/providers/defs_cpp.bzl <<'\''EOF'\''
+def nix_cxx_library(name, **kwargs):
+    native.filegroup(name = name, srcs = [], visibility = ["PUBLIC"])
+EOF
+cat > .viberoots/workspace/providers/TARGETS <<'\''EOF'\''
+load("@workspace_providers//:defs_cpp.bzl", "nix_cxx_library")
 nix_cxx_library(name="nix_pkgs_openssl", attr="pkgs.openssl")
 EOF'`;
 
@@ -18,7 +22,7 @@ EOF'`;
 # GENERATED for test
 MODULE_PROVIDERS = {
     "//projects/apps/demo-cli:demo": [
-        "//third_party/providers:nix_pkgs_openssl",
+        "workspace_providers//:nix_pkgs_openssl",
     ],
 }
 EOF'`;
@@ -52,13 +56,11 @@ EOF'`;
       stdio: "pipe",
       reject: false,
       nothrow: true,
-    })`buck2 --isolation-dir ${inheritedBuckIsolation("cgo_openssl")} cquery "deps(//projects/apps/demo-cli:demo)" --json --output-attribute name`;
+    })`buck2 --isolation-dir ${inheritedBuckIsolation("cgo_openssl")} cquery "deps(//projects/apps/demo-cli:demo)"`;
     if (probe.exitCode !== 0) return; // skip if prelude not available
     const raw = String(probe.stdout || "").trim();
-    if (!raw) return; // skip if no JSON produced (empty graph/older buck)
-    const nodes = JSON.parse(raw) as Array<{ name: string }>;
-    const names = new Set(nodes.map((n) => n.name));
-    if (!names.has("//third_party/providers:nix_pkgs_openssl")) {
+    if (!raw) return; // skip if no output produced (empty graph/older buck)
+    if (!raw.includes("workspace_providers//:nix_pkgs_openssl")) {
       console.error("expected openssl provider dep present");
       process.exit(2);
     }

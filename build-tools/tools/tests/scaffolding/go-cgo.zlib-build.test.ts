@@ -6,8 +6,12 @@ test("nixpkg_deps wires provider dep; build stays planner-scoped", async () => {
   await runInTemp("go-cgo-zlib", async (tmp, $) => {
     await $({
       cwd: tmp,
-    })`bash --noprofile --norc -c 'mkdir -p third_party/providers && cat > third_party/providers/TARGETS <<'\''EOF'\''
-load("//third_party/providers:defs_cpp.bzl", "nix_cxx_library")
+    })`bash --noprofile --norc -c 'cat > .viberoots/workspace/providers/defs_cpp.bzl <<'\''EOF'\''
+def nix_cxx_library(name, **kwargs):
+    native.filegroup(name = name, srcs = [], visibility = ["PUBLIC"])
+EOF
+cat > .viberoots/workspace/providers/TARGETS <<'\''EOF'\''
+load("@workspace_providers//:defs_cpp.bzl", "nix_cxx_library")
 nix_cxx_library(name="nix_pkgs_zlib", attr="pkgs.zlib")
 EOF'`;
 
@@ -18,7 +22,7 @@ EOF'`;
 # GENERATED for test
 MODULE_PROVIDERS = {
     "//projects/apps/demo-cli:demo": [
-        "//third_party/providers:nix_pkgs_zlib",
+        "workspace_providers//:nix_pkgs_zlib",
     ],
 }
 EOF'`;
@@ -58,14 +62,10 @@ EOF'`;
       stdio: "pipe",
       reject: false,
       nothrow: true,
-    })`buck2 --isolation-dir ${inheritedBuckIsolation("cgo_zlib")} cquery "deps(//projects/apps/demo-cli:demo)" --json --output-attribute name`;
+    })`buck2 --isolation-dir ${inheritedBuckIsolation("cgo_zlib")} cquery "deps(//projects/apps/demo-cli:demo)"`;
     if (probe.exitCode !== 0) return; // skip if prelude not available
-    const parsed = JSON.parse(String(probe.stdout || "")) as unknown;
-    const values = Array.isArray(parsed)
-      ? (parsed as Array<{ name: string }>)
-      : (Object.values(parsed as Record<string, { name: string }>) as Array<{ name: string }>);
-    const names = new Set(values.map((n) => n.name));
-    if (!names.has("//third_party/providers:nix_pkgs_zlib")) {
+    const out = String(probe.stdout || "");
+    if (!out.includes("workspace_providers//:nix_pkgs_zlib")) {
       console.error("expected provider dep present");
       process.exit(2);
     }

@@ -38,18 +38,18 @@ plugins/repo-skills/skills/**/references/*.local.md
 __pycache__/
 
 # Generated glue (not committed per design)
-third_party/providers/TARGETS.auto
-third_party/providers/TARGETS.node.auto
-third_party/providers/TARGETS.*.auto
-third_party/providers/provider_index.bzl
-third_party/providers/provider_index.json
-third_party/providers/nix_attr_map.bzl
-build-tools/tools/buck/graph.json
-build-tools/tools/buck/export-metrics.json
-build-tools/tools/buck/node-lock-index.json
-build-tools/tools/buck/invalidation-report.txt
-build-tools/tools/buck/invalidation-report.json
-build-tools/tools/buck/.export-cache/
+.viberoots/workspace/providers/TARGETS.auto
+.viberoots/workspace/providers/TARGETS.node.auto
+.viberoots/workspace/providers/TARGETS.*.auto
+.viberoots/workspace/providers/provider_index.bzl
+.viberoots/workspace/providers/provider_index.json
+.viberoots/workspace/providers/nix_attr_map.bzl
+.viberoots/workspace/buck/graph.json
+.viberoots/workspace/buck/export-metrics.json
+.viberoots/workspace/buck/node-lock-index.json
+.viberoots/workspace/buck/invalidation-report.txt
+.viberoots/workspace/buck/invalidation-report.json
+.viberoots/workspace/buck/.export-cache/
 
 # Local out-links created during ad-hoc nix builds (not part of normal flow)
 buck-graph-result

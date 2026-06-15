@@ -23,8 +23,8 @@ test("provider-writer: deterministic output and managed section sync", async () 
       { lockfile: lockA, importer: "apps/a", patchPaths: ["apps/a/patches/node/x@1.0.0.patch"] },
       { lockfile: lockB, importer: "apps/b", patchPaths: [] },
     ];
-    const outFile = "third_party/providers/TARGETS.test.auto";
-    const ruleLoad = 'load("//third_party/providers:defs_node.bzl", "node_importer_deps")';
+    const outFile = ".viberoots/workspace/providers/TARGETS.test.auto";
+    const ruleLoad = 'load("@workspace_providers//:defs_node.bzl", "node_importer_deps")';
     const ruleName = "node_importer_deps";
 
     await withScopedEnv({ WORKSPACE_ROOT: tmp }, async () => {
