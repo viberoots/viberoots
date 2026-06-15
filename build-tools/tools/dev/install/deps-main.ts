@@ -16,6 +16,7 @@ import { withExclusiveInstallLock } from "./lock";
 import { syncModuleContractsForWebapps } from "./module-contracts";
 import { runUvRefreshAll } from "./uv";
 import { ensureToolchainPathsFiles } from "../toolchain-paths";
+import { buildToolPath } from "../dev-build/paths";
 import { applyNixCacheHealthPolicy } from "../verify/nix-cache-health";
 import { discoverImportersWithLock } from "./importers";
 import { pruneNodeModulesHashesJson } from "../update-pnpm-hash/hashes-json";
@@ -154,7 +155,7 @@ if (dryRun) {
             `[install-deps] pruned stale node-modules hash entries: ${removedHashEntries.join(", ")}`,
           );
         }
-        const absUpdate = path.join(repoRoot, "build-tools/tools/dev/update-pnpm-hash.ts");
+        const absUpdate = buildToolPath(repoRoot, "tools/dev/update-pnpm-hash.ts");
         for (const imp of importers) {
           const relLock = path.join(imp, "pnpm-lock.yaml");
           if (verbose) {
@@ -182,7 +183,7 @@ if (dryRun) {
               ...process.env,
               NIX_PNPM_FETCH_TIMEOUT: String(process.env.NIX_PNPM_FETCH_TIMEOUT || "600"),
             },
-          })`zx-wrapper ${path.join(repoRoot, "build-tools/tools/dev/install/link-node.ts")} ${force ? "--force" : ""}`;
+          })`zx-wrapper ${buildToolPath(repoRoot, "tools/dev/install/link-node.ts")} ${force ? "--force" : ""}`;
         }
       } finally {
         if (prevInstallLockSkip === undefined) {
@@ -199,7 +200,7 @@ if (dryRun) {
 }
 // Best-effort patches lint (non-fatal)
 try {
-  const patchesLintAbs = path.join(repoRoot, "build-tools/tools/dev/patches-lint.ts");
+  const patchesLintAbs = buildToolPath(repoRoot, "tools/dev/patches-lint.ts");
   await $({ stdio: "inherit" })`zx-wrapper ${patchesLintAbs}`.nothrow();
 } catch {}
 // Generate gomod2nix.toml at repo root (if present) and per project (projects/apps/*, projects/libs/*)
