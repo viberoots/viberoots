@@ -1,11 +1,25 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 
-export const TEMPLATE_MANIFEST_PATH = "build-tools/tools/scaffolding/template-manifest.json";
-export const GENERATED_TAXONOMY_TS_PATH =
-  "build-tools/tools/scaffolding/scaf/templates/generated/template-taxonomy.generated.ts";
-export const GENERATED_ADAPTER_BZL_PATH = "build-tools/tools/tests/template_taxonomy_adapter.bzl";
-export const GENERATED_RESOLVER_JSON_PATH = "build-tools/tools/scaffolding/resolver.json";
+const SCAFFOLDING_ROOT = path.dirname(fileURLToPath(import.meta.url));
+
+export const TEMPLATE_MANIFEST_PATH = path.join(SCAFFOLDING_ROOT, "template-manifest.json");
+export const GENERATED_TAXONOMY_TS_PATH = path.join(
+  SCAFFOLDING_ROOT,
+  "scaf",
+  "templates",
+  "generated",
+  "template-taxonomy.generated.ts",
+);
+export const GENERATED_ADAPTER_BZL_PATH = path.resolve(
+  SCAFFOLDING_ROOT,
+  "..",
+  "tests",
+  "template_taxonomy_adapter.bzl",
+);
+export const GENERATED_RESOLVER_JSON_PATH = path.join(SCAFFOLDING_ROOT, "resolver.json");
+const DISPLAY_TEMPLATE_MANIFEST_PATH = "build-tools/tools/scaffolding/template-manifest.json";
 
 type TemplateManifestEntry = {
   language: string;
@@ -37,7 +51,7 @@ function assertValidEntry(entry: TemplateManifestEntry): void {
 async function discoverTemplatesFromDirectories(
   resolverDefaults: Record<string, string>,
 ): Promise<TemplateManifestEntry[]> {
-  const templatesRoot = path.join("build-tools", "tools", "scaffolding", "templates");
+  const templatesRoot = path.join(SCAFFOLDING_ROOT, "templates");
   const languages = await fsp.readdir(templatesRoot, { withFileTypes: true });
   const out: TemplateManifestEntry[] = [];
 
@@ -158,7 +172,7 @@ export function renderGeneratedTaxonomyTs(manifest: TemplateManifest): string {
     "\n} as const";
   return [
     "// GENERATED FILE — DO NOT EDIT.",
-    `// Rendered from ${TEMPLATE_MANIFEST_PATH}`,
+    `// Rendered from ${DISPLAY_TEMPLATE_MANIFEST_PATH}`,
     "",
     `export const TEMPLATE_NAME_ALIASES: Record<string, string> = ${renderTsObject(manifest.templateNameAliases)};`,
     "",
@@ -172,7 +186,7 @@ export function renderTemplateTaxonomyAdapterBzl(manifest: TemplateManifest): st
   const idLines = ids.map((id) => `    ${JSON.stringify(id)},`).join("\n");
   return [
     "# GENERATED FILE — DO NOT EDIT.",
-    `# Rendered from ${TEMPLATE_MANIFEST_PATH}`,
+    `# Rendered from ${DISPLAY_TEMPLATE_MANIFEST_PATH}`,
     "",
     "CANONICAL_TEMPLATE_IDS = [",
     idLines,
