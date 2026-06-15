@@ -5,6 +5,7 @@ import process from "node:process";
 import { nixBuilderPolicyShellArgs } from "../lib/nix-builder-policy";
 import { sharedExactPnpmStateRootPath } from "../lib/pnpm-state-paths";
 import { resolveToolPathSync } from "../lib/tool-paths";
+import { buildToolPath } from "./dev-build/paths";
 import { findNearestImporterLock, nodeModulesAttr } from "./install/common";
 import {
   currentVerifiedMarkerFingerprint,
@@ -119,7 +120,7 @@ try {
 }
 const flakeRef = flakeRoot;
 async function readHashForLock(lockfileRel: string): Promise<string> {
-  const hashFile = path.join(flakeRoot, "build-tools", "tools", "nix", "node-modules.hashes.json");
+  const hashFile = buildToolPath(flakeRoot, "tools/nix/node-modules.hashes.json");
   try {
     const raw = await fsp.readFile(hashFile, "utf8");
     const parsed = JSON.parse(raw) as Record<string, string>;
