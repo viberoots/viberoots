@@ -13,7 +13,8 @@ type PackageJson = {
 };
 
 const appRoot = fileURLToPath(new URL(".", import.meta.url));
-const viberootsRoot = process.env.VIBEROOTS_SOURCE_ROOT || process.env.VIBEROOTS_ROOT || path.resolve(appRoot, "../../..");
+const workspaceRoot = path.resolve(appRoot, "../../..");
+const viberootsRoot = process.env.VIBEROOTS_SOURCE_ROOT || process.env.VIBEROOTS_ROOT || workspaceRoot;
 const viberootsTool = (name: string) => path.join(viberootsRoot, "build-tools", "tools", "dev", name);
 const workspaceRoot = path.resolve(appRoot, "../../..");
 
@@ -127,6 +128,7 @@ function staticPwaPrecachePlugin() {
         ],
         {
           cwd: appRoot,
+          env: { ...process.env, WORKSPACE_ROOT: workspaceRoot },
           stdio: "inherit",
         },
       );

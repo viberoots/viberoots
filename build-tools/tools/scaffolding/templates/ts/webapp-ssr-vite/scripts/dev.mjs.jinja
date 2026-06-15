@@ -4,6 +4,7 @@ import path from "node:path";
 const viberootsRoot =
   process.env.VIBEROOTS_SOURCE_ROOT || process.env.VIBEROOTS_ROOT || path.resolve("..", "..", "..");
 const viberootsTool = (name) => path.join(viberootsRoot, "build-tools", "tools", "dev", name);
+const workspaceRoot = path.resolve("..", "..", "..");
 
 const child = spawn(
   "zx-wrapper",
@@ -14,7 +15,7 @@ const child = spawn(
     "--watch-cmd",
     "pnpm run dev:wasm:watch",
   ],
-  { stdio: "inherit" },
+  { stdio: "inherit", env: { ...process.env, WORKSPACE_ROOT: workspaceRoot } },
 );
 
 child.on("exit", (code) => {

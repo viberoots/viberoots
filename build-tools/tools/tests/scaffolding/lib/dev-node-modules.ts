@@ -29,13 +29,13 @@ export async function ensureNodeModulesForDevApp(opts: {
   await _$({
     cwd: tmp,
     stdio: "inherit",
-    env: { ...process.env, CI: "1" },
+    env: { ...process.env, WORKSPACE_ROOT: tmp, CI: "1" },
   })`pnpm --dir ${tmp} install --filter ./${appRel}... --lockfile-only --no-frozen-lockfile --prefer-offline --ignore-scripts --reporter=append-only`;
   await _$({ cwd: tmp, stdio: "pipe" })`git add ${lockfile}`;
   await _$({
     cwd: tmp,
     stdio: "inherit",
-    env: { ...process.env, NIX_PNPM_ALLOW_GENERATE: "1" },
+    env: { ...process.env, WORKSPACE_ROOT: tmp, NIX_PNPM_ALLOW_GENERATE: "1" },
   })`zx-wrapper ${viberootsDevTool("update-pnpm-hash.ts")} --lockfile ${lockfile}`;
   await stageTempRepoPaths({
     tmp,
@@ -56,6 +56,7 @@ export async function ensureNodeModulesForDevApp(opts: {
   const outPathRaw = await $({
     cwd: appAbs,
     stdio: "pipe",
+    env: { ...process.env, WORKSPACE_ROOT: tmp },
   })`zx-wrapper ${viberootsDevTool("node-modules-build.ts")}`;
 
   const outPath = String(outPathRaw.stdout || "").trim();

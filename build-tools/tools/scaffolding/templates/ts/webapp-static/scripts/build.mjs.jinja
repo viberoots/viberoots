@@ -7,8 +7,9 @@ const viteBin = path.resolve(
   ".bin",
   process.platform === "win32" ? "vite.cmd" : "vite",
 );
+const workspaceRoot = path.resolve("..", "..", "..");
 const viberootsRoot =
-  process.env.VIBEROOTS_SOURCE_ROOT || process.env.VIBEROOTS_ROOT || path.resolve("..", "..", "..");
+  process.env.VIBEROOTS_SOURCE_ROOT || process.env.VIBEROOTS_ROOT || workspaceRoot;
 const viberootsTool = (name) => path.join(viberootsRoot, "build-tools", "tools", "dev", name);
 
 const wasmManifestPath = path.join("src", "wasm-modules.manifest.json");
@@ -21,7 +22,7 @@ execFileSync(
     "--wasm-manifest",
     wasmManifestPath,
   ],
-  { stdio: "inherit" },
+  { stdio: "inherit", env: { ...process.env, WORKSPACE_ROOT: workspaceRoot } },
 );
 execFileSync(viteBin, ["build"], { stdio: "inherit" });
 

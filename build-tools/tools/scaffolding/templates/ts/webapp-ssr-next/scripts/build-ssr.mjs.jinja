@@ -4,13 +4,16 @@ import path from "node:path";
 
 const nextBin = path.join(process.cwd(), "node_modules", ".bin", "next");
 const tscBin = path.join(process.cwd(), "node_modules", ".bin", "tsc");
+const workspaceRoot = path.resolve("..", "..", "..");
 const viberootsRoot =
-  process.env.VIBEROOTS_SOURCE_ROOT || process.env.VIBEROOTS_ROOT || path.resolve("..", "..", "..");
+  process.env.VIBEROOTS_SOURCE_ROOT || process.env.VIBEROOTS_ROOT || workspaceRoot;
 const viberootsTool = (name) => path.join(viberootsRoot, "build-tools", "tools", "dev", name);
+const toolEnv = { ...process.env, WORKSPACE_ROOT: workspaceRoot };
 
 const contractsPaths = JSON.parse(
   execFileSync("zx-wrapper", [viberootsTool("sync-module-contracts.ts"), "--cwd", ".", "--print-json", "1"], {
     encoding: "utf8",
+    env: toolEnv,
   }),
 );
 const wasmManifestPath = String(contractsPaths.wasmManifestPath || "").trim();
@@ -24,7 +27,7 @@ cpSync(tsManifestPath, "app/ts-modules.manifest.json");
 execFileSync(
   "zx-wrapper",
   [viberootsTool("ensure-wasm-contract-assets.ts"), "--cwd", ".", "--wasm-manifest", wasmManifestPath],
-  { stdio: "inherit" },
+  { stdio: "inherit", env: toolEnv },
 );
 
 execFileSync(nextBin, ["build"], { stdio: "inherit" });

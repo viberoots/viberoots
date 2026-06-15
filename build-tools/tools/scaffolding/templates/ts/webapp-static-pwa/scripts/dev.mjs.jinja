@@ -14,7 +14,7 @@ const child = spawn(
   {
     stdio: "inherit",
     cwd: path.join(appRoot, ".."),
-    env: process.env,
+    env: { ...process.env, WORKSPACE_ROOT: repoRoot },
   },
 );
 

@@ -88,7 +88,10 @@ async function buildSsrWebappOutPath(
   lockfile: string,
   _$: any,
 ): Promise<string> {
-  const env = { ...process.env, NIX_PNPM_ALLOW_GENERATE: "1" } as Record<string, string>;
+  const env = { ...process.env, WORKSPACE_ROOT: tmp, NIX_PNPM_ALLOW_GENERATE: "1" } as Record<
+    string,
+    string
+  >;
   await _$({
     cwd: tmp,
     stdio: "inherit",
@@ -166,7 +169,7 @@ export async function scaffoldBuildAndSmoke(
   await $`scaf new ts ${template} ${appName} --yes --no-tests`;
   await _$({
     cwd: appAbs,
-    env: { ...process.env },
+    env: { ...process.env, WORKSPACE_ROOT: tmp },
     stdio: "inherit",
   })`zx-wrapper ${viberootsDevTool("install/deps-main.ts")} --verbose --glue-only`;
   await stageTempRepoPaths({

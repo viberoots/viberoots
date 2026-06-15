@@ -77,7 +77,7 @@ export async function scaffoldAndPrepareWorkspace(
   await _$({
     cwd: tmp,
     stdio: "inherit",
-    env: { ...process.env, BUCK_TARGET: appLabel },
+    env: { ...process.env, WORKSPACE_ROOT: tmp, BUCK_TARGET: appLabel },
   })`zx-wrapper ${viberootsDevTool("install/deps-main.ts")} --verbose --glue-only`;
   // deps-main --glue-only is the single authoritative glue path for this flow.
   await fsp.access(graphJsonAbs);
@@ -90,7 +90,7 @@ export async function scaffoldAndPrepareWorkspace(
   await _$({
     cwd: tmp,
     stdio: "inherit",
-    env: { ...process.env, NIX_PNPM_ALLOW_GENERATE: "1" },
+    env: { ...process.env, WORKSPACE_ROOT: tmp, NIX_PNPM_ALLOW_GENERATE: "1" },
   })`zx-wrapper ${viberootsDevTool("update-pnpm-hash.ts")} --lockfile ${`${appRel}/pnpm-lock.yaml`}`;
   await stageTempRepoPaths({
     tmp,
