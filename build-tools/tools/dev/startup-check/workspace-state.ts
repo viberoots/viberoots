@@ -105,6 +105,19 @@ async function expectedGitlinkRevision(): Promise<string> {
   return match?.[1] || "";
 }
 
+function strictSubmoduleState(): boolean {
+  return (
+    (process.env.VIBEROOTS_STRICT_SUBMODULE_STATE || "").trim() === "1" ||
+    (process.env.CI || "").trim() === "true" ||
+    (process.env.CI || "").trim() === "1"
+  );
+}
+
+function warnOrThrowSubmoduleState(message: string): void {
+  if (strictSubmoduleState()) throw new Error(message);
+  console.warn(message);
+}
+
 async function requireSubmoduleGitState(flakeText: string): Promise<void> {
   if (!flakeUsesLocalViberoots(flakeText)) return;
   const expected = await expectedGitlinkRevision();
@@ -118,13 +131,13 @@ async function requireSubmoduleGitState(flakeText: string): Promise<void> {
     );
   }
   if (actual !== expected) {
-    throw new Error(
+    warnOrThrowSubmoduleState(
       `[startup-check] viberoots submodule revision ${actual} does not match parent gitlink ${expected}`,
     );
   }
   const dirty = await git(["status", "--porcelain=v1"], "viberoots");
   if (dirty) {
-    throw new Error("[startup-check] viberoots submodule has uncommitted changes");
+    warnOrThrowSubmoduleState("[startup-check] viberoots submodule has uncommitted changes");
   }
 }
 

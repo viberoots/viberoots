@@ -127,14 +127,38 @@ test("startup-check accepts a clean local viberoots submodule gitlink", async ()
   }
 });
 
-test("startup-check rejects dirty local viberoots submodule", async () => {
+test("startup-check warns but allows dirty local viberoots submodule", async () => {
   const { root, submodule } = await submoduleWorkspace("vbr-startup-submodule-dirty");
   const oldCwd = process.cwd();
+  const oldWarn = console.warn;
+  const warnings: string[] = [];
   try {
     await writeFile(path.join(submodule, "dirty.txt"), "dirty\n");
     process.chdir(root);
+    console.warn = (message?: unknown) => {
+      warnings.push(String(message || ""));
+    };
+    await validateStartupWorkspaceState();
+    assert.match(warnings.join("\n"), /submodule has uncommitted changes/);
+  } finally {
+    console.warn = oldWarn;
+    process.chdir(oldCwd);
+    await fsp.rm(root, { recursive: true, force: true });
+  }
+});
+
+test("startup-check strict mode rejects dirty local viberoots submodule", async () => {
+  const { root, submodule } = await submoduleWorkspace("vbr-startup-submodule-dirty-strict");
+  const oldCwd = process.cwd();
+  const oldStrict = process.env.VIBEROOTS_STRICT_SUBMODULE_STATE;
+  try {
+    await writeFile(path.join(submodule, "dirty.txt"), "dirty\n");
+    process.chdir(root);
+    process.env.VIBEROOTS_STRICT_SUBMODULE_STATE = "1";
     await assert.rejects(validateStartupWorkspaceState(), /submodule has uncommitted changes/);
   } finally {
+    if (oldStrict === undefined) delete process.env.VIBEROOTS_STRICT_SUBMODULE_STATE;
+    else process.env.VIBEROOTS_STRICT_SUBMODULE_STATE = oldStrict;
     process.chdir(oldCwd);
     await fsp.rm(root, { recursive: true, force: true });
   }
@@ -166,15 +190,40 @@ test("startup-check rejects misaligned local viberoots flake lock", async () => 
   }
 });
 
-test("startup-check rejects gitlink-mismatched local viberoots submodule", async () => {
+test("startup-check warns but allows gitlink-mismatched local viberoots submodule", async () => {
   const { root, submodule } = await submoduleWorkspace("vbr-startup-submodule-mismatch");
   const oldCwd = process.cwd();
+  const oldWarn = console.warn;
+  const warnings: string[] = [];
   try {
     await writeFile(path.join(submodule, "next.txt"), "next\n");
     await commitAll(submodule, "submodule next");
     process.chdir(root);
+    console.warn = (message?: unknown) => {
+      warnings.push(String(message || ""));
+    };
+    await validateStartupWorkspaceState();
+    assert.match(warnings.join("\n"), /does not match parent gitlink/);
+  } finally {
+    console.warn = oldWarn;
+    process.chdir(oldCwd);
+    await fsp.rm(root, { recursive: true, force: true });
+  }
+});
+
+test("startup-check strict mode rejects gitlink-mismatched local viberoots submodule", async () => {
+  const { root, submodule } = await submoduleWorkspace("vbr-startup-submodule-mismatch-strict");
+  const oldCwd = process.cwd();
+  const oldStrict = process.env.VIBEROOTS_STRICT_SUBMODULE_STATE;
+  try {
+    await writeFile(path.join(submodule, "next.txt"), "next\n");
+    await commitAll(submodule, "submodule next");
+    process.chdir(root);
+    process.env.VIBEROOTS_STRICT_SUBMODULE_STATE = "1";
     await assert.rejects(validateStartupWorkspaceState(), /does not match parent gitlink/);
   } finally {
+    if (oldStrict === undefined) delete process.env.VIBEROOTS_STRICT_SUBMODULE_STATE;
+    else process.env.VIBEROOTS_STRICT_SUBMODULE_STATE = oldStrict;
     process.chdir(oldCwd);
     await fsp.rm(root, { recursive: true, force: true });
   }
