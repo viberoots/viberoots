@@ -1,19 +1,11 @@
 import path from "node:path";
 import { runNodeWithZx } from "./node-run";
-
-const ZX_INIT = path.join("build-tools", "tools", "dev", "zx-init.mjs");
-const ENFORCE_SCRIPT = path.join("build-tools", "tools", "buck", "enforce-node-deps.ts");
-const ENFORCE_PATCH_REQUIREMENTS_SCRIPT = path.join(
-  "build-tools",
-  "tools",
-  "buck",
-  "enforce-node-patch-requirements.ts",
-);
+import { buildToolPath, zxInitPath } from "../dev/dev-build/paths";
 
 function resolveNodeDepsScript(repoRoot: string): { zxInitPath: string; script: string } {
   return {
-    zxInitPath: path.join(repoRoot, ZX_INIT),
-    script: path.join(repoRoot, ENFORCE_SCRIPT),
+    zxInitPath: zxInitPath(repoRoot),
+    script: buildToolPath(repoRoot, "tools/buck/enforce-node-deps.ts"),
   };
 }
 
@@ -48,12 +40,12 @@ export async function warnNodeDepsInLocal(repoRoot: string): Promise<void> {
 }
 
 export async function warnNodePatchRequirementsInLocal(repoRoot: string): Promise<void> {
-  const zxInitPath = path.join(repoRoot, ZX_INIT);
-  const script = path.join(repoRoot, ENFORCE_PATCH_REQUIREMENTS_SCRIPT);
+  const activeZxInitPath = zxInitPath(repoRoot);
+  const script = buildToolPath(repoRoot, "tools/buck/enforce-node-patch-requirements.ts");
   try {
     await runNodeWithZx({
       cwd: repoRoot,
-      zxInitPath,
+      zxInitPath: activeZxInitPath,
       script,
       args: ["--check"],
       stdio: "pipe",

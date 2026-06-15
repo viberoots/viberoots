@@ -1,5 +1,6 @@
 import path from "node:path";
 import { runNodeWithZx } from "../../lib/node-run";
+import { buildToolPath, zxInitPath } from "../dev-build/paths";
 import { sharedUnifiedStorePath } from "./importers";
 
 export async function prewarmUnifiedPnpmStore(opts: {
@@ -25,9 +26,9 @@ export async function prewarmUnifiedPnpmStore(opts: {
     if (opts.verbose) console.log("[install-deps] prewarming unified pnpm store");
     await runNodeWithZx({
       cwd: opts.repoRoot,
-      script: path.join(opts.repoRoot, "build-tools/tools/dev/require-unified-pnpm-store.ts"),
+      script: buildToolPath(opts.repoRoot, "tools/dev/require-unified-pnpm-store.ts"),
       args: [],
-      zxInitPath: path.join(opts.repoRoot, "build-tools", "tools", "dev", "zx-init.mjs"),
+      zxInitPath: zxInitPath(opts.repoRoot),
       stdio: opts.verbose ? "inherit" : "pipe",
       timeoutMs:
         Number.parseInt(process.env.INSTALL_UNIFIED_PNPM_TIMEOUT_MS || "180000", 10) || 180000,
