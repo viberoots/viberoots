@@ -8,7 +8,7 @@ import { test } from "node:test";
 import { promisify } from "node:util";
 
 const execFileAsync = promisify(execFile);
-const VERSION_SCRIPT = "build-tools/tools/dev/viberoots.ts";
+const VERSION_SCRIPT = new URL("../../dev/viberoots.ts", import.meta.url).pathname;
 
 async function git(args: string[], cwd: string): Promise<string> {
   const { stdout } = await execFileAsync("git", args, { cwd });

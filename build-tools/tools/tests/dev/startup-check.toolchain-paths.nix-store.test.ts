@@ -2,6 +2,8 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
+const startupCheckScript = new URL("../../dev/startup-check.ts", import.meta.url).pathname;
+
 test("startup-check enforces nix-store toolchain paths", async () => {
   const res = await $({
     stdio: "pipe",
@@ -9,7 +11,7 @@ test("startup-check enforces nix-store toolchain paths", async () => {
       ...process.env,
       STARTUP_CHECK_ALLOW_NON_NIX_STORE: "",
     },
-  })`zx-wrapper build-tools/tools/dev/startup-check.ts`.nothrow();
+  })`zx-wrapper ${startupCheckScript}`.nothrow();
   assert.equal(
     res.exitCode,
     0,
