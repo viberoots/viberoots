@@ -30,6 +30,10 @@ test("cpp lib scaffold: files render and TARGETS wires gtest deps", async () => 
       path.join(buildTools, "tools", "nix", "templates", "cpp.nix"),
       path.join(tmp, "build-tools", "tools", "nix", "templates", "cpp.nix"),
     );
+    await fs.copy(
+      path.join(buildTools, "tools", "scaffolding", "templates", "cpp", "lib"),
+      path.join(tmp, "build-tools", "tools", "scaffolding", "templates", "cpp", "lib"),
+    );
 
     // Scaffold
     await $`${path.join(buildTools, "tools", "bin", "scaf")} new cpp lib demo-lib --yes --path=projects/libs/demo-lib`;
