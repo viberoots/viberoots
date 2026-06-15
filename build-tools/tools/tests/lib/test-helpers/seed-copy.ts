@@ -237,14 +237,16 @@ export async function copySeedStoreToTempRepo(args: {
     } catch (e) {
       copyError = e;
     }
-    const missing = await missingRequiredSeedFiles(stagingDir);
+    const missing = await missingRequiredSeedFiles(stagingDir, { allowMissingToolRoot: true });
     if (copyError || missing.length > 0) {
       throw new Error(
         copyFailureMessage({
           ...args,
           exitCode: null,
           missing,
-          sourceMissing: await missingRequiredSeedFiles(args.seedPath),
+          sourceMissing: await missingRequiredSeedFiles(args.seedPath, {
+            allowMissingToolRoot: true,
+          }),
           stderr: copyError instanceof Error ? copyError.stack || copyError.message : copyError,
           stdout: "",
         }),
