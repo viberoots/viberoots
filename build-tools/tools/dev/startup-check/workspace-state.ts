@@ -24,7 +24,7 @@ async function readText(p: string): Promise<string> {
 }
 
 function flakeUsesLocalViberoots(text: string): boolean {
-  return /viberoots\.url\s*=\s*"path:\.\/viberoots"/.test(text);
+  return /viberoots\.url\s*=\s*"(?:path:\.\/viberoots|git\+file:\.\/viberoots)"/.test(text);
 }
 
 async function git(args: string[], cwd = "."): Promise<string> {
@@ -57,17 +57,21 @@ async function requireLocalFlakeLock(flakeText: string): Promise<void> {
     const locked = node?.locked || {};
     const original = node?.original || {};
     if (
-      locked.type === "path" &&
-      locked.path === "./viberoots" &&
-      original.type === "path" &&
-      original.path === "./viberoots"
+      (locked.type === "path" &&
+        locked.path === "./viberoots" &&
+        original.type === "path" &&
+        original.path === "./viberoots") ||
+      (locked.type === "git" &&
+        locked.url === "file:./viberoots" &&
+        original.type === "git" &&
+        original.url === "file:./viberoots")
     ) {
       return;
     }
   } catch {
     throw new Error("[startup-check] root flake.lock is missing or invalid");
   }
-  throw new Error("[startup-check] root flake.lock is not aligned with path:./viberoots");
+  throw new Error("[startup-check] root flake.lock is not aligned with local viberoots input");
 }
 
 async function requireLocalCurrentTarget(flakeText: string): Promise<void> {
