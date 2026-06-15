@@ -3,6 +3,7 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { writeIfChanged } from "../lib/fs-helpers";
 import { repoRoot } from "../lib/repo";
+import { buildToolPath, buildToolsRoot } from "./dev-build/paths";
 
 type ToolchainPaths = {
   go: { bin: string; root: string };
@@ -12,6 +13,18 @@ type ToolchainPaths = {
 
 const JSON_REL = path.join("build-tools", "tools", "dev", "toolchain-paths.json");
 const BZL_REL = path.join("toolchains", "toolchain_paths.bzl");
+
+function activeViberootsRoot(root: string): string {
+  return path.dirname(buildToolsRoot(root));
+}
+
+function toolchainJsonPath(root: string): string {
+  return buildToolPath(root, "tools/dev/toolchain-paths.json");
+}
+
+function toolchainBzlPath(root: string): string {
+  return path.join(activeViberootsRoot(root), BZL_REL);
+}
 
 function isNixStorePath(p: string): boolean {
   return p === "/nix/store" || p.startsWith("/nix/store/");
@@ -88,7 +101,7 @@ function renderBzl(paths: ToolchainPaths): string {
 }
 
 async function readExistingToolchainPaths(repo: string): Promise<ToolchainPaths | null> {
-  const jsonPath = path.join(repo, JSON_REL);
+  const jsonPath = toolchainJsonPath(repo);
   let raw = "";
   try {
     raw = await fsp.readFile(jsonPath, "utf8");
@@ -126,7 +139,7 @@ async function readExistingToolchainPaths(repo: string): Promise<ToolchainPaths 
       python: { bin: pyBin },
       zxWrapper: { bin: zxWrapperBin },
     };
-    const bzlPath = path.join(repo, BZL_REL);
+    const bzlPath = toolchainBzlPath(repo);
     await writeIfChanged(jsonPath, JSON.stringify(out, null, 2) + "\n");
     await writeIfChanged(bzlPath, renderBzl(out));
     return out;
@@ -158,8 +171,8 @@ export async function ensureToolchainPathsFiles(root?: string): Promise<Toolchai
     python: { bin: pyBin },
     zxWrapper: { bin: zxWrapperBin },
   };
-  const jsonPath = path.join(repo, JSON_REL);
-  const bzlPath = path.join(repo, BZL_REL);
+  const jsonPath = toolchainJsonPath(repo);
+  const bzlPath = toolchainBzlPath(repo);
   await writeIfChanged(jsonPath, JSON.stringify(pathsObj, null, 2) + "\n");
   await writeIfChanged(bzlPath, renderBzl(pathsObj));
   await fsp.access(jsonPath);
