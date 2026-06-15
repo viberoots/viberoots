@@ -162,7 +162,6 @@ async function overlayActiveViberootsIntoTempRepo(tmpDir: string): Promise<void>
     : cwd;
   const sourceFlake = path.join(source, "flake.nix");
   const sourceTool = path.join(source, "build-tools", "tools", "dev", "zx-init.mjs");
-  const tmpFlake = path.join(tmpDir, "viberoots", "flake.nix");
   const sourceExists = await Promise.all([
     fsp
       .access(sourceFlake)
@@ -179,11 +178,7 @@ async function overlayActiveViberootsIntoTempRepo(tmpDir: string): Promise<void>
     .then(() => true)
     .catch(() => false);
   if (tmpHasToolRoot) return;
-  const tmpExists = await fsp
-    .access(tmpFlake)
-    .then(() => true)
-    .catch(() => false);
-  if (tmpExists) return;
+  await fsp.rm(path.join(tmpDir, "viberoots"), { recursive: true, force: true });
   await fsp.mkdir(path.join(tmpDir, "viberoots"), { recursive: true });
   await $({ cwd })`rsync -a ${`${source}/`} ${path.join(tmpDir, "viberoots")}/`;
 }
