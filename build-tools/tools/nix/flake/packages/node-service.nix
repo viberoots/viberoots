@@ -1,4 +1,4 @@
-{ pkgs, nodeMods, importerDirs, filterRepo, repoSnapshot, repoRoot }:
+{ pkgs, nodeMods, importerDirs, filterRepo, repoSnapshot, repoRoot, viberootsRoot }:
 let
   sanitize = (import ../../templates-common.nix { inherit pkgs; }).sanitizeName;
   makeService =
@@ -36,10 +36,11 @@ let
           TSC_BIN="node_modules/.bin/tsc"
           test -x "$TSC_BIN" || { echo "node-service: tsc binary missing" >&2; exit 3; }
           "$TSC_BIN" -p .
+          VIBEROOTS_SOURCE_ROOT="${viberootsRoot}"
           node --experimental-strip-types \
             --disable-warning=ExperimentalWarning \
-            --import "$REPO_ROOT/build-tools/tools/dev/zx-init.mjs" \
-            "$REPO_ROOT/build-tools/tools/node/service-artifact.ts" \
+            --import "$VIBEROOTS_SOURCE_ROOT/build-tools/tools/dev/zx-init.mjs" \
+            "$VIBEROOTS_SOURCE_ROOT/build-tools/tools/node/service-artifact.ts" \
             --dist-dir "$PWD/dist" \
             --contract "$PWD/$CONTRACT_REL" \
             --package-json "$PWD/package.json" \
