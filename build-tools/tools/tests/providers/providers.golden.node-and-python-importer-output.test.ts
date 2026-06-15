@@ -9,6 +9,19 @@ async function readText(p: string): Promise<string> {
   return await fsp.readFile(p, "utf8");
 }
 
+async function toolScript(tmp: string, rel: string): Promise<string> {
+  const local = path.join("build-tools", rel);
+  if (
+    await fsp
+      .access(path.join(tmp, local))
+      .then(() => true)
+      .catch(() => false)
+  ) {
+    return local;
+  }
+  return path.join("viberoots", "build-tools", rel);
+}
+
 test("golden: Node importer provider TARGETS.node.auto is stable for representative fixture", async () => {
   await runInTemp("golden-node-provider-output", async (tmp, $) => {
     await $`git init`;
@@ -50,7 +63,7 @@ packages:
     await fsp.writeFile(lockfilePath, lockfile, "utf8");
     await $`git add projects/apps/web/pnpm-lock.yaml`;
 
-    await $`node build-tools/tools/buck/sync-providers.ts --lang node --no-glue`;
+    await $`node ${await toolScript(tmp, "tools/buck/sync-providers.ts")} --lang node --no-glue`;
     const out = await readText(path.join(tmp, ".viberoots/workspace/providers/TARGETS.node.auto"));
 
     const { providerNameForImporter } = await import("../../lib/providers");
@@ -96,7 +109,7 @@ test("golden: Python importer provider TARGETS.python.auto is stable for represe
     ].join("\n");
     await fsp.writeFile(lockfilePath, uvLock, "utf8");
 
-    await $`node build-tools/tools/buck/sync-providers.ts --lang python`;
+    await $`node ${await toolScript(tmp, "tools/buck/sync-providers.ts")} --lang python`;
     const out = await readText(
       path.join(tmp, ".viberoots/workspace/providers/TARGETS.python.auto"),
     );
