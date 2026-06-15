@@ -97,6 +97,23 @@ const src = `export async function resolve(specifier, context, nextResolve) {
     // Try default resolution first
     return await nextResolve(specifier, context);
   } catch (e) {
+    try {
+      const isRelOrAbs = specifier.startsWith('./') || specifier.startsWith('../') || specifier.startsWith('/');
+      if (isRelOrAbs) {
+        const attempted = new URL(specifier, base).pathname;
+        const marker = '/build-tools/tools/';
+        const idx = attempted.indexOf(marker);
+        if (idx >= 0) {
+          const suffix = attempted.slice(idx + 1);
+          const ws = '${WORKSPACE_ROOT_FIXED}'.endsWith('/') ? '${WORKSPACE_ROOT_FIXED}' : '${WORKSPACE_ROOT_FIXED}/';
+          const href = new URL(suffix, new URL(ws, base)).href;
+          try { return await nextResolve(href, context); } catch {}
+          if (!/\\.(?:cjs|js|json|mjs|node|ts|tsx)$/.test(href.split('/').pop() || '')) {
+            try { return await nextResolve(href + '.ts', context); } catch {}
+          }
+        }
+      }
+    } catch {}
     // Fallback: treat bare specifiers as coming from NODE_PATH or workspace node_modules
     try {
       // Special-case zx bare import; prefer the flake-provided globals file
