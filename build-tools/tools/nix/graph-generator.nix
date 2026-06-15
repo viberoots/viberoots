@@ -27,9 +27,14 @@ let
       isBuildTools = lib.hasSuffix "/build-tools" p;
       isBuildToolsTools = lib.hasSuffix "/build-tools/tools" p;
       inBuildToolsTools = lib.hasInfix "/build-tools/tools/" p;
+      isViberoots = lib.hasSuffix "/viberoots" p;
+      isViberootsBuildTools = lib.hasSuffix "/viberoots/build-tools" p;
+      isViberootsBuildToolsTools = lib.hasSuffix "/viberoots/build-tools/tools" p;
+      inViberootsBuildToolsTools = lib.hasInfix "/viberoots/build-tools/tools/" p;
     in
       isRoot || isProjects || isProjectsApps || isProjectsLibs || inProjectsApps || inProjectsLibs
-      || isBuildTools || isBuildToolsTools || inBuildToolsTools;
+      || isBuildTools || isBuildToolsTools || inBuildToolsTools
+      || isViberoots || isViberootsBuildTools || isViberootsBuildToolsTools || inViberootsBuildToolsTools;
   appsLibsSrc = if filteredFlakeSnapshot
     then src
     else if buckTestSrcEnv != ""

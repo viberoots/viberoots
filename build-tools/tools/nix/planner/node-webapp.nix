@@ -31,8 +31,11 @@ let
   sanitize = H.sanitizeName;
   nm = nodeMods.mkNodeModules { lockfilePath = info.lockfilePath; inherit importerDir; };
   viberootsRootEnv = builtins.getEnv "VIBEROOTS_ROOT";
+  nestedViberootsRoot = repoStoreRoot + "/viberoots";
   viberootsStoreRoot =
-    if viberootsRootEnv != "" then builtins.toPath viberootsRootEnv else repoStoreRoot;
+    if builtins.pathExists (nestedViberootsRoot + "/build-tools/tools/dev/zx-init.mjs") then nestedViberootsRoot
+    else if viberootsRootEnv != "" then builtins.toPath viberootsRootEnv
+    else repoStoreRoot;
 in
   pkgs.stdenvNoCC.mkDerivation {
     pname = "node-webapp-" + (sanitize name);

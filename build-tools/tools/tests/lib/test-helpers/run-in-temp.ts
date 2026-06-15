@@ -326,18 +326,37 @@ async function createTempBuck2Shim(tmp: string, iso: string): Promise<string> {
 async function createTempNixShim(shimDir: string): Promise<void> {
   const realNix = resolveToolPathSync("nix");
   const shimPath = path.join(shimDir, "nix");
+  const repoRoot = process.cwd();
+  const viberootsCandidates = [
+    process.env.VIBEROOTS_SOURCE_ROOT || "",
+    process.env.VIBEROOTS_ROOT || "",
+    path.join(repoRoot, "viberoots"),
+    path.join(repoRoot, ".viberoots", "current"),
+    repoRoot,
+  ].filter(Boolean);
+  let viberootsRoot = repoRoot;
+  for (const candidate of viberootsCandidates) {
+    const hasTool = await fsp
+      .access(path.join(candidate, "build-tools", "tools", "dev", "zx-init.mjs"))
+      .then(() => true)
+      .catch(() => false);
+    if (hasTool) {
+      viberootsRoot = candidate;
+      break;
+    }
+  }
   await fsp.writeFile(
     shimPath,
     [
       "#!/usr/bin/env bash",
       "set -euo pipefail",
       `real_nix=${JSON.stringify(realNix)}`,
-      `repo_root=${JSON.stringify(process.cwd())}`,
+      `viberoots_root=${JSON.stringify(viberootsRoot)}`,
       'if [[ "${1:-}" == "store" && "${2:-}" == "gc" ]]; then',
       '  exec "$real_nix" "$@"',
       "fi",
       "wait_for_gc(){",
-      '  node --experimental-strip-types --import "$repo_root/build-tools/tools/dev/zx-init.mjs" "$repo_root/build-tools/tools/lib/nix-gc-lock.ts" wait-for-no-active-gc',
+      '  node --experimental-strip-types --import "$viberoots_root/build-tools/tools/dev/zx-init.mjs" "$viberoots_root/build-tools/tools/lib/nix-gc-lock.ts" wait-for-no-active-gc',
       "}",
       'transient_store_error(){ grep -Eq "path .*/nix/store/.*\\.drv. is not valid|database is locked" "$1" "$2"; }',
       "attempt=0",
