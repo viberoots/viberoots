@@ -6,6 +6,7 @@ import { DEFAULT_GRAPH_PATH } from "../lib/graph-const";
 import { runNodeWithZx } from "../lib/node-run";
 import { ensureWorkspaceBuckStatePackage } from "../lib/workspace-buck-state";
 import { ensureWorkspaceProvidersPackage } from "../lib/workspace-providers-package";
+import { buildToolPath, zxInitPath } from "../dev/dev-build/paths";
 import {
   DEFAULT_AUTO_MAP_PATH,
   DEFAULT_INVALIDATION_REPORT_PATH,
@@ -32,14 +33,10 @@ function repoRootFromCwd(): string {
   return process.cwd();
 }
 
-function zxInitDefault(repoRoot: string): string {
-  return path.join(repoRoot, "build-tools/tools/dev/zx-init.mjs");
-}
-
 export async function runGluePipeline(opts: RunGluePipelineOptions = {}): Promise<void> {
   const nodeBin = process.execPath || "node";
   const repoRoot = repoRootFromCwd();
-  const zxInit = opts.zxInitPath || zxInitDefault(repoRoot);
+  const zxInit = opts.zxInitPath || zxInitPath(repoRoot);
   const graphPath = opts.graphPath || DEFAULT_GRAPH_PATH;
   const outAutoMap = opts.outAutoMap || DEFAULT_AUTO_MAP_PATH;
   const outInvalidationReport = opts.outInvalidationReport || DEFAULT_INVALIDATION_REPORT_PATH;
@@ -54,7 +51,7 @@ export async function runGluePipeline(opts: RunGluePipelineOptions = {}): Promis
 
   // Step 0: ensure importer roots Starlark view is up-to-date (deterministic, idempotent)
   {
-    const genImporterRoots = path.join(repoRoot, "build-tools/tools/dev/gen-importer-roots-bzl.ts");
+    const genImporterRoots = buildToolPath(repoRoot, "tools/dev/gen-importer-roots-bzl.ts");
     if (verbose) console.error("[glue-pipeline] gen-importer-roots");
     await runNodeWithZx({ nodeBin, zxInitPath: zxInit, script: genImporterRoots });
   }
@@ -68,7 +65,7 @@ export async function runGluePipeline(opts: RunGluePipelineOptions = {}): Promis
 
   // Step 2: sync providers (all languages; language drivers are no-ops when inactive)
   if (!skipProviderSync) {
-    const syncScript = path.join(repoRoot, "build-tools/tools/buck/sync-providers.ts");
+    const syncScript = buildToolPath(repoRoot, "tools/buck/sync-providers.ts");
     if (verbose) console.error("[glue-pipeline] sync-providers");
     await runNodeWithZx({ nodeBin, zxInitPath: zxInit, script: syncScript });
   } else if (verbose) {
@@ -77,7 +74,7 @@ export async function runGluePipeline(opts: RunGluePipelineOptions = {}): Promis
 
   // Step 3: generate provider index for diagnostics and mapping visibility
   if (providerIndexMode !== "skip") {
-    const providerIndexScript = path.join(repoRoot, "build-tools/tools/buck/gen-provider-index.ts");
+    const providerIndexScript = buildToolPath(repoRoot, "tools/buck/gen-provider-index.ts");
     if (verbose) console.error("[glue-pipeline] gen-provider-index");
     try {
       await runNodeWithZx({ nodeBin, zxInitPath: zxInit, script: providerIndexScript });
@@ -91,7 +88,7 @@ export async function runGluePipeline(opts: RunGluePipelineOptions = {}): Promis
 
   // Step 4: generate auto_map deterministically from the graph
   if (autoMapMode !== "skip") {
-    const autoMapScript = path.join(repoRoot, "build-tools/tools/buck/gen-auto-map.ts");
+    const autoMapScript = buildToolPath(repoRoot, "tools/buck/gen-auto-map.ts");
     if (verbose) console.error(`[glue-pipeline] gen-auto-map → ${outAutoMap}`);
     // Ensure output directory exists to avoid noisy errors in temp repos
     try {
@@ -109,14 +106,14 @@ export async function runGluePipeline(opts: RunGluePipelineOptions = {}): Promis
 
   // Step 5: generate workspace map for Node deps enforcement
   {
-    const workspaceMapScript = path.join(repoRoot, "build-tools/tools/node/gen-workspace-map.ts");
+    const workspaceMapScript = buildToolPath(repoRoot, "tools/node/gen-workspace-map.ts");
     if (verbose) console.error("[glue-pipeline] gen-workspace-map");
     await runNodeWithZx({ nodeBin, zxInitPath: zxInit, script: workspaceMapScript });
   }
 
   // Step 6: generate invalidation report (diagnostic; stable output)
   if (invalidationReportMode !== "skip") {
-    const reportScript = path.join(repoRoot, "build-tools/tools/buck/invalidation-report.ts");
+    const reportScript = buildToolPath(repoRoot, "tools/buck/invalidation-report.ts");
     if (verbose) console.error(`[glue-pipeline] invalidation-report → ${outInvalidationReport}`);
     try {
       await fsp.mkdir(path.dirname(outInvalidationReport), { recursive: true });
