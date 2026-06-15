@@ -1,5 +1,6 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
+import { buildToolPath } from "../dev/dev-build/paths";
 import { getImporterRootsContract } from "./importer-roots";
 import { normalizeTargetLabel } from "./labels";
 import { toPosixPath, uniqSorted } from "./posix-path";
@@ -132,7 +133,7 @@ async function readJsonFile<T>(filePath: string): Promise<T> {
 }
 
 export async function loadWorkspaceMap(root: string): Promise<WorkspaceMap> {
-  const mapPath = path.join(root, "build-tools", "tools", "node", "workspace-map.json");
+  const mapPath = buildToolPath(root, "tools/node/workspace-map.json");
   let raw: unknown;
   try {
     raw = await readJsonFile<unknown>(mapPath);
