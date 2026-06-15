@@ -4,6 +4,15 @@ import fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
 
+async function activeBuildToolPath(rel: string): Promise<string> {
+  const direct = path.join("build-tools", rel);
+  try {
+    await fsp.access(direct);
+    return direct;
+  } catch {}
+  return path.join("viberoots", "build-tools", rel);
+}
+
 test("root flake delegates workspace construction to local viberoots input", async () => {
   const flake = await fsp.readFile("flake.nix", "utf8");
   assert.match(flake, /viberoots\.url\s*=\s*"git\+file:\.\/viberoots"/);
@@ -21,7 +30,10 @@ test("root flake lock records local viberoots git input", async () => {
 });
 
 test("graph planner packages use the workspace source under delegated flakes", async () => {
-  const graphGenerator = await fsp.readFile("build-tools/tools/nix/graph-generator.nix", "utf8");
+  const graphGenerator = await fsp.readFile(
+    await activeBuildToolPath("tools/nix/graph-generator.nix"),
+    "utf8",
+  );
   assert.match(
     graphGenerator,
     /repoStoreRoot\s*=\s*if buckTestSrcEnv != ""[\s\S]*else appsLibsSrc;/,
