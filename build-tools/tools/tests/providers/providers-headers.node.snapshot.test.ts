@@ -7,8 +7,6 @@ test("providers-headers: node header snapshot", () => {
   const load = providersLoadFor({ lang: "node", rule: "node_importer_deps" });
   const header = providersHeaderFor({ lang: "node", load, rule: "node_importer_deps" });
   const expected =
-    "# GENERATED FILE — DO NOT EDIT.\n" +
-    'load("@workspace_providers//:defs_node.bzl", "node_importer_deps")\n' +
-    "\n";
+    "# GENERATED FILE — DO NOT EDIT.\n" + 'load("//:defs_node.bzl", "node_importer_deps")\n' + "\n";
   assert.equal(header, expected);
 });

@@ -25,12 +25,12 @@ export function providersHeaderFor(opts: ProvidersHeaderOptions): string {
 
 /**
  * Canonical load(...) line for a language-specific providers defs file.
- * Example: load("@workspace_providers//:defs_node.bzl", "node_importer_deps")
+ * Example: load("//:defs_node.bzl", "node_importer_deps")
  */
 export function providersLoadFor(args: { lang: string; rule: string }): string {
   const lang = String(args.lang || "").trim();
   const rule = String(args.rule || "").trim();
-  return `load("@workspace_providers//:defs_${lang}.bzl", "${rule}")`;
+  return `load("//:defs_${lang}.bzl", "${rule}")`;
 }
 
 export default providersHeaderFor;

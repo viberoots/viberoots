@@ -70,7 +70,7 @@ packages:
     const name = providerNameForImporter("projects/apps/web/pnpm-lock.yaml", "projects/apps/web");
     const expected = [
       "# GENERATED FILE — DO NOT EDIT.",
-      'load("@workspace_providers//:defs_node.bzl", "node_importer_deps")',
+      'load("//:defs_node.bzl", "node_importer_deps")',
       "",
       `node_importer_deps(name="${name}", lockfile="projects/apps/web/pnpm-lock.yaml", importer="projects/apps/web", patch_paths=["projects/apps/web/patches/node/aaa@1.0.0.patch", "projects/apps/web/patches/node/zzz@9.9.9.patch"])`,
       "",
@@ -118,7 +118,7 @@ test("golden: Python importer provider TARGETS.python.auto is stable for represe
     const name = providerNameForImporter("projects/libs/api/uv.lock", "projects/libs/api");
     const expected = [
       "# GENERATED FILE — DO NOT EDIT.",
-      'load("@workspace_providers//:defs_python.bzl", "python_importer_deps")',
+      'load("//:defs_python.bzl", "python_importer_deps")',
       "",
       `python_importer_deps(name="${name}", lockfile="projects/libs/api/uv.lock", importer="projects/libs/api", patch_paths=["projects/libs/api/patches/python/requests@2.32.3.patch"])`,
       "",
