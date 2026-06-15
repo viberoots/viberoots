@@ -1,8 +1,0 @@
-{
-  "sampleCount": 7,
-  "baselineSolveTriggerCommitDurationMsP95": 18,
-  "baselineSolveApplyCommitDurationMsP95": 32,
-  "maxRegressionVsBaselineMs": 48,
-  "maxSolveTriggerCommitDurationMsP95": 90,
-  "maxSolveApplyCommitDurationMsP95": 140
-}

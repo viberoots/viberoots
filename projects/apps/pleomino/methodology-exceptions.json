@@ -1,8 +1,0 @@
-{
-  "sourceFileSizeExceptions": [
-    {
-      "path": "src/game/solver/static-interesting-solutions.ts",
-      "justification": "Generated interesting-solution pool kept as a checked-in artifact for deterministic seeded solver selection."
-    }
-  ]
-}
