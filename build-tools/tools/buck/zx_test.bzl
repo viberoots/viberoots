@@ -175,12 +175,17 @@ def _zx_test_impl(ctx):
         ctx.attrs.remote_builder_smoke,
     ] if ctx.attrs.remote_ready_runner != None else []
     remote_command = [ctx.attrs.remote_ready_runner] + snapshot_inputs + evidence_inputs if ctx.attrs.remote_ready_runner != None else None
+    runtime_inputs = (
+        ctx.attrs._buck_runtime[DefaultInfo].default_outputs +
+        ctx.attrs._dev_runtime[DefaultInfo].default_outputs +
+        ctx.attrs._lib_runtime[DefaultInfo].default_outputs
+    )
     declared_inputs = ([] if ctx.attrs.remote_ready_runner == None else [ctx.attrs.remote_ready_runner]) + [
         ctx.attrs.script,
         ctx.attrs._command_heartbeat,
         ctx.attrs._node_modules_build,
         ctx.attrs._zx_init,
-    ] + snapshot_inputs + evidence_inputs + (ctx.attrs.template_inputs or [])
+    ] + runtime_inputs + snapshot_inputs + evidence_inputs + (ctx.attrs.template_inputs or [])
     command = external_runner_command(
         labels,
         local_command + snapshot_inputs,
@@ -192,7 +197,7 @@ def _zx_test_impl(ctx):
             ctx.attrs._command_heartbeat,
             ctx.attrs._node_modules_build,
             ctx.attrs._zx_init,
-        ] + snapshot_inputs + evidence_inputs,
+        ] + runtime_inputs + snapshot_inputs + evidence_inputs,
     )
     stamp = ctx.actions.declare_output(ctx.attrs.out)
     stamp_cmd = cmd_args(
@@ -253,6 +258,9 @@ zx_test = clone_rule(
             default = "repo_toolchains//:remote_profile_conversion_action_key",
         ),
         "_command_heartbeat": attrs.source(default = "@viberoots//build-tools/tools/dev:command-heartbeat.ts"),
+        "_buck_runtime": attrs.dep(default = "@viberoots//build-tools/tools/buck:runtime_ts"),
+        "_dev_runtime": attrs.dep(default = "@viberoots//build-tools/tools/dev:runtime_ts"),
+        "_lib_runtime": attrs.dep(default = "@viberoots//build-tools/tools/lib:runtime_ts"),
         "_node_modules_build": attrs.source(default = "@viberoots//build-tools/tools/dev:node-modules-build.ts"),
         "_zx_init": attrs.source(default = "@viberoots//build-tools/tools/dev:zx-init.mjs"),
     },
