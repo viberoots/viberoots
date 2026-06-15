@@ -7,6 +7,7 @@ import { nodeFlagsWithZx } from "../../lib/node-run";
 import { findRepoRoot } from "../../lib/repo";
 import { ensureWorkspaceProvidersPackage } from "../../lib/workspace-providers-package";
 import { DEFAULT_AUTO_MAP_PATH } from "../../lib/workspace-state-paths";
+import { buildToolPath, zxInitPath } from "../dev-build/paths";
 import { applyNixCacheHealthPolicy } from "../verify/nix-cache-health";
 import { discoverImportersWithLock } from "./importers";
 
@@ -28,7 +29,7 @@ async function workspaceRoot(): Promise<string> {
 }
 
 export function zxNodeBase(): string {
-  const zxInit = path.resolve(repoRoot(), "build-tools/tools/dev/zx-init.mjs");
+  const zxInit = zxInitPath(process.cwd());
   return nodeFlagsWithZx(zxInit).join(" ");
 }
 
@@ -36,32 +37,10 @@ async function ensurePreludeSymlinkIfMissing() {
   const wsRoot = await workspaceRoot();
   await applyNixCacheHealthPolicy(wsRoot);
   try {
-    const check = await $({
-      stdio: "pipe",
-      cwd: wsRoot,
-    })`bash --noprofile --norc -c ${`test -e ${path.join(wsRoot, "prelude")}`}`;
-    if (check.exitCode === 0) return;
+    await fsp.access(path.join(wsRoot, ".viberoots", "current", "prelude"));
+    return;
   } catch {}
-  const zxInit = String(process.env.ZX_INIT || "").trim();
-  const flakeRoot =
-    zxInit && zxInit.length > 0 ? path.resolve(path.dirname(zxInit), "..", "..") : repoRoot();
-  const build = await $({
-    stdio: "pipe",
-    cwd: flakeRoot,
-  })`nix build ${flakeRoot}#buck2-prelude --no-link --accept-flake-config --print-out-paths`;
-  const storeOut = String(build.stdout || "")
-    .replace(/\r/g, "")
-    .trim()
-    .split("\n")
-    .filter(Boolean)
-    .pop();
-  if (!storeOut) {
-    throw new Error("[glue] Failed to resolve buck2-prelude store path");
-  }
-  const src = path.join(storeOut, "prelude");
-  const dst = path.join(wsRoot, "prelude");
-  await fsp.rm(dst, { recursive: true, force: true }).catch(() => {});
-  await fsp.symlink(src, dst, "dir");
+  throw new Error("[glue] missing .viberoots/current/prelude; run workspace activation first");
 }
 
 async function ensureAutoMapStubIfMissing() {
@@ -91,15 +70,15 @@ async function ensureAutoMapStubIfMissing() {
 export async function runGlue(dryRun: boolean, verbose: boolean) {
   const nodeBase = zxNodeBase();
   const nodeBin = process.execPath || "node";
-  const zxImport = path.join(repoRoot(), "build-tools/tools/dev/zx-init.mjs");
   const wsRoot = await workspaceRoot();
+  const zxImport = zxInitPath(wsRoot);
   type LangConfig = {
     enabled?: string[];
     languages?: Array<{ id: string; capabilities?: Record<string, boolean> }>;
   };
   let enabledLangs: Set<string> = new Set();
   const caps = new Map<string, Record<string, boolean>>();
-  const langsJson = path.join(repoRoot(), "build-tools/tools/nix/langs.json");
+  const langsJson = buildToolPath(wsRoot, "tools/nix/langs.json");
   try {
     const { stdout } = await $({
       stdio: "pipe",
@@ -110,7 +89,7 @@ export async function runGlue(dryRun: boolean, verbose: boolean) {
       caps.set(String(l.id), (l.capabilities || {}) as Record<string, boolean>);
   } catch {}
   if (enabledLangs.size === 0) {
-    const tplDir = path.join(repoRoot(), "build-tools/tools/nix/templates");
+    const tplDir = buildToolPath(wsRoot, "tools/nix/templates");
     try {
       const { stdout } = await $({
         stdio: "pipe",
@@ -136,7 +115,7 @@ export async function runGlue(dryRun: boolean, verbose: boolean) {
       const repo = wsRoot;
       const importers = await discoverImportersWithLock(repo, { cwd: process.cwd() });
       if (importers.length) {
-        const updater = path.join(repo, "build-tools/tools/dev/update-pnpm-hash.ts");
+        const updater = buildToolPath(repo, "tools/dev/update-pnpm-hash.ts");
         for (const imp of importers) {
           const relLock = path.join(imp, "pnpm-lock.yaml");
           if (dryRun) {
@@ -171,25 +150,25 @@ export async function runGlue(dryRun: boolean, verbose: boolean) {
   }> = [
     {
       label: "gen-importer-roots",
-      cmd: `${nodeBin} ${nodeBase} ${path.join(repoRoot(), "build-tools/tools/dev/gen-importer-roots-bzl.ts")}`,
+      cmd: `${nodeBin} ${nodeBase} ${buildToolPath(wsRoot, "tools/dev/gen-importer-roots-bzl.ts")}`,
       withZx: true,
       when: true,
     },
     {
       label: "gen-langs",
-      cmd: `${nodeBin} ${nodeBase} ${path.join(repoRoot(), "build-tools/tools/dev/gen-langs.ts")}`,
+      cmd: `${nodeBin} ${nodeBase} ${buildToolPath(wsRoot, "tools/dev/gen-langs.ts")}`,
       withZx: true,
       when: true,
     },
     {
       label: "gen-nix-attr-aliases",
-      cmd: `${nodeBin} ${nodeBase} ${path.join(repoRoot(), "build-tools/tools/dev/gen-nix-attr-aliases-bzl.ts")}`,
+      cmd: `${nodeBin} ${nodeBase} ${buildToolPath(wsRoot, "tools/dev/gen-nix-attr-aliases-bzl.ts")}`,
       withZx: true,
       when: true,
     },
     {
       label: "glue-pipeline",
-      cmd: `${nodeBin} ${nodeBase} ${path.join(repoRoot(), "build-tools/tools/buck/glue-pipeline.ts")}`,
+      cmd: `${nodeBin} ${nodeBase} ${buildToolPath(wsRoot, "tools/buck/glue-pipeline.ts")}`,
       withZx: true,
       when: true,
     },

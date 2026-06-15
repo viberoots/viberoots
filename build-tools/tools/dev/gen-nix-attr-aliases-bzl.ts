@@ -6,6 +6,7 @@
  */
 import fsp from "node:fs/promises";
 import path from "node:path";
+import { buildToolPath } from "./dev-build/paths";
 
 async function readJsonIfExists<T = unknown>(p: string): Promise<T | null> {
   try {
@@ -59,8 +60,9 @@ async function writeIfChanged(dst: string, data: string) {
 }
 
 async function main() {
-  const jsonPath = "build-tools/tools/lib/nix-attr-aliases.json";
-  const bzlPath = "build-tools/lang/nix_attr_aliases.bzl";
+  const root = process.cwd();
+  const jsonPath = buildToolPath(root, "tools/lib/nix-attr-aliases.json");
+  const bzlPath = buildToolPath(root, "lang/nix_attr_aliases.bzl");
   const src = await readJsonIfExists<Record<string, string>>(jsonPath);
   const map = validateMap(src || {});
   const data = renderBzl(map);

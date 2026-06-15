@@ -6,6 +6,7 @@
  */
 import fsp from "node:fs/promises";
 import path from "node:path";
+import { buildToolPath } from "./dev-build/paths";
 
 type RawContract = Partial<{
   allowDotImporter: unknown;
@@ -60,8 +61,9 @@ async function writeIfChanged(dst: string, data: string) {
 }
 
 async function main() {
-  const jsonPath = "build-tools/tools/lib/importer-roots.json";
-  const bzlPath = "build-tools/lang/importer_roots.bzl";
+  const root = process.cwd();
+  const jsonPath = buildToolPath(root, "tools/lib/importer-roots.json");
+  const bzlPath = buildToolPath(root, "lang/importer_roots.bzl");
   const txt = await fsp.readFile(jsonPath, "utf8");
   const raw = JSON.parse(txt) as RawContract;
   const allowDotImporter = raw.allowDotImporter === false ? false : true;

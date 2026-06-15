@@ -2,6 +2,7 @@
 import fsp from "node:fs/promises";
 import path from "node:path";
 import { findRepoRoot } from "../lib/repo";
+import { buildToolPath } from "./dev-build/paths";
 
 type Capabilities = Record<string, boolean>;
 type Lang = {
@@ -15,7 +16,7 @@ type Manifest =
     };
 
 async function readManifest(repo: string): Promise<Lang[]> {
-  const p = path.join(repo, "build-tools/tools/nix/langs.json");
+  const p = buildToolPath(repo, "tools/nix/langs.json");
   try {
     const txt = await fsp.readFile(p, "utf8");
     const doc = JSON.parse(txt) as Manifest;
@@ -46,7 +47,7 @@ async function main() {
     })
     .join("\n");
   const out = [header, "{", body, "}", ""].join("\n");
-  const outPath = path.join(repo, "build-tools/tools/nix/langs.nix");
+  const outPath = buildToolPath(repo, "tools/nix/langs.nix");
   await fsp.mkdir(path.dirname(outPath), { recursive: true });
   try {
     const cur = await fsp.readFile(outPath, "utf8");
