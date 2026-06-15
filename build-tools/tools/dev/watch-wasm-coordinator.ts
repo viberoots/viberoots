@@ -6,7 +6,11 @@ import { getFlagStr } from "../lib/cli";
 import { resolveModuleContractsPaths } from "./module-contract-paths";
 import { syncModuleContractsForApp } from "./sync-module-contracts-core";
 import { findRepoRoot } from "../lib/repo";
-import { specsFromWasmManifest, validateTsManifestProbes } from "./wasm-watch-manifest";
+import {
+  specsFromWasmManifest,
+  validateTsManifestProbes,
+  type WasmModuleSpec,
+} from "./wasm-watch-manifest";
 import {
   computeFingerprintMap,
   copyAtomically,
@@ -105,36 +109,46 @@ function leaseFromSpecs(args: {
   };
 }
 
+async function runCoordinatorBuild(args: {
+  cwd: string;
+  spec: WasmModuleSpec;
+  seq: number;
+  reason: string;
+}): Promise<void> {
+  const startedAt = Date.now();
+  console.error(
+    `[wasm-watch] rebuild:start seq=${args.seq} module_type=${args.spec.moduleType} module_key=${args.spec.moduleKey} reason=${args.reason}`,
+  );
+  try {
+    await runBuildStep(args.spec.buildCommand, args.cwd);
+    const syncOuts = [args.spec.syncOut, ...(args.spec.extraSyncOuts || [])];
+    let copiedSize = 0;
+    for (const outPath of syncOuts) {
+      copiedSize = await copyAtomically(args.spec.buildOut, outPath);
+    }
+    console.error(
+      `[wasm-watch] sync:ok seq=${args.seq} module_type=${args.spec.moduleType} module_key=${args.spec.moduleKey} bytes=${copiedSize} elapsed_ms=${Date.now() - startedAt} out=${syncOuts.join(",")}`,
+    );
+  } catch (err) {
+    console.error(
+      `[wasm-watch] rebuild:fail seq=${args.seq} module_type=${args.spec.moduleType} module_key=${args.spec.moduleKey} elapsed_ms=${Date.now() - startedAt}`,
+    );
+    console.error(err instanceof Error ? err.message : String(err));
+    console.error(`[wasm-watch] recovery: run this command manually:\n${args.spec.buildCommand}`);
+    throw err;
+  }
+}
+
 async function runInitialBuilds(
   cwd: string,
   specs: Awaited<ReturnType<typeof specsFromWasmManifest>>,
-): Promise<void> {
+): Promise<number> {
   let seq = 0;
   for (const spec of specs) {
     seq += 1;
-    const startedAt = Date.now();
-    console.error(
-      `[wasm-watch] rebuild:start seq=${seq} module_type=${spec.moduleType} module_key=${spec.moduleKey} reason=startup`,
-    );
-    try {
-      await runBuildStep(spec.buildCommand, cwd);
-      const syncOuts = [spec.syncOut, ...(spec.extraSyncOuts || [])];
-      let copiedSize = 0;
-      for (const outPath of syncOuts) {
-        copiedSize = await copyAtomically(spec.buildOut, outPath);
-      }
-      console.error(
-        `[wasm-watch] sync:ok seq=${seq} module_type=${spec.moduleType} module_key=${spec.moduleKey} bytes=${copiedSize} elapsed_ms=${Date.now() - startedAt} out=${syncOuts.join(",")}`,
-      );
-    } catch (err) {
-      console.error(
-        `[wasm-watch] rebuild:fail seq=${seq} module_type=${spec.moduleType} module_key=${spec.moduleKey} elapsed_ms=${Date.now() - startedAt}`,
-      );
-      console.error(err instanceof Error ? err.message : String(err));
-      console.error(`[wasm-watch] recovery: run this command manually:\n${spec.buildCommand}`);
-      throw err;
-    }
+    await runCoordinatorBuild({ cwd, spec, seq, reason: "startup" });
   }
+  return seq;
 }
 
 async function main() {
@@ -185,7 +199,11 @@ async function main() {
   ]);
   let refreshState = await computeFingerprintMap(refreshTriggerPaths(baseRefreshPaths, specs));
   let lastRefreshAt = 0;
-  await runInitialBuilds(cwd, specs);
+  let buildSeq = await runInitialBuilds(cwd, specs);
+  const prevByModule = new Map<string, Map<string, Fingerprint>>();
+  for (const spec of specs) {
+    prevByModule.set(spec.moduleKey, await computeFingerprintMap(spec.watchPaths));
+  }
   await ensureDaemon(resolved.repoRoot, pollMs);
   await writeLease(specs);
   console.error(
@@ -201,7 +219,12 @@ async function main() {
           appTargetLabel: resolved.appTargetLabel,
           root: resolved.repoRoot,
         });
+        const prevKeys = new Set(prevByModule.keys());
         specs = await specsFromWasmManifest(cwd, resolved.wasmManifestPath);
+        const nextKeys = new Set(specs.map((spec) => spec.moduleKey));
+        for (const removed of Array.from(prevKeys).filter((key) => !nextKeys.has(key))) {
+          prevByModule.delete(removed);
+        }
         const nextProbe = await validateTsManifestProbes(cwd, resolved.tsManifestPath);
         for (const line of nextProbe) console.error(line);
         baseRefreshPaths = uniqueSorted([
@@ -212,6 +235,12 @@ async function main() {
           path.join(resolved.repoRoot, "build-tools", "tools", "buck", "graph.json"),
         ]);
         refreshState = await computeFingerprintMap(refreshTriggerPaths(baseRefreshPaths, specs));
+        for (const spec of specs) {
+          if (prevByModule.has(spec.moduleKey)) continue;
+          prevByModule.set(spec.moduleKey, await computeFingerprintMap(spec.watchPaths));
+          buildSeq += 1;
+          await runCoordinatorBuild({ cwd, spec, seq: buildSeq, reason: "refresh:add" });
+        }
         await writeLease(specs);
         console.error(`[wasm-watch] coordinator:refresh modules=${specs.length}`);
       } else {
@@ -224,6 +253,15 @@ async function main() {
     const parsed = prev ? (JSON.parse(prev) as CoordinatorLease) : null;
     if (!parsed || parsed.updatedAtMs + refreshThrottleMs < Date.now()) {
       await writeLease(specs);
+    }
+    for (const spec of specs) {
+      const prev = prevByModule.get(spec.moduleKey) || new Map<string, Fingerprint>();
+      const next = await computeFingerprintMap(spec.watchPaths);
+      if (!mapsEqual(prev, next)) {
+        prevByModule.set(spec.moduleKey, next);
+        buildSeq += 1;
+        await runCoordinatorBuild({ cwd, spec, seq: buildSeq, reason: "source-change" });
+      }
     }
   }
 }
