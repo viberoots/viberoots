@@ -65,6 +65,17 @@ export async function ensureGraph(
       return false;
     }
   }
+  async function isParseableJsonFile(p: string): Promise<boolean> {
+    try {
+      const txt = await fsp.readFile(p, "utf8");
+      const trimmed = String(txt || "").trim();
+      if (!trimmed) return false;
+      JSON.parse(trimmed);
+      return true;
+    } catch {
+      return false;
+    }
+  }
   try {
     console.error(`[ensureGraph] workspaceRoot=${workspaceRoot}`);
   } catch {}
@@ -199,7 +210,7 @@ export async function ensureGraph(
       cwd: workspaceRoot,
       env: passEnv,
     });
-    if (!(await isValidJsonFile(graphPath))) {
+    if (!(await isParseableJsonFile(graphPath))) {
       throw new Error(`export-graph produced invalid JSON at ${graphPath}`);
     }
     return;
@@ -210,7 +221,7 @@ export async function ensureGraph(
     env: passEnv,
   })`nix run --accept-flake-config ${repoRoot}#zx-wrapper -- ${exportScript} ${exporterArgs}`;
   await fsp.access(graphPath);
-  if (!(await isValidJsonFile(graphPath))) {
+  if (!(await isParseableJsonFile(graphPath))) {
     throw new Error(`export-graph produced invalid JSON at ${graphPath}`);
   }
 }
