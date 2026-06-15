@@ -11,9 +11,8 @@ nix_cpp_test(
     name = "{{ name }}_gtest",
     srcs = ["tests/{{ name }}_gtest.cpp"],
     deps = [
-        "//third_party/providers:nix_pkgs_googletest",
+        "workspace_providers//:nix_pkgs_googletest",
     ],
     labels = ["lang:cpp", "kind:test"],
 )
-
 

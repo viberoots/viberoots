@@ -57,3 +57,43 @@ test("extraction blocker detection ignores legacy references in non-active docs"
     await fsp.rm(root, { recursive: true, force: true });
   }
 });
+
+test("extraction blocker detection scans active templates and generated workspace state", async () => {
+  const root = await tmpWorkspace("vbr-extraction-blockers-active-generated");
+  try {
+    await fsp.mkdir(
+      path.join(root, "viberoots", "build-tools", "tools", "scaffolding", "templates", "cpp"),
+      { recursive: true },
+    );
+    await fsp.mkdir(path.join(root, ".viberoots", "workspace", "providers"), {
+      recursive: true,
+    });
+    await fsp.writeFile(
+      path.join(
+        root,
+        "viberoots",
+        "build-tools",
+        "tools",
+        "scaffolding",
+        "templates",
+        "cpp",
+        "TARGETS.jinja",
+      ),
+      'deps = ["//third_party/providers:nix_pkgs_googletest"]\n',
+      "utf8",
+    );
+    await fsp.writeFile(
+      path.join(root, ".viberoots", "workspace", "providers", "TARGETS.node.auto"),
+      'load("//build-tools/node:defs.bzl", "nix_node_lib")\n',
+      "utf8",
+    );
+
+    const summary = findExtractionBlockers(root).map((b) => `${b.kind}:${b.path}`);
+    assert.deepEqual(summary, [
+      "buck-label:viberoots/build-tools/tools/scaffolding/templates/cpp/TARGETS.jinja",
+      "buck-load:.viberoots/workspace/providers/TARGETS.node.auto",
+    ]);
+  } finally {
+    await fsp.rm(root, { recursive: true, force: true });
+  }
+});

@@ -14,7 +14,14 @@ const ROOT_LEGACY_PATHS = [
   "toolchains",
 ] as const;
 
-const ACTIVE_BUCK_ROOTS = ["TARGETS", "projects"] as const;
+const ACTIVE_BUCK_ROOTS = [
+  "TARGETS",
+  "projects",
+  "build-tools/tools/scaffolding/templates",
+  "viberoots/build-tools/tools/scaffolding/templates",
+  ".viberoots/workspace/providers",
+  ".viberoots/workspace/buck",
+] as const;
 
 function exists(root: string, rel: string): boolean {
   return fs.existsSync(path.join(root, rel));
@@ -25,7 +32,8 @@ function walkBuckFiles(root: string, rel: string, out: string[]): void {
   if (!fs.existsSync(full)) return;
   const stat = fs.statSync(full);
   if (stat.isFile()) {
-    if (rel.endsWith("TARGETS") || rel.endsWith(".bzl")) out.push(rel);
+    const name = path.basename(rel);
+    if (name.startsWith("TARGETS") || rel.endsWith(".bzl") || rel.endsWith(".jinja")) out.push(rel);
     return;
   }
   if (!stat.isDirectory()) return;

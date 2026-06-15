@@ -6,7 +6,7 @@
     "usage": "scaf new cpp lib <name> [--path=DEST]",
     "notes": [
       "Generates a minimal C++ static library and a GoogleTest-based test.",
-      "Targets use nix_cpp_* macros; tests depend on //third_party/providers:nix_pkgs_googletest."
+      "Targets use nix_cpp_* macros; tests depend on workspace_providers//:nix_pkgs_googletest."
     ],
     "examples": ["scaf new cpp lib demo-lib --path=libs/demo-lib"]
   }

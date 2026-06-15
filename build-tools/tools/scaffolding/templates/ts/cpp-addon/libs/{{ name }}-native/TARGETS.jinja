@@ -17,9 +17,8 @@ nix_cpp_test(
     srcs = ["tests/{{ name }}_gtest.cpp"],
     deps = [
         "//projects/libs/{{ name }}-native:napi_addon",  # ensure addon sources are visible for include
-        "//third_party/providers:nix_pkgs_googletest",
+        "workspace_providers//:nix_pkgs_googletest",
     ],
     labels = ["lang:cpp", "kind:test"],
 )
-
 

@@ -5,27 +5,34 @@ import path from "node:path";
 import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
 
+async function activeBuildToolsRoot(): Promise<string> {
+  const direct = path.join(process.cwd(), "build-tools");
+  if (await fs.pathExists(direct)) return direct;
+  return path.join(process.cwd(), "viberoots", "build-tools");
+}
+
 test("cpp lib scaffold: files render and TARGETS wires gtest deps", async () => {
   await runInTemp("scaf-cpp-lib", async (tmp, _$) => {
     const $ = _$({ stdio: "inherit" });
+    const buildTools = await activeBuildToolsRoot();
 
     // Ensure language is enabled by presence
     await fs.ensureFile(path.join(tmp, "build-tools", "cpp", "defs.bzl"));
     await fs.copy(
-      path.join(process.cwd(), "build-tools", "cpp", "defs.bzl"),
+      path.join(buildTools, "cpp", "defs.bzl"),
       path.join(tmp, "build-tools", "cpp", "defs.bzl"),
     );
     await fs.copy(
-      path.join(process.cwd(), "build-tools", "cpp", "wasm_defs.bzl"),
+      path.join(buildTools, "cpp", "wasm_defs.bzl"),
       path.join(tmp, "build-tools", "cpp", "wasm_defs.bzl"),
     );
     await fs.copy(
-      path.join(process.cwd(), "build-tools", "tools", "nix", "templates", "cpp.nix"),
+      path.join(buildTools, "tools", "nix", "templates", "cpp.nix"),
       path.join(tmp, "build-tools", "tools", "nix", "templates", "cpp.nix"),
     );
 
     // Scaffold
-    await $`scaf new cpp lib demo-lib --yes --path=projects/libs/demo-lib`;
+    await $`${path.join(buildTools, "tools", "bin", "scaf")} new cpp lib demo-lib --yes --path=projects/libs/demo-lib`;
 
     // Expect TARGETS present at the scaffold path
     const targetsPath = path.join(tmp, "projects/libs/demo-lib", "TARGETS");
@@ -35,11 +42,11 @@ test("cpp lib scaffold: files render and TARGETS wires gtest deps", async () => 
     const txt = await fs.readFile(targetsPath, "utf8");
     assert(txt.includes("nix_cpp_test("), "expected nix_cpp_test present");
     assert(
-      txt.includes("//third_party/providers:nix_pkgs_googletest"),
+      txt.includes("workspace_providers//:nix_pkgs_googletest"),
       "expected provider gtest dep present",
     );
     assert(
-      !txt.includes("//third_party/providers:nix_pkgs_gtest_main"),
+      !txt.includes("workspace_providers//:nix_pkgs_gtest_main"),
       "expected provider gtest_main dep present",
     );
   });
