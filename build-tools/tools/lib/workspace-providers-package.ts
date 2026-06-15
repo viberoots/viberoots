@@ -27,11 +27,26 @@ async function ensureCuratedTargets(workspaceRoot: string): Promise<void> {
   try {
     current = await fsp.readFile(targetsPath, "utf8");
   } catch {}
+  current = current.replaceAll(
+    'load("@workspace_providers//:defs_cpp.bzl", "nix_cxx_library")',
+    'load("//:defs_cpp.bzl", "nix_cxx_library")',
+  );
+  current = current.replaceAll(
+    'load("@workspace_providers//:defs_node.bzl", "node_importer_deps")',
+    'load("//:defs_node.bzl", "node_importer_deps")',
+  );
+  current = current.replaceAll(
+    'load("@workspace_providers//:defs_python.bzl", "python_importer_deps")',
+    'load("//:defs_python.bzl", "python_importer_deps")',
+  );
   if (!current.trim()) {
     await writeIfChanged(targetsPath, CXX_PROVIDER_TARGETS);
     return;
   }
-  if (current.includes("nix_pkgs_googletest")) return;
+  if (current.includes("nix_pkgs_googletest")) {
+    await writeIfChanged(targetsPath, current);
+    return;
+  }
   await writeIfChanged(targetsPath, `${CXX_PROVIDER_TARGETS}\n${current}`);
 }
 
