@@ -1,5 +1,5 @@
-import path from "node:path";
 import { runNodeWithZx } from "../../lib/node-run";
+import { buildToolPath } from "../dev-build/paths";
 
 export async function computeZxTestNodeModulesOut(
   root: string,
@@ -7,7 +7,7 @@ export async function computeZxTestNodeModulesOut(
 ): Promise<string> {
   const { stdout } = await runNodeWithZx({
     cwd: root,
-    script: path.join(root, "build-tools/tools/dev/node-modules-build.ts"),
+    script: buildToolPath(root, "tools/dev/node-modules-build.ts"),
     args: ["--print-out-paths"],
     zxInitPath,
     stdio: "pipe",
