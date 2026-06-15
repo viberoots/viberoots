@@ -23,6 +23,7 @@ import { exists } from "../fs";
 import { isLanguageEnabled } from "../language-enablement";
 import { resolveDestination } from "../templates/destination";
 import { normalizeTemplateName } from "../templates/names";
+import { templateRootPath } from "../templates/paths";
 import { canonicalTemplateLanguage, isCanonicalTypeScriptTemplate } from "../templates/taxonomy";
 import { usage } from "../usage";
 import { validateDeploymentScaffoldAnswers } from "./deployment-validation";
@@ -43,14 +44,7 @@ export async function cmdNew(args: string[], flags: ScafFlags) {
     return;
   }
   const canonicalLanguage = canonicalTemplateLanguage(language, template);
-  const root = path.join(
-    "build-tools",
-    "tools",
-    "scaffolding",
-    "templates",
-    canonicalLanguage,
-    template,
-  );
+  const root = templateRootPath(canonicalLanguage, template);
   const metaPath = path.join(root, "meta.json");
   if (!(await exists(root)) || !(await exists(metaPath))) {
     console.error(`unknown template: ${language}/${template}`);

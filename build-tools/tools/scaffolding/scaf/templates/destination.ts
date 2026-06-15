@@ -2,6 +2,7 @@ import * as fs from "node:fs";
 import path from "node:path";
 
 import { canonicalTemplateLanguage, normalizeTemplateName } from "./taxonomy";
+import { scaffoldingPath } from "./paths";
 
 export function resolveDestination(
   language: string,
@@ -12,7 +13,7 @@ export function resolveDestination(
   if (override) {
     return { path: override, needsConfirm: false };
   }
-  const cfgPath = path.join("build-tools", "tools", "scaffolding", "resolver.json");
+  const cfgPath = scaffoldingPath("resolver.json");
   try {
     const raw = fs.readFileSync(cfgPath, "utf8");
     const cfg = JSON.parse(raw || "{}");

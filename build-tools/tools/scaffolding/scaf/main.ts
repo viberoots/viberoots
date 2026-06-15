@@ -67,6 +67,7 @@ async function runTemplateManifestPreflight(repoRoot: string): Promise<void> {
 
 export async function runScafCli() {
   const ctx: ScafContext = { originalCwd: process.cwd(), repoRoot: repoRootFromScafModuleUrl() };
+  process.env.VIBEROOTS_ROOT = process.env.VIBEROOTS_ROOT || ctx.repoRoot;
 
   normalizeCwd(ctx.repoRoot);
   guardBuckTests(ctx.repoRoot);

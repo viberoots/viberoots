@@ -4,6 +4,7 @@ import * as fsp from "node:fs/promises";
 
 import { exists } from "../fs";
 import { isLanguageEnabled } from "../language-enablement";
+import { templateRootPath } from "./paths";
 import { canonicalTemplateIdsForLanguage, TEMPLATE_TAXONOMY } from "./taxonomy";
 import { readCopierVariables } from "./variables";
 
@@ -16,7 +17,7 @@ export type TemplateMetaRow = {
 };
 
 export async function readTemplateMeta(language?: string): Promise<TemplateMetaRow[]> {
-  const root = path.join("build-tools", "tools", "scaffolding", "templates");
+  const root = templateRootPath();
   const requestedLanguage = language ? String(language).trim() : "";
   const strictCanonicalRoots = requestedLanguage !== "";
   let langs = requestedLanguage ? [requestedLanguage] : Object.keys(TEMPLATE_TAXONOMY);

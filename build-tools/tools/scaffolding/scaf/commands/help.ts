@@ -4,6 +4,7 @@ import path from "node:path";
 
 import { readTemplateMeta } from "../templates/meta";
 import { normalizeTemplateName } from "../templates/names";
+import { templateRootPath } from "../templates/paths";
 import { canonicalTemplateLanguage, isCanonicalTypeScriptTemplate } from "../templates/taxonomy";
 import { readCopierVariables } from "../templates/variables";
 import { usage } from "../usage";
@@ -98,14 +99,7 @@ async function helpForNewTemplate(language: string, templateRaw: string, flags: 
     process.exit(1);
   }
   const canonicalLanguage = canonicalTemplateLanguage(language, template);
-  const tmplDirPath = path.join(
-    "build-tools",
-    "tools",
-    "scaffolding",
-    "templates",
-    canonicalLanguage,
-    template,
-  );
+  const tmplDirPath = templateRootPath(canonicalLanguage, template);
   const variables = await readCopierVariables(tmplDirPath).catch(() => [] as string[]);
   if (flags["json"] === "true") {
     console.log(
