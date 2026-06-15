@@ -9,6 +9,7 @@ import { runNodeWithZx } from "../lib/node-run";
 import { findRepoRoot } from "../lib/repo";
 import { ensureWorkspaceBuckStatePackage } from "../lib/workspace-buck-state";
 import { DEFAULT_AUTO_MAP_PATH } from "../lib/workspace-state-paths";
+import { buildToolPath, zxInitPath } from "../dev/dev-build/paths";
 
 async function buck2Present(): Promise<boolean> {
   try {
@@ -130,8 +131,8 @@ export async function ensureGraph(
   const nodeBin = process.execPath;
   const repoRoot =
     (process.env.REPO_ROOT && process.env.REPO_ROOT.trim()) || (await findRepoRoot(process.cwd()));
-  const zxInit = path.join(repoRoot, "build-tools/tools/dev/zx-init.mjs");
-  const exportScript = path.join(repoRoot, "build-tools/tools/buck/export-graph.ts");
+  const zxInit = zxInitPath(repoRoot);
+  const exportScript = buildToolPath(repoRoot, "tools/buck/export-graph.ts");
   const exporterArgs = ["--out", graphPath];
 
   const exportWithInline = async (inlineOpts: {
