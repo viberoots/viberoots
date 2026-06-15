@@ -30,6 +30,9 @@ let
       });
   sanitize = H.sanitizeName;
   nm = nodeMods.mkNodeModules { lockfilePath = info.lockfilePath; inherit importerDir; };
+  viberootsRootEnv = builtins.getEnv "VIBEROOTS_ROOT";
+  viberootsStoreRoot =
+    if viberootsRootEnv != "" then builtins.toPath viberootsRootEnv else repoStoreRoot;
 in
   pkgs.stdenvNoCC.mkDerivation {
     pname = "node-webapp-" + (sanitize name);
@@ -77,12 +80,7 @@ EOF
       VITE_BIN="${nm}/node_modules/.bin/vite"
       TSC_BIN="${nm}/node_modules/.bin/tsc"
       NEXT_BIN="${nm}/node_modules/.bin/next"
-      VIBEROOTS_SOURCE_ROOT="$REPO_ROOT"
-      if [ -f "$REPO_ROOT/viberoots/build-tools/tools/dev/zx-init.mjs" ]; then
-        VIBEROOTS_SOURCE_ROOT="$REPO_ROOT/viberoots"
-      elif [ -f "$REPO_ROOT/.viberoots/current/build-tools/tools/dev/zx-init.mjs" ]; then
-        VIBEROOTS_SOURCE_ROOT="$REPO_ROOT/.viberoots/current"
-      fi
+      VIBEROOTS_SOURCE_ROOT="${viberootsStoreRoot}"
       SYNC_CONTRACTS_SCRIPT="$VIBEROOTS_SOURCE_ROOT/build-tools/tools/dev/sync-module-contracts.ts"
       requires_module_contracts() {
         [ -f src/ts-modules.ts ] || [ -f src/wasm-contract.ts ] || [ -f app/ts-modules.ts ] || [ -f app/wasm-contract.ts ]
