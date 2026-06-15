@@ -14,50 +14,31 @@ export async function ensureBuckPreludeConfig(root: string): Promise<void> {
   try {
     await applyNixCacheHealthPolicy(root);
     try {
-      const preludeExists = await fsp
-        .lstat(path.join(root, "prelude"))
-        .then(() => true)
-        .catch(() => false);
-      const preludeFileExists = await pathExists(path.join(root, "prelude", "prelude.bzl"));
+      const preludeFileExists = await pathExists(
+        path.join(root, ".viberoots", "current", "prelude", "prelude.bzl"),
+      );
       const rootCfgExists = await pathExists(path.join(root, ".buckconfig"));
-      const toolCfgExists = await pathExists(path.join(root, "toolchains", ".buckconfig"));
-      if (preludeExists && preludeFileExists && rootCfgExists && toolCfgExists) {
+      const workspaceProvidersCfgExists = await pathExists(
+        path.join(root, ".viberoots", "workspace", "providers", ".buckconfig"),
+      );
+      const workspaceBuckCfgExists = await pathExists(
+        path.join(root, ".viberoots", "workspace", "buck", ".buckconfig"),
+      );
+      if (
+        preludeFileExists &&
+        rootCfgExists &&
+        workspaceProvidersCfgExists &&
+        workspaceBuckCfgExists
+      ) {
         return;
       }
     } catch {}
 
-    let preludePath = "";
-    try {
-      const { stdout } = await $({
-        stdio: "pipe",
-        cwd: root,
-      })`nix build .#buck2-prelude --no-link --no-write-lock-file --accept-flake-config --print-out-paths`;
-      const out = String(stdout || "")
-        .trim()
-        .split("\n")
-        .filter(Boolean)
-        .pop();
-      if (!out) throw new Error("unable to build .#buck2-prelude");
-      preludePath = `${out}/prelude`;
-    } catch {
-      try {
-        const { stdout } = await $({
-          stdio: "pipe",
-          cwd: root,
-        })`nix eval --raw .#inputs.buck2.outPath`;
-        const out = String(stdout || "").trim();
-        if (!out) throw new Error("unable to eval .#inputs.buck2.outPath");
-        preludePath = `${out}/prelude`;
-      } catch {
-        preludePath = path.join(root, "prelude");
-      }
-    }
-
     await $({ cwd: root })`bash --noprofile --norc -c ${`set -euo pipefail
       printf '.\n' > .buckroot
       mkdir -p .viberoots
-      [ -e .viberoots/current ] || ln -s .. .viberoots/current
-      rm -rf prelude && ln -s "${preludePath}" prelude
+      [ -e .viberoots/current ] || ln -s ../viberoots .viberoots/current
+      mkdir -p .viberoots/workspace/providers .viberoots/workspace/buck
       cat > .buckconfig <<'EOF'
 [buildfile]
 name = TARGETS
@@ -65,33 +46,43 @@ name = TARGETS
 [repositories]
 root = .
 viberoots = ./.viberoots/current
-prelude = ./prelude
-toolchains = ./toolchains
-repo_toolchains = ./toolchains
-fbsource = ./prelude/third-party/fbsource_stub
-fbcode = ./prelude/third-party/fbcode_stub
-config = ./prelude
+prelude = ./.viberoots/current/prelude
+toolchains = ./.viberoots/current/toolchains
+repo_toolchains = ./.viberoots/current/toolchains
+fbsource = ./.viberoots/current/config/fbsource_stub
+fbcode = ./.viberoots/current/config/fbcode_stub
+config = ./.viberoots/current/prelude
+workspace_providers = ./.viberoots/workspace/providers
+workspace_buck = ./.viberoots/workspace/buck
 
 [cells]
 root = .
 viberoots = ./.viberoots/current
-prelude = ./prelude
-toolchains = ./toolchains
-repo_toolchains = ./toolchains
-fbsource = ./prelude/third-party/fbsource_stub
-fbcode = ./prelude/third-party/fbcode_stub
-config = ./prelude
+prelude = ./.viberoots/current/prelude
+toolchains = ./.viberoots/current/toolchains
+repo_toolchains = ./.viberoots/current/toolchains
+fbsource = ./.viberoots/current/config/fbsource_stub
+fbcode = ./.viberoots/current/config/fbcode_stub
+config = ./.viberoots/current/prelude
+workspace_providers = ./.viberoots/workspace/providers
+workspace_buck = ./.viberoots/workspace/buck
 
 [build]
 prelude = prelude
 user_platform = prelude//platforms:default
 target_platforms = prelude//platforms:default
+
+[project]
+ignore = buck-out/tmp/tmpdir,.claude/worktrees,.codex/worktrees
 EOF
     `}`;
 
     await $({ cwd: root })`bash --noprofile --norc -c ${`set -euo pipefail
-      mkdir -p toolchains
-      cat > toolchains/.buckconfig <<'EOF'
+      cat > .viberoots/workspace/providers/.buckconfig <<'EOF'
+[buildfile]
+name = TARGETS
+EOF
+      cat > .viberoots/workspace/buck/.buckconfig <<'EOF'
 [buildfile]
 name = TARGETS
 EOF
