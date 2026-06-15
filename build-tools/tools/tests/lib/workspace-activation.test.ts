@@ -9,16 +9,24 @@ import { resolveToolPathSync } from "../../lib/tool-paths";
 import { activateWorkspace } from "../../lib/workspace-activation";
 
 const execFileAsync = promisify(execFile);
-const COMMAND = "build-tools/tools/dev/viberoots.ts";
+const COMMAND = new URL("../../dev/viberoots.ts", import.meta.url).pathname;
 
-async function workspace(prefix: string, localInput = true): Promise<string> {
+type LocalInputMode = "path" | "git" | false;
+
+async function workspace(prefix: string, localInput: LocalInputMode = "path"): Promise<string> {
   const tmp = await fsp.realpath(await fsp.mkdtemp(path.join(os.tmpdir(), `${prefix}-`)));
-  const flake = localInput
-    ? '{ inputs.viberoots.url = "path:./viberoots"; outputs = _: {}; }\n'
+  const url =
+    localInput === "path" ? "path:./viberoots" : localInput === "git" ? "git+file:./viberoots" : "";
+  const flake = url
+    ? `{ inputs.viberoots.url = "${url}"; outputs = _: {}; }\n`
     : "{ outputs = _: {}; }\n";
   await fsp.writeFile(path.join(tmp, "flake.nix"), flake, "utf8");
   await fsp.writeFile(path.join(tmp, ".buckroot"), ".\n", "utf8");
   return tmp;
+}
+
+async function addExtractedToolTree(source: string): Promise<void> {
+  await fsp.mkdir(path.join(source, "build-tools"), { recursive: true });
 }
 
 async function makeSource(root: string, rel = "viberoots"): Promise<string> {
@@ -60,6 +68,22 @@ test("init-workspace keeps current on workspace root before local tool extractio
       assert.equal((await fsp.stat(path.join(root, rel))).isDirectory(), true);
     }
     assert.equal(await fsp.readFile(path.join(root, "flake.nix"), "utf8"), flakeBefore);
+  } finally {
+    await fsp.rm(root, { recursive: true, force: true });
+  }
+});
+
+test("init-workspace points current at extracted git+file viberoots submodule", async () => {
+  const root = await workspace("vbr-activate-git-local", "git");
+  try {
+    const source = await makeSource(root);
+    await addExtractedToolTree(source);
+
+    const result = await runInit(root);
+
+    assert.equal(result.sourcePath, source);
+    assert.equal(await readlink(root), "../viberoots");
+    assert.equal(await fsp.realpath(path.join(root, ".viberoots/current")), source);
   } finally {
     await fsp.rm(root, { recursive: true, force: true });
   }

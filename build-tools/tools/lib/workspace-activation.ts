@@ -21,7 +21,7 @@ type ActivationOptions = {
 function flakeUsesLocalViberoots(workspaceRoot: string): boolean {
   try {
     const text = fs.readFileSync(path.join(workspaceRoot, "flake.nix"), "utf8");
-    return /viberoots\.url\s*=\s*"path:\.\/viberoots"/.test(text);
+    return /viberoots\.url\s*=\s*"(?:path|git\+file):\.\/viberoots"/.test(text);
   } catch {
     return false;
   }
