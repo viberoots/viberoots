@@ -11,11 +11,13 @@ async function realizedFixedStoreRoot(opts: {
   flakeRef: string;
   attrPath: string;
 }): Promise<string | null> {
+  const env = { ...process.env };
+  delete env.NIX_PNPM_EXACT_STORE;
   const result = await runManagedCommand({
     command: "nix",
     args: ["path-info", `${opts.flakeRef}#${opts.attrPath}`, "--impure", "--accept-flake-config"],
     cwd: opts.repoRoot,
-    env: process.env,
+    env,
     timeoutMs: REALIZED_FIXED_STORE_TIMEOUT_MS,
   });
   if (!result.ok) return null;
