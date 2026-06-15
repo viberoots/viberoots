@@ -38,6 +38,7 @@ def _zx_test_impl(ctx):
             + "VBR_NODE_MODULES_BUILD=\"$VBR_ROOT/build-tools/tools/dev/node-modules-build.ts\"; "
             + "VBR_HEARTBEAT_RUNNER=\"$VBR_ROOT/build-tools/tools/dev/command-heartbeat.ts\"; "
             + "export VBR_ZX_INIT VBR_NODE_MODULES_BUILD VBR_HEARTBEAT_RUNNER; "
+            + "if [ -d \"$VBR_ROOT/build-tools/tools/bin\" ]; then export PATH=\"$VBR_ROOT/build-tools/tools/bin:$PATH\"; fi; "
             + "export BUCK_EXPORTER_REUSE_DAEMON=\"${BUCK_EXPORTER_REUSE_DAEMON:-1}\"; "
             + "if [ -z \"$BUCK_NESTED_ISO\" ]; then "
             + "  ISO_HASH=\"$($NODE_BIN -e 'const crypto=require(\"node:crypto\"); const path=require(\"node:path\"); const root=path.resolve(process.argv[1] || process.cwd()); process.stdout.write(crypto.createHash(\"sha256\").update(root).digest(\"hex\").slice(0, 10));' \"$WORKSPACE_ROOT\")\"; "
