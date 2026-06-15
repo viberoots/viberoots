@@ -3,7 +3,7 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
 import { printSkip } from "../../lib/errors";
-import { nodeFlagsWithZx } from "../../lib/node-run";
+import { nodeFlagsWithZx, nodeOptionsWithoutZxInit } from "../../lib/node-run";
 import { findRepoRoot } from "../../lib/repo";
 import { ensureWorkspaceProvidersPackage } from "../../lib/workspace-providers-package";
 import { DEFAULT_AUTO_MAP_PATH } from "../../lib/workspace-state-paths";
@@ -195,7 +195,7 @@ export async function runGlue(dryRun: boolean, verbose: boolean) {
     const env = c.withZx
       ? {
           ...baseEnv,
-          NODE_OPTIONS: [`--import ${zxImport}`, process.env.NODE_OPTIONS || ""]
+          NODE_OPTIONS: [`--import ${zxImport}`, nodeOptionsWithoutZxInit(process.env.NODE_OPTIONS)]
             .filter(Boolean)
             .join(" "),
         }

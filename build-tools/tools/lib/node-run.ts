@@ -22,7 +22,7 @@ export function nodeFlagsWithZx(zxInitPath: string): string[] {
   ];
 }
 
-function nodeOptionsWithoutZxInit(value: string | undefined): string {
+export function nodeOptionsWithoutZxInit(value: string | undefined): string {
   if (!value) return "";
   const tokens = value.match(/(?:[^\s"']+|"[^"]*"|'[^']*')+/g) || [];
   const kept: string[] = [];
