@@ -1,13 +1,11 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 
-const requiredFiles = [
-  "flake.nix",
-  ".buckconfig",
+const requiredFiles = ["flake.nix", ".buckconfig"];
+const requiredToolFiles = [
   "build-tools/deployments/defs.bzl",
   "build-tools/tools/buck/export-graph.ts",
   "build-tools/tools/dev/zx-init.mjs",
-  "viberoots/flake.nix",
 ];
 const fastCopyOpts = { stdio: "pipe" as const, reject: false, nothrow: true };
 const darwinCloneFileScript = String.raw`
@@ -114,7 +112,10 @@ async function makeTreeWritable(root: string): Promise<void> {
   }
 }
 
-export async function missingRequiredSeedFiles(dir: string): Promise<string[]> {
+export async function missingRequiredSeedFiles(
+  dir: string,
+  opts: { allowMissingToolRoot?: boolean } = {},
+): Promise<string[]> {
   const missing: string[] = [];
   for (const rel of requiredFiles) {
     try {
@@ -123,11 +124,28 @@ export async function missingRequiredSeedFiles(dir: string): Promise<string[]> {
       missing.push(rel);
     }
   }
+  if (opts.allowMissingToolRoot) return missing;
+  for (const rel of requiredToolFiles) {
+    const activeRel = path.join("viberoots", rel);
+    const hasStandalone = await fsp
+      .access(path.join(dir, rel))
+      .then(() => true)
+      .catch(() => false);
+    const hasSubmodule = await fsp
+      .access(path.join(dir, activeRel))
+      .then(() => true)
+      .catch(() => false);
+    if (!hasStandalone && !hasSubmodule) missing.push(`${rel} or ${activeRel}`);
+  }
   return missing;
 }
 
-export async function assertRequiredSeedFiles(dir: string, label: string): Promise<void> {
-  const missing = await missingRequiredSeedFiles(dir);
+export async function assertRequiredSeedFiles(
+  dir: string,
+  label: string,
+  opts: { allowMissingToolRoot?: boolean } = {},
+): Promise<void> {
+  const missing = await missingRequiredSeedFiles(dir, opts);
   if (missing.length) throw new Error(`runInTemp: ${label} missing ${missing.join(", ")}`);
 }
 

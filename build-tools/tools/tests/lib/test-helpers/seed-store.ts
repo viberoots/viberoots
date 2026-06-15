@@ -151,6 +151,23 @@ async function overlayUntrackedFilesIntoTempRepo(tmpDir: string): Promise<void> 
   }
 }
 
+async function overlayActiveViberootsIntoTempRepo(tmpDir: string): Promise<void> {
+  const source = path.join(process.cwd(), "viberoots");
+  const sourceFlake = path.join(source, "flake.nix");
+  const tmpFlake = path.join(tmpDir, "viberoots", "flake.nix");
+  const sourceExists = await fsp
+    .access(sourceFlake)
+    .then(() => true)
+    .catch(() => false);
+  if (!sourceExists) return;
+  const tmpExists = await fsp
+    .access(tmpFlake)
+    .then(() => true)
+    .catch(() => false);
+  if (tmpExists) return;
+  await $({ cwd: process.cwd() })`rsync -a viberoots ${tmpDir}/`;
+}
+
 async function seedStoreCowCopySupportedOncePerWorker(args: {
   timeAsync: TimeAsync;
   seedPath: string;
@@ -197,7 +214,7 @@ export async function initTempRepoFromSeedStore(args: {
     return "rsync";
   }
   await requireSeedPath(seedPath, seedKey);
-  await assertRequiredSeedFiles(seedPath, "seed store");
+  await assertRequiredSeedFiles(seedPath, "seed store", { allowMissingToolRoot: true });
   await seedStoreCowCopySupportedOncePerWorker({
     timeAsync: deps.timeAsync,
     seedPath,
@@ -208,6 +225,9 @@ export async function initTempRepoFromSeedStore(args: {
   });
   await deps.timeAsync(`seedOverlayUntracked(${path.basename(tmpDir)})`, async () => {
     await overlayUntrackedFilesIntoTempRepo(tmpDir);
+  });
+  await deps.timeAsync(`seedOverlayViberoots(${path.basename(tmpDir)})`, async () => {
+    await overlayActiveViberootsIntoTempRepo(tmpDir);
   });
   if (!(await isSeedStoreWritable(seedPath))) {
     try {
