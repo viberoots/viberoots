@@ -44,22 +44,30 @@ test("graph planner packages use the workspace source under delegated flakes", a
   );
 });
 
-test("nix develop activates live local pre-extraction current path", async () => {
+test("nix develop activates live local submodule workflow path", async () => {
+  const markerText = `live-edit-${Date.now()}`;
+  const marker = path.join("viberoots", ".live-edit-marker");
   const script = `
 set -euo pipefail
 test "$(realpath .viberoots/current)" = "$(pwd -P)/viberoots"
+printf '%s\\n' "${markerText}" > viberoots/.live-edit-marker
+test "$(cat .viberoots/current/.live-edit-marker)" = "${markerText}"
 viberoots status --json | jq -e '.sourceMode == "local" and .currentPointsToLiveCheckout == true'
 `;
-  const result = await $({
-    stdio: "pipe",
-    reject: false,
-    nothrow: true,
-  })`nix develop --accept-flake-config .#default -c bash --noprofile --norc -c ${script}`;
+  try {
+    const result = await $({
+      stdio: "pipe",
+      reject: false,
+      nothrow: true,
+    })`nix develop --accept-flake-config .#default -c bash --noprofile --norc -c ${script}`;
 
-  assert.equal(
-    result.exitCode,
-    0,
-    `expected nix develop to activate live local submodule workspace\nstdout:\n${result.stdout}\nstderr:\n${result.stderr}`,
-  );
-  assert.equal(await fsp.realpath(path.join(".viberoots", "current")), path.resolve("viberoots"));
+    assert.equal(
+      result.exitCode,
+      0,
+      `expected nix develop to activate live local submodule workspace\nstdout:\n${result.stdout}\nstderr:\n${result.stderr}`,
+    );
+    assert.equal(await fsp.realpath(path.join(".viberoots", "current")), path.resolve("viberoots"));
+  } finally {
+    await fsp.rm(marker, { force: true });
+  }
 });

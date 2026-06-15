@@ -140,6 +140,32 @@ test("startup-check rejects dirty local viberoots submodule", async () => {
   }
 });
 
+test("startup-check rejects misaligned local viberoots flake lock", async () => {
+  const { root } = await submoduleWorkspace("vbr-startup-lock-mismatch");
+  const oldCwd = process.cwd();
+  try {
+    await writeFile(
+      path.join(root, "flake.lock"),
+      JSON.stringify({
+        nodes: {
+          viberoots: {
+            locked: { type: "git", url: "https://example.invalid/viberoots.git" },
+            original: { type: "git", url: "https://example.invalid/viberoots.git" },
+          },
+        },
+      }),
+    );
+    process.chdir(root);
+    await assert.rejects(
+      validateStartupWorkspaceState(),
+      /root flake\.lock is not aligned with local viberoots input/,
+    );
+  } finally {
+    process.chdir(oldCwd);
+    await fsp.rm(root, { recursive: true, force: true });
+  }
+});
+
 test("startup-check rejects gitlink-mismatched local viberoots submodule", async () => {
   const { root, submodule } = await submoduleWorkspace("vbr-startup-submodule-mismatch");
   const oldCwd = process.cwd();
