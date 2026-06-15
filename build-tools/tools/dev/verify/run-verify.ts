@@ -4,6 +4,7 @@ import process from "node:process";
 import "zx/globals";
 import { isRemoteVerifyPolicy, shouldComputeLocalZxTestNodeModules } from "./remote-policy";
 import { defaultRunVerifyDeps, type RunVerifyDeps } from "./run-verify-deps";
+import { zxInitPath } from "../dev-build/paths";
 
 export async function runVerify(): Promise<void> {
   await runVerifyWithDeps(defaultRunVerifyDeps);
@@ -34,7 +35,7 @@ export async function runVerifyWithDeps(overrides: Partial<RunVerifyDeps> = {}):
       args: parsedArgs,
     })
     .catch(cleanupEarlyFailure);
-  const zxInitPath = path.join(root, "build-tools", "tools", "dev", "zx-init.mjs");
+  const zxInit = zxInitPath(root);
   await timedPhase(
     "nix-cache-health",
     async () => await deps.applyNixCacheHealthPolicy(root),
@@ -53,14 +54,15 @@ export async function runVerifyWithDeps(overrides: Partial<RunVerifyDeps> = {}):
   await timedPhase(
     "lint-preflight",
     async () =>
-      await deps.runVerifyLintPreflight(root, zxInitPath, {
+      await deps.runVerifyLintPreflight(root, zxInit, {
         lintFilters: selection.lintFilters,
         includeBuildSystemPolicy: !nonBuildSystemOnlyScope,
       }),
   ).catch(cleanupEarlyFailure);
   await timedPhase(
     "template-manifest-check",
-    async () => await deps.runTemplateManifestCheck({ root, zxInitPath, nonBuildSystemOnlyScope }),
+    async () =>
+      await deps.runTemplateManifestCheck({ root, zxInitPath: zxInit, nonBuildSystemOnlyScope }),
   ).catch(cleanupEarlyFailure);
   const allowConcurrent = process.env.VERIFY_ALLOW_CONCURRENT === "1";
   const lock = await timedPhase(
@@ -101,7 +103,7 @@ export async function runVerifyWithDeps(overrides: Partial<RunVerifyDeps> = {}):
     : await timedPhase("setup-local-workspace", async () => {
         return await deps.setupLocalVerifyWorkspace({
           root,
-          zxInitPath,
+          zxInitPath: zxInit,
           coverage: args.coverage,
           targets: selection.targets,
         });
@@ -117,13 +119,14 @@ export async function runVerifyWithDeps(overrides: Partial<RunVerifyDeps> = {}):
   if (!remoteVerify) {
     await timedPhase(
       "start-buck-daemon-reaper",
-      async () => await deps.startBuckDaemonReaper({ root, zxInitPath, iso, stateFile }),
+      async () => await deps.startBuckDaemonReaper({ root, zxInitPath: zxInit, iso, stateFile }),
     );
     await timedPhase(
       "start-buck-watchdog",
-      async () => await deps.startBuckWatchdog({ root, zxInitPath, iso, logFile: lock.logFile }),
+      async () =>
+        await deps.startBuckWatchdog({ root, zxInitPath: zxInit, iso, logFile: lock.logFile }),
     );
-    await timedPhase("prewarm-verify", async () => await deps.prewarmVerifyOnce(root, zxInitPath));
+    await timedPhase("prewarm-verify", async () => await deps.prewarmVerifyOnce(root, zxInit));
   }
   await deps.appendVerifyLogLine(
     lock.logFile,
@@ -211,7 +214,7 @@ export async function runVerifyWithDeps(overrides: Partial<RunVerifyDeps> = {}):
   const zxNodeModulesOut = shouldComputeLocalZxTestNodeModules(executionPolicy)
     ? await timedPhase(
         "compute-zx-test-node-modules",
-        async () => await deps.computeZxTestNodeModulesOut(root, zxInitPath),
+        async () => await deps.computeZxTestNodeModulesOut(root, zxInit),
       )
     : null;
   const status = await timedPhase(
@@ -234,7 +237,7 @@ export async function runVerifyWithDeps(overrides: Partial<RunVerifyDeps> = {}):
   );
   if (shutdownPromise) await shutdownPromise;
   await cleanupRegisteredTempRepoState();
-  await deps.maybeWriteVerifyTimingSummary({ root, logFile: lock.logFile, zxInitPath });
+  await deps.maybeWriteVerifyTimingSummary({ root, logFile: lock.logFile, zxInitPath: zxInit });
   if (status === 0 && cov.rawDir) await deps.runMergedCoverageReport({ root, rawDir: cov.rawDir });
   if (seedCleanup) {
     await timedPhase("seed-cleanup", async () => await seedCleanup?.());

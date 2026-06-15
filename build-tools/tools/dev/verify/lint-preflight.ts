@@ -5,9 +5,10 @@ import "zx/globals";
 import { collectChangedPaths } from "../../lib/build-system-test-scope";
 import { runNodeWithZx } from "../../lib/node-run";
 import { resolveToolPath } from "../../lib/tool-paths";
+import { buildToolPath } from "../dev-build/paths";
 
 async function runVerifyFileSizePreflight(root: string, zxInitPath: string): Promise<void> {
-  const script = path.resolve(root, "build-tools/tools/dev/file-size-lint.ts");
+  const script = buildToolPath(root, "tools/dev/file-size-lint.ts");
   const args = ["--scope=source", "--fail=true"];
   process.stderr.write("[verify] file-size preflight: running strict repo-owned file-size gate\n");
   try {
@@ -21,7 +22,7 @@ async function runVerifyFileSizePreflight(root: string, zxInitPath: string): Pro
 }
 
 async function runVerifyStaleNamesPreflight(root: string, zxInitPath: string): Promise<void> {
-  const script = path.resolve(root, "build-tools/tools/dev/stale-names-lint.ts");
+  const script = buildToolPath(root, "tools/dev/stale-names-lint.ts");
   process.stderr.write("[verify] stale-names preflight: scanning active source for stale names\n");
   try {
     await runNodeWithZx({ cwd: root, script, args: ["--full"], zxInitPath, stdio: "inherit" });
@@ -34,7 +35,7 @@ async function runVerifyStaleNamesPreflight(root: string, zxInitPath: string): P
 }
 
 async function runVerifyNixGapsPolicyPreflight(root: string, zxInitPath: string): Promise<void> {
-  const script = path.resolve(root, "build-tools/tools/dev/nix-gaps-inventory-check.ts");
+  const script = buildToolPath(root, "tools/dev/nix-gaps-inventory-check.ts");
   const args = [
     "--starlark-api",
     "docs/handbook/starlark-api.md",

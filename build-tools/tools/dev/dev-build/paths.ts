@@ -1,5 +1,6 @@
 import path from "node:path";
 import { execSync } from "node:child_process";
+import fs from "node:fs";
 import { nodeFlagsWithZx } from "../../lib/node-run";
 
 export function repoRoot(): string {
@@ -27,7 +28,20 @@ export function nodeBin(): string {
   return process.execPath || "node";
 }
 
+export function buildToolsRoot(root: string): string {
+  const direct = path.resolve(root, "build-tools");
+  if (fs.existsSync(direct)) return direct;
+  return path.resolve(root, ".viberoots/current/build-tools");
+}
+
+export function buildToolPath(root: string, rel: string): string {
+  return path.join(buildToolsRoot(root), rel);
+}
+
+export function zxInitPath(root: string): string {
+  return buildToolPath(root, "tools/dev/zx-init.mjs");
+}
+
 export function zxNodeBase(root: string): string {
-  const zxInit = path.resolve(root, "build-tools/tools/dev/zx-init.mjs");
-  return nodeFlagsWithZx(zxInit).join(" ");
+  return nodeFlagsWithZx(zxInitPath(root)).join(" ");
 }
