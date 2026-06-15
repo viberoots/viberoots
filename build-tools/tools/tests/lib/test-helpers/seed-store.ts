@@ -152,20 +152,40 @@ async function overlayUntrackedFilesIntoTempRepo(tmpDir: string): Promise<void> 
 }
 
 async function overlayActiveViberootsIntoTempRepo(tmpDir: string): Promise<void> {
-  const source = path.join(process.cwd(), "viberoots");
+  const cwd = process.cwd();
+  const nestedSource = path.join(cwd, "viberoots");
+  const source = (await fsp
+    .access(path.join(nestedSource, "flake.nix"))
+    .then(() => true)
+    .catch(() => false))
+    ? nestedSource
+    : cwd;
   const sourceFlake = path.join(source, "flake.nix");
+  const sourceTool = path.join(source, "build-tools", "tools", "dev", "zx-init.mjs");
   const tmpFlake = path.join(tmpDir, "viberoots", "flake.nix");
-  const sourceExists = await fsp
-    .access(sourceFlake)
+  const sourceExists = await Promise.all([
+    fsp
+      .access(sourceFlake)
+      .then(() => true)
+      .catch(() => false),
+    fsp
+      .access(sourceTool)
+      .then(() => true)
+      .catch(() => false),
+  ]).then(([hasFlake, hasTool]) => hasFlake && hasTool);
+  if (!sourceExists) return;
+  const tmpHasToolRoot = await fsp
+    .access(path.join(tmpDir, "build-tools", "tools", "dev", "zx-init.mjs"))
     .then(() => true)
     .catch(() => false);
-  if (!sourceExists) return;
+  if (tmpHasToolRoot) return;
   const tmpExists = await fsp
     .access(tmpFlake)
     .then(() => true)
     .catch(() => false);
   if (tmpExists) return;
-  await $({ cwd: process.cwd() })`rsync -a viberoots ${tmpDir}/`;
+  await fsp.mkdir(path.join(tmpDir, "viberoots"), { recursive: true });
+  await $({ cwd })`rsync -a ${`${source}/`} ${path.join(tmpDir, "viberoots")}/`;
 }
 
 async function seedStoreCowCopySupportedOncePerWorker(args: {
