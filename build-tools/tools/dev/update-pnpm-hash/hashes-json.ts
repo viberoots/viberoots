@@ -1,8 +1,9 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
+import { buildToolPath } from "../dev-build/paths";
 
 function hashesJsonPath(): string {
-  return path.join(process.cwd(), "build-tools", "tools", "nix", "node-modules.hashes.json");
+  return buildToolPath(process.cwd(), "tools/nix/node-modules.hashes.json");
 }
 
 async function readHashesJson(): Promise<Record<string, string>> {
