@@ -18,6 +18,11 @@ import {
 export const TEST_TIMEOUT_MS =
   Number(process.env.TEST_NIX_TIMEOUT_SECS || process.env.VERIFY_TIMEOUT_SECS || "1200") * 1000;
 
+function viberootsDevTool(name: string): string {
+  const root = process.env.VIBEROOTS_SOURCE_ROOT || process.env.VIBEROOTS_ROOT || process.cwd();
+  return path.join(root, "build-tools", "tools", "dev", name);
+}
+
 async function pickFreePort(): Promise<number> {
   const server = net.createServer();
   await new Promise<void>((resolve, reject) => {
@@ -73,7 +78,7 @@ export async function scaffoldAndPrepareWorkspace(
     cwd: tmp,
     stdio: "inherit",
     env: { ...process.env, BUCK_TARGET: appLabel },
-  })`zx-wrapper build-tools/tools/dev/install/deps-main.ts --verbose --glue-only`;
+  })`zx-wrapper ${viberootsDevTool("install/deps-main.ts")} --verbose --glue-only`;
   // deps-main --glue-only is the single authoritative glue path for this flow.
   await fsp.access(graphJsonAbs);
   await stageTempRepoPaths({
@@ -86,7 +91,7 @@ export async function scaffoldAndPrepareWorkspace(
     cwd: tmp,
     stdio: "inherit",
     env: { ...process.env, NIX_PNPM_ALLOW_GENERATE: "1" },
-  })`zx-wrapper build-tools/tools/dev/update-pnpm-hash.ts --lockfile ${`${appRel}/pnpm-lock.yaml`}`;
+  })`zx-wrapper ${viberootsDevTool("update-pnpm-hash.ts")} --lockfile ${`${appRel}/pnpm-lock.yaml`}`;
   await stageTempRepoPaths({
     tmp,
     _$,

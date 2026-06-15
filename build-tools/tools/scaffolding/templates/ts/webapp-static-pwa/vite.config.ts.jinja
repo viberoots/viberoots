@@ -13,6 +13,8 @@ type PackageJson = {
 };
 
 const appRoot = fileURLToPath(new URL(".", import.meta.url));
+const viberootsRoot = process.env.VIBEROOTS_SOURCE_ROOT || process.env.VIBEROOTS_ROOT || path.resolve(appRoot, "../../..");
+const viberootsTool = (name: string) => path.join(viberootsRoot, "build-tools", "tools", "dev", name);
 const workspaceRoot = path.resolve(appRoot, "../../..");
 
 function readPackageJson(pkgPath: string): PackageJson {
@@ -115,7 +117,7 @@ function staticPwaPrecachePlugin() {
       execFileSync(
         "zx-wrapper",
         [
-          "../../../build-tools/tools/dev/materialize-static-pwa-precache.ts",
+          viberootsTool("materialize-static-pwa-precache.ts"),
           "--client-dir",
           path.resolve(appRoot, outDir),
           "--cache-version-prefix",

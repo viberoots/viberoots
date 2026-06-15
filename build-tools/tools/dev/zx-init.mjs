@@ -92,6 +92,11 @@ const { register } = await import("node:module");
 const { pathToFileURL } = await import("node:url");
 const fsp = await import("node:fs/promises");
 const pathMod2 = await import("node:path");
+const WORKSPACE_ROOT_URL = pathToFileURL(
+  WORKSPACE_ROOT_FIXED.endsWith(pathMod2.sep)
+    ? WORKSPACE_ROOT_FIXED
+    : WORKSPACE_ROOT_FIXED + pathMod2.sep,
+).href;
 
 //
 
@@ -120,11 +125,13 @@ const src = `export async function resolve(specifier, context, nextResolve) {
         const idx = attempted.indexOf(marker);
         if (idx >= 0) {
           const suffix = attempted.slice(idx + 1);
-          const ws = '${WORKSPACE_ROOT_FIXED}'.endsWith('/') ? '${WORKSPACE_ROOT_FIXED}' : '${WORKSPACE_ROOT_FIXED}/';
-          const href = new URL(suffix, new URL(ws, base)).href;
+          const href = new URL(suffix, ${JSON.stringify(WORKSPACE_ROOT_URL)}).href;
+          if (/\\.(?:cjs|js|json|mjs|node|ts|tsx)$/.test(href.split('/').pop() || '')) {
+            return { url: href, shortCircuit: true };
+          }
           try { return await nextResolve(href, context); } catch {}
           if (!/\\.(?:cjs|js|json|mjs|node|ts|tsx)$/.test(href.split('/').pop() || '')) {
-            try { return await nextResolve(href + '.ts', context); } catch {}
+            try { return { url: href + '.ts', shortCircuit: true }; } catch {}
           }
         }
       }
@@ -137,8 +144,7 @@ const src = `export async function resolve(specifier, context, nextResolve) {
         if (zxResolved && zxResolved.length > 0) {
           return await nextResolve(zxResolved, context);
         }
-        const ws = '${WORKSPACE_ROOT_FIXED}'.endsWith('/') ? '${WORKSPACE_ROOT_FIXED}' : '${WORKSPACE_ROOT_FIXED}/';
-        const baseUrl = new URL(ws, base);
+        const baseUrl = new URL(${JSON.stringify(WORKSPACE_ROOT_URL)});
         const zxGlobals = new URL('node_modules/zx/build/globals.cjs', baseUrl).href;
         return await nextResolve(zxGlobals, context);
       }
@@ -150,8 +156,7 @@ const src = `export async function resolve(specifier, context, nextResolve) {
         const candidateDir = new URL(specifier + '/index.js', baseUrl).href;
         try { return await nextResolve(candidateDir, context); } catch {}
       }
-      const ws = '${WORKSPACE_ROOT_FIXED}'.endsWith('/') ? '${WORKSPACE_ROOT_FIXED}' : '${WORKSPACE_ROOT_FIXED}/';
-      const baseUrl = new URL(ws, base);
+      const baseUrl = new URL(${JSON.stringify(WORKSPACE_ROOT_URL)});
       // Prefer Node's CJS resolver first to respect package "exports" fields via createRequire
       try {
         const { createRequire } = await import('node:module');

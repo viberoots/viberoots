@@ -5,10 +5,12 @@ import { spawn } from "node:child_process";
 
 const appRoot = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(appRoot, "../../../..");
+const viberootsRoot = process.env.VIBEROOTS_SOURCE_ROOT || process.env.VIBEROOTS_ROOT || repoRoot;
+const viberootsTool = (name) => path.join(viberootsRoot, "build-tools", "tools", "dev", name);
 
 const child = spawn(
   "zx-wrapper",
-  [path.join(repoRoot, "build-tools/tools/dev/watch-wasm-coordinator.ts")],
+  [viberootsTool("watch-wasm-coordinator.ts")],
   {
     stdio: "inherit",
     cwd: path.join(appRoot, ".."),
@@ -23,4 +25,3 @@ child.on("exit", (code, signal) => {
   }
   process.exit(code ?? 0);
 });
-

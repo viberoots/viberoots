@@ -7,6 +7,11 @@ import {
 } from "../../lib/test-helpers/git-stage";
 import { esbuildPackageName } from "./wasm-watch";
 
+function viberootsDevTool(name: string): string {
+  const root = process.env.VIBEROOTS_SOURCE_ROOT || process.env.VIBEROOTS_ROOT || process.cwd();
+  return path.join(root, "build-tools", "tools", "dev", name);
+}
+
 export async function ensureNodeModulesForDevApp(opts: {
   tmp: string;
   appAbs: string;
@@ -31,7 +36,7 @@ export async function ensureNodeModulesForDevApp(opts: {
     cwd: tmp,
     stdio: "inherit",
     env: { ...process.env, NIX_PNPM_ALLOW_GENERATE: "1" },
-  })`zx-wrapper build-tools/tools/dev/update-pnpm-hash.ts --lockfile ${lockfile}`;
+  })`zx-wrapper ${viberootsDevTool("update-pnpm-hash.ts")} --lockfile ${lockfile}`;
   await stageTempRepoPaths({
     tmp,
     _$,
@@ -51,7 +56,7 @@ export async function ensureNodeModulesForDevApp(opts: {
   const outPathRaw = await $({
     cwd: appAbs,
     stdio: "pipe",
-  })`zx-wrapper ../../../build-tools/tools/dev/node-modules-build.ts`;
+  })`zx-wrapper ${viberootsDevTool("node-modules-build.ts")}`;
 
   const outPath = String(outPathRaw.stdout || "").trim();
   if (!outPath) throw new Error("failed to resolve node_modules derivation path");

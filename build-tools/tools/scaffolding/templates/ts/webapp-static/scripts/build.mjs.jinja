@@ -7,12 +7,15 @@ const viteBin = path.resolve(
   ".bin",
   process.platform === "win32" ? "vite.cmd" : "vite",
 );
+const viberootsRoot =
+  process.env.VIBEROOTS_SOURCE_ROOT || process.env.VIBEROOTS_ROOT || path.resolve("..", "..", "..");
+const viberootsTool = (name) => path.join(viberootsRoot, "build-tools", "tools", "dev", name);
 
 const wasmManifestPath = path.join("src", "wasm-modules.manifest.json");
 execFileSync(
   "zx-wrapper",
   [
-    "../../../build-tools/tools/dev/ensure-wasm-contract-assets.ts",
+    viberootsTool("ensure-wasm-contract-assets.ts"),
     "--cwd",
     ".",
     "--wasm-manifest",

@@ -49,6 +49,11 @@ function sanitizeImporterForNixAttr(importer: string): string {
     .replace(/[\/\s]+/g, "-");
 }
 
+function viberootsDevTool(name: string): string {
+  const root = process.env.VIBEROOTS_SOURCE_ROOT || process.env.VIBEROOTS_ROOT || process.cwd();
+  return path.join(root, "build-tools", "tools", "dev", name);
+}
+
 async function readCanonicalServerWasmArtifact(outPath: string): Promise<string | null> {
   const manifestPath = path.join(outPath, "dist", "server", "wasm-modules.manifest.json");
   const manifest = parseWasmModuleManifest(
@@ -88,7 +93,7 @@ async function buildSsrWebappOutPath(
     cwd: tmp,
     stdio: "inherit",
     env,
-  })`zx-wrapper build-tools/tools/dev/update-pnpm-hash.ts --lockfile ${lockfile}`;
+  })`zx-wrapper ${viberootsDevTool("update-pnpm-hash.ts")} --lockfile ${lockfile}`;
   await stageTempRepoPaths({
     tmp,
     _$,
@@ -163,7 +168,7 @@ export async function scaffoldBuildAndSmoke(
     cwd: appAbs,
     env: { ...process.env },
     stdio: "inherit",
-  })`zx-wrapper ../../../build-tools/tools/dev/install/deps-main.ts --verbose --glue-only`;
+  })`zx-wrapper ${viberootsDevTool("install/deps-main.ts")} --verbose --glue-only`;
   await stageTempRepoPaths({
     tmp,
     _$,

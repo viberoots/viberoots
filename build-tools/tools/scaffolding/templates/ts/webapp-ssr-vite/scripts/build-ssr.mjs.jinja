@@ -4,9 +4,12 @@ import path from "node:path";
 
 const viteBin = path.join(process.cwd(), "node_modules", ".bin", "vite");
 const tscBin = path.join(process.cwd(), "node_modules", ".bin", "tsc");
+const viberootsRoot =
+  process.env.VIBEROOTS_SOURCE_ROOT || process.env.VIBEROOTS_ROOT || path.resolve("..", "..", "..");
+const viberootsTool = (name) => path.join(viberootsRoot, "build-tools", "tools", "dev", name);
 
 const contractsPaths = JSON.parse(
-  execSync("zx-wrapper ../../../build-tools/tools/dev/sync-module-contracts.ts --cwd . --print-json 1", {
+  execFileSync("zx-wrapper", [viberootsTool("sync-module-contracts.ts"), "--cwd", ".", "--print-json", "1"], {
     encoding: "utf8",
   }),
 );
@@ -18,8 +21,9 @@ if (!wasmManifestPath || !tsManifestPath) {
 
 cpSync(wasmManifestPath, "src/wasm-modules.manifest.json");
 cpSync(tsManifestPath, "src/ts-modules.manifest.json");
-execSync(
-  `zx-wrapper ../../../build-tools/tools/dev/ensure-wasm-contract-assets.ts --cwd . --wasm-manifest ${JSON.stringify(wasmManifestPath)}`,
+execFileSync(
+  "zx-wrapper",
+  [viberootsTool("ensure-wasm-contract-assets.ts"), "--cwd", ".", "--wasm-manifest", wasmManifestPath],
   { stdio: "inherit" },
 );
 
