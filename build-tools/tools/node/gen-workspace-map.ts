@@ -8,6 +8,7 @@ import { isWorkspaceImporterPath } from "../lib/importers";
 import { normalizeTargetLabel, parseLockfileLabel } from "../lib/labels";
 import { collectDeps, listImporters } from "../lib/node-deps-enforcement-core";
 import { repoRoot } from "../lib/repo";
+import { buildToolPath } from "../dev/dev-build/paths";
 
 type GraphNode = { name?: string; labels?: string[]; rule_type?: string };
 
@@ -81,10 +82,7 @@ async function main(): Promise<void> {
   const root = repoRoot();
   const graphPath = getFlagStr("graph", "");
   const nodeLockIndexPath = getFlagStr("node-lock-index", "");
-  const outPath = getFlagStr(
-    "out",
-    path.join(root, "build-tools", "tools", "node", "workspace-map.json"),
-  );
+  const outPath = getFlagStr("out", buildToolPath(root, "tools/node/workspace-map.json"));
   let comp: any;
   try {
     comp = await readCompositeGraph({
