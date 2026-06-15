@@ -1,6 +1,7 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
+import { buildToolPath } from "../dev-build/paths";
 import { runNodeWithZx } from "../../lib/node-run";
 
 async function exists(p: string): Promise<boolean> {
@@ -28,7 +29,7 @@ export async function prewarmVerifyOnce(root: string, zxInitPath: string): Promi
   if (shouldPrewarmUnifiedInVerify && !(await exists(unifiedStamp))) {
     await runNodeWithZx({
       cwd: root,
-      script: path.join(root, "build-tools/tools/dev/require-unified-pnpm-store.ts"),
+      script: buildToolPath(root, "tools/dev/require-unified-pnpm-store.ts"),
       args: [],
       zxInitPath,
       stdio: "pipe",
@@ -45,7 +46,7 @@ export async function prewarmVerifyOnce(root: string, zxInitPath: string): Promi
   if ((process.env.VERIFY_PREWARM || "0").trim() === "1") {
     await runNodeWithZx({
       cwd: root,
-      script: path.join(root, "build-tools/tools/dev/prewarm-toolchains.ts"),
+      script: buildToolPath(root, "tools/dev/prewarm-toolchains.ts"),
       args: [],
       zxInitPath,
       stdio: "pipe",
