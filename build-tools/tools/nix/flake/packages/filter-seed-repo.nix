@@ -22,6 +22,7 @@ let
     "third_party"
     "toolchains"
     "types"
+    "viberoots"
   ];
   rootMdKeep = [
     "abstractions.md"
@@ -67,6 +68,8 @@ let
     rel == "flake.lock" ||
     rel == "prelude" ||
     lib.hasPrefix "prelude/" rel ||
+    rel == "viberoots" ||
+    lib.hasPrefix "viberoots/" rel ||
     builtins.any (r: rel == r || lib.hasPrefix (r + "/") rel) roots;
   allowByDefault = rel:
     let

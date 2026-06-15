@@ -79,7 +79,7 @@ test("real viberoots mkWorkspace exposes metadata for external workspace source"
     const result = await $({
       cwd: repoRoot,
       stdio: "pipe",
-    })`nix eval --json --accept-flake-config .#lib.mkWorkspace --apply ${`mk: (mk { workspaceSrc = ${tmp}; viberootsInput = { outPath = ./.; }; workspaceName = "external-probe"; }).lib`}`;
+    })`nix eval --json --accept-flake-config ./viberoots#lib.mkWorkspace --apply ${`mk: (mk { workspaceSrc = ${tmp}; viberootsInput = { outPath = ./viberoots; }; workspaceName = "external-probe"; }).lib`}`;
     const probe = JSON.parse(String(result.stdout || "{}"));
     assert.equal(probe.workspaceName, "external-probe");
     assert.equal(probe.version, "0.0.0-dev");

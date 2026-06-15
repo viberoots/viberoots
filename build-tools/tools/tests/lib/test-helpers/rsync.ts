@@ -17,7 +17,16 @@ export async function rsyncRepoTo(tmp: string) {
           if [ -f flake.lock ]; then mkdir -p "${tmp}"; cp -f flake.lock "${tmp}/flake.lock"; fi
         `}`;
       } catch {}
-      for (const r of roots as string[]) {
+      const rootsToCopy = new Set<string>(roots);
+      if (
+        await fsp
+          .access("viberoots/flake.nix")
+          .then(() => true)
+          .catch(() => false)
+      ) {
+        rootsToCopy.add("viberoots");
+      }
+      for (const r of rootsToCopy) {
         try {
           await $`rsync -a --relative ${r} ${tmp}/`;
         } catch {}

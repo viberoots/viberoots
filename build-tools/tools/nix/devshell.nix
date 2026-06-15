@@ -176,10 +176,10 @@ EOF
 
       if [ -f flake.nix ]; then
         vbr_source="${viberootsRoot}"
-        if [ -f "$PWD/viberoots/flake.nix" ]; then
-          vbr_source="$PWD/viberoots"
-        elif [ -f "$PWD/build-tools/tools/dev/viberoots.ts" ]; then
+        if [ -f "$PWD/build-tools/tools/dev/viberoots.ts" ]; then
           vbr_source="$PWD"
+        elif [ -f "$PWD/viberoots/flake.nix" ]; then
+          vbr_source="$PWD/viberoots"
         fi
         export VIBEROOTS_ROOT="$vbr_source"
         viberoots init-workspace --shell-entry --source "$vbr_source" >/dev/null || {

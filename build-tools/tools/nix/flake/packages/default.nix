@@ -68,6 +68,10 @@ let
     nodeMods = resolvedNodeMods;
   };
   remoteTools = import ./remote-worker-tools.nix { inherit pkgs zx-wrapper; };
+  remoteWorkerBootstrap = import ./remote-worker-bootstrap.nix {
+    inherit pkgs viberootsRoot;
+    inherit (remoteTools) remote-worker-tools;
+  };
   viberootsCommand = import ../../packages/viberoots-command.nix {
     inherit pkgs zx-wrapper version releaseTag;
     viberootsSrc = viberootsRoot;
@@ -77,6 +81,7 @@ in
   buck2-prelude = prelude.buck2-prelude;
   zx-wrapper = zx-wrapper;
   viberoots = viberootsCommand;
+  remote-worker-bootstrap = remoteWorkerBootstrap;
 } // remoteTools // nodeModsPkgs // {
   graph-generator = graph.graphGen.all;
   graph-generator-cppTargets = graph.graphGen.cppTargetsFlat;

@@ -25,4 +25,11 @@ test("verify test-seed includes build-system paths needed by temp Buck repos", a
   const deploymentDefs = path.join(seedPath, "build-tools", "deployments", "defs.bzl");
   const deploymentDefsStat = await fsp.lstat(deploymentDefs);
   assert.ok(deploymentDefsStat.isFile(), "expected deployment defs in verify test-seed snapshot");
+
+  const localViberootsFlake = path.join(seedPath, "viberoots", "flake.nix");
+  const localViberootsFlakeStat = await fsp.lstat(localViberootsFlake);
+  assert.ok(
+    localViberootsFlakeStat.isFile(),
+    "expected local viberoots flake input in verify test-seed snapshot",
+  );
 });

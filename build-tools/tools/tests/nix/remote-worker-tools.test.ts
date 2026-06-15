@@ -69,10 +69,11 @@ test("remote worker and CI tool closures expose declared tools only from Nix sto
 
 test("remote worker bootstrap uses closure PATH and avoids scheduler registration", async () => {
   await runInTemp("remote-worker-bootstrap", async (tmp, $) => {
+    const bootstrap = await build(tmp, $, "remote-worker-bootstrap");
     const res = await $({
       cwd: tmp,
       stdio: "pipe",
-    })`nix run .#remote-worker-bootstrap --accept-flake-config -- --check-only`;
+    })`${path.join(bootstrap, "bin", "remote-worker-bootstrap")} --check-only`;
 
     const output = `${res.stdout}\n${res.stderr}`;
     assert.match(output, /remote-worker-tools=\/nix\/store\//);
@@ -85,18 +86,24 @@ test("remote worker bootstrap uses closure PATH and avoids scheduler registratio
 
 test("remote worker bootstrap app is a thin zx-wrapper launcher", async () => {
   const app = await fs.readFile("build-tools/tools/nix/flake/outputs-apps.nix", "utf8");
+  const packages = await fs.readFile("build-tools/tools/nix/flake/packages/default.nix", "utf8");
+  const launcher = await fs.readFile(
+    "build-tools/tools/nix/flake/packages/remote-worker-bootstrap.nix",
+    "utf8",
+  );
   const helper = await fs.readFile(
     "build-tools/tools/remote-exec/remote-worker-bootstrap.ts",
     "utf8",
   );
-  const bootstrapBlock = app.match(/bootstrap = pkgs\.writeShellScriptBin[\s\S]*?'';/)?.[0] || "";
 
   assert.match(helper, /^#!\/usr\/bin\/env zx-wrapper/);
-  assert.match(bootstrapBlock, /exec \$\{remoteTools\.remote-worker-tools\}\/bin\/zx-wrapper/);
-  assert.match(bootstrapBlock, /--remote-worker-tools "\$\{remoteTools\.remote-worker-tools\}"/);
-  assert.doesNotMatch(bootstrapBlock, /zx-init\.mjs/);
-  assert.doesNotMatch(bootstrapBlock, /for bin in/);
-  assert.doesNotMatch(bootstrapBlock, /command -v/);
+  assert.match(app, /import \.\/packages\/remote-worker-bootstrap\.nix/);
+  assert.match(packages, /import \.\/remote-worker-bootstrap\.nix/);
+  assert.match(launcher, /exec \$\{remote-worker-tools\}\/bin\/zx-wrapper/);
+  assert.match(launcher, /--remote-worker-tools "\$\{remote-worker-tools\}"/);
+  assert.doesNotMatch(launcher, /zx-init\.mjs/);
+  assert.doesNotMatch(launcher, /for bin in/);
+  assert.doesNotMatch(launcher, /command -v/);
   assert.match(helper, /requiredWorkerBins/);
   assert.match(helper, /scheduler registration is disabled/);
 });

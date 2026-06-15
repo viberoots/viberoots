@@ -1,6 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import fs from "node:fs/promises";
 import path from "node:path";
+import { pathToFileURL } from "node:url";
 import { getFlagBool, getFlagStr } from "../lib/cli";
 
 const requiredWorkerBins = [
@@ -64,4 +65,15 @@ export async function main(): Promise<void> {
   console.log("remote-worker-bootstrap: no scheduler registration is implemented");
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) await main();
+async function isEntrypoint(): Promise<boolean> {
+  const argvPath = process.argv[1];
+  if (!argvPath) return false;
+  if (import.meta.url === pathToFileURL(argvPath).href) return true;
+  try {
+    return import.meta.url === pathToFileURL(await fs.realpath(argvPath)).href;
+  } catch {
+    return false;
+  }
+}
+
+if (await isEntrypoint()) await main();

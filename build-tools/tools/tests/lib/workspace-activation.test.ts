@@ -44,7 +44,7 @@ async function runInit(root: string, args: string[] = []) {
   return JSON.parse(String(stdout));
 }
 
-test("init-workspace creates local current symlink and workspace state dirs", async () => {
+test("init-workspace keeps current on workspace root before local tool extraction", async () => {
   const root = await workspace("vbr-activate-local");
   try {
     const flakeBefore = await fsp.readFile(path.join(root, "flake.nix"), "utf8");
@@ -53,11 +53,9 @@ test("init-workspace creates local current symlink and workspace state dirs", as
     const result = await runInit(root);
 
     assert.equal(result.workspaceRoot, root);
-    assert.equal(await readlink(root), "../viberoots");
-    assert.equal(
-      await fsp.realpath(path.join(root, ".viberoots/current")),
-      path.join(root, "viberoots"),
-    );
+    assert.equal(result.sourcePath, path.join(root, "viberoots"));
+    assert.equal(await readlink(root), "..");
+    assert.equal(await fsp.realpath(path.join(root, ".viberoots/current")), root);
     for (const rel of [".viberoots/workspace/providers", ".viberoots/workspace/buck"]) {
       assert.equal((await fsp.stat(path.join(root, rel))).isDirectory(), true);
     }
@@ -96,11 +94,8 @@ test("activateWorkspace tolerates concurrent current-link activation", async () 
       ),
     );
 
-    assert.equal(await readlink(root), "../viberoots");
-    assert.equal(
-      await fsp.realpath(path.join(root, ".viberoots/current")),
-      path.join(root, "viberoots"),
-    );
+    assert.equal(await readlink(root), "..");
+    assert.equal(await fsp.realpath(path.join(root, ".viberoots/current")), root);
   } finally {
     await fsp.rm(root, { recursive: true, force: true });
   }
@@ -153,7 +148,7 @@ test("shell-entry activation touches only ignored activation state", async () =>
 
     await activateWorkspace({ start: root, env: { WORKSPACE_ROOT: root }, shellEntry: true });
 
-    assert.equal(await readlink(root), "../viberoots");
+    assert.equal(await readlink(root), "..");
     assert.equal((await fsp.stat(path.join(root, ".viberoots/cache"))).isDirectory(), true);
     await assert.rejects(fsp.stat(path.join(root, ".viberoots/workspace/providers")));
     assert.equal(await fsp.readFile(path.join(root, "flake.nix"), "utf8"), flakeBefore);

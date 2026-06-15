@@ -7,6 +7,7 @@ const requiredFiles = [
   "build-tools/deployments/defs.bzl",
   "build-tools/tools/buck/export-graph.ts",
   "build-tools/tools/dev/zx-init.mjs",
+  "viberoots/flake.nix",
 ];
 const fastCopyOpts = { stdio: "pipe" as const, reject: false, nothrow: true };
 const darwinCloneFileScript = String.raw`

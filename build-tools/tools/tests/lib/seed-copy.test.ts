@@ -19,6 +19,7 @@ async function writeRequiredSeedFiles(root: string): Promise<void> {
     path.join("build-tools", "deployments", "defs.bzl"),
     path.join("build-tools", "tools", "buck", "export-graph.ts"),
     path.join("build-tools", "tools", "dev", "zx-init.mjs"),
+    path.join("viberoots", "flake.nix"),
   ];
   for (const rel of files) {
     const abs = path.join(root, rel);
@@ -72,6 +73,10 @@ test("copySeedStoreToTempRepo publishes a complete forced-CoW seed copy atomical
 
   assert.equal(await fsp.readFile(path.join(tmp, "flake.nix"), "utf8"), "flake.nix\n");
   assert.equal(
+    await fsp.readFile(path.join(tmp, "viberoots", "flake.nix"), "utf8"),
+    `${path.join("viberoots", "flake.nix")}\n`,
+  );
+  assert.equal(
     await fsp.readFile(path.join(tmp, "build-tools", "tools", "dev", "zx-init.mjs"), "utf8"),
     `${path.join("build-tools", "tools", "dev", "zx-init.mjs")}\n`,
   );
@@ -107,6 +112,10 @@ test("copySeedStoreToTempRepo can publish from a read-only seed root", async (t)
 
   await fsp.writeFile(path.join(tmp, "private-write.txt"), "ok\n", "utf8");
   assert.equal(await fsp.readFile(path.join(tmp, "flake.nix"), "utf8"), "flake.nix\n");
+  assert.equal(
+    await fsp.readFile(path.join(tmp, "viberoots", "flake.nix"), "utf8"),
+    `${path.join("viberoots", "flake.nix")}\n`,
+  );
   assert.ok((await fsp.stat(path.join(tmp, "docs"))).isDirectory());
   assert.equal(
     await fsp.readFile(path.join(tmp, "bulk", "dir-79", "file.txt"), "utf8"),

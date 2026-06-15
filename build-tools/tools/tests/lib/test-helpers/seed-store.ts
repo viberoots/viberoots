@@ -36,6 +36,15 @@ function wantsFilteredRsync(): boolean {
   );
 }
 
+function shouldOverlaySeedFile(rel: string): boolean {
+  return (
+    rel === "flake.nix" ||
+    rel === "flake.lock" ||
+    rel.startsWith("build-tools/") ||
+    rel.startsWith("viberoots/")
+  );
+}
+
 async function requireSeedPath(seedPath: string, seedKey: string): Promise<void> {
   const st = await fsp.stat(seedPath).catch(() => null);
   if (!st || !st.isDirectory()) {
@@ -63,7 +72,7 @@ async function listUntrackedFilesOncePerWorker(): Promise<string[]> {
         .split(/\r?\n/)
         .map((s) => s.trim())
         .filter(Boolean)
-        .filter((rel) => rel.startsWith("build-tools/"))
+        .filter(shouldOverlaySeedFile)
         .sort((a, b) => a.localeCompare(b));
     })();
   }
@@ -89,7 +98,7 @@ async function listTrackedChangedFilesOncePerWorker(): Promise<string[]> {
           return (renameSep >= 0 ? raw.slice(renameSep + 4) : raw).trim();
         })
         .filter(Boolean)
-        .filter((rel) => rel.startsWith("build-tools/"))
+        .filter(shouldOverlaySeedFile)
         .sort((a, b) => a.localeCompare(b));
       return Array.from(new Set(rels));
     })();

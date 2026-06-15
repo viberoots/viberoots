@@ -18,6 +18,7 @@ test("rsync: copies only specified roots when TEST_RSYNC_ROOTS=build-tools", asy
         }
       }
       const toolsPresent = await dirExists("build-tools");
+      const localViberootsPresent = await dirExists("viberoots");
       const docsPresent = await dirExists("docs");
       const goPresent = await dirExists("go");
       if (!toolsPresent) {
@@ -31,6 +32,12 @@ test("rsync: copies only specified roots when TEST_RSYNC_ROOTS=build-tools", asy
             docsPresent,
             goPresent,
           },
+        );
+        process.exit(2);
+      }
+      if (!localViberootsPresent) {
+        console.error(
+          "expected local viberoots flake input to be present with delegated root flake",
         );
         process.exit(2);
       }

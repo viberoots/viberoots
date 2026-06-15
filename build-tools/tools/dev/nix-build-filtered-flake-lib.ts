@@ -9,6 +9,7 @@ const SHARED_CPP_SNAPSHOT_ROOTS = [
   "third_party",
   "toolchains",
   "types",
+  "viberoots",
 ];
 
 const SHARED_CPP_SNAPSHOT_ROOT_FILES = [

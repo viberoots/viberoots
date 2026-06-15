@@ -15,6 +15,7 @@ const REQUIRED_STAGE_FILES = [
   path.join("build-tools", "tools", "buck", "export-graph.ts"),
   path.join("build-tools", "tools", "dev", "zx-init.mjs"),
   path.join("build-tools", "tools", "node", "gen-wasm-inline-module.ts"),
+  path.join("viberoots", "flake.nix"),
 ];
 
 export function seedStageRootDirForTest(): string {

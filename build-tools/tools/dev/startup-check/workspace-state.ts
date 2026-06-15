@@ -1,5 +1,6 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
+import { findExtractionBlockers, formatExtractionBlockers } from "../../lib/extraction-blockers";
 
 async function exists(p: string): Promise<boolean> {
   try {
@@ -33,6 +34,24 @@ async function requireLocalViberootsFlake(flakeText: string): Promise<void> {
   }
 }
 
+async function localSourceHasExtractedToolTree(): Promise<boolean> {
+  try {
+    const flakeText = await fsp.readFile("viberoots/flake.nix", "utf8");
+    if (
+      flakeText.includes("viberoots local dogfood flake") &&
+      flakeText.includes("import ./build-tools/tools/nix/flake/outputs.nix")
+    ) {
+      return false;
+    }
+  } catch {}
+  try {
+    const stat = await fsp.lstat("viberoots/build-tools");
+    return stat.isDirectory() && !stat.isSymbolicLink();
+  } catch {
+    return false;
+  }
+}
+
 async function requireLocalCurrentTarget(flakeText: string): Promise<void> {
   if (!flakeUsesLocalViberoots(flakeText)) return;
   try {
@@ -41,7 +60,9 @@ async function requireLocalCurrentTarget(flakeText: string): Promise<void> {
     if ((e as NodeJS.ErrnoException).code === "ENOENT") return;
     throw e;
   }
-  const expectedReal = await fsp.realpath("viberoots");
+  const expectedReal = (await localSourceHasExtractedToolTree())
+    ? await fsp.realpath("viberoots")
+    : await fsp.realpath(".");
   let currentReal = "";
   try {
     currentReal = await fsp.realpath(".viberoots/current");
@@ -97,4 +118,11 @@ export async function validateStartupWorkspaceState(): Promise<void> {
     );
   }
   await requireBuckconfigCells(buckconfig);
+  const blockers = findExtractionBlockers(process.cwd());
+  if (blockers.length === 0) return;
+  const message = `[startup-check] extraction old-layout blockers remain:\n${formatExtractionBlockers(blockers)}`;
+  if ((process.env.VIBEROOTS_STRICT_EXTRACTION_BLOCKERS || "").trim() === "1") {
+    throw new Error(message);
+  }
+  console.warn(message);
 }

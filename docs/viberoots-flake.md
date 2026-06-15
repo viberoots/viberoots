@@ -836,6 +836,11 @@ that reports:
 - in local source mode, whether `.viberoots/current` points at the live `viberoots/` checkout.
 
 The command also supports `viberoots status` as an alias and `--json` for CI or activation checks.
+Until PR-9 completes the physical extraction, status output should also report root old-layout
+surfaces as PR-9 blockers instead of treating them as supported compatibility. The blocker list
+includes root `build-tools/`, root `third_party/providers/`, root `prelude/`, root `toolchains/`,
+active `load("//build-tools...")` usage in workspace Buck files, and active
+`//third_party/providers` labels.
 
 ### Compatibility Policy
 

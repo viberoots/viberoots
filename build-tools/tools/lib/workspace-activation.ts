@@ -44,6 +44,25 @@ function chooseSource(workspaceRoot: string, opts: ActivationOptions): string {
   return workspaceRoot;
 }
 
+function localSourceHasExtractedToolTree(workspaceRoot: string, sourcePath: string): boolean {
+  try {
+    const flakeText = fs.readFileSync(path.join(sourcePath, "flake.nix"), "utf8");
+    if (
+      flakeText.includes("viberoots local dogfood flake") &&
+      flakeText.includes("import ./build-tools/tools/nix/flake/outputs.nix")
+    ) {
+      return false;
+    }
+  } catch {}
+  const buildToolsPath = path.join(sourcePath, "build-tools");
+  try {
+    const stat = fs.lstatSync(buildToolsPath);
+    return stat.isDirectory() && !stat.isSymbolicLink();
+  } catch {
+    return false;
+  }
+}
+
 function validateSource(workspaceRoot: string, sourcePath: string): void {
   if (sourcePath === workspaceRoot) return;
   requireFile(
@@ -102,7 +121,11 @@ async function replaceCurrentSymlink(currentPath: string, target: string): Promi
   }
 }
 
-async function rejectStaleLocalCurrent(currentPath: string, sourcePath: string): Promise<void> {
+async function rejectStaleLocalCurrent(
+  currentPath: string,
+  sourcePath: string,
+  workspaceRoot: string,
+): Promise<void> {
   try {
     const stat = await fsp.lstat(currentPath);
     if (!stat.isSymbolicLink()) throw new Error(`${currentPath} exists and is not a symlink`);
@@ -118,6 +141,7 @@ async function rejectStaleLocalCurrent(currentPath: string, sourcePath: string):
     const target = await fsp.readlink(currentPath);
     throw new Error(`${currentPath} points at ${target}; expected local viberoots ${sourceReal}`);
   }
+  if (currentReal === workspaceRoot) return;
   if (currentReal !== sourceReal) {
     throw new Error(
       `${currentPath} points at ${currentReal}; expected local viberoots ${sourceReal}`,
@@ -135,11 +159,13 @@ export async function activateWorkspace(opts: ActivationOptions = {}): Promise<A
 
   const viberootsDir = path.join(workspaceRoot, ".viberoots");
   const currentPath = path.join(workspaceRoot, VIBEROOTS_CURRENT_REL);
-  const currentTarget =
-    sourcePath === path.join(workspaceRoot, "viberoots")
-      ? "../viberoots"
-      : relativeLinkTarget(viberootsDir, sourcePath);
   const sourceIsLocalViberoots = sourcePath === path.join(workspaceRoot, "viberoots");
+  const currentTarget =
+    sourceIsLocalViberoots && !localSourceHasExtractedToolTree(workspaceRoot, sourcePath)
+      ? ".."
+      : sourceIsLocalViberoots
+        ? "../viberoots"
+        : relativeLinkTarget(viberootsDir, sourcePath);
   const workspaceDirs = opts.shellEntry
     ? [path.join(workspaceRoot, ".viberoots", "cache")]
     : [
@@ -151,7 +177,7 @@ export async function activateWorkspace(opts: ActivationOptions = {}): Promise<A
 
   await fsp.mkdir(viberootsDir, { recursive: true });
   for (const dir of workspaceDirs) await fsp.mkdir(dir, { recursive: true });
-  if (sourceIsLocalViberoots) await rejectStaleLocalCurrent(currentPath, sourcePath);
+  if (sourceIsLocalViberoots) await rejectStaleLocalCurrent(currentPath, sourcePath, workspaceRoot);
   await replaceCurrentSymlink(currentPath, currentTarget);
   validateBuckconfigCells(workspaceRoot);
 

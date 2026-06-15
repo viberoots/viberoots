@@ -5,18 +5,10 @@ let
     inherit pkgs zx-wrapper version releaseTag;
     viberootsSrc = viberootsRoot;
   };
-  bootstrap = pkgs.writeShellScriptBin "remote-worker-bootstrap" ''
-    set -euo pipefail
-    helper="${viberootsRoot}/build-tools/tools/remote-exec/remote-worker-bootstrap.ts"
-    if [ ! -f "$helper" ]; then
-      echo "remote-worker-bootstrap: viberoots source is missing $helper" >&2
-      exit 1
-    fi
-    exec ${remoteTools.remote-worker-tools}/bin/zx-wrapper \
-      "$helper" \
-      --remote-worker-tools "${remoteTools.remote-worker-tools}" \
-      "$@"
-  '';
+  bootstrap = import ./packages/remote-worker-bootstrap.nix {
+    inherit pkgs viberootsRoot;
+    inherit (remoteTools) remote-worker-tools;
+  };
 in
 {
   gomod2nix = {

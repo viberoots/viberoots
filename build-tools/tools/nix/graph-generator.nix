@@ -106,7 +106,7 @@ let
         else ./.;
   repoStoreRoot = if buckTestSrcEnv != ""
     then appsLibsSrc
-    else ./../../..;
+    else appsLibsSrc;
   # Load language templates from the chosen manifest base (temp repo when set)
   T = import (manifestBase + "/lang-templates.nix") { inherit pkgs uv2nixLib; };
   M = if builtins.pathExists ./mapping.nix then (

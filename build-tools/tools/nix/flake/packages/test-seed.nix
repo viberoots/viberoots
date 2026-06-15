@@ -47,7 +47,7 @@ let
   # (which produces an empty snap — harmless when copied into the output tree).
   # Note: `prelude` is intentionally omitted — it is a symlink and is handled via
   # rootFilesSnap above (see comment there for why mkSubSnap cannot handle symlinks).
-  subDirs = [".husky" "build-tools" "cpp" "go" "lang" "node" "patches" "python" "tools" "third_party" "toolchains" "types"];
+  subDirs = [".husky" "build-tools" "cpp" "go" "lang" "node" "patches" "python" "tools" "third_party" "toolchains" "types" "viberoots"];
 
   mkSubSnap = d:
     let

@@ -3,6 +3,7 @@ import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { getFlagBool, getFlagStr, getPositionals } from "../lib/cli";
+import { findExtractionBlockers } from "../lib/extraction-blockers";
 import { resolveWorkspaceRootsSync } from "../lib/repo";
 import { activateWorkspace } from "../lib/workspace-activation";
 
@@ -74,6 +75,7 @@ function buildVersionStatus() {
     revisionSource: resolvedRevision.source,
     dirtyState: dirtyState(roots.viberootsRoot, roots.sourceMode),
     currentPointsToLiveCheckout: roots.currentPointsToLiveCheckout,
+    extractionBlockers: findExtractionBlockers(roots.workspaceRoot),
   };
 }
 
@@ -90,6 +92,12 @@ function printText(status: VersionStatus): void {
   console.log(
     `local current:  ${status.currentPointsToLiveCheckout ? "live checkout" : "not live checkout"}`,
   );
+  if (status.extractionBlockers.length > 0) {
+    console.log("extraction blockers:");
+    for (const blocker of status.extractionBlockers) {
+      console.log(`  - ${blocker.kind}: ${blocker.path} - ${blocker.detail}`);
+    }
+  }
 }
 
 async function initWorkspace(): Promise<void> {

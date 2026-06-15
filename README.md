@@ -135,10 +135,22 @@ b        # build the default repo scope
 v        # run impacted tests and verification checks
 ```
 
-Shell entry also prepares ignored viberoots workspace state. In this in-repo dogfood checkout,
-`.viberoots/current` points at the live repository root so Buck cells and Nix-backed commands see
-local build-tool edits immediately. Generated provider and Buck graph state stays under
-`.viberoots/workspace/`.
+Shell entry also prepares ignored viberoots workspace state. In this pre-extraction dogfood
+checkout, the root flake consumes `path:./viberoots` while `.viberoots/current` points at the live
+repository root so Buck cells and Nix-backed commands see local build-tool edits immediately. After
+the physical extraction, activation points `.viberoots/current` at the local `viberoots/` source.
+Generated provider and Buck graph state stays under `.viberoots/workspace/`.
+
+Check the active source mode and split-readiness diagnostics with:
+
+```bash
+viberoots status
+```
+
+During the flake split, the status output may list PR-9 blockers such as root `build-tools/`,
+`third_party/providers/`, `prelude/`, or `toolchains/`. Those diagnostics mean the checkout is still
+in the temporary pre-extraction shape; PR-9 owns moving or removing those root compatibility
+surfaces.
 
 The usual local check is:
 

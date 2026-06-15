@@ -74,6 +74,17 @@ await runInTemp("startup-check-viberoots-activation", async (tmp) => {
   await fs.symlink("../stale-viberoots", path.join(tmp, ".viberoots/current"));
   assertFailed(await runStartup(tmp), /\.viberoots\/current points at/);
 
+  await fs.remove(path.join(tmp, ".viberoots/current"));
+  await fs.symlink("..", path.join(tmp, ".viberoots/current"));
+  let res = await runStartup(tmp);
+  if (res.exitCode !== 0) throw new Error(`expected pre-extraction current to pass\n${res.stderr}`);
+
+  await fs.ensureDir(path.join(tmp, "viberoots/build-tools"));
+  await fs.remove(path.join(tmp, ".viberoots/current"));
+  await fs.symlink("../viberoots", path.join(tmp, ".viberoots/current"));
+  res = await runStartup(tmp);
+  if (res.exitCode !== 0) throw new Error(`expected extracted current to pass\n${res.stderr}`);
+
   await writeBuckState(tmp, ["viberoots = ./.viberoots/current"]);
   await fs.writeFile(path.join(tmp, "flake.nix"), "{ outputs = _: {}; }\n", "utf8");
   await fs.remove(path.join(tmp, ".viberoots/current"));

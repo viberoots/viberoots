@@ -58,8 +58,9 @@ test("selected cpp filtered-flake snapshots follow the target package closure", 
   assert.ok(
     snapshotRelPaths.includes("build-tools") &&
       snapshotRelPaths.includes("prelude") &&
-      snapshotRelPaths.includes("toolchains"),
-    "expected selected cpp snapshot to retain shared flake infrastructure roots",
+      snapshotRelPaths.includes("toolchains") &&
+      snapshotRelPaths.includes("viberoots"),
+    "expected selected cpp snapshot to retain shared flake and local viberoots roots",
   );
   assert.ok(
     snapshotRelPaths.includes("projects/apps/demo") &&
@@ -95,6 +96,7 @@ test("selected cpp snapshot rsync sources keep flake files at the snapshot root"
       "third_party/providers",
       "toolchains",
       "types",
+      "viberoots/flake.nix",
       "projects/libs/pleomino-solver-wasm",
     ]) {
       const abs = path.join(root, rel);
@@ -115,6 +117,7 @@ test("selected cpp snapshot rsync sources keep flake files at the snapshot root"
       "prelude",
       "third_party",
       "toolchains",
+      "viberoots",
       "projects/libs/pleomino-solver-wasm",
     ]);
     await $({ cwd: root, stdio: "pipe" })`rsync -a --delete --relative ${sources} ${out}/`;
@@ -123,6 +126,10 @@ test("selected cpp snapshot rsync sources keep flake files at the snapshot root"
     assert.equal(await fsp.readFile(path.join(out, "flake.lock"), "utf8"), "flake.lock\n");
     await fsp.access(path.join(out, "projects", "libs", "pleomino-solver-wasm"));
     await fsp.access(path.join(out, "build-tools"));
+    assert.equal(
+      await fsp.readFile(path.join(out, "viberoots", "flake.nix"), "utf8"),
+      "viberoots/flake.nix\n",
+    );
     await assert.rejects(fsp.access(path.join(out, "Users")));
   } finally {
     await fsp.rm(root, { recursive: true, force: true });
