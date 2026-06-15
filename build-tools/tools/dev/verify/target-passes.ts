@@ -1,6 +1,6 @@
 import { spawnSync } from "node:child_process";
 import process from "node:process";
-import { normalizeTargetLabel } from "../../lib/labels";
+import { dropConfigSuffix, normalizeTargetLabel } from "../../lib/labels";
 import { resolveToolPathSync } from "../../lib/tool-paths";
 import { buckCqueryArgsForExecutionPolicy, targetPlatformArgsForPolicy } from "./remote-policy";
 import { assertVerifyRemoteTargetsAllowed } from "./remote-target-policy";
@@ -46,6 +46,12 @@ type CqueryTargetInfo = {
 
 function cqueryLiteral(target: string): string {
   return JSON.stringify(String(target || ""));
+}
+
+export function normalizeVerifyTargetLabel(label: string): string {
+  const withoutConfig = dropConfigSuffix(label);
+  if (withoutConfig.startsWith("root//")) return `//${withoutConfig.slice("root//".length)}`;
+  return withoutConfig;
 }
 
 export function buildCqueryQuery(targets: readonly string[]): string {
@@ -127,7 +133,7 @@ function parseVerifyTargetLabelsJson(stdout: string): Map<string, readonly strin
   const parsed = JSON.parse(stdout) as Record<string, CqueryTargetInfo>;
   const out = new Map<string, readonly string[]>();
   for (const [label, attrs] of Object.entries(parsed || {})) {
-    out.set(normalizeTargetLabel(label), Array.isArray(attrs?.labels) ? attrs.labels : []);
+    out.set(normalizeVerifyTargetLabel(label), Array.isArray(attrs?.labels) ? attrs.labels : []);
   }
   return out;
 }
@@ -192,7 +198,7 @@ export function loadVerifyTargetLabels(opts: {
       executionPolicy: opts.executionPolicy,
     });
     for (const target of explicitTargets) {
-      const normalizedTarget = normalizeTargetLabel(target);
+      const normalizedTarget = normalizeVerifyTargetLabel(target);
       resolved.set(normalizedTarget, labelsByTarget.get(normalizedTarget) ?? []);
     }
   }

@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
   buildCqueryQuery,
+  normalizeVerifyTargetLabel,
   planVerifyTargetPasses,
   VERIFY_BROAD_RESOURCE_LIMITED_TARGET_MIN,
   VERIFY_BROAD_RESOURCE_LIMITED_THREADS,
@@ -22,6 +23,20 @@ test("verify target cquery quotes explicit labels with operator characters", () 
     '"//:providers_registry_build_handlers_node+python_detected"',
   );
   assert.equal(buildCqueryQuery(["//:one", "//:two+three"]), 'set("//:one" "//:two+three")');
+});
+
+test("verify target labels preserve non-root Buck cells", () => {
+  assert.equal(
+    normalizeVerifyTargetLabel(
+      "viberoots//:dev_startup_check_extraction_blockers (root//:platform)",
+    ),
+    "viberoots//:dev_startup_check_extraction_blockers",
+  );
+  assert.equal(
+    normalizeVerifyTargetLabel("root//projects/apps/service:test (root//:platform)"),
+    "//projects/apps/service:test",
+  );
+  assert.equal(normalizeVerifyTargetLabel("//:root_test (root//:platform)"), "//:root_test");
 });
 
 test("verify target passes batch isolated targets ahead of the shared batch", () => {
