@@ -26,6 +26,7 @@ import {
 import { externalPnpmStateDirs } from "../../../lib/pnpm-state-paths";
 import { stableBuckIsolation } from "../../../lib/buck-command-env";
 import { resolveToolPathSync } from "../../../lib/tool-paths";
+import { pathExists } from "../../../lib/repo";
 
 const LOCAL_FIXTURE_SERVICE_ENV = "VBR_DEPLOY_LOCAL_FIXTURE_SERVICE";
 
@@ -658,7 +659,20 @@ export async function runInTemp<T>(
     exportEnv.SSL_CERT_DIR = exportEnv.NIX_SSL_CERT_DIR;
   }
   exportEnv.DIRENV_LOG_FORMAT = "";
-  exportEnv.ZX_INIT = zxInitPathFromWorkspace();
+  const tempZxInit = path.join(tmp, "build-tools", "tools", "dev", "zx-init.mjs");
+  const tempViberootsZxInit = path.join(
+    tmp,
+    "viberoots",
+    "build-tools",
+    "tools",
+    "dev",
+    "zx-init.mjs",
+  );
+  exportEnv.ZX_INIT = (await pathExists(tempZxInit))
+    ? tempZxInit
+    : (await pathExists(tempViberootsZxInit))
+      ? tempViberootsZxInit
+      : zxInitPathFromWorkspace();
   prependPath(exportEnv, buck2ShimDir);
   await prependTempRepoBin(exportEnv, tmp);
   const wantsUnifiedPnpmStore =
