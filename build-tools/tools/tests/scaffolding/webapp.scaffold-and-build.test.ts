@@ -8,6 +8,7 @@ import {
   DEFAULT_TEMP_REPO_GLUE_STAGE_PATHS,
   stageTempRepoPaths,
 } from "../lib/test-helpers/git-stage";
+import { viberootsDevTool } from "./lib/viberoots-tools";
 
 const TEST_TIMEOUT_MS =
   Number(process.env.TEST_NIX_TIMEOUT_SECS || process.env.VERIFY_TIMEOUT_SECS || "1200") * 1000;
@@ -60,7 +61,7 @@ test("webapp: scaffold, glue, build dist via Buck", { timeout: TEST_TIMEOUT_MS }
         cwd: tmp,
         stdio: "inherit",
         env: { ...envWithPrefetch },
-      })`zx-wrapper build-tools/tools/dev/update-pnpm-hash.ts --lockfile ${lockfile}`;
+      })`zx-wrapper ${viberootsDevTool("update-pnpm-hash.ts")} --lockfile ${lockfile}`;
       const nixOut = await (async () => {
         const mj = String(process.env.NIX_MAX_JOBS || "0");
         const cr = String(process.env.NIX_CORES || "0");

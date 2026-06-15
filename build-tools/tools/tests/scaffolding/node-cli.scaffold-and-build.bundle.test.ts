@@ -2,6 +2,7 @@
 import path from "node:path";
 import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
+import { viberootsDevTool } from "./lib/viberoots-tools";
 
 // Ensure dev env tooling (yaml parser, zx deps) is exported in temp repos
 process.env.TEST_NEED_DEV_ENV = "1";
@@ -27,7 +28,7 @@ test("node cli: build bundled single-file and run help", async () => {
       await $({
         cwd: tmp,
         stdio: "inherit",
-      })`NIX_PNPM_ALLOW_GENERATE=1 node build-tools/tools/dev/update-pnpm-hash.ts --lockfile projects/apps/demo/pnpm-lock.yaml`;
+      })`NIX_PNPM_ALLOW_GENERATE=1 node ${viberootsDevTool("update-pnpm-hash.ts")} --lockfile projects/apps/demo/pnpm-lock.yaml`;
       await $({
         cwd: tmp,
         stdio: "inherit",

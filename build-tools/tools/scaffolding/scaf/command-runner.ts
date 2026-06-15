@@ -7,7 +7,13 @@ function repoRoot(): string {
   return path.resolve(process.env.WORKSPACE_ROOT || process.env.BUCK_TEST_SRC || process.cwd());
 }
 
-function zxInitPath(root: string): string {
+function sourceRoot(): string {
+  return path.resolve(
+    process.env.VIBEROOTS_SOURCE_ROOT || process.env.VIBEROOTS_ROOT || repoRoot(),
+  );
+}
+
+function zxInitPath(root = sourceRoot()): string {
   return path.join(root, "build-tools", "tools", "dev", "zx-init.mjs");
 }
 
@@ -16,7 +22,7 @@ export async function runScafNodeTool(
   args: string[] = [],
   cwd = repoRoot(),
 ): Promise<void> {
-  const root = repoRoot();
+  const root = sourceRoot();
   await runNodeWithZx({
     cwd,
     script: path.join(root, scriptRelativePath),

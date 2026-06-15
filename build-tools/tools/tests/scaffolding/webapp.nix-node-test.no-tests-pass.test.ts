@@ -3,6 +3,7 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
+import { viberootsDevTool } from "./lib/viberoots-tools";
 
 // Ensure dev env tooling when spawning Buck/Nix inside temp repos
 process.env.TEST_NEED_DEV_ENV = "1";
@@ -38,7 +39,7 @@ test("node webapp: nix_node_test target passes when no tests present", async () 
     await $({
       stdio: "inherit",
       env: { ...process.env, NIX_PNPM_ALLOW_GENERATE: "1" },
-    })`zx-wrapper build-tools/tools/dev/update-pnpm-hash.ts --lockfile ${path.join(importer, "pnpm-lock.yaml")}`;
+    })`zx-wrapper ${viberootsDevTool("update-pnpm-hash.ts")} --lockfile ${path.join(importer, "pnpm-lock.yaml")}`;
 
     // Glue and provider mapping (export graph → providers → auto_map)
     await $`node build-tools/tools/buck/export-graph.ts --out .viberoots/workspace/buck/graph.json`;

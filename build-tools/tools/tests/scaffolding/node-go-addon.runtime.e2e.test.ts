@@ -3,6 +3,7 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
+import { viberootsTool } from "./lib/viberoots-tools";
 
 // Ensure dev env tooling when invoking Buck/Nix inside temp repos
 process.env.TEST_NEED_DEV_ENV = "1";
@@ -18,7 +19,7 @@ test("node go-addon: scaffold, build addon via Buck planner, run and observe Go-
     // Export Buck graph for the temp repo (exercise exporter path; not strictly required to build)
     await $({
       env: { ...process.env, BUCK_QUERY_ROOTS: "projects/apps,projects/libs,go,cpp,third_party" },
-    })`node --experimental-strip-types --import ./build-tools/tools/dev/zx-init.mjs ./build-tools/tools/buck/export-graph.ts --out .viberoots/workspace/buck/graph.json`;
+    })`node --experimental-strip-types --import ${viberootsTool("build-tools/tools/dev/zx-init.mjs")} ${viberootsTool("build-tools/tools/buck/export-graph.ts")} --out .viberoots/workspace/buck/graph.json`;
 
     // Build via Buck2 to exercise macro -> planner -> Nix through the normal user path
     const res = await $({

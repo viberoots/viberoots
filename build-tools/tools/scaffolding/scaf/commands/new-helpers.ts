@@ -2,7 +2,7 @@ import type { Dirent } from "node:fs";
 
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import { runScafCommand } from "../command-runner";
+import { runScafCommand, runScafNodeTool } from "../command-runner";
 
 const FORMAT_EXTENSIONS = new Set([
   ".ts",
@@ -127,9 +127,9 @@ export async function refreshImporterStoreHash(repoRoot: string, importer: strin
     .then((s) => s.isFile())
     .catch(() => false);
   if (!hasLockfile) return;
-  await runScafCommand(
-    "zx-wrapper",
-    ["build-tools/tools/dev/update-pnpm-hash.ts", "--lockfile", lockfile],
+  await runScafNodeTool(
+    "build-tools/tools/dev/update-pnpm-hash.ts",
+    ["--lockfile", lockfile],
     repoRoot,
   );
 }

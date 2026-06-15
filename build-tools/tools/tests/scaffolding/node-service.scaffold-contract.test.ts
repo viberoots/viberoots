@@ -4,6 +4,7 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
+import { viberootsDevTool } from "./lib/viberoots-tools";
 
 process.env.TEST_NEED_DEV_ENV = "1";
 process.env.NIX_PNPM_ALLOW_GENERATE = "1";
@@ -50,7 +51,7 @@ test(
       await $`bash --noprofile --norc -c 'set -euo pipefail; git -C ${tmp} config user.email test@example.com; git -C ${tmp} config user.name test; git -C ${tmp} add -A; git -C ${tmp} commit -m scaffold'`;
       await $({
         stdio: "inherit",
-      })`zx-wrapper build-tools/tools/dev/update-pnpm-hash.ts --lockfile ${importer}/pnpm-lock.yaml`;
+      })`zx-wrapper ${viberootsDevTool("update-pnpm-hash.ts")} --lockfile ${importer}/pnpm-lock.yaml`;
 
       const buildAttr = async (name: string) => {
         const cmd = `set -euo pipefail; timeout ${timeoutSecs}s nix build "${tmp}#${name}.${attr}" --impure --no-link --accept-flake-config --builders "" --print-out-paths`;
