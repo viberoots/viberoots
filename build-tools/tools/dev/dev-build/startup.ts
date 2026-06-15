@@ -60,8 +60,27 @@ async function resolveRootNodeModulesOut(root: string): Promise<string> {
   return "";
 }
 
+async function resolveStartupCheckEntrypoints(
+  root: string,
+): Promise<{ startupCheck: string; zxInit: string }> {
+  const localBase = "build-tools/tools/dev";
+  try {
+    await fsp.access(path.join(root, localBase, "startup-check.ts"));
+    return {
+      startupCheck: path.join(root, localBase, "startup-check.ts"),
+      zxInit: path.join(root, localBase, "zx-init.mjs"),
+    };
+  } catch {}
+  const submoduleBase = ".viberoots/current/build-tools/tools/dev";
+  return {
+    startupCheck: path.join(root, submoduleBase, "startup-check.ts"),
+    zxInit: path.join(root, submoduleBase, "zx-init.mjs"),
+  };
+}
+
 export async function runStartupCheck(root: string): Promise<void> {
   const rootNmOut = await resolveRootNodeModulesOut(root);
+  const { startupCheck, zxInit } = await resolveStartupCheckEntrypoints(root);
   const envStartup = {
     ...process.env,
     ...(rootNmOut
@@ -76,5 +95,5 @@ export async function runStartupCheck(root: string): Promise<void> {
     stdio: "inherit",
     cwd: root,
     env: envStartup,
-  })`zx-wrapper build-tools/tools/dev/startup-check.ts`;
+  })`node --experimental-strip-types --disable-warning=ExperimentalWarning --import ${zxInit} ${startupCheck}`;
 }
