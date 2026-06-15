@@ -53,6 +53,20 @@ function dirtyState(root: string, sourceMode: string): string {
   return status ? "dirty" : "clean";
 }
 
+function gitlinkRevision(workspaceRoot: string): string {
+  const entry = git(["ls-files", "-s", "viberoots"], workspaceRoot);
+  return entry.match(/^160000\s+([0-9a-f]{40})\s+/)?.[1] || "";
+}
+
+function submoduleState(workspaceRoot: string, viberootsRoot: string): string {
+  const expected = gitlinkRevision(workspaceRoot);
+  if (!expected) return "not-gitlink";
+  const actual = checkedOutRevision(viberootsRoot);
+  if (actual === "unknown") return "uninitialized";
+  if (actual !== expected) return "gitlink-mismatch";
+  return dirtyState(viberootsRoot, "local") === "dirty" ? "dirty" : "clean";
+}
+
 function currentDisplay(status: VersionStatus): string {
   if (status.currentStatus === "missing") return `${status.viberootsCurrent} (missing)`;
   if (status.viberootsCurrent === status.viberootsRoot) return status.viberootsCurrent;
@@ -62,6 +76,7 @@ function currentDisplay(status: VersionStatus): string {
 function buildVersionStatus() {
   const roots = resolveWorkspaceRootsSync();
   const resolvedRevision = revision(roots.viberootsRoot, roots.sourceMode, roots.workspaceRoot);
+  const expectedRevision = gitlinkRevision(roots.workspaceRoot);
   return {
     sourceMode: roots.sourceMode,
     declaredVersion: process.env.VIBEROOTS_VERSION || "unknown",
@@ -73,6 +88,11 @@ function buildVersionStatus() {
     currentStatus: roots.currentStatus,
     revision: resolvedRevision.value,
     revisionSource: resolvedRevision.source,
+    expectedGitlinkRevision: expectedRevision || "unknown",
+    submoduleState:
+      roots.sourceMode === "local"
+        ? submoduleState(roots.workspaceRoot, roots.viberootsRoot)
+        : "not-applicable",
     dirtyState: dirtyState(roots.viberootsRoot, roots.sourceMode),
     currentPointsToLiveCheckout: roots.currentPointsToLiveCheckout,
     extractionBlockers: findExtractionBlockers(roots.workspaceRoot),
@@ -88,6 +108,8 @@ function printText(status: VersionStatus): void {
   console.log(`version:        ${status.declaredVersion}`);
   console.log(`revision:       ${status.revision}`);
   console.log(`revision source: ${status.revisionSource}`);
+  console.log(`gitlink:        ${status.expectedGitlinkRevision}`);
+  console.log(`submodule:      ${status.submoduleState}`);
   console.log(`dirty state:    ${status.dirtyState}`);
   console.log(
     `local current:  ${status.currentPointsToLiveCheckout ? "live checkout" : "not live checkout"}`,

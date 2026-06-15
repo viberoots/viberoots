@@ -1,6 +1,10 @@
 import * as fsp from "node:fs/promises";
+import { execFile } from "node:child_process";
 import path from "node:path";
+import { promisify } from "node:util";
 import { findExtractionBlockers, formatExtractionBlockers } from "../../lib/extraction-blockers";
+
+const execFileAsync = promisify(execFile);
 
 async function exists(p: string): Promise<boolean> {
   try {
@@ -23,6 +27,15 @@ function flakeUsesLocalViberoots(text: string): boolean {
   return /viberoots\.url\s*=\s*"path:\.\/viberoots"/.test(text);
 }
 
+async function git(args: string[], cwd = "."): Promise<string> {
+  try {
+    const { stdout } = await execFileAsync("git", args, { cwd });
+    return String(stdout || "").trim();
+  } catch {
+    return "";
+  }
+}
+
 async function requireBuckroot(): Promise<void> {
   if (!(await exists(".buckroot"))) throw new Error("[startup-check] .buckroot not found");
 }
@@ -30,26 +43,31 @@ async function requireBuckroot(): Promise<void> {
 async function requireLocalViberootsFlake(flakeText: string): Promise<void> {
   if (!flakeUsesLocalViberoots(flakeText)) return;
   if (!(await exists("viberoots/flake.nix"))) {
-    throw new Error("[startup-check] local viberoots source is missing viberoots/flake.nix");
+    throw new Error(
+      "[startup-check] viberoots submodule is missing or uninitialized; run `git submodule update --init viberoots`",
+    );
   }
 }
 
-async function localSourceHasExtractedToolTree(): Promise<boolean> {
+async function requireLocalFlakeLock(flakeText: string): Promise<void> {
+  if (!flakeUsesLocalViberoots(flakeText)) return;
   try {
-    const flakeText = await fsp.readFile("viberoots/flake.nix", "utf8");
+    const lock = JSON.parse(await fsp.readFile("flake.lock", "utf8"));
+    const node = lock?.nodes?.viberoots || lock?.nodes?.viberootsInput;
+    const locked = node?.locked || {};
+    const original = node?.original || {};
     if (
-      flakeText.includes("viberoots local dogfood flake") &&
-      flakeText.includes("import ./build-tools/tools/nix/flake/outputs.nix")
+      locked.type === "path" &&
+      locked.path === "./viberoots" &&
+      original.type === "path" &&
+      original.path === "./viberoots"
     ) {
-      return false;
+      return;
     }
-  } catch {}
-  try {
-    const stat = await fsp.lstat("viberoots/build-tools");
-    return stat.isDirectory() && !stat.isSymbolicLink();
   } catch {
-    return false;
+    throw new Error("[startup-check] root flake.lock is missing or invalid");
   }
+  throw new Error("[startup-check] root flake.lock is not aligned with path:./viberoots");
 }
 
 async function requireLocalCurrentTarget(flakeText: string): Promise<void> {
@@ -60,9 +78,7 @@ async function requireLocalCurrentTarget(flakeText: string): Promise<void> {
     if ((e as NodeJS.ErrnoException).code === "ENOENT") return;
     throw e;
   }
-  const expectedReal = (await localSourceHasExtractedToolTree())
-    ? await fsp.realpath("viberoots")
-    : await fsp.realpath(".");
+  const expectedReal = await fsp.realpath("viberoots");
   let currentReal = "";
   try {
     currentReal = await fsp.realpath(".viberoots/current");
@@ -79,6 +95,35 @@ async function requireLocalCurrentTarget(flakeText: string): Promise<void> {
   }
 }
 
+async function expectedGitlinkRevision(): Promise<string> {
+  const entry = await git(["ls-files", "-s", "viberoots"]);
+  const match = entry.match(/^160000\s+([0-9a-f]{40})\s+/);
+  return match?.[1] || "";
+}
+
+async function requireSubmoduleGitState(flakeText: string): Promise<void> {
+  if (!flakeUsesLocalViberoots(flakeText)) return;
+  const expected = await expectedGitlinkRevision();
+  if (!expected) {
+    throw new Error("[startup-check] viberoots is not recorded as a git submodule gitlink");
+  }
+  const actual = await git(["rev-parse", "HEAD"], "viberoots");
+  if (!actual) {
+    throw new Error(
+      "[startup-check] viberoots submodule is uninitialized; run `git submodule update --init viberoots`",
+    );
+  }
+  if (actual !== expected) {
+    throw new Error(
+      `[startup-check] viberoots submodule revision ${actual} does not match parent gitlink ${expected}`,
+    );
+  }
+  const dirty = await git(["status", "--porcelain=v1"], "viberoots");
+  if (dirty) {
+    throw new Error("[startup-check] viberoots submodule has uncommitted changes");
+  }
+}
+
 async function requireBuckconfigCells(buckconfig: string): Promise<void> {
   const values = buckconfig
     .split(/\r?\n/)
@@ -91,6 +136,16 @@ async function requireBuckconfigCells(buckconfig: string): Promise<void> {
       throw new Error(`[startup-check] .buckconfig references missing cell path: ${value}`);
     }
   }
+}
+
+async function requirePreludeEntrypoint(flakeText: string): Promise<void> {
+  const rel = flakeUsesLocalViberoots(flakeText)
+    ? ".viberoots/current/prelude/prelude.bzl"
+    : "prelude/prelude.bzl";
+  if (await exists(rel)) return;
+  throw new Error(
+    `[startup-check] invalid Buck prelude: ${rel} is missing. Re-enter the dev shell or run \`viberoots init-workspace\`.`,
+  );
 }
 
 export async function validateStartupWorkspaceState(): Promise<void> {
@@ -112,12 +167,10 @@ export async function validateStartupWorkspaceState(): Promise<void> {
       "[startup-check] invalid .buckconfig: missing prelude mapping in [repositories] or [cells]. Run 'nix develop' to provision or fix the mapping.",
     );
   }
-  if (!(await exists("prelude/prelude.bzl"))) {
-    throw new Error(
-      "[startup-check] invalid Buck prelude: prelude/prelude.bzl is missing. Re-enter the dev shell or run a repo wrapper so the prelude symlink can be repaired.",
-    );
-  }
+  await requirePreludeEntrypoint(flakeText);
   await requireBuckconfigCells(buckconfig);
+  await requireLocalFlakeLock(flakeText);
+  await requireSubmoduleGitState(flakeText);
   const blockers = findExtractionBlockers(process.cwd());
   if (blockers.length === 0) return;
   const message = `[startup-check] extraction old-layout blockers remain:\n${formatExtractionBlockers(blockers)}`;
