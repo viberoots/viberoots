@@ -3,7 +3,6 @@ import { execFileSync } from "node:child_process";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { defineConfig, type Plugin, type ViteDevServer } from "vite";
-import { parseWasmModuleManifest } from "../../../build-tools/tools/scaffolding/webapp-module-manifests.ts";
 
 type PackageJson = {
   dependencies?: Record<string, string>;
@@ -16,7 +15,6 @@ const appRoot = fileURLToPath(new URL(".", import.meta.url));
 const workspaceRoot = path.resolve(appRoot, "../../..");
 const viberootsRoot = process.env.VIBEROOTS_SOURCE_ROOT || process.env.VIBEROOTS_ROOT || workspaceRoot;
 const viberootsTool = (name: string) => path.join(viberootsRoot, "build-tools", "tools", "dev", name);
-const workspaceRoot = path.resolve(appRoot, "../../..");
 
 function readPackageJson(pkgPath: string): PackageJson {
   try {
@@ -90,13 +88,12 @@ function workspaceDependencyWatchPlugin(): Plugin {
 function readStaticPwaExtraUrls(): string[] {
   const manifestPath = path.join(appRoot, "src", "wasm-modules.manifest.json");
   try {
-    const parsed = parseWasmModuleManifest(
-      JSON.parse(fsp.readFileSync(manifestPath, "utf8")) as unknown,
-      manifestPath,
-    );
+    const parsed = JSON.parse(fsp.readFileSync(manifestPath, "utf8")) as {
+      modules?: Array<{ runtimeDestinations?: { client?: unknown } }>;
+    };
     return [...new Set(
-      parsed.modules
-        .map((entry) => String(entry.runtimeDestinations.client || "").trim())
+      (Array.isArray(parsed.modules) ? parsed.modules : [])
+        .map((entry) => String(entry.runtimeDestinations?.client || "").trim())
         .map((dest) => `/${dest.replace(/^\/+/, "")}`)
         .filter((dest) => dest !== "/"),
     )].sort();

@@ -3,6 +3,7 @@ import fs from "node:fs";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { runNodeWithZx } from "../../lib/node-run";
+import { resolveWorkspaceRootsSync } from "../../lib/repo";
 import { runGlue } from "../glue-run";
 import {
   DEFAULT_GRAPH_PATH,
@@ -28,9 +29,10 @@ async function ensureProviderIndexArtifacts(): Promise<void> {
   };
   if (!(await hasValidIndex())) {
     try {
+      const roots = resolveWorkspaceRootsSync();
       await runNodeWithZx({
-        zxInitPath: path.resolve("build-tools/tools/dev/zx-init.mjs"),
-        script: path.resolve("build-tools/tools/buck/gen-provider-index.ts"),
+        zxInitPath: path.join(roots.viberootsRoot, "build-tools/tools/dev/zx-init.mjs"),
+        script: path.join(roots.viberootsRoot, "build-tools/tools/buck/gen-provider-index.ts"),
       });
     } catch {}
   }
@@ -190,9 +192,10 @@ export async function autoFixGlue() {
   // Ensure gomod2nix.toml is generated before glue; ignore errors in local mode
   if (await shouldRunInstallDeps()) {
     try {
+      const roots = resolveWorkspaceRootsSync();
       await runNodeWithZx({
-        zxInitPath: path.resolve("build-tools/tools/dev/zx-init.mjs"),
-        script: path.resolve("build-tools/tools/dev/install-deps.ts"),
+        zxInitPath: path.join(roots.viberootsRoot, "build-tools/tools/dev/zx-init.mjs"),
+        script: path.join(roots.viberootsRoot, "build-tools/tools/dev/install-deps.ts"),
         args: ["--glue-only"],
       });
     } catch {}

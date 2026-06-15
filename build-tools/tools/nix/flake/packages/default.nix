@@ -36,7 +36,7 @@ let
   };
 
   nodeWebapp = import ./node-webapp.nix {
-    inherit pkgs filterRepo repoSnapshot repoRoot zx-wrapper;
+    inherit pkgs filterRepo repoSnapshot repoRoot viberootsRoot zx-wrapper;
     nodeMods = resolvedNodeMods;
     importerDirs = importers.importerDirs;
   };

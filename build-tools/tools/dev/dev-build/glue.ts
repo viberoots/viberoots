@@ -4,7 +4,7 @@ import path from "node:path";
 import { DEFAULT_GRAPH_PATH } from "../../lib/graph-const";
 import { readCompositeGraph } from "../../lib/graph-view";
 import { runGomod2nixGenerate, runGomod2nixScanAll } from "../install/gomod2nix";
-import { nodeBin, zxNodeBase } from "./paths";
+import { buildToolPath, nodeBin, zxNodeBase } from "./paths";
 
 export async function cleanDevBuildWorkspace(root: string): Promise<void> {
   await $({
@@ -41,7 +41,7 @@ async function exportGraph(root: string, opts: { scope?: string; env: Record<str
   const nodeBase = zxNodeBase(root);
   const graphPath = path.join(root, DEFAULT_GRAPH_PATH);
   const scope = (opts.scope || "").trim();
-  const cmd = `${node} ${nodeBase} ${path.join(root, "build-tools/tools/buck/export-graph.ts")}${
+  const cmd = `${node} ${nodeBase} ${buildToolPath(root, "tools/buck/export-graph.ts")}${
     scope ? ` --scope ${scope}` : ""
   } --out ${graphPath}`;
   await $({
@@ -124,9 +124,9 @@ export async function refreshGlueAndExportGraph(root: string): Promise<string> {
   await $({
     stdio: "inherit",
     cwd: root,
-  })`bash --noprofile --norc -c ${`${node} ${nodeBase} ${path.join(
+  })`bash --noprofile --norc -c ${`${node} ${nodeBase} ${buildToolPath(
     root,
-    "build-tools/tools/dev/install-deps.ts",
+    "tools/dev/install-deps.ts",
   )} --glue-only`}`;
 
   try {

@@ -1,5 +1,6 @@
 import path from "node:path";
 import { runNodeWithZx } from "../../lib/node-run";
+import { resolveWorkspaceRootsSync } from "../../lib/repo";
 import { findGoImporterMissingSum } from "./presence";
 
 type Mode = "ci" | "local";
@@ -10,9 +11,10 @@ export async function handleGoMissingSum(mode: Mode): Promise<void> {
 
   if (mode === "local") {
     try {
+      const roots = resolveWorkspaceRootsSync();
       await runNodeWithZx({
-        zxInitPath: path.resolve("build-tools/tools/dev/zx-init.mjs"),
-        script: path.resolve("build-tools/tools/dev/install-deps.ts"),
+        zxInitPath: path.join(roots.viberootsRoot, "build-tools/tools/dev/zx-init.mjs"),
+        script: path.join(roots.viberootsRoot, "build-tools/tools/dev/install-deps.ts"),
         args: ["--glue-only"],
       });
     } catch {}

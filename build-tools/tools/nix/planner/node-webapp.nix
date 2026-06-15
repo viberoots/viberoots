@@ -77,7 +77,13 @@ EOF
       VITE_BIN="${nm}/node_modules/.bin/vite"
       TSC_BIN="${nm}/node_modules/.bin/tsc"
       NEXT_BIN="${nm}/node_modules/.bin/next"
-      SYNC_CONTRACTS_SCRIPT="${repoStoreRoot}/build-tools/tools/dev/sync-module-contracts.ts"
+      VIBEROOTS_SOURCE_ROOT="$REPO_ROOT"
+      if [ -f "$REPO_ROOT/viberoots/build-tools/tools/dev/zx-init.mjs" ]; then
+        VIBEROOTS_SOURCE_ROOT="$REPO_ROOT/viberoots"
+      elif [ -f "$REPO_ROOT/.viberoots/current/build-tools/tools/dev/zx-init.mjs" ]; then
+        VIBEROOTS_SOURCE_ROOT="$REPO_ROOT/.viberoots/current"
+      fi
+      SYNC_CONTRACTS_SCRIPT="$VIBEROOTS_SOURCE_ROOT/build-tools/tools/dev/sync-module-contracts.ts"
       requires_module_contracts() {
         [ -f src/ts-modules.ts ] || [ -f src/wasm-contract.ts ] || [ -f app/ts-modules.ts ] || [ -f app/wasm-contract.ts ]
       }
@@ -106,7 +112,7 @@ EOF
         node --experimental-top-level-await \
           --disable-warning=ExperimentalWarning \
           --experimental-strip-types \
-          --import "${repoStoreRoot}/build-tools/tools/dev/zx-init.mjs" \
+          --import "$VIBEROOTS_SOURCE_ROOT/build-tools/tools/dev/zx-init.mjs" \
           "$SYNC_CONTRACTS_SCRIPT" \
           --cwd . \
           --app-target "//${importerDir}:$APP_STAGE_NAME" \
