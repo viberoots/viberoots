@@ -9,8 +9,10 @@ import { findRepoRoot } from "../lib/repo";
 import { specsFromWasmManifest, validateTsManifestProbes } from "./wasm-watch-manifest";
 import {
   computeFingerprintMap,
+  copyAtomically,
   mapsEqual,
   refreshTriggerPaths,
+  runBuildStep,
   type Fingerprint,
 } from "./watch-wasm-producer-ops";
 import { computeTaskKey, type CoordinatorLease } from "./wasm-watch-coordinator-types";
@@ -103,6 +105,38 @@ function leaseFromSpecs(args: {
   };
 }
 
+async function runInitialBuilds(
+  cwd: string,
+  specs: Awaited<ReturnType<typeof specsFromWasmManifest>>,
+): Promise<void> {
+  let seq = 0;
+  for (const spec of specs) {
+    seq += 1;
+    const startedAt = Date.now();
+    console.error(
+      `[wasm-watch] rebuild:start seq=${seq} module_type=${spec.moduleType} module_key=${spec.moduleKey} reason=startup`,
+    );
+    try {
+      await runBuildStep(spec.buildCommand, cwd);
+      const syncOuts = [spec.syncOut, ...(spec.extraSyncOuts || [])];
+      let copiedSize = 0;
+      for (const outPath of syncOuts) {
+        copiedSize = await copyAtomically(spec.buildOut, outPath);
+      }
+      console.error(
+        `[wasm-watch] sync:ok seq=${seq} module_type=${spec.moduleType} module_key=${spec.moduleKey} bytes=${copiedSize} elapsed_ms=${Date.now() - startedAt} out=${syncOuts.join(",")}`,
+      );
+    } catch (err) {
+      console.error(
+        `[wasm-watch] rebuild:fail seq=${seq} module_type=${spec.moduleType} module_key=${spec.moduleKey} elapsed_ms=${Date.now() - startedAt}`,
+      );
+      console.error(err instanceof Error ? err.message : String(err));
+      console.error(`[wasm-watch] recovery: run this command manually:\n${spec.buildCommand}`);
+      throw err;
+    }
+  }
+}
+
 async function main() {
   const cwd = path.resolve(getFlagStr("cwd", process.cwd()) || process.cwd());
   const pollMs = Math.max(100, Number(getFlagStr("poll-ms", "300")));
@@ -151,6 +185,7 @@ async function main() {
   ]);
   let refreshState = await computeFingerprintMap(refreshTriggerPaths(baseRefreshPaths, specs));
   let lastRefreshAt = 0;
+  await runInitialBuilds(cwd, specs);
   await ensureDaemon(resolved.repoRoot, pollMs);
   await writeLease(specs);
   console.error(
