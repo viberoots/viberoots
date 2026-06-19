@@ -1,0 +1,6 @@
+load(":auto_map.bzl", "provider_fixture")
+
+provider_fixture(
+    name = "auto_map",
+    visibility = ["PUBLIC"],
+)

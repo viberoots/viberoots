@@ -1,0 +1,27 @@
+{
+  "nodes": {
+    "root": {
+      "inputs": {
+        "viberoots": "viberoots"
+      }
+    },
+    "viberoots": {
+      "locked": {
+        "lastModified": 1760000000,
+        "narHash": "sha256-0000000000000000000000000000000000000000000=",
+        "owner": "viberoots",
+        "repo": "viberoots",
+        "rev": "1111111111111111111111111111111111111111",
+        "type": "github"
+      },
+      "original": {
+        "owner": "viberoots",
+        "ref": "v1.4.2",
+        "repo": "viberoots",
+        "type": "github"
+      }
+    }
+  },
+  "root": "root",
+  "version": 7
+}

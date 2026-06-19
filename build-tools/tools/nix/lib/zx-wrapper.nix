@@ -9,6 +9,9 @@
 # spawned from temp scaffolding workspaces, and `nativeBuildInputs` injection into
 # nix derivations that need to spawn the wrapper from a hermetic sandbox.
 { pkgs }:
+let
+  zxPackage = if pkgs ? zx then pkgs.zx else pkgs.nodePackages.zx;
+in
 pkgs.writeShellScriptBin "zx-wrapper" ''
   set -euo pipefail
   _zx_init_import=()
@@ -45,7 +48,7 @@ pkgs.writeShellScriptBin "zx-wrapper" ''
     --experimental-strip-types \
     --experimental-top-level-await \
     --disable-warning=ExperimentalWarning \
-    --import="${pkgs.nodePackages.zx}/lib/node_modules/zx/build/globals.js" \
+    --import="${zxPackage}/lib/node_modules/zx/build/globals.js" \
     "''${_zx_init_import[@]}" \
     "$@"
 ''

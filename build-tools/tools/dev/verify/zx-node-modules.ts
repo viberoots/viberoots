@@ -20,6 +20,13 @@ export async function computeZxTestNodeModulesOut(
   zxInitPath: string,
 ): Promise<string> {
   const importer = await zxTestNodeModulesImporter(root);
+  if (importer === ".") {
+    try {
+      await fsp.access(path.join(root, "pnpm-lock.yaml"));
+    } catch {
+      return "";
+    }
+  }
   const { stdout } = await runNodeWithZx({
     cwd: root,
     script: buildToolPath(root, "tools/dev/node-modules-build.ts"),

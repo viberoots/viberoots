@@ -2,6 +2,7 @@ import fs from "node:fs";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { VIBEROOTS_CURRENT_REL, VIBEROOTS_WORKSPACE_REL, resolveWorkspaceRootSync } from "./repo";
+import { remoteSourcePath } from "./workspace-remote-source";
 
 export type ActivationResult = {
   workspaceRoot: string;
@@ -38,6 +39,7 @@ function requireFile(filePath: string, message: string): void {
 }
 
 function relativeLinkTarget(fromDir: string, target: string): string {
+  if (target.startsWith(`${path.sep}nix${path.sep}store${path.sep}`)) return target;
   const rel = path.relative(fromDir, target) || ".";
   return rel.startsWith("..") ? rel : `./${rel}`;
 }
@@ -47,6 +49,8 @@ function chooseSource(workspaceRoot: string, opts: ActivationOptions): string {
   if (flakeUsesLocalViberoots(workspaceRoot)) return path.join(workspaceRoot, "viberoots");
   const envRoot = (opts.env?.VIBEROOTS_ROOT || "").trim();
   if (envRoot) return path.resolve(envRoot);
+  const remotePath = remoteSourcePath(workspaceRoot);
+  if (remotePath) return remotePath;
   return workspaceRoot;
 }
 

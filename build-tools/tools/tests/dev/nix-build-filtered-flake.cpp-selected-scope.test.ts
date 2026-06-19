@@ -91,6 +91,7 @@ test("selected cpp snapshot rsync sources keep flake files at the snapshot root"
       "gomod2nix.toml",
       "package.json",
       "pnpm-lock.yaml",
+      ".viberoots/buck/graph.json",
       "build-tools/tools/dev",
       "prelude",
       "third_party/providers",
@@ -106,6 +107,8 @@ test("selected cpp snapshot rsync sources keep flake files at the snapshot root"
         await fsp.writeFile(abs, `${rel}\n`, "utf8");
       }
     }
+    await fsp.mkdir(path.join(root, ".viberoots", "workspace"), { recursive: true });
+    await fsp.symlink("../buck", path.join(root, ".viberoots", "workspace", "buck"));
 
     const sources = selectedCppSnapshotRsyncSources([
       "flake.nix",
@@ -113,6 +116,7 @@ test("selected cpp snapshot rsync sources keep flake files at the snapshot root"
       ".npmrc",
       "package.json",
       "pnpm-lock.yaml",
+      ".viberoots",
       "build-tools",
       "prelude",
       "third_party",
@@ -125,6 +129,11 @@ test("selected cpp snapshot rsync sources keep flake files at the snapshot root"
     assert.equal(await fsp.readFile(path.join(out, "flake.nix"), "utf8"), "flake.nix\n");
     assert.equal(await fsp.readFile(path.join(out, "flake.lock"), "utf8"), "flake.lock\n");
     await fsp.access(path.join(out, "projects", "libs", "pleomino-solver-wasm"));
+    assert.equal(
+      await fsp.readFile(path.join(out, ".viberoots", "buck", "graph.json"), "utf8"),
+      ".viberoots/buck/graph.json\n",
+    );
+    assert.equal(await fsp.readlink(path.join(out, ".viberoots", "workspace", "buck")), "../buck");
     await fsp.access(path.join(out, "build-tools"));
     assert.equal(
       await fsp.readFile(path.join(out, "viberoots", "flake.nix"), "utf8"),

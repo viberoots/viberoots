@@ -27,6 +27,7 @@ export async function withRegisteredToolState<T>(kind: string, fn: () => Promise
   const root = await findRepoRoot(process.cwd());
   const tmpRoot = path.join(root, ".viberoots", "workspace", "buck", "tmp");
   const logRoot = path.join(root, ".viberoots", "workspace", "buck", "test-logs");
+  await fsp.mkdir(tmpRoot, { recursive: true });
   await fsp.mkdir(logRoot, { recursive: true });
   const stamp = `${Date.now()}-${process.pid}`;
   const stateFile = path.join(tmpRoot, `${kind}-buck-reaper-${stamp}.txt`);

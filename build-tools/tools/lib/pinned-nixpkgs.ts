@@ -5,7 +5,14 @@ export function pinnedNixpkgsOutPathExpr(lockPath: string): string {
   return String.raw`let
     lock = builtins.fromJSON (builtins.readFile ${JSON.stringify(lockPath)});
     rootNode = builtins.getAttr lock.root lock.nodes;
-    nixpkgsNode = builtins.getAttr rootNode.inputs.nixpkgs lock.nodes;
+    rootInputs = rootNode.inputs or {};
+    viberootsNode = if rootInputs ? viberoots then builtins.getAttr rootInputs.viberoots lock.nodes else {};
+    viberootsInputs = viberootsNode.inputs or {};
+    nixpkgsInput =
+      if rootInputs ? nixpkgs then rootInputs.nixpkgs
+      else if viberootsInputs ? nixpkgs then viberootsInputs.nixpkgs
+      else "";
+    nixpkgsNode = builtins.getAttr nixpkgsInput lock.nodes;
   in (builtins.fetchTree nixpkgsNode.locked).outPath`;
 }
 

@@ -6,6 +6,7 @@ import { getFlagBool, getFlagStr, getPositionals } from "../lib/cli";
 import { findExtractionBlockers } from "../lib/extraction-blockers";
 import { resolveWorkspaceRootsSync } from "../lib/repo";
 import { activateWorkspace } from "../lib/workspace-activation";
+import { remoteSourceStatus } from "../lib/workspace-remote-source";
 
 type VersionStatus = ReturnType<typeof buildVersionStatus>;
 
@@ -33,6 +34,14 @@ function lockedRevision(workspaceRoot: string): string {
     return String(node?.locked?.rev || "").trim();
   } catch {
     return "";
+  }
+}
+
+function currentMatchesSource(currentPath: string, sourcePath: string): boolean {
+  try {
+    return fs.realpathSync(currentPath) === fs.realpathSync(sourcePath);
+  } catch {
+    return false;
   }
 }
 
@@ -75,6 +84,7 @@ function currentDisplay(status: VersionStatus): string {
 
 function buildVersionStatus() {
   const roots = resolveWorkspaceRootsSync();
+  const remote = roots.sourceMode === "remote" ? remoteSourceStatus(roots.workspaceRoot) : null;
   const resolvedRevision = revision(roots.viberootsRoot, roots.sourceMode, roots.workspaceRoot);
   const expectedRevision = gitlinkRevision(roots.workspaceRoot);
   return {
@@ -88,6 +98,12 @@ function buildVersionStatus() {
     currentStatus: roots.currentStatus,
     revision: resolvedRevision.value,
     revisionSource: resolvedRevision.source,
+    requestedRef: remote?.requestedRef || "unknown",
+    lockedRevision: remote?.lockedRevision || "unknown",
+    effectiveSourcePath: remote?.sourcePath || roots.viberootsRoot,
+    currentMatchesLockedSource: remote
+      ? currentMatchesSource(roots.viberootsCurrent, remote.sourcePath)
+      : "not-applicable",
     expectedGitlinkRevision: expectedRevision || "unknown",
     submoduleState:
       roots.sourceMode === "local"
@@ -108,6 +124,10 @@ function printText(status: VersionStatus): void {
   console.log(`version:        ${status.declaredVersion}`);
   console.log(`revision:       ${status.revision}`);
   console.log(`revision source: ${status.revisionSource}`);
+  console.log(`requested ref:  ${status.requestedRef}`);
+  console.log(`locked revision: ${status.lockedRevision}`);
+  console.log(`effective source: ${status.effectiveSourcePath}`);
+  console.log(`current locked: ${status.currentMatchesLockedSource}`);
   console.log(`gitlink:        ${status.expectedGitlinkRevision}`);
   console.log(`submodule:      ${status.submoduleState}`);
   console.log(`dirty state:    ${status.dirtyState}`);
